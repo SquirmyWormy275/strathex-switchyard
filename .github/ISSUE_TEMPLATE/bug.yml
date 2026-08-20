@@ -1,0 +1,47 @@
+name: Bug report
+description: Report reproducible incorrect or unsafe behavior.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets, private prompt content, or proprietary source. Security-sensitive reports belong in a private advisory.
+  - type: input
+    id: revision
+    attributes:
+      label: Revision
+      description: Release, commit, or configuration identifier.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version, keyboard/controller, firmware, Vial, AutoHotkey, PowerShell, editor, and agent context.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: This report does not expose credentials, private source, or sensitive logs.
+          required: true

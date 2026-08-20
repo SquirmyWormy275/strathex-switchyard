@@ -1,0 +1,26 @@
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Editor and OS state
+.vscode/*.log
+.idea/
+Thumbs.db
+.DS_Store
+
+# Runtime output
+logs/
+tmp/
+*.log
+
+# Generated packages
+dist/
+build/
+*.zip
+
+# Keep generated printable releases deliberate
+legends/printable/*.pdf
+!legends/printable/.gitkeep

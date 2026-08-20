@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use STRATHEX SWITCHYARD in research or a published build, please cite this repository and the upstream projects listed in ATTRIBUTION.md."
+title: "STRATHEX SWITCHYARD: SXSY-B122 Agentic Operator Station"
+type: software
+authors:
+  - family-names: Kaper
+    given-names: Alex
+repository-code: "https://github.com/SquirmyWormy275/strathex-switchyard"
+url: "https://github.com/SquirmyWormy275/strathex-switchyard"
+abstract: "An open-source Model F Labs B122 operator station for agentic software development, workflow routing, and human-supervised automation."
+keywords:
+  - B122
+  - beam spring
+  - agentic development
+  - human-computer interaction
+  - Vial
+  - QMK
+license: "LicenseRef-Provisional-Mixed"
+version: 0.0.1
