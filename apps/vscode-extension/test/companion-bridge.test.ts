@@ -72,3 +72,70 @@ test("malformed or mismatched local-companion replies fail closed in the extensi
   assert.equal(mismatchedResult.ok, false);
   if (!mismatchedResult.ok) assert.equal(mismatchedResult.code, "invalid_response");
 });
+
+test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
+  const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
+  const signalId = `hardware-signal:${"a".repeat(64)}`;
+  const claimToken = "claim-token-bridge";
+  const dispatchReceiptId = `hardware-dispatch:${"b".repeat(64)}`;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload?: Record<string, unknown> };
+      seen.push({ method: request.method, payload: request.payload });
+      if (request.method === "hardware-signal.claim") return JSON.stringify({ version: 1, id: request.id, ok: true, result: { claim: { signalId, claimToken, deviceId: "c".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3, control: "SHIELD", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"] } } });
+      if (request.method === "hardware-signal.prepare") return JSON.stringify({ version: 1, id: request.id, ok: true, result: { preparation: { status: "prepared", summary: "prepared", authorityId: "authority" } } });
+      if (request.method === "hardware-signal.dispatch") return JSON.stringify({ version: 1, id: request.id, ok: true, result: { command: { status: "completed", summary: "handled" }, dispatchReceiptId } });
+      if (request.method === "hardware-signal.complete") return JSON.stringify({ version: 1, id: request.id, ok: true, result: { completion: { signalId, outcome: "handled" } } });
+      return JSON.stringify({ version: 1, id: request.id, ok: false, error: { code: "unknown_method", message: "unexpected" } });
+    }
+  });
+  const claim = await bridge.claimHardwareSignal({ windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"], focused: true });
+  assert.equal(claim.ok, true);
+  assert.ok(claim.ok && claim.value);
+  if (!claim.ok || !claim.value) return;
+  const prepared = await bridge.prepareHardwareSignal(claim.value, session.id, "Focused physical chord");
+  assert.equal(prepared.ok, true);
+  const dispatched = await bridge.dispatchHardwareSignal(claim.value, { sessionId: session.id, authorityId: "authority" });
+  assert.equal(dispatched.ok, true);
+  if (!dispatched.ok) return;
+  await bridge.completeHardwareSignal(claim.value, { outcome: "handled", summary: "Mediated dispatch returned.", dispatchReceiptId: dispatched.value.dispatchReceiptId, dispatchSessionId: session.id, repositoryRoot: "C:/isolated/repo" });
+
+  const dispatchPayload = seen.find((entry) => entry.method === "hardware-signal.dispatch")?.payload;
+  assert.equal("control" in (dispatchPayload ?? {}), false);
+  assert.equal("modifier" in (dispatchPayload ?? {}), false);
+  assert.equal(seen.find((entry) => entry.method === "hardware-signal.complete")?.payload?.dispatchReceiptId, dispatchReceiptId);
+});
+
+test("Raw-HID and hardware response schemas fail closed on malformed or mismatched durable identities", async () => {
+  const signalId = `hardware-signal:${"a".repeat(64)}`;
+  const claimToken = "claim-token-schema";
+  let responseKind: "bad-claim" | "bad-dispatch" | "bad-completion" | "bad-list" = "bad-claim";
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string };
+      const result = responseKind === "bad-claim"
+        ? { claim: { signalId, claimToken, deviceId: "c".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3, control: "NOT_A_CHORD", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"] } }
+        : responseKind === "bad-dispatch"
+          ? { command: { status: "completed", summary: "handled" }, dispatchReceiptId: "client-forged" }
+          : responseKind === "bad-completion"
+            ? { completion: { signalId: `hardware-signal:${"d".repeat(64)}`, outcome: "handled" } }
+            : { installations: {} };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+    }
+  });
+
+  const malformedClaim = await bridge.claimHardwareSignal({ windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"], focused: true });
+  assert.equal(malformedClaim.ok, false);
+  if (!malformedClaim.ok) assert.equal(malformedClaim.code, "invalid_response");
+
+  const claim = { signalId, claimToken, deviceId: "c".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3, control: "SHIELD", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"] } as const;
+  responseKind = "bad-dispatch";
+  const malformedDispatch = await bridge.dispatchHardwareSignal(claim, { sessionId: session.id });
+  assert.equal(malformedDispatch.ok, false);
+  responseKind = "bad-completion";
+  const mismatchedCompletion = await bridge.completeHardwareSignal(claim, { outcome: "handled", summary: "done", dispatchReceiptId: `hardware-dispatch:${"b".repeat(64)}` });
+  assert.equal(mismatchedCompletion.ok, false);
+  responseKind = "bad-list";
+  const malformedList = await bridge.listRawHid();
+  assert.equal(malformedList.ok, false);
+});

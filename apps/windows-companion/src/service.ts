@@ -1,4 +1,5 @@
 import { isAbsolute } from "node:path";
+import { realpath } from "node:fs/promises";
 
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
@@ -8,6 +9,8 @@ import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
 import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
 import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
+import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type {
   AuditEvent,
   Capability,
@@ -35,6 +38,12 @@ import {
   type CredentialRevokePayload,
   type NetworkPolicyInstallPayload,
   type ProviderHandshakePayload,
+  type RawHidInstallPayload,
+  type HardwareSignalBindingPayload,
+  type HardwareSignalClaimPayload,
+  type HardwareSignalPreparationPayload,
+  type HardwareSignalDispatchPayload,
+  type HardwareSignalCompletionPayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -99,6 +108,10 @@ export interface CompanionServiceOptions {
   readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  readonly rawHidInstallations?: RawHidInstallationCoordinator;
+  readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
+  readonly hardwareSignals?: DurableHardwareSignalInbox;
+  readonly canonicalizeHostPath?: (value: string) => Promise<string>;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -126,6 +139,10 @@ export class CompanionService {
   private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  private readonly rawHidInstallations?: RawHidInstallationCoordinator;
+  private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
+  private readonly hardwareSignals?: DurableHardwareSignalInbox;
+  private readonly canonicalizeHostPath: (value: string) => Promise<string>;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
@@ -139,6 +156,10 @@ export class CompanionService {
     this.credentialProvisioning = options.credentialProvisioning;
     this.networkPolicyProvisioning = options.networkPolicyProvisioning;
     this.providerHandshakes = options.providerHandshakes;
+    this.rawHidInstallations = options.rawHidInstallations;
+    this.rawHidSupervisor = options.rawHidSupervisor;
+    this.hardwareSignals = options.hardwareSignals;
+    this.canonicalizeHostPath = options.canonicalizeHostPath ?? realpath;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -200,6 +221,22 @@ export class CompanionService {
           return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
         case "provider.handshake":
           return this.success(request.id, await this.providerHandshake(this.requireProviderHandshake(request.payload)));
+        case "raw-hid.install":
+          return this.success(request.id, await this.installRawHid(this.requireRawHidInstall(request.payload)));
+        case "raw-hid.list":
+          return this.success(request.id, { installations: await this.listRawHid(request.payload) });
+        case "raw-hid.revoke":
+          return this.success(request.id, { installation: await this.revokeRawHid(request.payload) });
+        case "raw-hid.status":
+          return this.success(request.id, await this.rawHidStatus(request.payload));
+        case "hardware-signal.claim":
+          return this.success(request.id, { claim: await this.claimHardwareSignal(this.requireHardwareSignalClaim(request.payload)) });
+        case "hardware-signal.prepare":
+          return this.success(request.id, await this.prepareHardwareSignal(this.requireHardwareSignalPreparation(request.payload)));
+        case "hardware-signal.dispatch":
+          return this.success(request.id, await this.dispatchHardwareSignal(this.requireHardwareSignalDispatch(request.payload)));
+        case "hardware-signal.complete":
+          return this.success(request.id, { completion: await this.completeHardwareSignal(this.requireHardwareSignalCompletion(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
@@ -513,6 +550,190 @@ export class CompanionService {
   private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
   private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
 
+  private async installRawHid(payload: RawHidInstallPayload) {
+    if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    // A changed tuple or helper pin is never made durable while the prior
+    // generation can still emit signals under the old installation identity.
+    await this.rawHidSupervisor.stop();
+    const installation = await this.rawHidInstallations.install(payload);
+    const supervisor = await this.rawHidSupervisor.startConfigured();
+    this.record("raw-hid.install", "completed", "Installed one current-user-attested exact B122 Raw-HID tuple and fixed helper pin.");
+    return { installation, supervisor };
+  }
+
+  private async listRawHid(payload: unknown) {
+    requireEmptyPayload(payload, "Raw-HID installation listing");
+    if (!this.rawHidInstallations) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    return this.rawHidInstallations.list();
+  }
+
+  private async revokeRawHid(payload: unknown) {
+    requireEmptyPayload(payload, "Raw-HID revocation");
+    if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    await this.rawHidSupervisor.stop();
+    const installation = await this.rawHidInstallations.revoke();
+    this.record("raw-hid.revoke", "completed", "Revoked the current-user-attested B122 Raw-HID tuple and stopped its helper generation.");
+    return installation;
+  }
+
+  private async rawHidStatus(payload: unknown) {
+    requireEmptyPayload(payload, "Raw-HID status");
+    if (!this.rawHidInstallations || !this.rawHidSupervisor || !this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No complete trusted Raw-HID runtime boundary is attached.");
+    return { supervisor: this.rawHidSupervisor.status(), inbox: await this.hardwareSignals.status(), installations: await this.rawHidInstallations.list() };
+  }
+
+  private async claimHardwareSignal(payload: HardwareSignalClaimPayload): Promise<HardwareSignalClaim | undefined> {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const binding = await this.requireFocusedWindowBinding(payload);
+    return this.hardwareSignals.claim(binding);
+  }
+
+  private async prepareHardwareSignal(payload: HardwareSignalPreparationPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    const sessionId = payload.sessionId ?? claim.windowSessionId;
+    await this.assertHardwareDispatchSession(claim, sessionId);
+    const preparation = await this.prepareCommand({ control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason });
+    if (preparation.status === "prepared") return { preparation };
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
+    const disposition = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: `preparation:${preparation.status}`
+    });
+    return { preparation, dispositionReceiptId: disposition.dispatchReceiptId };
+  }
+
+  private async dispatchHardwareSignal(payload: HardwareSignalDispatchPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    const sessionId = payload.sessionId ?? claim.windowSessionId;
+    await this.assertHardwareDispatchSession(claim, sessionId);
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
+    // Persist the exact canonical handler before the executor may cause an
+    // effect. A concurrent client can no longer requeue this claim as if
+    // dispatch had not begun.
+    const dispatch = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: "dispatching"
+    });
+    const command = await this.dispatch({
+      control: claim.control,
+      modifier: claim.modifier,
+      sessionId,
+      authorityId: payload.authorityId,
+      confirmationToken: payload.confirmationToken,
+      input: payload.input
+    });
+    this.record("hardware-signal.dispatch", command.status, `Dispatched the server-resolved ${assignment.handler} hardware assignment.`, sessionId, command.operationId);
+    return { command, dispatchReceiptId: dispatch.dispatchReceiptId };
+  }
+
+  private async completeHardwareSignal(payload: HardwareSignalCompletionPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    if (payload.dispatchSessionId) await this.assertHardwareDispatchSession(claim, payload.dispatchSessionId);
+    const completionRoot = payload.repositoryRoot ? await this.canonicalizeHostPath(payload.repositoryRoot) : undefined;
+    if (completionRoot && !claim.workspaceRoots.some((root) => normalizeHostPath(root) === normalizeHostPath(completionRoot))) {
+      throw new CompanionServiceError("capability_denied", "The hardware completion repository is outside its exact focused-window workspace binding.");
+    }
+    const completion = await this.hardwareSignals.complete({ ...payload, ...(completionRoot ? { repositoryRoot: completionRoot } : {}) });
+    this.record("hardware-signal.complete", payload.outcome === "handled" ? "completed" : payload.outcome === "failed_before_dispatch" ? "failed" : "incomplete", payload.summary, payload.dispatchSessionId);
+    return completion;
+  }
+
+  private requireRawHidInstall(payload: unknown): RawHidInstallPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["vendorId", "productId", "usagePage", "usage"], ["serialNumber"])
+      || !uint16(payload.vendorId) || !uint16(payload.productId) || !uint16(payload.usagePage) || !uint16(payload.usage)
+      || (payload.serialNumber !== undefined && (typeof payload.serialNumber !== "string" || !/^[A-Za-z0-9._-]{1,128}$/.test(payload.serialNumber)))) {
+      throw new CompanionServiceError("invalid_request", "Raw-HID installation accepts only one exact uint16 VID/PID/usage tuple and optional bounded serial number; helper path, digest, map, and protocol are host-owned.");
+    }
+    return { vendorId: payload.vendorId, productId: payload.productId, usagePage: payload.usagePage, usage: payload.usage, ...(typeof payload.serialNumber === "string" ? { serialNumber: payload.serialNumber } : {}) };
+  }
+
+  private requireHardwareSignalClaim(payload: unknown): HardwareSignalClaimPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "workspaceRoots", "focused"]) || payload.focused !== true) throw new CompanionServiceError("invalid_request", "Hardware signal claim requires one explicitly focused VS Code window and its exact workspace roots.");
+    const binding = parseHardwareBinding(payload);
+    return { ...binding, focused: true };
+  }
+
+  private requireHardwareSignalPreparation(payload: unknown): HardwareSignalPreparationPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId"])
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, and bounded reason.");
+    return { ...parseHardwareClaimReference(payload), reason: payload.reason, ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}) };
+  }
+
+  private requireHardwareSignalDispatch(payload: unknown): HardwareSignalDispatchPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots"], ["sessionId", "authorityId", "confirmationToken", "input"])
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) throw new CompanionServiceError("invalid_request", "Hardware signal dispatch accepts only an exact live claim and host-issued mediation references; the chord is server-resolved.");
+    return {
+      ...parseHardwareClaimReference(payload),
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}),
+      authorityId: optionalReference(payload.authorityId, "authority ID"),
+      confirmationToken: optionalReference(payload.confirmationToken, "confirmation token"),
+      input: parseInput(payload.input)
+    };
+  }
+
+  private requireHardwareSignalCompletion(payload: unknown): HardwareSignalCompletionPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "outcome", "summary"], ["dispatchReceiptId", "dispatchSessionId", "repositoryRoot"])
+      || !hardwareCompletionOutcome(payload.outcome) || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
+      || (payload.dispatchReceiptId !== undefined && (typeof payload.dispatchReceiptId !== "string" || !/^hardware-dispatch:[a-f0-9]{64}$/.test(payload.dispatchReceiptId)))
+      || (payload.dispatchSessionId !== undefined && !boundedReferenceValue(payload.dispatchSessionId))
+      || (payload.repositoryRoot !== undefined && !boundedHostPath(payload.repositoryRoot))) throw new CompanionServiceError("invalid_request", "Hardware signal completion requires an exact live claim, bounded outcome, and server-issued dispatch receipt when handled.");
+    return { ...parseHardwareClaimReference(payload), outcome: payload.outcome, summary: payload.summary, ...(typeof payload.dispatchReceiptId === "string" ? { dispatchReceiptId: payload.dispatchReceiptId } : {}), ...(typeof payload.dispatchSessionId === "string" ? { dispatchSessionId: payload.dispatchSessionId } : {}), ...(typeof payload.repositoryRoot === "string" ? { repositoryRoot: payload.repositoryRoot } : {}) };
+  }
+
+  private async requireFocusedWindowBinding(payload: HardwareSignalClaimPayload): Promise<HardwareSignalClaimBinding> {
+    const session = this.requireSession(payload.windowSessionId);
+    if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !session.capabilities.includes("registered") || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "Hardware signals may be claimed only by a current Registered VS Code window session.");
+    }
+    let registeredRoots: unknown;
+    try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+    if (!Array.isArray(registeredRoots) || registeredRoots.length < 1 || !registeredRoots.every((root) => typeof root === "string" && boundedHostPath(root))) throw new CompanionServiceError("capability_denied", "The focused VS Code window has no valid Registered workspace-root record.");
+    const [canonicalRegistered, canonicalClaimed] = await Promise.all([
+      Promise.all(registeredRoots.map((root) => this.canonicalizeHostPath(root))),
+      Promise.all(payload.workspaceRoots.map((root) => this.canonicalizeHostPath(root)))
+    ]);
+    if (new Set(canonicalClaimed.map(normalizeHostPath)).size !== canonicalClaimed.length || !sameHostRoots(canonicalRegistered, canonicalClaimed)) throw new CompanionServiceError("capability_denied", "The focused VS Code window workspace binding does not match its canonical Registered host record.");
+    return { windowSessionId: payload.windowSessionId, workspaceRoots: canonicalClaimed };
+  }
+
+  private async assertHardwareDispatchSession(claim: HardwareSignalClaim, sessionId: string): Promise<void> {
+    const session = this.requireSession(sessionId);
+    if (!session.capabilities.includes("registered") || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "The selected hardware dispatch session is no longer a current Registered session.");
+    }
+    if (sessionId === claim.windowSessionId) {
+      let registeredRoots: unknown;
+      try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+      if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !Array.isArray(registeredRoots)
+        || registeredRoots.length < 1 || !registeredRoots.every((root) => typeof root === "string" && boundedHostPath(root))) {
+        throw new CompanionServiceError("capability_denied", "The focused hardware window session no longer has its exact Registered workspace binding.");
+      }
+      const canonicalRoots = await Promise.all(registeredRoots.map((root) => this.canonicalizeHostPath(root as string)));
+      if (!sameHostRoots(canonicalRoots, claim.workspaceRoots)) {
+        throw new CompanionServiceError("capability_denied", "The focused hardware window workspace binding changed after claim.");
+      }
+      return;
+    }
+    const sessionRoot = session.workspaceRoot ? await this.canonicalizeHostPath(session.workspaceRoot) : undefined;
+    if (!sessionRoot || !claim.workspaceRoots.some((root) => normalizeHostPath(root) === normalizeHostPath(sessionRoot))) {
+      throw new CompanionServiceError("capability_denied", "The selected hardware dispatch session is outside the exact focused-window workspace binding.");
+    }
+  }
+
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
     if (!isRecord(payload) || !isRecord(payload.session)) throw new CompanionServiceError("invalid_request", "A session registration requires a session record.");
     return { session: payload.session as unknown as ManagedSession };
@@ -781,6 +1002,31 @@ function boundedHostPath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value)
     && (isAbsolute(value) || /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value));
 }
+
+function parseHardwareBinding(value: Record<string, unknown>): HardwareSignalClaimBinding {
+  if (!boundedReferenceValue(value.windowSessionId) || !Array.isArray(value.workspaceRoots) || value.workspaceRoots.length < 1 || value.workspaceRoots.length > 32
+    || !value.workspaceRoots.every((root) => boundedHostPath(root)) || new Set(value.workspaceRoots.map((root) => normalizeHostPath(root as string))).size !== value.workspaceRoots.length) {
+    throw new CompanionServiceError("invalid_request", "Hardware signal binding requires one exact window session and at least one unique absolute workspace root.");
+  }
+  return { windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots as string[] };
+}
+
+function parseHardwareClaimReference(value: Record<string, unknown>): HardwareSignalBindingPayload {
+  const binding = parseHardwareBinding(value);
+  if (typeof value.signalId !== "string" || !/^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{8,256}$/.test(value.claimToken)) {
+    throw new CompanionServiceError("invalid_request", "Hardware signal request requires an exact durable signal ID and opaque live claim token.");
+  }
+  return { signalId: value.signalId, claimToken: value.claimToken, ...binding };
+}
+
+function sameHostRoots(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((root, index) => normalizeHostPath(root) === normalizeHostPath(right[index]!));
+}
+
+function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
+function hardwareCompletionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
 
 function normalizeHostPath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
 

@@ -16,10 +16,17 @@ import {
   type SandboxInstallationPin,
   type CredentialReferenceSummary,
   type InstalledNetworkPolicy,
+  type RawHidDeviceIdentity,
+  type RawHidInstallationPin,
+  type RawHidRuntimeStatus,
+  type HardwareSignalClaim,
+  type HardwareSignalDispatchResult,
+  type HardwareSignalPreparationResult,
+  type HardwareSignalCompletionResult,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
-import type { B122Control, B122Modifier } from "../src/commands.ts";
+import { chordFor, type B122Control, type B122Modifier } from "../src/commands.ts";
 import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
 
 class FakeDisposable implements DisposableLike { dispose(): void {} }
@@ -56,11 +63,13 @@ class FakeVscode {
   activeTerminal?: FakeTerminal;
   workspaceFolders: WorkspaceFolderLike[];
   debugConfigurations: DebugConfigurationLike[] = [{ name: "Launch test", type: "node", request: "launch" }];
+  focused = true;
   private readonly openListeners: Array<(terminal: TerminalLike) => unknown> = [];
   private readonly closeListeners: Array<(terminal: TerminalLike) => unknown> = [];
   private readonly workspaceListeners: Array<() => unknown> = [];
   private readonly debugStartListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
+  private readonly focusListeners: Array<(state: { readonly focused: boolean }) => unknown> = [];
   private readonly quickPickValues: string[] = [];
   private readonly inputValues: string[] = [];
   readonly api: VscodeLike;
@@ -79,6 +88,7 @@ class FakeVscode {
         async executeCommand(command): Promise<void> { self.executedCommands.push(command); }
       },
       window: {
+        get state(): { readonly focused: boolean } { return { focused: self.focused }; },
         get terminals(): readonly TerminalLike[] { return self.terminals; },
         get activeTerminal(): TerminalLike | undefined { return self.activeTerminal; },
         createTerminal(options): TerminalLike {
@@ -98,7 +108,8 @@ class FakeVscode {
         },
         async showInputBox(): Promise<string | undefined> { return self.inputValues.shift(); },
         onDidOpenTerminal(listener): DisposableLike { self.openListeners.push(listener); return new FakeDisposable(); },
-        onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); }
+        onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); },
+        onDidChangeWindowState(listener): DisposableLike { self.focusListeners.push(listener); return new FakeDisposable(); }
       },
       workspace: {
         get workspaceFolders(): readonly WorkspaceFolderLike[] { return self.workspaceFolders; },
@@ -128,6 +139,7 @@ class FakeVscode {
   async fireWorkspaceChange(): Promise<void> { for (const listener of this.workspaceListeners) await listener(); }
   async fireDebugStart(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStartListeners) await listener(session); }
   async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); }
+  async fireFocus(focused: boolean): Promise<void> { this.focused = focused; for (const listener of this.focusListeners) await listener({ focused }); }
   choose(value: string): void { this.quickPickValues.push(value); }
   input(value: string): void { this.inputValues.push(value); }
 }
@@ -140,8 +152,15 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
   readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string }> = [];
   readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
+  readonly hardwarePrepared: HardwareSignalClaim[] = [];
+  readonly hardwareDispatched: HardwareSignalClaim[] = [];
+  readonly hardwareCompleted: Array<{ claim: HardwareSignalClaim; outcome: string; dispatchReceiptId?: string }> = [];
+  readonly hardwareClaims: HardwareSignalClaim[] = [];
+  readonly hardwareClaimBindings: Array<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }> = [];
+  readonly rawHidInstallRequests: RawHidDeviceIdentity[] = [];
   nextDispatch?: ForwardedCommandResult;
   nextPreparation?: PreparedCommand;
+  onHardwareClaim?: () => void;
 
   async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
   async registerSession(session: ExtensionManagedSession): Promise<BridgeResult<ExtensionManagedSession>> {
@@ -202,6 +221,27 @@ class FakeBridge implements ExtensionCompanionBridge {
   async providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> {
     const existing = this.registered.find((session) => session.id === sessionId);
     return existing ? { ok: true, value: { ...existing, workspaceRoot: repositoryRoot, capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "fake-provider" } } : { ok: false, code: "not_found", message: "missing" };
+  }
+  async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
+    this.rawHidInstallRequests.push(identity);
+    return { ok: true, value: { installation: { identity, helperPath: "C:\\host\\strathex-b122-hid-helper.exe", helperSha256: "a".repeat(64), protocolVersion: 1, mapFingerprint: "0123456789abcdef", installedAt: "2026-08-24T00:00:00.000Z", status: "active" }, supervisor: { state: "running", generation: 1, detail: "ready" } } };
+  }
+  async listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return { ok: true, value: [] }; }
+  async revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return { ok: false, code: "not_found", message: "none" }; }
+  async rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> { return { ok: true, value: { supervisor: { state: "unprovisioned", generation: 0, detail: "none" }, inbox: { pending: 0, claimed: 0, completed: 0, needsReconciliation: 0 }, installations: [] } }; }
+  async claimHardwareSignal(binding: { windowSessionId: string; workspaceRoots: readonly string[]; focused: true }): Promise<BridgeResult<HardwareSignalClaim | undefined>> { this.hardwareClaimBindings.push(binding); this.onHardwareClaim?.(); return { ok: true, value: this.hardwareClaims.shift() }; }
+  async prepareHardwareSignal(claim: HardwareSignalClaim): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+    this.hardwarePrepared.push(claim);
+    const preparation = this.nextPreparation ?? { status: "prepared" as const, summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" };
+    return { ok: true, value: { preparation, ...(preparation.status === "prepared" ? {} : { dispositionReceiptId: `hardware-dispatch:${"d".repeat(64)}` }) } };
+  }
+  async dispatchHardwareSignal(claim: HardwareSignalClaim): Promise<BridgeResult<HardwareSignalDispatchResult>> {
+    this.hardwareDispatched.push(claim);
+    return { ok: true, value: { command: this.nextDispatch ?? { status: "completed", summary: "Routed by fake companion." }, dispatchReceiptId: `hardware-dispatch:${"e".repeat(64)}` } };
+  }
+  async completeHardwareSignal(claim: HardwareSignalClaim, completion: { outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; dispatchReceiptId?: string }): Promise<BridgeResult<HardwareSignalCompletionResult>> {
+    this.hardwareCompleted.push({ claim, outcome: completion.outcome, ...(completion.dispatchReceiptId ? { dispatchReceiptId: completion.dispatchReceiptId } : {}) });
+    return { ok: true, value: { signalId: claim.signalId, outcome: completion.outcome } };
   }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
@@ -421,6 +461,93 @@ test("a disconnected or malicious companion cannot cause a host action", async (
   await vscode.invoke("sxsy-b122.chord.claude.alt");
   assert.equal(vscode.createdTerminals.length, 0);
   assert.match(vscode.warnings.at(-1) ?? "", /unexpected local host action/i);
+});
+
+test("public hardware dispatch traverses canonical prepare, authority, dispatch, and receipt completion without a client-selected chord", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-24T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }]
+  });
+  await controller.start();
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const claim: HardwareSignalClaim = { signalId: `hardware-signal:${"a".repeat(64)}`, claimToken: "claim-token-controller", deviceId: "b".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3, control: "SHIELD", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] };
+  const command = chordFor(claim.control, claim.modifier);
+  assert.ok(command);
+  await controller.dispatchChord(command, undefined, claim);
+
+  assert.deepEqual(bridge.hardwarePrepared, [claim]);
+  assert.deepEqual(bridge.hardwareDispatched, [claim]);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((item) => ({ outcome: item.outcome, receipt: item.dispatchReceiptId })), [{ outcome: "handled", receipt: `hardware-dispatch:${"e".repeat(64)}` }]);
+});
+
+test("hardware high-consequence preparation remains blocked and closes only with the server disposition receipt", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  bridge.nextPreparation = { status: "blocked", summary: "High-consequence acceptance gates are incomplete." };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }] });
+  await controller.start();
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const claim: HardwareSignalClaim = { signalId: `hardware-signal:${"c".repeat(64)}`, claimToken: "claim-token-high", deviceId: "d".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 4, control: "PIPELINE", modifier: "ctrl_shift_alt", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] };
+  const command = chordFor(claim.control, claim.modifier);
+  assert.ok(command);
+  await controller.dispatchChord(command, undefined, claim);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.equal(bridge.hardwareCompleted[0]?.outcome, "handled");
+  assert.equal(bridge.hardwareCompleted[0]?.dispatchReceiptId, `hardware-dispatch:${"d".repeat(64)}`);
+  assert.match(vscode.warnings.at(-1) ?? "", /high-consequence acceptance gates/i);
+});
+
+test("only a focused VS Code window with nonempty exact roots polls and atomically dispatches a durable hardware claim", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  vscode.focused = false;
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }] });
+  await controller.start();
+  assert.equal(bridge.hardwareClaimBindings.length, 0);
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  bridge.hardwareClaims.push({ signalId: `hardware-signal:${"f".repeat(64)}`, claimToken: "claim-token-focus", deviceId: "a".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 5, control: "PROOF", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] });
+  await vscode.fireFocus(true);
+  for (let attempt = 0; attempt < 20 && bridge.hardwareCompleted.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.deepEqual(bridge.hardwareClaimBindings[0], { windowSessionId: window.id, workspaceRoots: ["C:\\repo"], focused: true });
+  assert.equal(bridge.hardwarePrepared.length, 1);
+  assert.equal(bridge.hardwareCompleted[0]?.outcome, "handled");
+  controller.stop();
+});
+
+test("focus loss during the claim round trip returns the signal before preparation", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }] });
+  await controller.start();
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  bridge.hardwareClaims.push({ signalId: `hardware-signal:${"1".repeat(64)}`, claimToken: "claim-token-focus-race", deviceId: "2".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 6, control: "PROOF", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] });
+  bridge.onHardwareClaim = () => { vscode.focused = false; };
+  for (let attempt = 0; attempt < 20 && bridge.hardwareCompleted.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(bridge.hardwarePrepared.length, 0);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.equal(bridge.hardwareCompleted[0]?.outcome, "failed_before_dispatch");
+  controller.stop();
+});
+
+test("Raw-HID provisioning UI collects only the exact device tuple and never a helper path or digest", async () => {
+  const vscode = new FakeVscode();
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
+  await controller.start();
+  vscode.input("0x5358");
+  vscode.input("0xb122");
+  vscode.input("0xff60");
+  vscode.input("0x0061");
+  vscode.input("B122-A");
+  await vscode.invoke("sxsy-b122.installRawHid");
+  assert.deepEqual(bridge.rawHidInstallRequests, [{ vendorId: 0x5358, productId: 0xb122, usagePage: 0xff60, usage: 0x61, serialNumber: "B122-A" }]);
+  assert.equal(vscode.commandCallbacks.has("sxsy-b122.showRawHidStatus"), true);
+  assert.equal(vscode.commandCallbacks.has("sxsy-b122.revokeRawHid"), true);
+  controller.stop();
 });
 
 function directAction(command: ForwardedCommand): LocalHostAction | undefined {

@@ -5,6 +5,7 @@ import {
   type ExtensionCompanionBridge,
   type ExtensionManagedSession,
   type ExtensionProvider,
+  type HardwareSignalClaim,
   type ForwardedCommand,
   type ForwardedHostAction,
   type LocalHostAction,
@@ -82,6 +83,8 @@ export class ManagedSessionController {
   private gitRoots: readonly GitRootRegistration[] = [];
   private bridge: ExtensionCompanionBridge;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private hardwareSignalTimer?: ReturnType<typeof setTimeout>;
+  private hardwareSignalInFlight = false;
 
   constructor(vscode: VscodeLike, context: ExtensionContextLike, bridge: ExtensionCompanionBridge, options: ManagedSessionControllerOptions = {}) {
     this.vscode = vscode;
@@ -106,7 +109,13 @@ export class ManagedSessionController {
     this.scheduleReconnect(0);
   }
 
-  stop(): void { if (this.reconnectTimer) clearTimeout(this.reconnectTimer); this.reconnectTimer = undefined; }
+  stop(): void {
+    this.stopReconnect();
+    if (this.hardwareSignalTimer) clearTimeout(this.hardwareSignalTimer);
+    this.hardwareSignalTimer = undefined;
+    this.hardwareSignalInFlight = false;
+    this.started = false;
+  }
 
   async start(): Promise<void> {
     if (this.started) return;
@@ -117,12 +126,17 @@ export class ManagedSessionController {
       this.vscode.window.onDidCloseTerminal((terminal) => { void this.markTerminalClosed(terminal); }),
       this.vscode.workspace.onDidChangeWorkspaceFolders(() => { void this.refreshWorkspaceRegistration(); }),
       this.vscode.debug.onDidStartDebugSession((session) => { void this.registerDebugSession(session); }),
-      this.vscode.debug.onDidTerminateDebugSession((session) => { void this.markDebugSessionEnded(session); })
+      this.vscode.debug.onDidTerminateDebugSession((session) => { void this.markDebugSessionEnded(session); }),
+      this.vscode.window.onDidChangeWindowState((state) => {
+        if (state.focused) this.scheduleHardwareSignalPoll(0);
+        else if (this.hardwareSignalTimer) { clearTimeout(this.hardwareSignalTimer); this.hardwareSignalTimer = undefined; }
+      })
     );
 
     await this.refreshWorkspaceRegistration();
     for (const terminal of this.vscode.window.terminals) await this.registerTerminal(terminal);
     await this.registerDebugConfigurations();
+    this.scheduleHardwareSignalPoll(0);
   }
 
   /** Test and operator-visible snapshot; it never claims mediation on its own. */
@@ -180,13 +194,17 @@ export class ManagedSessionController {
       this.vscode.commands.registerCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.installRawHid", async () => { await this.installRawHid(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.listRawHid", async () => { await this.listRawHid(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.showRawHidStatus", async () => { await this.showRawHidStatus(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.revokeRawHid", async () => { await this.revokeRawHid(); }),
       this.vscode.commands.registerCommand("sxsy-b122.dispatch", async (argument: unknown) => {
         const command = parseChordArgument(argument);
         if (!command) {
           await this.vscode.window.showWarningMessage("SXSY-B122 cannot route that command because its control or modifier is not a settled assignment.");
           return;
         }
-        await this.dispatch(command, parseInputArgument(argument));
+        await this.dispatchChord(command, parseInputArgument(argument));
       }),
       // Retained for compatibility with the baseline command. It cannot turn
       // arbitrary UI text into a companion action.
@@ -198,7 +216,7 @@ export class ManagedSessionController {
 
     for (const command of chordCommands) {
       this.context.subscriptions.push(this.vscode.commands.registerCommand(command.command, async (argument: unknown) => {
-        await this.dispatch(command, parseInputArgument(argument));
+        await this.dispatchChord(command, parseInputArgument(argument));
       }));
     }
   }
@@ -385,6 +403,44 @@ export class ManagedSessionController {
   private async showNetworkPolicy(): Promise<void> { const result = await this.bridge.currentNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy registry unavailable: ${result.message}`); else await this.vscode.window.showInformationMessage(`SXSY-B122 network policy: ${result.value?.status === "active" ? `active ${result.value.sha256.slice(0, 12)}…` : "no active policy"}`); }
   private async revokeNetworkPolicy(): Promise<void> { const result = await this.bridge.revokeNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not revoked: ${result.message}`); else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the active exact-route HTTPS policy."); }
 
+  private async installRawHid(): Promise<void> {
+    const input = this.vscode.window.showInputBox;
+    if (!input) { await this.vscode.window.showWarningMessage("SXSY-B122 Raw-HID provisioning requires the installed VS Code input boundary."); return; }
+    const labels = ["USB vendor ID", "USB product ID", "HID usage page", "HID usage"] as const;
+    const values: number[] = [];
+    for (const label of labels) {
+      const text = await input({ prompt: `Enter the exact ${label} (decimal or 0x-prefixed hexadecimal)`, validateInput: validateUint16Text });
+      if (text === undefined) return;
+      const parsed = parseUint16Text(text);
+      if (parsed === undefined) return;
+      values.push(parsed);
+    }
+    const serialNumber = await input({ prompt: "Enter the exact device serial number, or leave empty only for an otherwise unambiguous tuple", validateInput: (value) => !value || /^[A-Za-z0-9._-]{1,128}$/.test(value) ? undefined : "Use 1-128 letters, digits, dot, underscore, or hyphen." });
+    if (serialNumber === undefined) return;
+    const identity = { vendorId: values[0]!, productId: values[1]!, usagePage: values[2]!, usage: values[3]!, ...(serialNumber ? { serialNumber } : {}) };
+    const result = await this.bridge.installRawHid(identity);
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 Raw-HID was not installed: ${result.message}`); return; }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 installed exact Raw-HID tuple ${formatUint16(identity.vendorId)}:${formatUint16(identity.productId)} ${formatUint16(identity.usagePage)}:${formatUint16(identity.usage)} with fixed helper ${result.value.installation.helperSha256.slice(0, 12)}….`);
+  }
+
+  private async listRawHid(): Promise<void> {
+    const result = await this.bridge.listRawHid();
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 Raw-HID registry unavailable: ${result.message}`); return; }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 Raw-HID registry: ${result.value.length ? result.value.map((pin) => `${formatUint16(pin.identity.vendorId)}:${formatUint16(pin.identity.productId)} ${pin.status}`).join("; ") : "No installation."}`);
+  }
+
+  private async showRawHidStatus(): Promise<void> {
+    const result = await this.bridge.rawHidStatus();
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 Raw-HID status unavailable: ${result.message}`); return; }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 Raw-HID ${result.value.supervisor.state}; pending ${result.value.inbox.pending}, reconciliation ${result.value.inbox.needsReconciliation}.`);
+  }
+
+  private async revokeRawHid(): Promise<void> {
+    const result = await this.bridge.revokeRawHid();
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 Raw-HID was not revoked: ${result.message}`); return; }
+    await this.vscode.window.showInformationMessage("SXSY-B122 revoked the active Raw-HID pin and stopped its helper generation.");
+  }
+
   private async refreshWorkspaceRegistration(): Promise<void> {
     this.gitRoots = await this.resolveGitRoots();
     const stored = this.context.workspaceState.get<StoredWindowState>(windowStateKey);
@@ -405,7 +461,7 @@ export class ManagedSessionController {
       workspaceRoots: this.workspaceRoots(),
       updatedAt: this.now()
     } satisfies StoredWindowState);
-    if (result.ok) this.stop(); else this.scheduleReconnect();
+    if (result.ok) this.stopReconnect(); else this.scheduleReconnect();
     await this.registerGitRootSessions();
   }
 
@@ -549,60 +605,86 @@ export class ManagedSessionController {
     await this.bridge.updateStatus(sessionId, "unreachable");
   }
 
-  private async dispatch(command: ChordCommand, input?: Readonly<Record<string, string>>): Promise<void> {
+  /** Physical claims use this exact UI/policy path; only the bridge call differs. */
+  async dispatchChord(command: ChordCommand, input?: Readonly<Record<string, string>>, hardwareClaim?: HardwareSignalClaim): Promise<void> {
     const selectedSession = await this.resolveDispatchSession(command);
     if (selectedSession === null) {
       await this.vscode.window.showWarningMessage("SXSY-B122 stopped because no exact managed target was selected.");
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "No exact managed target was selected; no preparation or dispatch request was sent.");
       return;
     }
-    const preparation = await this.bridge.prepareCommand({
-      control: command.control,
-      modifier: command.modifier,
-      ...(selectedSession ? { sessionId: selectedSession } : {}),
-      reason: `Operator requested ${command.title} through the installed SXSY-B122 extension.`
-    });
-    if (!preparation.ok) {
-      await this.vscode.window.showWarningMessage(`SXSY-B122 preparation unavailable: ${preparation.message}`);
+    const reason = `Operator requested ${command.title} through the installed SXSY-B122 extension.`;
+    const hardwarePreparation = hardwareClaim ? await this.bridge.prepareHardwareSignal(hardwareClaim, selectedSession, reason) : undefined;
+    const regularPreparation = hardwareClaim ? undefined : await this.bridge.prepareCommand({ control: command.control, modifier: command.modifier, ...(selectedSession ? { sessionId: selectedSession } : {}), reason });
+    const preparationFailure = hardwarePreparation && !hardwarePreparation.ok ? hardwarePreparation : regularPreparation && !regularPreparation.ok ? regularPreparation : undefined;
+    if (preparationFailure) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 preparation unavailable: ${preparationFailure.message}`);
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Command preparation failed before any dispatch request was sent.", undefined, selectedSession);
       return;
     }
-    if (preparation.value.status !== "prepared") {
-      await this.vscode.window.showWarningMessage(`SXSY-B122 ${preparation.value.status}: ${preparation.value.summary}`);
+    const preparation = hardwarePreparation?.ok ? hardwarePreparation.value.preparation : regularPreparation?.ok ? regularPreparation.value : undefined;
+    if (!preparation) {
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The extension could not prove a canonical preparation result.", undefined, selectedSession);
       return;
     }
-    if (preparation.value.session) this.sessions.set(preparation.value.session.id, preparation.value.session);
-    if (selectedSession && !await this.reviewGitMutation(command, selectedSession)) return;
+    if (preparation.status !== "prepared") {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 ${preparation.status}: ${preparation.summary}`);
+      if (hardwareClaim) {
+        const dispositionReceiptId = hardwarePreparation?.ok ? hardwarePreparation.value.dispositionReceiptId : undefined;
+        await this.finishHardwareSignal(hardwareClaim, dispositionReceiptId ? "handled" : "needs_reconciliation", `Canonical preparation returned ${preparation.status}: ${preparation.summary}`.slice(0, 512), dispositionReceiptId, selectedSession);
+      }
+      return;
+    }
+    if (preparation.session) this.sessions.set(preparation.session.id, preparation.session);
+    if (selectedSession && !await this.reviewGitMutation(command, selectedSession)) {
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "The exact Git mutation review did not approve dispatch.", undefined, selectedSession);
+      return;
+    }
     const forwarded: ForwardedCommand = {
       control: command.control,
       modifier: command.modifier,
       ...(selectedSession ? { sessionId: selectedSession } : {}),
-      ...(preparation.value.authorityId ? { authorityId: preparation.value.authorityId } : {}),
-      ...(preparation.value.confirmationToken ? { confirmationToken: preparation.value.confirmationToken } : {}),
+      ...(preparation.authorityId ? { authorityId: preparation.authorityId } : {}),
+      ...(preparation.confirmationToken ? { confirmationToken: preparation.confirmationToken } : {}),
       input
     };
-    const result = await this.bridge.dispatch(forwarded);
-    if (!result.ok) {
-      await this.vscode.window.showWarningMessage(`SXSY-B122 ${command.title.replace("SXSY-B122: ", "")} unavailable: ${result.message}`);
+    const hardwareDispatch = hardwareClaim ? await this.bridge.dispatchHardwareSignal(hardwareClaim, { ...(forwarded.sessionId ? { sessionId: forwarded.sessionId } : {}), ...(forwarded.authorityId ? { authorityId: forwarded.authorityId } : {}), ...(forwarded.confirmationToken ? { confirmationToken: forwarded.confirmationToken } : {}), ...(forwarded.input ? { input: forwarded.input } : {}) }) : undefined;
+    const regularDispatch = hardwareClaim ? undefined : await this.bridge.dispatch(forwarded);
+    const dispatchFailure = hardwareDispatch && !hardwareDispatch.ok ? hardwareDispatch : regularDispatch && !regularDispatch.ok ? regularDispatch : undefined;
+    if (dispatchFailure) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 ${command.title.replace("SXSY-B122: ", "")} unavailable: ${dispatchFailure.message}`);
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The hardware dispatch transport failed after dispatch may have begun.", undefined, selectedSession);
+      return;
+    }
+    const result = hardwareDispatch?.ok ? hardwareDispatch.value.command : regularDispatch?.ok ? regularDispatch.value : undefined;
+    const dispatchReceiptId = hardwareDispatch?.ok ? hardwareDispatch.value.dispatchReceiptId : undefined;
+    if (!result) {
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The extension could not prove a canonical dispatch result.", dispatchReceiptId, selectedSession);
       return;
     }
 
-    const action = forwardedHostAction(result.value);
-    const attemptedHostAction = result.value.data?.hostActionId !== undefined || result.value.data?.hostActionKind !== undefined || result.value.data?.localAction !== undefined;
+    const action = forwardedHostAction(result);
+    const attemptedHostAction = result.data?.hostActionId !== undefined || result.data?.hostActionKind !== undefined || result.data?.localAction !== undefined;
     if (attemptedHostAction && !action) {
       await this.vscode.window.showWarningMessage("SXSY-B122 rejected malformed host-action data from the companion.");
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned malformed host-action data and the extension rejected it.", dispatchReceiptId, selectedSession);
       return;
     }
     const expected = expectedLocalAction(command);
     if (action && action.kind !== expected) {
       await this.vscode.window.showWarningMessage("SXSY-B122 rejected an unexpected local host action from the companion.");
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned an unexpected host action and the extension rejected it.", dispatchReceiptId, selectedSession);
       return;
     }
-    if (result.value.status === "blocked" || result.value.status === "unavailable" || result.value.status === "incomplete" || result.value.status === "failed") {
-      await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.value.status}: ${result.value.summary}`);
+    if (result.status === "blocked" || result.status === "unavailable" || result.status === "incomplete" || result.status === "failed") {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.status}: ${result.summary}`);
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
       return;
     }
     if (action) {
-      if (result.value.status !== "running") {
+      if (result.status !== "running") {
         await this.vscode.window.showWarningMessage("SXSY-B122 rejected a host action that was not bound to a running durable operation.");
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned a host action without a running durable operation.", dispatchReceiptId, selectedSession);
         return;
       }
       let succeeded = false;
@@ -617,13 +699,64 @@ export class ManagedSessionController {
       const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion);
       if (!completion.ok) {
         await this.vscode.window.showWarningMessage(`SXSY-B122 host action requires reconciliation: ${completion.message}`);
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The local host action may have occurred but durable settlement failed.", dispatchReceiptId, selectedSession);
         return;
       }
       const show = completion.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
       await show(`SXSY-B122 ${completion.value.status}: ${completion.value.summary}`);
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch and host action settled as ${completion.value.status}.`, dispatchReceiptId, selectedSession);
       return;
     }
-    await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.value.summary}`);
+    await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.summary}`);
+    if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
+  }
+
+  private stopReconnect(): void { if (this.reconnectTimer) clearTimeout(this.reconnectTimer); this.reconnectTimer = undefined; }
+
+  private scheduleHardwareSignalPoll(delayMs = 250): void {
+    if (!this.started || !this.vscode.window.state.focused || this.hardwareSignalTimer || this.hardwareSignalInFlight || !this.windowSessionId || this.workspaceRoots().length < 1) return;
+    this.hardwareSignalTimer = setTimeout(() => {
+      this.hardwareSignalTimer = undefined;
+      void this.pollHardwareSignal();
+    }, delayMs);
+    this.hardwareSignalTimer.unref?.();
+  }
+
+  private async pollHardwareSignal(): Promise<void> {
+    if (!this.started || !this.vscode.window.state.focused || this.hardwareSignalInFlight || !this.windowSessionId) return;
+    const workspaceRoots = this.workspaceRoots();
+    if (!workspaceRoots.length) return;
+    this.hardwareSignalInFlight = true;
+    try {
+      const claimResult = await this.bridge.claimHardwareSignal({ windowSessionId: this.windowSessionId, workspaceRoots, focused: true });
+      if (!claimResult.ok || !claimResult.value) return;
+      const claim = claimResult.value;
+      if (!this.vscode.window.state.focused || !sameRootList(this.workspaceRoots(), workspaceRoots)) {
+        await this.finishHardwareSignal(claim, "failed_before_dispatch", "The VS Code window lost focus or changed workspace binding before hardware preparation began.");
+        return;
+      }
+      const command = chordFor(claim.control, claim.modifier);
+      if (!command || claim.windowSessionId !== this.windowSessionId || !sameRootList(claim.workspaceRoots, workspaceRoots)) {
+        await this.vscode.window.showWarningMessage("SXSY-B122 rejected a hardware signal claim that was not bound to this exact focused window and canonical assignment.");
+        return;
+      }
+      await this.dispatchChord(command, undefined, claim);
+    } finally {
+      this.hardwareSignalInFlight = false;
+      this.scheduleHardwareSignalPoll();
+    }
+  }
+
+  private async finishHardwareSignal(claim: HardwareSignalClaim, outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation", summary: string, dispatchReceiptId?: string, dispatchSessionId?: string): Promise<void> {
+    const session = dispatchSessionId ? this.sessions.get(dispatchSessionId) : undefined;
+    const completion = await this.bridge.completeHardwareSignal(claim, {
+      outcome,
+      summary,
+      ...(dispatchReceiptId ? { dispatchReceiptId } : {}),
+      ...(dispatchSessionId ? { dispatchSessionId } : {}),
+      ...(session?.workspaceRoot ? { repositoryRoot: session.workspaceRoot } : {})
+    });
+    if (!completion.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 hardware signal requires reconciliation: ${completion.message}`);
   }
 
   private async reviewGitMutation(command: ChordCommand, sessionId: string): Promise<boolean> {
@@ -923,9 +1056,22 @@ function validBranchInput(value: string): string | undefined {
   return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") ? undefined : "Enter a valid exact branch name.";
 }
 
+function parseUint16Text(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!/^(?:0x[a-f0-9]{1,4}|[0-9]{1,5})$/i.test(trimmed)) return undefined;
+  const parsed = Number.parseInt(trimmed, trimmed.toLowerCase().startsWith("0x") ? 16 : 10);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 0xffff ? parsed : undefined;
+}
+function validateUint16Text(value: string): string | undefined { return parseUint16Text(value) === undefined ? "Enter a uint16 in decimal or 0x-prefixed hexadecimal." : undefined; }
+function formatUint16(value: number): string { return value.toString(16).padStart(4, "0"); }
+
 function samePath(left: string, right: string): boolean {
   const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
   return normalize(left) === normalize(right);
+}
+
+function sameRootList(left: readonly string[], right: readonly string[]): boolean {
+  return left.length > 0 && left.length === right.length && left.every((root, index) => samePath(root, right[index]!));
 }
 
 function parseChordArgument(value: unknown): ChordCommand | undefined {

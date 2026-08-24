@@ -14,6 +14,7 @@ import { companionBridgeVersion } from "../src/bridge.ts";
 import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
 import { AuthenticatedPipeServer, createPipeConfiguration } from "../src/authenticated-pipe.ts";
 import { FakeUserSecretProtector } from "../src/windows-secret.ts";
+import type { RawHidTransportEvents } from "../src/raw-hid-installation.ts";
 
 async function git(root: string, args: readonly string[]): Promise<void> {
   await new Promise<void>((resolveRun, reject) => {
@@ -149,4 +150,41 @@ test("installed composition synchronizes an authenticated extension session and 
   const stale = await bridge.dispatch({ control: "SHIELD", modifier: "normal", sessionId: "installed-extension", authorityId: authority.id, input: { attempt: "stale" } });
   assert.equal(stale.ok, true);
   assert.notEqual(stale.ok && stale.value.status, "completed", JSON.stringify(stale));
+});
+
+test("bootstrap owns a durable Raw-HID inbox and fixed-helper supervisor without launching while unprovisioned", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-bootstrap-raw-hid-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const helperPath = join(folder, "strathex-b122-hid-helper.exe");
+  await writeFile(helperPath, "isolated native helper", "utf8");
+  const events: RawHidTransportEvents[] = [];
+  let starts = 0;
+  let stops = 0;
+  const companion = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    targetResolver: { resolve: async () => target },
+    rawHidHelperPath: helperPath,
+    runtimePinPresence: { async verify() { return { verified: true, operator: "Current User", method: "windows-user-presence" }; } },
+    rawHidTransportFactory: {
+      create(_pin, callbacks) {
+        events.push(callbacks);
+        return { async start() { starts += 1; }, async stop() { stops += 1; } };
+      }
+    }
+  });
+  assert.ok(companion.hardwareSignals);
+  assert.ok(companion.rawHidInstallationRegistry);
+  assert.ok(companion.rawHidInstallations);
+  assert.ok(companion.rawHidSupervisor);
+  await companion.endpoint.ready();
+  assert.equal((await companion.rawHidSupervisor!.startConfigured()).state, "unprovisioned");
+  assert.equal(starts, 0);
+
+  const installed = await companion.endpoint.handle({ version: companionBridgeVersion, id: "hid-install", method: "raw-hid.install", payload: { vendorId: 0x5358, productId: 0xb122, usagePage: 0xff60, usage: 0x61, serialNumber: "B122-A" } });
+  assert.equal(installed.ok, true, JSON.stringify(installed));
+  assert.equal(starts, 1);
+  assert.equal(events.length, 1);
+  await companion.rawHidSupervisor!.stop();
+  assert.equal(stops, 1);
 });

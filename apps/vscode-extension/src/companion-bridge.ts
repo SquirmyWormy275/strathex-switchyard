@@ -1,4 +1,4 @@
-import type { B122Control, B122Modifier } from "./commands.ts";
+import { chordFor, type B122Control, type B122Modifier } from "./commands.ts";
 
 export type ExtensionCapability = "registered" | "observable" | "controllable" | "mediated";
 export type ExtensionSessionStatus = "running" | "verified_blocked" | "verified_finished" | "unreachable" | "stale" | "unknown";
@@ -97,6 +97,13 @@ export interface SandboxInstallationPin {
 
 export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string }[]; readonly revokedAt?: string; }
 export interface InstalledNetworkPolicy { readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface RawHidDeviceIdentity { readonly vendorId: number; readonly productId: number; readonly usagePage: number; readonly usage: number; readonly serialNumber?: string; }
+export interface RawHidInstallationPin { readonly identity: RawHidDeviceIdentity; readonly helperPath: string; readonly helperSha256: string; readonly protocolVersion: number; readonly mapFingerprint: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface RawHidRuntimeStatus { readonly supervisor: { readonly state: "unprovisioned" | "starting" | "running" | "retrying" | "stopped" | "unavailable"; readonly generation: number; readonly detail: string }; readonly inbox: { readonly pending: number; readonly claimed: number; readonly completed: number; readonly needsReconciliation: number }; readonly installations: readonly RawHidInstallationPin[]; }
+export interface HardwareSignalClaim { readonly signalId: string; readonly claimToken: string; readonly deviceId: string; readonly connectionEpoch: number; readonly bootNonce: number; readonly counter: number; readonly control: B122Control; readonly modifier: B122Modifier; readonly acceptedAt: string; readonly claimedAt: string; readonly attempt: number; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
+export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
+export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
+export interface HardwareSignalCompletionResult { readonly signalId: string; readonly outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; }
 
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -123,6 +130,14 @@ export interface ExtensionCompanionBridge {
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>>;
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
+  installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
+  listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
+  revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
+  rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>>;
+  claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>>;
+  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
+  dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
+  completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -219,6 +234,68 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> { return this.call("provider.handshake", { sessionId, repositoryRoot }); }
 
+  async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
+    const result = await this.call<unknown>("raw-hid.install", identity);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installation", "supervisor"]) || !isRawHidPin(result.value.installation) || !isRawHidSupervisorStatus(result.value.supervisor)
+      || !sameRawHidIdentity(result.value.installation.identity, identity) || result.value.installation.status !== "active") return invalidResponse();
+    return { ok: true, value: { installation: result.value.installation, supervisor: result.value.supervisor } };
+  }
+
+  async listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> {
+    const result = await this.call<unknown>("raw-hid.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installations"]) || !Array.isArray(result.value.installations) || !result.value.installations.every(isRawHidPin)) return invalidResponse();
+    return { ok: true, value: result.value.installations };
+  }
+
+  async revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> {
+    const result = await this.call<unknown>("raw-hid.revoke", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installation"]) || !isRawHidPin(result.value.installation) || result.value.installation.status !== "revoked") return invalidResponse();
+    return { ok: true, value: result.value.installation };
+  }
+
+  async rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> {
+    const result = await this.call<unknown>("raw-hid.status", undefined);
+    if (!result.ok) return result;
+    if (!isRawHidRuntimeStatus(result.value)) return invalidResponse();
+    return { ok: true, value: result.value };
+  }
+
+  async claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>> {
+    const result = await this.call<unknown>("hardware-signal.claim", binding);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["claim"])) return invalidResponse();
+    if (result.value.claim === undefined) return { ok: true, value: undefined };
+    if (!isHardwareSignalClaim(result.value.claim) || result.value.claim.windowSessionId !== binding.windowSessionId || !sameRoots(result.value.claim.workspaceRoots, binding.workspaceRoots)) return invalidResponse();
+    return { ok: true, value: result.value.claim };
+  }
+
+  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, { ...(sessionId ? { sessionId } : {}), reason }));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, ["preparation"], ["dispositionReceiptId"]) || !isPreparedCommand(result.value.preparation)
+      || (result.value.dispositionReceiptId !== undefined && !isHardwareDispatchReceipt(result.value.dispositionReceiptId))
+      || (result.value.preparation.status === "prepared" ? result.value.dispositionReceiptId !== undefined : result.value.dispositionReceiptId === undefined)) return invalidResponse();
+    return { ok: true, value: { preparation: result.value.preparation, ...(typeof result.value.dispositionReceiptId === "string" ? { dispositionReceiptId: result.value.dispositionReceiptId } : {}) } };
+  }
+
+  async dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>> {
+    const result = await this.call<unknown>("hardware-signal.dispatch", hardwareClaimPayload(claim, command));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command", "dispatchReceiptId"]) || !isForwardedCommandResult(result.value.command) || !isHardwareDispatchReceipt(result.value.dispatchReceiptId)) return invalidResponse();
+    return { ok: true, value: { command: result.value.command, dispatchReceiptId: result.value.dispatchReceiptId } };
+  }
+
+  async completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>> {
+    const result = await this.call<unknown>("hardware-signal.complete", hardwareClaimPayload(claim, completion));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["completion"]) || !isHardwareSignalCompletion(result.value.completion)
+      || result.value.completion.signalId !== claim.signalId || result.value.completion.outcome !== completion.outcome) return invalidResponse();
+    return { ok: true, value: result.value.completion };
+  }
+
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
@@ -285,6 +362,14 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return this.unavailable(); }
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
+  listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
+  revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return this.unavailable(); }
+  rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> { return this.unavailable(); }
+  claimHardwareSignal(): Promise<BridgeResult<HardwareSignalClaim | undefined>> { return this.unavailable(); }
+  prepareHardwareSignal(): Promise<BridgeResult<HardwareSignalPreparationResult>> { return this.unavailable(); }
+  dispatchHardwareSignal(): Promise<BridgeResult<HardwareSignalDispatchResult>> { return this.unavailable(); }
+  completeHardwareSignal(): Promise<BridgeResult<HardwareSignalCompletionResult>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 
@@ -324,6 +409,109 @@ function isLocalHostAction(value: string): value is LocalHostAction {
   ].includes(value);
 }
 
+function hardwareClaimPayload(claim: HardwareSignalClaim, extra: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return {
+    signalId: claim.signalId,
+    claimToken: claim.claimToken,
+    windowSessionId: claim.windowSessionId,
+    workspaceRoots: claim.workspaceRoots,
+    ...extra
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+function invalidResponse<T>(): BridgeResult<T> {
+  return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict Raw-HID or hardware-signal schema." };
+}
+
+function isRawHidPin(value: unknown): value is RawHidInstallationPin {
+  if (!isRecord(value) || !exactKeys(value, ["identity", "helperPath", "helperSha256", "protocolVersion", "mapFingerprint", "installedAt", "status"])
+    || !isRawHidIdentity(value.identity) || typeof value.helperPath !== "string" || !boundedText(value.helperPath, 4_096)
+    || typeof value.helperSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.helperSha256)
+    || !Number.isInteger(value.protocolVersion) || (value.protocolVersion as number) < 1 || (value.protocolVersion as number) > 255
+    || typeof value.mapFingerprint !== "string" || !/^[a-f0-9]{16}$/.test(value.mapFingerprint)
+    || typeof value.installedAt !== "string" || !Number.isFinite(Date.parse(value.installedAt))
+    || (value.status !== "active" && value.status !== "revoked")) return false;
+  return true;
+}
+
+function isRawHidIdentity(value: unknown): value is RawHidDeviceIdentity {
+  return isRecord(value) && allowedExactKeys(value, ["vendorId", "productId", "usagePage", "usage"], ["serialNumber"])
+    && uint16(value.vendorId) && uint16(value.productId) && uint16(value.usagePage) && uint16(value.usage)
+    && (value.serialNumber === undefined || (typeof value.serialNumber === "string" && /^[A-Za-z0-9._-]{1,128}$/.test(value.serialNumber)));
+}
+
+function sameRawHidIdentity(left: RawHidDeviceIdentity, right: RawHidDeviceIdentity): boolean {
+  return left.vendorId === right.vendorId && left.productId === right.productId && left.usagePage === right.usagePage
+    && left.usage === right.usage && left.serialNumber === right.serialNumber;
+}
+
+function isRawHidSupervisorStatus(value: unknown): value is RawHidRuntimeStatus["supervisor"] {
+  return isRecord(value) && exactKeys(value, ["state", "generation", "detail"])
+    && ["unprovisioned", "starting", "running", "retrying", "stopped", "unavailable"].includes(value.state as string)
+    && Number.isSafeInteger(value.generation) && (value.generation as number) >= 0
+    && typeof value.detail === "string" && boundedText(value.detail, 512);
+}
+
+function isRawHidRuntimeStatus(value: unknown): value is RawHidRuntimeStatus {
+  if (!isRecord(value) || !exactKeys(value, ["supervisor", "inbox", "installations"]) || !isRawHidSupervisorStatus(value.supervisor)
+    || !isRecord(value.inbox) || !exactKeys(value.inbox, ["pending", "claimed", "completed", "needsReconciliation"])
+    || ![value.inbox.pending, value.inbox.claimed, value.inbox.completed, value.inbox.needsReconciliation].every((count) => Number.isSafeInteger(count) && (count as number) >= 0)
+    || !Array.isArray(value.installations) || !value.installations.every(isRawHidPin)) return false;
+  return true;
+}
+
+function isHardwareSignalClaim(value: unknown): value is HardwareSignalClaim {
+  if (!isRecord(value) || !exactKeys(value, ["signalId", "claimToken", "deviceId", "connectionEpoch", "bootNonce", "counter", "control", "modifier", "acceptedAt", "claimedAt", "attempt", "windowSessionId", "workspaceRoots"])
+    || typeof value.signalId !== "string" || !/^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{8,256}$/.test(value.claimToken)
+    || typeof value.deviceId !== "string" || !/^[a-f0-9]{64}$/.test(value.deviceId)
+    || !uint32(value.connectionEpoch) || !uint32(value.bootNonce) || !uint32(value.counter)
+    || typeof value.control !== "string" || typeof value.modifier !== "string" || !chordFor(value.control as B122Control, value.modifier as B122Modifier)
+    || typeof value.acceptedAt !== "string" || !Number.isFinite(Date.parse(value.acceptedAt))
+    || typeof value.claimedAt !== "string" || !Number.isFinite(Date.parse(value.claimedAt))
+    || !Number.isSafeInteger(value.attempt) || (value.attempt as number) < 1
+    || typeof value.windowSessionId !== "string" || !boundedText(value.windowSessionId, 512)
+    || !Array.isArray(value.workspaceRoots) || value.workspaceRoots.length < 1 || value.workspaceRoots.length > 32
+    || !value.workspaceRoots.every((root) => typeof root === "string" && boundedText(root, 4_096))) return false;
+  return true;
+}
+
+function isPreparedCommand(value: unknown): value is PreparedCommand {
+  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationExpiresAt"])
+    && ["prepared", "blocked", "unavailable", "incomplete"].includes(value.status as string)
+    && typeof value.summary === "string" && boundedText(value.summary, 512)
+    && (value.session === undefined || isRecord(value.session))
+    && [value.authorityId, value.confirmationToken].every((item) => item === undefined || (typeof item === "string" && boundedText(item, 512)))
+    && (value.confirmationExpiresAt === undefined || (typeof value.confirmationExpiresAt === "string" && Number.isFinite(Date.parse(value.confirmationExpiresAt))));
+}
+
+function isForwardedCommandResult(value: unknown): value is ForwardedCommandResult {
+  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["data"])
+    && ["queued", "running", "awaiting_input", "awaiting_confirmation", "cancelling", "completed", "failed", "timed_out", "unavailable", "incomplete", "blocked", "cancelled"].includes(value.status as string)
+    && typeof value.summary === "string" && boundedText(value.summary, 512)
+    && (value.data === undefined || isRecord(value.data));
+}
+
+function isHardwareSignalCompletion(value: unknown): value is HardwareSignalCompletionResult {
+  return isRecord(value) && exactKeys(value, ["signalId", "outcome"])
+    && typeof value.signalId === "string" && /^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    && (value.outcome === "handled" || value.outcome === "failed_before_dispatch" || value.outcome === "needs_reconciliation");
+}
+
+function isHardwareDispatchReceipt(value: unknown): value is string {
+  return typeof value === "string" && /^hardware-dispatch:[a-f0-9]{64}$/.test(value);
+}
+
+function sameRoots(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((root, index) => root.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase() === right[index]!.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase());
+}
+
+function boundedText(value: string, maximum: number): boolean { return value.length > 0 && value.length <= maximum && !/[\r\n\0]/.test(value); }
+function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
+function uint32(value: unknown): value is number { return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff_ffff; }
+function exactKeys(value: Record<string, unknown>, required: readonly string[]): boolean { const keys = Object.keys(value); return keys.length === required.length && required.every((key) => key in value); }
+function allowedExactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean { const keys = Object.keys(value); const allowed = new Set([...required, ...optional]); return required.every((key) => key in value) && keys.every((key) => allowed.has(key)); }

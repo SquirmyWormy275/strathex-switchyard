@@ -71,10 +71,7 @@ export * from "./pipeline-adapters.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";
 export * from "./git-review.ts";
+export * from "./hardware-signal-queue.ts";
+export * from "./raw-hid-installation.ts";
+export * from "./raw-hid-protocol.ts";
 export { runStandaloneCompanion } from "./main.ts";
-
-/**
- * Platform-specific Raw HID discovery remains deferred until the selected B122
- * firmware target is available. The exported companion service is local
- * JSON-lines control-plane transport only; it does not claim hardware support.
- */

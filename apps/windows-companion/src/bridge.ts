@@ -3,6 +3,8 @@ import type { CommandAction } from "../../../packages/control-plane/src/command-
 import type { CommandResult, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { CompanionService } from "./service.ts";
+import type { HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
+import type { RawHidDeviceIdentity } from "./raw-hid-installation.ts";
 
 /**
  * Versioned, local-only JSON-lines contract used between the VS Code extension
@@ -39,6 +41,14 @@ export type CompanionMethod =
   | "network-policy.current"
   | "network-policy.revoke"
   | "provider.handshake"
+  | "raw-hid.install"
+  | "raw-hid.list"
+  | "raw-hid.revoke"
+  | "raw-hid.status"
+  | "hardware-signal.claim"
+  | "hardware-signal.prepare"
+  | "hardware-signal.dispatch"
+  | "hardware-signal.complete"
   | "host-action.complete";
 
 export interface CompanionRequest {
@@ -163,6 +173,12 @@ export interface CredentialProvisionPayload { readonly reference: string; readon
 export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
 export interface NetworkPolicyInstallPayload { readonly sourcePath: string; }
 export interface ProviderHandshakePayload { readonly sessionId: string; readonly repositoryRoot: string; }
+export type RawHidInstallPayload = RawHidDeviceIdentity;
+export interface HardwareSignalBindingPayload { readonly signalId: string; readonly claimToken: string; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
+export interface HardwareSignalClaimPayload { readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; readonly focused: true; }
+export interface HardwareSignalPreparationPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly reason: string; }
+export interface HardwareSignalDispatchPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly authorityId?: string; readonly confirmationToken?: string; readonly input?: Readonly<Record<string, string>>; }
+export interface HardwareSignalCompletionPayload extends HardwareSignalBindingPayload { readonly outcome: HardwareSignalCompletionOutcome; readonly summary: string; readonly dispatchReceiptId?: string; readonly dispatchSessionId?: string; readonly repositoryRoot?: string; }
 
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
@@ -218,7 +234,8 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
-    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake", "host-action.complete"
+    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake",
+    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.complete"
   ].includes(value);
 }
 

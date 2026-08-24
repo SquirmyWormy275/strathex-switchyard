@@ -21,6 +21,7 @@
     "vscode": "^1.85.0"
   },
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:sxsy-b122.registerManagedSession",
     "onCommand:sxsy-b122.adoptTerminal",
     "onCommand:sxsy-b122.refreshManagedRegistry",
@@ -32,6 +33,10 @@
     "onCommand:sxsy-b122.installWindowsSandbox",
     "onCommand:sxsy-b122.listWindowsSandboxes",
     "onCommand:sxsy-b122.revokeWindowsSandbox",
+    "onCommand:sxsy-b122.installRawHid",
+    "onCommand:sxsy-b122.listRawHid",
+    "onCommand:sxsy-b122.showRawHidStatus",
+    "onCommand:sxsy-b122.revokeRawHid",
     "onCommand:sxsy-b122.provisionCredential",
     "onCommand:sxsy-b122.listCredentials",
     "onCommand:sxsy-b122.revokeCredential",
@@ -151,6 +156,22 @@
       {
         "command": "sxsy-b122.revokeWindowsSandbox",
         "title": "SXSY-B122: Revoke Windows Sandbox Installation"
+      },
+      {
+        "command": "sxsy-b122.installRawHid",
+        "title": "SXSY-B122: Install Exact Raw-HID Device"
+      },
+      {
+        "command": "sxsy-b122.listRawHid",
+        "title": "SXSY-B122: Show Raw-HID Installations"
+      },
+      {
+        "command": "sxsy-b122.showRawHidStatus",
+        "title": "SXSY-B122: Show Raw-HID Status"
+      },
+      {
+        "command": "sxsy-b122.revokeRawHid",
+        "title": "SXSY-B122: Revoke Raw-HID Device"
       },
       {
         "command": "sxsy-b122.provisionCredential",

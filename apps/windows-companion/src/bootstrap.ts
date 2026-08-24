@@ -23,6 +23,16 @@ import { DurableContainmentManager } from "../../../packages/control-plane/src/c
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
+import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
+import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
+import {
+  AttestedRawHidInstallationCoordinator,
+  DurableRawHidInstallationRegistry,
+  InstalledRawHidSupervisor,
+  type RawHidTransportFactory
+} from "./raw-hid-installation.ts";
+import { WindowsRawHidTransport } from "./raw-hid-protocol.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -55,6 +65,10 @@ export interface DurableWindowsCompanionOptions {
   readonly runtimePinPresence?: WindowsUserPresenceRunner;
   /** Fixed packaged b122-sandbox-worker.exe. Omit to keep OS isolation unavailable. */
   readonly sandboxHelperPath?: string;
+  /** Fixed packaged strathex-b122-hid-helper.exe. Never supplied by a client. */
+  readonly rawHidHelperPath?: string;
+  /** Isolated tests may replace only process creation, never the pinned path or identity. */
+  readonly rawHidTransportFactory?: RawHidTransportFactory;
 }
 
 /**
@@ -80,6 +94,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly networkPolicyRegistry: DurableNetworkPolicyRegistry;
   readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  readonly hardwareSignals: DurableHardwareSignalInbox;
+  readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
+  readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
+  readonly rawHidSupervisor?: InstalledRawHidSupervisor;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -106,6 +124,34 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     : undefined;
   const sandboxInstallations = sandboxInstallationRegistry && options.runtimePinPresence && options.sandboxHelperPath
     ? new AttestedSandboxInstallationCoordinator(sandboxInstallationRegistry, options.sandboxHelperPath, options.runtimePinPresence)
+    : undefined;
+  const hardwareSignals = new DurableHardwareSignalInbox(store);
+  const rawHidInstallationRegistry = options.rawHidHelperPath
+    ? new DurableRawHidInstallationRegistry(store, {
+        helperPath: options.rawHidHelperPath,
+        protocolVersion,
+        mapFingerprint: Buffer.from(mapFingerprint).toString("hex")
+      })
+    : undefined;
+  const rawHidInstallations = rawHidInstallationRegistry && options.runtimePinPresence
+    ? new AttestedRawHidInstallationCoordinator(rawHidInstallationRegistry, options.runtimePinPresence)
+    : undefined;
+  const rawHidFactory: RawHidTransportFactory | undefined = rawHidInstallationRegistry
+    ? options.rawHidTransportFactory ?? {
+        create(pin, events) {
+          return new WindowsRawHidTransport({
+            installationRoot: dirname(pin.helperPath),
+            helperPath: pin.helperPath,
+            helperSha256: pin.helperSha256,
+            identity: pin.identity,
+            onSignal: events.onSignal,
+            onTransportStatus: events.onTransportStatus
+          });
+        }
+      }
+    : undefined;
+  const rawHidSupervisor = rawHidInstallationRegistry && rawHidFactory
+    ? new InstalledRawHidSupervisor(rawHidInstallationRegistry, hardwareSignals, rawHidFactory)
     : undefined;
   const targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
     new TargetSnapshotFactory(new GitCliInspector({
@@ -171,9 +217,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
-    startupRecovery: async () => { await executor.recoverAfterRestart(); }
+    startupRecovery: async () => { await executor.recoverAfterRestart(); await hardwareSignals.recoverAfterRestart(); }
   });
   return {
     store,
@@ -185,6 +231,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     repositoryRuntimes,
     credentialVault,
     networkPolicyRegistry,
+    hardwareSignals,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),
@@ -192,6 +239,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...(credentialProvisioning ? { credentialProvisioning } : {}),
     ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}),
     ...(providerHandshakes ? { providerHandshakes } : {}),
+    ...(rawHidInstallationRegistry ? { rawHidInstallationRegistry } : {}),
+    ...(rawHidInstallations ? { rawHidInstallations } : {}),
+    ...(rawHidSupervisor ? { rawHidSupervisor } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

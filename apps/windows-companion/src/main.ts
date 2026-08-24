@@ -8,6 +8,7 @@ import { DpapiJournalAuthenticator, WindowsDpapiCurrentUserProtector } from "./w
 import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./configured-network.ts";
 import { PowerShellWindowsUserPresenceRunner, WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
 import { acquireCompanionInstance } from "./instance-lifecycle.ts";
+import type { InstalledRawHidSupervisor } from "./raw-hid-installation.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -22,6 +23,7 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   const mainPath = fileURLToPath(import.meta.url);
   const instance = await acquireCompanionInstance(stateDirectory, mainPath);
   let pipe: AuthenticatedPipeServer | undefined;
+  let rawHidSupervisor: InstalledRawHidSupervisor | undefined;
   let stopped = false;
   try {
   const store = new ProtectedJsonStore({
@@ -32,6 +34,7 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   const networkPolicy = await loadNetworkPolicy(join(stateDirectory, "network-policy.json"));
   const userPresence = new PowerShellWindowsUserPresenceRunner();
   const sandboxHelperPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "sandbox-helper", "b122-sandbox-worker.exe");
+  const rawHidHelperPath = packagedRawHidHelperPath(mainPath);
   const companion = createDurableWindowsCompanion({
     policyVersion: "b122-local-v1",
     store,
@@ -42,9 +45,12 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
     runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor(userPresence) },
     runtimePinPresence: userPresence,
     sandboxHelperPath,
+    rawHidHelperPath,
     snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
   });
+  rawHidSupervisor = companion.rawHidSupervisor;
   await companion.endpoint.ready();
+  await rawHidSupervisor?.startConfigured();
   const configurationPath = join(stateDirectory, "authenticated-pipe.json");
   let configuration;
   try {
@@ -56,12 +62,18 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   }
   pipe = new AuthenticatedPipeServer(configuration, protector, companion.endpoint);
   await pipe.start();
-  return { async stop() { if (stopped) return; stopped = true; await pipe?.stop().finally(() => instance.release()); } };
+  return { async stop() { if (stopped) return; stopped = true; await rawHidSupervisor?.stop(); await pipe?.stop().finally(() => instance.release()); } };
   } catch (error) {
+    await rawHidSupervisor?.stop().catch(() => undefined);
     await pipe?.stop().catch(() => undefined);
     await instance.release();
     throw error;
   }
+}
+
+/** Fixed packaged location; no command line, environment, or workspace input participates. */
+export function packagedRawHidHelperPath(mainModulePath: string): string {
+  return resolve(dirname(mainModulePath), "..", "raw-hid", "strathex-b122-hid-helper.exe");
 }
 
 async function loadNetworkPolicy(path: string): Promise<ConfiguredNetworkPolicy> {

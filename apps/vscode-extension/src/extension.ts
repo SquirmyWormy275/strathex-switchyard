@@ -5,7 +5,7 @@ import { ManagedSessionController, type GitRootRegistration } from "./controller
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
-export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport } from "./companion-bridge.ts";
+export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport, type RawHidDeviceIdentity, type RawHidInstallationPin, type RawHidRuntimeStatus, type HardwareSignalClaim } from "./companion-bridge.ts";
 export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader, type ExtensionSecretReader, type StoredCompanionPipeConfiguration } from "./named-pipe-transport.ts";
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
