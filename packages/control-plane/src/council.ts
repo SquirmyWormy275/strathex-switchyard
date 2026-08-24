@@ -38,6 +38,8 @@ export interface CouncilAssignment {
   readonly sessionId: string;
   readonly paths: readonly string[];
   readonly resources: readonly string[];
+  /** Exact host-isolation binding acknowledged by the assigned participant. */
+  readonly isolationDigest?: string;
 }
 
 export interface CouncilEpoch {
@@ -135,6 +137,7 @@ function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilE
     if (entry.kind !== "council.epoch.saved") continue;
     const epoch = (entry.payload as CouncilEpochSavedEvent | undefined)?.epoch;
     if (!epoch || typeof epoch.id !== "string") throw new CouncilError("Protected Council epoch record is malformed.");
+    if (Object.values(epoch.assignments ?? {}).some((assignment) => assignment.isolationDigest !== undefined && !/^[a-f0-9]{64}$/.test(assignment.isolationDigest))) throw new CouncilError("Protected Council assignment isolation digest is malformed.");
     result.set(epoch.id, cloneEpoch(epoch));
   }
   return result;
@@ -282,7 +285,7 @@ export class CouncilCoordinator {
     });
   }
 
-  async assign(id: string, sessionId: string, paths: readonly string[], resources: readonly string[]): Promise<CouncilEpoch> {
+  async assign(id: string, sessionId: string, paths: readonly string[], resources: readonly string[], isolationDigest?: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_pause_acknowledgements" && epoch.status !== "awaiting_assignment_acknowledgements") {
         throw new CouncilError("Council assignments are not accepted for this epoch state.");
@@ -291,6 +294,7 @@ export class CouncilCoordinator {
       const participant = this.assertParticipant(epoch, sessionId);
       const normalizedPaths = unique(paths, "assigned path");
       const normalizedResources = unique(resources, "assigned resource");
+      const normalizedIsolationDigest = isolationDigest === undefined ? undefined : exactIsolationDigest(isolationDigest);
       if (!normalizedPaths.every((path) => participant.plannedFiles.includes(path))) throw new CouncilError("Council cannot assign a path outside the participant's verified plan.");
       if (!normalizedResources.every((resource) => participant.resources.includes(resource))) throw new CouncilError("Council cannot assign a resource outside the participant's verified declaration.");
       for (const [otherId, assignment] of Object.entries(epoch.assignments)) {
@@ -301,17 +305,19 @@ export class CouncilCoordinator {
       }
       return {
         ...epoch,
-        assignments: { ...epoch.assignments, [sessionId]: { sessionId, paths: normalizedPaths, resources: normalizedResources } },
+        assignments: { ...epoch.assignments, [sessionId]: { sessionId, paths: normalizedPaths, resources: normalizedResources, ...(normalizedIsolationDigest ? { isolationDigest: normalizedIsolationDigest } : {}) } },
         status: "awaiting_assignment_acknowledgements"
       };
     });
   }
 
-  async acknowledgeAssignment(id: string, sessionId: string): Promise<CouncilEpoch> {
+  async acknowledgeAssignment(id: string, sessionId: string, isolationDigest?: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council assignment acknowledgement is not accepted for this epoch.");
       this.assertParticipant(epoch, sessionId);
-      if (!epoch.assignments[sessionId]) throw new CouncilError("A participant cannot acknowledge an assignment it has not received.");
+      const assignment = epoch.assignments[sessionId];
+      if (!assignment) throw new CouncilError("A participant cannot acknowledge an assignment it has not received.");
+      assertIsolationAcknowledgement(assignment, isolationDigest);
       return {
         ...epoch,
         assignmentAcknowledgedSessionIds: unique([...epoch.assignmentAcknowledgedSessionIds, sessionId], "session id")
@@ -367,10 +373,13 @@ export class CouncilCoordinator {
     });
   }
 
-  async acknowledgeResume(id: string, sessionId: string): Promise<CouncilEpoch> {
+  async acknowledgeResume(id: string, sessionId: string, isolationDigest?: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_resume_acknowledgements") throw new CouncilError("Council resume acknowledgement is not accepted for this epoch.");
       this.assertParticipant(epoch, sessionId);
+      const assignment = epoch.assignments[sessionId];
+      if (!assignment) throw new CouncilError("A participant cannot acknowledge resume without an exact assignment.");
+      assertIsolationAcknowledgement(assignment, isolationDigest);
       return { ...epoch, resumeAcknowledgedSessionIds: unique([...epoch.resumeAcknowledgedSessionIds, sessionId], "session id") };
     });
   }
@@ -458,4 +467,20 @@ export class CouncilCoordinator {
 
 function recommendationDigest(value: Pick<CouncilRecommendation, "id" | "repositoryRoot" | "targetSnapshotId" | "participantSessionIds" | "assignments" | "reportDigest" | "ready" | "createdAt">): string {
   return sha256(stableJson({ id: value.id, repositoryRoot: value.repositoryRoot, targetSnapshotId: value.targetSnapshotId, participantSessionIds: value.participantSessionIds, assignments: value.assignments, reportDigest: value.reportDigest, ready: value.ready, createdAt: value.createdAt }));
+}
+
+function exactIsolationDigest(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) throw new CouncilError("Council isolation digest must be an exact SHA-256 value.");
+  return normalized;
+}
+
+function assertIsolationAcknowledgement(assignment: CouncilAssignment, supplied: string | undefined): void {
+  if (!assignment.isolationDigest) {
+    if (supplied !== undefined) throw new CouncilError("Council assignment has no durable isolation digest to acknowledge.");
+    return;
+  }
+  if (supplied === undefined || exactIsolationDigest(supplied) !== assignment.isolationDigest) {
+    throw new CouncilError("Council acknowledgement does not match the exact durable isolation digest.");
+  }
 }

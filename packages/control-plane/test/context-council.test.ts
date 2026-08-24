@@ -119,6 +119,28 @@ test("Council cannot become active before every durable resume acknowledgement a
   });
 });
 
+test("Council assignment and resume acknowledgements bind the exact durable isolation digest", async () => {
+  await withStore(async (store) => {
+    const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "epoch-isolated" });
+    const epoch = await council.beginAutomatic({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
+      session("agent-a", ["src/a.ts"], ["port:4100"]), session("agent-b", ["src/b.ts"], ["port:4200"])
+    ] });
+    for (const id of ["agent-a", "agent-b"]) await council.acknowledgePause(epoch.id, id);
+    const digestA = "a".repeat(64); const digestB = "b".repeat(64);
+    await council.assign(epoch.id, "agent-a", ["src/a.ts"], ["port:4100"], digestA);
+    await council.assign(epoch.id, "agent-b", ["src/b.ts"], ["port:4200"], digestB);
+    await assert.rejects(council.acknowledgeAssignment(epoch.id, "agent-a", digestB), /isolation digest/i);
+    await council.acknowledgeAssignment(epoch.id, "agent-a", digestA);
+    await council.acknowledgeAssignment(epoch.id, "agent-b", digestB);
+    await council.beginResume(epoch.id);
+    await assert.rejects(council.acknowledgeResume(epoch.id, "agent-a", digestB), /isolation digest/i);
+    await council.acknowledgeResume(epoch.id, "agent-a", digestA);
+    await council.acknowledgeResume(epoch.id, "agent-b", digestB);
+    assert.equal((await council.activate(epoch.id)).status, "active");
+    assert.equal((await council.get(epoch.id))?.assignments["agent-a"]?.isolationDigest, digestA);
+  });
+});
+
 test("Council normal is truthful for an Observable-only participant instead of pretending it can pause or isolate", async () => {
   await withStore(async (store) => {
     const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z" });
