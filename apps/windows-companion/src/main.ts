@@ -5,6 +5,7 @@ import { createDurableWindowsCompanion } from "./bootstrap.ts";
 import { AuthenticatedPipeServer, createPipeConfiguration, loadPipeConfiguration, savePipeConfiguration } from "./authenticated-pipe.ts";
 import { defaultControlPlaneStorePath, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { DpapiJournalAuthenticator, WindowsDpapiCurrentUserProtector } from "./windows-secret.ts";
+import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./configured-network.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -21,11 +22,14 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
     authenticator: new DpapiJournalAuthenticator(protector),
     requireAuthenticatedProtection: true
   });
+  const networkPolicy = await loadNetworkPolicy(join(stateDirectory, "network-policy.json"));
   const companion = createDurableWindowsCompanion({
     policyVersion: process.env.SXSY_B122_POLICY_VERSION?.trim() || "b122-local-v1",
     store,
     localStateDirectory: stateDirectory,
     localGitStateDirectory: stateDirectory,
+    credentialProtector: protector,
+    networkPolicy,
     snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
   });
   await companion.endpoint.ready();
@@ -41,6 +45,15 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
   const pipe = new AuthenticatedPipeServer(configuration, protector, companion.endpoint);
   await pipe.start();
   return { stop: () => pipe.stop() };
+}
+
+async function loadNetworkPolicy(path: string): Promise<ConfiguredNetworkPolicy> {
+  try {
+    return await loadConfiguredNetworkPolicy(path);
+  } catch (error) {
+    if (!isMissingFile(error)) throw error;
+    return { version: 1, proxy: "direct", routes: [] };
+  }
 }
 
 function isMissingFile(error: unknown): boolean {

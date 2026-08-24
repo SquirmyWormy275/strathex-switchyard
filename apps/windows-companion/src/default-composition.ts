@@ -12,9 +12,12 @@ import type { CommandDefinition } from "../../../packages/control-plane/src/comm
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
-import { captureLiveTargetSnapshot, FilesystemBroker, LocalCredentialBroker, LocalNetworkBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
+import { captureLiveTargetSnapshot, FilesystemBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
 import { LocalMediatedGitHandler } from "./mediated-git.ts";
 import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
+import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
+import { createDirectConfiguredNetworkBroker, type ConfiguredHttpsNetworkBroker, type ConfiguredNetworkPolicy } from "./configured-network.ts";
+import type { UserSecretProtector } from "./windows-secret.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -148,16 +151,30 @@ class LocalPipelineStatusAdapter implements CommandAdapter {
 }
 
 export interface DefaultLocalComposition {
-  readonly filesystem: "canonical-allowlist"; readonly credentials: LocalCredentialBroker; readonly network: LocalNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue;
+  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue;
 }
 export interface DefaultLocalCompositionOptions {
   readonly localGitStateDirectory?: string;
   readonly localGitMutationFactory?: GitMutationFactory;
   readonly hostActions?: DurableHostActionQueue;
+  readonly credentialProtector: UserSecretProtector;
+  readonly networkPolicy?: ConfiguredNetworkPolicy;
 }
-export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory = dirname(store.filePath), options: DefaultLocalCompositionOptions = {}): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
-  const credentials = new LocalCredentialBroker(); const network = new LocalNetworkBroker(new Set(), { send: async () => { throw new Error("No approved network transport is configured."); } }, credentials);
-  const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const containment = new DurableContainmentManager(store); const council = new CouncilCoordinator(store);
+export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
+  let credentials: DurableCredentialReferenceVault | undefined;
+  const containment = new DurableContainmentManager(store, {
+    revokeCredentialLeases: async ({ repositoryRoot }) => {
+      if (!credentials) throw new Error("The durable credential vault is unavailable during containment.");
+      await credentials.revokeRepositoryLeases(repositoryRoot);
+    }
+  });
+  credentials = new DurableCredentialReferenceVault(store, options.credentialProtector, containment);
+  const network = createDirectConfiguredNetworkBroker(
+    options.networkPolicy ?? { version: 1, proxy: "direct", routes: [] },
+    containment,
+    credentials.createAdapter("configured-network")
+  );
+  const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
   const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
   const hostActionAdapter = new DurableHostActionAdapter(hostActions);

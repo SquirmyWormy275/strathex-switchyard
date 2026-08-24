@@ -34,6 +34,27 @@ export {
 } from "./windows-secret.ts";
 export { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner, type MediatedGitHandlerOptions } from "./mediated-git.ts";
 export { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions, localHostActionKinds, type HostActionIntent, type LocalHostActionKind } from "./host-actions.ts";
+export {
+  DurableCredentialReferenceVault,
+  StdinCredentialSecretReader,
+  type CredentialAdapterPort,
+  type CredentialLease,
+  type CredentialLeaseRequest,
+  type CredentialReferenceSummary,
+  type CredentialScope,
+  type ProvisionCredentialReference
+} from "./durable-credentials.ts";
+export {
+  ConfiguredHttpsNetworkBroker,
+  DirectPinnedHttpsTransport,
+  SystemNetworkAddressResolver,
+  createDirectConfiguredNetworkBroker,
+  loadConfiguredNetworkPolicy,
+  type ConfiguredNetworkPolicy,
+  type ConfiguredNetworkRequest,
+  type ConfiguredNetworkResult,
+  type ConfiguredNetworkRoute
+} from "./configured-network.ts";
 export { runStandaloneCompanion } from "./main.ts";
 
 /**

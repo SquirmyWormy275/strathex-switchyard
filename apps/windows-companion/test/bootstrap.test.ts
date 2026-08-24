@@ -74,7 +74,7 @@ test("default installed composition uses canonical filesystem and allowlisted Gi
   const material = { ...targetMaterial, repositoryRoot: folder, canonicalRemote: undefined, head: "local-head", indexTree: "local-tree", trackedManifest: "local-tracked", untrackedManifest: "local-untracked" };
   const localTarget: TargetSnapshot = { id: targetSnapshotDigest(material), ...material, capturedAt: new Date().toISOString() };
   const store = new ProtectedJsonStore({ filePath: join(folder, "state", "protected.jsonl"), authenticator: isolatedAuthenticator });
-  const companion = createDurableWindowsCompanion({ store, policyVersion: "policy-1", localStateDirectory: join(folder, "state"), targetResolver: { resolve: async () => localTarget } });
+  const companion = createDurableWindowsCompanion({ store, policyVersion: "policy-1", localStateDirectory: join(folder, "state"), credentialProtector: new FakeUserSecretProtector(), targetResolver: { resolve: async () => localTarget } });
   const session = await companion.registerTrustedSession({ id: "mediated-local", provider: "generic", surface: "vscode_window", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: folder, targetSnapshotId: localTarget.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-smoke", metadata: {} });
   const safeGrant = await companion.executor.authorities.issue({ repositoryRoot: folder, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["shield_change_scan"], prohibitedActions: [], expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user" });
   const status = await companion.endpoint.handle({ version: companionBridgeVersion, id: "scan", method: "command.dispatch", payload: { control: "SHIELD", modifier: "normal", sessionId: session.id, authorityId: safeGrant.id } });
@@ -84,6 +84,12 @@ test("default installed composition uses canonical filesystem and allowlisted Gi
   assert.equal(companion.localComponents?.filesystem, "canonical-allowlist");
   const epoch = companion.localComponents!.rawHid.connect("loopback-test");
   assert.equal(companion.localComponents!.rawHid.send("loopback-test", epoch, new Uint8Array([0xb1, 0x22])), true);
+  const credentialScope = { repositoryRoot: folder, adapterId: "configured-network", purpose: "isolated-provider" } as const;
+  await companion.localComponents!.credentials.provision({ reference: "isolated", scopes: [credentialScope] }, Buffer.from("ephemeral-test-secret", "utf8"));
+  const credentialAdapter = companion.localComponents!.credentials.createAdapter("configured-network");
+  const lease = await credentialAdapter.acquireLease({ reference: "isolated", repositoryRoot: folder, purpose: "isolated-provider" });
+  await companion.localComponents!.containment.activate({ repositoryRoot: folder, operationId: "test-containment", reason: "verify credential lease revocation" });
+  await assert.rejects(() => credentialAdapter.redeem(lease, async () => undefined), /used, expired, or revoked/i);
   const grant = await companion.executor.authorities.issue({ repositoryRoot: folder, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["emergency_containment"], prohibitedActions: [], expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user" });
   const high = await companion.endpoint.handle({ version: companionBridgeVersion, id: "contain", method: "command.dispatch", payload: { control: "SHIELD", modifier: "ctrl_shift_alt", sessionId: session.id, authorityId: grant.id } });
   assert.equal(high.ok, true);

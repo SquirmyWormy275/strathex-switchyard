@@ -12,6 +12,8 @@ import { createDefaultLocalComposition, type DefaultLocalComposition } from "./d
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { DurableHostActionQueue } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
+import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
+import type { UserSecretProtector } from "./windows-secret.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -36,6 +38,10 @@ export interface DurableWindowsCompanionOptions {
    */
   readonly localGitStateDirectory?: string;
   readonly localGitMutationFactory?: GitMutationFactory;
+  /** Required by the installed composition; tests may inject a fake protector. */
+  readonly credentialProtector?: UserSecretProtector;
+  /** Host-loaded, validated exact HTTPS routes. Empty or omitted means no outbound route. */
+  readonly networkPolicy?: ConfiguredNetworkPolicy;
 }
 
 /**
@@ -77,6 +83,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         {
           ...(options.localGitStateDirectory ? { localGitStateDirectory: options.localGitStateDirectory } : {}),
           ...(options.localGitMutationFactory ? { localGitMutationFactory: options.localGitMutationFactory } : {}),
+          credentialProtector: options.credentialProtector ?? unavailableCredentialProtector,
+          ...(options.networkPolicy ? { networkPolicy: options.networkPolicy } : {}),
           hostActions
         }
       );
@@ -115,3 +123,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     }
   };
 }
+
+const unavailableCredentialProtector: UserSecretProtector = {
+  provider: "unavailable-no-host-secret-protector",
+  async seal(): Promise<string> { throw new Error("No host credential protector is configured."); },
+  async open(): Promise<Uint8Array> { throw new Error("No host credential protector is configured."); }
+};
