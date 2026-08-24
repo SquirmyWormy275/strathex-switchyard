@@ -148,6 +148,15 @@ export class ManagedSessionController {
         const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
         await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
       }),
+      this.vscode.commands.registerCommand("sxsy-b122.installRepositoryRuntime", async () => {
+        await this.installRepositoryRuntime();
+      }),
+      this.vscode.commands.registerCommand("sxsy-b122.listRepositoryRuntimes", async () => {
+        await this.listRepositoryRuntimes();
+      }),
+      this.vscode.commands.registerCommand("sxsy-b122.revokeRepositoryRuntime", async () => {
+        await this.revokeRepositoryRuntime();
+      }),
       this.vscode.commands.registerCommand("sxsy-b122.dispatch", async (argument: unknown) => {
         const command = parseChordArgument(argument);
         if (!command) {
@@ -169,6 +178,77 @@ export class ManagedSessionController {
         await this.dispatch(command, parseInputArgument(argument));
       }));
     }
+  }
+
+  private async installRepositoryRuntime(): Promise<void> {
+    const root = await this.chooseGitRoot("Choose the exact Git root for this verified runtime manifest");
+    if (!root) return;
+    const selected = await this.vscode.window.showOpenDialog?.({
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      openLabel: "Review Runtime Manifest",
+      filters: { "SXSY-B122 runtime manifest": ["json"] }
+    });
+    const manifestPath = selected?.length === 1 ? selected[0]?.fsPath : undefined;
+    if (!manifestPath) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 runtime installation was cancelled; no manifest was pinned.");
+      return;
+    }
+    const result = await this.bridge.installRuntimePin(root.gitRoot, manifestPath);
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 runtime was not installed: ${result.message}`);
+      return;
+    }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 installed the current-user-attested runtime digest ${result.value.expectedSha256.slice(0, 12)}… for the selected Git root.`);
+  }
+
+  private async listRepositoryRuntimes(): Promise<void> {
+    const result = await this.bridge.listRuntimePins();
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 runtime registry unavailable: ${result.message}`);
+      return;
+    }
+    const active = result.value.filter((pin) => pin.status === "active");
+    const summary = active.length
+      ? active.map((pin) => `${pin.canonicalRepositoryRoot} (${pin.expectedSha256.slice(0, 12)}…)`).join("; ")
+      : "No active repository runtime manifests are installed.";
+    await this.vscode.window.showInformationMessage(`SXSY-B122 runtime registry: ${summary}`);
+  }
+
+  private async revokeRepositoryRuntime(): Promise<void> {
+    const result = await this.bridge.listRuntimePins();
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 runtime registry unavailable: ${result.message}`);
+      return;
+    }
+    const active = result.value.filter((pin) => pin.status === "active");
+    if (!active.length) {
+      await this.vscode.window.showInformationMessage("SXSY-B122 has no active repository runtime manifest to revoke.");
+      return;
+    }
+    const items = active.map((pin) => ({ label: pin.canonicalRepositoryRoot, description: pin.expectedSha256.slice(0, 16) }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the exact repository runtime pin to revoke" });
+    const pin = selected ? active[items.indexOf(selected)] : undefined;
+    if (!pin) return;
+    const revoked = await this.bridge.revokeRuntimePin(pin.canonicalRepositoryRoot);
+    if (!revoked.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 runtime pin was not revoked: ${revoked.message}`);
+      return;
+    }
+    await this.vscode.window.showInformationMessage("SXSY-B122 revoked the selected current-user-attested repository runtime pin.");
+  }
+
+  private async chooseGitRoot(placeHolder: string): Promise<GitRootRegistration | undefined> {
+    if (!this.gitRoots.length) await this.refreshWorkspaceRegistration();
+    if (this.gitRoots.length === 1) return this.gitRoots[0];
+    if (!this.gitRoots.length) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 found no structured Git root in this VS Code window.");
+      return undefined;
+    }
+    const items = this.gitRoots.map((root) => ({ label: root.gitRoot, description: root.branch ?? "unknown branch" }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder });
+    return selected ? this.gitRoots[items.indexOf(selected)] : undefined;
   }
 
   private async refreshWorkspaceRegistration(): Promise<void> {

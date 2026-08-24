@@ -74,6 +74,14 @@ export interface GitReviewResult {
   readonly session?: ExtensionManagedSession;
 }
 
+export interface RepositoryRuntimePin {
+  readonly canonicalRepositoryRoot: string;
+  readonly manifestPath: string;
+  readonly expectedSha256: string;
+  readonly installedAt: string;
+  readonly status: "active" | "revoked";
+}
+
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: string; readonly message: string };
@@ -86,6 +94,9 @@ export interface ExtensionCompanionBridge {
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
   prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>>;
   reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
+  installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
+  listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>>;
+  revokeRuntimePin(repositoryRoot: string): Promise<BridgeResult<RepositoryRuntimePin>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -144,6 +155,21 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return result.ok ? { ok: true, value: result.value.review } : result;
   }
 
+  async installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>> {
+    const result = await this.call<{ pin: RepositoryRuntimePin }>("runtime.pin.install", { repositoryRoot, manifestPath });
+    return result.ok ? { ok: true, value: result.value.pin } : result;
+  }
+
+  async listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> {
+    const result = await this.call<{ pins: readonly RepositoryRuntimePin[] }>("runtime.pin.list", undefined);
+    return result.ok ? { ok: true, value: result.value.pins } : result;
+  }
+
+  async revokeRuntimePin(repositoryRoot: string): Promise<BridgeResult<RepositoryRuntimePin>> {
+    const result = await this.call<{ pin: RepositoryRuntimePin }>("runtime.pin.revoke", { repositoryRoot });
+    return result.ok ? { ok: true, value: result.value.pin } : result;
+  }
+
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
@@ -197,6 +223,9 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   prepareCommand(): Promise<BridgeResult<PreparedCommand>> { return this.unavailable(); }
   reviewGitMutation(): Promise<BridgeResult<GitReviewResult>> { return this.unavailable(); }
+  installRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
+  listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> { return this.unavailable(); }
+  revokeRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 

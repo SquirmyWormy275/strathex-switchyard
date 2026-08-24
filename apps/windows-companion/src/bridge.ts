@@ -26,6 +26,9 @@ export type CompanionMethod =
   | "command.prepare"
   | "confirmation.request"
   | "git.review.submit"
+  | "runtime.pin.install"
+  | "runtime.pin.list"
+  | "runtime.pin.revoke"
   | "host-action.complete";
 
 export interface CompanionRequest {
@@ -129,6 +132,16 @@ export interface GitReviewPayload {
   readonly mutation: GitMutation;
 }
 
+/** Paths are selection input only; digest and user-presence evidence are host-owned. */
+export interface RuntimePinInstallPayload {
+  readonly repositoryRoot: string;
+  readonly manifestPath: string;
+}
+
+export interface RuntimePinRevokePayload {
+  readonly repositoryRoot: string;
+}
+
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
   request(request: CompanionRequest): Promise<CompanionResponse>;
@@ -182,7 +195,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
-    "git.review.submit", "host-action.complete"
+    "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "host-action.complete"
   ].includes(value);
 }
 

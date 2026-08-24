@@ -15,6 +15,9 @@ import { CompanionService } from "./service.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableGitMutationReviewQueue } from "./git-review.ts";
+import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
+import { AttestedRuntimePinCoordinator } from "./runtime-provisioning.ts";
+import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -43,6 +46,8 @@ export interface DurableWindowsCompanionOptions {
   readonly credentialProtector?: UserSecretProtector;
   /** Host-loaded, validated exact HTTPS routes. Empty or omitted means no outbound route. */
   readonly networkPolicy?: ConfiguredNetworkPolicy;
+  /** Host-owned Windows user-presence verifier for runtime pin changes. */
+  readonly runtimePinPresence?: WindowsUserPresenceRunner;
 }
 
 /**
@@ -59,6 +64,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly localComponents?: DefaultLocalComposition;
   readonly hostActions: DurableHostActionQueue;
   readonly gitReviews?: DurableGitMutationReviewQueue;
+  readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry;
+  readonly runtimePins?: AttestedRuntimePinCoordinator;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -69,6 +76,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     throw new Error("The durable B122 companion requires a host-backed journal authenticator; unprotected hash-chain storage is rejected.");
   }
   const sessions = new SessionRegistry(store);
+  const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store);
+  const runtimePins = options.runtimePinPresence
+    ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
+    : undefined;
   const targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
     new TargetSnapshotFactory(new GitCliInspector()),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
@@ -93,6 +104,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           ...((options.localGitMutationFactory ?? gitReviews) ? { localGitMutationFactory: options.localGitMutationFactory ?? gitReviews } : {}),
           credentialProtector: options.credentialProtector ?? unavailableCredentialProtector,
           ...(options.networkPolicy ? { networkPolicy: options.networkPolicy } : {}),
+          repositoryRuntimes,
           hostActions
         }
       );
@@ -111,7 +123,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}) });
+  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -122,7 +134,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     service,
     endpoint,
     hostActions,
+    repositoryRuntimes,
     ...(gitReviews ? { gitReviews } : {}),
+    ...(runtimePins ? { runtimePins } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

@@ -6,7 +6,7 @@ import { AuthenticatedPipeServer, createPipeConfiguration, loadPipeConfiguration
 import { defaultControlPlaneStorePath, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { DpapiJournalAuthenticator, WindowsDpapiCurrentUserProtector } from "./windows-secret.ts";
 import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./configured-network.ts";
-import { WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
+import { PowerShellWindowsUserPresenceRunner, WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -24,6 +24,7 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
     requireAuthenticatedProtection: true
   });
   const networkPolicy = await loadNetworkPolicy(join(stateDirectory, "network-policy.json"));
+  const userPresence = new PowerShellWindowsUserPresenceRunner();
   const companion = createDurableWindowsCompanion({
     policyVersion: process.env.SXSY_B122_POLICY_VERSION?.trim() || "b122-local-v1",
     store,
@@ -31,7 +32,8 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
     localGitStateDirectory: stateDirectory,
     credentialProtector: protector,
     networkPolicy,
-    runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor() },
+    runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor(userPresence) },
+    runtimePinPresence: userPresence,
     snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
   });
   await companion.endpoint.ready();

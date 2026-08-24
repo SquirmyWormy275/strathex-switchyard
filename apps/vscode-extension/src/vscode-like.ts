@@ -47,6 +47,8 @@ export interface QuickPickItemLike {
   readonly description?: string;
 }
 
+export interface UriLike { readonly fsPath: string; }
+
 export interface VscodeLike {
   readonly commands: {
     registerCommand(command: string, callback: (...args: unknown[]) => unknown): DisposableLike;
@@ -60,6 +62,7 @@ export interface VscodeLike {
     showWarningMessage(message: string): PromiseLike<string | undefined>;
     showQuickPick<T extends string | QuickPickItemLike>(items: readonly T[], options?: { readonly placeHolder?: string }): PromiseLike<T | undefined>;
     showInputBox?(options?: { readonly prompt?: string; readonly placeHolder?: string; readonly value?: string; readonly password?: boolean; validateInput?(value: string): string | undefined | null | PromiseLike<string | undefined | null> }): PromiseLike<string | undefined>;
+    showOpenDialog?(options?: { readonly canSelectFiles?: boolean; readonly canSelectFolders?: boolean; readonly canSelectMany?: boolean; readonly openLabel?: string; readonly filters?: Readonly<Record<string, readonly string[]>> }): PromiseLike<readonly UriLike[] | undefined>;
     onDidOpenTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
     onDidCloseTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
   };

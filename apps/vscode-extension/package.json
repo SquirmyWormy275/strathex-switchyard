@@ -20,6 +20,9 @@
     "onCommand:sxsy-b122.adoptTerminal",
     "onCommand:sxsy-b122.refreshManagedRegistry",
     "onCommand:sxsy-b122.showManagedSessions",
+    "onCommand:sxsy-b122.installRepositoryRuntime",
+    "onCommand:sxsy-b122.listRepositoryRuntimes",
+    "onCommand:sxsy-b122.revokeRepositoryRuntime",
     "onCommand:sxsy-b122.dispatch",
     "onCommand:sxsy-b122.showIntent",
     "onCommand:sxsy-b122.chord.reanchor.normal",
@@ -105,6 +108,18 @@
       {
         "command": "sxsy-b122.showManagedSessions",
         "title": "SXSY-B122: Show Managed Sessions"
+      },
+      {
+        "command": "sxsy-b122.installRepositoryRuntime",
+        "title": "SXSY-B122: Install Verified Repository Runtime"
+      },
+      {
+        "command": "sxsy-b122.listRepositoryRuntimes",
+        "title": "SXSY-B122: Show Repository Runtimes"
+      },
+      {
+        "command": "sxsy-b122.revokeRepositoryRuntime",
+        "title": "SXSY-B122: Revoke Repository Runtime"
       },
       {
         "command": "sxsy-b122.dispatch",

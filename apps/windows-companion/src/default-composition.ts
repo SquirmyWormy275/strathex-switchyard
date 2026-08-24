@@ -145,6 +145,7 @@ export interface DefaultLocalCompositionOptions {
   readonly credentialProtector: UserSecretProtector;
   readonly networkPolicy?: ConfiguredNetworkPolicy;
   readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
+  readonly repositoryRuntimes?: DurableRepositoryRuntimeRegistry;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   let credentials: DurableCredentialReferenceVault | undefined;
@@ -161,7 +162,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     credentials.createAdapter("configured-network")
   );
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
-  const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
+  const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
   const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
   const hostActionAdapter = new DurableHostActionAdapter(hostActions);

@@ -1,7 +1,10 @@
+import { isAbsolute } from "node:path";
+
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { GitReviewResult } from "./git-review.ts";
+import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type {
   AuditEvent,
   Capability,
@@ -21,6 +24,8 @@ import {
   type ConfirmationRequestPayload,
   type HostActionCompletionPayload,
   type GitReviewPayload,
+  type RuntimePinInstallPayload,
+  type RuntimePinRevokePayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -80,6 +85,7 @@ export interface CompanionServiceOptions {
   readonly executor?: MediatedCommandExecutor;
   readonly hostActions?: HostActionCoordinator;
   readonly gitReviews?: GitMutationReviewCoordinator;
+  readonly runtimePins?: RuntimePinCoordinator;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -102,6 +108,7 @@ export class CompanionService {
   private readonly executor?: MediatedCommandExecutor;
   private readonly hostActions?: HostActionCoordinator;
   private readonly gitReviews?: GitMutationReviewCoordinator;
+  private readonly runtimePins?: RuntimePinCoordinator;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
@@ -110,6 +117,7 @@ export class CompanionService {
     this.executor = options.executor;
     this.hostActions = options.hostActions;
     this.gitReviews = options.gitReviews;
+    this.runtimePins = options.runtimePins;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -145,6 +153,12 @@ export class CompanionService {
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
         case "git.review.submit":
           return this.success(request.id, { review: await this.reviewGitMutation(this.requireGitReview(request.payload)) });
+        case "runtime.pin.install":
+          return this.success(request.id, { pin: await this.installRuntimePin(this.requireRuntimePinInstall(request.payload)) });
+        case "runtime.pin.list":
+          return this.success(request.id, { pins: await this.listRuntimePins(request.payload) });
+        case "runtime.pin.revoke":
+          return this.success(request.id, { pin: await this.revokeRuntimePin(this.requireRuntimePinRevoke(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
@@ -339,6 +353,41 @@ export class CompanionService {
     if (result.session) this.installTrustedSession(result.session);
     this.record("git.review.submit", result.status === "approved" ? "completed" : result.status, result.summary, payload.sessionId);
     return result;
+  }
+
+  private async installRuntimePin(payload: RuntimePinInstallPayload) {
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    const pin = await this.runtimePins.install(payload);
+    this.record("runtime.pin.install", "completed", "Installed one current-user-attested repository runtime digest.");
+    return pin;
+  }
+
+  private async listRuntimePins(payload: unknown) {
+    if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Runtime pin listing accepts no client options.");
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    return this.runtimePins.list();
+  }
+
+  private async revokeRuntimePin(payload: RuntimePinRevokePayload) {
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    const pin = await this.runtimePins.revoke(payload.repositoryRoot);
+    this.record("runtime.pin.revoke", "completed", "Revoked one current-user-attested repository runtime digest.");
+    return pin;
+  }
+
+  private requireRuntimePinInstall(payload: unknown): RuntimePinInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "manifestPath"])
+      || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.manifestPath)) {
+      throw new CompanionServiceError("invalid_request", "Runtime pin installation requires only bounded absolute repository and manifest paths.");
+    }
+    return { repositoryRoot: payload.repositoryRoot, manifestPath: payload.manifestPath };
+  }
+
+  private requireRuntimePinRevoke(payload: unknown): RuntimePinRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) {
+      throw new CompanionServiceError("invalid_request", "Runtime pin revocation requires one bounded absolute repository path.");
+    }
+    return { repositoryRoot: payload.repositoryRoot };
   }
 
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
@@ -583,6 +632,16 @@ function parseGitMutation(value: unknown): GitMutation {
 function exactMutationKeys(value: Record<string, unknown>, expected: readonly string[]): void {
   const keys = Object.keys(value);
   if (keys.length !== expected.length || expected.some((key) => !(key in value))) throw new CompanionServiceError("invalid_request", "Git review mutation contains an unknown or missing field.");
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === expected.length && expected.every((key) => key in value);
+}
+
+function boundedHostPath(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value)
+    && (isAbsolute(value) || /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value));
 }
 
 function isCommandPreparationExecutor(value: MediatedCommandExecutor | undefined): value is CommandPreparationCapableMediatedCommandExecutor {

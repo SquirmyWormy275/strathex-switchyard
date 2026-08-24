@@ -63,6 +63,7 @@ export {
 } from "./windows-user-presence.ts";
 export * from "./repository-runtime.ts";
 export * from "./runtime-registry.ts";
+export * from "./runtime-provisioning.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";
 export * from "./git-review.ts";

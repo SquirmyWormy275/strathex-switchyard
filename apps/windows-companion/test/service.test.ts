@@ -196,6 +196,30 @@ test("Git review accepts only an exact typed mutation and cannot carry force or 
   assert.equal(force.error?.code, "invalid_request");
 });
 
+test("runtime pin routes accept paths only and delegate digest and presence authority to the host", async () => {
+  const calls: unknown[] = [];
+  const pin = { canonicalRepositoryRoot: "C:\\repo", manifestPath: "C:\\repo\\runtime.json", expectedSha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" as const };
+  const service = new CompanionService({ runtimePins: {
+    async install(payload) { calls.push(["install", payload]); return pin; },
+    async list() { calls.push(["list"]); return [pin]; },
+    async revoke(repositoryRoot) { calls.push(["revoke", repositoryRoot]); return { ...pin, status: "revoked" as const }; }
+  } });
+  assert.equal((await service.handle(request("install", "runtime.pin.install", { repositoryRoot: "C:\\repo", manifestPath: "C:\\repo\\runtime.json" }))).ok, true);
+  assert.equal((await service.handle(request("list", "runtime.pin.list"))).ok, true);
+  assert.equal((await service.handle(request("revoke", "runtime.pin.revoke", { repositoryRoot: "C:\\repo" }))).ok, true);
+  assert.deepEqual(calls, [
+    ["install", { repositoryRoot: "C:\\repo", manifestPath: "C:\\repo\\runtime.json" }],
+    ["list"],
+    ["revoke", "C:\\repo"]
+  ]);
+
+  const fabricated = await service.handle(request("fabricated", "runtime.pin.install", {
+    repositoryRoot: "C:\\repo", manifestPath: "C:\\repo\\runtime.json", expectedSha256: "b".repeat(64), approved: true
+  }));
+  assert.equal(fabricated.ok, false);
+  assert.equal(fabricated.error?.code, "invalid_request");
+});
+
 test("in-process and unavailable bridges retain request IDs and fail closed", async () => {
   const service = new CompanionService({ now: () => "2026-08-23T00:00:00.000Z", idFactory: () => "audit" });
   const inProcess = new InProcessCompanionBridge(service);
