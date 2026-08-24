@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Microsoft.Win32.SafeHandles;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -22,6 +24,7 @@ internal static class Program
     private const string RequestSchema = "sxsy-b122.windows-sandbox-request";
     private const string CatalogSchema = "sxsy-b122.windows-sandbox-catalog";
     private const string ResultSchema = "sxsy-b122.windows-sandbox-result";
+    private const int RequestVersion = 2;
     private const int MaximumCatalogBytes = 256 * 1024;
     private const int MaximumRequestBytes = 32 * 1024;
     private const int MaximumRecipes = 32;
@@ -55,6 +58,7 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        bool sandboxGuestConfirmed = false;
         Console.CancelKeyPress += (_, eventArgs) =>
         {
             eventArgs.Cancel = true;
@@ -64,6 +68,8 @@ internal static class Program
         try
         {
             Invocation invocation = ParseInvocation(args);
+            RequireWindowsSandboxGuest(invocation);
+            sandboxGuestConfirmed = true;
             await ExecuteAsync(invocation, ApplicationCancellation.Token).ConfigureAwait(false);
             return 0;
         }
@@ -81,6 +87,27 @@ internal static class Program
         {
             WriteDiagnostic("Sandbox helper failed closed.");
             return 70;
+        }
+        finally
+        {
+            if (sandboxGuestConfirmed)
+            {
+                RequestSandboxShutdown();
+            }
+        }
+    }
+
+    private static void RequireWindowsSandboxGuest(Invocation invocation)
+    {
+        if (!OperatingSystem.IsWindows() ||
+            !StringComparer.OrdinalIgnoreCase.Equals(Environment.UserName, "WDAGUtilityAccount") ||
+            !SamePath(invocation.RequestPath, RequestPath) ||
+            !SamePath(invocation.OutputPath, ExchangeRoot) ||
+            !Directory.Exists(InputRoot) ||
+            !Directory.Exists(ExchangeRoot) ||
+            !Directory.Exists(@"C:\B122\tools"))
+        {
+            throw new HelperException(66, "Sandbox helper refused to run outside the expected Windows Sandbox guest boundary.");
         }
     }
 
@@ -178,8 +205,9 @@ internal static class Program
             processArguments,
             workingDirectory,
             processEnvironment,
-            recipe.TimeoutMilliseconds,
+            Math.Min(recipe.TimeoutMilliseconds, request.ResourcePolicy.WallTimeMs),
             recipe.MaxOutputBytes,
+            request.ResourcePolicy,
             cancellationToken).ConfigureAwait(false);
 
         if (processExecution.ExitCode != 0)
@@ -195,13 +223,24 @@ internal static class Program
         var manifest = new
         {
             schema = ResultSchema,
-            version = 1,
+            version = RequestVersion,
             requestId = request.RequestId,
             leaseId = request.LeaseId,
             recipeId = request.RecipeId,
+            profile = request.Profile,
             recipeCatalogDigest = request.RecipeCatalogDigest,
+            resourcePolicyDigest = request.ResourcePolicyDigest,
             outcome = "completed",
             summary = "Fixed digest-pinned sandbox recipe completed with validated bounded outputs.",
+            resourceEnforcement = new
+            {
+                jobObject = true,
+                cpuHardCap = true,
+                memoryLimit = true,
+                processLimit = true,
+                noSurvivors = true,
+                activeProcessesAfterCleanup = 0
+            },
             outputs = outputs.Select(output => new { path = output.Path, size = output.Size, sha256 = output.Sha256 }).ToArray()
         };
         byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
@@ -219,66 +258,18 @@ internal static class Program
         IReadOnlyDictionary<string, string> environment,
         int timeoutMilliseconds,
         int maximumOutputBytes,
+        ResourcePolicy resourcePolicy,
         CancellationToken cancellationToken)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = executable,
-                WorkingDirectory = workingDirectory,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            },
-            EnableRaisingEvents = true
-        };
-        foreach (string argument in arguments)
-        {
-            process.StartInfo.ArgumentList.Add(argument);
-        }
-        process.StartInfo.Environment.Clear();
-        foreach ((string name, string value) in environment)
-        {
-            process.StartInfo.Environment.Add(name, value);
-        }
-
-        if (!process.Start())
-        {
-            throw new HelperException(74, "Verified sandbox process did not start.");
-        }
-        process.StandardInput.Close();
-        var budget = new SharedOutputBudget(maximumOutputBytes);
-        Task<string> stdout = DrainBoundedAsync(process.StandardOutput, budget);
-        Task<string> stderr = DrainBoundedAsync(process.StandardError, budget);
-        using var timeout = new CancellationTokenSource(timeoutMilliseconds);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-        try
-        {
-            await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (InvalidOperationException)
-            {
-                // The owned process exited between cancellation and termination.
-            }
-            await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            throw new HelperException(75, "Verified sandbox recipe exceeded its bounded timeout.");
-        }
-        string[] captured = await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-        return new ProcessExecution(process.ExitCode, captured[0], captured[1]);
+        return await JobObjectProcessBoundary.RunAsync(
+            executable,
+            arguments,
+            workingDirectory,
+            environment,
+            timeoutMilliseconds,
+            maximumOutputBytes,
+            resourcePolicy,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<string> DrainBoundedAsync(StreamReader reader, SharedOutputBudget budget)
@@ -376,20 +367,62 @@ internal static class Program
     {
         using JsonDocument document = ParseJson(bytes, "request");
         JsonElement root = RequireExactObject(document.RootElement,
-            new[] { "schema", "version", "requestId", "leaseId", "recipeId", "recipeCatalogDigest", "helperDigest" },
+            new[] { "schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "helperDigest", "resourcePolicy", "resourcePolicyDigest" },
             "request");
         RequireExactString(root, "schema", RequestSchema);
-        RequireExactInteger(root, "version", 1);
+        RequireExactInteger(root, "version", RequestVersion);
         string requestId = RequireBoundedString(root, "requestId", 256);
         string leaseId = RequireBoundedString(root, "leaseId", 256);
         string recipeId = RequireBoundedString(root, "recipeId", 128);
+        string profile = RequireBoundedString(root, "profile", 64);
         string catalogDigest = RequireDigest(root, "recipeCatalogDigest");
         string helperDigest = RequireDigest(root, "helperDigest");
-        if (!SafeRequestId.IsMatch(requestId) || !SafeLeaseId.IsMatch(leaseId) || !SafeIdentifier.IsMatch(recipeId))
+        string resourcePolicyDigest = RequireDigest(root, "resourcePolicyDigest");
+        ResourcePolicy resourcePolicy = ParseResourcePolicy(root.GetProperty("resourcePolicy"));
+        if (!SafeRequestId.IsMatch(requestId) || !SafeLeaseId.IsMatch(leaseId) || !SafeIdentifier.IsMatch(recipeId) ||
+            (profile != "full_sandbox" && profile != "fresh_full_sandbox" && profile != "quarantine"))
         {
             throw new HelperException(65, "Request contains an invalid exact identity.");
         }
-        return new Request(requestId, leaseId, recipeId, catalogDigest, helperDigest);
+        if ((recipeId == "full_sandbox" && profile != "full_sandbox") ||
+            (recipeId == "rebuild_full_sandbox" && profile != "fresh_full_sandbox") ||
+            (recipeId == "quarantine" && profile != "quarantine") ||
+            (recipeId != "full_sandbox" && recipeId != "rebuild_full_sandbox" && recipeId != "quarantine" && profile != "full_sandbox"))
+        {
+            throw new HelperException(65, "Request recipe and sandbox profile do not match.");
+        }
+        ValidateResourcePolicy(profile, resourcePolicy, resourcePolicyDigest);
+        return new Request(requestId, leaseId, recipeId, profile, catalogDigest, helperDigest, resourcePolicy, resourcePolicyDigest);
+    }
+
+    private static ResourcePolicy ParseResourcePolicy(JsonElement element)
+    {
+        JsonElement policy = RequireExactObject(element,
+            new[] { "cpuRatePercent", "jobMemoryMiB", "processMemoryMiB", "activeProcessLimit", "wallTimeMs" },
+            "resource policy");
+        return new ResourcePolicy(
+            RequireBoundedInteger(policy, "cpuRatePercent", 1, 100),
+            RequireBoundedInteger(policy, "jobMemoryMiB", 256, 4096),
+            RequireBoundedInteger(policy, "processMemoryMiB", 128, 4096),
+            RequireBoundedInteger(policy, "activeProcessLimit", 1, 128),
+            RequireBoundedInteger(policy, "wallTimeMs", 1000, MaximumTimeoutMilliseconds));
+    }
+
+    private static void ValidateResourcePolicy(string profile, ResourcePolicy policy, string expectedDigest)
+    {
+        ResourcePolicy required = profile == "quarantine"
+            ? new ResourcePolicy(25, 1536, 512, 8, policy.WallTimeMs)
+            : new ResourcePolicy(75, 3584, 2048, 64, policy.WallTimeMs);
+        if (policy != required || policy.ProcessMemoryMiB > policy.JobMemoryMiB)
+        {
+            throw new HelperException(65, "Resource policy does not match the fixed sandbox profile.");
+        }
+        string canonical = string.Create(CultureInfo.InvariantCulture,
+            $"{{\"cpuRatePercent\":{policy.CpuRatePercent},\"jobMemoryMiB\":{policy.JobMemoryMiB},\"processMemoryMiB\":{policy.ProcessMemoryMiB},\"activeProcessLimit\":{policy.ActiveProcessLimit},\"wallTimeMs\":{policy.WallTimeMs}}}");
+        if (!FixedTimeHexEquals(Sha256Hex(Encoding.UTF8.GetBytes(canonical)), expectedDigest))
+        {
+            throw new HelperException(65, "Resource policy digest does not match the exact host request.");
+        }
     }
 
     private static Catalog ParseCatalog(byte[] bytes)
@@ -506,7 +539,7 @@ internal static class Program
         JsonProperty[] actual = element.EnumerateObject().ToArray();
         if (actual.Length != properties.Count || actual.Any(property => !properties.Contains(property.Name, StringComparer.Ordinal)) || actual.Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() != actual.Length)
         {
-            throw new HelperException(65, $"{label} does not use the exact v1 schema.");
+            throw new HelperException(65, $"{label} does not use its exact supported schema.");
         }
         return element;
     }
@@ -772,6 +805,34 @@ internal static class Program
         File.Move(temporaryPath, finalPath, overwrite: false);
     }
 
+    private static void RequestSandboxShutdown()
+    {
+        const string shutdownPath = @"C:\Windows\System32\shutdown.exe";
+        try
+        {
+            if (!File.Exists(shutdownPath))
+            {
+                WriteDiagnostic("Sandbox shutdown executable is unavailable; the host deadline must terminate the disposable VM.");
+                return;
+            }
+            using Process? shutdown = Process.Start(new ProcessStartInfo
+            {
+                FileName = shutdownPath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                ArgumentList = { "/s", "/t", "0", "/f", "/d", "p:0:0" }
+            });
+            if (shutdown is null)
+            {
+                WriteDiagnostic("Sandbox shutdown request did not start; the host deadline must terminate the disposable VM.");
+            }
+        }
+        catch (Exception)
+        {
+            WriteDiagnostic("Sandbox shutdown request failed; the host deadline must terminate the disposable VM.");
+        }
+    }
+
     private static void WriteDiagnostic(string message)
     {
         string safe = message.Length <= 512 ? message : message[..512];
@@ -785,7 +846,16 @@ internal static class Program
     };
 
     private sealed record Invocation(string CatalogPath, string RequestPath, string OutputPath);
-    private sealed record Request(string RequestId, string LeaseId, string RecipeId, string RecipeCatalogDigest, string HelperDigest);
+    private sealed record Request(
+        string RequestId,
+        string LeaseId,
+        string RecipeId,
+        string Profile,
+        string RecipeCatalogDigest,
+        string HelperDigest,
+        ResourcePolicy ResourcePolicy,
+        string ResourcePolicyDigest);
+    private sealed record ResourcePolicy(int CpuRatePercent, int JobMemoryMiB, int ProcessMemoryMiB, int ActiveProcessLimit, int WallTimeMs);
     private sealed record Catalog(IReadOnlyList<Recipe> Recipes);
     private sealed record Recipe(
         string Id,
@@ -801,6 +871,496 @@ internal static class Program
     private sealed record ExecutableIdentity(string CanonicalPath, long Length, DateTime LastWriteUtc, string Sha256);
     private sealed record ProcessExecution(int ExitCode, string StandardOutput, string StandardError);
     private sealed record ResultOutput(string Path, long Size, string Sha256);
+
+    private static class JobObjectProcessBoundary
+    {
+        private const uint CREATE_SUSPENDED = 0x00000004;
+        private const uint CREATE_NO_WINDOW = 0x08000000;
+        private const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
+        private const uint STARTF_USESTDHANDLES = 0x00000100;
+        private const uint WAIT_OBJECT_0 = 0x00000000;
+        private const uint WAIT_TIMEOUT = 0x00000102;
+        private const uint JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008;
+        private const uint JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100;
+        private const uint JOB_OBJECT_LIMIT_JOB_MEMORY = 0x00000200;
+        private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+        private const uint JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION = 0x00000400;
+        private const uint JOB_OBJECT_CPU_RATE_CONTROL_ENABLE = 0x00000001;
+        private const uint JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP = 0x00000004;
+        private const uint HANDLE_FLAG_INHERIT = 0x00000001;
+        private const uint GENERIC_READ = 0x80000000;
+        private const uint FILE_SHARE_READ = 0x00000001;
+        private const uint FILE_SHARE_WRITE = 0x00000002;
+        private const uint OPEN_EXISTING = 3;
+
+        internal static async Task<ProcessExecution> RunAsync(
+            string executable,
+            IReadOnlyList<string> arguments,
+            string workingDirectory,
+            IReadOnlyDictionary<string, string> environment,
+            int timeoutMilliseconds,
+            int maximumOutputBytes,
+            ResourcePolicy resourcePolicy,
+            CancellationToken cancellationToken)
+        {
+            IntPtr job = IntPtr.Zero;
+            IntPtr processHandle = IntPtr.Zero;
+            IntPtr threadHandle = IntPtr.Zero;
+            IntPtr stdinHandle = IntPtr.Zero;
+            IntPtr stdoutRead = IntPtr.Zero;
+            IntPtr stdoutWrite = IntPtr.Zero;
+            IntPtr stderrRead = IntPtr.Zero;
+            IntPtr stderrWrite = IntPtr.Zero;
+            IntPtr environmentBlock = IntPtr.Zero;
+            bool processCreated = false;
+            try
+            {
+                job = CreateJobObjectW(IntPtr.Zero, null);
+                if (job == IntPtr.Zero)
+                {
+                    throw NativeFailure("Windows Job Object creation failed");
+                }
+                ConfigureJob(job, resourcePolicy);
+
+                var inheritable = new SECURITY_ATTRIBUTES
+                {
+                    nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>(),
+                    bInheritHandle = 1
+                };
+                stdinHandle = CreateFileW("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, ref inheritable, OPEN_EXISTING, 0, IntPtr.Zero);
+                if (stdinHandle == new IntPtr(-1) ||
+                    !CreatePipe(out stdoutRead, out stdoutWrite, ref inheritable, 0) ||
+                    !CreatePipe(out stderrRead, out stderrWrite, ref inheritable, 0) ||
+                    !SetHandleInformation(stdoutRead, HANDLE_FLAG_INHERIT, 0) ||
+                    !SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0))
+                {
+                    throw NativeFailure("Sandbox output pipe creation failed");
+                }
+
+                var startup = new STARTUPINFO
+                {
+                    cb = Marshal.SizeOf<STARTUPINFO>(),
+                    dwFlags = STARTF_USESTDHANDLES,
+                    hStdInput = stdinHandle,
+                    hStdOutput = stdoutWrite,
+                    hStdError = stderrWrite
+                };
+                string environmentText = string.Join('\0', environment.OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase).Select(entry => $"{entry.Key}={entry.Value}")) + "\0\0";
+                environmentBlock = Marshal.StringToHGlobalUni(environmentText);
+                var commandLine = new StringBuilder(QuoteWindowsArgument(executable));
+                foreach (string argument in arguments)
+                {
+                    commandLine.Append(' ').Append(QuoteWindowsArgument(argument));
+                }
+
+                if (!CreateProcessW(
+                    executable,
+                    commandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    true,
+                    CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+                    environmentBlock,
+                    workingDirectory,
+                    ref startup,
+                    out PROCESS_INFORMATION processInformation))
+                {
+                    throw NativeFailure("Suspended sandbox process creation failed");
+                }
+                processCreated = true;
+                processHandle = processInformation.hProcess;
+                threadHandle = processInformation.hThread;
+                CloseHandle(stdoutWrite);
+                stdoutWrite = IntPtr.Zero;
+                CloseHandle(stderrWrite);
+                stderrWrite = IntPtr.Zero;
+                CloseHandle(stdinHandle);
+                stdinHandle = IntPtr.Zero;
+
+                if (!AssignProcessToJobObject(job, processHandle))
+                {
+                    TerminateProcess(processHandle, 0xB1220001);
+                    throw NativeFailure("Suspended sandbox process could not enter its Job Object");
+                }
+                if (ResumeThread(threadHandle) == uint.MaxValue)
+                {
+                    TerminateJobObject(job, 0xB1220002);
+                    throw NativeFailure("Sandbox process could not resume inside its Job Object");
+                }
+                CloseHandle(threadHandle);
+                threadHandle = IntPtr.Zero;
+
+                using var stdoutStream = new FileStream(new SafeFileHandle(stdoutRead, ownsHandle: true), FileAccess.Read, 4096, isAsync: true);
+                stdoutRead = IntPtr.Zero;
+                using var stderrStream = new FileStream(new SafeFileHandle(stderrRead, ownsHandle: true), FileAccess.Read, 4096, isAsync: true);
+                stderrRead = IntPtr.Zero;
+                using var stdoutReader = new StreamReader(stdoutStream, new UTF8Encoding(false, true), false, 4096, leaveOpen: false);
+                using var stderrReader = new StreamReader(stderrStream, new UTF8Encoding(false, true), false, 4096, leaveOpen: false);
+                var budget = new SharedOutputBudget(maximumOutputBytes);
+                Task<string> stdout = DrainBoundedAsync(stdoutReader, budget);
+                Task<string> stderr = DrainBoundedAsync(stderrReader, budget);
+
+                DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+                bool cancelled = false;
+                bool timedOut = false;
+                while (true)
+                {
+                    uint wait = WaitForSingleObject(processHandle, 50);
+                    if (wait == WAIT_OBJECT_0)
+                    {
+                        break;
+                    }
+                    if (wait != WAIT_TIMEOUT)
+                    {
+                        throw NativeFailure("Sandbox process wait failed");
+                    }
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        cancelled = true;
+                        break;
+                    }
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        timedOut = true;
+                        break;
+                    }
+                    await Task.Yield();
+                }
+
+                uint exitCode = 0;
+                if (!cancelled && !timedOut && !GetExitCodeProcess(processHandle, out exitCode))
+                {
+                    throw NativeFailure("Sandbox process exit code was unavailable");
+                }
+                if (!TerminateJobObject(job, cancelled ? 0xB1220003u : timedOut ? 0xB1220004u : 0xB1220005u))
+                {
+                    throw NativeFailure("Sandbox Job Object termination failed");
+                }
+                if (WaitForSingleObject(processHandle, 5000) != WAIT_OBJECT_0)
+                {
+                    throw new HelperException(75, "Sandbox root process survived Job Object termination.");
+                }
+                AssertNoSurvivors(job);
+                string[] captured = await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
+                if (cancelled)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+                if (timedOut)
+                {
+                    throw new HelperException(75, "Verified sandbox recipe exceeded its bounded timeout.");
+                }
+                return new ProcessExecution(checked((int)exitCode), captured[0], captured[1]);
+            }
+            finally
+            {
+                if (processCreated && processHandle != IntPtr.Zero && WaitForSingleObject(processHandle, 0) == WAIT_TIMEOUT)
+                {
+                    if (job != IntPtr.Zero)
+                    {
+                        TerminateJobObject(job, 0xB12200FF);
+                    }
+                    else
+                    {
+                        TerminateProcess(processHandle, 0xB12200FF);
+                    }
+                }
+                CloseIfValid(threadHandle);
+                CloseIfValid(processHandle);
+                CloseIfValid(stdinHandle);
+                CloseIfValid(stdoutRead);
+                CloseIfValid(stdoutWrite);
+                CloseIfValid(stderrRead);
+                CloseIfValid(stderrWrite);
+                CloseIfValid(job);
+                if (environmentBlock != IntPtr.Zero)
+                {
+                    Marshal.FreeHGlobal(environmentBlock);
+                }
+            }
+        }
+
+        private static void ConfigureJob(IntPtr job, ResourcePolicy policy)
+        {
+            var limits = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+            {
+                BasicLimitInformation = new JOBOBJECT_BASIC_LIMIT_INFORMATION
+                {
+                    LimitFlags = JOB_OBJECT_LIMIT_ACTIVE_PROCESS |
+                        JOB_OBJECT_LIMIT_PROCESS_MEMORY |
+                        JOB_OBJECT_LIMIT_JOB_MEMORY |
+                        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
+                        JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION,
+                    ActiveProcessLimit = checked((uint)policy.ActiveProcessLimit)
+                },
+                ProcessMemoryLimit = new UIntPtr(checked((ulong)policy.ProcessMemoryMiB * 1024UL * 1024UL)),
+                JobMemoryLimit = new UIntPtr(checked((ulong)policy.JobMemoryMiB * 1024UL * 1024UL))
+            };
+            SetInformation(job, JobObjectExtendedLimitInformation, limits);
+            var cpu = new JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+            {
+                ControlFlags = JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP,
+                CpuRate = checked((uint)policy.CpuRatePercent * 100)
+            };
+            SetInformation(job, JobObjectCpuRateControlInformation, cpu);
+        }
+
+        private static void SetInformation<T>(IntPtr job, int informationClass, T value) where T : struct
+        {
+            int size = Marshal.SizeOf<T>();
+            IntPtr buffer = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(value, buffer, false);
+                if (!SetInformationJobObject(job, informationClass, buffer, checked((uint)size)))
+                {
+                    throw NativeFailure("Windows Job Object resource enforcement is unavailable");
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        private static void AssertNoSurvivors(IntPtr job)
+        {
+            int size = Marshal.SizeOf<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>();
+            IntPtr buffer = Marshal.AllocHGlobal(size);
+            try
+            {
+                DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                while (true)
+                {
+                    if (!QueryInformationJobObject(job, JobObjectBasicAccountingInformation, buffer, checked((uint)size), IntPtr.Zero))
+                    {
+                        throw NativeFailure("Windows Job Object survivor query failed");
+                    }
+                    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting = Marshal.PtrToStructure<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>(buffer);
+                    if (accounting.ActiveProcesses == 0)
+                    {
+                        return;
+                    }
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        throw new HelperException(75, "Sandbox process tree retained survivors after termination.");
+                    }
+                    Thread.Sleep(25);
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
+        private static string QuoteWindowsArgument(string argument)
+        {
+            if (argument.Length > 0 && argument.All(character => !char.IsWhiteSpace(character) && character != '"'))
+            {
+                return argument;
+            }
+            var quoted = new StringBuilder("\"");
+            int backslashes = 0;
+            foreach (char character in argument)
+            {
+                if (character == '\\')
+                {
+                    backslashes += 1;
+                    continue;
+                }
+                if (character == '"')
+                {
+                    quoted.Append('\\', backslashes * 2 + 1).Append('"');
+                    backslashes = 0;
+                    continue;
+                }
+                quoted.Append('\\', backslashes).Append(character);
+                backslashes = 0;
+            }
+            return quoted.Append('\\', backslashes * 2).Append('"').ToString();
+        }
+
+        private static HelperException NativeFailure(string message) =>
+            new(74, $"{message} (Win32 {Marshal.GetLastWin32Error().ToString(CultureInfo.InvariantCulture)}).");
+
+        private static void CloseIfValid(IntPtr handle)
+        {
+            if (handle != IntPtr.Zero && handle != new IntPtr(-1))
+            {
+                CloseHandle(handle);
+            }
+        }
+
+        private const int JobObjectBasicAccountingInformation = 1;
+        private const int JobObjectExtendedLimitInformation = 9;
+        private const int JobObjectCpuRateControlInformation = 15;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SECURITY_ATTRIBUTES
+        {
+            internal int nLength;
+            internal IntPtr lpSecurityDescriptor;
+            internal int bInheritHandle;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct STARTUPINFO
+        {
+            internal int cb;
+            internal string? lpReserved;
+            internal string? lpDesktop;
+            internal string? lpTitle;
+            internal uint dwX;
+            internal uint dwY;
+            internal uint dwXSize;
+            internal uint dwYSize;
+            internal uint dwXCountChars;
+            internal uint dwYCountChars;
+            internal uint dwFillAttribute;
+            internal uint dwFlags;
+            internal ushort wShowWindow;
+            internal ushort cbReserved2;
+            internal IntPtr lpReserved2;
+            internal IntPtr hStdInput;
+            internal IntPtr hStdOutput;
+            internal IntPtr hStdError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PROCESS_INFORMATION
+        {
+            internal IntPtr hProcess;
+            internal IntPtr hThread;
+            internal uint dwProcessId;
+            internal uint dwThreadId;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        {
+            internal long PerProcessUserTimeLimit;
+            internal long PerJobUserTimeLimit;
+            internal uint LimitFlags;
+            internal UIntPtr MinimumWorkingSetSize;
+            internal UIntPtr MaximumWorkingSetSize;
+            internal uint ActiveProcessLimit;
+            internal UIntPtr Affinity;
+            internal uint PriorityClass;
+            internal uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IO_COUNTERS
+        {
+            internal ulong ReadOperationCount;
+            internal ulong WriteOperationCount;
+            internal ulong OtherOperationCount;
+            internal ulong ReadTransferCount;
+            internal ulong WriteTransferCount;
+            internal ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        {
+            internal JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            internal IO_COUNTERS IoInfo;
+            internal UIntPtr ProcessMemoryLimit;
+            internal UIntPtr JobMemoryLimit;
+            internal UIntPtr PeakProcessMemoryUsed;
+            internal UIntPtr PeakJobMemoryUsed;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_CPU_RATE_CONTROL_INFORMATION
+        {
+            internal uint ControlFlags;
+            internal uint CpuRate;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_ACCOUNTING_INFORMATION
+        {
+            internal long TotalUserTime;
+            internal long TotalKernelTime;
+            internal long ThisPeriodTotalUserTime;
+            internal long ThisPeriodTotalKernelTime;
+            internal uint TotalPageFaultCount;
+            internal uint TotalProcesses;
+            internal uint ActiveProcesses;
+            internal uint TotalTerminatedProcesses;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateJobObjectW(IntPtr jobAttributes, string? name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetInformationJobObject(IntPtr job, int informationClass, IntPtr information, uint informationLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool QueryInformationJobObject(IntPtr job, int informationClass, IntPtr information, uint informationLength, IntPtr returnLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool TerminateJobObject(IntPtr job, uint exitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreateProcessW(
+            string applicationName,
+            StringBuilder commandLine,
+            IntPtr processAttributes,
+            IntPtr threadAttributes,
+            [MarshalAs(UnmanagedType.Bool)] bool inheritHandles,
+            uint creationFlags,
+            IntPtr environment,
+            string currentDirectory,
+            ref STARTUPINFO startupInfo,
+            out PROCESS_INFORMATION processInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint ResumeThread(IntPtr thread);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool TerminateProcess(IntPtr process, uint exitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreatePipe(out IntPtr readPipe, out IntPtr writePipe, ref SECURITY_ATTRIBUTES pipeAttributes, uint size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateFileW(
+            string filename,
+            uint desiredAccess,
+            uint shareMode,
+            ref SECURITY_ATTRIBUTES securityAttributes,
+            uint creationDisposition,
+            uint flagsAndAttributes,
+            IntPtr templateFile);
+    }
 
     private sealed class SharedOutputBudget
     {

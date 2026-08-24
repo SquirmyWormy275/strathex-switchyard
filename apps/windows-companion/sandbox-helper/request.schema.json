@@ -1,17 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sxsy.invalid/schemas/b122-windows-sandbox-request-v1.json",
+  "$id": "https://sxsy.invalid/schemas/b122-windows-sandbox-request-v2.json",
   "title": "SXSY-B122 Windows Sandbox exact request",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "version", "requestId", "leaseId", "recipeId", "recipeCatalogDigest", "helperDigest"],
+  "required": ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicy", "resourcePolicyDigest", "helperDigest"],
   "properties": {
     "schema": { "const": "sxsy-b122.windows-sandbox-request" },
-    "version": { "const": 1 },
+    "version": { "const": 2 },
     "requestId": { "type": "string", "pattern": "^sandbox-request:[a-fA-F0-9-]{36}$" },
     "leaseId": { "type": "string", "pattern": "^sandbox:[a-fA-F0-9-]{36}$" },
     "recipeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "profile": { "enum": ["full_sandbox", "fresh_full_sandbox", "quarantine"] },
     "recipeCatalogDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "resourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpuRatePercent", "jobMemoryMiB", "processMemoryMiB", "activeProcessLimit", "wallTimeMs"],
+      "properties": {
+        "cpuRatePercent": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "jobMemoryMiB": { "type": "integer", "minimum": 256, "maximum": 4096 },
+        "processMemoryMiB": { "type": "integer", "minimum": 128, "maximum": 4096 },
+        "activeProcessLimit": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "wallTimeMs": { "type": "integer", "minimum": 1000, "maximum": 86400000 }
+      }
+    },
+    "resourcePolicyDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
     "helperDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
   }
 }

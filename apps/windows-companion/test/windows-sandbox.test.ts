@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  access,
   copyFile,
   lstat,
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   realpath,
   rename,
   rm,
@@ -43,6 +45,7 @@ class InjectedFileSystem implements WindowsSandboxFileSystem {
   }
   async readBytes(path: string): Promise<Uint8Array> { return readFile(path); }
   async readText(path: string): Promise<string> { return readFile(path, "utf8"); }
+  async readDirectory(path: string): Promise<readonly string[]> { return readdir(path); }
   async writeBytes(path: string, contents: Uint8Array): Promise<void> { this.writes.push(path); await writeFile(path, contents); }
   async writeText(path: string, contents: string): Promise<void> { this.writes.push(path); await writeFile(path, contents, "utf8"); }
   async rename(from: string, to: string): Promise<void> { await rename(from, to); }
@@ -104,16 +107,26 @@ function successfulRunner(assertSpec?: (spec: WindowsSandboxRunSpec) => Promise<
       await writeFile(join(outputRoot, "report.txt"), contents);
       await writeFile(join(exchangeRoot, "result-manifest.json"), JSON.stringify({
         schema: "sxsy-b122.windows-sandbox-result",
-        version: 1,
+        version: 2,
         requestId: request.requestId,
         leaseId: request.leaseId,
         recipeId: request.recipeId,
+        profile: request.profile,
         recipeCatalogDigest: request.recipeCatalogDigest,
+        resourcePolicyDigest: request.resourcePolicyDigest,
         outcome: "completed",
         summary: "sandbox helper completed",
+        resourceEnforcement: {
+          jobObject: true,
+          cpuHardCap: true,
+          memoryLimit: true,
+          processLimit: true,
+          noSurvivors: true,
+          activeProcessesAfterCleanup: 0
+        },
         outputs: [{ path: "report.txt", size: contents.byteLength, sha256: sha256(contents) }]
       }), "utf8");
-      return { pid: 4242, exitCode: 0, stdout: "x".repeat(100_000), stderr: "", timedOut: false, cancelled: false, outputTruncated: false };
+      return { pid: 4242, exitCode: 0, stdout: "x".repeat(100_000), stderr: "", timedOut: false, cancelled: false, outputTruncated: false, hostProcessContained: true };
     }
   };
 }
@@ -169,7 +182,7 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
   }), guardCalls);
 
   const result = await backend.run(await sandboxRequest(setup));
-  assert.equal(result.status, "completed");
+  assert.equal(result.status, "completed", result.summary);
   assert.equal(result.leaseId, "sandbox:11111111-2222-4333-8444-555555555555");
   assert.equal(result.processId, "sandbox-process:11111111-2222-4333-8444-555555555555");
   assert.equal(result.resultManifestSha256?.length, 64);
@@ -179,6 +192,7 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
   assert.deepEqual(guardCalls, ["launch", "extract"]);
   assert.match(configuration, /<Networking>Disable<\/Networking>/);
   assert.match(configuration, /<VGpu>Disable<\/VGpu>/);
+  assert.match(configuration, /<MemoryInMB>4096<\/MemoryInMB>/);
   assert.match(configuration, /<ReadOnly>true<\/ReadOnly>/);
   assert.match(configuration, /C:\\B122\\tools\\b122-sandbox-worker\.exe/);
   assert.doesNotMatch(configuration, /powershell|cmd\.exe|wscript/i);
@@ -189,6 +203,149 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
   assert.equal(receipt.hostPid, 4242);
   assert.equal(receipt.processOutputTruncated, true);
   assert.equal(receipt.resultRoot, result.resultRoot);
+  assert.equal(receipt.profile, "full_sandbox");
+  assert.equal(receipt.cleanupVerified, true);
+  await assert.rejects(access(join(dirname(result.receiptPath!), "exchange")));
+});
+
+test("full, fresh-full, and quarantine emit distinct fixed resource profiles and only fresh/full map host-approved persistence", async (context) => {
+  const setup = await fixture(context);
+  const persistent = join(setup.base, "approved-cache");
+  await mkdir(persistent);
+  const configurations = new Map<string, string>();
+  const requests = new Map<string, Record<string, unknown>>();
+  let invocation = 0;
+  const ids = [
+    "11111111-2222-4333-8444-555555555555",
+    "22222222-2222-4333-8444-555555555555",
+    "33333333-2222-4333-8444-555555555555"
+  ];
+  const runner = successfulRunner(async (spec) => {
+    const config = await readFile(spec.args[0], "utf8");
+    const exchange = join(dirname(spec.args[0]), "exchange");
+    const request = JSON.parse(await readFile(join(exchange, "request.json"), "utf8")) as Record<string, unknown>;
+    configurations.set(String(request.profile), config);
+    requests.set(String(request.profile), request);
+  });
+  const backend = createBackend(setup, runner, [], {
+    idFactory: () => ids[invocation++]!,
+    approvedPersistentVolumes: [{ id: "build-cache", hostRoot: persistent }]
+  });
+
+  for (const [profile, recipeId] of [
+    ["full_sandbox", "full_sandbox"],
+    ["fresh_full_sandbox", "rebuild_full_sandbox"],
+    ["quarantine", "quarantine"]
+  ] as const) {
+    const result = await backend.run(await sandboxRequest(setup, { profile, recipeId }));
+    assert.equal(result.status, "completed");
+  }
+
+  assert.match(configurations.get("full_sandbox")!, /<MemoryInMB>4096<\/MemoryInMB>/);
+  assert.match(configurations.get("fresh_full_sandbox")!, /<MemoryInMB>4096<\/MemoryInMB>/);
+  assert.match(configurations.get("quarantine")!, /<MemoryInMB>2048<\/MemoryInMB>/);
+  assert.match(configurations.get("fresh_full_sandbox")!, /C:\\B122\\persistent\\build-cache/);
+  assert.match(configurations.get("fresh_full_sandbox")!, /approved-cache/);
+  assert.doesNotMatch(configurations.get("quarantine")!, /approved-cache|B122\\persistent/);
+  assert.deepEqual((requests.get("quarantine")!.resourcePolicy as Record<string, unknown>), {
+    cpuRatePercent: 25,
+    jobMemoryMiB: 1536,
+    processMemoryMiB: 512,
+    activeProcessLimit: 8,
+    wallTimeMs: 5_000
+  });
+  assert.match(String(requests.get("quarantine")!.resourcePolicyDigest), /^[a-f0-9]{64}$/);
+});
+
+test("fails closed when the host process boundary or guest resource receipt cannot prove no survivors", async (context) => {
+  const setup = await fixture(context);
+  const hostUncontained: WindowsSandboxProcessRunner = {
+    async run(spec, signal, onStarted) {
+      const result = await successfulRunner().run(spec, signal, onStarted);
+      return { ...result, hostProcessContained: false };
+    }
+  };
+  const backend = createBackend(setup, hostUncontained, []);
+  const result = await backend.run(await sandboxRequest(setup, { profile: "quarantine", recipeId: "quarantine" }));
+  assert.equal(result.status, "failed");
+  assert.match(result.summary, /containment|survivor/i);
+
+  const second = await fixture(context);
+  const guestUnenforced: WindowsSandboxProcessRunner = {
+    async run(spec, signal, onStarted) {
+      const result = await successfulRunner().run(spec, signal, onStarted);
+      const manifestPath = join(dirname(spec.args[0]), "exchange", "result-manifest.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
+      manifest.resourceEnforcement = {
+        jobObject: true,
+        cpuHardCap: false,
+        memoryLimit: true,
+        processLimit: true,
+        noSurvivors: true,
+        activeProcessesAfterCleanup: 0
+      };
+      await writeFile(manifestPath, JSON.stringify(manifest), "utf8");
+      return result;
+    }
+  };
+  const guestResult = await createBackend(second, guestUnenforced, []).run(await sandboxRequest(second, { profile: "quarantine", recipeId: "quarantine" }));
+  assert.equal(guestResult.status, "failed");
+  assert.match(guestResult.summary, /CPU|memory|process-count|survivor/i);
+});
+
+test("reconciles an expired crash receipt only after the recorded host process is absent", async (context) => {
+  const setup = await fixture(context);
+  const live = new Set([7001]);
+  const runner: WindowsSandboxProcessRunner = {
+    async run() { throw new Error("not used"); },
+    async isProcessActive(pid) { return live.has(pid); }
+  };
+  const backend = createBackend(setup, runner, [], { now: () => new Date("2026-08-24T12:00:00.000Z") });
+  const rawId = "aaaaaaaa-2222-4333-8444-555555555555";
+  const leaseRoot = join(setup.stateRoot, "leases", rawId);
+  await mkdir(join(leaseRoot, "exchange"), { recursive: true });
+  await writeFile(join(leaseRoot, "sandbox.wsb"), "stale", "utf8");
+  await writeFile(join(leaseRoot, "receipt.json"), JSON.stringify({
+    schema: "sxsy-b122.windows-sandbox-receipt",
+    version: 2,
+    leaseId: `sandbox:${rawId}`,
+    processId: `sandbox-process:${rawId}`,
+    requestId: `sandbox-request:${rawId}`,
+    recipeId: "quarantine",
+    profile: "quarantine",
+    state: "running",
+    targetRoot: setup.targetRoot,
+    destinationRoot: setup.destinationRoot,
+    createdAt: "2026-08-24T11:00:00.000Z",
+    updatedAt: "2026-08-24T11:00:01.000Z",
+    deadline: "2026-08-24T11:01:00.000Z",
+    hostPid: 7001,
+    timedOut: false,
+    cancelled: false,
+    processOutput: "",
+    processOutputTruncated: false,
+    recipeCatalogDigest: "a".repeat(64),
+    helperDigest: "b".repeat(64),
+    resourcePolicyDigest: "c".repeat(64),
+    requestDigest: "d".repeat(64),
+    configurationDigest: "e".repeat(64),
+    persistentVolumeIds: [],
+    cleanupVerified: false,
+    summary: "crashed while running"
+  }), "utf8");
+
+  const stillRunning = await backend.reconcile();
+  assert.equal(stillRunning[0]?.state, "running");
+  assert.equal(stillRunning[0]?.cleanupVerified, false);
+  assert.equal((await readdir(leaseRoot)).includes("exchange"), true);
+
+  live.clear();
+  const recovered = await backend.reconcile();
+  assert.equal(recovered[0]?.state, "failed");
+  assert.equal(recovered[0]?.cleanupVerified, true);
+  assert.equal((await readdir(leaseRoot)).includes("exchange"), false);
+  const receipt = JSON.parse(await readFile(join(leaseRoot, "receipt.json"), "utf8")) as Record<string, unknown>;
+  assert.equal(receipt.reconciledAt, "2026-08-24T12:00:00.000Z");
 });
 
 test("host-attested catalog and helper digests are rechecked immediately before launch", async (context) => {
@@ -233,16 +390,26 @@ test("invalid quarantine content fails closed without copying any output", async
       await writeFile(join(exchangeRoot, "output", "report.txt"), "tampered", "utf8");
       await writeFile(join(exchangeRoot, "result-manifest.json"), JSON.stringify({
         schema: "sxsy-b122.windows-sandbox-result",
-        version: 1,
+        version: 2,
         requestId: request.requestId,
         leaseId: request.leaseId,
         recipeId: request.recipeId,
+        profile: request.profile,
         recipeCatalogDigest: request.recipeCatalogDigest,
+        resourcePolicyDigest: request.resourcePolicyDigest,
         outcome: "completed",
         summary: "untrusted",
+        resourceEnforcement: {
+          jobObject: true,
+          cpuHardCap: true,
+          memoryLimit: true,
+          processLimit: true,
+          noSurvivors: true,
+          activeProcessesAfterCleanup: 0
+        },
         outputs: [{ path: "report.txt", size: 8, sha256: "0".repeat(64) }]
       }), "utf8");
-      return { pid: 9, exitCode: 0, stdout: "", stderr: "", timedOut: false, cancelled: false, outputTruncated: false };
+      return { pid: 9, exitCode: 0, stdout: "", stderr: "", timedOut: false, cancelled: false, outputTruncated: false, hostProcessContained: true };
     }
   };
   const backend = createBackend(setup, runner, []);
@@ -265,7 +432,8 @@ test("timeout and cancellation receipts remain bounded and never extract output"
           stderr: "",
           timedOut: mode === "timeout",
           cancelled: mode === "cancel",
-          outputTruncated: true
+          outputTruncated: true,
+          hostProcessContained: true
         };
       }
     }, [], { idFactory: () => mode === "timeout" ? "aaaaaaaa-2222-4333-8444-555555555555" : "bbbbbbbb-2222-4333-8444-555555555555" });
