@@ -176,6 +176,32 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("provider-observed sessions reject extension status and heartbeat forgery while local heartbeat stays monotonic", async () => {
+  const now = "2026-08-24T00:02:00.000Z";
+  const service = new CompanionService({ now: () => now });
+  service.installTrustedSession({
+    ...session("provider-observed"),
+    capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running",
+    lastHeartbeat: "2026-08-24T00:01:30.000Z",
+    metadata: { "sxsy-b122.providerHandshake": "exact-route-v1" }
+  });
+  const status = await service.handle(request("provider-status", "session.status", { sessionId: "provider-observed", status: "verified_finished" }));
+  const heartbeat = await service.handle(request("provider-heartbeat", "session.heartbeat", { sessionId: "provider-observed", at: now }));
+  assert.equal(status.ok, false);
+  assert.equal(status.error?.code, "capability_denied");
+  assert.equal(heartbeat.ok, false);
+  assert.equal(heartbeat.error?.code, "capability_denied");
+
+  service.installTrustedSession({ ...session("local"), status: "running", lastHeartbeat: "2026-08-24T00:01:30.000Z" });
+  const backwards = await service.handle(request("backwards", "session.heartbeat", { sessionId: "local", at: "2026-08-24T00:01:00.000Z" }));
+  const future = await service.handle(request("future", "session.heartbeat", { sessionId: "local", at: "2026-08-24T00:03:00.000Z" }));
+  const current = await service.handle(request("current", "session.heartbeat", { sessionId: "local", at: "2026-08-24T00:02:10.000Z" }));
+  assert.equal(backwards.ok, false);
+  assert.equal(future.ok, false);
+  assert.equal(current.ok, true);
+});
+
 test("provider handshake capabilities can enter only through the trusted coordinator", async () => {
   const service = new CompanionService({
     now: () => "2026-08-24T00:00:00.000Z",

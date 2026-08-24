@@ -42,7 +42,7 @@ const companionTests = [
   "repository-recipe-host-evidence", "repository-runner-helper",
   "repository-runtime", "repository-runtime-broker",
   "repository-runtime-release-package", "router", "runtime-provisioning",
-  "runtime-registry", "sandbox-installation", "service", "stdio",
+  "runtime-registry", "sandbox-installation", "service", "session-freshness", "stdio",
   "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
   "windows-user-presence", "workflow-voice-service"
 ].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime" }));

@@ -48,6 +48,7 @@ import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-evidence.ts";
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
+import { SessionFreshnessCoordinator } from "./session-freshness.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -132,6 +133,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     throw new Error("The durable B122 companion requires a host-backed journal authenticator; unprotected hash-chain storage is rejected.");
   }
   const sessions = new SessionRegistry(store);
+  const sessionFreshness = new SessionFreshnessCoordinator(sessions);
   const localStateDirectory = resolve(options.localStateDirectory ?? dirname(store.filePath));
   const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
     stateRoot: resolve(localStateDirectory, "council-isolation")
@@ -323,6 +325,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   });
   const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
+    refreshSessions: () => sessionFreshness.refresh(),
     startupRecovery: async () => {
       for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
       await repositoryRuntimes.recoverManagedProcesses();

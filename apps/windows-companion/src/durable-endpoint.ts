@@ -27,11 +27,13 @@ export class DurableCompanionEndpoint {
   private initializationFailed = false;
   private persistenceFailed = false;
   private readonly startupRecovery?: () => Promise<unknown>;
+  private readonly refreshSessions?: () => Promise<readonly ManagedSession[]>;
 
-  constructor(service: CompanionService, registry: SessionRegistry, options: { readonly startupRecovery?: () => Promise<unknown> } = {}) {
+  constructor(service: CompanionService, registry: SessionRegistry, options: { readonly startupRecovery?: () => Promise<unknown>; readonly refreshSessions?: () => Promise<readonly ManagedSession[]> } = {}) {
     this.service = service;
     this.registry = registry;
     this.startupRecovery = options.startupRecovery;
+    this.refreshSessions = options.refreshSessions;
     // Capture startup failure internally so construction never creates an
     // unhandled rejection. `ready`, `handle`, and `listSessions` expose the
     // same fail-closed state to their callers.
@@ -54,6 +56,10 @@ export class DurableCompanionEndpoint {
   async handle(request: CompanionRequest): Promise<CompanionResponse> {
     await this.initialized;
     if (this.initializationFailed || this.persistenceFailed) return this.failClosed(request);
+    if (this.refreshSessions) {
+      try { for (const session of await this.refreshSessions()) this.service.installTrustedSession(session); }
+      catch { this.persistenceFailed = true; return this.failClosed(request); }
+    }
 
     let response: CompanionResponse;
     try {
@@ -92,6 +98,7 @@ export class DurableCompanionEndpoint {
     // side effect. A failed probe makes the endpoint unavailable rather than
     // guessing a recovery outcome.
     await this.startupRecovery?.();
+    if (this.refreshSessions) for (const session of await this.refreshSessions()) this.service.installTrustedSession(session);
   }
 
   private assertHealthy(): void {

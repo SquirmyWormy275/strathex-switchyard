@@ -383,6 +383,7 @@ export class CompanionService {
 
   private setStatus(payload: SessionStatusPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
+    if (session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1") throw new CompanionServiceError("capability_denied", "Provider status is host-observed through its exact adapter boundary; an extension request cannot replace it.");
     if ((payload.status === "verified_blocked" || payload.status === "verified_finished") && !session.capabilities.includes("observable")) {
       throw new CompanionServiceError("capability_denied", "Verified blocked or finished status requires an Observable adapter signal.");
     }
@@ -394,7 +395,10 @@ export class CompanionService {
 
   private heartbeat(payload: SessionHeartbeatPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
-    const next: ManagedSession = { ...session, lastHeartbeat: payload.at ?? this.now() };
+    if (session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1") throw new CompanionServiceError("capability_denied", "Provider liveness is host-observed through its exact adapter boundary; an extension heartbeat cannot extend it.");
+    const hostNow = Date.parse(this.now()); const at = payload.at ?? new Date(hostNow).toISOString(); const observed = Date.parse(at);
+    if (!Number.isFinite(hostNow) || !Number.isFinite(observed) || observed < Date.parse(session.lastHeartbeat) || observed > hostNow + 30_000) throw new CompanionServiceError("invalid_request", "The session heartbeat is invalid, out of order, or too far in the future.");
+    const next: ManagedSession = { ...session, lastHeartbeat: at };
     this.sessions.set(session.id, next);
     this.record("session.heartbeat", "completed", "Recorded a session heartbeat.", session.id);
     return cloneSession(next);
