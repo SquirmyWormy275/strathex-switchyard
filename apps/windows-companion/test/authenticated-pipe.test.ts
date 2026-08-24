@@ -70,6 +70,31 @@ test("unauthenticated pipe frames never reach the companion request handler", as
   assert.deepEqual(JSON.parse(reply), { version: 1, id: "invalid", ok: false, error: { code: "companion_unavailable", message: "The companion rejected an unauthenticated local request." } });
 });
 
+test("authenticated pipe shutdown destroys idle clients instead of waiting indefinitely", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `idle-${Date.now()}`);
+  const server = new AuthenticatedPipeServer(configuration, protector, {
+    async handle(candidate): Promise<CompanionResponse> {
+      return { version: 1, id: candidate.id, ok: true };
+    }
+  }, { timeoutMs: 30_000 });
+  await server.start();
+  const idle = connect(configuration.pipePath);
+  await new Promise<void>((resolve, reject) => {
+    idle.once("connect", resolve);
+    idle.once("error", reject);
+  });
+  const closed = new Promise<void>((resolve) => idle.once("close", () => resolve()));
+  await Promise.race([
+    server.stop(),
+    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("server shutdown did not close an idle pipe client")), 1_000))
+  ]);
+  await closed;
+  assert.equal(idle.destroyed, true);
+});
+
 test("journal authenticator test harness detects a sealed tag from the wrong digest", async () => {
   const authenticator = new DpapiJournalAuthenticator(new FakeUserSecretProtector());
   const tag = await authenticator.seal("a".repeat(64));

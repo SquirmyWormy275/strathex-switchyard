@@ -68,6 +68,7 @@ export class AuthenticatedPipeServer {
   private readonly maxFrameBytes: number;
   private server?: Server;
   private token?: Buffer;
+  private readonly sockets = new Set<Socket>();
 
   constructor(configuration: AuthenticatedPipeConfiguration, protector: UserSecretProtector, handler: CompanionRequestHandler, options: AuthenticatedPipeServerOptions = {}) {
     if (!isPipeConfiguration(configuration)) throw new Error("The local pipe configuration is invalid.");
@@ -94,6 +95,8 @@ export class AuthenticatedPipeServer {
   async stop(): Promise<void> {
     const server = this.server;
     this.server = undefined;
+    for (const socket of this.sockets) socket.destroy();
+    this.sockets.clear();
     this.token?.fill(0);
     this.token = undefined;
     if (server) await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -101,6 +104,13 @@ export class AuthenticatedPipeServer {
   }
 
   private accept(socket: Socket): void {
+    if (!this.server) {
+      socket.destroy();
+      return;
+    }
+    this.sockets.add(socket);
+    const forget = (): void => { this.sockets.delete(socket); };
+    socket.once("close", forget);
     let pending = Buffer.alloc(0);
     let replied = false;
     socket.setTimeout(this.timeoutMs, () => socket.destroy());
