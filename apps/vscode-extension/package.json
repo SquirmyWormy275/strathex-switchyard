@@ -15,16 +15,6 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "configuration": {
-    "title": "SXSY-B122",
-    "properties": {
-      "sxsy-b122.companionConfigurationPath": {
-        "type": "string",
-        "default": "",
-        "description": "Absolute path to the per-user config.json emitted by the started SXSY-B122 Windows companion."
-      }
-    }
-  },
   "activationEvents": [
     "onCommand:sxsy-b122.registerManagedSession",
     "onCommand:sxsy-b122.adoptTerminal",

@@ -8,12 +8,14 @@ agent's state, or grant mediation. A registered session must never be represente
 as Observable, Controllable, or Mediated until a companion/provider adapter
 supplies independently verifiable evidence.
 
-Commands are exposed for Register/Adopt/Select/Show Managed Sessions and
-canonical chord dispatch. Start the Windows companion, then set
-`sxsy-b122.companionConfigurationPath` to its per-user `config.json`. The
-extension reads its local pipe and token only at request time and uses them
-only for authenticated named-pipe requests. It is safe when the companion or
-provider is unavailable and never falls back to UI automation for consequential
+Commands are exposed for Register/Adopt/Select/Show Managed Sessions, Create
+Managed Agent Terminal, Invoke Control, and verified Blocked/Finished
+discovery. There is intentionally no Configure Local Companion command. The
+extension reads only the companion-created canonical endpoint record under the
+host-owned local state directory, opens its DPAPI CurrentUser-sealed token, and
+uses it only for bounded authenticated named-pipe requests. It is safe when the
+companion or provider is unavailable and never falls back to workspace
+configuration, TCP, shell execution, or UI automation for consequential
 actions.
 
 Run `npm run build:vscode` before packaging; it emits the CommonJS extension

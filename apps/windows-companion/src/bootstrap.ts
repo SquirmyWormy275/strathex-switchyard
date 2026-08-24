@@ -1,5 +1,5 @@
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory } from "../../../packages/control-plane/src/dispatch.ts";
+import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
@@ -29,6 +29,12 @@ export interface DurableWindowsCompanionOptions {
   readonly receiptEvidence?: DispatchReceiptEvidenceFactory;
   /** Explicit install-state directory used by disposable local broker work. */
   readonly localStateDirectory?: string;
+  /**
+   * Enables the concrete local-commit handler. It still needs a reviewed
+   * mutation factory; no chord can invent a commit message or path set.
+   */
+  readonly localGitStateDirectory?: string;
+  readonly localGitMutationFactory?: GitMutationFactory;
 }
 
 /**
@@ -61,7 +67,15 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
     if (!defaultDependencies) {
-      const composed = createDefaultLocalComposition(context, store, options.localStateDirectory ?? dirname(store.filePath));
+      const composed = createDefaultLocalComposition(
+        context,
+        store,
+        options.localStateDirectory ?? dirname(store.filePath),
+        {
+          ...(options.localGitStateDirectory ? { localGitStateDirectory: options.localGitStateDirectory } : {}),
+          ...(options.localGitMutationFactory ? { localGitMutationFactory: options.localGitMutationFactory } : {})
+        }
+      );
       localComponents = composed.components;
       defaultDependencies = composed.dependencies;
     }

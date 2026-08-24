@@ -123,7 +123,10 @@ export const commandCatalog: readonly CommandDefinition[] = [
   definition("new_vscode", "VSCODE", "shift", "Open VS Code window", "adapter", { requiresConfirmation: true }),
   definition("focus_terminal", "TERMINAL", "normal", "Focus external terminal", "adapter", {}),
   definition("focus_vscode_terminal", "TERMINAL", "shift", "Focus VS Code terminal", "adapter", { requiresTarget: true }),
-  definition("local_commit", "COMMIT", "normal", "Scoped local commit", "git", consequential),
+  // A local commit is an external Git mutation.  It is never a convenience
+  // shortcut around the reviewed confirmation flow, even when the mutation
+  // stays on a feature branch and never pushes.
+  definition("local_commit", "COMMIT", "normal", "Scoped local commit", "git", confirmed),
   definition("pr_upsert", "COMMIT", "shift", "PR upsert", "git", { ...confirmed, outbound: true }),
   definition("pr_merge", "COMMIT", "alt", "Exact-head PR merge", "git", { ...confirmed, outbound: true, highConsequence: true, acceptanceGates: gates.merge }),
   definition("direct_main", "COMMIT", "shift_alt", "Guarded Direct Main", "git", { ...confirmed, outbound: true, highConsequence: true, acceptanceGates: gates.merge }),

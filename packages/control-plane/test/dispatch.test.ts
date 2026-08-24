@@ -19,7 +19,7 @@ const target: TargetSnapshot = {
 const session: ManagedSession = {
   id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
   status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
-  plannedFiles: [], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+  plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
 };
 const grant = (action: CommandAction): AuthorityGrant => ({
   id: `authority-${action}`, repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
@@ -124,6 +124,33 @@ test("authenticated emergency containment is an explicit broker fence, never a r
   assert.equal(containment.check(target.repositoryRoot, "git").allowed, false);
 });
 
+test("active containment blocks Council before the coordinator can receive a report request", async () => {
+  const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  let councilCalls = 0;
+  const controlPlane = new CommandDispatcher({
+    policy,
+    sessions: { get: () => session },
+    authorities: { get: () => grant("council_report") },
+    containment,
+    council: {
+      execute: async () => {
+        councilCalls += 1;
+        return { status: "completed", summary: "must not run" };
+      }
+    }
+  });
+  const assignment = commandForAction("council_report").assignment!;
+
+  const result = await controlPlane.dispatch({
+    assignment, control: assignment.control, modifier: assignment.modifier,
+    sessionId: session.id, targetSnapshot: target, authorityId: "authority-council_report"
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(councilCalls, 0);
+});
+
 test("dispatcher asks trusted mutation factories for structured Git data rather than parsing raw input", async () => {
   const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
   const git = new InMemoryGitBroker(policy);
@@ -135,9 +162,36 @@ test("dispatcher asks trusted mutation factories for structured Git data rather 
     gitMutationFactory: { create: () => { factoryCalls += 1; return expected; } }
   });
   const assignment = commandForAction("local_commit").assignment!;
-  const result = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, targetSnapshot: target, authorityId: "authority-local_commit", input: { shell: "git push --force" } });
+  const confirmation = policy.createConfirmation({
+    action: "local_commit", targetSnapshotId: target.id, sessionId: session.id, authorityId: "authority-local_commit",
+    reason: "isolated reviewed local commit", reauthenticated: true
+  });
+  const result = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, targetSnapshot: target, authorityId: "authority-local_commit", confirmationToken: confirmation.token, input: { shell: "git push --force" } });
   assert.equal(result.status, "completed");
   assert.equal(factoryCalls, 1);
+});
+
+test("a local commit cannot reach its mutation factory or broker without an exact reviewed confirmation", async () => {
+  const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+  const git = new InMemoryGitBroker(policy);
+  let factoryCalls = 0;
+  let brokerCalls = 0;
+  git.register("local_commit", () => { brokerCalls += 1; return { status: "completed", summary: "must not run" }; });
+  const controlPlane = new CommandDispatcher({
+    policy,
+    sessions: { get: () => session },
+    authorities: { get: () => grant("local_commit") },
+    git,
+    gitMutationFactory: { create: () => { factoryCalls += 1; return { kind: "local_commit", paths: ["src/safe.ts"], message: "must not run" }; } }
+  });
+  const assignment = commandForAction("local_commit").assignment!;
+  const result = await controlPlane.dispatch({
+    assignment, control: assignment.control, modifier: assignment.modifier,
+    sessionId: session.id, targetSnapshot: target, authorityId: "authority-local_commit"
+  });
+  assert.equal(result.status, "awaiting_confirmation");
+  assert.equal(factoryCalls, 0);
+  assert.equal(brokerCalls, 0);
 });
 
 test("dispatcher advances an injected durable lifecycle and records the result before settling", async () => {

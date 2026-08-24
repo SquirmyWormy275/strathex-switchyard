@@ -8,11 +8,12 @@ import test from "node:test";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
-import { AuthenticatedLocalPipeTransport, JsonLineCompanionBridge } from "../../vscode-extension/src/companion-bridge.ts";
+import { JsonLineCompanionBridge } from "../../vscode-extension/src/companion-bridge.ts";
+import { NamedPipeJsonLineTransport } from "../../vscode-extension/src/named-pipe-transport.ts";
 import { companionBridgeVersion } from "../src/bridge.ts";
 import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
-import { DurableLocalIpcServer } from "../src/durable-ipc.ts";
-import { createCompanionConfiguration } from "../src/local-runtime.ts";
+import { AuthenticatedPipeServer, createPipeConfiguration } from "../src/authenticated-pipe.ts";
+import { FakeUserSecretProtector } from "../src/windows-secret.ts";
 
 async function git(root: string, args: readonly string[]): Promise<void> {
   await new Promise<void>((resolveRun, reject) => {
@@ -109,11 +110,12 @@ test("installed composition synchronizes an authenticated extension session and 
         : currentTarget.value;
     } }
   });
-  const configuration = await createCompanionConfiguration(state);
-  const server = new DurableLocalIpcServer(configuration, companion.endpoint);
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(state, protector, `bootstrap-${Date.now()}`);
+  const server = new AuthenticatedPipeServer(configuration, protector, companion.endpoint);
   await server.start();
   context.after(async () => { await server.stop(); });
-  const bridge = new JsonLineCompanionBridge(new AuthenticatedLocalPipeTransport(configuration));
+  const bridge = new JsonLineCompanionBridge(new NamedPipeJsonLineTransport(configuration, protector));
   const registered = await bridge.registerSession({ id: "installed-extension", provider: "generic", surface: "vscode_window", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-smoke", metadata: {} });
   assert.equal(registered.ok, true);
   assert.equal((await companion.sessions.get("installed-extension"))?.targetSnapshotId, currentTarget.value.id);
@@ -130,7 +132,8 @@ test("installed composition synchronizes an authenticated extension session and 
   const high = await bridge.dispatch({ control: "SHIELD", modifier: "ctrl_shift_alt", sessionId: "installed-extension", authorityId: authority.id });
   assert.equal(high.ok, true);
   assert.equal(high.ok && high.value.status, "blocked");
-  const invalid = new JsonLineCompanionBridge(new AuthenticatedLocalPipeTransport({ ...configuration, token: "0".repeat(64) }));
+  const invalidConfiguration = { ...configuration, sealedToken: await protector.seal(Buffer.alloc(32, 0)) };
+  const invalid = new JsonLineCompanionBridge(new NamedPipeJsonLineTransport(invalidConfiguration, protector));
   const rejected = await invalid.health();
   assert.equal(rejected.ok, false);
   staleReplay = true;

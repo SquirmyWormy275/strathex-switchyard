@@ -58,7 +58,17 @@ test("policy requires a mediated capability and matching scoped authority for a 
   const managedOnly = { ...mediatedSession(), capabilities: ["registered", "observable"] as const };
 
   assert.equal(policy.authorize({ definition, target: target(), session: managedOnly, authority: authority(definition.action) }).status, "blocked");
-  assert.equal(policy.authorize({ definition, target: target(), session: mediatedSession(), authority: authority(definition.action) }).status, "allowed");
+  const subject = { definition, target: target(), session: mediatedSession(), authority: authority(definition.action) };
+  assert.equal(policy.authorize(subject).status, "awaiting_confirmation");
+  const confirmation = policy.createConfirmation({
+    action: definition.action,
+    targetSnapshotId: subject.target.id,
+    sessionId: subject.session.id,
+    authorityId: subject.authority.id,
+    reason: "isolated reviewed local commit",
+    reauthenticated: true
+  });
+  assert.equal(policy.authorize({ ...subject, confirmationToken: confirmation.token }).status, "allowed");
 });
 
 test("untrusted request input cannot enable a high-consequence action", () => {

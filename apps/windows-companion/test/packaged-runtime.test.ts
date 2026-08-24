@@ -4,7 +4,8 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { AuthenticatedLocalPipeTransport, JsonLineCompanionBridge, readLocalCompanionConfiguration } from "../../vscode-extension/src/companion-bridge.ts";
+import { JsonLineCompanionBridge } from "../../vscode-extension/src/companion-bridge.ts";
+import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "../../vscode-extension/src/named-pipe-transport.ts";
 
 async function waitFor(path: string, milliseconds = 10_000): Promise<void> {
   const deadline = Date.now() + milliseconds;
@@ -28,8 +29,9 @@ test("packaged Windows companion starts with DPAPI protection and accepts config
   const child = spawn(process.execPath, [entry], { cwd: process.cwd(), shell: false, windowsHide: true, env: { ...process.env, SXSY_B122_STATE_DIR: state } });
   let stderr = ""; child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
   context.after(async () => { if (child.exitCode === null) { child.kill(); await new Promise<void>((done) => child.once("close", () => done())); } await rm(state, { recursive: true, force: true }); });
-  await waitFor(join(state, "config.json"));
-  const bridge = new JsonLineCompanionBridge(new AuthenticatedLocalPipeTransport(await readLocalCompanionConfiguration(join(state, "config.json"))));
+  const configurationPath = join(state, "authenticated-pipe.json");
+  await waitFor(configurationPath);
+  const bridge = new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(configurationPath, new WindowsDpapiSecretReader()));
   const registered = await registerWhenReady(bridge);
   assert.equal(registered.ok, true, registered.ok ? stderr : `${registered.code}: ${registered.message}\n${stderr}`);
   const ping = await bridge.dispatch({ control: "VSCODE", modifier: "normal", sessionId: "installed-extension" });

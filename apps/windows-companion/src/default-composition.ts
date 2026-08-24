@@ -3,16 +3,17 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AdapterRegistry, type AdapterOutcome, type AdapterRequest, type CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import type { AutomationBroker, AutomationRequest, BrokerOutcome, ExecutionBroker, ExecutionRequest, ExecutionRecipe, GitBroker, GitRequest, IsolationRuntime, IsolationRequest, TestEnvironmentBroker, TestEnvironmentRequest, TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
+import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type ExecutionBroker, type ExecutionRequest, type ExecutionRecipe, type GitBroker, type GitRequest, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { CouncilCoordinator, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
-import type { CouncilExecutor, CommandDispatcherDependencies } from "../../../packages/control-plane/src/dispatch.ts";
+import type { CouncilExecutor, CommandDispatcherDependencies, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import type { RuntimeDispatcherContext } from "../../../packages/control-plane/src/runtime.ts";
 import type { CommandDefinition } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { captureLiveTargetSnapshot, FilesystemBroker, LocalCredentialBroker, LocalNetworkBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
+import { LocalMediatedGitHandler } from "./mediated-git.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -148,11 +149,19 @@ class LocalPipelineStatusAdapter implements CommandAdapter {
 export interface DefaultLocalComposition {
   readonly filesystem: "canonical-allowlist"; readonly credentials: LocalCredentialBroker; readonly network: LocalNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator;
 }
-export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory = dirname(store.filePath)): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
-  void context;
+export interface DefaultLocalCompositionOptions {
+  readonly localGitStateDirectory?: string;
+  readonly localGitMutationFactory?: GitMutationFactory;
+}
+export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory = dirname(store.filePath), options: DefaultLocalCompositionOptions = {}): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   const credentials = new LocalCredentialBroker(); const network = new LocalNetworkBroker(new Set(), { send: async () => { throw new Error("No approved network transport is configured."); } }, credentials);
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const containment = new DurableContainmentManager(store); const council = new CouncilCoordinator(store);
   const adapters = new AdapterRegistry(); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+  const git = new InMemoryGitBroker(context.policy, containment);
+  if (options.localGitStateDirectory) {
+    const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory });
+    git.register("local_commit", (request) => localGit.execute(request));
+  }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git: new LocalReviewedGitBroker(processes), testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined } } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

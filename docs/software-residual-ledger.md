@@ -63,7 +63,7 @@ than being presented as implemented.
 | ChatGPT | normal, shift, alt | Managed-session records and unavailable truth | Codex/Desktop authorization |
 | VS Code | normal, shift | Extension session registration/selection/status | Multiple-window live acceptance |
 | Terminal | normal, shift | Managed terminal creation/adoption | External-terminal focus adapter |
-| Commit | normal, shift, alt, shift-alt | Live Git status/diff, reviewed commit/push broker | Merge/direct-main stays gate-disabled |
+| Commit | normal, shift, alt, shift-alt | Scoped private-index local-commit handler with exact confirmation and final target check | Push, PR, merge, and Direct Main stay unavailable/gate-disabled |
 | GitHub | normal, shift, alt, shift-alt | Explicit unavailable path | GitHub authorization/API adapter |
 | Compound | normal, shift, alt, shift-alt | Authority/receipt path | Compound installation/authorization |
 | Run | normal, shift, alt, shift-alt | Isolated recipe broker seam | Repository run/debug recipe |

@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
-import { AuthenticatedLocalPipeTransport, JsonLineCompanionBridge, readLocalCompanionConfiguration, UnavailableExtensionCompanionBridge } from "./companion-bridge.ts";
+import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { ManagedSessionController, type GitRootRegistration } from "./controller.ts";
+import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
 export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport } from "./companion-bridge.ts";
+export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader, type ExtensionSecretReader, type StoredCompanionPipeConfiguration } from "./named-pipe-transport.ts";
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
 let controller: ManagedSessionController | undefined;
@@ -12,7 +14,7 @@ export function activate(context: vscode.ExtensionContext): void {
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
-    configuredBridge(vscode as unknown as VscodeLike),
+    configuredCompanionBridge(),
     { resolveGitRoots: createVscodeGitRootResolver(vscode) }
   );
   void controller.start().catch(async () => {
@@ -20,13 +22,19 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 }
 
-function configuredBridge(host: VscodeLike): JsonLineCompanionBridge | UnavailableExtensionCompanionBridge {
-  const path = host.workspace.getConfiguration("sxsy-b122").get<string>("companionConfigurationPath");
-  if (!path?.trim()) return new UnavailableExtensionCompanionBridge("Configure sxsy-b122.companionConfigurationPath after starting the local Windows companion.");
-  // Configuration validation/connection failures are mapped by the bridge to
-  // an unavailable result; activation never falls back to a shell or direct API.
-  const transport = { request: async (line: string) => new AuthenticatedLocalPipeTransport(await readLocalCompanionConfiguration(path.trim())).request(line) };
-  return new JsonLineCompanionBridge(transport);
+/**
+ * The companion creates the opaque configuration under its host-owned local
+ * state directory. Missing, malformed, or DPAPI-unreadable configuration stays
+ * unavailable; neither workspace settings nor an extension command selects an
+ * endpoint.
+ */
+export function configuredCompanionBridge(): ExtensionCompanionBridge {
+  if (process.platform !== "win32") return new UnavailableExtensionCompanionBridge("The SXSY-B122 companion is available only on Windows.");
+  try {
+    return new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(undefined, new WindowsDpapiSecretReader()));
+  } catch {
+    return new UnavailableExtensionCompanionBridge("The authenticated SXSY-B122 local companion pipe configuration is invalid.");
+  }
 }
 
 export function deactivate(): void {
