@@ -14,6 +14,7 @@ import {
   type HardwareSignalClaim,
   type ForwardedCommand,
   type ForwardedHostAction,
+  type ForwardedHostActionAuthorization,
   type LocalHostAction,
   type ReviewedGitMutation
 } from "./companion-bridge.ts";
@@ -708,7 +709,7 @@ export class ManagedSessionController {
       return;
     }
     const expected = expectedLocalAction(command);
-    if (action && action.kind !== expected) {
+    if (action && !isExpectedLocalAction(command, action.kind, expected)) {
       await this.vscode.window.showWarningMessage("SXSY-B122 rejected an unexpected local host action from the companion.");
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned an unexpected host action and the extension rejected it.", dispatchReceiptId, selectedSession);
       return;
@@ -729,11 +730,13 @@ export class ManagedSessionController {
       let authorizationToken: string | undefined;
       try {
         if (Date.parse(action.expiresAt) <= Date.parse(this.now())) throw new Error("The host-action acknowledgement deadline elapsed.");
-        const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion);
+        const selectionId = action.kind === "select_github_navigation" ? await this.selectGitHubNavigationCandidate(action) : undefined;
+        if (action.kind === "select_github_navigation" && !selectionId) throw new Error("GitHub navigation selection was cancelled; no destination was opened.");
+        const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion, selectionId);
         if (!authorization.ok) throw new Error(`The companion refused the final host-action barrier: ${authorization.message}`);
         if (authorization.value.hostActionId !== action.id || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The final host-action authorization is mismatched or expired.");
         authorizationToken = authorization.value.authorizationToken;
-        summary = await this.executeLocalHostAction(action, command);
+        summary = await this.executeLocalHostAction(action, command, authorization.value);
         succeeded = true;
       } catch (error) {
         summary = error instanceof Error && error.message ? error.message : summary;
@@ -1040,7 +1043,7 @@ export class ManagedSessionController {
     return value === undefined ? undefined : commaList(value);
   }
 
-  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand): Promise<string> {
+  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand, authorization: ForwardedHostActionAuthorization): Promise<string> {
     switch (action.kind) {
       case "show_handoff_queue":
         return this.openHandoffQueue();
@@ -1063,6 +1066,12 @@ export class ManagedSessionController {
         if (!action.url || !trustedExternalUrl(action.url)) throw new Error("The companion supplied an untrusted external URL.");
         if (!await this.openExternal(action.url)) throw new Error("VS Code did not confirm opening the trusted external URL.");
         return "Opened the verified external destination.";
+      }
+      case "select_github_navigation": {
+        if (!authorization.selectionId || !authorization.url || !action.githubCandidates?.some((candidate) => candidate.id === authorization.selectionId)) throw new Error("The companion did not bind the authorization to the selected GitHub candidate.");
+        if (!trustedExternalUrl(authorization.url)) throw new Error("The companion authorized an untrusted GitHub destination.");
+        if (!await this.openExternal(authorization.url)) throw new Error("VS Code did not confirm opening the selected GitHub destination.");
+        return `Opened the exact selected GitHub destination ${authorization.selectionId}.`;
       }
       case "create_claude_terminal":
         await this.createManagedAgentTerminal("SXSY-B122 Claude Code");
@@ -1122,6 +1131,14 @@ export class ManagedSessionController {
         await this.executeCommand("workbench.action.output.toggleOutput");
         return "Opened the VS Code output surface for the pipeline failure trace.";
     }
+  }
+
+  private async selectGitHubNavigationCandidate(action: ForwardedHostAction): Promise<string | undefined> {
+    const candidates = action.githubCandidates;
+    if (!candidates?.length) throw new Error("The companion did not provide an exact bounded GitHub candidate set.");
+    const items = candidates.map((candidate) => ({ label: candidate.label, description: candidate.description }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose one exact current GitHub destination" });
+    return selected ? candidates[items.indexOf(selected)]?.id : undefined;
   }
 
   private async openHandoffQueue(): Promise<string> {
@@ -1346,6 +1363,11 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
     "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];
+}
+
+function isExpectedLocalAction(command: ChordCommand, actual: LocalHostAction, expected: LocalHostAction | undefined): boolean {
+  if (actual === expected) return true;
+  return command.control === "GITHUB" && expected === "open_external_url" && actual === "select_github_navigation";
 }
 
 function requiresExactTarget(command: ChordCommand): boolean {

@@ -5,13 +5,14 @@ import type { CommandAction } from "../../../packages/control-plane/src/command-
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { HostActionAuthorizationPayload, HostActionCompletionPayload } from "./bridge.ts";
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
-import type { GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
+import type { GitHubNavigationCandidate, GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
 
 export const localHostActionKinds = [
   "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
   "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
   "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-  "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv"
+  "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv",
+  "select_github_navigation"
 ] as const;
 
 export type LocalHostActionKind = (typeof localHostActionKinds)[number];
@@ -28,6 +29,7 @@ export interface HostActionIntent {
   readonly url?: string;
   readonly debugConfiguration?: string;
   readonly pythonInterpreter?: string;
+  readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly createdAt: string;
   readonly expiresAt: string;
 }
@@ -40,6 +42,8 @@ export interface HostActionAuthorization {
   readonly adapterVersion: string;
   readonly authorizedAt: string;
   readonly expiresAt: string;
+  readonly selectionId?: string;
+  readonly url?: string;
 }
 
 export interface HostActionFinalAuthorizer {
@@ -85,7 +89,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     }
   }
 
-  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }>): Promise<HostActionIntent> {
+  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[] }>): Promise<HostActionIntent> {
     if (!request.operationId) throw new Error("A durable operation ID is required before a host action can be queued.");
     const now = this.now();
     const intent: HostActionIntent = {
@@ -100,6 +104,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       ...(plan.url ? { url: plan.url } : {}),
       ...(plan.debugConfiguration ? { debugConfiguration: plan.debugConfiguration } : {}),
       ...(plan.pythonInterpreter ? { pythonInterpreter: plan.pythonInterpreter } : {}),
+      ...(plan.githubCandidates ? { githubCandidates: validateGitHubCandidates(plan.githubCandidates) } : {}),
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + this.lifetimeMs).toISOString()
     };
@@ -110,7 +115,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         if (existing.operationId !== intent.operationId || existing.commandAction !== intent.commandAction || existing.hostAction !== intent.hostAction
           || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
           || existing.sessionId !== intent.sessionId
-          || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter) {
+          || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter
+          || JSON.stringify(existing.githubCandidates) !== JSON.stringify(intent.githubCandidates)) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
         }
         return existing;
@@ -131,6 +137,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     const hostActionId = exactHostActionId(payload.hostActionId);
     const events = await this.events();
     const intent = pendingIntent(events, hostActionId, this.now());
+    const selected = selectGitHubCandidate(intent, payload.selectionId);
     if (events.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === hostActionId)) {
       throw new Error("The host action was already authorized; its outcome requires reconciliation and cannot be replayed.");
     }
@@ -144,7 +151,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       authorizationToken: `host-action-auth:${randomBytes(32).toString("hex")}`,
       adapterVersion,
       authorizedAt: now.toISOString(),
-      expiresAt: new Date(Math.min(Date.parse(intent.expiresAt), now.getTime() + this.authorizationLifetimeMs)).toISOString()
+      expiresAt: new Date(Math.min(Date.parse(intent.expiresAt), now.getTime() + this.authorizationLifetimeMs)).toISOString(),
+      ...(selected ? { selectionId: selected.id, url: selected.url } : {})
     };
     return this.store.transaction(async (transaction) => {
       const current = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
@@ -295,14 +303,14 @@ export class DurableHostActionAdapter implements CommandAdapter {
   constructor(queue: DurableHostActionQueue, github?: GitHubNavigationResolver) { this.queue = queue; this.github = github; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }> | undefined;
+    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[] }> | undefined;
     const githubPage = navigationPage(request.definition.action);
     if (githubPage) {
       if (!this.github) return { status: "unavailable", summary: "Exact GitHub navigation requires an installed authenticated GitHub route; no search URL was guessed.", effectDisposition: "not_started" };
       const resolved = await this.github.resolve(request, githubPage);
-      if (resolved.kind === "picker") return { status: "awaiting_input", summary: resolved.summary, effectDisposition: "committed", data: { githubNavigationKind: githubPage, githubCandidates: resolved.candidates } };
-      if (resolved.kind !== "open") return { status: resolved.kind === "blocked" ? "blocked" : resolved.kind === "unavailable" ? "unavailable" : "failed", summary: resolved.summary, effectDisposition: resolved.kind === "failed" ? "ambiguous" : "not_started" };
-      plan = { hostAction: "open_external_url", url: resolved.url };
+      if (resolved.kind === "picker") plan = { hostAction: "select_github_navigation", githubCandidates: resolved.candidates };
+      else if (resolved.kind !== "open") return { status: resolved.kind === "blocked" ? "blocked" : resolved.kind === "unavailable" ? "unavailable" : "failed", summary: resolved.summary, effectDisposition: resolved.kind === "failed" ? "ambiguous" : "not_started" };
+      else plan = { hostAction: "open_external_url", url: resolved.url };
     } else plan = hostActionPlan(request);
     if (!plan) return { status: "unavailable", summary: `No installed host action is configured for ${request.definition.title}.` };
     const intent = await this.queue.enqueue(request, plan);
@@ -316,7 +324,8 @@ export class DurableHostActionAdapter implements CommandAdapter {
         ...(intent.workspaceRoot ? { hostActionWorkspaceRoot: intent.workspaceRoot } : {}),
         ...(intent.url ? { hostActionUrl: intent.url } : {}),
         ...(intent.debugConfiguration ? { hostActionDebugConfiguration: intent.debugConfiguration } : {}),
-        ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {})
+        ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {}),
+        ...(intent.githubCandidates ? { githubCandidates: intent.githubCandidates } : {})
       }
     };
   }
@@ -370,6 +379,35 @@ function boundedSummary(value: string): string {
 function boundedVersion(value: string): string {
   if (!/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The host adapter version is invalid.");
   return value;
+}
+
+function validateGitHubCandidates(value: readonly GitHubNavigationCandidate[]): readonly GitHubNavigationCandidate[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 50) throw new Error("The GitHub navigation candidate set is absent or unbounded.");
+  const ids = new Set<string>();
+  return value.map((candidate) => {
+    if (!candidate || typeof candidate !== "object" || !/^(?:pull|run):[A-Za-z0-9._:-]{1,128}$/.test(candidate.id)
+      || !candidate.label.trim() || candidate.label.length > 160 || /[\r\n\0]/.test(candidate.label)
+      || !candidate.description.trim() || candidate.description.length > 512 || /[\r\n\0]/.test(candidate.description)
+      || !trustedHttpsUrl(candidate.url) || ids.has(candidate.id)) throw new Error("The GitHub navigation candidate set is malformed or ambiguous.");
+    ids.add(candidate.id);
+    return { id: candidate.id, label: candidate.label, description: candidate.description, url: candidate.url };
+  });
+}
+
+function selectGitHubCandidate(intent: HostActionIntent, selectionId: string | undefined): GitHubNavigationCandidate | undefined {
+  if (intent.hostAction !== "select_github_navigation") {
+    if (selectionId !== undefined) throw new Error("A host-action selection was supplied for an action that has no picker.");
+    return undefined;
+  }
+  if (typeof selectionId !== "string") throw new Error("GitHub navigation requires one exact candidate selection before authorization.");
+  const selected = validateGitHubCandidates(intent.githubCandidates ?? []).find((candidate) => candidate.id === selectionId);
+  if (!selected) throw new Error("The GitHub navigation selection is not in the exact durable candidate set.");
+  return selected;
+}
+
+function trustedHttpsUrl(value: string): boolean {
+  try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && url.hash === ""; }
+  catch { return false; }
 }
 
 function exactHostActionId(value: string): string {

@@ -175,6 +175,7 @@ export interface HostActionCompletionPayload {
 export interface HostActionAuthorizationPayload {
   readonly hostActionId: string;
   readonly adapterVersion: string;
+  readonly selectionId?: string;
 }
 
 export interface GitReviewPayload {

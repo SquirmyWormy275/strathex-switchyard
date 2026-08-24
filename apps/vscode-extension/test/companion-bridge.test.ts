@@ -112,6 +112,27 @@ test("host-action authorization accepts only the exact one-time companion token 
   if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
 });
 
+test("GitHub picker authorization binds one exact requested candidate and companion-selected URL", async () => {
+  const hostActionId = `host-action:${"c".repeat(64)}`;
+  let corrupt = false;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      assert.equal(request.method, "host-action.authorize");
+      assert.deepEqual(request.payload, { hostActionId, adapterVersion: "extension-1", selectionId: "pull:3" });
+      const authorization = corrupt
+        ? { hostActionId, authorizationToken: `host-action-auth:${"d".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", selectionId: "pull:2", url: "https://evil.invalid/" }
+        : { hostActionId, authorizationToken: `host-action-auth:${"d".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", selectionId: "pull:3", url: "https://github.com/acme/project/pull/3" };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { authorization } });
+    }
+  });
+  const accepted = await bridge.authorizeHostAction(hostActionId, "extension-1", "pull:3");
+  assert.equal(accepted.ok, true);
+  corrupt = true;
+  const rejected = await bridge.authorizeHostAction(hostActionId, "extension-1", "pull:3");
+  assert.equal(rejected.ok, false);
+});
+
 test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
   const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
   const signalId = `hardware-signal:${"a".repeat(64)}`;

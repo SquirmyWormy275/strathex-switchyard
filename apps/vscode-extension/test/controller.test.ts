@@ -160,7 +160,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
-  readonly authorizedHostActions: Array<{ id: string; adapterVersion: string }> = [];
+  readonly authorizedHostActions: Array<{ id: string; adapterVersion: string; selectionId?: string }> = [];
   readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string }> = [];
   readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
   readonly hardwarePrepared: HardwareSignalClaim[] = [];
@@ -301,9 +301,9 @@ class FakeBridge implements ExtensionCompanionBridge {
   async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   async deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status } }; }
-  async authorizeHostAction(id: string, adapterVersion: string) {
-    this.authorizedHostActions.push({ id, adapterVersion });
-    return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z" } } as const;
+  async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string) {
+    this.authorizedHostActions.push({ id, adapterVersion, ...(selectionId ? { selectionId } : {}) });
+    return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", ...(selectionId ? { selectionId, url: `https://github.com/acme/project/pull/${selectionId.split(":")[1]}` } : {}) } } as const;
   }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string, _authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
@@ -574,6 +574,33 @@ test("PR upsert reviews title and body and opens only the companion-verified PR 
   assert.deepEqual(bridge.gitReviews.at(-1)?.mutation, { kind: "pr_upsert", headBranch: "feature/review", baseBranch: "main", title: "Reviewed PR title", body: "Reviewed PR body" });
   assert.deepEqual(opened, ["https://github.com/acme/project/pull/12"]);
   assert.equal(bridge.authorizedHostActions.at(-1)?.id, `host-action:${"c".repeat(64)}`);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+});
+
+test("ambiguous GitHub navigation selects and authorizes one exact companion candidate", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const opened: string[] = [];
+  const id = `host-action:${"8".repeat(64)}`;
+  bridge.nextDispatch = { status: "running", summary: "Choose one exact current PR.", data: {
+    hostActionId: id,
+    hostActionKind: "select_github_navigation",
+    hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    githubCandidates: [
+      { id: "pull:2", label: "PR #2", description: "to main", url: "https://github.com/acme/project/pull/2" },
+      { id: "pull:3", label: "PR #3", description: "to release", url: "https://github.com/acme/project/pull/3" }
+    ]
+  } };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-23T00:00:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/review", canonicalRemote: "https://github.com/acme/project.git" }],
+    openExternal: async (url) => { opened.push(url); return true; }
+  });
+  await controller.start();
+  vscode.choose("PR #3");
+  await vscode.invoke("sxsy-b122.chord.github.shift");
+  assert.deepEqual(bridge.authorizedHostActions.at(-1), { id, adapterVersion: "0.2.0", selectionId: "pull:3" });
+  assert.deepEqual(opened, ["https://github.com/acme/project/pull/3"]);
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 });
 

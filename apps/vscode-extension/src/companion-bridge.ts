@@ -41,7 +41,9 @@ export type LocalHostAction =
   | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
   | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
   | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
-  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv";
+  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv" | "select_github_navigation";
+
+export interface GitHubNavigationCandidate { readonly id: string; readonly label: string; readonly description: string; readonly url: string; }
 
 export interface ForwardedHostAction {
   readonly id: string;
@@ -51,12 +53,15 @@ export interface ForwardedHostAction {
   readonly workspaceRoot?: string;
   readonly debugConfiguration?: string;
   readonly pythonInterpreter?: string;
+  readonly githubCandidates?: readonly GitHubNavigationCandidate[];
 }
 
 export interface ForwardedHostActionAuthorization {
   readonly hostActionId: string;
   readonly authorizationToken: string;
   readonly expiresAt: string;
+  readonly selectionId?: string;
+  readonly url?: string;
 }
 
 export interface PreparedCommand {
@@ -188,7 +193,7 @@ export interface ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
-  authorizeHostAction(hostActionId: string, adapterVersion: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
+  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
@@ -436,15 +441,17 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
 
-  async authorizeHostAction(hostActionId: string, adapterVersion: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
-    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion });
+  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
+    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion, ...(selectionId ? { selectionId } : {}) });
     if (!result.ok) return result;
     const authorization = isRecord(result.value) ? result.value.authorization : undefined;
-    if (!isRecord(authorization) || !exactKeys(authorization, ["hostActionId", "authorizationToken", "expiresAt"])
+    if (!isRecord(authorization) || !allowedExactKeys(authorization, ["hostActionId", "authorizationToken", "expiresAt"], ["selectionId", "url"])
       || authorization.hostActionId !== hostActionId
       || typeof authorization.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(authorization.authorizationToken)
-      || typeof authorization.expiresAt !== "string" || !Number.isFinite(Date.parse(authorization.expiresAt))) return invalidResponse();
-    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt } };
+      || typeof authorization.expiresAt !== "string" || !Number.isFinite(Date.parse(authorization.expiresAt))
+      || (selectionId === undefined && (authorization.selectionId !== undefined || authorization.url !== undefined))
+      || (selectionId !== undefined && (authorization.selectionId !== selectionId || typeof authorization.url !== "string" || !trustedHttpsUrl(authorization.url)))) return invalidResponse();
+    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}) } };
   }
 
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
@@ -585,14 +592,16 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
   const workspaceRoot = result.data?.hostActionWorkspaceRoot;
   const debugConfiguration = result.data?.hostActionDebugConfiguration;
   const pythonInterpreter = result.data?.hostActionPythonInterpreter;
+  const githubCandidates = result.data?.githubCandidates;
   if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
     || typeof kind !== "string" || !isLocalHostAction(kind)
     || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
     || (url !== undefined && typeof url !== "string")
     || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
     || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
-    || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))) return undefined;
-  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}) };
+    || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))
+    || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}) };
 }
 
 function isLocalHostAction(value: string): value is LocalHostAction {
@@ -600,8 +609,23 @@ function isLocalHostAction(value: string): value is LocalHostAction {
     "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
     "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
     "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv"
+    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv", "select_github_navigation"
   ].includes(value);
+}
+
+function isGitHubCandidates(value: unknown): value is readonly GitHubNavigationCandidate[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 50) return false;
+  const ids = new Set<string>();
+  return value.every((candidate) => isRecord(candidate) && exactKeys(candidate, ["id", "label", "description", "url"])
+    && typeof candidate.id === "string" && /^(?:pull|run):[A-Za-z0-9._:-]{1,128}$/.test(candidate.id) && !ids.has(candidate.id) && !!ids.add(candidate.id)
+    && typeof candidate.label === "string" && !!candidate.label.trim() && candidate.label.length <= 160 && !/[\r\n\0]/.test(candidate.label)
+    && typeof candidate.description === "string" && !!candidate.description.trim() && candidate.description.length <= 512 && !/[\r\n\0]/.test(candidate.description)
+    && typeof candidate.url === "string" && trustedHttpsUrl(candidate.url));
+}
+
+function trustedHttpsUrl(value: string): boolean {
+  try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && url.hash === ""; }
+  catch { return false; }
 }
 
 function safeBranch(value: string): boolean {
