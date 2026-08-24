@@ -4,6 +4,29 @@
 there is executable code and an isolated test; it does not mean hardware or a
 proprietary/cloud surface has been accepted.
 
+## Unfinished software-only residuals
+
+This branch is **not** the complete B122 endpoint. The following are still
+ordinary software work and must not be relabeled as hardware or external:
+
+- The control router still presents route-only chords as previews; it does not
+  connect every one of the 65 assignments to a concrete local handler.
+- VS Code registration is not yet synchronized into the companion registry;
+  its invoke UI therefore cannot establish a real mediated session by itself.
+- Local Git mediation has snapshot/status/diff and reviewed commit/push, but
+  lacks a complete branch/PR/merge recovery workflow and protected receipt gate
+  activation.
+- There is no concrete scoped-credential issuer, network proxy, repository
+  test-recipe manifest loader, process/debug supervisor, scanner adapter, or
+  Windows Raw HID lifecycle implementation.
+- Sandbox copies and quarantine leases are not a full sandbox or enforceable
+  quarantine runtime; Council leases and authority records are not durable
+  cross-process coordination state.
+
+The tables below distinguish the implemented local pieces from these remaining
+software-only requirements. High-consequence flows remain safely blocked rather
+than being presented as implemented.
+
 | Control | Settled chords accounted for | Concrete local evidence | Honest residual |
 | --- | --- | --- | --- |
 | Re-anchor | normal | Local simulated-provider pause | Proprietary provider pause adapter |
