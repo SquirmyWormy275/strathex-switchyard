@@ -23,11 +23,6 @@ import {
   type SessionStatusPayload
 } from "./bridge.ts";
 
-export type LocalHostAction =
-  | "create_claude_terminal"
-  | "create_codex_terminal"
-  | "focus_integrated_terminal";
-
 /**
  * A mediator can be attached after it has a verified execution boundary.  The
  * default service deliberately has no executor, so a local JSON request can
@@ -227,71 +222,20 @@ export class CompanionService {
       return result;
     }
 
-    if (assignment.capability === "disabled_pending_gates") {
-      const session = payload.sessionId ? this.requireSession(payload.sessionId) : undefined;
-      if (!session?.capabilities.includes("mediated") || !this.executor) {
-        const result: CommandResult = {
-          status: "blocked",
-          summary: "This high-consequence B122 control remains disabled until a Mediated executor evaluates its policy and acceptance gates."
-        };
-        this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-        return result;
-      }
-      // The executor is the policy/receipt authority. Forwarding a canonical,
-      // still-gated intent lets it emit durable evidence while preventing the
-      // transport layer from inventing a high-consequence happy path.
-      const result = await this.executor.execute({
-        assignment,
-        control: payload.control,
-        modifier: payload.modifier,
-        sessionId: payload.sessionId,
-        authorityId: payload.authorityId,
-        confirmationToken: payload.confirmationToken,
-        input: payload.input
-      });
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId, result.operationId);
-      return result;
-    }
-
-    const localAction = directHostActionFor(payload.control, payload.modifier);
-    if (localAction) {
-      const result: CommandResult = {
-        status: "completed",
-        summary: "A direct VS Code host action was routed. Its resulting session/process remains Registered unless a verified mediator says otherwise.",
-        data: { localAction, mediated: false, assignment: assignment.summary }
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
-
-    if (assignment.capability === "route_only") {
-      const result: CommandResult = {
-        status: "completed",
-        summary: "Intent was routed for a visible host adapter. The companion did not execute a repository, Git, credential, network, or prompt action.",
-        data: { intentOnly: true, assignment: assignment.summary }
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
-
-    const session = payload.sessionId ? this.requireSession(payload.sessionId) : undefined;
-    if (!session?.capabilities.includes("mediated")) {
-      const result: CommandResult = {
-        status: "unavailable",
-        summary: "This request needs a Mediated session. Registered, Observable, or Controllable state cannot enforce filesystem, Git, credential, network, or test-data policy."
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
     if (!this.executor) {
       const result: CommandResult = {
-        status: "unavailable",
-        summary: "A Mediated session was identified, but no verified execution broker is attached to this companion endpoint."
+        status: assignment.capability === "disabled_pending_gates" ? "blocked" : "unavailable",
+        summary: assignment.capability === "disabled_pending_gates"
+          ? "This high-consequence B122 control remains disabled until the durable policy executor evaluates its acceptance gates."
+          : "No durable policy executor is attached; this command was not reported as completed and no host action was requested."
       };
       this.record("command.dispatch", result.status, result.summary, payload.sessionId);
       return result;
     }
 
+    // Every settled assignment, including route-only UI/navigation work, must
+    // cross the durable executor. Missing adapters remain unavailable instead
+    // of becoming false-green transport acknowledgements.
     const request: CommandRequest = {
       assignment,
       control: payload.control,
@@ -501,19 +445,6 @@ function cloneSession(session: ManagedSession): ManagedSession {
     plannedFiles: [...session.plannedFiles],
     metadata: { ...session.metadata }
   };
-}
-
-function directHostActionFor(control: Control, modifier: Modifier): LocalHostAction | undefined {
-  const key = `${control}:${modifier}`;
-  const actions: Readonly<Record<string, LocalHostAction>> = {
-    "CLAUDE:alt": "create_claude_terminal",
-    "CHATGPT:alt": "create_codex_terminal",
-    "TERMINAL:shift": "focus_integrated_terminal"
-  };
-  // Run, Debug, and Stop Managed Run are explicitly requires_mediation in the
-  // canonical protocol. They must never become an extension-local process or
-  // debug API call just because this transport is available.
-  return actions[key];
 }
 
 function isCancellableExecutor(value: MediatedCommandExecutor | undefined): value is CancellableMediatedCommandExecutor {

@@ -11,7 +11,7 @@ export {
   type ConfirmationRequestPayload,
   type OperationCancellationPayload
 } from "./bridge.ts";
-export { CompanionService, type CompanionServiceOptions, type LocalHostAction, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor } from "./service.ts";
+export { CompanionService, type CompanionServiceOptions, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor } from "./service.ts";
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
 export { WindowsDpapiJournalAuthenticator } from "./windows-authenticator.ts";
 export { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";

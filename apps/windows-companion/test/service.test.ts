@@ -69,9 +69,8 @@ test("dispatches every request through canonical safety classification before an
     control: "CLAUDE", modifier: "alt", sessionId
   }));
   const directCommand = (directVsCode.result as { command: { status: string; data?: Record<string, unknown> } }).command;
-  assert.equal(directCommand.status, "completed");
-  assert.equal(directCommand.data?.localAction, "create_claude_terminal");
-  assert.equal(directCommand.data?.mediated, false);
+  assert.equal(directCommand.status, "unavailable");
+  assert.equal(directCommand.data?.localAction, undefined);
 
   const runWithoutMediator = await service.handle(request("run", "command.dispatch", {
     control: "RUN", modifier: "normal", sessionId
@@ -115,13 +114,19 @@ test("a verified mediator calls only its attached executor and disabled actions 
   assert.equal((proof.result as { command: { status: string } }).command.status, "completed");
   assert.deepEqual(received, ["PROOF:normal"]);
 
+  const routed = await service.handle(request("github", "command.dispatch", { control: "GITHUB", modifier: "normal", sessionId }));
+  assert.equal((routed.result as { command: { status: string } }).command.status, "completed");
+
+  const localHost = await service.handle(request("claude", "command.dispatch", { control: "CLAUDE", modifier: "alt", sessionId }));
+  assert.equal((localHost.result as { command: { status: string } }).command.status, "completed");
+
   const run = await service.handle(request("run", "command.dispatch", { control: "RUN", modifier: "shift", sessionId }));
   assert.equal((run.result as { command: { status: string } }).command.status, "completed");
-  assert.deepEqual(received, ["PROOF:normal", "RUN:shift"]);
+  assert.deepEqual(received, ["PROOF:normal", "GITHUB:normal", "CLAUDE:alt", "RUN:shift"]);
 
   const repair = await service.handle(request("repair", "command.dispatch", { control: "PIPELINE", modifier: "ctrl_shift_alt", sessionId }));
   assert.equal((repair.result as { command: { status: string } }).command.status, "blocked");
-  assert.deepEqual(received, ["PROOF:normal", "RUN:shift", "PIPELINE:ctrl_shift_alt"]);
+  assert.deepEqual(received, ["PROOF:normal", "GITHUB:normal", "CLAUDE:alt", "RUN:shift", "PIPELINE:ctrl_shift_alt"]);
 });
 
 test("cancellation and confirmation requests cross only their dedicated mediator hooks", async () => {
