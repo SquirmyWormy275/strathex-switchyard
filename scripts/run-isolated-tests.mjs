@@ -59,6 +59,10 @@ export const requiredGroups = [
     file: "deployment/windows/Test-B122ManifestGenerators.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ManifestGenerators.ps1"]
+  }, {
+    file: "deployment/windows/Test-B122InstallLifecycle.ps1",
+    executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122InstallLifecycle.ps1"]
   }] : []),
   { file: "packages/protocol/test/b122.test.ts" },
   { file: "packages/protocol/test/raw-hid.test.ts" },

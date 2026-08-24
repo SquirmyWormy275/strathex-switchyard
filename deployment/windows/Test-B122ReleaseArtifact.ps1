@@ -11,6 +11,8 @@ function Read-Json([string]$Path) {
 }
 
 $release = Read-Json (Join-Path $root 'release.json')
+$requiredInstallScripts = @('B122InstallTools.psm1','Invoke-B122Current.ps1','Install-B122.ps1','Update-B122.ps1','Rollback-B122.ps1','Uninstall-B122.ps1')
+foreach ($name in $requiredInstallScripts) { if (-not (Test-Path -LiteralPath (Join-Path $root (Join-Path 'scripts' $name)) -PathType Leaf)) { throw "The versioned install lifecycle script is missing: $name" } }
 $checksumsDocument = Read-Json (Join-Path $root 'SHA256SUMS.json')
 $checksums = @($checksumsDocument | ForEach-Object { $_ })
 $sbom = Read-Json (Join-Path $root 'sbom.spdx.json')

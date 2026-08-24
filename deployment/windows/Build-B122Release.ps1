@@ -182,7 +182,10 @@ try {
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\dist') -Destination (Join-Path $extension 'dist') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\package.json') -Destination $extension
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\README.md') -Destination $extension
-foreach ($name in @('Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $scripts }
+foreach ($name in @(
+  'Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1',
+  'B122InstallTools.psm1','Invoke-B122Current.ps1','Install-B122.ps1','Update-B122.ps1','Rollback-B122.ps1','Uninstall-B122.ps1'
+)) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $scripts }
 foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $provisioning }
 $documentationSource = [IO.Path]::GetFullPath((Join-Path $repo 'docs')).TrimEnd('\')
 foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Recurse | Sort-Object FullName)) {
