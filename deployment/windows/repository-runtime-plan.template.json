@@ -1,0 +1,19 @@
+{
+  "schema": "sxsy-b122.repository-runtime-plan",
+  "version": 1,
+  "allowedHttpsUrls": [],
+  "recipes": {
+    "run_target": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["run_target"], "cwd": ".", "environment": {}, "lifecycle": "managed", "isolation": "repository", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "debug_target": { "configuration": "B122: Repository Debug" },
+    "launch_web_app": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["launch_web_app"], "cwd": ".", "environment": {}, "lifecycle": "managed", "isolation": "repository", "timeoutMs": 3600000, "maxOutputBytes": 1048576, "web": { "url": "http://127.0.0.1:3000/", "healthUrl": "http://127.0.0.1:3000/health", "healthTimeoutMs": 30000, "healthIntervalMs": 250 } },
+    "venv": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["venv"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "repository", "timeoutMs": 600000, "maxOutputBytes": 1048576 },
+    "rebuild_venv": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["rebuild_venv"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "repository", "timeoutMs": 600000, "maxOutputBytes": 1048576 },
+    "pipeline_local_gate": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["pipeline_local_gate"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "disposable", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "pipeline_clean_reproduction": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["pipeline_clean_reproduction"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "disposable", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "shield_change_scan": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["shield_change_scan"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "repository", "timeoutMs": 600000, "maxOutputBytes": 1048576 },
+    "shield_codebase_audit": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["shield_codebase_audit"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "repository", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "shield_supply_chain": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["shield_supply_chain"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "repository", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "release_shield": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-repository-runner.exe", "args": ["release_shield"], "cwd": ".", "environment": {}, "lifecycle": "foreground", "isolation": "disposable", "timeoutMs": 3600000, "maxOutputBytes": 1048576 },
+    "stop_managed_run": { "managedActions": ["run_target", "launch_web_app"], "gracefulTimeoutMs": 2000, "forceTimeoutMs": 5000 }
+  }
+}

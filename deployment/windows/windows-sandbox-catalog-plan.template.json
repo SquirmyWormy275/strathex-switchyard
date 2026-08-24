@@ -1,0 +1,12 @@
+{
+  "schema": "sxsy-b122.windows-sandbox-catalog-plan",
+  "version": 1,
+  "allowedHttpsUrls": [],
+  "recipes": {
+    "full_sandbox": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-sandbox-recipe.exe", "arguments": ["full_sandbox", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576, "artifacts": [] },
+    "quarantine": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-sandbox-recipe.exe", "arguments": ["quarantine", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576, "artifacts": [] },
+    "pipeline_local_gate": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-sandbox-recipe.exe", "arguments": ["pipeline_local_gate", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576, "artifacts": [] },
+    "pipeline_clean_reproduction": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-sandbox-recipe.exe", "arguments": ["pipeline_clean_reproduction", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576, "artifacts": [] },
+    "release_shield": { "executable": "C:\\ABSOLUTE\\PINNED\\b122-sandbox-recipe.exe", "arguments": ["release_shield", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576, "artifacts": [] }
+  }
+}
