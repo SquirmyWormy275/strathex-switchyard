@@ -97,6 +97,55 @@ function Restore-B122PreviousVersion {
   return Write-B122InstallStateAtomic -InstallRoot $InstallRoot -Current ([string]$state.previous) -Previous ([string]$state.current)
 }
 
+function Restore-B122InstallStateSnapshot {
+  param([Parameter(Mandatory=$true)][string]$InstallRoot,[AllowNull()]$Snapshot)
+  $root = [IO.Path]::GetFullPath($InstallRoot)
+  $path = Join-Path $root 'install-state.json'
+  if ($null -eq $Snapshot) {
+    if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
+    return $null
+  }
+  return Write-B122InstallStateAtomic -InstallRoot $root -Current ([string]$Snapshot.current) -Previous $(if($null -eq $Snapshot.previous){$null}else{[string]$Snapshot.previous})
+}
+
+function Invoke-B122AtomicActivation {
+  param(
+    [Parameter(Mandatory=$true)][string]$InstallRoot,
+    [Parameter(Mandatory=$true)][string]$VersionId,
+    [AllowNull()]$PriorState,
+    [Parameter(Mandatory=$true)][scriptblock]$InstallExtension,
+    [Parameter(Mandatory=$true)][scriptblock]$WaitForHealth,
+    [Parameter(Mandatory=$true)][scriptblock]$ConfigureAutostart,
+    [Parameter(Mandatory=$true)][scriptblock]$RestoreExtension,
+    [Parameter(Mandatory=$true)][scriptblock]$RestoreAutostart,
+    [Parameter(Mandatory=$true)][scriptblock]$RecoverPrior
+  )
+  $extensionAttempted = $false; $autostartAttempted = $false; $primary = $null; $rollbackErrors = New-Object Collections.Generic.List[string]
+  try {
+    Set-B122CurrentVersion -InstallRoot $InstallRoot -VersionId $VersionId | Out-Null
+    $extensionAttempted = $true; & $InstallExtension
+    & $WaitForHealth
+    $autostartAttempted = $true; & $ConfigureAutostart
+    return Get-B122InstallState -InstallRoot $InstallRoot
+  } catch {
+    $primary = $_
+    try { Restore-B122InstallStateSnapshot -InstallRoot $InstallRoot -Snapshot $PriorState | Out-Null } catch { $rollbackErrors.Add("install pointer: $($_.Exception.Message)") }
+    if ($extensionAttempted) { try { & $RestoreExtension } catch { $rollbackErrors.Add("VS Code extension: $($_.Exception.Message)") } }
+    if ($autostartAttempted) { try { & $RestoreAutostart } catch { $rollbackErrors.Add("autostart: $($_.Exception.Message)") } }
+    if ($null -ne $PriorState) { try { & $RecoverPrior } catch { $rollbackErrors.Add("prior companion: $($_.Exception.Message)") } }
+    $suffix = if($rollbackErrors.Count){' Rollback errors: '+($rollbackErrors -join '; ')}else{''}
+    throw "B122 activation failed: $($primary.Exception.Message).$suffix"
+  }
+}
+
+function Remove-B122UnreferencedVersion {
+  param([Parameter(Mandatory=$true)][string]$InstallRoot,[Parameter(Mandatory=$true)][string]$VersionId)
+  $root = [IO.Path]::GetFullPath($InstallRoot); $id = Test-B122VersionId $VersionId; $state = Get-B122InstallState -InstallRoot $root
+  if ($null -ne $state -and ($state.current -ceq $id -or $state.previous -ceq $id)) { throw 'Refusing to remove a referenced B122 version.' }
+  $versions = Join-Path $root 'versions'; $path = Join-Path $versions $id; Assert-B122ChildPath -Parent $versions -Child $path | Out-Null
+  if (Test-Path -LiteralPath $path -PathType Container) { Remove-Item -LiteralPath $path -Recurse -Force }
+}
+
 function Get-B122CurrentBundle {
   param([Parameter(Mandatory=$true)][string]$InstallRoot)
   $state = Get-B122InstallState -InstallRoot $InstallRoot
@@ -115,4 +164,4 @@ function Stop-B122InstalledCompanion {
   }
 }
 
-Export-ModuleMember -Function Assert-B122ChildPath,Get-B122InstallState,Write-B122InstallStateAtomic,Repair-B122InterruptedInstall,Import-B122ValidatedBundle,Set-B122CurrentVersion,Restore-B122PreviousVersion,Get-B122CurrentBundle,Stop-B122InstalledCompanion
+Export-ModuleMember -Function Assert-B122ChildPath,Test-B122VersionId,Get-B122InstallState,Write-B122InstallStateAtomic,Repair-B122InterruptedInstall,Import-B122ValidatedBundle,Set-B122CurrentVersion,Restore-B122PreviousVersion,Restore-B122InstallStateSnapshot,Invoke-B122AtomicActivation,Remove-B122UnreferencedVersion,Get-B122CurrentBundle,Stop-B122InstalledCompanion
