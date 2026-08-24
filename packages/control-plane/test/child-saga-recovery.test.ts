@@ -131,6 +131,51 @@ test("a crash after durable child creation is reconciled instead of becoming rep
   });
 });
 
+test("a pre-effect unavailable composite settles its boundary and remains intentionally retryable", async () => {
+  await withStore(async (store) => {
+    const now = "2026-08-23T12:00:00.000Z";
+    const target: TargetSnapshot = {
+      id: "snapshot-unavailable", repositoryRoot: "C:/work/example", branch: "feature/safe", head: "abc", indexTree: "tree",
+      trackedManifest: "tracked", untrackedManifest: "untracked", submodules: {}, policyVersion: "policy-1",
+      environmentFingerprint: "env-1", capturedAt: now, completeness: "complete", reasons: []
+    };
+    const session: ManagedSession = {
+      id: "session-unavailable", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
+      plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+    };
+    const authority: AuthorityGrant = {
+      id: "authority-compound", repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["compound_capture"], prohibitedActions: [], issuedAt: now, expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "user"
+    };
+    const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const automation = new InMemoryAutomationBroker(policy);
+    let calls = 0;
+    automation.register("compound_capture", () => {
+      calls += 1;
+      return { status: "unavailable", summary: "The exact provider route is not configured; no request was sent." };
+    });
+    const dispatcher = new CommandDispatcher({
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => id === authority.id ? authority : undefined },
+      operations: coordinator,
+      automation
+    });
+    const assignment = commandForAction("compound_capture").assignment!;
+    const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+
+    assert.equal((await dispatcher.dispatch(request)).status, "unavailable");
+    assert.equal((await dispatcher.dispatch(request)).status, "unavailable");
+    assert.equal(calls, 2, "a later intentional press may retry after a known pre-effect refusal");
+    const all = await operations.list();
+    assert.equal(all.filter((operation) => !operation.parentId).length, 2);
+    assert.equal(all.filter((operation) => operation.parentId).every((operation) => operation.state === "failed"), true);
+  });
+});
+
 test("durable dispatch gives Git, automation, and Council handlers a scoped child-saga capability", async () => {
   await withStore(async (store) => {
     const now = "2026-08-23T12:00:00.000Z";

@@ -445,6 +445,13 @@ export class CommandDispatcher {
         if (result.status === "completed") {
           await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status });
           await childSaga.settle(boundary, "completed");
+        } else if (["unavailable", "blocked", "awaiting_input", "awaiting_confirmation"].includes(result.status)) {
+          // These dispositions are defined as pre-effect refusals. Closing the
+          // boundary as a known failure lets the parent record the truthful
+          // result and permits a later intentional press after provisioning or
+          // reviewed input changes. Ambiguous provider/network failures must
+          // use failed/incomplete/running and remain reconcilable below.
+          await childSaga.settle(boundary, "failed", { brokerStatus: result.status, externalEffect: "not_started" });
         } else {
           await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status });
         }
