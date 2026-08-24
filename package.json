@@ -9,6 +9,7 @@
     "build:vscode": "tsc -p apps/vscode-extension/tsconfig.build.json",
     "build:protocol": "tsc -p packages/protocol/tsconfig.build.json",
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
+    "start:companion": "node --experimental-strip-types apps/windows-companion/src/main.ts",
     "package:vscode:dry-run": "npm pack --dry-run --workspace @strathex/switchyard-vscode",
     "package:companion:dry-run": "npm run build:companion && npm pack --dry-run --workspace @strathex/switchyard-companion",
     "test": "node --test scripts/run-isolated-tests.test.mjs && node scripts/run-isolated-tests.mjs",
