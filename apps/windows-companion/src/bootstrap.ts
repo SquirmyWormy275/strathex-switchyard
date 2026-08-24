@@ -45,6 +45,7 @@ import { HandoffPackageStore } from "../../../packages/control-plane/src/context
 import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-evidence.ts";
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
+import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -115,6 +116,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly handoffs: HandoffPackageStore;
   readonly workflowArtifacts: WorkflowArtifactStore;
   readonly voice: VoiceCoordinator;
+  readonly councilIsolation: CouncilWorkspaceIsolationManager;
   readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
@@ -129,6 +131,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   }
   const sessions = new SessionRegistry(store);
   const localStateDirectory = resolve(options.localStateDirectory ?? dirname(store.filePath));
+  const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
+    stateRoot: resolve(localStateDirectory, "council-isolation")
+  });
   const checkpointCapture = options.runtime?.checkpointCapture ?? new LocalCheckpointCapture({ stateDirectory: localStateDirectory });
   const checkpointVerifier = options.runtime?.checkpointVerifier ?? new LocalRecoveryArtifactVerifier(localStateDirectory);
   const credentialProtector = options.credentialProtector ?? unavailableCredentialProtector;
@@ -261,6 +266,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           containmentManager,
           credentialVault,
           networkPolicyRegistry,
+          councilIsolation,
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
           ...(repositorySandbox ? { repositorySandbox } : {}),
           hostActions
@@ -290,6 +296,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     startupRecovery: async () => {
       for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
       await repositoryRuntimes.recoverManagedProcesses();
+      await councilIsolation.recoverPending();
       await executor.recoverAfterRestart();
       await hardwareSignals.recoverAfterRestart();
     }
@@ -311,6 +318,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     handoffs,
     workflowArtifacts,
     voice,
+    councilIsolation,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),

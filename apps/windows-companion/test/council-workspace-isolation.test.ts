@@ -142,6 +142,32 @@ test("Council recovery preserves dirty or advanced work and requires manual clea
   }
 });
 
+test("Council startup recovery enumerates durable epochs and never resumes an invalid prepared plan", async () => {
+  const context = await fixture();
+  try {
+    const request = { ...context.request, assignments: [context.request.assignments[0]!] };
+    const manager = new CouncilWorkspaceIsolationManager(context.store, {
+      stateRoot: context.stateRoot, git: context.runner, ports: portsAvailable, clock: () => at
+    });
+    const prepared = await manager.prepare(request);
+    const binding = prepared.bindings[0]!;
+    await writeFile(join(binding.worktreeRoot, "unexpected.txt"), "preserve on restart\n", "utf8");
+
+    const recovered = await manager.recoverPending();
+    assert.equal(recovered.length, 1);
+    assert.equal(recovered[0]?.epochId, prepared.epochId);
+    assert.equal(recovered[0]?.status, "manual_cleanup_required");
+    assert.equal(await realpath(binding.worktreeRoot), binding.worktreeRoot);
+
+    const listed = await manager.list();
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0]?.status, "manual_cleanup_required");
+    assert.equal((await manager.recoverPending()).length, 0);
+  } finally {
+    await rm(context.base, { recursive: true, force: true });
+  }
+});
+
 test("Council fails closed on unproven ports, unknown resource kinds, or an unsafe state root", async () => {
   const context = await fixture();
   try {

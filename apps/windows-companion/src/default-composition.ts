@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { AdapterRegistry, type AdapterOutcome, type AdapterRequest, type CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
+import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type GitRequest, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
 import type { CommandDispatcherDependencies, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
@@ -24,8 +24,9 @@ import { repositoryProcessActions, type RepositoryExecutionRootProvider, type Re
 import { RepositoryRuntimeExecutionBroker, SandboxedRepositoryExecutionBroker, repositoryRuntimeExecutionRecipe, type SandboxRepositoryRecipeRunner } from "./repository-runtime-broker.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, providerCommandActions } from "./remote-adapters.ts";
-import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler } from "./remote-git.ts";
+import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor } from "./council-runtime.ts";
+import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter } from "./pipeline-adapters.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
@@ -84,6 +85,7 @@ export interface DefaultLocalCompositionOptions {
   readonly containmentManager?: DurableContainmentManager;
   readonly credentialVault?: DurableCredentialReferenceVault;
   readonly networkPolicyRegistry?: DurableNetworkPolicyRegistry;
+  readonly councilIsolation?: CouncilWorkspaceIsolationManager;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   let credentials: DurableCredentialReferenceVault | undefined = options.credentialVault;
@@ -123,11 +125,8 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   }
   if (dynamicNetwork) {
     const receiptLedger = new ReceiptLedger(store);
-    const remoteGit = new ConfiguredRemoteGitHandler(
-      new ConfiguredGitSmartHttpPusher(dynamicNetwork),
-      new ConfiguredGitHubGraphqlPort(dynamicNetwork),
-      { async verify(receiptId, targetSnapshotId) { const receipt = await receiptLedger.get(receiptId); return !!receipt && receipt.action === "release_shield" && await receiptLedger.isFresh(receipt, targetSnapshotId); } },
-      { async open(request, url) {
+    const directMainReceipts = { async verify(receiptId: string, targetSnapshotId: string) { const receipt = await receiptLedger.get(receiptId); return !!receipt && receipt.action === "release_shield" && await receiptLedger.isFresh(receipt, targetSnapshotId); } };
+    const pullRequestHost = { async open(request: GitRequest, url: string): Promise<BrokerOutcome> {
         const fence = await containment.check(request.target.repositoryRoot, "adapter");
         if (!fence.allowed) return { status: "blocked", summary: fence.reason };
         const current = await request.effectGuard?.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
@@ -138,14 +137,27 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
           ...(request.executionControl ? { executionControl: request.executionControl } : {}), ...(request.effectGuard ? { effectGuard: request.effectGuard } : {})
         }, { hostAction: "open_external_url", url });
         return { status: "running", summary: "The exact PR is verified; opening its status awaits an authenticated VS Code acknowledgement.", data: { hostActionId: intent.id, hostActionKind: intent.hostAction, hostActionExpiresAt: intent.expiresAt, hostActionUrl: intent.url } };
-      } }
-    );
-    git.register("pr_upsert", (request) => remoteGit.execute(request));
-    git.register("merge_pr", (request) => remoteGit.execute(request));
-    git.register("direct_main", (request) => remoteGit.execute(request));
+      } };
+    const executeRemoteGit = async (request: GitRequest) => {
+      try {
+        const host = configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve());
+        return new ConfiguredRemoteGitHandler(
+          new ConfiguredGitSmartHttpPusher(dynamicNetwork, host),
+          new ConfiguredGitHubGraphqlPort(dynamicNetwork, host),
+          host,
+          directMainReceipts,
+          pullRequestHost
+        ).execute(request);
+      } catch {
+        return { status: "unavailable" as const, summary: "Remote Git requires one active exact-host GitHub or GitHub Enterprise route set.", effectDisposition: "not_started" as const };
+      }
+    };
+    git.register("pr_upsert", executeRemoteGit);
+    git.register("merge_pr", executeRemoteGit);
+    git.register("direct_main", executeRemoteGit);
   }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
   const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
   const executionOptions = { containment, hostActions };
-  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, dynamicNetwork), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, dynamicNetwork, Date.now, { ...(options.councilIsolation ? { isolation: options.councilIsolation } : {}) }), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

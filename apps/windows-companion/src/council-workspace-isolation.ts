@@ -130,6 +130,13 @@ export class CouncilWorkspaceIsolationManager {
     return plan ? clonePlan(plan) : undefined;
   }
 
+  /** Returns the latest authenticated state for every durable isolation epoch. */
+  async list(): Promise<readonly CouncilIsolationPlan[]> {
+    return [...planMap(await this.store.readEntries()).values()]
+      .sort((left, right) => left.epochId.localeCompare(right.epochId))
+      .map(clonePlan);
+  }
+
   /** Reserves every branch, worktree, and resource collision key before any Git mutation. */
   async reserve(input: CouncilIsolationPrepareRequest): Promise<CouncilIsolationPlan> {
     const normalized = await this.normalizeRequest(input);
@@ -216,8 +223,17 @@ export class CouncilWorkspaceIsolationManager {
     const plan = await this.requirePlan(epochId);
     if (plan.status === "cleaned" || plan.status === "manual_cleanup_required") return plan;
     if (plan.status === "prepared") {
-      await this.verifyMaterialized(plan, true);
-      return plan;
+      try {
+        await this.verifyMaterialized(plan, true);
+        return plan;
+      } catch (error) {
+        await this.mutate(plan.epochId, (current) => ({
+          ...current,
+          status: "cleanup_pending",
+          failureReason: controlledReason(error, "Council recovery could not prove the prepared external isolation state.")
+        }));
+        return this.cleanup(plan.epochId);
+      }
     }
     const exact = await this.materializedExactly(plan).catch(() => false);
     if (exact) return this.mutate(plan.epochId, (current) => {
@@ -226,6 +242,20 @@ export class CouncilWorkspaceIsolationManager {
     });
     await this.mutate(plan.epochId, (current) => ({ ...current, status: "cleanup_pending", failureReason: "Council recovery found partial external state; compensation was required without replay." }));
     return this.cleanup(plan.epochId);
+  }
+
+  /**
+   * Reconciles every nonterminal epoch at companion startup. Recovery observes
+   * exact host state and compensates only coordinator-owned clean resources; it
+   * never repeats a Git worktree creation or provider assignment.
+   */
+  async recoverPending(): Promise<readonly CouncilIsolationPlan[]> {
+    const recovered: CouncilIsolationPlan[] = [];
+    for (const plan of await this.list()) {
+      if (plan.status === "cleaned" || plan.status === "manual_cleanup_required") continue;
+      recovered.push(await this.recover(plan.epochId));
+    }
+    return recovered;
   }
 
   /** Removes only exact, clean, unadvanced coordinator-owned worktrees and unused scopes. */

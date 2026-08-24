@@ -26,10 +26,25 @@ const controlPlaneTests = [
   "child-saga-recovery", "command-catalog", "confirmations", "containment",
   "context-council", "dispatch", "durable-containment", "git-inspector",
   "policy", "recipes", "redaction", "runtime", "session-authority",
-  "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts"
+  "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts",
+  "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "authenticated-pipe", "bootstrap", "configured-network", "control-plane", "council-runtime", "durable-credentials", "durable-endpoint", "git-review", "host-actions", "host-provisioning", "instance-lifecycle", "local-runtime", "packaged-runtime", "pipeline-adapters", "raw-hid-protocol", "remote-adapters", "remote-git", "repository-runtime", "repository-runtime-broker", "runtime-provisioning", "runtime-registry", "router", "sandbox-installation", "service", "stdio", "windows-sandbox", "windows-user-presence"
+  "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
+  "council-runtime", "council-workspace-isolation", "durable-credentials",
+  "durable-endpoint", "git-review", "hardware-signal-queue",
+  "hardware-signal-service", "host-actions", "host-provisioning",
+  "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
+  "operation-recovery", "packaged-runtime", "pipeline-adapters",
+  "provider-desktop", "raw-hid-installation", "raw-hid-main-wiring",
+  "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
+  "repository-process-supervisor", "repository-recipe-evidence",
+  "repository-recipe-host-evidence", "repository-runner-helper",
+  "repository-runtime", "repository-runtime-broker",
+  "repository-runtime-release-package", "router", "runtime-provisioning",
+  "runtime-registry", "sandbox-installation", "service", "stdio",
+  "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
+  "windows-user-presence", "workflow-voice-service"
 ].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime" }));
 const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
