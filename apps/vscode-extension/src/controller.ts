@@ -6,7 +6,8 @@ import {
   type ExtensionProvider,
   type ForwardedCommand,
   type ForwardedHostAction,
-  type LocalHostAction
+  type LocalHostAction,
+  type ReviewedGitMutation
 } from "./companion-bridge.ts";
 import type {
   DebugConfigurationLike,
@@ -51,6 +52,7 @@ export interface GitRootRegistration {
   readonly branch?: string;
   readonly worktree?: string;
   readonly canonicalRemote?: string;
+  readonly changedPaths?: readonly string[];
 }
 
 /**
@@ -354,6 +356,7 @@ export class ManagedSessionController {
       return;
     }
     if (preparation.value.session) this.sessions.set(preparation.value.session.id, preparation.value.session);
+    if (selectedSession && !await this.reviewGitMutation(command, selectedSession)) return;
     const forwarded: ForwardedCommand = {
       control: command.control,
       modifier: command.modifier,
@@ -407,6 +410,71 @@ export class ManagedSessionController {
       return;
     }
     await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.value.summary}`);
+  }
+
+  private async reviewGitMutation(command: ChordCommand, sessionId: string): Promise<boolean> {
+    const action = gitReviewAction(command);
+    if (!action) return true;
+    const input = this.vscode.window.showInputBox;
+    if (!input) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Git review is unavailable because this VS Code host cannot collect bounded review fields.");
+      return false;
+    }
+    const session = this.sessions.get(sessionId);
+    const root = this.gitRoots.find((candidate) => session?.workspaceRoot && samePath(candidate.gitRoot, session.workspaceRoot));
+    if (!session || !root) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Git review stopped because the exact Git-root session is unavailable.");
+      return false;
+    }
+    let mutation: ReviewedGitMutation | undefined;
+    if (action === "local_commit") {
+      const available = [...new Set(root.changedPaths ?? [])].filter((path) => path && !path.includes(","));
+      if (!available.length) {
+        await this.vscode.window.showWarningMessage("SXSY-B122 found no structured changed-file list for a local commit; it will not infer paths from terminal text.");
+        return false;
+      }
+      const selection = await input({
+        prompt: "Review the exact changed files to include (comma-separated repository paths)",
+        value: available.join(", "),
+        validateInput: (value) => {
+          const selected = splitReviewedPaths(value);
+          return selected.length && selected.every((path) => available.includes(path)) ? undefined : "Choose only paths from the current structured Git change list.";
+        }
+      });
+      if (!selection) return false;
+      const paths = splitReviewedPaths(selection);
+      if (!paths.length || paths.some((path) => !available.includes(path))) return false;
+      const message = await input({ prompt: "Enter the exact local commit message", validateInput: (value) => value.trim() && value.length <= 120 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 120 characters." });
+      if (!message) return false;
+      mutation = { kind: "local_commit", paths, message };
+    } else if (action === "pr_upsert") {
+      if (!root.branch) return false;
+      const baseBranch = await input({ prompt: "Review the pull request base branch", value: "main", validateInput: validBranchInput });
+      if (!baseBranch) return false;
+      mutation = { kind: "pr_upsert", headBranch: root.branch, baseBranch };
+    } else if (action === "pr_merge") {
+      const pullRequestText = await input({ prompt: "Enter the exact pull request number", validateInput: (value) => /^[1-9][0-9]{0,9}$/.test(value) ? undefined : "Enter a positive pull request number." });
+      const head = pullRequestText ? await input({ prompt: "Enter the exact 40-character reviewed head SHA", validateInput: (value) => /^[a-f0-9]{40}$/i.test(value) ? undefined : "Enter the exact 40-character SHA." }) : undefined;
+      const baseBranch = head ? await input({ prompt: "Enter the exact reviewed base branch", value: "main", validateInput: validBranchInput }) : undefined;
+      if (!pullRequestText || !head || !baseBranch) return false;
+      mutation = { kind: "merge_pr", pullRequest: Number(pullRequestText), head, baseBranch };
+    } else {
+      if (!root.branch) return false;
+      const validationReceiptId = await input({ prompt: "Enter the exact Release Shield validation receipt ID", validateInput: (value) => /^receipt:[A-Za-z0-9._:-]{1,200}$/.test(value) ? undefined : "Enter a receipt ID beginning with receipt:." });
+      if (!validationReceiptId) return false;
+      mutation = { kind: "direct_main", branch: root.branch, validationReceiptId };
+    }
+    const reviewed = await this.bridge.reviewGitMutation({ action, sessionId, mutation });
+    if (!reviewed.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Git review unavailable: ${reviewed.message}`);
+      return false;
+    }
+    if (reviewed.value.status !== "approved") {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Git review ${reviewed.value.status}: ${reviewed.value.summary}`);
+      return false;
+    }
+    if (reviewed.value.session) this.sessions.set(reviewed.value.session.id, reviewed.value.session);
+    return true;
   }
 
   private async executeLocalHostAction(action: ForwardedHostAction): Promise<string> {
@@ -574,6 +642,28 @@ function trustedExternalUrl(value: string): boolean {
     const url = new URL(value);
     return url.protocol === "https:" && ["github.com", "claude.ai", "chatgpt.com"].includes(url.hostname) && !url.username && !url.password;
   } catch { return false; }
+}
+
+function gitReviewAction(command: ChordCommand): "local_commit" | "pr_upsert" | "pr_merge" | "direct_main" | undefined {
+  if (command.control !== "COMMIT") return undefined;
+  if (command.modifier === "normal") return "local_commit";
+  if (command.modifier === "shift") return "pr_upsert";
+  if (command.modifier === "alt") return "pr_merge";
+  if (command.modifier === "shift_alt") return "direct_main";
+  return undefined;
+}
+
+function splitReviewedPaths(value: string): readonly string[] {
+  return [...new Set(value.split(",").map((path) => path.trim().replaceAll("\\", "/")).filter(Boolean))];
+}
+
+function validBranchInput(value: string): string | undefined {
+  return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") ? undefined : "Enter a valid exact branch name.";
+}
+
+function samePath(left: string, right: string): boolean {
+  const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+  return normalize(left) === normalize(right);
 }
 
 function parseChordArgument(value: unknown): ChordCommand | undefined {

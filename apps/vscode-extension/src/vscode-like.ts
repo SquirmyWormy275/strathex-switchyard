@@ -59,6 +59,7 @@ export interface VscodeLike {
     showInformationMessage(message: string): PromiseLike<string | undefined>;
     showWarningMessage(message: string): PromiseLike<string | undefined>;
     showQuickPick<T extends string | QuickPickItemLike>(items: readonly T[], options?: { readonly placeHolder?: string }): PromiseLike<T | undefined>;
+    showInputBox?(options?: { readonly prompt?: string; readonly placeHolder?: string; readonly value?: string; readonly password?: boolean; validateInput?(value: string): string | undefined | null | PromiseLike<string | undefined | null> }): PromiseLike<string | undefined>;
     onDidOpenTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
     onDidCloseTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
   };

@@ -176,6 +176,26 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("Git review accepts only an exact typed mutation and cannot carry force or shell fields", async () => {
+  const reviewed: unknown[] = [];
+  const service = new CompanionService({ gitReviews: { async review(payload) { reviewed.push(payload); return { status: "approved", summary: "Exact mutation approved." }; } } });
+  const response = await service.handle(request("review", "git.review.submit", {
+    action: "local_commit",
+    sessionId: "session-1",
+    mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe" }
+  }));
+  assert.equal(response.ok, true);
+  assert.deepEqual(reviewed, [{ action: "local_commit", sessionId: "session-1", mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe" } }]);
+
+  const force = await service.handle(request("force", "git.review.submit", {
+    action: "local_commit",
+    sessionId: "session-1",
+    mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe", force: true }
+  }));
+  assert.equal(force.ok, false);
+  assert.equal(force.error?.code, "invalid_request");
+});
+
 test("in-process and unavailable bridges retain request IDs and fail closed", async () => {
   const service = new CompanionService({ now: () => "2026-08-23T00:00:00.000Z", idFactory: () => "audit" });
   const inProcess = new InProcessCompanionBridge(service);

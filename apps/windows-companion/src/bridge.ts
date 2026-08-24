@@ -1,6 +1,7 @@
 import type { Control, Modifier } from "../../../packages/protocol/src/b122.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CommandResult, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
+import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { CompanionService } from "./service.ts";
 
 /**
@@ -24,6 +25,7 @@ export type CompanionMethod =
   | "operation.cancel"
   | "command.prepare"
   | "confirmation.request"
+  | "git.review.submit"
   | "host-action.complete";
 
 export interface CompanionRequest {
@@ -121,6 +123,12 @@ export interface HostActionCompletionPayload {
   readonly adapterVersion: string;
 }
 
+export interface GitReviewPayload {
+  readonly action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main";
+  readonly sessionId: string;
+  readonly mutation: GitMutation;
+}
+
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
   request(request: CompanionRequest): Promise<CompanionResponse>;
@@ -174,7 +182,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
-    "host-action.complete"
+    "git.review.submit", "host-action.complete"
   ].includes(value);
 }
 

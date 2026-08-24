@@ -1,5 +1,7 @@
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
+import type { GitReviewResult } from "./git-review.ts";
 import type {
   AuditEvent,
   Capability,
@@ -18,6 +20,7 @@ import {
   type CommandPreparationPayload,
   type ConfirmationRequestPayload,
   type HostActionCompletionPayload,
+  type GitReviewPayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -63,6 +66,10 @@ export interface HostActionCoordinator {
   settle(payload: HostActionCompletionPayload): Promise<HostActionCompletionRecord>;
 }
 
+export interface GitMutationReviewCoordinator {
+  review(payload: GitReviewPayload): Promise<GitReviewResult>;
+}
+
 export interface ExternalCompletionCapableMediatedCommandExecutor extends MediatedCommandExecutor {
   completeExternalOperation(record: HostActionCompletionRecord): Promise<CommandResult>;
 }
@@ -72,6 +79,7 @@ export interface CompanionServiceOptions {
   readonly idFactory?: () => string;
   readonly executor?: MediatedCommandExecutor;
   readonly hostActions?: HostActionCoordinator;
+  readonly gitReviews?: GitMutationReviewCoordinator;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -93,6 +101,7 @@ export class CompanionService {
   private readonly idFactory: () => string;
   private readonly executor?: MediatedCommandExecutor;
   private readonly hostActions?: HostActionCoordinator;
+  private readonly gitReviews?: GitMutationReviewCoordinator;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
@@ -100,6 +109,7 @@ export class CompanionService {
     this.idFactory = options.idFactory ?? (() => `audit-${crypto.randomUUID()}`);
     this.executor = options.executor;
     this.hostActions = options.hostActions;
+    this.gitReviews = options.gitReviews;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -133,6 +143,8 @@ export class CompanionService {
           return this.success(request.id, { preparation: await this.prepareCommand(this.requireCommandPreparation(request.payload)) });
         case "confirmation.request":
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
+        case "git.review.submit":
+          return this.success(request.id, { review: await this.reviewGitMutation(this.requireGitReview(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
@@ -321,6 +333,14 @@ export class CompanionService {
     return result;
   }
 
+  private async reviewGitMutation(payload: GitReviewPayload): Promise<GitReviewResult> {
+    if (!this.gitReviews) return { status: "unavailable", summary: "No trusted current-user Git review boundary is attached." };
+    const result = await this.gitReviews.review(payload);
+    if (result.session) this.installTrustedSession(result.session);
+    this.record("git.review.submit", result.status === "approved" ? "completed" : result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
     if (!isRecord(payload) || !isRecord(payload.session)) throw new CompanionServiceError("invalid_request", "A session registration requires a session record.");
     return { session: payload.session as unknown as ManagedSession };
@@ -399,6 +419,13 @@ export class CompanionService {
       throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
     }
     return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, summary: payload.summary, adapterVersion: payload.adapterVersion };
+  }
+
+  private requireGitReview(payload: unknown): GitReviewPayload {
+    if (!isRecord(payload) || !isGitReviewAction(payload.action) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256) {
+      throw new CompanionServiceError("invalid_request", "Git review requires an exact action and managed session ID.");
+    }
+    return { action: payload.action, sessionId: payload.sessionId, mutation: parseGitMutation(payload.mutation) };
   }
 
   private requireSession(id: string): ManagedSession {
@@ -528,6 +555,36 @@ function isConfirmationCapableExecutor(value: MediatedCommandExecutor | undefine
   return !!value && typeof (value as Partial<ConfirmationCapableMediatedCommandExecutor>).requestConfirmation === "function";
 }
 
+function parseGitMutation(value: unknown): GitMutation {
+  if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Git review requires a typed mutation record.");
+  switch (value.kind) {
+    case "local_commit":
+      exactMutationKeys(value, ["kind", "paths", "message"]);
+      if (!Array.isArray(value.paths) || !value.paths.length || value.paths.length > 256 || !value.paths.every((path) => typeof path === "string" && path.length <= 512)
+        || typeof value.message !== "string" || !value.message.trim() || value.message.length > 120) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths and message.");
+      return { kind: "local_commit", paths: value.paths, message: value.message };
+    case "pr_upsert":
+      exactMutationKeys(value, ["kind", "headBranch", "baseBranch"]);
+      if (typeof value.headBranch !== "string" || typeof value.baseBranch !== "string") throw new CompanionServiceError("invalid_request", "PR review requires exact head and base branches.");
+      return { kind: "pr_upsert", headBranch: value.headBranch, baseBranch: value.baseBranch };
+    case "merge_pr":
+      exactMutationKeys(value, ["kind", "pullRequest", "head", "baseBranch"]);
+      if (!Number.isSafeInteger(value.pullRequest) || typeof value.head !== "string" || typeof value.baseBranch !== "string") throw new CompanionServiceError("invalid_request", "PR merge review requires exact pull request, head, and base values.");
+      return { kind: "merge_pr", pullRequest: value.pullRequest as number, head: value.head, baseBranch: value.baseBranch };
+    case "direct_main":
+      exactMutationKeys(value, ["kind", "branch", "validationReceiptId"]);
+      if (typeof value.branch !== "string" || typeof value.validationReceiptId !== "string") throw new CompanionServiceError("invalid_request", "Direct Main review requires an exact branch and validation receipt.");
+      return { kind: "direct_main", branch: value.branch, validationReceiptId: value.validationReceiptId };
+    default:
+      throw new CompanionServiceError("invalid_request", "Git review mutation kind is unknown.");
+  }
+}
+
+function exactMutationKeys(value: Record<string, unknown>, expected: readonly string[]): void {
+  const keys = Object.keys(value);
+  if (keys.length !== expected.length || expected.some((key) => !(key in value))) throw new CompanionServiceError("invalid_request", "Git review mutation contains an unknown or missing field.");
+}
+
 function isCommandPreparationExecutor(value: MediatedCommandExecutor | undefined): value is CommandPreparationCapableMediatedCommandExecutor {
   return !!value && typeof (value as Partial<CommandPreparationCapableMediatedCommandExecutor>).prepareCommand === "function";
 }
@@ -558,6 +615,10 @@ function isProvider(value: unknown): value is ManagedSession["provider"] {
 
 function isTerminalProvider(value: unknown): value is SessionAdoptionPayload["provider"] {
   return value === "claude" || value === "codex" || value === "generic";
+}
+
+function isGitReviewAction(value: unknown): value is GitReviewPayload["action"] {
+  return value === "local_commit" || value === "pr_upsert" || value === "pr_merge" || value === "direct_main";
 }
 
 function isSurface(value: unknown): value is ManagedSession["surface"] {

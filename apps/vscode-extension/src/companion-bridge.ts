@@ -59,6 +59,21 @@ export interface PreparedCommand {
   readonly confirmationExpiresAt?: string;
 }
 
+export type ReviewedGitMutation =
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string }
+  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string }
+  | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
+  | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
+
+export interface GitReviewResult {
+  readonly status: "approved" | "blocked" | "unavailable";
+  readonly summary: string;
+  readonly reviewId?: string;
+  readonly targetSnapshotId?: string;
+  readonly expiresAt?: string;
+  readonly session?: ExtensionManagedSession;
+}
+
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: string; readonly message: string };
@@ -70,6 +85,7 @@ export interface ExtensionCompanionBridge {
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
   prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>>;
+  reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -121,6 +137,11 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>> {
     const result = await this.call<{ preparation: PreparedCommand }>("command.prepare", command);
     return result.ok ? { ok: true, value: result.value.preparation } : result;
+  }
+
+  async reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>> {
+    const result = await this.call<{ review: GitReviewResult }>("git.review.submit", request);
+    return result.ok ? { ok: true, value: result.value.review } : result;
   }
 
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
@@ -175,6 +196,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   prepareCommand(): Promise<BridgeResult<PreparedCommand>> { return this.unavailable(); }
+  reviewGitMutation(): Promise<BridgeResult<GitReviewResult>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 

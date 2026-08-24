@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { isAbsolute, relative } from "node:path";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
@@ -67,11 +68,13 @@ function createVscodeGitRootResolver(host: unknown): () => Promise<readonly GitR
         const remote = remotes.length === 1
           ? firstString(remotes[0]?.fetchUrl, remotes[0]?.pushUrl)
           : undefined;
+        const changedPaths = structuredGitChanges(repository.state, gitRoot);
         return [{
           gitRoot,
           worktree: gitRoot,
           branch: typeof repository.state?.HEAD?.name === "string" ? repository.state.HEAD.name : undefined,
-          canonicalRemote: remote
+          canonicalRemote: remote,
+          changedPaths
         }];
       });
     } catch {
@@ -100,5 +103,25 @@ interface GitRepositoryLike {
   readonly state?: {
     readonly HEAD?: { readonly name?: string };
     readonly remotes?: readonly { readonly fetchUrl?: string; readonly pushUrl?: string }[];
+    readonly workingTreeChanges?: readonly GitChangeLike[];
+    readonly indexChanges?: readonly GitChangeLike[];
+    readonly mergeChanges?: readonly GitChangeLike[];
+    readonly untrackedChanges?: readonly GitChangeLike[];
   };
+}
+
+interface GitChangeLike { readonly uri?: { readonly fsPath?: string }; readonly originalUri?: { readonly fsPath?: string }; }
+
+function structuredGitChanges(state: GitRepositoryLike["state"], root: string): readonly string[] {
+  const changes = [...(state?.workingTreeChanges ?? []), ...(state?.indexChanges ?? []), ...(state?.mergeChanges ?? []), ...(state?.untrackedChanges ?? [])];
+  const result = new Set<string>();
+  for (const change of changes) {
+    for (const candidate of [change.uri?.fsPath, change.originalUri?.fsPath]) {
+      if (!candidate) continue;
+      const path = relative(root, candidate).replaceAll("\\", "/");
+      if (!path || isAbsolute(path) || path === ".." || path.startsWith("../") || path.split("/").includes(".git")) continue;
+      result.add(path);
+    }
+  }
+  return [...result].sort();
 }

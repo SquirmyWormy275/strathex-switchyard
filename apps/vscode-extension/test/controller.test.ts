@@ -10,6 +10,8 @@ import {
   type ForwardedCommandResult,
   type LocalHostAction,
   type PreparedCommand,
+  type GitReviewResult,
+  type ReviewedGitMutation,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
@@ -54,6 +56,7 @@ class FakeVscode {
   private readonly debugStartListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly quickPickValues: string[] = [];
+  private readonly inputValues: string[] = [];
   readonly api: VscodeLike;
 
   constructor(terminalNames = ["Manual terminal"], workspaceRoots = ["C:\\repo"]) {
@@ -86,6 +89,7 @@ class FakeVscode {
           if (!wanted) return undefined;
           return items.find((item) => typeof item === "string" ? item === wanted : item.label === wanted);
         },
+        async showInputBox(): Promise<string | undefined> { return self.inputValues.shift(); },
         onDidOpenTerminal(listener): DisposableLike { self.openListeners.push(listener); return new FakeDisposable(); },
         onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); }
       },
@@ -114,6 +118,7 @@ class FakeVscode {
   async fireDebugStart(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStartListeners) await listener(session); }
   async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); }
   choose(value: string): void { this.quickPickValues.push(value); }
+  input(value: string): void { this.inputValues.push(value); }
 }
 
 class FakeBridge implements ExtensionCompanionBridge {
@@ -123,6 +128,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly dispatched: ForwardedCommand[] = [];
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
   readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string }> = [];
+  readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
   nextDispatch?: ForwardedCommandResult;
   nextPreparation?: PreparedCommand;
 
@@ -157,6 +163,10 @@ class FakeBridge implements ExtensionCompanionBridge {
   async prepareCommand(command: { control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }): Promise<BridgeResult<PreparedCommand>> {
     this.prepared.push(command);
     return { ok: true, value: this.nextPreparation ?? { status: "prepared", summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" } };
+  }
+  async reviewGitMutation(request: { action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }): Promise<BridgeResult<GitReviewResult>> {
+    this.gitReviews.push(request);
+    return { ok: true, value: { status: "approved", summary: "Reviewed by fake companion." } };
   }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
@@ -211,6 +221,25 @@ test("tracks terminal, workspace, and debug lifecycle events as identities rathe
   assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.kind"] === "debug-session"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "unreachable"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "verified_finished"), false);
+});
+
+test("local commit collects an exact structured Git review before dispatch", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-23T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/review", changedPaths: ["src/safe.ts", "README.md"] }]
+  });
+  await controller.start();
+  vscode.input("src/safe.ts");
+  vscode.input("feat: reviewed local change");
+
+  await vscode.invoke("sxsy-b122.chord.commit.normal");
+
+  assert.equal(bridge.gitReviews.length, 1);
+  assert.deepEqual(bridge.gitReviews[0]?.mutation, { kind: "local_commit", paths: ["src/safe.ts"], message: "feat: reviewed local change" });
+  assert.equal(bridge.dispatched.at(-1)?.control, "COMMIT");
 });
 
 test("picker-or-stop selects one Git target and forwards only companion-prepared authority and confirmation", async () => {

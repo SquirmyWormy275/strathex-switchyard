@@ -14,6 +14,7 @@ import { DurableHostActionQueue } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
+import { DurableGitMutationReviewQueue } from "./git-review.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -57,6 +58,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly endpoint: DurableCompanionEndpoint;
   readonly localComponents?: DefaultLocalComposition;
   readonly hostActions: DurableHostActionQueue;
+  readonly gitReviews?: DurableGitMutationReviewQueue;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -72,6 +74,12 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
   const hostActions = new DurableHostActionQueue(store);
+  const gitReviews = options.runtime?.confirmationAttestor ? new DurableGitMutationReviewQueue({
+    store,
+    sessions,
+    targetResolver,
+    attestor: options.runtime.confirmationAttestor
+  }) : undefined;
   let localComponents: DefaultLocalComposition | undefined;
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
@@ -82,7 +90,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         options.localStateDirectory ?? dirname(store.filePath),
         {
           ...(options.localGitStateDirectory ? { localGitStateDirectory: options.localGitStateDirectory } : {}),
-          ...(options.localGitMutationFactory ? { localGitMutationFactory: options.localGitMutationFactory } : {}),
+          ...((options.localGitMutationFactory ?? gitReviews) ? { localGitMutationFactory: options.localGitMutationFactory ?? gitReviews } : {}),
           credentialProtector: options.credentialProtector ?? unavailableCredentialProtector,
           ...(options.networkPolicy ? { networkPolicy: options.networkPolicy } : {}),
           hostActions
@@ -103,7 +111,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions });
+  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -114,6 +122,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     service,
     endpoint,
     hostActions,
+    ...(gitReviews ? { gitReviews } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

@@ -65,6 +65,7 @@ export * from "./repository-runtime.ts";
 export * from "./runtime-registry.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";
+export * from "./git-review.ts";
 export { runStandaloneCompanion } from "./main.ts";
 
 /**
