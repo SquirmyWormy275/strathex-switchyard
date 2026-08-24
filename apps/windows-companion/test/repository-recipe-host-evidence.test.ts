@@ -13,6 +13,7 @@ import { HostReceiptEvidenceFactory } from "../src/receipt-evidence.ts";
 import { HostValidatedRepositoryRecipeRunner } from "../src/repository-recipe-host-evidence.ts";
 import { SandboxedRepositoryExecutionBroker, repositoryRuntimeExecutionRecipe } from "../src/repository-runtime-broker.ts";
 import type { SandboxInstallationPin } from "../src/sandbox-installation.ts";
+import type { ScannerFixtureResolver } from "../src/scanner-fixtures.ts";
 
 const now = "2026-08-24T12:00:00.000Z";
 const runnerSha256 = "a".repeat(64);
@@ -20,8 +21,24 @@ const toolSha256 = "b".repeat(64);
 const sandboxHelperSha256 = "c".repeat(64);
 const configurationSha256 = "d".repeat(64);
 const resultManifestSha256 = "e".repeat(64);
+const fixtureManifestSha256 = "8".repeat(64);
+const fixtureContentSha256 = "9".repeat(64);
 
 function sha256(value: Uint8Array | string): string { return createHash("sha256").update(value).digest("hex"); }
+
+const scannerFixtures: ScannerFixtureResolver = {
+  async resolve(input) {
+    assert.deepEqual(input.scannerFixtureIds, ["scanner-fixture-2026-08-24"]);
+    assert.deepEqual(input.advisoryFixtureIds, []);
+    assert.equal(input.observedAt.toISOString(), now);
+    return [{
+      id: "scanner-fixture-2026-08-24", kind: "scanner", authorityId: "security-lab", keyId: "f".repeat(64),
+      feedVersion: "scanner-feed-2026-08-24", toolName: "b122-test-scanner", toolVersion: "1.0.0",
+      manifestSha256: fixtureManifestSha256, contentSha256: fixtureContentSha256,
+      generatedAt: "2026-08-24T11:30:00.000Z", expiresAt: "2026-08-24T12:30:00.000Z"
+    }];
+  }
+};
 
 async function fixture(context: test.TestContext) {
   const base = await mkdtemp(join(tmpdir(), "sxsy-b122-host-evidence-"));
@@ -98,7 +115,7 @@ test("installed sandbox bytes become a complete HMAC receipt only after exact ho
     } }; } },
     { async resolve() { return setup.pin; } },
     evidence,
-    { stateDirectory: setup.stateDirectory, clock: () => new Date(now) }
+    { stateDirectory: setup.stateDirectory, clock: () => new Date(now), scannerFixtures }
   );
   const invocation = request(setup.target);
   const broker = new SandboxedRepositoryExecutionBroker(
@@ -109,6 +126,10 @@ test("installed sandbox bytes become a complete HMAC receipt only after exact ho
   assert.equal(outcome.status, "completed");
   const envelope = outcome.data?.receiptEvidenceEnvelope;
   assert.ok(envelope);
+  assert.equal(
+    (envelope as { evidence: { toolVersions: Readonly<Record<string, string>> } }).evidence.toolVersions["fixture:scanner:scanner-fixture-2026-08-24"],
+    `manifest=sha256:${fixtureManifestSha256};content=sha256:${fixtureContentSha256};feed=scanner-feed-2026-08-24;tool=b122-test-scanner@1.0.0;generated=2026-08-24T11:30:00.000Z;expires=2026-08-24T12:30:00.000Z`
+  );
   assert.deepEqual(evidence.forResult(
     commandForAction("shield_change_scan"),
     { status: "completed", summary: outcome.summary, operationId: "operation-host-evidence", data: { receiptEvidenceEnvelope: envelope } } as CommandResult,
@@ -119,6 +140,25 @@ test("installed sandbox bytes become a complete HMAC receipt only after exact ho
     toolVersions: { companion: "test", sandboxHelper: `sha256:${sandboxHelperSha256}`, repositoryRunner: `sha256:${runnerSha256}` },
     expiresAt: "2026-08-24T12:05:00.000Z"
   });
+});
+
+test("a recipe-supplied scanner label cannot earn evidence without exact host fixture resolution", async (context) => {
+  const setup = await fixture(context);
+  const evidence = new HostReceiptEvidenceFactory({ authenticationKey: Buffer.alloc(32, 6), policyVersion: setup.target.policyVersion, exactVersions: { companion: "test" }, clock: () => new Date(now) });
+  const runner = new HostValidatedRepositoryRecipeRunner(
+    { async runRecipe() { return { status: "completed", summary: "sandbox complete", data: {
+      backend: "windows-sandbox", enforced: true, resultRoot: setup.resultRoot,
+      resultManifestSha256, recipeCatalogSha256: setup.pin.catalogSha256, sandboxHelperSha256,
+      validatedOutputs: [{ path: "b122-recipe-evidence.json", size: setup.evidenceBytes.byteLength, sha256: sha256(setup.evidenceBytes) }]
+    } }; } },
+    { async resolve() { return setup.pin; } },
+    evidence,
+    { stateDirectory: setup.stateDirectory, clock: () => new Date(now) }
+  );
+  const outcome = await runner.runRecipe(request(setup.target), "shield_change_scan");
+  assert.equal(outcome.status, "incomplete");
+  assert.match(outcome.summary, /signed scanner\/advisory fixture registry/i);
+  assert.equal(outcome.data, undefined);
 });
 
 test("post-extraction tamper and final target churn can never earn completion evidence", async (context) => {

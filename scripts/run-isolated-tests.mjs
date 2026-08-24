@@ -40,7 +40,7 @@ const companionTests = [
   "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
   "repository-process-supervisor", "repository-recipe-evidence",
   "repository-recipe-host-evidence", "repository-runner-helper",
-  "repository-runtime", "repository-runtime-broker",
+  "repository-runtime", "repository-runtime-broker", "scanner-fixtures",
   "repository-runtime-release-package", "router", "runtime-provisioning",
   "runtime-registry", "sandbox-installation", "service", "session-freshness", "stdio",
   "windows-job-supervisor", "windows-provider-process", "windows-sandbox",

@@ -18,6 +18,7 @@ import {
 } from "./repository-runtime-broker.ts";
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import type { SandboxInstallationPin } from "./sandbox-installation.ts";
+import type { ScannerFixtureResolver, VerifiedScannerFixture } from "./scanner-fixtures.ts";
 
 const evidenceFile = "b122-recipe-evidence.json";
 const evidenceLimit = 256 * 1024;
@@ -39,6 +40,7 @@ export interface SandboxInstallationResolver {
 export interface HostValidatedRepositoryRecipeRunnerOptions {
   readonly stateDirectory: string;
   readonly clock?: () => Date;
+  readonly scannerFixtures?: ScannerFixtureResolver;
 }
 
 /**
@@ -52,6 +54,7 @@ export class HostValidatedRepositoryRecipeRunner implements SandboxRepositoryRec
   private readonly issuer: HostReceiptEvidenceIssuer;
   private readonly stateDirectory: string;
   private readonly clock: () => Date;
+  private readonly scannerFixtures?: ScannerFixtureResolver;
 
   constructor(
     inner: SandboxRepositoryRecipeRunner,
@@ -65,6 +68,7 @@ export class HostValidatedRepositoryRecipeRunner implements SandboxRepositoryRec
     this.issuer = issuer;
     this.stateDirectory = resolve(options.stateDirectory);
     this.clock = options.clock ?? (() => new Date());
+    this.scannerFixtures = options.scannerFixtures;
   }
 
   async runRecipe(request: IsolationRequest, recipeId: string): Promise<BrokerOutcome> {
@@ -105,6 +109,12 @@ export class HostValidatedRepositoryRecipeRunner implements SandboxRepositoryRec
         return incomplete("Repository recipe evidence does not match the exact reviewed catalog and typed configuration.");
       }
 
+      const needsScanner = action.startsWith("shield_") || action === "release_shield";
+      const needsAdvisory = action === "shield_supply_chain" || action === "release_shield";
+      if ((needsScanner && report.scannerFixtureIds.length === 0) || (needsAdvisory && report.advisoryFixtureIds.length === 0)) {
+        return incomplete("Repository validation did not name every required signed scanner/advisory fixture.");
+      }
+
       const current = await request.effectGuard.assertCurrent({
         action: request.action,
         operationId: request.operationId,
@@ -116,6 +126,18 @@ export class HostValidatedRepositoryRecipeRunner implements SandboxRepositoryRec
 
       const observedAt = this.clock();
       if (!Number.isFinite(observedAt.getTime())) return incomplete("The host evidence clock is invalid.");
+      let verifiedFixtures: readonly VerifiedScannerFixture[] = [];
+      if (needsScanner || needsAdvisory) {
+        if (!this.scannerFixtures) return incomplete("No host-owned signed scanner/advisory fixture registry is installed.");
+        verifiedFixtures = await this.scannerFixtures.resolve({
+          scannerFixtureIds: report.scannerFixtureIds,
+          advisoryFixtureIds: report.advisoryFixtureIds,
+          observedAt
+        });
+        if (verifiedFixtures.length !== report.scannerFixtureIds.length + report.advisoryFixtureIds.length) {
+          return incomplete("Signed scanner/advisory fixture resolution was incomplete or ambiguous.");
+        }
+      }
       const executionRequest: ExecutionRequest = {
         action: request.action,
         operationId: request.operationId,
@@ -143,14 +165,15 @@ export class HostValidatedRepositoryRecipeRunner implements SandboxRepositoryRec
           repositoryRunner: `sha256:${report.helperSha256}`,
           recipeTool: `sha256:${report.toolSha256}`,
           typedRecipeConfiguration: `sha256:${report.configurationSha256}`,
-          sandboxHelper: `sha256:${pin.helperSha256}`
+          sandboxHelper: `sha256:${pin.helperSha256}`,
+          ...fixtureVersionBindings(verifiedFixtures)
         },
         scannerFixtureIds: report.scannerFixtureIds,
         advisoryFixtureIds: report.advisoryFixtureIds,
         coverage: report.coverage,
         policyVersion: request.target.policyVersion,
         createdAt: observedAt.toISOString(),
-        expiresAt: new Date(observedAt.getTime() + receiptLifetimeMs).toISOString()
+        expiresAt: new Date(Math.min(observedAt.getTime() + receiptLifetimeMs, ...verifiedFixtures.map((item) => Date.parse(item.expiresAt)))).toISOString()
       } as const;
       const typed = createRepositoryRecipeEvidence(executionRequest, runtimeResult, binding, observedAt.getTime());
       const receiptEvidenceEnvelope = this.issuer.issueRepositoryRecipeEvidence(typed, executionRequest, binding);
@@ -300,6 +323,13 @@ function canonicalOutputBinding(output: TypedRecipeReport["output"]): string {
     stderrBytes: output.stderrBytes,
     truncated: output.truncated
   });
+}
+
+function fixtureVersionBindings(fixtures: readonly VerifiedScannerFixture[]): Readonly<Record<string, string>> {
+  return Object.fromEntries([...fixtures].sort((left, right) => left.id.localeCompare(right.id)).map((item) => [
+    `fixture:${item.kind}:${item.id}`,
+    `manifest=sha256:${item.manifestSha256};content=sha256:${item.contentSha256};feed=${item.feedVersion};tool=${item.toolName}@${item.toolVersion};generated=${item.generatedAt};expires=${item.expiresAt}`
+  ]));
 }
 
 function incomplete(summary: string): BrokerOutcome { return { status: "incomplete", summary, effectDisposition: "not_started" }; }
