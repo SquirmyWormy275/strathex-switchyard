@@ -73,6 +73,23 @@ test("malformed or mismatched local-companion replies fail closed in the extensi
   if (!mismatchedResult.ok) assert.equal(mismatchedResult.code, "invalid_response");
 });
 
+test("managed-session listing accepts only the strict protected-registry shape", async () => {
+  let malformed = false;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string };
+      assert.equal(request.method, "session.list");
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: malformed ? [{ ...session, capabilities: ["registered", "fabricated"] }] : [session] });
+    }
+  });
+  const accepted = await bridge.listSessions();
+  assert.equal(accepted.ok, true);
+  malformed = true;
+  const rejected = await bridge.listSessions();
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
+});
+
 test("host-action authorization accepts only the exact one-time companion token shape", async () => {
   const hostActionId = `host-action:${"a".repeat(64)}`;
   let malformed = false;

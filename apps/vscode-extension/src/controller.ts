@@ -52,6 +52,8 @@ export interface ManagedSessionControllerOptions {
   readonly executeCommand?: (command: string) => Promise<void>;
   /** DPAPI CurrentUser sealing owned by the installed extension host. */
   readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
+  /** Local Registered-session liveness only; provider proof is host-observed. */
+  readonly heartbeatIntervalMs?: number;
 }
 
 export interface GitRootRegistration {
@@ -77,6 +79,7 @@ export class ManagedSessionController {
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
+  private readonly heartbeatIntervalMs: number;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
   private readonly debugSessionIds = new WeakMap<DebugSessionLike, string>();
@@ -88,6 +91,8 @@ export class ManagedSessionController {
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private hardwareSignalTimer?: ReturnType<typeof setTimeout>;
   private hardwareSignalInFlight = false;
+  private sessionHeartbeatTimer?: ReturnType<typeof setTimeout>;
+  private sessionHeartbeatInFlight = false;
 
   constructor(vscode: VscodeLike, context: ExtensionContextLike, bridge: ExtensionCompanionBridge, options: ManagedSessionControllerOptions = {}) {
     this.vscode = vscode;
@@ -104,6 +109,7 @@ export class ManagedSessionController {
       await this.vscode.commands.executeCommand(command);
     });
     this.sealSecret = options.sealSecret;
+    this.heartbeatIntervalMs = boundedHeartbeatInterval(options.heartbeatIntervalMs ?? 30_000);
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
@@ -114,6 +120,9 @@ export class ManagedSessionController {
 
   stop(): void {
     this.stopReconnect();
+    if (this.sessionHeartbeatTimer) clearTimeout(this.sessionHeartbeatTimer);
+    this.sessionHeartbeatTimer = undefined;
+    this.sessionHeartbeatInFlight = false;
     if (this.hardwareSignalTimer) clearTimeout(this.hardwareSignalTimer);
     this.hardwareSignalTimer = undefined;
     this.hardwareSignalInFlight = false;
@@ -139,6 +148,7 @@ export class ManagedSessionController {
     await this.refreshWorkspaceRegistration();
     for (const terminal of this.vscode.window.terminals) await this.registerTerminal(terminal);
     await this.registerDebugConfigurations();
+    this.scheduleSessionHeartbeat();
     this.scheduleHardwareSignalPoll(0);
   }
 
@@ -725,6 +735,33 @@ export class ManagedSessionController {
 
   private stopReconnect(): void { if (this.reconnectTimer) clearTimeout(this.reconnectTimer); this.reconnectTimer = undefined; }
 
+  private scheduleSessionHeartbeat(delayMs = this.heartbeatIntervalMs): void {
+    if (!this.started || this.sessionHeartbeatTimer || this.sessionHeartbeatInFlight) return;
+    this.sessionHeartbeatTimer = setTimeout(() => {
+      this.sessionHeartbeatTimer = undefined;
+      void this.heartbeatLocalSessions();
+    }, delayMs);
+    this.sessionHeartbeatTimer.unref?.();
+  }
+
+  private async heartbeatLocalSessions(): Promise<void> {
+    if (!this.started || this.sessionHeartbeatInFlight) return;
+    this.sessionHeartbeatInFlight = true;
+    try {
+      const at = this.now();
+      const localSessions = [...this.sessions.values()].filter((session) =>
+        session.metadata["sxsy-b122.providerHandshake"] !== "exact-route-v1"
+        && session.status !== "unreachable" && session.status !== "stale");
+      for (const session of localSessions) {
+        const result = await this.bridge.heartbeat(session.id, at);
+        if (result.ok) this.sessions.set(result.value.id, result.value);
+      }
+    } finally {
+      this.sessionHeartbeatInFlight = false;
+      this.scheduleSessionHeartbeat();
+    }
+  }
+
   private scheduleHardwareSignalPoll(delayMs = 250): void {
     if (!this.started || !this.vscode.window.state.focused || this.hardwareSignalTimer || this.hardwareSignalInFlight || !this.windowSessionId || this.workspaceRoots().length < 1) return;
     this.hardwareSignalTimer = setTimeout(() => {
@@ -1196,6 +1233,9 @@ export class ManagedSessionController {
   }
 
   private async showSessionQueue(status: ExtensionManagedSession["status"] | "all", placeHolder: string, predicate: (session: ExtensionManagedSession) => boolean = () => true): Promise<ExtensionManagedSession | undefined> {
+    const current = await this.bridge.listSessions();
+    if (!current.ok) throw new Error(`The protected managed-session registry is unavailable: ${current.message}`);
+    for (const session of current.value) this.sessions.set(session.id, session);
     const candidates = [...this.sessions.values()].filter((session) => (status === "all" || session.status === status) && predicate(session));
     if (!candidates.length) throw new Error(status === "all" ? "No managed sessions are registered." : `No ${status.replace("verified_", "verified ")} sessions are available.`);
     const items = candidates.map((session) => ({ label: `${session.provider}: ${session.id}`, description: `${session.surface} / ${session.status}` }));
@@ -1299,6 +1339,10 @@ const canonicalAuthorityActions = new Set([
 ]);
 
 function knownAuthorityAction(value: string): boolean { return canonicalAuthorityActions.has(value); }
+function boundedHeartbeatInterval(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 10 || value > 5 * 60_000) throw new Error("The local session heartbeat interval is invalid.");
+  return value;
+}
 function workflowVoiceProvider(provider: ExtensionVoiceProvider): "claude" | "codex" | "generic" { return provider === "claude" ? "claude" : provider === "chatgpt" ? "generic" : "generic"; }
 function providerVoiceUrl(provider: ExtensionVoiceProvider): string | undefined { return provider === "claude" ? "https://claude.ai/new" : provider === "chatgpt" ? "https://chatgpt.com/" : undefined; }
 function commaList(value: string): readonly string[] { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }

@@ -132,6 +132,7 @@ export type BridgeResult<T> =
 
 export interface ExtensionCompanionBridge {
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>>;
+  listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>>;
   registerSession(session: ExtensionManagedSession, kind?: "session" | "terminal" | "debug"): Promise<BridgeResult<ExtensionManagedSession>>;
   adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>>;
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
@@ -205,6 +206,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   }
 
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.call("ping", undefined); }
+
+  async listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>> {
+    const result = await this.call<unknown>("session.list", undefined);
+    if (!result.ok) return result;
+    if (!Array.isArray(result.value) || result.value.length > 4_096 || !result.value.every(isExtensionManagedSession)) return invalidResponse();
+    return { ok: true, value: result.value };
+  }
 
   registerSession(session: ExtensionManagedSession, kind: "session" | "terminal" | "debug" = "session"): Promise<BridgeResult<ExtensionManagedSession>> {
     const method = kind === "terminal" ? "terminal.register" : kind === "debug" ? "debug.register" : "session.register";
@@ -493,6 +501,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   }
 
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.unavailable(); }
+  listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>> { return this.unavailable(); }
   registerSession(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   adoptTerminal(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
@@ -601,6 +610,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidResponse<T>(): BridgeResult<T> {
   return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict SXSY-B122 schema." };
+}
+
+function isExtensionManagedSession(value: unknown): value is ExtensionManagedSession {
+  const required = ["id", "provider", "surface", "capabilities", "status", "plannedFiles", "lastHeartbeat", "adapterVersion", "metadata"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["workspaceRoot", "targetSnapshotId", "taskId", "planRevision"])
+    || !reference(value.id) || !["claude", "codex", "generic", "voice"].includes(value.provider as string)
+    || !["vscode_terminal", "vscode_window", "desktop", "browser", "bridge"].includes(value.surface as string)
+    || !Array.isArray(value.capabilities) || value.capabilities.length < 1 || value.capabilities.length > 4
+    || !value.capabilities.includes("registered") || new Set(value.capabilities).size !== value.capabilities.length
+    || !value.capabilities.every((capability) => ["registered", "observable", "controllable", "mediated"].includes(capability as string))
+    || !["running", "verified_blocked", "verified_finished", "unreachable", "stale", "unknown"].includes(value.status as string)
+    || !Array.isArray(value.plannedFiles) || value.plannedFiles.length > 4_096 || !value.plannedFiles.every(pathText)
+    || !timeText(value.lastHeartbeat) || !reference(value.adapterVersion)
+    || !isRecord(value.metadata) || Object.keys(value.metadata).length > 256
+    || !Object.entries(value.metadata).every(([key, item]) => reference(key) && typeof item === "string" && item.length <= 16_384 && !item.includes("\0"))
+    || (value.workspaceRoot !== undefined && !pathText(value.workspaceRoot))
+    || ![value.targetSnapshotId, value.taskId, value.planRevision].every((item) => item === undefined || reference(item))) return false;
+  return true;
 }
 
 function isExtensionHandoffPackage(value: unknown): value is ExtensionHandoffPackage {

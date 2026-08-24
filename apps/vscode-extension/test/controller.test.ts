@@ -152,6 +152,8 @@ class FakeVscode {
 
 class FakeBridge implements ExtensionCompanionBridge {
   readonly registered: ExtensionManagedSession[] = [];
+  readonly heartbeats: Array<{ sessionId: string; at?: string }> = [];
+  listedSessions?: readonly ExtensionManagedSession[];
   readonly adopted: Array<{ sessionId: string; adoptionKey: string; provider: Exclude<ExtensionProvider, "voice"> }> = [];
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
@@ -171,6 +173,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   onHardwareClaim?: () => void;
 
   async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
+  async listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>> { return { ok: true, value: this.listedSessions ?? this.registered }; }
   async registerSession(session: ExtensionManagedSession): Promise<BridgeResult<ExtensionManagedSession>> {
     this.registered.push(session);
     return { ok: true, value: session };
@@ -186,9 +189,10 @@ class FakeBridge implements ExtensionCompanionBridge {
     const existing = this.registered.find((session) => session.id === sessionId);
     return existing ? { ok: true, value: { ...existing, status } } : { ok: false, code: "not_found", message: "missing" };
   }
-  async heartbeat(session: string): Promise<BridgeResult<ExtensionManagedSession>> {
+  async heartbeat(session: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>> {
+    this.heartbeats.push({ sessionId: session, ...(at ? { at } : {}) });
     const existing = this.registered.find((record) => record.id === session);
-    return existing ? { ok: true, value: existing } : { ok: false, code: "not_found", message: "missing" };
+    return existing ? { ok: true, value: { ...existing, lastHeartbeat: at ?? existing.lastHeartbeat } } : { ok: false, code: "not_found", message: "missing" };
   }
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
     this.dispatched.push(command);
@@ -234,7 +238,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: "C:\\state\\network-policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } }; }
   async providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> {
     const existing = this.registered.find((session) => session.id === sessionId);
-    return existing ? { ok: true, value: { ...existing, workspaceRoot: repositoryRoot, capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "fake-provider" } } : { ok: false, code: "not_found", message: "missing" };
+    return existing ? { ok: true, value: { ...existing, workspaceRoot: repositoryRoot, capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "fake-provider", metadata: { ...existing.metadata, "sxsy-b122.providerHandshake": "exact-route-v1" } } } : { ok: false, code: "not_found", message: "missing" };
   }
   async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
     this.rawHidInstallRequests.push(identity);
@@ -352,6 +356,28 @@ test("provider connection command installs only capabilities returned by the com
   const connected = controller.listKnownSessions().find((session) => session.id === candidate.id)!;
   assert.deepEqual(connected.capabilities, ["registered", "observable", "controllable", "mediated"]);
   assert.equal(connected.workspaceRoot, "C:\\repo");
+});
+
+test("heartbeats local extension sessions but never renews provider-observed proof", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-24T00:00:10.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/liveness" }],
+    heartbeatIntervalMs: 20
+  });
+  await controller.start();
+  const provider = controller.listKnownSessions()[0]!;
+  vscode.choose(`${provider.provider}: ${provider.id}`);
+  await vscode.invoke("sxsy-b122.connectProviderAdapter");
+  bridge.heartbeats.length = 0;
+  await new Promise((resolve) => setTimeout(resolve, 55));
+  controller.stop();
+
+  assert.equal(bridge.heartbeats.some((heartbeat) => heartbeat.sessionId === provider.id), false);
+  assert.equal(bridge.heartbeats.some((heartbeat) => heartbeat.sessionId !== provider.id), true);
+  assert.equal(bridge.heartbeats.every((heartbeat) => heartbeat.at === "2026-08-24T00:00:10.000Z"), true);
 });
 
 test("provider chords prepare one exact typed workflow artifact before durable dispatch", async () => {
