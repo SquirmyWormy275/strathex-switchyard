@@ -405,7 +405,7 @@ export class SandboxedRepositoryExecutionBroker implements ExecutionBroker {
     if (!request.effectGuard) return { status: "blocked", summary: "Sandboxed repository validation requires an exact final effect guard." };
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
     if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason };
-    return this.sandbox.runRecipe({
+    const outcome = await this.sandbox.runRecipe({
       action: request.action,
       operationId: request.operationId,
       target: request.target,
@@ -416,7 +416,31 @@ export class SandboxedRepositoryExecutionBroker implements ExecutionBroker {
       effectGuard: request.effectGuard,
       profile: "full_sandbox"
     }, request.action);
+    if (outcome.status === "completed" && !boundHostReceipt(outcome.data?.receiptEvidenceEnvelope, request, "passed", "complete")) {
+      return { status: "incomplete", summary: "The OS sandbox recipe ran, but no exact host-authenticated completion evidence was attached.", effectDisposition: "not_started" };
+    }
+    if (outcome.status === "incomplete" && outcome.data?.receiptEvidenceEnvelope !== undefined
+      && !boundHostReceipt(outcome.data.receiptEvidenceEnvelope, request, "incomplete", "incomplete")) {
+      return { status: "incomplete", summary: "The OS sandbox recipe returned malformed or cross-bound incomplete evidence.", effectDisposition: "not_started" };
+    }
+    return outcome;
   }
+}
+
+function boundHostReceipt(value: unknown, request: ExecutionRequest, outcome: "passed" | "incomplete", completeness: "complete" | "incomplete"): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.schema === "sxsy-b122.host-receipt-evidence"
+    && record.version === 1
+    && record.producer === "repository-runtime"
+    && record.action === request.action
+    && record.operationId === request.operationId
+    && record.targetSnapshotId === request.target.id
+    && record.policyVersion === request.target.policyVersion
+    && record.outcome === outcome
+    && record.completeness === completeness
+    && typeof record.evidenceDigest === "string" && digestPattern.test(record.evidenceDigest)
+    && typeof record.authenticationTag === "string" && digestPattern.test(record.authenticationTag);
 }
 
 function exactMarker(request: ExecutionRequest, action: RepositoryRuntimeAction): boolean {

@@ -151,6 +151,11 @@ export interface WindowsSandboxExecutionResult {
   readonly processId?: string;
   readonly receiptPath?: string;
   readonly resultRoot?: string;
+  /** Host-memory bindings from the already validated result manifest. */
+  readonly resultManifestSha256?: string;
+  readonly recipeCatalogSha256?: string;
+  readonly sandboxHelperSha256?: string;
+  readonly validatedOutputs?: readonly Readonly<{ path: string; size: number; sha256: string }>[];
 }
 
 export interface WindowsSandboxExecutionRequest {
@@ -504,7 +509,14 @@ export class WindowsSandboxBackend {
         resultManifestDigest: validated.digest,
         resultRoot
       });
-      return await this.finish(receiptPath, receipt, "completed", `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
+      const finished = await this.finish(receiptPath, receipt, "completed", `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
+      return {
+        ...finished,
+        resultManifestSha256: validated.digest,
+        recipeCatalogSha256: recipeCatalogDigest,
+        sandboxHelperSha256: helperDigest,
+        validatedOutputs: validated.outputs.map((output) => ({ path: output.relativePath, size: output.size, sha256: output.sha256 }))
+      };
     } catch (error) {
       const status: Exclude<WindowsSandboxReceiptState, "prepared" | "running"> = error instanceof SandboxCancelledError ? "cancelled" : error instanceof SandboxBlockedError ? "blocked" : "failed";
       const summary = untrustedSummary((error as Error).message || "Windows Sandbox failed closed.");
@@ -724,7 +736,11 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
           ...(result.leaseId ? { leaseId: result.leaseId } : {}),
           ...(result.processId ? { processId: result.processId } : {}),
           ...(result.receiptPath ? { receiptPath: result.receiptPath } : {}),
-          ...(result.resultRoot ? { resultRoot: result.resultRoot } : {})
+          ...(result.resultRoot ? { resultRoot: result.resultRoot } : {}),
+          ...(result.resultManifestSha256 ? { resultManifestSha256: result.resultManifestSha256 } : {}),
+          ...(result.recipeCatalogSha256 ? { recipeCatalogSha256: result.recipeCatalogSha256 } : {}),
+          ...(result.sandboxHelperSha256 ? { sandboxHelperSha256: result.sandboxHelperSha256 } : {}),
+          ...(result.validatedOutputs ? { validatedOutputs: result.validatedOutputs } : {})
         }
       };
     } finally {

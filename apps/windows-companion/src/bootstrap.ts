@@ -41,6 +41,10 @@ import { SpawnCheckpointGitRunner } from "./local-checkpoints.ts";
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
 import type { RepositoryProcessSupervisor } from "./repository-runtime.ts";
 import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
+import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
+import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-evidence.ts";
+import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -108,6 +112,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly checkpointCapture: LocalCheckpointCapture | NonNullable<DurableMediatedExecutorOptions["checkpointCapture"]>;
   readonly checkpointVerifier: LocalRecoveryArtifactVerifier | NonNullable<DurableMediatedExecutorOptions["checkpointVerifier"]>;
   readonly operationControl: InstalledOperationControl;
+  readonly handoffs: HandoffPackageStore;
+  readonly workflowArtifacts: WorkflowArtifactStore;
+  readonly voice: VoiceCoordinator;
   readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
@@ -131,6 +138,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const hardwareSignals = new DurableHardwareSignalInbox(store);
   const hostActions = new DurableHostActionQueue(store);
   const workflowArtifacts = new WorkflowArtifactStore(store);
+  const handoffs = new HandoffPackageStore(store);
+  const voice = new VoiceCoordinator(store);
   const operationControl = new InstalledOperationControl({
     queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals],
     processes: repositoryRuntimes
@@ -233,6 +242,12 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       const installedSandbox = sandboxInstallationRegistry
         ? new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy)
         : undefined;
+      const receiptIssuer = hostReceiptEvidenceIssuer(options.receiptEvidence);
+      const repositorySandbox = installedSandbox && receiptIssuer && sandboxInstallationRegistry
+        ? new HostValidatedRepositoryRecipeRunner(installedSandbox, sandboxInstallationRegistry, receiptIssuer, {
+            stateDirectory: options.localStateDirectory ?? dirname(store.filePath)
+          })
+        : installedSandbox;
       const composed = createDefaultLocalComposition(
         context,
         store,
@@ -246,7 +261,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           containmentManager,
           credentialVault,
           networkPolicyRegistry,
-          ...(installedSandbox ? { isolationRuntime: installedSandbox, repositorySandbox: installedSandbox } : {}),
+          ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
+          ...(repositorySandbox ? { repositorySandbox } : {}),
           hostActions
         }
       );
@@ -269,7 +285,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, workflowArtifacts, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => {
       for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
@@ -292,6 +308,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     checkpointCapture,
     checkpointVerifier,
     operationControl,
+    handoffs,
+    workflowArtifacts,
+    voice,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),
@@ -317,3 +336,8 @@ const unavailableCredentialProtector: UserSecretProtector = {
   async seal(): Promise<string> { throw new Error("No host credential protector is configured."); },
   async open(): Promise<Uint8Array> { throw new Error("No host credential protector is configured."); }
 };
+
+function hostReceiptEvidenceIssuer(value: DispatchReceiptEvidenceFactory | undefined): HostReceiptEvidenceIssuer | undefined {
+  const candidate = value as Partial<HostReceiptEvidenceIssuer> | undefined;
+  return typeof candidate?.issueRepositoryRecipeEvidence === "function" ? candidate as HostReceiptEvidenceIssuer : undefined;
+}

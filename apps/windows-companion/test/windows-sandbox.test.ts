@@ -172,6 +172,10 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
   assert.equal(result.status, "completed");
   assert.equal(result.leaseId, "sandbox:11111111-2222-4333-8444-555555555555");
   assert.equal(result.processId, "sandbox-process:11111111-2222-4333-8444-555555555555");
+  assert.equal(result.resultManifestSha256?.length, 64);
+  assert.equal(result.recipeCatalogSha256, (await sandboxRequest(setup)).expectedRecipeCatalogSha256);
+  assert.equal(result.sandboxHelperSha256, (await sandboxRequest(setup)).expectedHelperSha256);
+  assert.deepEqual(result.validatedOutputs, [{ path: "report.txt", size: Buffer.byteLength("validated sandbox result"), sha256: sha256("validated sandbox result") }]);
   assert.deepEqual(guardCalls, ["launch", "extract"]);
   assert.match(configuration, /<Networking>Disable<\/Networking>/);
   assert.match(configuration, /<VGpu>Disable<\/VGpu>/);

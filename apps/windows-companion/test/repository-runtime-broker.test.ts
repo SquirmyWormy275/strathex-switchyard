@@ -153,7 +153,14 @@ test("pipeline and security recipes always route through the OS sandbox runner",
   const actions: string[] = [];
   const broker = new SandboxedRepositoryExecutionBroker(
     { async resolve() { hostResolutions += 1; throw new Error("host runtime must not run"); } },
-    { async runRecipe(invocation, recipeId) { actions.push(`${invocation.action}:${recipeId}:${invocation.profile}`); return { status: "completed", summary: "OS sandbox receipt verified", data: { enforced: true } }; } }
+    { async runRecipe(invocation, recipeId) {
+      actions.push(`${invocation.action}:${recipeId}:${invocation.profile}`);
+      return { status: "completed", summary: "OS sandbox receipt verified", data: { enforced: true, receiptEvidenceEnvelope: {
+        schema: "sxsy-b122.host-receipt-evidence", version: 1, producer: "repository-runtime", action: invocation.action,
+        operationId: invocation.operationId, targetSnapshotId: invocation.target.id, policyVersion: invocation.target.policyVersion,
+        outcome: "passed", completeness: "complete", evidenceDigest: "a".repeat(64), authenticationTag: "b".repeat(64)
+      } } };
+    } }
   );
   const pipeline = await broker.execute(request({ action: "pipeline_local_gate", recipe: { ...repositoryRuntimeExecutionRecipe("pipeline_local_gate", target), environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } }));
   const shield = await broker.execute(request({ action: "shield_change_scan", recipe: repositoryRuntimeExecutionRecipe("shield_change_scan", target) }));
