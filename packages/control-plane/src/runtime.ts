@@ -96,6 +96,21 @@ export interface RuntimeConfirmationResult {
   readonly expiresAt?: string;
 }
 
+export interface RuntimeCommandPreparationRequest {
+  readonly action: CommandAction;
+  readonly sessionId?: string;
+  readonly reason: string;
+}
+
+export interface RuntimeCommandPreparationResult {
+  readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
+  readonly summary: string;
+  readonly session?: ManagedSession;
+  readonly authorityId?: string;
+  readonly confirmationToken?: string;
+  readonly confirmationExpiresAt?: string;
+}
+
 export interface ExternalOperationCompletion {
   readonly operationId: string;
   readonly action: CommandAction;
@@ -187,8 +202,9 @@ export class DurableMediatedExecutor {
 
   constructor(options: DurableMediatedExecutorOptions) {
     this.options = options;
+    this.now = options.now ?? (() => new Date());
     this.sessions = options.sessions ?? new SessionRegistry(options.store);
-    this.authorities = options.authorities ?? new AuthorityLedger(options.store);
+    this.authorities = options.authorities ?? new AuthorityLedger(options.store, { clock: () => this.now().toISOString() });
     this.gateEvidence = options.gateEvidence ?? new GateEvidenceLedger(options.store);
     this.snapshots = options.snapshots ?? new TargetSnapshotLedger(options.store);
     this.checkpoints = options.checkpoints ?? new CheckpointLedger(options.store);
@@ -199,7 +215,6 @@ export class DurableMediatedExecutor {
     this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts);
     this.recovery = new NoReplayOperationRecovery(this.operations);
     for (const [action, reconciler] of Object.entries(options.operationReconcilers ?? {})) this.recovery.register(action, reconciler);
-    this.now = options.now ?? (() => new Date());
   }
 
   async execute(request: CommandRequest): Promise<CommandResult> {
@@ -479,6 +494,115 @@ export class DurableMediatedExecutor {
     }
   }
 
+  /**
+   * Installed-host preparation ceremony for one exact command. Repository or
+   * keyboard input cannot mint capabilities, authority, or confirmation: the
+   * host-owned user-presence attestor must succeed first. A local Git-root
+   * session may gain only `mediated`; observable/controllable provider claims
+   * still require a separate adapter handshake.
+   */
+  async prepareCommand(request: RuntimeCommandPreparationRequest): Promise<RuntimeCommandPreparationResult> {
+    const definition = commandForAction(request.action);
+    let session = request.sessionId ? await this.sessions.get(request.sessionId) : undefined;
+    const needsSession = definition.requiresTarget || definition.requiresAuthority || definition.requiresCapabilities.length > 0;
+    if (needsSession && !session) return { status: "unavailable", summary: "Command preparation requires one exact protected managed session." };
+
+    let target: TargetSnapshot | undefined;
+    if (definition.requiresTarget) {
+      target = await this.resolveTarget(definition, session);
+      if (!target) return { status: "unavailable", summary: "The trusted target resolver could not identify one exact workspace target." };
+      try { target = await this.snapshots.record(target); }
+      catch { return { status: "unavailable", summary: "The exact TargetSnapshot could not be durably recorded for preparation." }; }
+      if (definition.requiresCompleteTargetSnapshot && target.completeness !== "complete") {
+        return { status: "incomplete", summary: "Command preparation requires a complete TargetSnapshot." };
+      }
+    }
+
+    const missing = definition.requiresCapabilities.filter((capability) => !session?.capabilities.includes(capability));
+    const mayAddMediation = missing.length === 1 && missing[0] === "mediated" && isLocalGitRootSession(session, target);
+    if (missing.length > 0 && !mayAddMediation) {
+      return { status: "blocked", summary: `The selected session lacks adapter-proven capabilities: ${missing.join(", ")}.` };
+    }
+    const needsAttestation = mayAddMediation || definition.requiresAuthority || definition.requiresConfirmation;
+    if (needsAttestation && !this.options.confirmationAttestor) {
+      return { status: "unavailable", summary: "No host-owned current-user presence attestor is configured." };
+    }
+
+    let operator: string | undefined;
+    if (needsAttestation) {
+      try {
+        const attestation = await this.options.confirmationAttestor!.attest({ definition, ...(target ? { target } : {}), ...(session ? { session } : {}), reason: request.reason });
+        if (!attestation?.reauthenticated || !attestation.operator.trim()) return { status: "blocked", summary: "Current-user presence was not verified; nothing was prepared." };
+        operator = attestation.operator.trim();
+      } catch {
+        return { status: "unavailable", summary: "The host-owned current-user presence ceremony could not be completed." };
+      }
+    }
+
+    if (mayAddMediation && session && target) {
+      try {
+        session = await this.sessions.upsert({
+          ...session,
+          capabilities: [...new Set([...session.capabilities, "mediated" as const])],
+          status: "running",
+          targetSnapshotId: target.id,
+          lastHeartbeat: this.now().toISOString(),
+          metadata: { ...session.metadata, "sxsy-b122.mediatedBy": operator!, "sxsy-b122.mediatedAt": this.now().toISOString() }
+        });
+      } catch {
+        return { status: "unavailable", summary: "The mediated session attestation could not be durably recorded." };
+      }
+    }
+
+    let authority: AuthorityGrant | undefined;
+    if (definition.requiresAuthority) {
+      if (!target || !session || !operator) return { status: "blocked", summary: "Exact target, session, and verified operator are required for scoped authority." };
+      try {
+        authority = await this.authorities.issue({
+          repositoryRoot: target.repositoryRoot,
+          sessionId: session.id,
+          ...(session.taskId ? { taskId: session.taskId } : {}),
+          ...(session.planRevision ? { planRevision: session.planRevision } : {}),
+          allowedActions: [definition.action],
+          prohibitedActions: [],
+          expiresAt: new Date(this.now().getTime() + 5 * 60_000).toISOString(),
+          issuedBy: operator
+        });
+      } catch {
+        return { status: "unavailable", summary: "Exact-action authority could not be durably recorded." };
+      }
+    }
+
+    let confirmationToken: string | undefined;
+    let confirmationExpiresAt: string | undefined;
+    if (definition.requiresConfirmation) {
+      if (!operator) return { status: "blocked", summary: "Verified current-user presence is required for confirmation." };
+      try {
+        const issued = await this.confirmations.issue({
+          action: definition.action,
+          ...(target ? { targetSnapshotId: target.id } : {}),
+          ...(session ? { sessionId: session.id } : {}),
+          ...(authority ? { authorityId: authority.id } : {}),
+          reason: `${request.reason} (attested by ${operator})`,
+          reauthenticated: true
+        });
+        confirmationToken = issued.token;
+        confirmationExpiresAt = issued.record.expiresAt;
+      } catch {
+        return { status: "unavailable", summary: "The exact one-time confirmation could not be durably recorded." };
+      }
+    }
+
+    return {
+      status: "prepared",
+      summary: needsAttestation ? "Current-user presence prepared this exact command scope." : "This command needs no privileged preparation.",
+      ...(session ? { session } : {}),
+      ...(authority ? { authorityId: authority.id } : {}),
+      ...(confirmationToken ? { confirmationToken } : {}),
+      ...(confirmationExpiresAt ? { confirmationExpiresAt } : {})
+    };
+  }
+
   private async resolveTarget(definition: CommandDefinition, session: ManagedSession | undefined): Promise<TargetSnapshot | undefined> {
     try {
       return await this.options.targetResolver.resolve({ definition, session });
@@ -511,6 +635,12 @@ export class DurableMediatedExecutor {
       return { status: "unavailable", summary: "The companion could not durably record this denied or unavailable request; no action was started." };
     }
   }
+}
+
+function isLocalGitRootSession(session: ManagedSession | undefined, target: TargetSnapshot | undefined): boolean {
+  if (!session || !target || session.provider !== "generic" || session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "git-root" || !session.workspaceRoot) return false;
+  const normalized = (value: string) => value.replaceAll("\\", "/").replace(/^\/\/\?\//, "").replace(/\/+$/, "").toLowerCase();
+  return normalized(session.workspaceRoot) === normalized(target.repositoryRoot);
 }
 
 function policyStatus(status: "allowed" | "awaiting_confirmation" | "blocked" | "unavailable" | "incomplete"): "blocked" | "unavailable" | "incomplete" {

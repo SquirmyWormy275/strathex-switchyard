@@ -1,5 +1,5 @@
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
-import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type {
   AuditEvent,
   Capability,
@@ -15,6 +15,7 @@ import {
   type CompanionRequest,
   type CompanionResponse,
   type DispatchPayload,
+  type CommandPreparationPayload,
   type ConfirmationRequestPayload,
   type HostActionCompletionPayload,
   type OperationCancellationPayload,
@@ -40,6 +41,10 @@ export interface CancellableMediatedCommandExecutor extends MediatedCommandExecu
 
 export interface ConfirmationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
   requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string }>): Promise<Readonly<{ status: string; summary: string; token?: string; expiresAt?: string }>>;
+}
+
+export interface CommandPreparationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationExpiresAt?: string }>>;
 }
 
 export interface HostActionCompletionRecord {
@@ -124,6 +129,8 @@ export class CompanionService {
           return this.success(request.id, { command: await this.dispatch(this.requireDispatch(request.payload)) });
         case "operation.cancel":
           return this.success(request.id, { command: await this.cancelOperation(this.requireCancellation(request.payload)) });
+        case "command.prepare":
+          return this.success(request.id, { preparation: await this.prepareCommand(this.requireCommandPreparation(request.payload)) });
         case "confirmation.request":
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
         case "host-action.complete":
@@ -294,6 +301,16 @@ export class CompanionService {
     return this.executor.requestConfirmation(payload);
   }
 
+  private async prepareCommand(payload: CommandPreparationPayload): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationExpiresAt?: string }>> {
+    if (!isCommandPreparationExecutor(this.executor)) return { status: "unavailable", summary: "No durable command-preparation boundary is attached." };
+    const definition = commandFor(payload.control, payload.modifier);
+    if (!definition) return { status: "blocked", summary: "The chord is intentionally unassigned and cannot be prepared." };
+    const result = await this.executor.prepareCommand({ action: definition.action, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), reason: payload.reason });
+    if (result.session) this.installTrustedSession(result.session);
+    this.record("command.prepare", result.status === "prepared" ? "completed" : result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
   private async completeHostAction(payload: HostActionCompletionPayload): Promise<CommandResult> {
     if (!this.hostActions || !isExternalCompletionExecutor(this.executor)) {
       return { status: "unavailable", summary: "No durable host-action settlement boundary is attached; the acknowledgement was not accepted." };
@@ -362,6 +379,15 @@ export class CompanionService {
       throw new CompanionServiceError("invalid_request", "A confirmation request requires a known action, bounded reason, and optional opaque session/authority references.");
     }
     return { action: payload.action as CommandAction, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(payload.authorityId ? { authorityId: payload.authorityId } : {}) };
+  }
+
+  private requireCommandPreparation(payload: unknown): CommandPreparationPayload {
+    if (!isRecord(payload) || !isControl(payload.control) || !isModifier(payload.modifier)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
+      || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")) {
+      throw new CompanionServiceError("invalid_request", "Command preparation requires a canonical chord, bounded host reason, and optional exact session ID.");
+    }
+    return { control: payload.control, modifier: payload.modifier, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}) };
   }
 
   private requireHostActionCompletion(payload: unknown): HostActionCompletionPayload {
@@ -500,6 +526,10 @@ function isCancellableExecutor(value: MediatedCommandExecutor | undefined): valu
 
 function isConfirmationCapableExecutor(value: MediatedCommandExecutor | undefined): value is ConfirmationCapableMediatedCommandExecutor {
   return !!value && typeof (value as Partial<ConfirmationCapableMediatedCommandExecutor>).requestConfirmation === "function";
+}
+
+function isCommandPreparationExecutor(value: MediatedCommandExecutor | undefined): value is CommandPreparationCapableMediatedCommandExecutor {
+  return !!value && typeof (value as Partial<CommandPreparationCapableMediatedCommandExecutor>).prepareCommand === "function";
 }
 
 function isExternalCompletionExecutor(value: MediatedCommandExecutor | undefined): value is ExternalCompletionCapableMediatedCommandExecutor {

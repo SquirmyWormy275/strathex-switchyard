@@ -55,6 +55,13 @@ export {
   type ConfiguredNetworkResult,
   type ConfiguredNetworkRoute
 } from "./configured-network.ts";
+export {
+  PowerShellWindowsUserPresenceRunner,
+  WindowsHelloConfirmationAttestor,
+  type WindowsUserPresenceResult,
+  type WindowsUserPresenceRunner
+} from "./windows-user-presence.ts";
+export * from "./repository-runtime.ts";
 export { runStandaloneCompanion } from "./main.ts";
 
 /**

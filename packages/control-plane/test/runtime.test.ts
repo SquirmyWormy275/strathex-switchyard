@@ -147,6 +147,42 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
   });
 });
 
+test("installed preparation attests one Git-root session and binds exact authority and confirmation without enabling high consequence", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const session = await sessions.register({
+      id: "session-prepared", provider: "generic", surface: "vscode_window", capabilities: ["registered"],
+      status: "unknown", workspaceRoot: target.repositoryRoot, taskId: "task-prepared", planRevision: "plan-prepared",
+      plannedFiles: [], adapterVersion: "installed-extension", metadata: { "sxsy-b122.kind": "git-root" }
+    });
+    let attestations = 0;
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      confirmationAttestor: { attest: async () => { attestations += 1; return { reauthenticated: true, operator: "windows-user-presence" }; } }
+    });
+    const prepared = await runtime.prepareCommand({ action: "local_commit", sessionId: session.id, reason: "review exact local commit" });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(attestations, 1);
+    assert.equal(prepared.session?.capabilities.includes("mediated"), true);
+    assert.equal(prepared.session?.capabilities.includes("observable"), false);
+    assert.ok(prepared.authorityId);
+    assert.ok(prepared.confirmationToken);
+    const authority = await runtime.authorities.get(prepared.authorityId!);
+    assert.deepEqual(authority?.allowedActions, ["local_commit"]);
+    assert.equal(authority?.repositoryRoot, target.repositoryRoot);
+
+    const high = await runtime.prepareCommand({ action: "pr_merge", sessionId: session.id, reason: "review exact PR merge" });
+    assert.equal(high.status, "prepared");
+    const assignment = commandForAction("pr_merge").assignment!;
+    const blocked = await runtime.execute({
+      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id,
+      authorityId: high.authorityId, confirmationToken: high.confirmationToken
+    });
+    assert.equal(blocked.status, "blocked", JSON.stringify(blocked));
+    assert.match(blocked.summary, /high-consequence|acceptance/i);
+  });
+});
+
 test("agent work receives a durable deadline signal and operation-ID cancellation never guesses a process", async () => {
   await withStore(async (store) => {
     const sessions = new SessionRegistry(store, { clock: () => now });

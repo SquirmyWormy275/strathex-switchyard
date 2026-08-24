@@ -6,6 +6,7 @@ import { AuthenticatedPipeServer, createPipeConfiguration, loadPipeConfiguration
 import { defaultControlPlaneStorePath, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { DpapiJournalAuthenticator, WindowsDpapiCurrentUserProtector } from "./windows-secret.ts";
 import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./configured-network.ts";
+import { WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -30,6 +31,7 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
     localGitStateDirectory: stateDirectory,
     credentialProtector: protector,
     networkPolicy,
+    runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor() },
     snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
   });
   await companion.endpoint.ready();

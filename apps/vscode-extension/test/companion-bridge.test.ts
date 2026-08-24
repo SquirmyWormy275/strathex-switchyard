@@ -29,6 +29,9 @@ test("the VS Code JSON-lines client sends bounded companion methods and preserve
       if (request.method === "command.dispatch") {
         return JSON.stringify({ version: 1, id: request.id, ok: true, result: { command: { status: "unavailable", summary: "No mediated execution broker is attached." } } });
       }
+      if (request.method === "command.prepare") {
+        return JSON.stringify({ version: 1, id: request.id, ok: true, result: { preparation: { status: "prepared", summary: "Exact scope prepared.", authorityId: "authority" } } });
+      }
       return JSON.stringify({ version: 1, id: request.id, ok: true, result: (request.payload as { session: ExtensionManagedSession }).session });
     }
   };
@@ -38,10 +41,14 @@ test("the VS Code JSON-lines client sends bounded companion methods and preserve
   assert.equal(registered.ok, true);
   if (registered.ok) assert.equal(registered.value.id, session.id);
 
+  const prepared = await bridge.prepareCommand({ control: "RUN", modifier: "normal", sessionId: session.id, reason: "operator requested run" });
+  assert.equal(prepared.ok, true);
+  if (prepared.ok) assert.equal(prepared.value.authorityId, "authority");
+
   const dispatched = await bridge.dispatch({ control: "RUN", modifier: "normal", sessionId: session.id });
   assert.equal(dispatched.ok, true);
   if (dispatched.ok) assert.equal(dispatched.value.status, "unavailable");
-  assert.deepEqual(seen.map((entry) => entry.method), ["session.register", "command.dispatch"]);
+  assert.deepEqual(seen.map((entry) => entry.method), ["session.register", "command.prepare", "command.dispatch"]);
   assert.equal(seen.every((entry) => entry.id.startsWith("isolated-vscode-")), true);
 });
 

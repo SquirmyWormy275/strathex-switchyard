@@ -18,6 +18,7 @@ import type {
 } from "./vscode-like.ts";
 
 const windowStateKey = "sxsy-b122.managedWindow";
+const selectedTargetStateKey = "sxsy-b122.selectedGitTarget";
 
 interface StoredWindowState {
   readonly id: string;
@@ -333,10 +334,32 @@ export class ManagedSessionController {
   }
 
   private async dispatch(command: ChordCommand, input?: Readonly<Record<string, string>>): Promise<void> {
+    const selectedSession = await this.resolveDispatchSession(command);
+    if (selectedSession === null) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 stopped because no exact managed target was selected.");
+      return;
+    }
+    const preparation = await this.bridge.prepareCommand({
+      control: command.control,
+      modifier: command.modifier,
+      ...(selectedSession ? { sessionId: selectedSession } : {}),
+      reason: `Operator requested ${command.title} through the installed SXSY-B122 extension.`
+    });
+    if (!preparation.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 preparation unavailable: ${preparation.message}`);
+      return;
+    }
+    if (preparation.value.status !== "prepared") {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 ${preparation.value.status}: ${preparation.value.summary}`);
+      return;
+    }
+    if (preparation.value.session) this.sessions.set(preparation.value.session.id, preparation.value.session);
     const forwarded: ForwardedCommand = {
       control: command.control,
       modifier: command.modifier,
-      sessionId: this.activeSessionId(),
+      ...(selectedSession ? { sessionId: selectedSession } : {}),
+      ...(preparation.value.authorityId ? { authorityId: preparation.value.authorityId } : {}),
+      ...(preparation.value.confirmationToken ? { confirmationToken: preparation.value.confirmationToken } : {}),
       input
     };
     const result = await this.bridge.dispatch(forwarded);
@@ -501,6 +524,22 @@ export class ManagedSessionController {
     return terminal ? this.terminalRecords.get(terminal)?.sessionId ?? this.windowSessionId : this.windowSessionId;
   }
 
+  private async resolveDispatchSession(command: ChordCommand): Promise<string | null | undefined> {
+    if (!requiresExactTarget(command)) return this.activeSessionId();
+    const candidates = [...this.sessions.values()].filter((session) => session.metadata["sxsy-b122.kind"] === "git-root" && !!session.workspaceRoot);
+    if (candidates.length === 0) return this.activeSessionId();
+    if (candidates.length === 1) return candidates[0]!.id;
+    const stored = this.context.workspaceState.get<string>(selectedTargetStateKey);
+    if (stored && candidates.some((session) => session.id === stored)) return stored;
+    const items = candidates.map((session) => ({ label: session.workspaceRoot!, description: session.metadata["sxsy-b122.branch"] ?? "unknown branch", detail: session.id }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: `Choose one exact Git target for ${command.title.replace("SXSY-B122: ", "")}` });
+    if (!selected) return null;
+    const session = candidates[items.indexOf(selected)];
+    if (!session) return null;
+    await this.context.workspaceState.update(selectedTargetStateKey, session.id);
+    return session.id;
+  }
+
   private workspaceRoots(): readonly string[] {
     return (this.vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath);
   }
@@ -520,6 +559,14 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
     "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];
+}
+
+function requiresExactTarget(command: ChordCommand): boolean {
+  const noTarget = new Set([
+    "CLAUDE:normal", "CLAUDE:shift", "CHATGPT:normal", "CHATGPT:shift",
+    "VSCODE:normal", "VSCODE:shift", "TERMINAL:normal", "VOICE:normal", "VOICE:shift"
+  ]);
+  return !noTarget.has(`${command.control}:${command.modifier}`);
 }
 
 function trustedExternalUrl(value: string): boolean {

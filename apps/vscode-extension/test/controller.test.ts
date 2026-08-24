@@ -9,9 +9,11 @@ import {
   type ForwardedCommand,
   type ForwardedCommandResult,
   type LocalHostAction,
+  type PreparedCommand,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
+import type { B122Control, B122Modifier } from "../src/commands.ts";
 import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
 
 class FakeDisposable implements DisposableLike { dispose(): void {} }
@@ -120,7 +122,9 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
+  readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string }> = [];
   nextDispatch?: ForwardedCommandResult;
+  nextPreparation?: PreparedCommand;
 
   async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
   async registerSession(session: ExtensionManagedSession): Promise<BridgeResult<ExtensionManagedSession>> {
@@ -149,6 +153,10 @@ class FakeBridge implements ExtensionCompanionBridge {
     return action
       ? { ok: true, value: { status: "running", summary: "Awaiting host acknowledgement.", data: { hostActionId: `host-action:${"a".repeat(64)}`, hostActionKind: action, hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } } }
       : { ok: true, value: { status: "completed", summary: "Routed by fake companion." } };
+  }
+  async prepareCommand(command: { control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }): Promise<BridgeResult<PreparedCommand>> {
+    this.prepared.push(command);
+    return { ok: true, value: this.nextPreparation ?? { status: "prepared", summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" } };
   }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
@@ -203,6 +211,35 @@ test("tracks terminal, workspace, and debug lifecycle events as identities rathe
   assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.kind"] === "debug-session"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "unreachable"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "verified_finished"), false);
+});
+
+test("picker-or-stop selects one Git target and forwards only companion-prepared authority and confirmation", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo-a", "C:\\repo-b"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-23T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [
+      { gitRoot: "C:\\repo-a", branch: "feature/a" },
+      { gitRoot: "C:\\repo-b", branch: "feature/b" }
+    ]
+  });
+  await controller.start();
+
+  vscode.choose("C:\\repo-b");
+  await vscode.invoke("sxsy-b122.chord.shield.normal");
+  const selected = bridge.registered.find((session) => session.workspaceRoot === "C:\\repo-b" && session.metadata["sxsy-b122.kind"] === "git-root");
+  assert.ok(selected);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, selected.id);
+  assert.equal(bridge.dispatched.at(-1)?.sessionId, selected.id);
+  assert.equal(bridge.dispatched.at(-1)?.authorityId, "authority-test");
+  assert.equal(bridge.dispatched.at(-1)?.confirmationToken, "confirmation-test");
+
+  bridge.nextPreparation = { status: "blocked", summary: "User presence was denied." };
+  const before = bridge.dispatched.length;
+  await vscode.invoke("sxsy-b122.chord.shield.normal");
+  assert.equal(bridge.dispatched.length, before);
+  assert.match(vscode.warnings.at(-1) ?? "", /user presence was denied/i);
 });
 
 test("forwards Run/Debug to the companion and performs only safe local host actions", async () => {

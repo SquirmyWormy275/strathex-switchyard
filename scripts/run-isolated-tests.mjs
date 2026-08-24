@@ -19,7 +19,7 @@ const controlPlaneTests = [
   "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "authenticated-pipe", "bootstrap", "configured-network", "control-plane", "durable-credentials", "durable-endpoint", "host-actions", "local-runtime", "mediated-git", "packaged-runtime", "router", "service", "stdio"
+  "authenticated-pipe", "bootstrap", "configured-network", "control-plane", "durable-credentials", "durable-endpoint", "host-actions", "local-runtime", "mediated-git", "packaged-runtime", "repository-runtime", "router", "service", "stdio", "windows-user-presence"
 ].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts` }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));

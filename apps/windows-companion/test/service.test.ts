@@ -132,6 +132,7 @@ test("a verified mediator calls only its attached executor and disabled actions 
 test("cancellation and confirmation requests cross only their dedicated mediator hooks", async () => {
   const cancelled: Array<{ operationId: string; reason: string }> = [];
   const confirmationRequests: Array<Readonly<Record<string, unknown>>> = [];
+  const preparationRequests: Array<Readonly<Record<string, unknown>>> = [];
   const executor = {
     execute: (): { status: "unavailable"; summary: string } => ({ status: "unavailable", summary: "not used by this bridge test" }),
     cancelOperation: async (operationId: string, reason: string) => {
@@ -141,6 +142,10 @@ test("cancellation and confirmation requests cross only their dedicated mediator
     requestConfirmation: async (input: Readonly<Record<string, unknown>>) => {
       confirmationRequests.push(input);
       return { status: "issued", summary: "Host UI attested the exact request.", token: "test-token", expiresAt: "2026-08-23T00:05:00.000Z" };
+    },
+    prepareCommand: async (input: Readonly<Record<string, unknown>>) => {
+      preparationRequests.push(input);
+      return { status: "prepared" as const, summary: "Exact command prepared.", authorityId: "authority-1", confirmationToken: "confirmation-1" };
     }
   };
   const service = new CompanionService({ executor });
@@ -157,6 +162,14 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(confirmationResponse.ok, true);
   assert.equal((confirmationResponse.result as { confirmation: { status: string } }).confirmation.status, "issued");
   assert.equal("reauthenticated" in (confirmationRequests[0] ?? {}), false, "bridge payload cannot self-attest reauthentication");
+
+  const preparationResponse = await service.handle(request("prepare", "command.prepare", {
+    control: "COMMIT", modifier: "normal", sessionId: "session-1", reason: "Review exact local commit.", reauthenticated: true
+  }));
+  assert.equal(preparationResponse.ok, true);
+  assert.equal((preparationResponse.result as { preparation: { status: string; authorityId: string } }).preparation.authorityId, "authority-1");
+  assert.deepEqual(preparationRequests, [{ action: "local_commit", sessionId: "session-1", reason: "Review exact local commit." }]);
+  assert.equal("reauthenticated" in (preparationRequests[0] ?? {}), false, "bridge payload cannot self-attest current-user presence");
 
   const malformed = await service.handle(request("bad-cancel", "operation.cancel", { operationId: "", reason: "" }));
   assert.equal(malformed.ok, false);

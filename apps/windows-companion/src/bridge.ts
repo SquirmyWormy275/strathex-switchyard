@@ -22,6 +22,7 @@ export type CompanionMethod =
   | "debug.register"
   | "command.dispatch"
   | "operation.cancel"
+  | "command.prepare"
   | "confirmation.request"
   | "host-action.complete";
 
@@ -105,6 +106,13 @@ export interface ConfirmationRequestPayload {
   readonly reason: string;
 }
 
+export interface CommandPreparationPayload {
+  readonly control: Control;
+  readonly modifier: Modifier;
+  readonly sessionId?: string;
+  readonly reason: string;
+}
+
 /** A typed result from the installed VS Code host, never an execution request. */
 export interface HostActionCompletionPayload {
   readonly hostActionId: string;
@@ -165,7 +173,7 @@ export function isCompanionRequest(value: unknown): value is CompanionRequest {
 export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
-    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "confirmation.request",
+    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "host-action.complete"
   ].includes(value);
 }
