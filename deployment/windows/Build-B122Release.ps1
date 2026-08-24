@@ -113,7 +113,8 @@ $scripts = Join-Path $output 'scripts'
 $provisioning = Join-Path $scripts 'provisioning'
 $documentation = Join-Path $output 'docs'
 $source = Join-Path $output 'source'
-New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts,$provisioning,$documentation,$source | Out-Null
+$licenses = Join-Path $output 'licenses'
+New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts,$provisioning,$documentation,$source,$licenses | Out-Null
 & git.exe archive --format=zip --output (Join-Path $source 'sxsy-b122-source.zip') HEAD
 if ($LASTEXITCODE -ne 0) { throw 'The exact source-commit archive could not be created.' }
 Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\dist') -Destination (Join-Path $app 'dist') -Recurse
@@ -166,6 +167,8 @@ Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'SECURITY.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSING.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'ATTRIBUTION.md') -Destination $output
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\DOTNET-RUNTIME-LICENSE.txt') -Destination $licenses
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt') -Destination $licenses
 
 Remove-Item -LiteralPath $runtimeExtract -Recurse -Force
 Remove-Item -LiteralPath $vsixRoot -Recurse -Force
@@ -183,21 +186,24 @@ Write-Utf8NoBom (Join-Path $output 'SHA256SUMS.json') ($payload | ConvertTo-Json
 $nodeVersion = & (Join-Path $runtime 'node.exe') -p 'process.version'
 $packages = @(
   [ordered]@{ SPDXID='SPDXRef-Package-B122'; name='SXSY-B122 Switchyard'; versionInfo='0.2.0'; downloadLocation='NOASSERTION'; filesAnalyzed=$true; licenseConcluded='NOASSERTION'; licenseDeclared='NOASSERTION'; copyrightText='NOASSERTION' },
-  [ordered]@{ SPDXID='SPDXRef-Package-Node'; name='Node.js runtime'; versionInfo=$nodeVersion; downloadLocation=$NodeRuntimeSourceUri; filesAnalyzed=$true; licenseConcluded='NOASSERTION'; licenseDeclared='NOASSERTION'; copyrightText='NOASSERTION' }
+  [ordered]@{ SPDXID='SPDXRef-Package-Node'; name='Node.js runtime'; versionInfo=$nodeVersion; downloadLocation=$NodeRuntimeSourceUri; filesAnalyzed=$true; licenseConcluded='NOASSERTION'; licenseDeclared='NOASSERTION'; copyrightText='NOASSERTION' },
+  [ordered]@{ SPDXID='SPDXRef-Package-DotNet'; name='Microsoft .NET runtime in self-contained helpers'; versionInfo='8.0.30'; downloadLocation='NOASSERTION'; filesAnalyzed=$true; licenseConcluded='NOASSERTION'; licenseDeclared='MIT'; copyrightText='NOASSERTION' }
 )
 $spdxFiles = @(); $relationships = @(
   [ordered]@{ spdxElementId='SPDXRef-DOCUMENT'; relationshipType='DESCRIBES'; relatedSpdxElement='SPDXRef-Package-B122' },
-  [ordered]@{ spdxElementId='SPDXRef-DOCUMENT'; relationshipType='DESCRIBES'; relatedSpdxElement='SPDXRef-Package-Node' }
+  [ordered]@{ spdxElementId='SPDXRef-DOCUMENT'; relationshipType='DESCRIBES'; relatedSpdxElement='SPDXRef-Package-Node' },
+  [ordered]@{ spdxElementId='SPDXRef-DOCUMENT'; relationshipType='DESCRIBES'; relatedSpdxElement='SPDXRef-Package-DotNet' },
+  [ordered]@{ spdxElementId='SPDXRef-Package-B122'; relationshipType='STATIC_LINK'; relatedSpdxElement='SPDXRef-Package-DotNet' }
 )
 for ($index = 0; $index -lt $payload.Count; $index++) {
   $entry = $payload[$index]; $fileId = 'SPDXRef-File-' + ($index + 1)
   $spdxFiles += [ordered]@{ SPDXID=$fileId; fileName=('./' + $entry.path); checksums=@([ordered]@{ algorithm='SHA256'; checksumValue=$entry.sha256 }); licenseConcluded='NOASSERTION'; copyrightText='NOASSERTION' }
-  $owner = if ($entry.path -in @('runtime/node.exe', 'runtime/NODE-LICENSE.txt')) { 'SPDXRef-Package-Node' } else { 'SPDXRef-Package-B122' }
+  $owner = if ($entry.path -in @('runtime/node.exe', 'runtime/NODE-LICENSE.txt')) { 'SPDXRef-Package-Node' } elseif ($entry.path.StartsWith('licenses/DOTNET-RUNTIME-')) { 'SPDXRef-Package-DotNet' } else { 'SPDXRef-Package-B122' }
   $relationships += [ordered]@{ spdxElementId=$owner; relationshipType='CONTAINS'; relatedSpdxElement=$fileId }
 }
 Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='SPDX-2.3'; dataLicense='CC0-1.0'; SPDXID='SPDXRef-DOCUMENT'; name='SXSY-B122 Windows bundle'; documentNamespace=('https://strathex.invalid/spdx/b122/' + [guid]::NewGuid()); creationInfo=[ordered]@{ created=(Get-Date).ToUniversalTime().ToString('o'); creators=@('Tool: SXSY-B122 Build-B122Release.ps1') }; packages=$packages; files=$spdxFiles; relationships=$relationships } | ConvertTo-Json -Depth 10)
 $sourceCommit = (& git.exe rev-parse HEAD).Trim()
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; sandboxHelperSha256=$helperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 Write-Output "Built verified SXSY-B122 Windows bundle: $output"

@@ -1,6 +1,6 @@
 # Windows Release and Installation
 
-The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, fixed native Raw-HID helper, VS Code VSIX, the runtime/sandbox manifest generators and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, checksums, a portable-startup receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. Prebuilt sandbox and Raw-HID helpers likewise require their reviewed SHA-256 values.
+The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, fixed native Raw-HID helper, VS Code VSIX, the runtime/sandbox manifest generators and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, the pinned self-contained .NET runtime license and third-party notices, checksums, a portable-startup receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. Prebuilt sandbox and Raw-HID helpers likewise require their reviewed SHA-256 values.
 
 ```powershell
 .\deployment\windows\Build-B122Release.ps1 `

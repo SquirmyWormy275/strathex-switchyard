@@ -20,7 +20,7 @@ if ($release.schema -cne 'sxsy-b122.windows-release' -or $release.version -ne 1 
 if ($release.sourceCommit -notmatch '^[0-9a-f]{40}$' -or $release.sandboxHelperSha256 -notmatch '^[0-9a-f]{64}$' -or $release.rawHidHelperSha256 -notmatch '^[0-9a-f]{64}$') { throw 'Release provenance metadata is invalid.' }
 if ($release.payloadCount -ne $checksums.Count) { throw 'Release payload count does not match the checksum manifest.' }
 if ($sbom.spdxVersion -cne 'SPDX-2.3' -or $sbom.dataLicense -cne 'CC0-1.0' -or $sbom.SPDXID -cne 'SPDXRef-DOCUMENT') { throw 'The SPDX document header is invalid.' }
-if ($sbomPackages.Count -lt 2 -or $sbomFiles.Count -ne $checksums.Count) { throw 'The SPDX package or file inventory is incomplete.' }
+if ($sbomPackages.Count -lt 3 -or $sbomFiles.Count -ne $checksums.Count) { throw 'The SPDX package or file inventory is incomplete.' }
 
 $expected = @{}
 foreach ($entry in $checksums) {
@@ -32,6 +32,7 @@ $sandboxHelperPath = 'app/dist/apps/windows-companion/sandbox-helper/b122-sandbo
 $rawHidHelperPath = 'app/dist/apps/windows-companion/raw-hid/strathex-b122-hid-helper.exe'
 if (-not $expected.ContainsKey($sandboxHelperPath) -or $expected[$sandboxHelperPath].sha256 -cne $release.sandboxHelperSha256) { throw 'Sandbox-helper release provenance is incomplete.' }
 if (-not $expected.ContainsKey($rawHidHelperPath) -or $expected[$rawHidHelperPath].sha256 -cne $release.rawHidHelperSha256) { throw 'Raw-HID-helper release provenance is incomplete.' }
+if ($release.dotnetRuntime.version -cne '8.0.30' -or $release.dotnetRuntime.license -cne 'licenses/DOTNET-RUNTIME-LICENSE.txt' -or $release.dotnetRuntime.thirdPartyNotices -cne 'licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' -or -not $expected.ContainsKey($release.dotnetRuntime.license) -or -not $expected.ContainsKey($release.dotnetRuntime.thirdPartyNotices)) { throw 'The self-contained .NET runtime notices are missing from release provenance.' }
 $actualFiles = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object { $_.Name -notin @('SHA256SUMS.json', 'sbom.spdx.json', 'release.json') })
 if ($actualFiles.Count -ne $checksums.Count) { throw 'The bundle has missing or unmanifested payload files.' }
 foreach ($file in $actualFiles) {
