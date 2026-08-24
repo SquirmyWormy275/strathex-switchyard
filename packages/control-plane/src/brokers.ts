@@ -82,6 +82,9 @@ export interface ExecutionRequest extends BrokerInvocation {
   readonly recipe: ExecutionRecipe;
 }
 
+/** Runtime boundary for an allowlisted structured executor. */
+export interface ExecutionBroker { execute(request: ExecutionRequest): Promise<BrokerOutcome>; }
+
 export type ExecutionHandler = (request: ExecutionRequest) => MaybePromise<BrokerOutcome>;
 
 /**
@@ -143,6 +146,8 @@ export type GitMutation =
 export interface GitRequest extends BrokerInvocation {
   readonly mutation: GitMutation;
 }
+/** Runtime boundary for a reviewed, typed Git mutation broker. */
+export interface GitBroker { execute(request: GitRequest): Promise<BrokerOutcome>; }
 export type GitHandler = (request: GitRequest) => MaybePromise<BrokerOutcome>;
 
 const actionForGitMutation: Readonly<Record<GitMutation["kind"], CommandAction>> = {
@@ -215,6 +220,7 @@ export interface CredentialLease {
   readonly expiresAt: string;
 }
 export interface CredentialOutcome extends BrokerOutcome { readonly lease?: CredentialLease; }
+export interface CredentialBroker { acquire(request: CredentialRequest): Promise<CredentialOutcome>; }
 
 /** Supplies opaque, action-scoped leases rather than raw credentials. */
 export class InMemoryCredentialBroker {
@@ -260,6 +266,7 @@ export interface NetworkRequest extends BrokerInvocation {
 }
 export interface NetworkResponse { readonly statusCode: number; readonly body: string; }
 export interface NetworkOutcome extends BrokerOutcome { readonly response?: NetworkResponse; }
+export interface NetworkBroker { request(request: NetworkRequest): Promise<NetworkOutcome>; }
 
 /** No-fetch network mock. It is allowlisted and test-addressable only. */
 export class InMemoryNetworkBroker {
@@ -310,6 +317,7 @@ export interface TestEnvironment {
   readonly environment: Readonly<Record<string, string>>;
 }
 export interface TestEnvironmentOutcome extends BrokerOutcome { readonly environment?: TestEnvironment; }
+export interface TestEnvironmentBroker { prepare(request: TestEnvironmentRequest): Promise<TestEnvironmentOutcome>; }
 
 /** Allocates metadata-only disposable test environments; it never opens a database or inherits process.env. */
 export class InMemoryTestEnvironmentBroker {
@@ -395,6 +403,7 @@ export class InMemoryIsolationRuntime implements IsolationRuntime {
 export interface AutomationRequest extends BrokerInvocation {
   readonly testEnvironment?: TestEnvironment;
 }
+export interface AutomationBroker { execute(request: AutomationRequest): Promise<BrokerOutcome>; }
 export type AutomationHandler = (request: AutomationRequest) => MaybePromise<BrokerOutcome>;
 
 /** Models provider/Compound automation but has no external adapter unless one is explicitly registered. */

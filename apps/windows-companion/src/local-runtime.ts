@@ -223,7 +223,12 @@ export class LocalProcessBroker {
     if (!policy) return { outcome: "blocked", detail: "Process executable or arguments are not allowlisted." };
     const limit = policy.outputLimit ?? 32_768; const timeoutMs = policy.timeoutMs ?? 30_000;
     return new Promise((resolveResult) => {
-      const child = spawn(program, [...args], { cwd, shell: false, windowsHide: true }); let output = ""; let timedOut = false;
+      // Never give a brokered subprocess ambient credentials.  An executable
+      // that needs a secret must receive an opaque broker lease through an
+      // explicitly reviewed host adapter, not inherit the companion process.
+      const inherited = ["PATH", "PATHEXT", "SystemRoot", "ComSpec", "TEMP", "TMP", "USERPROFILE"];
+      const environment = Object.fromEntries(inherited.flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]!]]));
+      const child = spawn(program, [...args], { cwd, shell: false, windowsHide: true, env: environment }); let output = ""; let timedOut = false;
       const collect = (chunk: Buffer): void => { if (output.length < limit) output += chunk.toString().slice(0, limit - output.length); };
       child.stdout.on("data", collect); child.stderr.on("data", collect);
       const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);

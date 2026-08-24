@@ -7,6 +7,8 @@ import { WorkspaceSnapshotResolver } from "../../../packages/control-plane/src/s
 import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
+import { dirname } from "node:path";
+import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { CompanionService } from "./service.ts";
 
@@ -25,6 +27,8 @@ export interface DurableWindowsCompanionOptions {
   readonly runtime?: Omit<DurableMediatedExecutorOptions, "store" | "sessions" | "policyVersion" | "targetResolver" | "enabledHighConsequenceActions" | "dependencies" | "receiptEvidence">;
   readonly dependencies?: DurableMediatedExecutorOptions["dependencies"];
   readonly receiptEvidence?: DispatchReceiptEvidenceFactory;
+  /** Explicit install-state directory used by disposable local broker work. */
+  readonly localStateDirectory?: string;
 }
 
 /**
@@ -38,6 +42,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly executor: DurableMediatedExecutor;
   readonly service: CompanionService;
   readonly endpoint: DurableCompanionEndpoint;
+  readonly localComponents?: DefaultLocalComposition;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -52,6 +57,16 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     new TargetSnapshotFactory(new GitCliInspector()),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  let localComponents: DefaultLocalComposition | undefined;
+  let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
+  const dependencies = options.dependencies ?? ((context) => {
+    if (!defaultDependencies) {
+      const composed = createDefaultLocalComposition(context, store, options.localStateDirectory ?? dirname(store.filePath));
+      localComponents = composed.components;
+      defaultDependencies = composed.dependencies;
+    }
+    return defaultDependencies;
+  });
   const executor = new DurableMediatedExecutor({
     ...options.runtime,
     store,
@@ -59,7 +74,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     policyVersion: options.policyVersion,
     targetResolver,
     enabledHighConsequenceActions: options.enabledHighConsequenceActions,
-    dependencies: options.dependencies,
+    dependencies,
     receiptEvidence: options.receiptEvidence
   });
   const service = new CompanionService({ executor });
@@ -72,6 +87,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     executor,
     service,
     endpoint,
+    get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();
       const persisted = await sessions.upsert(session);

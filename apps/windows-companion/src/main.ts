@@ -20,7 +20,7 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
   const configuration = await createCompanionConfiguration(stateDirectory);
   const store = new ProtectedJsonStore({ filePath: resolve(stateDirectory, "protected-audit.jsonl"), authenticator: new WindowsDpapiJournalAuthenticator(), requireAuthenticatedProtection: true });
   const companion = createDurableWindowsCompanion({
-    policyVersion: process.env.SXSY_B122_POLICY_VERSION?.trim() || "b122-local-v1", store
+    policyVersion: process.env.SXSY_B122_POLICY_VERSION?.trim() || "b122-local-v1", store, localStateDirectory: stateDirectory
   });
   await companion.endpoint.ready();
   const server = new DurableLocalIpcServer(configuration, companion.endpoint);

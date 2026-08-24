@@ -15,6 +15,7 @@ export { CompanionService, type CompanionServiceOptions, type LocalHostAction, t
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
 export { DurableLocalIpcServer } from "./durable-ipc.ts";
 export { WindowsDpapiJournalAuthenticator } from "./windows-authenticator.ts";
+export { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 export { createDurableWindowsCompanion, type DurableWindowsCompanionOptions } from "./bootstrap.ts";
 export { handleJsonLine, runCompanionStdio, serveJsonLines, type CompanionRequestHandler } from "./stdio.ts";
 export { runStandaloneCompanion } from "./main.ts";

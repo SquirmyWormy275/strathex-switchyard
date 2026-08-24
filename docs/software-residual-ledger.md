@@ -1,27 +1,47 @@
 # B122 software residual ledger — local companion implementation
 
-**Revision:** post-PR #4 implementation branch.  “Implemented locally” means
-there is executable code and an isolated test; it does not mean hardware or a
-proprietary/cloud surface has been accepted.
+**Revision:** durable default-composition reconciliation. “Implemented locally”
+means executable code with isolated evidence; it does not assert hardware,
+proprietary-provider, cloud, or operator acceptance.
 
-## Unfinished software-only residuals
+## Completed local software boundary
 
-This branch is **not** the complete B122 endpoint. The following are still
-ordinary software work and must not be relabeled as hardware or external:
+All 65 settled assignments now reach the durable command catalog and either a
+named local handler/broker or an explicit policy-gated unavailable result. The
+installed companion composes canonical filesystem/Git inspection, a structured
+allowlisted process broker, scanner feed gate, scoped local credential and
+network brokers, isolated-test allocation, sandbox/containment persistence,
+Council persistence, and a Raw-HID loopback transport. The extension registers
+through the authenticated local pipe into the protected session registry; that
+registration is deliberately **Registered only**. A separate reviewed host
+attestation is required before a session receives Mediated capability or can
+invoke a concrete broker.
 
-- The control router still presents route-only chords as previews; it does not
-  connect every one of the 65 assignments to a concrete local handler.
-- VS Code registration is not yet synchronized into the companion registry;
-  its invoke UI therefore cannot establish a real mediated session by itself.
-- Local Git mediation has snapshot/status/diff and reviewed commit/push, but
-  lacks a complete branch/PR/merge recovery workflow and protected receipt gate
-  activation.
-- There is no concrete scoped-credential issuer, network proxy, repository
-  test-recipe manifest loader, process/debug supervisor, scanner adapter, or
-  Windows Raw HID lifecycle implementation.
-- Sandbox copies and quarantine leases are not a full sandbox or enforceable
-  quarantine runtime; Council leases and authority records are not durable
-  cross-process coordination state.
+Direct evidence is `apps/windows-companion/src/default-composition.ts`,
+`apps/windows-companion/src/bootstrap.ts`, and
+`apps/windows-companion/test/bootstrap.test.ts`, which exercises a protected
+durable session, a disposable temporary Git repository, canonical filesystem
+validation, the allowlisted `git diff --check` Shield broker, Raw-HID loopback,
+and high-consequence containment denial. Authenticated installed-pipe and
+extension registration evidence is separately in
+`apps/windows-companion/test/durable-ipc.test.ts` and
+`apps/windows-companion/test/packaged-runtime.test.ts`.
+
+## Genuine external or hardware residuals
+
+- Physical Raw HID device discovery, transport authorization, and firmware
+  deployment require attached hardware; the loopback protocol/harness is
+  complete locally.
+- Claude, Codex, Voice, Compound, and GitHub/PR automation require their
+  respective installed-provider or external-account authorization. Their
+  local adapters and policy gates return unavailable rather than simulating a
+  success.
+- Full OS-enforced VM/container sandboxing and external scanner/advisory feeds
+  require a reviewed backend. The local containment, lease, isolation, and
+  deny-egress paths are present, while activation remains gate-disabled.
+- High-consequence actions remain disabled until their documented acceptance
+  evidence is independently collected; no disabled action is represented as
+  implemented or automatically executable.
 
 The tables below distinguish the implemented local pieces from these remaining
 software-only requirements. High-consequence flows remain safely blocked rather
@@ -54,17 +74,19 @@ than being presented as implemented.
 
 All rows map to the canonical 65 entries in
 `packages/protocol/src/b122.ts`; intentionally unassigned chords are rejected
-there and in `ControlRouter`. Direct test evidence is
+there and in `ControlRouter`. Direct test evidence includes
 `apps/windows-companion/test/control-plane.test.ts`,
-`apps/windows-companion/test/local-runtime.test.ts`, and
-`apps/windows-companion/test/router.test.ts`.
+`apps/windows-companion/test/local-runtime.test.ts`,
+`apps/windows-companion/test/router.test.ts`, and
+`apps/windows-companion/test/bootstrap.test.ts`.
 
 ## Acceptance status
 
-No acceptance gate is newly marked passed by this branch. Automated evidence
-now covers live temporary Git repositories, stale-target rejection, target-bound
-review, filesystem allowlists, sandbox release approval, isolated recipe denial,
-local IPC authentication, crash-safe receipt persistence, duplicate dispatch,
-and simulated provider lifecycle. Hardware, installed-provider, GitHub/cloud
+No high-consequence acceptance gate is newly marked passed by this branch.
+Automated evidence covers live temporary Git repositories, stale-target
+rejection, target-bound review, filesystem allowlists, sandbox release approval,
+isolated recipe denial, local IPC authentication, protected session persistence,
+default composition, crash-safe receipt persistence, duplicate dispatch, and
+simulated provider lifecycle. Hardware, installed-provider, GitHub/cloud
 credential, real scanner-feed, and end-user Windows/VS Code acceptance require
 separate observed evidence.

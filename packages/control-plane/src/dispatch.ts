@@ -3,15 +3,15 @@ import type { AdapterRegistry, AdapterOutcome } from "./adapters.ts";
 import type {
   AutomationRequest,
   BrokerOutcome,
+  AutomationBroker,
+  ExecutionBroker,
   ExecutionRecipe,
+  GitBroker,
   GitMutation,
   IsolationRuntime,
   TestEnvironment,
   TestEnvironmentOutcome,
-  InMemoryAutomationBroker,
-  InMemoryExecutionBroker,
-  InMemoryGitBroker,
-  InMemoryTestEnvironmentBroker
+  TestEnvironmentBroker
 } from "./brokers.ts";
 import { commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
 import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
@@ -139,10 +139,10 @@ export interface CommandDispatcherDependencies {
   readonly sessions?: SessionLookup;
   readonly authorities?: AuthorityLookup;
   readonly adapters?: AdapterRegistry;
-  readonly execution?: InMemoryExecutionBroker;
-  readonly git?: InMemoryGitBroker;
-  readonly testEnvironment?: InMemoryTestEnvironmentBroker;
-  readonly automation?: InMemoryAutomationBroker;
+  readonly execution?: ExecutionBroker;
+  readonly git?: GitBroker;
+  readonly testEnvironment?: TestEnvironmentBroker;
+  readonly automation?: AutomationBroker;
   readonly isolation?: IsolationRuntime;
   readonly containment?: ContainmentManager;
   readonly council?: CouncilExecutor;

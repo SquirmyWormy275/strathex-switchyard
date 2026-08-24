@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import {
   callCompanion, captureLiveTargetSnapshot, CompanionIpcServer, createCompanionConfiguration, createReviewApproval,
-  FilesystemBroker, LocalControlExecutionBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker, LocalTestEnvironmentBroker, validateReviewApproval
+  FilesystemBroker, LocalControlExecutionBroker, LocalProcessBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker, LocalTestEnvironmentBroker, validateReviewApproval
 } from "../src/local-runtime.ts";
 import type { ManagedSession } from "../src/control-plane.ts";
 import { assignments } from "../../../packages/protocol/src/b122.ts";
@@ -102,4 +102,13 @@ test("companion IPC supplies the complete manifest and records a VS Code Git wor
       assert.equal(registered.ok, true); assert.equal((registered.result as { target?: { gitRoot?: string }; capability?: { mediated?: boolean } }).target?.gitRoot, await realpath(directory)); assert.equal((registered.result as { capability?: { mediated?: boolean } }).capability?.mediated, false);
     } finally { await server.stop(); }
   } finally { await rm(directory, { recursive: true, force: true }); await rm(state, { recursive: true, force: true }); }
+});
+
+test("allowlisted process broker strips ambient secret variables before launch", async () => {
+  const original = process.env.SXSY_AMBIENT_SECRET; process.env.SXSY_AMBIENT_SECRET = "must-not-reach-child";
+  try {
+    const broker = new LocalProcessBroker([{ executable: process.execPath, argumentPattern: /.*/, timeoutMs: 10_000 }]);
+    const result = await broker.execute(process.execPath, ["-e", "process.exit(process.env.SXSY_AMBIENT_SECRET ? 1 : 0)"], process.cwd());
+    assert.equal(result.outcome, "passed", result.detail);
+  } finally { if (original === undefined) delete process.env.SXSY_AMBIENT_SECRET; else process.env.SXSY_AMBIENT_SECRET = original; }
 });
