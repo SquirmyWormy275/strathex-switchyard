@@ -1,0 +1,261 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  type BridgeResult,
+  type ExtensionCompanionBridge,
+  type ExtensionManagedSession,
+  type ExtensionProvider,
+  type ExtensionSessionStatus,
+  type ForwardedCommand,
+  type ForwardedCommandResult,
+  UnavailableExtensionCompanionBridge
+} from "../src/companion-bridge.ts";
+import { ManagedSessionController } from "../src/controller.ts";
+import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
+
+class FakeDisposable implements DisposableLike { dispose(): void {} }
+
+class FakeTerminal implements TerminalLike {
+  readonly sent: string[] = [];
+  shown = 0;
+  readonly name: string;
+  constructor(name: string) { this.name = name; }
+  show(): void { this.shown += 1; }
+  sendText(text: string): void { this.sent.push(text); }
+}
+
+class FakeContext implements ExtensionContextLike {
+  readonly subscriptions: DisposableLike[] = [];
+  readonly values = new Map<string, unknown>();
+  readonly workspaceState = {
+    get: <T>(key: string): T | undefined => this.values.get(key) as T | undefined,
+    update: async (key: string, value: unknown): Promise<void> => { this.values.set(key, value); }
+  };
+}
+
+class FakeVscode {
+  readonly commandCallbacks = new Map<string, (...args: unknown[]) => unknown>();
+  readonly information: string[] = [];
+  readonly warnings: string[] = [];
+  readonly createdTerminals: FakeTerminal[] = [];
+  readonly started: Array<{ folder: WorkspaceFolderLike | undefined; configuration: DebugConfigurationLike; noDebug?: boolean }> = [];
+  readonly stopped: DebugSessionLike[] = [];
+  readonly terminals: FakeTerminal[];
+  activeTerminal?: FakeTerminal;
+  workspaceFolders: WorkspaceFolderLike[];
+  debugConfigurations: DebugConfigurationLike[] = [{ name: "Launch test", type: "node", request: "launch" }];
+  private readonly openListeners: Array<(terminal: TerminalLike) => unknown> = [];
+  private readonly closeListeners: Array<(terminal: TerminalLike) => unknown> = [];
+  private readonly workspaceListeners: Array<() => unknown> = [];
+  private readonly debugStartListeners: Array<(session: DebugSessionLike) => unknown> = [];
+  private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
+  private readonly quickPickValues: string[] = [];
+  readonly api: VscodeLike;
+
+  constructor(terminalNames = ["Manual terminal"], workspaceRoots = ["C:\\repo"]) {
+    this.terminals = terminalNames.map((name) => new FakeTerminal(name));
+    this.activeTerminal = this.terminals[0];
+    this.workspaceFolders = workspaceRoots.map((fsPath) => ({ uri: { fsPath } }));
+    const self = this;
+    this.api = {
+      commands: {
+        registerCommand(command, callback): DisposableLike {
+          self.commandCallbacks.set(command, callback);
+          return new FakeDisposable();
+        }
+      },
+      window: {
+        get terminals(): readonly TerminalLike[] { return self.terminals; },
+        get activeTerminal(): TerminalLike | undefined { return self.activeTerminal; },
+        createTerminal(options): TerminalLike {
+          const terminal = new FakeTerminal(options.name);
+          self.createdTerminals.push(terminal);
+          self.terminals.push(terminal);
+          self.activeTerminal = terminal;
+          return terminal;
+        },
+        async showInformationMessage(message): Promise<string | undefined> { self.information.push(message); return undefined; },
+        async showWarningMessage(message): Promise<string | undefined> { self.warnings.push(message); return undefined; },
+        async showQuickPick<T extends string | QuickPickItemLike>(items: readonly T[]): Promise<T | undefined> {
+          const wanted = self.quickPickValues.shift();
+          if (!wanted) return undefined;
+          return items.find((item) => typeof item === "string" ? item === wanted : item.label === wanted);
+        },
+        onDidOpenTerminal(listener): DisposableLike { self.openListeners.push(listener); return new FakeDisposable(); },
+        onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); }
+      },
+      workspace: {
+        get workspaceFolders(): readonly WorkspaceFolderLike[] { return self.workspaceFolders; },
+        getConfiguration(): { get<T>(key: string): T | undefined } {
+          return { get: <T>(key: string): T | undefined => key === "configurations" ? self.debugConfigurations as T : undefined };
+        },
+        onDidChangeWorkspaceFolders(listener): DisposableLike { self.workspaceListeners.push(listener); return new FakeDisposable(); }
+      },
+      debug: {
+        onDidStartDebugSession(listener): DisposableLike { self.debugStartListeners.push(listener); return new FakeDisposable(); },
+        onDidTerminateDebugSession(listener): DisposableLike { self.debugStopListeners.push(listener); return new FakeDisposable(); }
+      }
+    };
+  }
+
+  async invoke(command: string, ...args: unknown[]): Promise<void> {
+    const callback = this.commandCallbacks.get(command);
+    assert.ok(callback, `expected command ${command}`);
+    await callback(...args);
+  }
+
+  async fireOpen(terminal: FakeTerminal): Promise<void> { for (const listener of this.openListeners) await listener(terminal); }
+  async fireWorkspaceChange(): Promise<void> { for (const listener of this.workspaceListeners) await listener(); }
+  async fireDebugStart(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStartListeners) await listener(session); }
+  async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); }
+  choose(value: string): void { this.quickPickValues.push(value); }
+}
+
+class FakeBridge implements ExtensionCompanionBridge {
+  readonly registered: ExtensionManagedSession[] = [];
+  readonly adopted: Array<{ sessionId: string; adoptionKey: string; provider: Exclude<ExtensionProvider, "voice"> }> = [];
+  readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
+  readonly dispatched: ForwardedCommand[] = [];
+  nextDispatch?: ForwardedCommandResult;
+
+  async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
+  async registerSession(session: ExtensionManagedSession): Promise<BridgeResult<ExtensionManagedSession>> {
+    this.registered.push(session);
+    return { ok: true, value: session };
+  }
+  async adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>> {
+    this.adopted.push({ sessionId, adoptionKey, provider });
+    const existing = this.registered.find((session) => session.id === sessionId);
+    assert.ok(existing);
+    return { ok: true, value: { ...existing, provider, metadata: { ...existing.metadata, adopted: "true" } } };
+  }
+  async updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>> {
+    this.statuses.push({ sessionId, status });
+    const existing = this.registered.find((session) => session.id === sessionId);
+    return existing ? { ok: true, value: { ...existing, status } } : { ok: false, code: "not_found", message: "missing" };
+  }
+  async heartbeat(session: string): Promise<BridgeResult<ExtensionManagedSession>> {
+    const existing = this.registered.find((record) => record.id === session);
+    return existing ? { ok: true, value: existing } : { ok: false, code: "not_found", message: "missing" };
+  }
+  async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
+    this.dispatched.push(command);
+    if (this.nextDispatch) return { ok: true, value: this.nextDispatch };
+    const action = directAction(command);
+    return { ok: true, value: { status: "completed", summary: "Routed by fake companion.", data: action ? { localAction: action } : { intentOnly: true } } };
+  }
+}
+
+test("registers VS Code window, workspace, terminals, and debug configurations without claiming mediation", async () => {
+  const vscode = new FakeVscode();
+  const context = new FakeContext();
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, context, bridge, {
+    now: () => "2026-08-23T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/safe", canonicalRemote: "https://example.invalid/acme/repo.git" }]
+  });
+  await controller.start();
+
+  assert.equal(bridge.registered.filter((session) => session.surface === "vscode_window").length >= 2, true);
+  assert.equal(bridge.registered.some((session) => session.surface === "vscode_terminal"), true);
+  assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.kind"] === "git-root" && session.metadata["sxsy-b122.branch"] === "feature/safe"), true);
+  assert.equal(bridge.registered.every((session) => session.capabilities.length === 1 && session.capabilities[0] === "registered"), true);
+  assert.equal(bridge.registered.every((session) => !session.capabilities.includes("mediated")), true);
+  assert.equal(vscode.commandCallbacks.has("sxsy-b122.chord.pipeline.ctrl_shift_alt"), true);
+  assert.equal(vscode.commandCallbacks.has("sxsy-b122.chord.sandbox.ctrl_shift_alt"), true);
+
+  await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Manual terminal", provider: "claude" });
+  assert.equal(bridge.adopted.length, 1);
+  assert.equal(bridge.adopted[0].provider, "claude");
+  await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Manual terminal", provider: "codex" });
+  assert.match(vscode.warnings.at(-1) ?? "", /already been adopted/i);
+});
+
+test("tracks terminal, workspace, and debug lifecycle events as identities rather than inferred agent completion", async () => {
+  const vscode = new FakeVscode();
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { now: () => "2026-08-23T00:00:00.000Z", idFactory: sequenceFactory() });
+  await controller.start();
+  const countBefore = bridge.registered.length;
+  const extra = new FakeTerminal("Later terminal");
+  vscode.terminals.push(extra);
+  await vscode.fireOpen(extra);
+  assert.equal(bridge.registered.length, countBefore + 1);
+
+  vscode.workspaceFolders = [{ uri: { fsPath: "C:\\new-repo" } }];
+  await vscode.fireWorkspaceChange();
+  assert.equal(bridge.registered.filter((session) => session.surface === "vscode_window").length >= 3, true);
+
+  const debug: DebugSessionLike = { id: "debug-1", name: "Launch test", configuration: { name: "Launch test" } };
+  await vscode.fireDebugStart(debug);
+  await vscode.fireDebugStop(debug);
+  assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.kind"] === "debug-session"), true);
+  assert.equal(bridge.statuses.some((status) => status.status === "unreachable"), true);
+  assert.equal(bridge.statuses.some((status) => status.status === "verified_finished"), false);
+});
+
+test("forwards Run/Debug to the companion and performs only safe local host actions", async () => {
+  const vscode = new FakeVscode();
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { now: () => "2026-08-23T00:00:00.000Z", idFactory: sequenceFactory() });
+  await controller.start();
+
+  await vscode.invoke("sxsy-b122.chord.claude.alt");
+  assert.equal(bridge.dispatched.at(-1)?.control, "CLAUDE");
+  assert.equal(vscode.createdTerminals.length, 1);
+  assert.deepEqual(vscode.createdTerminals[0].sent, ["claude"]);
+
+  bridge.nextDispatch = { status: "unavailable", summary: "No verified execution broker is attached." };
+  await vscode.invoke("sxsy-b122.chord.run.normal");
+  assert.equal(bridge.dispatched.at(-1)?.control, "RUN");
+  assert.equal(bridge.dispatched.at(-1)?.modifier, "normal");
+  assert.equal(vscode.started.length, 0);
+  assert.equal(vscode.stopped.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /unavailable/i);
+
+  bridge.nextDispatch = { status: "completed", summary: "A malicious response attempted a deprecated host action.", data: { localAction: "start_debug" } };
+  await vscode.invoke("sxsy-b122.chord.run.shift");
+  assert.equal(bridge.dispatched.at(-1)?.control, "RUN");
+  assert.equal(bridge.dispatched.at(-1)?.modifier, "shift");
+  assert.equal(vscode.started.length, 0);
+  assert.equal(vscode.stopped.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /unrecognized local host action/i);
+
+  bridge.nextDispatch = { status: "blocked", summary: "Acceptance evidence is incomplete." };
+  await vscode.invoke("sxsy-b122.chord.pipeline.ctrl_shift_alt");
+  assert.match(vscode.warnings.at(-1) ?? "", /blocked/i);
+  assert.equal(vscode.createdTerminals.length, 1);
+});
+
+test("a disconnected or malicious companion cannot cause a host action", async () => {
+  const offlineVscode = new FakeVscode();
+  const offlineController = new ManagedSessionController(offlineVscode.api, new FakeContext(), new UnavailableExtensionCompanionBridge("offline"), { idFactory: sequenceFactory() });
+  await offlineController.start();
+  await offlineVscode.invoke("sxsy-b122.chord.run.normal");
+  assert.equal(offlineVscode.started.length, 0);
+  assert.match(offlineVscode.warnings.at(-1) ?? "", /offline/i);
+
+  const vscode = new FakeVscode();
+  const bridge = new FakeBridge();
+  bridge.nextDispatch = { status: "completed", summary: "bad response", data: { localAction: "create_codex_terminal" } };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
+  await controller.start();
+  await vscode.invoke("sxsy-b122.chord.claude.alt");
+  assert.equal(vscode.createdTerminals.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /unexpected local host action/i);
+});
+
+function directAction(command: ForwardedCommand): string | undefined {
+  const actions: Record<string, string> = {
+    "CLAUDE:alt": "create_claude_terminal",
+    "CHATGPT:alt": "create_codex_terminal",
+    "TERMINAL:shift": "focus_integrated_terminal"
+  };
+  return actions[`${command.control}:${command.modifier}`];
+}
+
+function sequenceFactory(): () => string {
+  let sequence = 0;
+  return () => `id-${++sequence}`;
+}

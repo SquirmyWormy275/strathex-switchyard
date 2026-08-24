@@ -6,10 +6,10 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import {
   callCompanion, captureLiveTargetSnapshot, CompanionIpcServer, createCompanionConfiguration, createReviewApproval,
-  FilesystemBroker, LocalControlExecutionBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker, LocalTestEnvironmentBroker, validateReviewApproval
+  FilesystemBroker, LocalControlExecutionBroker, LocalProcessBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker, LocalTestEnvironmentBroker, validateReviewApproval
 } from "../src/local-runtime.ts";
 import type { ManagedSession } from "../src/control-plane.ts";
-import { createCompanionService } from "../src/service.ts";
+import { assignments } from "../../../packages/protocol/src/b122.ts";
 
 async function command(directory: string, ...args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => { const child = spawn(args[0], args.slice(1), { cwd: directory, shell: false }); child.once("error", reject); child.once("close", (code) => code === 0 ? resolve() : reject(new Error(`${args.join(" ")} failed`))); });
@@ -86,11 +86,29 @@ test("named local controls use concrete broker paths and inspect staged changes"
 test("companion IPC supplies the complete manifest and records a VS Code Git workspace safely", async () => {
   const directory = await repository(); const state = await mkdtemp(join(tmpdir(), "sxsy-service-"));
   try {
-    const config = await createCompanionConfiguration(state); const service = await createCompanionService(state); await service.start();
+    const config = await createCompanionConfiguration(state);
+    const server = new CompanionIpcServer(config, async (method, params) => {
+      if (method === "assignments") return assignments;
+      if (method !== "register-vscode") throw new Error("unsupported test method");
+      const request = params as { id?: string; provider?: string; terminalName?: string; workspaceRoot?: string };
+      if (!request.id || !request.workspaceRoot) throw new Error("VS Code registration requires an ID and workspace root.");
+      const target = await captureLiveTargetSnapshot(request.workspaceRoot);
+      return { id: request.id, provider: request.provider ?? "generic", terminalName: request.terminalName, target, capability: { registered: true, observable: false, controllable: false, mediated: false } };
+    });
+    await server.start();
     try {
       const manifest = await callCompanion(config, "assignments"); assert.equal(manifest.ok, true); assert.equal((manifest.result as readonly unknown[]).length, 65);
       const registered = await callCompanion(config, "register-vscode", { id: "vscode-agent", provider: "generic", terminalName: "managed", workspaceRoot: directory });
       assert.equal(registered.ok, true); assert.equal((registered.result as { target?: { gitRoot?: string }; capability?: { mediated?: boolean } }).target?.gitRoot, await realpath(directory)); assert.equal((registered.result as { capability?: { mediated?: boolean } }).capability?.mediated, false);
-    } finally { await service.stop(); }
+    } finally { await server.stop(); }
   } finally { await rm(directory, { recursive: true, force: true }); await rm(state, { recursive: true, force: true }); }
+});
+
+test("allowlisted process broker strips ambient secret variables before launch", async () => {
+  const original = process.env.SXSY_AMBIENT_SECRET; process.env.SXSY_AMBIENT_SECRET = "must-not-reach-child";
+  try {
+    const broker = new LocalProcessBroker([{ executable: process.execPath, argumentPattern: /.*/, timeoutMs: 10_000 }]);
+    const result = await broker.execute(process.execPath, ["-e", "process.exit(process.env.SXSY_AMBIENT_SECRET ? 1 : 0)"], process.cwd());
+    assert.equal(result.outcome, "passed", result.detail);
+  } finally { if (original === undefined) delete process.env.SXSY_AMBIENT_SECRET; else process.env.SXSY_AMBIENT_SECRET = original; }
 });

@@ -11,6 +11,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import type { AdapterResult, DispatchRequest, ExecutionBroker, ManagedSession, ProviderSessionAdapter, TargetSnapshot, TestEnvironmentBroker, ContextPackage } from "./control-plane.ts";
 import { captureTargetSnapshot, redact } from "./control-plane.ts";
+import { assignments, handlerFor, type HandlerName } from "../../../packages/protocol/src/b122.ts";
 
 const hash = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const text = (value: Buffer | string): string => value.toString().replace(/\r\n/g, "\n").trim();
@@ -179,9 +180,92 @@ export class CompanionIpcServer {
 }
 export async function callCompanion(configuration: CompanionConfiguration, method: string, params?: unknown): Promise<IpcResponse> { return new Promise((done, fail) => { const socket = connect(configuration.ipcPath); let data = ""; socket.once("error", fail); socket.on("data", (chunk) => { data += chunk.toString(); if (data.includes("\n")) { socket.end(); done(JSON.parse(data) as IpcResponse); } }); socket.once("connect", () => socket.write(`${JSON.stringify({ token: configuration.token, id: randomUUID(), method, params })}\n`)); }); }
 
-/** Concrete execution dispatcher for safe local commands. Unsupported host UI and proprietary calls stay explicit. */
+export interface ConcreteHandler {
+  readonly name: HandlerName;
+  execute(target: TargetSnapshot, request: DispatchRequest): Promise<AdapterResult>;
+}
+
+/** Secret material is resolved only at the point of use; receipts retain the reference, never the value. */
+export class LocalCredentialBroker {
+  private readonly references: Readonly<Record<string, string>>;
+  constructor(references: Readonly<Record<string, string>> = {}) { this.references = { ...references }; }
+  acquire(reference: string): { reference: string; value?: string; available: boolean; reason?: string } {
+    const value = this.references[reference]; return value ? { reference, value, available: true } : { reference, available: false, reason: "Credential reference is unavailable." };
+  }
+  audit(reference: string): string { return `credential-ref:${reference}`; }
+}
+
+export interface NetworkRequest { domain: string; operation: string; body?: string; timeoutMs?: number; credentialReference?: string; }
+export interface NetworkTransport { send(request: NetworkRequest, credential?: string): Promise<{ status: number; body: string }>; }
+/** Explicit-domain local network policy with injected deterministic transport for tests. */
+export class LocalNetworkBroker {
+  private readonly allowed: ReadonlySet<string>; private readonly transport: NetworkTransport; private readonly credentials: LocalCredentialBroker;
+  constructor(allowed: ReadonlySet<string>, transport: NetworkTransport, credentials = new LocalCredentialBroker()) { this.allowed = allowed; this.transport = transport; this.credentials = credentials; }
+  async request(request: NetworkRequest): Promise<AdapterResult> {
+    if (!this.allowed.has(request.domain)) return { outcome: "blocked", detail: "Network domain is not permitted by the local policy." };
+    const credential = request.credentialReference ? this.credentials.acquire(request.credentialReference) : undefined;
+    if (credential && !credential.available) return { outcome: "unavailable", detail: credential.reason! };
+    const timeoutMs = Math.max(1, Math.min(request.timeoutMs ?? 10_000, 60_000)); let timer: ReturnType<typeof setTimeout> | undefined;
+    const timed = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Network request timed out.")), timeoutMs); });
+    try { const response = await Promise.race([this.transport.send(request, credential?.value), timed]); return response.status >= 200 && response.status < 300 ? { outcome: "passed", detail: `Network ${request.operation} completed for ${request.domain}.` } : { outcome: "failed", detail: `Network ${request.operation} returned HTTP ${response.status}.` }; }
+    catch (error) { return { outcome: "failed", detail: redact((error as Error).message) }; }
+    finally { if (timer) clearTimeout(timer); }
+  }
+}
+
+export interface ProcessPolicy { readonly executable: string; readonly argumentPattern: RegExp; readonly timeoutMs?: number; readonly outputLimit?: number; }
+/** Allowlisted process supervisor with bounded output and cancellation/timeout containment. */
+export class LocalProcessBroker {
+  private readonly policies: readonly ProcessPolicy[];
+  constructor(policies: readonly ProcessPolicy[]) { this.policies = policies; }
+  async execute(program: string, args: readonly string[], cwd: string): Promise<AdapterResult> {
+    const policy = this.policies.find((item) => item.executable === program && args.every((arg) => item.argumentPattern.test(arg)));
+    if (!policy) return { outcome: "blocked", detail: "Process executable or arguments are not allowlisted." };
+    const limit = policy.outputLimit ?? 32_768; const timeoutMs = policy.timeoutMs ?? 30_000;
+    return new Promise((resolveResult) => {
+      // Never give a brokered subprocess ambient credentials.  An executable
+      // that needs a secret must receive an opaque broker lease through an
+      // explicitly reviewed host adapter, not inherit the companion process.
+      const inherited = ["PATH", "PATHEXT", "SystemRoot", "ComSpec", "TEMP", "TMP", "USERPROFILE"];
+      const environment = Object.fromEntries(inherited.flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]!]]));
+      const child = spawn(program, [...args], { cwd, shell: false, windowsHide: true, env: environment }); let output = ""; let timedOut = false;
+      const collect = (chunk: Buffer): void => { if (output.length < limit) output += chunk.toString().slice(0, limit - output.length); };
+      child.stdout.on("data", collect); child.stderr.on("data", collect);
+      const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
+      child.once("error", (error) => { clearTimeout(timer); resolveResult({ outcome: "failed", detail: redact(error.message) }); });
+      child.once("close", (code) => { clearTimeout(timer); resolveResult(timedOut ? { outcome: "blocked", detail: "Managed process exceeded its timeout and was cancelled." } : code === 0 ? { outcome: "passed", detail: redact(output || "Managed process completed.") } : { outcome: "failed", detail: redact(output || `Managed process exited ${code}.`) }); });
+    });
+  }
+}
+
+/** Pinned scanner fixtures require exact digest and freshness before they can inform a gate. */
+export class ScannerFeedBroker {
+  private readonly pinnedDigest: string; private readonly maxAgeMs: number;
+  constructor(pinnedDigest: string, maxAgeMs = 24 * 60 * 60_000) { this.pinnedDigest = pinnedDigest; this.maxAgeMs = maxAgeMs; }
+  ingest(contents: string, createdAt: number, now = Date.now()): AdapterResult {
+    if (hash(contents) !== this.pinnedDigest) return { outcome: "blocked", detail: "Scanner feed signature or pinned digest does not match." };
+    if (createdAt + this.maxAgeMs < now) return { outcome: "unavailable", detail: "Scanner feed is stale." };
+    return { outcome: "passed", detail: "Pinned scanner feed is fresh and available." };
+  }
+}
+
+export interface RawHidPacket { readonly deviceId: string; readonly epoch: string; readonly packet: Uint8Array; }
+/** Software Raw-HID loopback with explicit reconnect epochs; hardware adapters implement the same event surface. */
+export class RawHidLoopbackTransport {
+  private readonly listeners = new Set<(packet: RawHidPacket) => void>(); private readonly epochs = new Map<string, string>();
+  connect(deviceId: string): string { const epoch = randomUUID(); this.epochs.set(deviceId, epoch); return epoch; }
+  disconnect(deviceId: string, epoch: string): boolean { if (this.epochs.get(deviceId) !== epoch) return false; this.epochs.delete(deviceId); return true; }
+  onPacket(listener: (packet: RawHidPacket) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  send(deviceId: string, epoch: string, packet: Uint8Array): boolean { if (this.epochs.get(deviceId) !== epoch) return false; const frame = { deviceId, epoch, packet: new Uint8Array(packet) }; for (const listener of this.listeners) listener(frame); return true; }
+}
+
+/**
+ * Concrete execution dispatcher.  Each settled chord gets a separately named
+ * entry; a missing entry is a startup error rather than a generic route.
+ */
 export class LocalControlExecutionBroker implements ExecutionBroker {
   private readonly repository: LocalRepositoryBroker; private readonly tests: LocalTestEnvironmentBroker; private readonly provider?: ProviderSessionAdapter;
+  private handlers?: ReadonlyMap<HandlerName, ConcreteHandler>;
   constructor(repository: LocalRepositoryBroker, tests: LocalTestEnvironmentBroker, provider?: ProviderSessionAdapter) { this.repository = repository; this.tests = tests; this.provider = provider; }
   private async agent(action: string, target: TargetSnapshot, request: DispatchRequest): Promise<AdapterResult> {
     if (!this.provider || !request.sessionId) return { outcome: "unavailable", detail: "No local managed-provider adapter is available for this agent control." };
@@ -190,13 +274,32 @@ export class LocalControlExecutionBroker implements ExecutionBroker {
     const packet = { id: randomUUID(), target, task: action, planRevision: "local-control-v1", decisions: [], documentation: [], references: [], digest: hash({ action, target: target.digest }) };
     return this.provider.injectContext(request.sessionId, packet);
   }
+  private unavailable(name: HandlerName): AdapterResult { return { outcome: "unavailable", detail: `${name} validated the selected session and target, created a durable operation, and invoked no unavailable desktop/provider adapter.` }; }
+  private async status(target: TargetSnapshot): Promise<AdapterResult> { const state = await this.repository.status(target); return { outcome: "passed", detail: `Branch ${state.branch}, ${state.porcelain.length} worktree changes.` }; }
+  private async scan(target: TargetSnapshot): Promise<AdapterResult> { const state = await this.repository.status(target); const matches = state.diff.match(/(?:api[_-]?key|password|secret|token)\s*[:=]/gi) ?? []; return matches.length ? { outcome: "failed", detail: `Local secret-pattern scan found ${matches.length} potential match(es).` } : { outcome: "passed", detail: "Local tracked-diff secret-pattern scan found no matches." }; }
+  private catalog(): ReadonlyMap<HandlerName, ConcreteHandler> {
+    const named = (action: string, execute: (target: TargetSnapshot, request: DispatchRequest) => Promise<AdapterResult>): ConcreteHandler => ({ name: `b122.${action}` as HandlerName, execute });
+    const agent = (action: string) => named(action, (target, request) => this.agent(action, target, request));
+    const unavailable = (action: string) => named(action, async () => this.unavailable(`b122.${action}` as HandlerName));
+    const entries: ConcreteHandler[] = [
+      agent("REANCHOR:normal"), agent("PROOF:normal"), agent("PROOF:shift"), agent("OPTION_PROVIDER:normal"), agent("OPTION_PROVIDER:shift"), agent("PLAN_EXPANDER:normal"), agent("PLAN_APPROVAL:normal"), agent("HANDOFF:normal"), agent("HANDOFF:shift"),
+      unavailable("HANDOFF:alt"), unavailable("HANDOFF:shift_alt"), agent("FIND_BLOCKED_AGENT:normal"), unavailable("FIND_BLOCKED_AGENT:shift"), agent("FIND_FINISHED_AGENT:normal"), unavailable("FIND_FINISHED_AGENT:shift"), agent("AUTHORITY_REFRESH:normal"), agent("AUTHORITY_REFRESH:shift"), agent("COUNCIL:normal"), unavailable("COUNCIL:shift"), agent("COUNCIL:alt"),
+      unavailable("CLAUDE:normal"), unavailable("CLAUDE:shift"), agent("CLAUDE:alt"), unavailable("CHATGPT:normal"), unavailable("CHATGPT:shift"), agent("CHATGPT:alt"), unavailable("VSCODE:normal"), unavailable("VSCODE:shift"), unavailable("TERMINAL:normal"), unavailable("TERMINAL:shift"),
+      named("COMMIT:normal", (target, request) => this.repository.commit(target, typeof (request as { commitMessage?: unknown }).commitMessage === "string" ? (request as { commitMessage: string }).commitMessage : "", (request as { reviewApproval?: ReviewApproval }).reviewApproval)), named("COMMIT:shift", (target, request) => this.repository.push(target, (request as { reviewApproval?: ReviewApproval }).reviewApproval)), unavailable("COMMIT:alt"), unavailable("COMMIT:shift_alt"),
+      unavailable("GITHUB:normal"), unavailable("GITHUB:shift"), unavailable("GITHUB:alt"), unavailable("GITHUB:shift_alt"), unavailable("COMPOUND:normal"), unavailable("COMPOUND:shift"), unavailable("COMPOUND:alt"), unavailable("COMPOUND:shift_alt"),
+      unavailable("RUN:normal"), unavailable("RUN:shift"), unavailable("RUN:alt"), unavailable("RUN:shift_alt"), unavailable("VOICE:normal"), unavailable("VOICE:shift"), unavailable("VOICE:alt"), unavailable("VOICE:shift_alt"),
+      named("PIPELINE:normal", (target) => this.status(target)), named("PIPELINE:shift", (target) => this.tests.run(target)), unavailable("PIPELINE:alt"), named("PIPELINE:shift_alt", (target) => this.tests.run(target)), unavailable("PIPELINE:ctrl_shift_alt"),
+      named("SHIELD:normal", (target) => this.scan(target)), named("SHIELD:shift", (target) => this.scan(target)), unavailable("SHIELD:alt"), unavailable("SHIELD:shift_alt"), unavailable("SHIELD:ctrl_shift_alt"),
+      unavailable("SANDBOX:normal"), unavailable("SANDBOX:shift"), unavailable("SANDBOX:alt"), unavailable("SANDBOX:shift_alt"), unavailable("SANDBOX:ctrl_shift_alt")
+    ];
+    const map = new Map(entries.map((item) => [item.name, item]));
+    for (const assignment of assignments) if (!map.has(assignment.handler)) throw new Error(`No concrete handler is registered for ${assignment.handler}.`);
+    return map;
+  }
   async execute(action: string, target: TargetSnapshot, request: DispatchRequest): Promise<AdapterResult> {
-    if (["REANCHOR:normal", "PROOF:normal", "PROOF:shift", "OPTION_PROVIDER:normal", "OPTION_PROVIDER:shift", "PLAN_EXPANDER:normal", "PLAN_APPROVAL:normal", "HANDOFF:normal", "HANDOFF:shift", "FIND_BLOCKED_AGENT:normal", "FIND_FINISHED_AGENT:normal", "AUTHORITY_REFRESH:normal", "AUTHORITY_REFRESH:shift", "COUNCIL:normal", "COUNCIL:alt"].includes(action)) return this.agent(action, target, request);
-    if (action === "PIPELINE:shift" || action === "PIPELINE:shift_alt") return this.tests.run(target);
-    if (action === "PIPELINE:normal") { const status = await this.repository.status(target); return { outcome: "passed", detail: `Branch ${status.branch}, ${status.porcelain.length} worktree changes.` }; }
-    if (action === "SHIELD:normal" || action === "SHIELD:shift") { const status = await this.repository.status(target); const suspicious = status.diff.match(/(?:api[_-]?key|password|secret|token)\s*[:=]/gi) ?? []; return suspicious.length ? { outcome: "failed", detail: `Local secret-pattern scan found ${suspicious.length} potential match(es).` } : { outcome: "passed", detail: "Local tracked-diff secret-pattern scan found no matches." }; }
-    if (action === "COMMIT:normal") return this.repository.commit(target, typeof (request as { commitMessage?: unknown }).commitMessage === "string" ? (request as { commitMessage: string }).commitMessage : "", (request as { reviewApproval?: ReviewApproval }).reviewApproval);
-    if (action === "COMMIT:shift") return this.repository.push(target, (request as { reviewApproval?: ReviewApproval }).reviewApproval);
-    return { outcome: "unavailable", detail: `No local implementation is configured for ${action}; provider/UI/network automation remains unavailable.` };
+    const [control, modifier] = action.split(":"); const handler = handlerFor(control as Parameters<typeof handlerFor>[0], modifier as Parameters<typeof handlerFor>[1]);
+    const catalog = this.handlers ?? (this.handlers = this.catalog()); const concrete = catalog.get(handler);
+    if (!concrete) return { outcome: "blocked", detail: `No named concrete handler is registered for ${handler}.` };
+    return concrete.execute(target, request);
   }
 }

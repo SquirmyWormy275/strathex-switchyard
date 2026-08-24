@@ -1,0 +1,213 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { InMemoryAutomationBroker, InMemoryGitBroker } from "../src/brokers.ts";
+import { commandForAction } from "../src/command-catalog.ts";
+import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../src/contracts.ts";
+import { CommandDispatcher } from "../src/dispatch.ts";
+import { DurableOperationCoordinator, NoReplayOperationRecovery, OperationSagaStore, type ChildOperationSaga } from "../src/operations.ts";
+import { PolicyEngine } from "../src/policy.ts";
+import { ReceiptLedger } from "../src/receipts.ts";
+import { ProtectedJsonStore } from "../src/store.ts";
+
+async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-child-saga-test-"));
+  try {
+    await run(new ProtectedJsonStore({ filePath: join(directory, "protected-audit.jsonl") }));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test("broker child sagas prevent replay, preserve ambiguity, and reconcile only through observation adapters", async () => {
+  await withStore(async (store) => {
+    const operations = new OperationSagaStore(store, {
+      clock: () => "2026-08-23T12:00:00.000Z",
+      idFactory: (() => {
+        let next = 0;
+        return () => `child-op-${++next}`;
+      })()
+    });
+    const receipts = new ReceiptLedger(store, { clock: () => "2026-08-23T12:00:00.000Z" });
+    const coordinator = new DurableOperationCoordinator(operations, receipts);
+    const parent = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    await coordinator.markExecuting(parent);
+
+    const saga = coordinator.childSaga(parent);
+    const child = await saga.begin({
+      action: "git.pr_upsert.create_or_update",
+      idempotencyScope: "provider:github:head:feature/safe",
+      details: { provider: "github" }
+    });
+    assert.equal(child.parentOperationId, parent.operationId);
+    assert.equal(child.targetSnapshotId, "snapshot-1");
+    assert.equal(child.mayExecute, true);
+
+    await saga.markExecuting(child);
+    await saga.settle(child, "ambiguous", { providerObservation: "response_lost" });
+    assert.equal((await operations.get(child.operationId))?.state, "executing");
+    assert.equal((await operations.get(child.operationId))?.details.providerObservation, "response_lost");
+
+    const reused = await saga.begin({
+      action: "git.pr_upsert.create_or_update",
+      idempotencyScope: "provider:github:head:feature/safe"
+    });
+    assert.equal(reused.existing, true);
+    assert.equal(reused.mayExecute, false);
+    await assert.rejects(saga.markExecuting(reused), /reconciled rather than replayed/i);
+
+    await assert.rejects(
+      coordinator.recordResult(parent, {
+        action: "pr_upsert",
+        targetSnapshotId: "snapshot-1",
+        status: "completed",
+        summary: "Provider reported completion but its child response is ambiguous.",
+        policyVersion: "policy-1",
+        evidenceDigest: "ambiguous-evidence",
+        toolVersions: { git: "2.50" }
+      }),
+      /child .* unresolved/i
+    );
+    assert.equal((await receipts.list()).length, 0, "an unresolved child must prevent a fresh gate-bearing receipt");
+
+    let observations = 0;
+    const recovery: NoReplayOperationRecovery = coordinator.createNoReplayRecovery();
+    recovery.register("git.pr_upsert.create_or_update", {
+      reconcile: async (operation) => {
+        observations += 1;
+        assert.equal(operation.id, child.operationId);
+        return { state: "recorded", details: { providerReference: "pr-77" }, note: "Provider confirms the PR exists." };
+      }
+    });
+    const recovered = await recovery.recoverPending();
+    assert.equal(observations, 1);
+    assert.equal(recovered.find((result) => result.operationId === child.operationId)?.outcome, "recorded");
+    assert.equal((await operations.get(child.operationId))?.state, "recorded");
+    // The root is deliberately not made green by bootstrap recovery; receipt
+    // issuance still goes through normal durable result recording.
+    assert.equal((await operations.get(parent.operationId))?.state, "external_committed");
+
+    const recorded = await coordinator.recordResult(parent, {
+      action: "pr_upsert",
+      targetSnapshotId: "snapshot-1",
+      status: "completed",
+      summary: "PR upsert completed through the broker after child reconciliation.",
+      policyVersion: "policy-1",
+      evidenceDigest: "evidence-1",
+      toolVersions: { git: "2.50" }
+    });
+    assert.ok(recorded.receiptId);
+    assert.equal((await operations.get(parent.operationId))?.state, "recorded");
+  });
+});
+
+test("a crash after durable child creation is reconciled instead of becoming replayable prepared work", async () => {
+  await withStore(async (store) => {
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const parent = await coordinator.claim({ action: "compound_capture", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    await coordinator.markExecuting(parent);
+    const saga = coordinator.childSaga(parent);
+    const child = await saga.begin({ action: "automation.compound_capture.write", idempotencyScope: "provider:compound:packet-1" });
+    assert.equal(child.state, "prepared");
+
+    const repeated = await saga.begin({ action: "automation.compound_capture.write", idempotencyScope: "provider:compound:packet-1" });
+    assert.equal(repeated.mayExecute, false);
+    assert.equal((await operations.reconciliationCandidates()).some((operation) => operation.id === child.operationId), true);
+
+    const recovery = coordinator.createNoReplayRecovery();
+    recovery.register("automation.compound_capture.write", {
+      reconcile: async (operation) => {
+        assert.equal(operation.id, child.operationId);
+        return { state: "failed", note: "Provider confirms that no capture request was accepted." };
+      }
+    });
+    await recovery.recoverPending();
+    assert.equal((await operations.get(child.operationId))?.state, "failed");
+    assert.equal((await operations.get(parent.operationId))?.state, "executing");
+  });
+});
+
+test("durable dispatch gives Git, automation, and Council handlers a scoped child-saga capability", async () => {
+  await withStore(async (store) => {
+    const now = "2026-08-23T12:00:00.000Z";
+    const target: TargetSnapshot = {
+      id: "snapshot-1", repositoryRoot: "C:/work/example", canonicalRemote: "https://github.com/example/repo.git",
+      branch: "feature/safe", head: "abc", indexTree: "tree", trackedManifest: "tracked", untrackedManifest: "untracked",
+      submodules: {}, policyVersion: "policy-1", environmentFingerprint: "env-1", capturedAt: now, completeness: "complete", reasons: []
+    };
+    const session: ManagedSession = {
+      id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
+      plannedFiles: [], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+    };
+    const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+    const authority = (action: AuthorityGrant["allowedActions"][number]): AuthorityGrant => ({
+      id: `authority-${action}`, repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: [action], prohibitedActions: [], issuedAt: now, expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "user"
+    });
+    const authorities = new Map([
+      ["authority-local_commit", authority("local_commit")],
+      ["authority-compound_capture", authority("compound_capture")],
+      ["authority-council_report", authority("council_report")]
+    ]);
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const git = new InMemoryGitBroker(policy);
+    const automation = new InMemoryAutomationBroker(policy);
+    const seen: string[] = [];
+    const settleChild = async (saga: ChildOperationSaga | undefined, action: string, scope: string): Promise<void> => {
+      if (!saga) throw new Error("Composite broker did not receive its child-saga capability.");
+      const child = await saga.begin({ action, idempotencyScope: scope });
+      await saga.markExecuting(child);
+      await saga.markExternalCommitted(child, { providerReference: `${scope}-accepted` });
+      await saga.settle(child, "completed");
+      seen.push(action);
+    };
+    git.register("local_commit", async (request) => {
+      assert.ok(request.childSaga);
+      await settleChild(request.childSaga, "git.local_commit.write", "git:commit-1");
+      return { status: "completed", summary: "Simulated mediated local commit." };
+    });
+    automation.register("compound_capture", async (request) => {
+      assert.ok(request.childSaga);
+      await settleChild(request.childSaga, "automation.compound_capture.write", "automation:packet-1");
+      return { status: "completed", summary: "Simulated mediated Compound capture." };
+    });
+    const council = {
+      execute: async (request: Readonly<{ action: "council_report" | "council_automatic" | "council_recommend"; childSaga?: ChildOperationSaga }>) => {
+        assert.equal(request.action, "council_report");
+        assert.ok(request.childSaga);
+        await settleChild(request.childSaga, "council.report.assemble", "council:report-1");
+        return { status: "completed" as const, summary: "Simulated mediated Council report." };
+      }
+    };
+    const dispatcher = new CommandDispatcher({
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => authorities.get(id) },
+      operations: coordinator,
+      git,
+      automation,
+      council,
+      gitMutationFactory: { create: () => ({ kind: "local_commit", paths: ["src/safe.ts"], message: "safe commit" }) }
+    });
+
+    for (const action of ["local_commit", "compound_capture", "council_report"] as const) {
+      const definition = commandForAction(action);
+      const assignment = definition.assignment!;
+      const result = await dispatcher.dispatch({
+        assignment, control: assignment.control, modifier: assignment.modifier,
+        targetSnapshot: target, sessionId: session.id, authorityId: `authority-${action}`
+      });
+      assert.equal(result.status, "completed");
+    }
+    assert.deepEqual(seen, ["git.local_commit.write", "automation.compound_capture.write", "council.report.assemble"]);
+    const children = (await operations.list()).filter((operation) => operation.parentId);
+    assert.equal(children.length, 6, "each composite has an automatic boundary plus its provider-specific child");
+    assert.equal(children.every((operation) => operation.state === "recorded" && operation.targetSnapshotId === target.id), true);
+  });
+});

@@ -1,65 +1,149 @@
 # STRATHEX SWITCHYARD — SXSY-B122
 
-SXSY-B122 is a safe operator station for agentic software development.  Its
-keyboard firmware is intentionally a **signal source**, not an automation
-engine: repository-aware behaviour belongs in a Windows companion, VS Code
-extension, and (eventually) a mediated execution broker.
+> Route attention. Direct agents. Keep the operator in command.
 
-## What is implemented
+SXSY-B122 is a software-only safety control plane for a proposed 22-control
+operator keyboard for agentic software development. Its target platform is a
+Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
+physical keyboard and its integration are not validated by this repository.
 
-- `firmware/qmk/` — QMK-compatible reference transport for all 22 logical
-  controls. It sends versioned raw-HID signals and does not run Git, terminals,
-  prompts, or desktop automation.
-- `packages/protocol/` — the canonical 22-control / 65-assignment manifest,
-  packet parser, and safety classifier.
-- `apps/windows-companion/` — a TypeScript control plane with anti-replay
-  routing, a capability/session registry, TargetSnapshot validation, scoped
-  authority, protected hash-chained receipts, durable parent/child operations,
-  restart reconciliation, containment, and safe broker/adapter contracts.
-- `apps/vscode-extension/` — a buildable extension that registers/adopts,
-  selects, displays, and retires managed VS Code sessions and creates tagged
-  managed-agent terminals. Registration is never represented as mediation.
-- `docs/` — the accepted complete design, historical ledger, reconstructed
-  interview notes, and a source-backed adversarial review.
+**Current status:** the repository implements and locally tests the
+software-owned control-plane machinery. It is **not** a production control
+system, a hardware integration, or evidence that any of the 27 acceptance
+gates has passed. Every gate remains **NOT ACCEPTED**.
 
-## Safety posture
+The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
+keys, 65 settled chord behaviors, and 111 intentionally unassigned chord slots.
+The complete behavior contract and adversarial review live in
+[docs/SXSY-B122-complete-key-specification-and-audit.md](docs/SXSY-B122-complete-key-specification-and-audit.md).
 
-`Managed` identifies or routes a session. Only **Mediated** execution with
-filesystem, Git, credential, network, and test-data brokers can enforce policy.
-The control plane implements those broker contracts, safe local deny-by-default
-implementations, deterministic test doubles, and the durable policy machinery;
-it does not pretend an ordinary terminal is mediated.
+## What this project is
 
-The following remain disabled pending mediated execution and the applicable
-adversarial acceptance gates: Council automatic mode, Repair Mission, `lfg`,
-broker-enforced Merge and Direct Main, containment release, Full Sandbox, and
-Quarantine. No control silently commits, pushes, merges, force-pushes, approves
-permissions, or submits a prompt.
+Agentic development spreads work across editors, terminals, repositories,
+worktrees, browser sessions, and multiple coding agents. SWITCHYARD explores a
+stable physical vocabulary for supervisory actions—route attention, inspect
+work, hand off context, interrupt, review, and approve only within a known
+boundary—rather than a macro layer that grants ambient authority.
 
-## Development
+A keyboard chord is an intent signal, never authority to change a repository,
+start a process, use a credential, or submit a prompt. The physical device
+conveys a bounded signal; a reviewed host decides whether a concrete action is
+safe and available in the current context.
 
-This repository uses no production database. Protocol and router tests are
-pure in-memory tests:
+## What is implemented here
 
-```powershell
-npm install
-npm test
-npm run typecheck
+- `firmware/qmk/` — QMK-compatible reference firmware that emits bounded,
+  versioned Raw HID signals only. It does not run Git, a terminal, a browser,
+  or desktop automation.
+- `packages/protocol/` — the canonical 22-control / 65-behavior manifest,
+  packet validation, and a closed command map. Unknown, forged, and
+  intentionally unassigned chords have no fallback action.
+- `packages/control-plane/` — the TypeScript mediation model: managed-session
+  lifecycle, exact target snapshots, authority and policy checks, durable
+  one-time confirmations, operation/child-operation sagas, receipts,
+  no-replay recovery, containment, budget claims, deadline/cancellation
+  control, and typed broker interfaces.
+- `apps/windows-companion/` — a local JSON-lines companion endpoint and
+  bootstrap seam. It hydrates durable state, runs no-replay startup recovery,
+  and requires a host-owned journal authenticator for a non-test durable
+  companion.
+- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It may
+  identify/focus approved local surfaces and route a canonical request; it does
+  not use direct Run/Debug APIs as a bypass around mediation.
+- `docs/` — the accepted specification, reconstructed interview history,
+  adversarial review, project charter, attribution records, operational safety
+  model, and source-linked software-only completion audit.
+
+## The safety boundary
+
+`Managed` means the companion can identify or route a session. It does **not**
+mean the session is trusted or mediated. A filesystem, Git, credential, process,
+network, test-data, or containment claim can only be enforced through a
+reviewed, concrete mediated adapter or broker.
+
+```text
+B122 signal / extension request
+  -> canonical assignment and selected registered session
+  -> protected target snapshot and scoped authority
+  -> durable exact-scope confirmation (when required)
+  -> operation ID, policy permit, checkpoint/artifact verification
+  -> budget claim, deadline/cancellation control, containment check
+  -> explicitly registered typed broker or safe unavailable result
 ```
 
-QMK compilation is intentionally not part of the default test command because
-it requires the selected B122-compatible target and toolchain. See
-[`firmware/qmk/README.md`](firmware/qmk/README.md) before adapting the matrix.
+The supplied in-memory brokers and adapters are test harnesses. They do not
+open shells, use credentials, fetch URLs, create databases, mutate GitHub, or
+contact an AI provider.
 
-## Current evidence boundary
+The following capabilities remain disabled by default, even though their
+software policy/saga paths are represented: Council automatic mode, Repair
+Mission, `lfg`, broker-enforced Merge and Direct Main, containment release,
+Full Sandbox, rebuild Full Sandbox, and Quarantine. No control silently commits,
+pushes, merges, force-pushes, approves a permission, or submits a prompt.
 
-The source and isolated tests prove the static protocol, complete dispatch,
-safe local policy, durable lifecycle, recovery, and VS Code extension build.
-They do **not** prove hardware identity, live provider capability, Windows UI
-automation, broker-enforced OS isolation, provider parity, or all 27 acceptance
-gates. See [`docs/software-completion-audit.md`](docs/software-completion-audit.md)
+## Local development
 
-For the concrete local companion, setup, and post-PR #4 software residual
-boundary, see [`docs/local-companion.md`](docs/local-companion.md) and
-[`docs/software-residual-ledger.md`](docs/software-residual-ledger.md).
-for the requirement-by-requirement boundary.
+Use a current Node.js runtime that supports TypeScript stripping (the test
+scripts use `node --experimental-strip-types`). Tests use temporary files,
+fakes, and in-memory brokers; they must never use a production database,
+credentials, data, or endpoint.
+
+```powershell
+npm ci
+npm test
+npm run typecheck
+npm run build:vscode
+```
+
+`npm run start:companion` is intentionally **not** a ready-to-use Windows
+service. The standalone entry point fails closed because no DPAPI/NCrypt/
+service-backed `JournalAuthenticator` is bundled. A reviewed host must embed
+`createDurableWindowsCompanion`, provide that authenticator, and supply any
+real adapters before a durable companion can start.
+
+QMK compilation is not part of the default suite because it needs the selected
+physical B122-compatible target and toolchain. See
+[firmware/qmk/README.md](firmware/qmk/README.md) before adapting the matrix.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a contribution. In
+particular:
+
+- Treat [the complete specification](docs/SXSY-B122-complete-key-specification-and-audit.md)
+  as authoritative; the historical ledger and reconstructed interview notes are
+  traceability material.
+- Keep the signal-only firmware boundary and the distinction between Registered,
+  Observable, Controllable, and Mediated sessions intact.
+- Add isolated automated coverage with every behavior change, and update
+  [the software-only audit](docs/software-only-completion-audit.md) when a
+  mechanism or its evidence boundary changes.
+- Do not enable a high-consequence path on the strength of a mock, a local
+  receipt, or a keyboard event. It needs the applicable real acceptance evidence
+  first.
+- Never put secrets, production credentials, production test data, or a
+  production database in the repository or test harness.
+
+## Documentation, attribution, and governance
+
+- [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
+- [Software-only completion audit](docs/software-only-completion-audit.md)
+- [Operational safety model](docs/operational-safety-model.md)
+- [Acceptance-gate ledger](docs/acceptance-gates.md)
+- [Project charter](docs/01-project-charter.md)
+- [Hardware and software architecture](docs/02-system-architecture.md)
+- [Workflow study protocol](docs/03-workflow-study.md)
+- [Control taxonomy requirements](docs/04-control-taxonomy.md)
+- [Publication roadmap](docs/05-roadmap.md) and [publication gate](docs/06-publication-gate.md)
+- [Documentation provenance](docs/README.md)
+- [Attribution register](ATTRIBUTION.md), [source bibliography](docs/references/bibliography.md),
+  [licensing status](LICENSING.md), [security policy](SECURITY.md), and
+  [third-party material policy](third-party/README.md)
+
+STRATHEX SWITCHYARD is an independent community project and is not affiliated
+with, sponsored by, or endorsed by Model F Labs, IBM, Vial, QMK, Microsoft,
+OpenAI, Anthropic, or any other referenced project or company.
+
+The audit is the current evidence boundary: it documents source-controlled
+mechanisms and isolated tests, not hardware, Windows service, provider, GitHub,
+credential-vault, isolation-runtime, or production readiness.
