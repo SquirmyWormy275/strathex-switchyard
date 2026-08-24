@@ -29,6 +29,174 @@ export interface RepositoryRuntimeExecutionBrokerOptions {
   readonly hostActions?: Pick<DurableHostActionQueue, "enqueue">;
 }
 
+export interface RepositoryRecipeCoverage {
+  readonly dimension: string;
+  readonly status: "covered" | "unavailable";
+  readonly fixtureId?: string;
+}
+
+/** Trusted host inputs only; recipe stdout and repository files cannot populate this binding. */
+export interface RepositoryRecipeEvidenceBinding {
+  readonly manifestSha256: string;
+  readonly helperSha256: string;
+  readonly helperVersion: string;
+  readonly resultSha256: string;
+  readonly toolVersions: Readonly<Record<string, string>>;
+  readonly scannerFixtureIds: readonly string[];
+  readonly advisoryFixtureIds: readonly string[];
+  readonly coverage: readonly RepositoryRecipeCoverage[];
+  readonly policyVersion: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+}
+
+export interface RepositoryRecipeEvidenceEnvelope {
+  readonly schema: "sxsy-b122.repository-recipe-evidence";
+  readonly version: 1;
+  readonly operationId: string;
+  readonly action: string;
+  readonly recipeId: string;
+  readonly targetSnapshotId: string;
+  readonly targetSnapshotSha256: string;
+  readonly policyVersion: string;
+  readonly manifestSha256: string;
+  readonly helperSha256: string;
+  readonly helperVersion: string;
+  readonly resultSha256: string;
+  readonly toolVersions: Readonly<Record<string, string>>;
+  readonly scannerFixtureIds: readonly string[];
+  readonly advisoryFixtureIds: readonly string[];
+  readonly coverage: readonly RepositoryRecipeCoverage[];
+  readonly output: Readonly<{ sha256: string; bytes: number; truncated: boolean }>;
+  readonly completeness: "complete" | "incomplete";
+  readonly unavailableDimensions: readonly string[];
+  readonly outcome: "passed" | "failed" | "incomplete";
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly evidenceSha256: string;
+}
+
+const evidenceSchema = "sxsy-b122.repository-recipe-evidence" as const;
+const digestPattern = /^[a-f0-9]{64}$/;
+const coverageByAction: Readonly<Record<string, readonly string[]>> = {
+  pipeline_local_gate: ["correctness", "isolation", "production_data", "ambient_credentials"],
+  pipeline_clean_reproduction: ["correctness", "reproduction", "isolation", "production_data", "ambient_credentials"],
+  shield_change_scan: ["secrets", "pii", "security_defects"],
+  shield_codebase_audit: ["secrets", "history", "insecure_paths", "permissions", "infrastructure"],
+  shield_supply_chain: ["vulnerabilities", "licenses", "provenance", "sbom"],
+  release_shield: ["secrets", "pii", "security_defects", "history", "insecure_paths", "permissions", "infrastructure", "vulnerabilities", "licenses", "provenance", "sbom", "isolation"]
+};
+
+export function createRepositoryRecipeEvidence(
+  request: ExecutionRequest,
+  result: RepositoryRuntimeResult,
+  binding: RepositoryRecipeEvidenceBinding,
+  now = Date.now()
+): RepositoryRecipeEvidenceEnvelope {
+  const required = coverageByAction[request.action] ?? [];
+  const unavailable = new Set<string>();
+  const coverage = [...binding.coverage].map((entry) => ({ ...entry })).sort((left, right) => left.dimension.localeCompare(right.dimension));
+  const seen = new Set<string>();
+  for (const entry of coverage) {
+    if (!entry.dimension.trim() || seen.has(entry.dimension) || entry.status === "unavailable" || entry.status === "covered" && !entry.fixtureId?.trim()) unavailable.add(entry.dimension || "invalid_coverage");
+    seen.add(entry.dimension);
+  }
+  for (const dimension of required) if (!seen.has(dimension) || coverage.find((entry) => entry.dimension === dimension)?.status !== "covered") unavailable.add(dimension);
+  if (required.length === 0) unavailable.add("unsupported_recipe_evidence");
+  if (request.target.completeness !== "complete") unavailable.add("target_snapshot");
+  if (result.status !== "completed" || result.exitCode !== undefined && result.exitCode !== 0) unavailable.add("result");
+  if (result.outputTruncated) unavailable.add("output_truncated");
+  if (binding.policyVersion !== request.target.policyVersion) unavailable.add("policy_version");
+  if (![binding.manifestSha256, binding.helperSha256, binding.resultSha256].every((value) => digestPattern.test(value))) unavailable.add("attestation_digest");
+  if (!binding.helperVersion.trim()) unavailable.add("helper_version");
+  if (Object.keys(binding.toolVersions).length === 0 || Object.values(binding.toolVersions).some((value) => !value.trim())) unavailable.add("tool_versions");
+  const security = request.action.startsWith("shield_") || request.action === "release_shield";
+  const advisory = request.action === "shield_supply_chain" || request.action === "release_shield";
+  if (security && binding.scannerFixtureIds.length === 0) unavailable.add("scanner_freshness");
+  if (advisory && binding.advisoryFixtureIds.length === 0) unavailable.add("advisory_freshness");
+  const created = Date.parse(binding.createdAt);
+  const expires = Date.parse(binding.expiresAt);
+  if (!Number.isFinite(created) || !Number.isFinite(expires) || created > now || expires <= now || expires <= created) unavailable.add("fixture_freshness");
+  const outputText = result.output ?? "";
+  const base = {
+    schema: evidenceSchema,
+    version: 1 as const,
+    operationId: request.operationId,
+    action: request.action,
+    recipeId: request.recipe.id,
+    targetSnapshotId: request.target.id,
+    targetSnapshotSha256: sha256Canonical(request.target),
+    policyVersion: binding.policyVersion,
+    manifestSha256: binding.manifestSha256,
+    helperSha256: binding.helperSha256,
+    helperVersion: binding.helperVersion,
+    resultSha256: binding.resultSha256,
+    toolVersions: sortedRecord(binding.toolVersions),
+    scannerFixtureIds: [...binding.scannerFixtureIds].sort(),
+    advisoryFixtureIds: [...binding.advisoryFixtureIds].sort(),
+    coverage,
+    output: { sha256: createHash("sha256").update(outputText).digest("hex"), bytes: Buffer.byteLength(outputText, "utf8"), truncated: result.outputTruncated ?? false },
+    completeness: unavailable.size === 0 ? "complete" as const : "incomplete" as const,
+    unavailableDimensions: [...unavailable].sort(),
+    outcome: result.status !== "completed" ? "failed" as const : unavailable.size === 0 ? "passed" as const : "incomplete" as const,
+    createdAt: binding.createdAt,
+    expiresAt: binding.expiresAt
+  };
+  return { ...base, evidenceSha256: sha256Canonical(base) };
+}
+
+export function verifyRepositoryRecipeEvidence(
+  envelope: RepositoryRecipeEvidenceEnvelope,
+  request: ExecutionRequest,
+  binding: RepositoryRecipeEvidenceBinding,
+  now = Date.now()
+): Readonly<{ valid: boolean; reason: string }> {
+  const created = Date.parse(envelope.createdAt);
+  const expires = Date.parse(envelope.expiresAt);
+  if (!Number.isFinite(created) || !Number.isFinite(expires) || created > now || expires <= now || expires <= created) return { valid: false, reason: "Repository recipe evidence is expired or future-dated." };
+  const { evidenceSha256, ...base } = envelope;
+  if (!digestPattern.test(evidenceSha256) || sha256Canonical(base) !== evidenceSha256) return { valid: false, reason: "Repository recipe evidence digest is invalid or tampered." };
+  const expectedBinding = canonicalString({
+    operationId: request.operationId,
+    action: request.action,
+    recipeId: request.recipe.id,
+    targetSnapshotId: request.target.id,
+    targetSnapshotSha256: sha256Canonical(request.target),
+    policyVersion: binding.policyVersion,
+    manifestSha256: binding.manifestSha256,
+    helperSha256: binding.helperSha256,
+    helperVersion: binding.helperVersion,
+    resultSha256: binding.resultSha256,
+    toolVersions: sortedRecord(binding.toolVersions),
+    scannerFixtureIds: [...binding.scannerFixtureIds].sort(),
+    advisoryFixtureIds: [...binding.advisoryFixtureIds].sort(),
+    coverage: [...binding.coverage].map((entry) => ({ ...entry })).sort((left, right) => left.dimension.localeCompare(right.dimension)),
+    createdAt: binding.createdAt,
+    expiresAt: binding.expiresAt
+  });
+  const actualBinding = canonicalString({
+    operationId: envelope.operationId,
+    action: envelope.action,
+    recipeId: envelope.recipeId,
+    targetSnapshotId: envelope.targetSnapshotId,
+    targetSnapshotSha256: envelope.targetSnapshotSha256,
+    policyVersion: envelope.policyVersion,
+    manifestSha256: envelope.manifestSha256,
+    helperSha256: envelope.helperSha256,
+    helperVersion: envelope.helperVersion,
+    resultSha256: envelope.resultSha256,
+    toolVersions: envelope.toolVersions,
+    scannerFixtureIds: envelope.scannerFixtureIds,
+    advisoryFixtureIds: envelope.advisoryFixtureIds,
+    coverage: envelope.coverage,
+    createdAt: envelope.createdAt,
+    expiresAt: envelope.expiresAt
+  });
+  return expectedBinding === actualBinding
+    ? { valid: true, reason: "Repository recipe evidence is current and exactly bound." }
+    : { valid: false, reason: "Repository recipe evidence does not match the exact trusted host binding." };
+}
+
 export function repositoryRuntimeExecutionRecipe(action: RepositoryRuntimeAction, target: TargetSnapshot): ExecutionRecipe {
   return {
     id: `${recipePrefix}${action}`,
@@ -93,7 +261,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       }
     };
     try {
-      const result = await runtime.execute(action as RepositoryRuntimeAction, { signal: controller.signal, effectGuard });
+      const result = await runtime.execute(action as RepositoryRuntimeAction, { operationId: request.operationId, signal: controller.signal, effectGuard });
       if (action === "debug_target" && result.status === "running" && result.debugConfiguration && this.hostActions) {
         return this.queueVerifiedDebug(request, result.debugConfiguration);
       }
@@ -293,4 +461,18 @@ function trustedRuntimeUrl(value: string): boolean {
     if (url.protocol === "https:") return true;
     return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
   } catch { return false; }
+}
+
+function sortedRecord(value: Readonly<Record<string, string>>): Readonly<Record<string, string>> {
+  return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function sha256Canonical(value: unknown): string {
+  return createHash("sha256").update(canonicalString(value)).digest("hex");
+}
+
+function canonicalString(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalString).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalString(item)}`).join(",")}}`;
 }

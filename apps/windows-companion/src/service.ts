@@ -4,6 +4,9 @@ import { realpath } from "node:fs/promises";
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
+import type { HandoffPackage, HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
+import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowArtifactPayload, WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { VoiceBinding, VoiceConsent, VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import type { GitReviewResult } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
@@ -11,6 +14,7 @@ import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from
 import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
+import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import type {
   AuditEvent,
   Capability,
@@ -45,6 +49,15 @@ import {
   type HardwareSignalDispatchPayload,
   type HardwareSignalCompletionPayload,
   type OperationCancellationPayload,
+  type HandoffCreatePayload,
+  type HandoffReferencePayload,
+  type HandoffRoutingPayload,
+  type WorkflowPreparePayload,
+  type VoiceConsentPayload,
+  type VoiceStartPayload,
+  type VoiceSwitchPayload,
+  type VoiceBindingPayload,
+  type VoiceReferencePayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
   type SessionRegistrationPayload,
@@ -80,8 +93,8 @@ export interface HostActionCompletionRecord {
   readonly targetSnapshotId?: string;
   readonly status: "completed" | "failed";
   readonly summary: string;
-  readonly evidenceDigest: string;
-  readonly toolVersions: Readonly<Record<string, string>>;
+  /** Host-action idempotency evidence; deliberately not eligible for gate receipts. */
+  readonly completionDigest?: string;
   readonly completedAt: string;
 }
 
@@ -111,6 +124,10 @@ export interface CompanionServiceOptions {
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
   readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   readonly hardwareSignals?: DurableHardwareSignalInbox;
+  readonly handoffs?: HandoffPackageStore;
+  readonly workflowArtifacts?: WorkflowArtifactStore;
+  readonly voice?: VoiceCoordinator;
+  readonly voicePresence?: WindowsUserPresenceRunner;
   readonly canonicalizeHostPath?: (value: string) => Promise<string>;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
@@ -142,6 +159,10 @@ export class CompanionService {
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
   private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   private readonly hardwareSignals?: DurableHardwareSignalInbox;
+  private readonly handoffs?: HandoffPackageStore;
+  private readonly workflowArtifacts?: WorkflowArtifactStore;
+  private readonly voice?: VoiceCoordinator;
+  private readonly voicePresence?: WindowsUserPresenceRunner;
   private readonly canonicalizeHostPath: (value: string) => Promise<string>;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
@@ -159,6 +180,10 @@ export class CompanionService {
     this.rawHidInstallations = options.rawHidInstallations;
     this.rawHidSupervisor = options.rawHidSupervisor;
     this.hardwareSignals = options.hardwareSignals;
+    this.handoffs = options.handoffs;
+    this.workflowArtifacts = options.workflowArtifacts;
+    this.voice = options.voice;
+    this.voicePresence = options.voicePresence;
     this.canonicalizeHostPath = options.canonicalizeHostPath ?? realpath;
     this.verifyCapabilities = options.verifyCapabilities;
   }
@@ -239,6 +264,25 @@ export class CompanionService {
           return this.success(request.id, { completion: await this.completeHardwareSignal(this.requireHardwareSignalCompletion(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
+        case "handoff.create": return this.success(request.id, { handoff: await this.createHandoff(this.requireHandoffCreate(request.payload)) });
+        case "handoff.list": return this.success(request.id, { handoffs: await this.listHandoffs(request.payload) });
+        case "handoff.acknowledge": return this.success(request.id, { handoff: await this.acknowledgeHandoff(this.requireHandoffReference(request.payload, true)) });
+        case "handoff.cancel": return this.success(request.id, { handoff: await this.cancelHandoff(this.requireHandoffReference(request.payload, false)) });
+        case "handoff.archive": return this.success(request.id, { handoff: await this.archiveHandoff(this.requireHandoffReference(request.payload, false)) });
+        case "handoff.routing.get": return this.success(request.id, { routing: await this.handoffRouting(request.payload) });
+        case "handoff.routing.set": return this.success(request.id, { routing: await this.setHandoffRouting(this.requireHandoffRouting(request.payload)) });
+        case "workflow.prepare": return this.success(request.id, { artifact: await this.prepareWorkflowArtifact(this.requireWorkflowPrepare(request.payload)) });
+        case "workflow.list": return this.success(request.id, { artifacts: await this.listWorkflowArtifacts(request.payload) });
+        case "voice.consent": return this.success(request.id, { consent: await this.grantVoiceConsent(this.requireVoiceConsent(request.payload)) });
+        case "voice.start": return this.success(request.id, { binding: await this.startVoice(this.requireVoiceStart(request.payload)) });
+        case "voice.current": return this.success(request.id, { binding: await this.currentVoice(request.payload) });
+        case "voice.switch": return this.success(request.id, { binding: await this.switchVoice(this.requireVoiceSwitch(request.payload)) });
+        case "voice.bind": return this.success(request.id, { binding: await this.bindVoice(this.requireVoiceBinding(request.payload)) });
+        case "voice.mute": return this.success(request.id, { binding: await this.muteVoice(this.requireVoiceReference(request.payload, false)) });
+        case "voice.resume": return this.success(request.id, { binding: await this.resumeVoice(this.requireVoiceReference(request.payload, false)) });
+        case "voice.interrupt": return this.success(request.id, { binding: await this.interruptVoice(this.requireVoiceReference(request.payload, true)) });
+        case "voice.end": return this.success(request.id, { binding: await this.endVoice(this.requireVoiceReference(request.payload, false)) });
+        case "voice.transcript.delete": return this.success(request.id, { binding: await this.deleteVoiceTranscript(this.requireVoiceReference(request.payload, false)) });
         default:
           return this.failure(request.id, "unknown_method", "Unknown SXSY-B122 companion method.");
       }
@@ -431,6 +475,79 @@ export class CompanionService {
     if (result.session) this.installTrustedSession(result.session);
     this.record("git.review.submit", result.status === "approved" ? "completed" : result.status, result.summary, payload.sessionId);
     return result;
+  }
+
+  private async createHandoff(payload: HandoffCreatePayload): Promise<HandoffPackage> {
+    if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached.");
+    const session = this.requireSession(payload.sessionId);
+    if (!session.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision) throw new CompanionServiceError("capability_denied", "Handoff requires a managed session bound to an exact target, task, and plan revision.");
+    if (payload.recipientSessionId) {
+      const recipient = this.requireSession(payload.recipientSessionId);
+      if (recipient.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(recipient.workspaceRoot ?? "") !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Handoff recipient is not bound to the exact same target.");
+    }
+    const handoff = await this.handoffs.create({
+      repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, taskId: session.taskId, planRevision: session.planRevision,
+      ...(payload.authorityId ? { authorityId: payload.authorityId } : {}), plan: payload.plan, decisions: payload.decisions,
+      documentation: payload.documentation, references: payload.references, constraints: payload.constraints, openQuestions: payload.openQuestions,
+      nextActions: payload.nextActions, ...(payload.recipientSessionId ? { recipientSessionId: payload.recipientSessionId } : {}), ...(payload.routing ? { routing: payload.routing } : {})
+    });
+    this.record("handoff.create", "completed", "Created one immutable non-executing Handoff context package.", session.id);
+    return handoff;
+  }
+
+  private async listHandoffs(payload: unknown): Promise<readonly HandoffPackage[]> { requireEmptyPayload(payload, "Handoff listing"); if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.list(); }
+  private async acknowledgeHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs || !payload.recipientSessionId) throw new CompanionServiceError("capability_denied", "Handoff acknowledgement requires the durable store and exact recipient."); this.requireSession(payload.recipientSessionId); return this.handoffs.acknowledge(payload.handoffId, payload.recipientSessionId); }
+  private async cancelHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.cancel(payload.handoffId); }
+  private async archiveHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.archive(payload.handoffId); }
+  private async handoffRouting(payload: unknown) { requireEmptyPayload(payload, "Handoff routing read"); if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.routingDefault(); }
+  private async setHandoffRouting(payload: HandoffRoutingPayload) { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.setRoutingDefault(payload.routing); }
+
+  private async prepareWorkflowArtifact(payload: WorkflowPreparePayload): Promise<WorkflowArtifact> {
+    if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached.");
+    const session = this.requireSession(payload.sessionId);
+    if (!session.workspaceRoot || !session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "Workflow preparation requires an exact managed-session target.");
+    if ((payload.action === "handoff" || payload.action === "handoff_queue") && payload.payload.kind === "handoff") {
+      const handoff = this.handoffs ? await this.handoffs.get(payload.payload.packageId) : undefined;
+      if (!handoff || handoff.repositoryRoot !== session.workspaceRoot || handoff.targetSnapshotId !== session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "The workflow Handoff package is missing or bound to another target.");
+    }
+    if (payload.action === "bind_voice_session" && payload.payload.kind === "voice_binding") {
+      const consent = this.voice ? await this.voice.getConsent(payload.payload.consentId) : undefined;
+      const active = this.voice ? await this.voice.active() : undefined;
+      if (!consent || !active || active.voiceSessionId !== payload.payload.voiceSessionId || active.contextPackageId !== payload.payload.contextPackageId || active.managedSessionId !== session.id) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active consent, context, and managed session.");
+    }
+    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), payload: payload.payload });
+  }
+
+  private async listWorkflowArtifacts(payload: unknown): Promise<readonly WorkflowArtifact[]> { requireEmptyPayload(payload, "Workflow artifact listing"); if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); return this.workflowArtifacts.list(); }
+
+  private async grantVoiceConsent(payload: VoiceConsentPayload): Promise<VoiceConsent> {
+    if (!this.voice || !this.voicePresence || !this.handoffs) throw new CompanionServiceError("capability_denied", "Voice requires durable context, privacy state, and current-user presence.");
+    const handoff = await this.handoffs.get(payload.handoffId);
+    if (!handoff || handoff.status === "cancelled" || handoff.status === "archived") throw new CompanionServiceError("not_found", "Voice consent requires a current immutable Handoff context package.");
+    const presence = await this.voicePresence.verify(`Start or switch SXSY-B122 voice for ${payload.provider} using context ${handoff.id} with transcripts ${payload.transcript}.`);
+    if (!presence.verified || !presence.operator) throw new CompanionServiceError("capability_denied", "Current-user presence did not approve voice access.");
+    const expiresAt = new Date(Date.parse(this.now()) + payload.expiresInMinutes * 60_000).toISOString();
+    return this.voice.grantConsent({ repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest, provider: payload.provider, operatorPresenceId: presence.operator, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes, expiresAt });
+  }
+
+  private async startVoice(payload: VoiceStartPayload): Promise<VoiceBinding> {
+    if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached.");
+    const consent = await this.voice.getConsent(payload.consentId);
+    if (!consent) throw new CompanionServiceError("not_found", "Voice consent was not found.");
+    if (payload.managedSessionId) this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), consent.repositoryRoot, consent.targetSnapshotId);
+    return this.voice.start(payload);
+  }
+  private async currentVoice(payload: unknown): Promise<VoiceBinding | undefined> { requireEmptyPayload(payload, "Voice current binding"); if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.active(); }
+  private async switchVoice(payload: VoiceSwitchPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }); }
+  private async bindVoice(payload: VoiceBindingPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await this.voice.getBinding(payload.bindingId); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); return this.voice.bindManagedSession(payload.bindingId, payload.managedSessionId); }
+  private async muteVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.mute(payload.bindingId); }
+  private async resumeVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.resume(payload.bindingId); }
+  private async interruptVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); return this.voice.interrupt(payload.bindingId, payload.reason); }
+  private async endVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.end(payload.bindingId); }
+  private async deleteVoiceTranscript(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.deleteTranscript(payload.bindingId); }
+
+  private assertVoiceSessionScope(session: ManagedSession, repositoryRoot: string, targetSnapshotId: string): void {
+    if (session.targetSnapshotId !== targetSnapshotId || normalizeHostPath(session.workspaceRoot ?? "") !== normalizeHostPath(repositoryRoot)) throw new CompanionServiceError("capability_denied", "Voice can bind only to a managed session on the exact consent target.");
   }
 
   private async installRuntimePin(payload: RuntimePinInstallPayload) {
@@ -821,6 +938,39 @@ export class CompanionService {
     return { action: payload.action, sessionId: payload.sessionId, mutation: parseGitMutation(payload.mutation) };
   }
 
+  private requireHandoffCreate(payload: unknown): HandoffCreatePayload {
+    const required = ["sessionId", "plan", "decisions", "documentation", "references", "constraints", "openQuestions", "nextActions"];
+    if (!isRecord(payload) || !allowedExactKeys(payload, required, ["recipientSessionId", "routing", "authorityId"]) || !boundedReferenceValue(payload.sessionId)
+      || typeof payload.plan !== "string" || !payload.plan.trim() || payload.plan.length > 16_384 || /\0/.test(payload.plan)
+      || (payload.recipientSessionId !== undefined && !boundedReferenceValue(payload.recipientSessionId))
+      || (payload.authorityId !== undefined && !boundedReferenceValue(payload.authorityId))
+      || (payload.routing !== undefined && payload.routing !== "queue" && payload.routing !== "immediate")) throw new CompanionServiceError("invalid_request", "Handoff creation requires exact bounded context fields and one managed source session.");
+    return { sessionId: payload.sessionId, plan: payload.plan, decisions: boundedStringList(payload.decisions, "handoff decision"), documentation: boundedStringList(payload.documentation, "handoff documentation"), references: boundedStringList(payload.references, "handoff reference"), constraints: boundedStringList(payload.constraints, "handoff constraint"), openQuestions: boundedStringList(payload.openQuestions, "handoff open question"), nextActions: boundedStringList(payload.nextActions, "handoff next action"), ...(typeof payload.recipientSessionId === "string" ? { recipientSessionId: payload.recipientSessionId } : {}), ...(payload.routing === "queue" || payload.routing === "immediate" ? { routing: payload.routing } : {}), ...(typeof payload.authorityId === "string" ? { authorityId: payload.authorityId } : {}) };
+  }
+
+  private requireHandoffReference(payload: unknown, recipientRequired: boolean): HandoffReferencePayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["handoffId", ...(recipientRequired ? ["recipientSessionId"] : [])], recipientRequired ? [] : ["recipientSessionId"]) || !boundedReferenceValue(payload.handoffId) || (payload.recipientSessionId !== undefined && !boundedReferenceValue(payload.recipientSessionId))) throw new CompanionServiceError("invalid_request", "Handoff request requires an exact package ID and, for acknowledgement, exact recipient session.");
+    return { handoffId: payload.handoffId, ...(typeof payload.recipientSessionId === "string" ? { recipientSessionId: payload.recipientSessionId } : {}) };
+  }
+  private requireHandoffRouting(payload: unknown): HandoffRoutingPayload { if (!isRecord(payload) || !exactKeys(payload, ["routing"]) || (payload.routing !== "queue" && payload.routing !== "immediate")) throw new CompanionServiceError("invalid_request", "Handoff routing must be exactly queue or immediate."); return { routing: payload.routing }; }
+
+  private requireWorkflowPrepare(payload: unknown): WorkflowPreparePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "payload"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !isRecord(payload.payload)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, and typed payload record.");
+    return { action: payload.action, sessionId: payload.sessionId, payload: payload.payload as unknown as WorkflowArtifactPayload };
+  }
+
+  private requireVoiceConsent(payload: unknown): VoiceConsentPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["handoffId", "provider", "transcript", "retentionMinutes", "expiresInMinutes"]) || !boundedReferenceValue(payload.handoffId)
+      || (payload.provider !== "claude" && payload.provider !== "chatgpt" && payload.provider !== "system") || (payload.transcript !== "off" && payload.transcript !== "redacted")
+      || !Number.isInteger(payload.retentionMinutes) || (payload.retentionMinutes as number) < 0 || (payload.retentionMinutes as number) > 1_440
+      || !Number.isInteger(payload.expiresInMinutes) || (payload.expiresInMinutes as number) < 1 || (payload.expiresInMinutes as number) > 60) throw new CompanionServiceError("invalid_request", "Voice consent requires one Handoff, provider, privacy policy, bounded retention, and a short expiry.");
+    return { handoffId: payload.handoffId, provider: payload.provider, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes as number, expiresInMinutes: payload.expiresInMinutes as number };
+  }
+  private requireVoiceStart(payload: unknown): VoiceStartPayload { if (!isRecord(payload) || !allowedExactKeys(payload, ["consentId", "voiceSessionId"], ["managedSessionId"]) || !boundedReferenceValue(payload.consentId) || !boundedReferenceValue(payload.voiceSessionId) || (payload.managedSessionId !== undefined && !boundedReferenceValue(payload.managedSessionId))) throw new CompanionServiceError("invalid_request", "Voice start requires exact consent and voice-session IDs."); return { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId, ...(typeof payload.managedSessionId === "string" ? { managedSessionId: payload.managedSessionId } : {}) }; }
+  private requireVoiceSwitch(payload: unknown): VoiceSwitchPayload { if (!isRecord(payload) || !exactKeys(payload, ["bindingId", "consentId", "voiceSessionId"]) || !boundedReferenceValue(payload.bindingId) || !boundedReferenceValue(payload.consentId) || !boundedReferenceValue(payload.voiceSessionId)) throw new CompanionServiceError("invalid_request", "Voice switch requires exact binding, consent, and voice-session IDs."); return { bindingId: payload.bindingId, consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }; }
+  private requireVoiceBinding(payload: unknown): VoiceBindingPayload { if (!isRecord(payload) || !exactKeys(payload, ["bindingId", "managedSessionId"]) || !boundedReferenceValue(payload.bindingId) || !boundedReferenceValue(payload.managedSessionId)) throw new CompanionServiceError("invalid_request", "Voice binding requires exact voice and managed-session IDs."); return { bindingId: payload.bindingId, managedSessionId: payload.managedSessionId }; }
+  private requireVoiceReference(payload: unknown, reasonRequired: boolean): VoiceReferencePayload { if (!isRecord(payload) || !allowedExactKeys(payload, ["bindingId", ...(reasonRequired ? ["reason"] : [])], reasonRequired ? [] : ["reason"]) || !boundedReferenceValue(payload.bindingId) || (payload.reason !== undefined && !boundedReferenceValue(payload.reason))) throw new CompanionServiceError("invalid_request", "Voice request requires an exact binding ID and bounded reason where applicable."); return { bindingId: payload.bindingId, ...(typeof payload.reason === "string" ? { reason: payload.reason } : {}) }; }
+
   private requireSession(id: string): ManagedSession {
     const session = this.sessions.get(id);
     if (!session) throw new CompanionServiceError("not_found", "The requested managed session is not registered with this companion.");
@@ -1025,6 +1175,8 @@ function sameHostRoots(left: readonly string[], right: readonly string[]): boole
 }
 
 function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function boundedStringList(value: unknown, label: string): readonly string[] { if (!Array.isArray(value) || value.length > 512 || !value.every((item) => typeof item === "string" && item.trim() && item.length <= 16_384 && !/\0/.test(item))) throw new CompanionServiceError("invalid_request", `${label} must be a bounded string list.`); return [...new Set(value.map((item) => (item as string).trim()))]; }
+function workflowArtifactAction(value: unknown): value is WorkflowArtifactAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
 function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
 function hardwareCompletionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
 

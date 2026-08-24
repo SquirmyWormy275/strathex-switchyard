@@ -10,7 +10,7 @@ export type WorkflowArtifactAction =
   | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue"
   | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast"
   | "bind_voice_session";
-export type WorkflowArtifactStatus = "prepared" | "submitted" | "acknowledged" | "rejected" | "cancelled";
+export type WorkflowArtifactStatus = "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled";
 
 export interface AnchorWorkflowPayload { readonly kind: "anchor"; readonly contextSummary: string; readonly anchors: readonly string[]; readonly unresolved: readonly string[]; }
 export interface ProofWorkflowPayload { readonly kind: "proof"; readonly claims: readonly string[]; readonly evidenceReferences: readonly string[]; readonly requiredBackends: readonly string[]; }
@@ -116,6 +116,13 @@ export class WorkflowArtifactStore {
     return [...artifactMap(await this.store.readEntries()).values()].filter((entry) => !status || entry.status === status).map(clone);
   }
 
+  async observeOperation(operationId: string): Promise<WorkflowArtifact | undefined> {
+    const id = text(operationId, "operation id");
+    const matches = [...artifactMap(await this.store.readEntries()).values()].filter((entry) => entry.operationId === id);
+    if (matches.length > 1) throw new WorkflowArtifactError("Multiple workflow artifacts are bound to one operation.");
+    return matches[0] ? clone(matches[0]) : undefined;
+  }
+
   async claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string }>): Promise<WorkflowArtifact | undefined> {
     return this.store.transaction(async (transaction) => {
       const entries = artifactMap(await transaction.readEntries());
@@ -140,14 +147,16 @@ export class WorkflowArtifactStore {
       if (!found) throw new WorkflowArtifactError("The provider response references an unknown workflow artifact.");
       const parsed = parseWorkflowProviderResponse(response, found);
       if (found.status === "acknowledged" && found.providerExternalId === parsed.externalId) return clone(found);
-      if (found.status !== "submitted") throw new WorkflowArtifactError(`Workflow artifact is already ${found.status}.`);
+      if (found.status !== "submitted" && found.status !== "cancelling") throw new WorkflowArtifactError(`Workflow artifact is already ${found.status}.`);
       const finalStatus: WorkflowArtifactStatus = parsed.status === "completed" && parsed.effectDisposition === "committed"
         ? "acknowledged"
-        : parsed.effectDisposition === "not_started"
+        : found.status === "cancelling" && (parsed.effectDisposition === "not_started" || parsed.effectDisposition === "compensated")
+          ? "cancelled"
+          : parsed.effectDisposition === "not_started"
           ? "rejected"
           : parsed.effectDisposition === "compensated"
             ? "cancelled"
-            : "submitted";
+            : found.status;
       const updated: WorkflowArtifact = {
         ...found,
         status: finalStatus,
@@ -165,9 +174,38 @@ export class WorkflowArtifactStore {
       const found = artifactMap(await transaction.readEntries()).get(text(id, "artifact id"));
       if (!found) throw new WorkflowArtifactError("Unknown workflow artifact.");
       if (found.status === "acknowledged") throw new WorkflowArtifactError("An acknowledged workflow artifact cannot be cancelled.");
-      const updated: WorkflowArtifact = { ...found, status: "cancelled", updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
+      if (found.status === "cancelled" || found.status === "cancelling") return clone(found);
+      const updated: WorkflowArtifact = { ...found, status: found.status === "submitted" ? "cancelling" : "cancelled", updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
       await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: updated });
       return clone(updated);
+    });
+  }
+
+  async cancelByOperation(operationId: string): Promise<WorkflowArtifact | undefined> {
+    const id = text(operationId, "operation id");
+    return this.store.transaction(async (transaction) => {
+      const matches = [...artifactMap(await transaction.readEntries()).values()].filter((entry) => entry.operationId === id);
+      if (matches.length > 1) throw new WorkflowArtifactError("Multiple workflow artifacts are bound to one operation.");
+      const found = matches[0];
+      if (!found || found.status === "acknowledged" || found.status === "rejected" || found.status === "cancelled" || found.status === "cancelling") return found ? clone(found) : undefined;
+      const updated: WorkflowArtifact = { ...found, status: found.status === "submitted" ? "cancelling" : "cancelled", updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
+      await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: updated });
+      return clone(updated);
+    });
+  }
+
+  async cancelQueuedForRepository(repositoryRoot: string): Promise<readonly WorkflowArtifact[]> {
+    const root = text(repositoryRoot, "repository root");
+    return this.store.transaction(async (transaction) => {
+      const candidates = [...artifactMap(await transaction.readEntries()).values()].filter((entry) => sameRepositoryRoot(entry.repositoryRoot, root) && (entry.status === "prepared" || entry.status === "submitted" || entry.status === "cancelling"));
+      const updated: WorkflowArtifact[] = [];
+      for (const artifact of candidates) {
+        if (artifact.status === "cancelling") { updated.push(clone(artifact)); continue; }
+        const next: WorkflowArtifact = { ...artifact, status: artifact.status === "submitted" ? "cancelling" : "cancelled", updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
+        await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: next });
+        updated.push(clone(next));
+      }
+      return updated;
     });
   }
 }
@@ -309,7 +347,7 @@ function expectedKind(action: WorkflowArtifactAction): WorkflowArtifactPayload["
 function workflowAction(value: unknown): WorkflowArtifactAction { if (typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value)) return value as WorkflowArtifactAction; return invalid("workflow action"); }
 function commandAction(value: unknown): CommandAction { if (typeof value === "string" && (commandActionIds as readonly string[]).includes(value)) return value as CommandAction; return invalid("authority action"); }
 function planStepStatus(value: unknown): PlanStepArtifact["status"] { if (value === "proposed" || value === "approved" || value === "completed" || value === "blocked") return value; return invalid("plan step status"); }
-function workflowStatus(value: unknown): value is WorkflowArtifactStatus { return value === "prepared" || value === "submitted" || value === "acknowledged" || value === "rejected" || value === "cancelled"; }
+function workflowStatus(value: unknown): value is WorkflowArtifactStatus { return value === "prepared" || value === "submitted" || value === "cancelling" || value === "acknowledged" || value === "rejected" || value === "cancelled"; }
 function providerStatus(value: unknown): value is WorkflowProviderResponse["status"] { return typeof value === "string" && ["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value); }
 function disposition(value: unknown): value is EffectDisposition { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
 function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
@@ -322,4 +360,5 @@ function text(value: unknown, field: string): string { if (!bounded(value, 16_38
 function timestamp(value: unknown, field: string): string { if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw new WorkflowArtifactError(`${field} must be an ISO timestamp.`); return value; }
 function list(values: readonly unknown[], field: string, emptyAllowed = false): readonly string[] { if (!Array.isArray(values) || values.length > 512 || (!emptyAllowed && values.length === 0)) throw new WorkflowArtifactError(`${field} list is invalid.`); return [...new Set(values.map((value) => text(value, field)))]; }
 function safeOwnedFile(value: unknown): string { if (typeof value !== "string" || !value || value.length > 4_096 || /[\r\n\0]/.test(value) || /^(?:[A-Za-z]:[\\/]|[\\/])/.test(value) || value.split(/[\\/]/).some((part) => !part || part === "." || part === "..")) throw new WorkflowArtifactError("Plan owned file is unsafe."); return value.replaceAll("\\", "/"); }
+function sameRepositoryRoot(left: string, right: string): boolean { const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase(); return normalize(left) === normalize(right); }
 function invalid(label: string): never { throw new WorkflowArtifactError(`${label} is invalid.`); }

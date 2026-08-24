@@ -23,6 +23,12 @@ import {
   type HardwareSignalDispatchResult,
   type HardwareSignalPreparationResult,
   type HardwareSignalCompletionResult,
+  type ExtensionHandoffPackage,
+  type ExtensionWorkflowAction,
+  type ExtensionWorkflowArtifact,
+  type ExtensionVoiceProvider,
+  type ExtensionVoiceConsent,
+  type ExtensionVoiceBinding,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
@@ -243,6 +249,30 @@ class FakeBridge implements ExtensionCompanionBridge {
     this.hardwareCompleted.push({ claim, outcome: completion.outcome, ...(completion.dispatchReceiptId ? { dispatchReceiptId: completion.dispatchReceiptId } : {}) });
     return { ok: true, value: { signalId: claim.signalId, outcome: completion.outcome } };
   }
+  async createHandoff(input: { sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate" }): Promise<BridgeResult<ExtensionHandoffPackage>> {
+    const session = this.registered.find((value) => value.id === input.sessionId);
+    if (!session?.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision) return { ok: false, code: "not_found", message: "missing" };
+    return { ok: true, value: { id: "handoff-test", digest: "a".repeat(64), repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, taskId: session.taskId, planRevision: session.planRevision, ...(input.recipientSessionId ? { recipientSessionId: input.recipientSessionId } : {}), status: input.routing === "immediate" ? "immediate_focus_requested" : "queued", executionAuthorized: false } };
+  }
+  async listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> { return { ok: true, value: [] }; }
+  async acknowledgeHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return { ok: false, code: "not_found", message: "missing" }; }
+  async cancelHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return { ok: false, code: "not_found", message: "missing" }; }
+  async archiveHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return { ok: false, code: "not_found", message: "missing" }; }
+  async handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return { ok: true, value: "queue" }; }
+  async setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">> { return { ok: true, value: routing }; }
+  async prepareWorkflow(input: { action: ExtensionWorkflowAction; sessionId: string }): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return { ok: true, value: { id: "workflow-test", digest: "b".repeat(64), action: input.action, targetSnapshotId: "snapshot-test", sessionId: input.sessionId, status: "prepared", executionAuthorized: false } }; }
+  async listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> { return { ok: true, value: [] }; }
+  async grantVoiceConsent(input: { handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number }): Promise<BridgeResult<ExtensionVoiceConsent>> { return { ok: true, value: { id: "voice-consent-test", contextPackageId: input.handoffId, contextDigest: "c".repeat(64), provider: input.provider, transcript: input.transcript, retentionMinutes: input.retentionMinutes, expiresAt: "2099-01-01T00:00:00.000Z" } }; }
+  async startVoice(input: { consentId: string; voiceSessionId: string; managedSessionId?: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: "voice-binding-test", consentId: input.consentId, voiceSessionId: input.voiceSessionId, ...(input.managedSessionId ? { managedSessionId: input.managedSessionId } : {}), contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
+  async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return { ok: true, value: undefined }; }
+  async switchVoice(input: { bindingId: string; consentId: string; voiceSessionId: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: input.bindingId, consentId: input.consentId, voiceSessionId: input.voiceSessionId, contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
+  async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
+  async muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "muted"); }
+  async resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "active"); }
+  async interruptVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "interrupted"); }
+  async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
+  async deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
+  private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status } }; }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };

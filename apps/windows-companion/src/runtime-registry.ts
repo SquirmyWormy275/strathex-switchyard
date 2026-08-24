@@ -5,8 +5,10 @@ import { resolve } from "node:path";
 import type { JournalEntry, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import {
   loadVerifiedRepositoryRuntimeManifest,
+  type ManagedRepositoryProcess,
   RepositoryRuntime,
   type RepositoryExecutionRootProvider,
+  type RepositoryProcessSupervisor,
   type RuntimeEffectGuard,
   type RuntimeHealthProbe
 } from "./repository-runtime.ts";
@@ -38,6 +40,7 @@ export interface DurableRepositoryRuntimeRegistryOptions {
   readonly effectGuard?: RuntimeEffectGuard;
   readonly executionRoots?: RepositoryExecutionRootProvider;
   readonly healthProbe?: RuntimeHealthProbe;
+  readonly processSupervisor?: RepositoryProcessSupervisor;
   readonly now?: () => string;
 }
 
@@ -121,7 +124,8 @@ export class DurableRepositoryRuntimeRegistry {
     const runtime = new RepositoryRuntime(verified, {
       ...(this.options.effectGuard ? { effectGuard: this.options.effectGuard } : {}),
       ...(this.options.executionRoots ? { executionRoots: this.options.executionRoots } : {}),
-      ...(this.options.healthProbe ? { healthProbe: this.options.healthProbe } : {})
+      ...(this.options.healthProbe ? { healthProbe: this.options.healthProbe } : {}),
+      ...(this.options.processSupervisor ? { processSupervisor: this.options.processSupervisor } : {})
     });
     this.cache.set(key, runtime);
     return runtime;
@@ -129,6 +133,53 @@ export class DurableRepositoryRuntimeRegistry {
 
   async list(): Promise<readonly RepositoryRuntimePin[]> {
     return [...(await this.state()).values()];
+  }
+
+  async cancelOperation(operationId: string, _reason: string): Promise<number> {
+    bounded(operationId, "operation ID");
+    bounded(_reason, "cancellation reason");
+    const runtimes = await this.activeRuntimes();
+    await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses()));
+    return sum(await Promise.all(runtimes.map((runtime) => runtime.cancelOperation(operationId))));
+  }
+
+  async cancelRepository(repositoryRoot: string, _reason: string): Promise<number> {
+    bounded(_reason, "cancellation reason");
+    const runtime = await this.resolve(bounded(repositoryRoot, "repository root"));
+    await runtime.recoverManagedProcesses();
+    return runtime.cancelRepository();
+  }
+
+  async cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number> {
+    return this.cancelRepository(repositoryRoot, reason);
+  }
+
+  async reconcileOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
+    bounded(operationId, "operation ID");
+    const runtimes = await this.activeRuntimes();
+    await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses()));
+    const observations = await Promise.all(runtimes.map((runtime) => runtime.reconcileOperation(operationId)));
+    if (observations.length === 0 || observations.every((observation) => !observation.settled && observation.summary.startsWith("No exact"))) {
+      return { settled: false, summary: "No exact durable repository supervisor identity is known for this operation; no process was replayed or killed." };
+    }
+    return observations.every((observation) => observation.settled || observation.summary.startsWith("No exact"))
+      ? { settled: true, summary: "Every exact durable repository process observation is terminal; no work was replayed." }
+      : { settled: false, summary: "At least one exact durable repository process tree remains active or unresolved; no work was replayed." };
+  }
+
+  /**
+   * Startup-wide, read-only reconciliation of every active attested pin.
+   * Recovery attaches only to helper-authenticated durable identities and never
+   * replays a recipe or falls back to an ambient PID.
+   */
+  async recoverManagedProcesses(): Promise<readonly ManagedRepositoryProcess[]> {
+    const recovered = await Promise.all((await this.activeRuntimes()).map((runtime) => runtime.recoverManagedProcesses()));
+    return recovered.flat();
+  }
+
+  private async activeRuntimes(): Promise<RepositoryRuntime[]> {
+    const pins = [...(await this.state()).values()].filter((pin) => pin.status === "active");
+    return Promise.all(pins.map((pin) => this.resolve(pin.canonicalRepositoryRoot)));
   }
 
   private async state(): Promise<Map<string, RepositoryRuntimePin>> {
@@ -192,4 +243,14 @@ function record(value: JsonValue): value is { readonly [key: string]: JsonValue 
 function pathKey(value: string): string {
   const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function bounded(value: string, label: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 4_096 || /[\0\r\n]/.test(value)) throw new Error(`The ${label} is invalid.`);
+  return value;
+}
+
+function sum(values: readonly number[]): number {
+  if (values.some((value) => !Number.isSafeInteger(value) || value < 0)) throw new Error("Repository process cancellation returned an invalid count.");
+  return values.reduce((total, value) => total + value, 0);
 }

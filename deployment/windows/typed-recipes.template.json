@@ -1,0 +1,38 @@
+{
+  "schema": "sxsy-b122.typed-recipes",
+  "version": 1,
+  "recipes": {
+    "full_sandbox": {
+      "executable": "tools/REPLACE-WITH-PINNED-SANDBOX-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["full-sandbox", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"production_data","fixtureId":"REPLACE"},{"dimension":"ambient_credentials","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
+    },
+    "quarantine": {
+      "executable": "tools/REPLACE-WITH-PINNED-QUARANTINE-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["quarantine", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"quarantine","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
+    },
+    "pipeline_local_gate": {
+      "executable": "tools/REPLACE-WITH-PINNED-PIPELINE-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["local-gate", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"correctness","fixtureId":"REPLACE"},{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"production_data","fixtureId":"REPLACE"},{"dimension":"ambient_credentials","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
+    },
+    "pipeline_clean_reproduction": {
+      "executable": "tools/REPLACE-WITH-PINNED-PIPELINE-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["clean-reproduction", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"correctness","fixtureId":"REPLACE"},{"dimension":"reproduction","fixtureId":"REPLACE"},{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"production_data","fixtureId":"REPLACE"},{"dimension":"ambient_credentials","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
+    },
+    "shield_change_scan": {
+      "executable": "tools/REPLACE-WITH-PINNED-SCANNER.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["change-scan", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"secrets","fixtureId":"REPLACE"},{"dimension":"pii","fixtureId":"REPLACE"},{"dimension":"security_defects","fixtureId":"REPLACE"}], "scannerFixtureIds": ["REPLACE-WITH-FRESH-SCANNER-FIXTURE"], "advisoryFixtureIds": []
+    },
+    "shield_codebase_audit": {
+      "executable": "tools/REPLACE-WITH-PINNED-SCANNER.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["codebase-audit", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"secrets","fixtureId":"REPLACE"},{"dimension":"history","fixtureId":"REPLACE"},{"dimension":"insecure_paths","fixtureId":"REPLACE"},{"dimension":"permissions","fixtureId":"REPLACE"},{"dimension":"infrastructure","fixtureId":"REPLACE"}], "scannerFixtureIds": ["REPLACE-WITH-FRESH-SCANNER-FIXTURE"], "advisoryFixtureIds": []
+    },
+    "shield_supply_chain": {
+      "executable": "tools/REPLACE-WITH-PINNED-SUPPLY-CHAIN-SCANNER.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["supply-chain", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"vulnerabilities","fixtureId":"REPLACE"},{"dimension":"licenses","fixtureId":"REPLACE"},{"dimension":"provenance","fixtureId":"REPLACE"},{"dimension":"sbom","fixtureId":"REPLACE"}], "scannerFixtureIds": ["REPLACE-WITH-FRESH-SCANNER-FIXTURE"], "advisoryFixtureIds": ["REPLACE-WITH-FRESH-ADVISORY-FIXTURE"]
+    },
+    "release_shield": {
+      "executable": "tools/REPLACE-WITH-PINNED-RELEASE-SCANNER.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["release-shield", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"secrets","fixtureId":"REPLACE"},{"dimension":"pii","fixtureId":"REPLACE"},{"dimension":"security_defects","fixtureId":"REPLACE"},{"dimension":"history","fixtureId":"REPLACE"},{"dimension":"insecure_paths","fixtureId":"REPLACE"},{"dimension":"permissions","fixtureId":"REPLACE"},{"dimension":"infrastructure","fixtureId":"REPLACE"},{"dimension":"vulnerabilities","fixtureId":"REPLACE"},{"dimension":"licenses","fixtureId":"REPLACE"},{"dimension":"provenance","fixtureId":"REPLACE"},{"dimension":"sbom","fixtureId":"REPLACE"},{"dimension":"isolation","fixtureId":"REPLACE"}], "scannerFixtureIds": ["REPLACE-WITH-FRESH-SCANNER-FIXTURE"], "advisoryFixtureIds": ["REPLACE-WITH-FRESH-ADVISORY-FIXTURE"]
+    }
+  }
+}

@@ -110,6 +110,11 @@ export class VoiceCoordinator {
     });
   }
 
+  async getConsent(id: string): Promise<VoiceConsent | undefined> {
+    const found = consents(await this.store.readEntries()).get(text(id, "voice consent id"));
+    return found ? clone(found) : undefined;
+  }
+
   async switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>): Promise<VoiceBinding> {
     return this.store.transaction(async (transaction) => {
       const entries = await transaction.readEntries();

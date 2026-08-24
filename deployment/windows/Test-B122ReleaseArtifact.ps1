@@ -17,7 +17,7 @@ $sbom = Read-Json (Join-Path $root 'sbom.spdx.json')
 $sbomPackages = @($sbom.packages | ForEach-Object { $_ })
 $sbomFiles = @($sbom.files | ForEach-Object { $_ })
 if ($release.schema -cne 'sxsy-b122.windows-release' -or $release.version -ne 1 -or $release.hardwareAcceptance -ne $false -or $release.highConsequenceAcceptance -ne $false) { throw 'Release status metadata is invalid or overclaims acceptance.' }
-if ($release.sourceCommit -notmatch '^[0-9a-f]{40}$' -or $release.sandboxHelperSha256 -notmatch '^[0-9a-f]{64}$' -or $release.rawHidHelperSha256 -notmatch '^[0-9a-f]{64}$') { throw 'Release provenance metadata is invalid.' }
+if ($release.sourceCommit -notmatch '^[0-9a-f]{40}$' -or $release.sandboxHelperSha256 -notmatch '^[0-9a-f]{64}$' -or $release.repositoryRuntimeHelperSha256 -notmatch '^[0-9a-f]{64}$' -or $release.rawHidHelperSha256 -notmatch '^[0-9a-f]{64}$') { throw 'Release provenance metadata is invalid.' }
 if ($release.payloadCount -ne $checksums.Count) { throw 'Release payload count does not match the checksum manifest.' }
 if ($sbom.spdxVersion -cne 'SPDX-2.3' -or $sbom.dataLicense -cne 'CC0-1.0' -or $sbom.SPDXID -cne 'SPDXRef-DOCUMENT') { throw 'The SPDX document header is invalid.' }
 if ($sbomPackages.Count -lt 3 -or $sbomFiles.Count -ne $checksums.Count) { throw 'The SPDX package or file inventory is incomplete.' }
@@ -29,8 +29,10 @@ foreach ($entry in $checksums) {
   $expected[$entry.path] = $entry
 }
 $sandboxHelperPath = 'app/dist/apps/windows-companion/sandbox-helper/b122-sandbox-worker.exe'
+$repositoryRuntimeHelperPath = 'app/dist/apps/windows-companion/repository-runtime/b122-repository-runner.exe'
 $rawHidHelperPath = 'app/dist/apps/windows-companion/raw-hid/strathex-b122-hid-helper.exe'
 if (-not $expected.ContainsKey($sandboxHelperPath) -or $expected[$sandboxHelperPath].sha256 -cne $release.sandboxHelperSha256) { throw 'Sandbox-helper release provenance is incomplete.' }
+if (-not $expected.ContainsKey($repositoryRuntimeHelperPath) -or $expected[$repositoryRuntimeHelperPath].sha256 -cne $release.repositoryRuntimeHelperSha256) { throw 'Repository-runtime-helper release provenance is incomplete.' }
 if (-not $expected.ContainsKey($rawHidHelperPath) -or $expected[$rawHidHelperPath].sha256 -cne $release.rawHidHelperSha256) { throw 'Raw-HID-helper release provenance is incomplete.' }
 if ($release.dotnetRuntime.version -cne '8.0.30' -or $release.dotnetRuntime.license -cne 'licenses/DOTNET-RUNTIME-LICENSE.txt' -or $release.dotnetRuntime.thirdPartyNotices -cne 'licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' -or -not $expected.ContainsKey($release.dotnetRuntime.license) -or -not $expected.ContainsKey($release.dotnetRuntime.thirdPartyNotices)) { throw 'The self-contained .NET runtime notices are missing from release provenance.' }
 $actualFiles = @(Get-ChildItem -LiteralPath $root -File -Recurse | Where-Object { $_.Name -notin @('SHA256SUMS.json', 'sbom.spdx.json', 'release.json') })
@@ -60,7 +62,7 @@ try {
 $sourcePath = Join-Path $root 'source\sxsy-b122-source.zip'
 $sourceArchive = [IO.Compression.ZipFile]::OpenRead($sourcePath)
 try {
-  foreach ($entryName in @('package.json', 'firmware/qmk/keymaps/b122/keymap.c', 'firmware/windows-hid-helper/Program.cs', 'docs/SXSY-B122-complete-key-specification-and-audit.md', 'docs/historical-interview-notes-reconstructed.md', 'docs/adversarial-review.md')) {
+  foreach ($entryName in @('package.json', 'firmware/qmk/keymaps/b122/keymap.c', 'firmware/windows-hid-helper/Program.cs', 'apps/windows-companion/repository-runner-helper/Program.cs', 'apps/windows-companion/repository-runner-helper/Sxsy.B122.RepositoryRunner.csproj', 'docs/SXSY-B122-complete-key-specification-and-audit.md', 'docs/historical-interview-notes-reconstructed.md', 'docs/adversarial-review.md')) {
     if ($null -eq $sourceArchive.GetEntry($entryName)) { throw "Source archive entry is missing: $entryName" }
   }
 } finally { $sourceArchive.Dispose() }

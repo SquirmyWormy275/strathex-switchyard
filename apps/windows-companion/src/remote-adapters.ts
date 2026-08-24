@@ -144,6 +144,11 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         return { status: "blocked", summary: "The prepared provider workflow artifact is missing, ambiguous, corrupt, or bound to another operation.", effectDisposition: "not_started" };
       }
       if (!artifact) return { status: "awaiting_input", summary: "Prepare and explicitly select one typed workflow artifact before provider dispatch.", effectDisposition: "not_started" };
+      if (artifact.status === "cancelled" || artifact.status === "cancelling") return { status: "cancelled", summary: "The durable provider workflow was cancelled before replay.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
+      if (artifact.status === "rejected") return { status: "failed", summary: "The durable provider workflow was previously rejected and was not replayed.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
+      if (artifact.status === "acknowledged") return { status: "completed", summary: "The durable provider workflow was already acknowledged and was not replayed.", effectDisposition: "committed", data: { artifactId: artifact.id, artifactDigest: artifact.digest, ...(artifact.providerExternalId ? { providerExternalId: artifact.providerExternalId } : {}) } };
+      if (artifact.status !== "submitted") return { status: "blocked", summary: "The durable provider workflow is not in a dispatchable submitted state.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
+      if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before network dispatch.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
       const routeId = `provider.${request.definition.action}`;
       const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest } }) : undefined;
       if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
@@ -162,6 +167,11 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         return outcome;
       };
       const body = JSON.stringify(providerDocument(request, artifact));
+      if (request.effectGuard) {
+        const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, session: request.session, ...(request.authority ? { authority: request.authority } : {}) });
+        if (!current.allowed) return finish({ status: "blocked", summary: current.reason, effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
+      }
+      if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider routing was cancelled immediately before network dispatch.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
       let result: ConfiguredNetworkResult;
       try { result = await this.network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal }); }
       catch { return finish({ status: "failed", summary: "The configured provider transport failed after dispatch may have begun; reconciliation is required.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }

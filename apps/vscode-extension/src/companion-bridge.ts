@@ -104,6 +104,12 @@ export interface HardwareSignalClaim { readonly signalId: string; readonly claim
 export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
 export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
 export interface HardwareSignalCompletionResult { readonly signalId: string; readonly outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; }
+export interface ExtensionHandoffPackage { readonly id: string; readonly digest: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly taskId: string; readonly planRevision: string; readonly recipientSessionId?: string; readonly status: "queued" | "immediate_focus_requested" | "acknowledged" | "cancelled" | "archived"; readonly executionAuthorized: false; }
+export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet" | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue" | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast" | "bind_voice_session";
+export interface ExtensionWorkflowArtifact { readonly id: string; readonly digest: string; readonly action: ExtensionWorkflowAction; readonly targetSnapshotId: string; readonly sessionId: string; readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled"; readonly executionAuthorized: false; }
+export type ExtensionVoiceProvider = "claude" | "chatgpt" | "system";
+export interface ExtensionVoiceConsent { readonly id: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly expiresAt: string; }
+export interface ExtensionVoiceBinding { readonly id: string; readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly status: "active" | "muted" | "interrupted" | "ended"; readonly transcriptDeletedAt?: string; }
 
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -138,6 +144,25 @@ export interface ExtensionCompanionBridge {
   prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
   dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
   completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
+  createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>>;
+  acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  cancelHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  archiveHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  handoffRouting(): Promise<BridgeResult<"queue" | "immediate">>;
+  setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">>;
+  prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
+  listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>>;
+  grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>>;
+  startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>>;
+  switchVoice(input: Readonly<{ bindingId: string; consentId: string; voiceSessionId: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  interruptVoice(bindingId: string, reason: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -296,9 +321,91 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.completion };
   }
 
+  async createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>> {
+    return this.handoffResult("handoff.create", input);
+  }
+
+  async listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> {
+    const result = await this.call<unknown>("handoff.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["handoffs"]) || !Array.isArray(result.value.handoffs) || !result.value.handoffs.every(isExtensionHandoffPackage)) return invalidResponse();
+    return { ok: true, value: result.value.handoffs };
+  }
+
+  acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.acknowledge", { handoffId, recipientSessionId }); }
+  cancelHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.cancel", { handoffId }); }
+  archiveHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.archive", { handoffId }); }
+
+  async handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> {
+    return this.routingResult("handoff.routing.get", undefined);
+  }
+
+  async setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">> {
+    return this.routingResult("handoff.routing.set", { routing });
+  }
+
+  async prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
+    const result = await this.call<unknown>("workflow.prepare", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
+    return { ok: true, value: result.value.artifact };
+  }
+
+  async listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> {
+    const result = await this.call<unknown>("workflow.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifacts"]) || !Array.isArray(result.value.artifacts) || !result.value.artifacts.every(isExtensionWorkflowArtifact)) return invalidResponse();
+    return { ok: true, value: result.value.artifacts };
+  }
+
+  async grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>> {
+    const result = await this.call<unknown>("voice.consent", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["consent"]) || !isExtensionVoiceConsent(result.value.consent)) return invalidResponse();
+    return { ok: true, value: result.value.consent };
+  }
+
+  startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.start", input); }
+
+  async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> {
+    const result = await this.call<unknown>("voice.current", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["binding"]) || (result.value.binding !== undefined && !isExtensionVoiceBinding(result.value.binding))) return invalidResponse();
+    return { ok: true, value: result.value.binding };
+  }
+
+  switchVoice(input: Readonly<{ bindingId: string; consentId: string; voiceSessionId: string }>): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.switch", input); }
+  bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.bind", { bindingId, managedSessionId }); }
+  muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.mute", { bindingId }); }
+  resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.resume", { bindingId }); }
+  interruptVoice(bindingId: string, reason: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.interrupt", { bindingId, reason }); }
+  endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
+  deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
+
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
+  }
+
+  private async handoffResult(method: string, payload: unknown): Promise<BridgeResult<ExtensionHandoffPackage>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["handoff"]) || !isExtensionHandoffPackage(result.value.handoff)) return invalidResponse();
+    return { ok: true, value: result.value.handoff };
+  }
+
+  private async routingResult(method: string, payload: unknown): Promise<BridgeResult<"queue" | "immediate">> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["routing"]) || (result.value.routing !== "queue" && result.value.routing !== "immediate")) return invalidResponse();
+    return { ok: true, value: result.value.routing };
+  }
+
+  private async voiceBindingResult(method: string, payload: unknown): Promise<BridgeResult<ExtensionVoiceBinding>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["binding"]) || !isExtensionVoiceBinding(result.value.binding)) return invalidResponse();
+    return { ok: true, value: result.value.binding };
   }
 
   private async call<T>(method: string, payload: unknown): Promise<BridgeResult<T>> {
@@ -370,6 +477,25 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   prepareHardwareSignal(): Promise<BridgeResult<HardwareSignalPreparationResult>> { return this.unavailable(); }
   dispatchHardwareSignal(): Promise<BridgeResult<HardwareSignalDispatchResult>> { return this.unavailable(); }
   completeHardwareSignal(): Promise<BridgeResult<HardwareSignalCompletionResult>> { return this.unavailable(); }
+  createHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> { return this.unavailable(); }
+  acknowledgeHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  cancelHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  archiveHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
+  setHandoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
+  prepareWorkflow(): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return this.unavailable(); }
+  listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> { return this.unavailable(); }
+  grantVoiceConsent(): Promise<BridgeResult<ExtensionVoiceConsent>> { return this.unavailable(); }
+  startVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return this.unavailable(); }
+  switchVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  bindVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  muteVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  resumeVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  interruptVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  endVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  deleteVoiceTranscript(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 
@@ -424,8 +550,64 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function invalidResponse<T>(): BridgeResult<T> {
-  return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict Raw-HID or hardware-signal schema." };
+  return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict SXSY-B122 schema." };
 }
+
+function isExtensionHandoffPackage(value: unknown): value is ExtensionHandoffPackage {
+  const required = ["id", "digest", "repositoryRoot", "targetSnapshotId", "taskId", "planRevision", "plan", "decisions", "documentation", "references", "constraints", "openQuestions", "nextActions", "status", "executionAuthorized", "createdAt", "updatedAt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["authorityId", "recipientSessionId", "acknowledgedAt"])
+    || !reference(value.id) || typeof value.digest !== "string" || !/^[a-f0-9]{64}$/.test(value.digest)
+    || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.taskId) || !reference(value.planRevision)
+    || !contentText(value.plan, 16_384) || ![value.decisions, value.documentation, value.references, value.constraints, value.openQuestions, value.nextActions].every(contentList)
+    || !["queued", "immediate_focus_requested", "acknowledged", "cancelled", "archived"].includes(value.status as string)
+    || value.executionAuthorized !== false || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || ![value.authorityId, value.recipientSessionId].every((item) => item === undefined || reference(item))
+    || (value.acknowledgedAt !== undefined && !timeText(value.acknowledgedAt))) return false;
+  return true;
+}
+
+function isExtensionWorkflowArtifact(value: unknown): value is ExtensionWorkflowArtifact {
+  const required = ["action", "repositoryRoot", "targetSnapshotId", "sessionId", "payload", "id", "digest", "status", "executionAuthorized", "createdAt", "updatedAt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["taskId", "planRevision", "operationId", "providerExternalId"])
+    || !workflowAction(value.action) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.sessionId)
+    || !isRecord(value.payload) || !reference(value.id) || typeof value.digest !== "string" || !/^[a-f0-9]{64}$/.test(value.digest)
+    || !["prepared", "submitted", "cancelling", "acknowledged", "rejected", "cancelled"].includes(value.status as string)
+    || value.executionAuthorized !== false || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || ![value.taskId, value.planRevision, value.operationId, value.providerExternalId].every((item) => item === undefined || reference(item))) return false;
+  return true;
+}
+
+function isExtensionVoiceConsent(value: unknown): value is ExtensionVoiceConsent {
+  if (!isRecord(value) || !exactKeys(value, ["id", "repositoryRoot", "targetSnapshotId", "contextPackageId", "contextDigest", "provider", "operatorPresenceId", "transcript", "retentionMinutes", "grantedAt", "expiresAt"])
+    || !reference(value.id) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.contextPackageId)
+    || typeof value.contextDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.contextDigest) || !voiceProvider(value.provider)
+    || !reference(value.operatorPresenceId) || (value.transcript !== "off" && value.transcript !== "redacted")
+    || !Number.isSafeInteger(value.retentionMinutes) || (value.retentionMinutes as number) < 0 || (value.retentionMinutes as number) > 1_440
+    || !timeText(value.grantedAt) || !timeText(value.expiresAt)) return false;
+  return true;
+}
+
+function isExtensionVoiceBinding(value: unknown): value is ExtensionVoiceBinding {
+  const required = ["id", "consentId", "voiceSessionId", "repositoryRoot", "targetSnapshotId", "contextPackageId", "contextDigest", "provider", "transcript", "retentionMinutes", "status", "createdAt", "updatedAt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["managedSessionId", "endedAt", "interruptionReason", "transcriptDeletedAt"])
+    || !reference(value.id) || !reference(value.consentId) || !reference(value.voiceSessionId) || !pathText(value.repositoryRoot)
+    || !reference(value.targetSnapshotId) || !reference(value.contextPackageId) || typeof value.contextDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.contextDigest)
+    || !voiceProvider(value.provider) || (value.transcript !== "off" && value.transcript !== "redacted")
+    || !Number.isSafeInteger(value.retentionMinutes) || (value.retentionMinutes as number) < 0 || (value.retentionMinutes as number) > 1_440
+    || !["active", "muted", "interrupted", "ended"].includes(value.status as string) || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || (value.managedSessionId !== undefined && !reference(value.managedSessionId))
+    || ![value.endedAt, value.transcriptDeletedAt].every((item) => item === undefined || timeText(item))
+    || (value.interruptionReason !== undefined && !contentText(value.interruptionReason, 512))) return false;
+  return true;
+}
+
+function workflowAction(value: unknown): value is ExtensionWorkflowAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function voiceProvider(value: unknown): value is ExtensionVoiceProvider { return value === "claude" || value === "chatgpt" || value === "system"; }
+function reference(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function pathText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value); }
+function contentText(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/\0/.test(value); }
+function contentList(value: unknown): value is readonly string[] { return Array.isArray(value) && value.length <= 512 && value.every((item) => contentText(item, 16_384)); }
+function timeText(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
 
 function isRawHidPin(value: unknown): value is RawHidInstallationPin {
   if (!isRecord(value) || !exactKeys(value, ["identity", "helperPath", "helperSha256", "protocolVersion", "mapFingerprint", "installedAt", "status"])

@@ -2,6 +2,9 @@ import type { Control, Modifier } from "../../../packages/protocol/src/b122.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CommandResult, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
+import type { HandoffPackageInput, HandoffRoutingDefault } from "../../../packages/control-plane/src/context-packages.ts";
+import type { WorkflowArtifactAction, WorkflowArtifactPayload } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { VoiceProvider, VoiceTranscriptPolicy } from "../../../packages/control-plane/src/voice.ts";
 import type { CompanionService } from "./service.ts";
 import type { HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidDeviceIdentity } from "./raw-hid-installation.ts";
@@ -49,7 +52,26 @@ export type CompanionMethod =
   | "hardware-signal.prepare"
   | "hardware-signal.dispatch"
   | "hardware-signal.complete"
-  | "host-action.complete";
+  | "host-action.complete"
+  | "handoff.create"
+  | "handoff.list"
+  | "handoff.acknowledge"
+  | "handoff.cancel"
+  | "handoff.archive"
+  | "handoff.routing.get"
+  | "handoff.routing.set"
+  | "workflow.prepare"
+  | "workflow.list"
+  | "voice.consent"
+  | "voice.start"
+  | "voice.current"
+  | "voice.switch"
+  | "voice.bind"
+  | "voice.mute"
+  | "voice.resume"
+  | "voice.interrupt"
+  | "voice.end"
+  | "voice.transcript.delete";
 
 export interface CompanionRequest {
   readonly version: typeof companionBridgeVersion;
@@ -179,6 +201,15 @@ export interface HardwareSignalClaimPayload { readonly windowSessionId: string; 
 export interface HardwareSignalPreparationPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly reason: string; }
 export interface HardwareSignalDispatchPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly authorityId?: string; readonly confirmationToken?: string; readonly input?: Readonly<Record<string, string>>; }
 export interface HardwareSignalCompletionPayload extends HardwareSignalBindingPayload { readonly outcome: HardwareSignalCompletionOutcome; readonly summary: string; readonly dispatchReceiptId?: string; readonly dispatchSessionId?: string; readonly repositoryRoot?: string; }
+export interface HandoffCreatePayload extends Omit<HandoffPackageInput, "repositoryRoot" | "targetSnapshotId" | "taskId" | "planRevision" | "authorityId" | "id"> { readonly sessionId: string; readonly authorityId?: string; }
+export interface HandoffReferencePayload { readonly handoffId: string; readonly recipientSessionId?: string; }
+export interface HandoffRoutingPayload { readonly routing: HandoffRoutingDefault; }
+export interface WorkflowPreparePayload { readonly action: WorkflowArtifactAction; readonly sessionId: string; readonly payload: WorkflowArtifactPayload; }
+export interface VoiceConsentPayload { readonly handoffId: string; readonly provider: VoiceProvider; readonly transcript: VoiceTranscriptPolicy; readonly retentionMinutes: number; readonly expiresInMinutes: number; }
+export interface VoiceStartPayload { readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; }
+export interface VoiceSwitchPayload { readonly bindingId: string; readonly consentId: string; readonly voiceSessionId: string; }
+export interface VoiceBindingPayload { readonly bindingId: string; readonly managedSessionId: string; }
+export interface VoiceReferencePayload { readonly bindingId: string; readonly reason?: string; }
 
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
@@ -235,7 +266,9 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake",
-    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.complete"
+    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.complete",
+    "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
+    "workflow.prepare", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"
   ].includes(value);
 }
 

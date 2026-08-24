@@ -6,6 +6,8 @@ param(
   [string]$OutputDirectory,
   [string]$SandboxHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$SandboxHelperSha256,
+  [string]$RepositoryRuntimeHelperPath,
+  [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RepositoryRuntimeHelperSha256,
   [string]$RawHidHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RawHidHelperSha256,
   [switch]$SkipVerification
@@ -79,6 +81,28 @@ if ($SandboxHelperPath) {
   if (-not ((Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.Equals($SandboxHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The sandbox helper digest does not match the reviewed value.' }
 }
 
+$repositoryRuntimeHelper = $RepositoryRuntimeHelperPath
+if (-not $repositoryRuntimeHelper) {
+  if ($RepositoryRuntimeHelperSha256) { throw '-RepositoryRuntimeHelperSha256 is valid only with -RepositoryRuntimeHelperPath.' }
+  $dotnet = (Get-Command dotnet.exe -ErrorAction SilentlyContinue).Source
+  if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -RepositoryRuntimeHelperPath is required to build the Job-Object repository runtime helper.' }
+  $repositoryRuntimePublish = Join-Path $output '.repository-runtime-helper-publish'
+  Assert-Child $output $repositoryRuntimePublish
+  & $dotnet publish (Join-Path $repo 'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $repositoryRuntimePublish
+  if ($LASTEXITCODE -ne 0) { throw 'Repository runtime Job-Object helper build failed.' }
+  $repositoryRuntimeHelper = Join-Path $repositoryRuntimePublish 'b122-repository-runner.exe'
+}
+$repositoryRuntimeHelper = [IO.Path]::GetFullPath($repositoryRuntimeHelper)
+if (-not (Test-Path -LiteralPath $repositoryRuntimeHelper -PathType Leaf)) { throw 'The repository runtime Job-Object helper executable is missing.' }
+if ($RepositoryRuntimeHelperPath) {
+  if (-not $RepositoryRuntimeHelperSha256) { throw '-RepositoryRuntimeHelperSha256 is required with a prebuilt helper.' }
+  if (-not ((Get-FileHash -LiteralPath $repositoryRuntimeHelper -Algorithm SHA256).Hash.Equals($RepositoryRuntimeHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The repository runtime helper digest does not match the reviewed value.' }
+}
+$repositoryRuntimeSelfTestRaw = & $repositoryRuntimeHelper --self-test
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRuntimeSelfTestRaw)) { throw 'Repository runtime helper Job-Object self-test failed.' }
+$repositoryRuntimeSelfTest = $repositoryRuntimeSelfTestRaw | ConvertFrom-Json
+if ($repositoryRuntimeSelfTest.schema -cne 'sxsy-b122.repository-runner-self-test' -or $repositoryRuntimeSelfTest.version -ne 1 -or $repositoryRuntimeSelfTest.killOnClose -ne $true -or $repositoryRuntimeSelfTest.childTreeTerminated -ne $true -or $repositoryRuntimeSelfTest.noSurvivors -ne $true) { throw 'Repository runtime helper returned an invalid containment self-test receipt.' }
+
 $rawHidHelper = $RawHidHelperPath
 if (-not $rawHidHelper) {
   if ($RawHidHelperSha256) { throw '-RawHidHelperSha256 is valid only with -RawHidHelperPath.' }
@@ -97,6 +121,7 @@ if ($RawHidHelperPath) {
   if (-not ((Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.Equals($RawHidHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The Raw-HID helper digest does not match the reviewed value.' }
 }
 $helperDigest = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
+$repositoryRuntimeHelperDigest = (Get-FileHash -LiteralPath $repositoryRuntimeHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 $rawHidHelperDigest = (Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 
 $runtimeExtract = Join-Path $output '.node-runtime'
@@ -123,6 +148,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\README.md') -Des
 $helperDestination = Join-Path $app 'dist\apps\windows-companion\sandbox-helper'
 New-Item -ItemType Directory -Path $helperDestination | Out-Null
 Copy-Item -LiteralPath $helper -Destination (Join-Path $helperDestination 'b122-sandbox-worker.exe')
+$repositoryRuntimeDestination = Join-Path $app 'dist\apps\windows-companion\repository-runtime'
+New-Item -ItemType Directory -Path $repositoryRuntimeDestination | Out-Null
+Copy-Item -LiteralPath $repositoryRuntimeHelper -Destination (Join-Path $repositoryRuntimeDestination 'b122-repository-runner.exe')
 $rawHidDestination = Join-Path $app 'dist\apps\windows-companion\raw-hid'
 New-Item -ItemType Directory -Path $rawHidDestination | Out-Null
 Copy-Item -LiteralPath $rawHidHelper -Destination (Join-Path $rawHidDestination 'strathex-b122-hid-helper.exe')
@@ -155,7 +183,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\dist') -Destinati
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\package.json') -Destination $extension
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\README.md') -Destination $extension
 foreach ($name in @('Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $scripts }
-foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $provisioning }
+foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $provisioning }
 $documentationSource = [IO.Path]::GetFullPath((Join-Path $repo 'docs')).TrimEnd('\')
 foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Recurse | Sort-Object FullName)) {
   $relativeDocument = $document.FullName.Substring($documentationSource.Length + 1)
@@ -173,6 +201,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\DOTNET-RUNTIME-THIRD-P
 Remove-Item -LiteralPath $runtimeExtract -Recurse -Force
 Remove-Item -LiteralPath $vsixRoot -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $output '.helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.helper-publish') -Recurse -Force }
+if (Test-Path -LiteralPath (Join-Path $output '.repository-runtime-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.repository-runtime-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.raw-hid-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.raw-hid-helper-publish') -Recurse -Force }
 
 $portableSmoke = & (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output
@@ -203,7 +232,7 @@ for ($index = 0; $index -lt $payload.Count; $index++) {
 }
 Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='SPDX-2.3'; dataLicense='CC0-1.0'; SPDXID='SPDXRef-DOCUMENT'; name='SXSY-B122 Windows bundle'; documentNamespace=('https://strathex.invalid/spdx/b122/' + [guid]::NewGuid()); creationInfo=[ordered]@{ created=(Get-Date).ToUniversalTime().ToString('o'); creators=@('Tool: SXSY-B122 Build-B122Release.ps1') }; packages=$packages; files=$spdxFiles; relationships=$relationships } | ConvertTo-Json -Depth 10)
 $sourceCommit = (& git.exe rev-parse HEAD).Trim()
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 Write-Output "Built verified SXSY-B122 Windows bundle: $output"

@@ -86,6 +86,26 @@ test("configured provider adapter does not call the network without one prepared
   assert.equal(requests, 0);
 });
 
+test("configured provider adapter never replays cancelled, cancelling, rejected, or acknowledged queue state", async () => {
+  let requests = 0;
+  const network = { async request() { requests += 1; throw new Error("must not dispatch"); } } as unknown as DynamicConfiguredNetworkClient;
+  for (const [status, expectedStatus, disposition] of [
+    ["cancelled", "cancelled", "not_started"],
+    ["cancelling", "cancelled", "not_started"],
+    ["rejected", "failed", "not_started"],
+    ["acknowledged", "completed", "committed"]
+  ] as const) {
+    const adapter = new ConfiguredProviderCommandAdapter(network, {
+      async claimForDispatch() { return { ...proofArtifact(), status }; },
+      async acknowledge() { throw new Error("must not acknowledge"); }
+    });
+    const outcome = await adapter.execute(providerRequest());
+    assert.equal(outcome.status, expectedStatus);
+    assert.equal(outcome.effectDisposition, disposition);
+  }
+  assert.equal(requests, 0);
+});
+
 test("provider handshake elevates only an exact current target after user presence", async () => {
   const targetId = "a".repeat(64);
   const target = { id: targetId, repositoryRoot: "C:\\repo", branch: "feat/test", head: "b".repeat(40), trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete", reasons: [] } as const;

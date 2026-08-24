@@ -139,3 +139,58 @@ test("Raw-HID and hardware response schemas fail closed on malformed or mismatch
   const malformedList = await bridge.listRawHid();
   assert.equal(malformedList.ok, false);
 });
+
+test("Handoff, typed workflow, and private voice replies are strictly validated across the installed bridge", async () => {
+  const methods: string[] = [];
+  const handoff = {
+    id: "handoff-1", digest: "a".repeat(64), repositoryRoot: "C:/isolated/repo", targetSnapshotId: "target-1", taskId: "task-1", planRevision: "plan-1",
+    plan: "Finish the exact plan.", decisions: ["Keep mediation."], documentation: ["docs/design.md"], references: ["ref-1"], constraints: ["Fail closed."], openQuestions: [], nextActions: ["Verify."],
+    recipientSessionId: "recipient-1", status: "queued", executionAuthorized: false, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
+  } as const;
+  const artifact = {
+    action: "handoff", repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, sessionId: session.id,
+    payload: { kind: "handoff", packageId: handoff.id, route: "queue", recipientSessionId: handoff.recipientSessionId }, id: "artifact-1", digest: "b".repeat(64),
+    status: "prepared", executionAuthorized: false, createdAt: "2026-08-24T00:00:01.000Z", updatedAt: "2026-08-24T00:00:01.000Z"
+  } as const;
+  const consent = {
+    id: "consent-1", repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest,
+    provider: "claude", operatorPresenceId: "presence-1", transcript: "off", retentionMinutes: 0, grantedAt: "2026-08-24T00:00:02.000Z", expiresAt: "2026-08-24T00:15:02.000Z"
+  } as const;
+  const binding = {
+    id: "binding-1", consentId: consent.id, voiceSessionId: "voice-session-1", managedSessionId: session.id, repositoryRoot: handoff.repositoryRoot,
+    targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest, provider: "claude", transcript: "off", retentionMinutes: 0,
+    status: "active", createdAt: "2026-08-24T00:00:03.000Z", updatedAt: "2026-08-24T00:00:03.000Z"
+  } as const;
+  let corrupt = false;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string };
+      methods.push(request.method);
+      const result = request.method === "handoff.create" ? { handoff }
+        : request.method === "handoff.list" ? { handoffs: [handoff] }
+          : request.method === "handoff.routing.get" ? { routing: "queue" }
+            : request.method === "workflow.prepare" ? { artifact: corrupt ? { ...artifact, executionAuthorized: true } : artifact }
+              : request.method === "workflow.list" ? { artifacts: [artifact] }
+                : request.method === "voice.consent" ? { consent }
+                  : request.method === "voice.current" ? { binding }
+                    : { binding };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+    }
+  }, "workflow-vscode");
+
+  assert.equal((await bridge.createHandoff({ sessionId: session.id, recipientSessionId: "recipient-1", plan: handoff.plan, decisions: handoff.decisions, documentation: handoff.documentation, references: handoff.references, constraints: handoff.constraints, openQuestions: handoff.openQuestions, nextActions: handoff.nextActions })).ok, true);
+  assert.equal((await bridge.listHandoffs()).ok, true);
+  assert.deepEqual(await bridge.handoffRouting(), { ok: true, value: "queue" });
+  assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, payload: artifact.payload })).ok, true);
+  assert.equal((await bridge.listWorkflows()).ok, true);
+  assert.equal((await bridge.grantVoiceConsent({ handoffId: handoff.id, provider: "claude", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 })).ok, true);
+  assert.equal((await bridge.startVoice({ consentId: consent.id, voiceSessionId: binding.voiceSessionId, managedSessionId: session.id })).ok, true);
+  assert.equal((await bridge.currentVoice()).ok, true);
+  assert.equal((await bridge.bindVoice(binding.id, session.id)).ok, true);
+  assert.equal(methods.includes("voice.bind"), true);
+
+  corrupt = true;
+  const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, payload: artifact.payload });
+  assert.equal(forgedAuthority.ok, false);
+  if (!forgedAuthority.ok) assert.equal(forgedAuthority.code, "invalid_response");
+});

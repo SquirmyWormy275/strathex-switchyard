@@ -114,3 +114,21 @@ test("handoff, authority, focus, and voice bindings retain typed non-executing i
     assert.equal(created.executionAuthorized, false);
   }
 });
+
+test("provider queue cancellation is durable, operation-bound, and preserves ambiguous in-flight state", async (context) => {
+  const artifacts = new WorkflowArtifactStore(await store(context), { clock: () => "2026-08-24T12:00:00.000Z" });
+  const prepared = await artifacts.create(base("proof", { kind: "proof", claims: ["claim"], evidenceReferences: ["receipt:1"], requiredBackends: ["local"] }));
+  const submittedInput = base("reanchor", { kind: "anchor", contextSummary: "Exact context", anchors: ["target"], unresolved: [] });
+  const submitted = await artifacts.create({ ...submittedInput, id: "artifact-submitted" });
+  await artifacts.claimForDispatch({ action: "reanchor", targetSnapshotId: submitted.targetSnapshotId, sessionId: submitted.sessionId, operationId: "operation-submitted" });
+
+  const observed = await artifacts.observeOperation("operation-submitted");
+  assert.equal(observed?.id, submitted.id);
+  assert.equal((await artifacts.cancelByOperation("operation-submitted"))?.status, "cancelling");
+  assert.equal((await artifacts.observeOperation("operation-submitted"))?.status, "cancelling");
+
+  const cancelled = await artifacts.cancelQueuedForRepository("c:/REPO/");
+  assert.deepEqual(cancelled.map((artifact) => [artifact.id, artifact.status]).sort(), [[prepared.id, "cancelled"], [submitted.id, "cancelling"]].sort());
+  assert.equal((await artifacts.get(prepared.id))?.status, "cancelled");
+  assert.equal(await artifacts.cancelByOperation("unknown-operation"), undefined);
+});

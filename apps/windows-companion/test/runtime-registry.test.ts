@@ -50,6 +50,7 @@ test("durable runtime pins are verified before install and resolve by canonical 
   assert.equal(installed.status, "active");
   assert.ok(await registry.resolve(root) instanceof RepositoryRuntime);
   assert.equal((await registry.list()).length, 1);
+  assert.deepEqual(await registry.recoverManagedProcesses(), []);
 });
 
 test("changed manifests and revoked pins fail closed", async () => {

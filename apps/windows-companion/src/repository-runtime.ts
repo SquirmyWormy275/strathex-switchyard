@@ -10,6 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import type { Readable } from "node:stream";
 
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 
@@ -83,6 +84,7 @@ export interface RepositoryRuntimeManifest {
 
 interface ExecutableIdentity {
   readonly canonicalPath: string;
+  readonly sha256: string;
   readonly device: number;
   readonly inode: number;
   readonly size: number;
@@ -149,13 +151,57 @@ export interface RepositoryRuntimeResult {
 
 export interface RepositoryRuntimeExecuteOptions {
   readonly managedProcessId?: string;
+  readonly operationId?: string;
   readonly signal?: AbortSignal;
   /** Exact dispatch-bound final barrier; the constructor guard remains the fail-closed default. */
   readonly effectGuard?: RuntimeEffectGuard;
 }
 
+export interface RepositoryProcessStartRequest {
+  readonly action: RepositoryProcessAction;
+  readonly operationId: string;
+  readonly repositoryRoot: string;
+  readonly manifestSha256: string;
+  readonly executable: string;
+  readonly executableSha256: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  /** Complete environment. A supervisor must never merge the ambient process environment. */
+  readonly environment: Readonly<Record<string, string>>;
+  readonly lifecycle: RepositoryRuntimeLifecycle;
+  readonly timeoutMs: number;
+  readonly maxOutputBytes: number;
+}
+
+export interface RepositoryProcessRecoveryScope {
+  readonly repositoryRoot: string;
+  readonly manifestSha256: string;
+}
+
+export interface RepositorySupervisedProcess {
+  /** Opaque, durable supervisor identity. It is never a caller-selected PID. */
+  readonly supervisorId: string;
+  readonly action: RepositoryProcessAction;
+  readonly operationId: string;
+  readonly pid: number;
+  readonly startedAt: string;
+  readonly stdout: Readable;
+  readonly stderr: Readable;
+  readonly recovered: boolean;
+  wait(): Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
+  isAlive(): Promise<boolean>;
+  /** Must terminate the entire supervisor-owned process tree. */
+  terminateTree(gracefulTimeoutMs: number, forceTimeoutMs: number): Promise<void>;
+}
+
+export interface RepositoryProcessSupervisor {
+  start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess>;
+  recover(scope: RepositoryProcessRecoveryScope): Promise<readonly RepositorySupervisedProcess[]>;
+}
+
 export interface ManagedRepositoryProcess {
   readonly id: string;
+  readonly operationId: string;
   readonly action: "run_target" | "debug_target" | "launch_web_app";
   readonly pid: number;
   readonly startedAt: string;
@@ -414,12 +460,13 @@ async function captureExecutableIdentity(executable: string): Promise<Executable
   const canonicalPath = await realpath(executable).catch(() => { throw new Error("Repository runtime executable does not exist."); });
   const metadata = await stat(canonicalPath);
   if (!metadata.isFile()) throw new Error("Repository runtime executable is not a regular file.");
-  return { canonicalPath, device: metadata.dev, inode: metadata.ino, size: metadata.size, modifiedMs: metadata.mtimeMs };
+  const sha256 = createHash("sha256").update(await readFile(canonicalPath)).digest("hex");
+  return { canonicalPath, sha256, device: metadata.dev, inode: metadata.ino, size: metadata.size, modifiedMs: metadata.mtimeMs };
 }
 
 async function assertExecutableUnchanged(expected: ExecutableIdentity): Promise<string> {
   const current = await captureExecutableIdentity(expected.canonicalPath);
-  if (!samePath(current.canonicalPath, expected.canonicalPath) || current.device !== expected.device || current.inode !== expected.inode || current.size !== expected.size || current.modifiedMs !== expected.modifiedMs) {
+  if (!samePath(current.canonicalPath, expected.canonicalPath) || current.sha256 !== expected.sha256 || current.device !== expected.device || current.inode !== expected.inode || current.size !== expected.size || current.modifiedMs !== expected.modifiedMs) {
     throw new Error("Repository runtime executable changed after manifest verification.");
   }
   return current.canonicalPath;
@@ -468,6 +515,7 @@ class ExactEnvironmentOutput {
 interface ManagedRecord {
   readonly public: {
     id: string;
+    operationId: string;
     action: "run_target" | "debug_target" | "launch_web_app";
     pid: number;
     startedAt: string;
@@ -475,7 +523,7 @@ interface ManagedRecord {
     exitCode?: number;
     outputTruncated: boolean;
   };
-  readonly child: ChildProcessWithoutNullStreams;
+  readonly process: RepositorySupervisedProcess;
   readonly output: ExactEnvironmentOutput;
   readonly exit: Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
   readonly lease: RepositoryExecutionRootLease;
@@ -505,11 +553,64 @@ const defaultHealthProbe: RuntimeHealthProbe = {
   }
 };
 
+/**
+ * Compatibility supervisor for tests and explicitly injected development use.
+ * Installed Windows composition supplies the Job-Object supervisor instead.
+ */
+class DirectChildProcessSupervisor implements RepositoryProcessSupervisor {
+  async recover(): Promise<readonly RepositorySupervisedProcess[]> { return []; }
+
+  async start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess> {
+    let child: ChildProcessWithoutNullStreams;
+    try {
+      child = spawn(request.executable, [...request.args], {
+        cwd: request.cwd,
+        env: { ...request.environment },
+        shell: false,
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+    } catch (error) { throw new Error(untrustedSummary((error as Error).message)); }
+    const spawned = await new Promise<boolean>((resolveSpawn) => {
+      child.once("spawn", () => resolveSpawn(true));
+      child.once("error", () => resolveSpawn(false));
+    });
+    if (!spawned || child.pid === undefined) throw new Error("Managed process failed before spawn.");
+    child.stdin.end();
+    const supervisorId = `managed:${createHash("sha256").update(`${randomUUID()}:${child.pid}:${Date.now()}:${request.action}`).digest("hex")}`;
+    let settle!: (value: { readonly code: number; readonly signal: NodeJS.Signals | null }) => void;
+    const exit = new Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>((resolveExit) => { settle = resolveExit; });
+    let settled = false;
+    child.once("close", (code, closeSignal) => { if (!settled) { settled = true; settle({ code: code ?? -1, signal: closeSignal }); } });
+    child.once("error", () => { if (!settled) { settled = true; settle({ code: -1, signal: null }); } });
+    return {
+      supervisorId,
+      action: request.action,
+      operationId: request.operationId,
+      pid: child.pid,
+      startedAt: new Date().toISOString(),
+      stdout: child.stdout,
+      stderr: child.stderr,
+      recovered: false,
+      wait: async () => exit,
+      isAlive: async () => child.exitCode === null,
+      terminateTree: async (gracefulTimeoutMs, forceTimeoutMs) => {
+        child.kill("SIGTERM");
+        if (!await settledWithin(exit, gracefulTimeoutMs)) {
+          child.kill("SIGKILL");
+          if (!await settledWithin(exit, forceTimeoutMs)) throw new Error("The direct child did not stop within the bounded termination window.");
+        }
+      }
+    };
+  }
+}
+
 export class RepositoryRuntime {
   private readonly verified: VerifiedRepositoryRuntimeManifest;
   private readonly effectGuard: RuntimeEffectGuard;
   private readonly executionRoots: RepositoryExecutionRootProvider;
   private readonly healthProbe: RuntimeHealthProbe;
+  private readonly processSupervisor: RepositoryProcessSupervisor;
   private readonly managed = new Map<string, ManagedRecord>();
 
   constructor(
@@ -518,6 +619,7 @@ export class RepositoryRuntime {
       effectGuard?: RuntimeEffectGuard;
       executionRoots?: RepositoryExecutionRootProvider;
       healthProbe?: RuntimeHealthProbe;
+      processSupervisor?: RepositoryProcessSupervisor;
     }> = {}
   ) {
     if (verified[verifiedBrand] !== true) throw new Error("Repository runtime requires a digest-verified host manifest.");
@@ -525,6 +627,32 @@ export class RepositoryRuntime {
     this.effectGuard = dependencies.effectGuard ?? denyEffects;
     this.executionRoots = dependencies.executionRoots ?? defaultExecutionRoots;
     this.healthProbe = dependencies.healthProbe ?? defaultHealthProbe;
+    this.processSupervisor = dependencies.processSupervisor ?? new DirectChildProcessSupervisor();
+  }
+
+  async recoverManagedProcesses(): Promise<readonly ManagedRepositoryProcess[]> {
+    const recovered = await this.processSupervisor.recover({ repositoryRoot: this.verified.canonicalRepositoryRoot, manifestSha256: this.verified.digest });
+    for (const process of recovered) {
+      if (!/^managed:[a-f0-9]{64}$/.test(process.supervisorId) || this.managed.has(process.supervisorId) || !await process.isAlive()) continue;
+      const action = process.action;
+      if (action !== "run_target" && action !== "launch_web_app") continue;
+      if (!this.verified.manifest.recipes[action] || this.verified.manifest.recipes[action]?.kind !== "process") continue;
+      const output = new ExactEnvironmentOutput((this.verified.manifest.recipes[action] as RepositoryProcessRecipe).maxOutputBytes);
+      process.stdout.on("data", (chunk: Buffer | string) => output.collect(chunk));
+      process.stderr.on("data", (chunk: Buffer | string) => output.collect(chunk));
+      const exit = process.wait();
+      const lease: RepositoryExecutionRootLease = { root: this.verified.canonicalRepositoryRoot, isolation: "repository", release: async () => undefined };
+      const record: ManagedRecord = {
+        public: { id: process.supervisorId, operationId: process.operationId, action, pid: process.pid, startedAt: process.startedAt, state: "running", outputTruncated: false },
+        process,
+        output,
+        exit,
+        lease
+      };
+      this.managed.set(process.supervisorId, record);
+      void this.observeManagedExit(record);
+    }
+    return this.listManagedProcesses();
   }
 
   listManagedProcesses(): readonly ManagedRepositoryProcess[] {
@@ -541,6 +669,27 @@ export class RepositoryRuntime {
     if (!record || (record.public.state !== "running" && record.public.state !== "stopping")) return false;
     await this.terminateRecord(record, 250, 1_000, "cancelled");
     return (record.public.state as ManagedRepositoryProcess["state"]) === "cancelled";
+  }
+
+  async cancelOperation(operationId: string): Promise<number> {
+    const records = [...this.managed.values()].filter((record) => record.public.operationId === operationId && (record.public.state === "running" || record.public.state === "stopping"));
+    await Promise.all(records.map((record) => this.terminateRecord(record, 250, 1_000, "cancelled")));
+    return records.filter((record) => record.public.state === "cancelled").length;
+  }
+
+  async cancelRepository(): Promise<number> {
+    const records = [...this.managed.values()].filter((record) => record.public.state === "running" || record.public.state === "stopping");
+    await Promise.all(records.map((record) => this.terminateRecord(record, 250, 1_000, "cancelled")));
+    return records.filter((record) => record.public.state === "cancelled").length;
+  }
+
+  async reconcileOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
+    const records = [...this.managed.values()].filter((record) => record.public.operationId === operationId);
+    if (records.length === 0) return { settled: false, summary: "No exact durable repository supervisor identity is known for this operation; no process was replayed or killed." };
+    const alive = await Promise.all(records.map((record) => record.process.isAlive().catch(() => true)));
+    return alive.some(Boolean)
+      ? { settled: false, summary: `${alive.filter(Boolean).length} exact supervisor-owned process tree(s) remain active for the operation.` }
+      : { settled: true, summary: "Every exact supervisor-owned process tree for the operation is terminal; no work was replayed." };
   }
 
   async execute(action: RepositoryRuntimeAction, options: RepositoryRuntimeExecuteOptions = {}): Promise<RepositoryRuntimeResult> {
@@ -561,10 +710,11 @@ export class RepositoryRuntime {
       return { status: "running", summary: "The exact verified VS Code debug configuration is ready for authenticated host execution.", debugConfiguration: recipe.configuration };
     }
     if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type." };
-    return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard);
+    return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`);
   }
 
-  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard): Promise<RepositoryRuntimeResult> {
+  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string): Promise<RepositoryRuntimeResult> {
+    if (!operationId.trim() || operationId.length > 256 || /[\0\r\n]/.test(operationId)) return { status: "blocked", summary: "Repository runtime operation identity is invalid." };
     if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.` };
     const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
     if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
@@ -595,7 +745,7 @@ export class RepositoryRuntime {
       const finalCwd = await realpath(cwd);
       if (!samePath(finalRoot, executionRoot) || !inside(finalCwd, finalRoot)) return { status: "blocked", summary: "Execution root changed during the final effect check." };
       const executable = await assertExecutableUnchanged(expectedExecutable);
-      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal);
+      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal, operationId);
       if ("result" in started) return started.result;
       transferredLease = recipe.lifecycle === "managed";
       if (recipe.lifecycle === "foreground") {
@@ -633,39 +783,43 @@ export class RepositoryRuntime {
     executable: string,
     cwd: string,
     lease: RepositoryExecutionRootLease,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    operationId: string
   ): Promise<{ readonly record: ManagedRecord } | { readonly result: RepositoryRuntimeResult }> {
     if (recipe.lifecycle === "managed" && [...this.managed.values()].some((item) => item.public.action === action && item.public.state === "running")) {
       return { result: { status: "blocked", summary: `A managed ${action} process is already running for this repository.` } };
     }
     const output = new ExactEnvironmentOutput(recipe.maxOutputBytes);
-    let child: ChildProcessWithoutNullStreams;
+    const expectedExecutable = this.verified.executableIdentities.get(action);
+    if (!expectedExecutable) return { result: { status: "blocked", summary: "Verified executable identity is missing at supervisor launch." } };
+    let process: RepositorySupervisedProcess;
     try {
-      child = spawn(executable, [...recipe.args], {
+      process = await this.processSupervisor.start({
+        action,
+        operationId,
+        repositoryRoot: this.verified.canonicalRepositoryRoot,
+        manifestSha256: this.verified.digest,
+        executable,
+        executableSha256: expectedExecutable.sha256,
+        args: recipe.args,
         cwd,
-        env: { ...recipe.environment },
-        shell: false,
-        windowsHide: true,
-        stdio: ["pipe", "pipe", "pipe"]
+        environment: recipe.environment,
+        lifecycle: recipe.lifecycle,
+        timeoutMs: recipe.timeoutMs,
+        maxOutputBytes: recipe.maxOutputBytes
       });
     } catch (error) { return { result: { status: "failed", summary: untrustedSummary((error as Error).message) } }; }
-    child.stdout.on("data", (chunk: Buffer) => output.collect(chunk));
-    child.stderr.on("data", (chunk: Buffer) => output.collect(chunk));
-    const spawned = await new Promise<boolean>((resolveSpawn) => {
-      child.once("spawn", () => resolveSpawn(true));
-      child.once("error", (error) => { output.collect(error.message); resolveSpawn(false); });
-    });
-    if (!spawned || child.pid === undefined) return { result: { status: "failed", summary: untrustedSummary(output.text() || "Managed process failed before spawn."), output: output.text(), outputTruncated: output.truncated } };
-
-    let settle!: (value: { readonly code: number; readonly signal: NodeJS.Signals | null }) => void;
-    const exit = new Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>((resolveExit) => { settle = resolveExit; });
-    let settled = false;
-    child.once("close", (code, closeSignal) => { if (!settled) { settled = true; settle({ code: code ?? -1, signal: closeSignal }); } });
-    child.once("error", (error) => { output.collect(error.message); if (!settled) { settled = true; settle({ code: -1, signal: null }); } });
-    const id = `managed:${createHash("sha256").update(`${randomUUID()}:${child.pid}:${Date.now()}:${action}`).digest("hex")}`;
+    if (process.action !== action || !/^managed:[a-f0-9]{64}$/.test(process.supervisorId) || !Number.isSafeInteger(process.pid) || process.pid <= 0) {
+      await process.terminateTree(0, 1_000).catch(() => undefined);
+      return { result: { status: "failed", summary: "The process supervisor returned an invalid or confused durable identity." } };
+    }
+    process.stdout.on("data", (chunk: Buffer | string) => output.collect(chunk));
+    process.stderr.on("data", (chunk: Buffer | string) => output.collect(chunk));
+    const exit = process.wait();
+    const id = process.supervisorId;
     const record: ManagedRecord = {
-      public: { id, action: action as ManagedRecord["public"]["action"], pid: child.pid, startedAt: new Date().toISOString(), state: "running", outputTruncated: false },
-      child,
+      public: { id, operationId, action: action as ManagedRecord["public"]["action"], pid: process.pid, startedAt: process.startedAt, state: "running", outputTruncated: false },
+      process,
       output,
       exit,
       lease
@@ -678,23 +832,15 @@ export class RepositoryRuntime {
         signal.addEventListener("abort", abort, { once: true });
         record.abortCleanup = () => signal.removeEventListener("abort", abort);
       }
-      void exit.then(async ({ code }) => {
-        if (record.timeout) clearTimeout(record.timeout);
-        record.abortCleanup?.();
-        if (record.public.state === "running" || record.public.state === "stopping") record.public.state = code === 0 ? "completed" : "failed";
-        record.public.exitCode = code;
-        record.public.outputTruncated = output.truncated;
-        await lease.release().catch(() => undefined);
-        this.pruneManagedHistory();
-      });
+      void this.observeManagedExit(record);
     }
     return { record };
   }
 
   private async waitForeground(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, record: ManagedRecord, signal?: AbortSignal): Promise<RepositoryRuntimeResult> {
     let terminal: ManagedRepositoryProcess["state"] | undefined;
-    const timeout = setTimeout(() => { terminal = "timed_out"; record.child.kill("SIGTERM"); }, recipe.timeoutMs);
-    const abort = (): void => { terminal = "cancelled"; record.child.kill("SIGTERM"); };
+    const timeout = setTimeout(() => { terminal = "timed_out"; void record.process.terminateTree(250, 1_000).catch(() => undefined); }, recipe.timeoutMs);
+    const abort = (): void => { terminal = "cancelled"; void record.process.terminateTree(250, 1_000).catch(() => undefined); };
     signal?.addEventListener("abort", abort, { once: true });
     const { code } = await record.exit;
     clearTimeout(timeout);
@@ -712,7 +858,7 @@ export class RepositoryRuntime {
     let last = "Health probe did not succeed before its deadline.";
     while (Date.now() < deadline) {
       if (signal?.aborted) return { healthy: false, detail: "Web launch was cancelled before health verification." };
-      if (record.child.exitCode !== null) return { healthy: false, detail: "Managed web process exited before health verification." };
+      if (!await record.process.isAlive()) return { healthy: false, detail: "Managed web process exited before health verification." };
       const guard = await effectGuard.check("launch_web_app", this.verified.canonicalRepositoryRoot);
       if (!guard.allowed) return { healthy: false, detail: guard.reason };
       const controller = new AbortController();
@@ -761,15 +907,25 @@ export class RepositoryRuntime {
   private async terminateRecord(record: ManagedRecord, gracefulMs: number, forceMs: number, terminal: ManagedRepositoryProcess["state"]): Promise<void> {
     if (record.public.state !== "running" && record.public.state !== "stopping") return;
     record.public.state = "stopping";
-    record.child.kill("SIGTERM");
-    if (!await settledWithin(record.exit, gracefulMs)) {
-      record.child.kill("SIGKILL");
-      if (!await settledWithin(record.exit, forceMs)) {
-        record.public.state = "failed";
-        return;
-      }
+    try {
+      await record.process.terminateTree(gracefulMs, forceMs);
+      if (!await settledWithin(record.exit, Math.max(10, gracefulMs + forceMs))) throw new Error("Supervisor did not report a terminal state.");
+    } catch {
+      record.public.state = "failed";
+      return;
     }
     record.public.state = terminal;
+  }
+
+  private async observeManagedExit(record: ManagedRecord): Promise<void> {
+    const { code } = await record.exit;
+    if (record.timeout) clearTimeout(record.timeout);
+    record.abortCleanup?.();
+    if (record.public.state === "running" || record.public.state === "stopping") record.public.state = code === 0 ? "completed" : "failed";
+    record.public.exitCode = code;
+    record.public.outputTruncated = record.output.truncated;
+    await record.lease.release().catch(() => undefined);
+    this.pruneManagedHistory();
   }
 
   private pruneManagedHistory(): void {

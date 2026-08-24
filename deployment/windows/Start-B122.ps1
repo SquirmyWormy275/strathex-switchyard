@@ -6,10 +6,11 @@ $node = Join-Path $current 'runtime\node.exe'
 $main = Join-Path $current 'app\dist\apps\windows-companion\src\main.js'
 $health = Join-Path $current 'scripts\Test-B122Health.mjs'
 $validator = Join-Path $current 'scripts\Test-B122ReleaseArtifact.ps1'
+$repositoryRuntimeHelper = Join-Path $current 'app\dist\apps\windows-companion\repository-runtime\b122-repository-runner.exe'
 $state = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'STRATHEX\switchyard'
 $logs = Join-Path $state 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
-foreach ($file in @($node,$main,$health,$validator)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
+foreach ($file in @($node,$main,$health,$validator,$repositoryRuntimeHelper)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
 $validation = & $validator -BundleRoot $current
 if ([string]::IsNullOrWhiteSpace($validation)) { throw 'The installed SXSY-B122 bundle failed integrity validation.' }
 $validationRecord = $validation | ConvertFrom-Json
