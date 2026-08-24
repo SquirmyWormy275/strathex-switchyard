@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { homedir } from "node:os";
@@ -31,7 +32,7 @@ export class WindowsDpapiSecretReader implements ExtensionSecretReader {
     // plaintext configuration token.
     const script = "Add-Type -AssemblyName System.Security;$in=[Console]::In.ReadToEnd();$raw=[Convert]::FromBase64String($in);$out=[Security.Cryptography.ProtectedData]::Unprotect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($out))";
     return new Promise<Uint8Array>((resolve, reject) => {
-      const child = spawn("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], { shell: false, windowsHide: true, env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" }, stdio: ["pipe", "pipe", "pipe"] });
       let output = "";
       child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString("utf8"); });
       child.once("error", () => reject(new Error("Windows DPAPI could not be started.")));
@@ -70,18 +71,19 @@ export class NamedPipeJsonLineTransport implements JsonLineTransport {
     const token = Buffer.from(await this.secrets.open(this.configuration.sealedToken));
     try {
       if (token.length < 32) throw new Error("The local companion token is too short.");
-      const envelope = JSON.stringify({ version: 1, token: token.toString("base64"), request });
-      if (Buffer.byteLength(envelope, "utf8") > maxFrameBytes) throw new Error("The authenticated local request is too large.");
-      return await this.roundTrip(envelope);
+      return await this.roundTrip(request, line, token);
     } finally {
       token.fill(0);
     }
   }
 
-  private roundTrip(envelope: string): Promise<string> {
+  private roundTrip(request: Readonly<{ version: 1; id: string; method: string }>, requestJson: string, token: Buffer): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const socket = connect(this.configuration.pipePath);
       let buffer = Buffer.alloc(0);
+      let state: "challenge" | "response" | "done" = "challenge";
+      const clientNonce = randomBytes(32).toString("base64");
+      let serverNonce: string | undefined;
       let settled = false;
       const done = (work: () => void): void => { if (settled) return; settled = true; socket.destroy(); work(); };
       socket.setTimeout(this.timeoutMs, () => done(() => reject(new Error("The local companion pipe timed out."))));
@@ -89,14 +91,31 @@ export class NamedPipeJsonLineTransport implements JsonLineTransport {
       socket.on("data", (chunk: Buffer) => {
         if (buffer.length + chunk.length > maxFrameBytes + 1) return done(() => reject(new Error("The local companion response is too large.")));
         buffer = Buffer.concat([buffer, chunk]);
-        const newline = buffer.indexOf(0x0a);
-        if (newline < 0) return;
-        if (buffer.length !== newline + 1) return done(() => reject(new Error("The local companion response has trailing data.")));
-        const response = buffer.subarray(0, newline).toString("utf8");
-        try { JSON.parse(response); } catch { return done(() => reject(new Error("The local companion response is malformed."))); }
-        done(() => resolve(response));
+        while (state !== "done") {
+          const newline = buffer.indexOf(0x0a);
+          if (newline < 0) return;
+          const frame = buffer.subarray(0, newline).toString("utf8");
+          buffer = buffer.subarray(newline + 1);
+          try {
+            const parsed: unknown = JSON.parse(frame);
+            if (state === "challenge") {
+              if (!isChallenge(parsed) || parsed.clientNonce !== clientNonce || !sameProof(parsed.proof, proof(token, "server", clientNonce, parsed.serverNonce))) throw new Error("invalid server proof");
+              serverNonce = parsed.serverNonce;
+              const envelope = JSON.stringify({ version: 2, clientNonce, serverNonce, proof: proof(token, "client", clientNonce, serverNonce, requestJson), request });
+              if (Buffer.byteLength(envelope, "utf8") > maxFrameBytes) throw new Error("request too large");
+              state = "response";
+              socket.write(`${envelope}\n`, "utf8");
+              continue;
+            }
+            if (!serverNonce || !isResponseEnvelope(parsed)) throw new Error("invalid response");
+            const responseJson = JSON.stringify(parsed.response);
+            if (!sameProof(parsed.proof, proof(token, "response", clientNonce, serverNonce, responseJson)) || parsed.response.id !== request.id || buffer.length) throw new Error("invalid response proof");
+            state = "done";
+            done(() => resolve(responseJson));
+          } catch { state = "done"; done(() => reject(new Error("The local companion response is malformed or unauthenticated."))); }
+        }
       });
-      socket.once("connect", () => socket.write(`${envelope}\n`, "utf8"));
+      socket.once("connect", () => socket.write(`${JSON.stringify({ version: 2, clientNonce })}\n`, "utf8"));
     });
   }
 }
@@ -141,3 +160,10 @@ function isRequest(value: unknown): value is { readonly version: 1; readonly id:
   return isRecord(value) && value.version === 1 && typeof value.id === "string" && typeof value.method === "string";
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function isNonce(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(value) && Buffer.from(value, "base64").length === 32; }
+function isProof(value: unknown): value is string { return isNonce(value); }
+function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+function isChallenge(value: unknown): value is { version: 2; clientNonce: string; serverNonce: string; proof: string } { return isRecord(value) && exact(value, ["version", "clientNonce", "serverNonce", "proof"]) && value.version === 2 && isNonce(value.clientNonce) && isNonce(value.serverNonce) && isProof(value.proof); }
+function isResponseEnvelope(value: unknown): value is { version: 2; response: { version: 1; id: string; ok: boolean }; proof: string } { return isRecord(value) && exact(value, ["version", "response", "proof"]) && value.version === 2 && isRecord(value.response) && value.response.version === 1 && typeof value.response.id === "string" && typeof value.response.ok === "boolean" && isProof(value.proof); }
+function proof(token: Buffer, role: "server" | "client" | "response", clientNonce: string, serverNonce: string, document = ""): string { const documentDigest = createHash("sha256").update(document).digest("hex"); return createHmac("sha256", token).update(`sxsy-b122-pipe-v2\0${role}\0${clientNonce}\0${serverNonce}\0${documentDigest}`).digest("base64"); }
+function sameProof(left: string, right: string): boolean { const a = Buffer.from(left, "base64"); const b = Buffer.from(right, "base64"); return a.length === b.length && timingSafeEqual(a, b); }

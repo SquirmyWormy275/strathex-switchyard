@@ -11,8 +11,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFile, lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { copyFile, lstat, mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
   canonicalRepositoryPath,
@@ -33,16 +33,33 @@ export interface LocalGitRunner {
 
 /** Fixed-argv runner: no request field is ever interpreted as shell syntax. */
 export class SpawnLocalGitRunner implements LocalGitRunner {
+  private readonly candidates: readonly string[];
+  constructor(candidates: readonly string[] = ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]) {
+    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Local Git mediation requires fixed absolute Git executable candidates.");
+    this.candidates = [...candidates];
+  }
   async run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>> }>): Promise<LocalGitResult> {
+    const executable = await this.resolveExecutable();
+    const environment = options.environment ?? {};
+    if (Object.keys(environment).some((key) => key !== "GIT_INDEX_FILE") || Object.values(environment).some((value) => /[\r\n\0]/.test(value))) throw new Error("Local Git mediation rejected an unknown or unsafe environment override.");
     return new Promise((resolveResult, reject) => {
-      const child = spawn("git", [...args], {
+      const child = spawn(executable, [...args], {
         cwd: options.cwd,
         shell: false,
         windowsHide: true,
         // Inspection commands must never opportunistically refresh the
         // caller's index.  Required locks for actual index writes still work;
         // this only disables Git's optional index writes.
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", ...options.environment }
+        env: {
+          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
+          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          GIT_OPTIONAL_LOCKS: "0",
+          GIT_TERMINAL_PROMPT: "0",
+          GCM_INTERACTIVE: "Never",
+          GIT_CONFIG_NOSYSTEM: "1",
+          LC_ALL: "C",
+          ...environment
+        }
       });
       const stdout: Buffer[] = [];
       const stderr: Buffer[] = [];
@@ -65,6 +82,16 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
         stderr: Buffer.concat(stderr).toString("utf8")
       }));
     });
+  }
+
+  private async resolveExecutable(): Promise<string> {
+    for (const candidate of this.candidates) {
+      try {
+        const metadata = await stat(candidate);
+        if (metadata.isFile()) return realpath(candidate);
+      } catch { /* try next fixed host path */ }
+    }
+    throw new Error("A trusted absolute Git executable is unavailable.");
   }
 }
 

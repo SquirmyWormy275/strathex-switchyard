@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
-import { connect } from "node:net";
+import { connect, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -67,7 +67,28 @@ test("unauthenticated pipe frames never reach the companion request handler", as
   context.after(async () => { await server.stop(); });
   const reply = await rawPipeRequest(configuration.pipePath, JSON.stringify({ version: 1, token: Buffer.alloc(32, 9).toString("base64"), request }));
   assert.equal(calls, 0);
-  assert.deepEqual(JSON.parse(reply), { version: 1, id: "invalid", ok: false, error: { code: "companion_unavailable", message: "The companion rejected an unauthenticated local request." } });
+  assert.equal(reply, "");
+});
+
+test("client proves the server before disclosing any companion request payload", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `mutual-${Date.now()}`);
+  const received: string[] = [];
+  const fake = createServer((socket) => {
+    socket.once("data", (chunk) => {
+      received.push(chunk.toString("utf8"));
+      const hello = JSON.parse(chunk.toString("utf8")) as { clientNonce: string };
+      socket.end(`${JSON.stringify({ version: 2, clientNonce: hello.clientNonce, serverNonce: Buffer.alloc(32, 3).toString("base64"), proof: Buffer.alloc(32, 4).toString("base64") })}\n`);
+    });
+  });
+  await new Promise<void>((resolve, reject) => { fake.once("error", reject); fake.listen(configuration.pipePath, resolve); });
+  context.after(async () => { await new Promise<void>((resolve) => fake.close(() => resolve())); });
+  await assert.rejects(() => new AuthenticatedPipeClient(configuration, protector).request({ ...request, payload: { credential: "must-not-cross" } }), /invalid|unavailable/i);
+  assert.equal(received.length, 1);
+  assert.equal(received[0]?.includes("must-not-cross"), false);
+  assert.equal(received[0]?.includes("\"method\""), false);
 });
 
 test("authenticated pipe shutdown destroys idle clients instead of waiting indefinitely", async (context) => {
