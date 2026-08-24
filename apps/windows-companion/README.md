@@ -1,24 +1,37 @@
 # Windows companion
 
-The companion owns packet validation, anti-replay sequencing, device disconnect
-cleanup, and truthful intent classification. It also provides the
-provider-independent control plane: managed-session capability registry,
-TargetSnapshot hashing, authority ledger, protected receipt/audit store,
-idempotent parent/child operations, restart reconciliation, containment, and
-execution/credential/test-environment broker interfaces.
+This package is the local, software-only SXSY-B122 control-plane boundary. It
+accepts only versioned, canonical bridge requests; a keyboard packet, VS Code
+command, repository string, or provider response is never authority.
 
-A Raw HID adapter must provide a fresh host-vetted connection ID at each device
-connection epoch; this permits a restarted firmware sequence without accepting
-replays in an existing connection. The included local brokers deliberately deny
-credential exposure, unverified test environments, and any filesystem, Git,
-process, network, or prompt-submission mutation. `UnavailableAdapter` is the
-functional safe fallback for proprietary or absent integrations, while
-`DeterministicAdapter` and `DeterministicTestEnvironmentBroker` exist only for
-isolated automated tests.
+## What is implemented
 
-The current companion also has a packageable local-only service, authenticated
-named-pipe/Unix-socket IPC, a real local Git snapshot/status/diff/commit/push
-broker, canonical filesystem allowlists, review-bound sandbox leases, and a
-declared isolated-test recipe runner. See [`../../docs/local-companion.md`](../../docs/local-companion.md)
-for setup and the residual boundary. Direct-main, automatic merge, repair,
-containment release, Full Sandbox, and Quarantine remain activation-gated.
+- Packet routing maintains per-device connection-epoch replay state and rejects
+  stale, repeated, malformed, ambiguous, and intentionally unassigned input.
+- The local JSON-lines bridge never opens a network listener and exposes only
+  bounded session, dispatch, confirmation, and operation-cancellation methods.
+- `DurableCompanionEndpoint` hydrates protected session lifecycle records,
+  awaits no-replay recovery before serving requests, persists every lifecycle
+  mutation, and fails closed after a persistence or recovery failure.
+- `createDurableWindowsCompanion` composes the protected session registry,
+  target resolver, durable executor, receipts, checkpoints, budgets,
+  confirmations, and startup reconciliation. It requires a host-owned journal
+  authenticator unless an isolated test harness explicitly opts out.
+- The durable executor has typed seams for Git, execution, credential, network,
+  test-data, automation, containment, cancellation, and reconciliation. Missing
+  real integrations are unavailable; in-memory implementations are test-only.
+
+## Deliberate limits
+
+There is no installed Raw HID driver, Windows service, DPAPI/NCrypt signer,
+credential vault, provider adapter, process supervisor, GitHub client, or OS
+isolation backend in this repository. `npm run start:companion` therefore
+fails closed until a reviewed embedding host supplies a journal authenticator.
+It does not invent a key or fall back to hash-chain-only persistence.
+
+No control silently commits, pushes, merges, force-pushes, approves a
+permission, submits a prompt, or kills an inferred process. High-consequence
+actions remain disabled until the mediated host, concrete adapters, and the
+required real acceptance evidence exist. See
+[`../../docs/software-only-completion-audit.md`](../../docs/software-only-completion-audit.md)
+for the evidence boundary.

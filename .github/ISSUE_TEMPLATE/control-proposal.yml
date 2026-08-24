@@ -1,0 +1,44 @@
+name: Control proposal
+description: Propose a physical control backed by observed workflow evidence.
+title: "[Control]: "
+labels: ["control-map", "needs-evidence"]
+body:
+  - type: input
+    id: intent
+    attributes:
+      label: Durable intent
+      placeholder: HALT, REVIEW, RESUME...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Observation evidence
+      description: Frequency, current method, friction, and representative contexts.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Supported and unknown-context behavior
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and authority implications
+    validations:
+      required: true
+  - type: textarea
+    id: test
+    attributes:
+      label: Acceptance test
+    validations:
+      required: true
+  - type: input
+    id: displacement
+    attributes:
+      label: Candidate displaced
+      description: Which existing or proposed control loses the scarce key position?
+    validations:
+      required: true

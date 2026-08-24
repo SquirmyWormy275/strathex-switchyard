@@ -1,15 +1,24 @@
 export { ControlRouter, type RouteContext, type RoutedIntent, type SessionState } from "./router.ts";
 export {
-  AuthorityLedger, ContainmentController, CouncilCoordinator, DeterministicAdapter, DeterministicExecutionBroker, DeterministicProviderAdapter, DeterministicTestEnvironmentBroker,
-  LeaseRegistry, OperationCoordinator, ProtectedStore, SafeLocalCredentialBroker, SafeLocalExecutionBroker,
-  SafeLocalTestEnvironmentBroker, SessionRegistry, UnavailableAdapter, UnavailableProviderAdapter, captureTargetSnapshot, createContextPackage, createReviewPackage, redact,
-  sameTarget, type AdapterResult, type Authority, type CapabilityReport, type CapabilitySet, type CredentialBroker,
-  type ContextPackage, type CouncilReport, type DispatchRequest, type DispatchResult, type DurableOperation, type ExecutionBroker,
-  type ManagedSession, type ProviderSessionAdapter, type Receipt, type ResourceLease, type ReviewPackage, type SessionStatus, type TargetSnapshot, type TestEnvironmentBroker
-} from "./control-plane.ts";
-export {
-  callCompanion, captureLiveTargetSnapshot, CompanionIpcServer, createCompanionConfiguration, createReviewApproval,
-  FilesystemBroker, LocalControlExecutionBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker,
-  LocalTestEnvironmentBroker, validateReviewApproval, type CompanionConfiguration, type GitStatus, type RepositoryPolicy,
-  type ReviewApproval, type SandboxLease, type TestRecipe
-} from "./local-runtime.ts";
+  companionBridgeVersion,
+  InProcessCompanionBridge,
+  UnavailableCompanionBridge,
+  type CompanionBridge,
+  type CompanionMethod,
+  type CompanionRequest,
+  type CompanionResponse,
+  type DispatchPayload,
+  type ConfirmationRequestPayload,
+  type OperationCancellationPayload
+} from "./bridge.ts";
+export { CompanionService, type CompanionServiceOptions, type LocalHostAction, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor } from "./service.ts";
+export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
+export { createDurableWindowsCompanion, type DurableWindowsCompanionOptions } from "./bootstrap.ts";
+export { handleJsonLine, runCompanionStdio, serveJsonLines, type CompanionRequestHandler } from "./stdio.ts";
+export { runStandaloneCompanion } from "./main.ts";
+
+/**
+ * Platform-specific Raw HID discovery remains deferred until the selected B122
+ * firmware target is available. The exported companion service is local
+ * JSON-lines control-plane transport only; it does not claim hardware support.
+ */

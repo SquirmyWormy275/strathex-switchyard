@@ -1,0 +1,342 @@
+import { randomUUID } from "node:crypto";
+
+import type { Capability, SessionStatus } from "./contracts.ts";
+import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
+
+export interface CouncilParticipant {
+  readonly id: string;
+  readonly targetSnapshotId: string;
+  readonly status: SessionStatus;
+  readonly capabilities: readonly Capability[];
+  readonly lastHeartbeat: string;
+  readonly plannedFiles: readonly string[];
+  readonly resources: readonly string[];
+  readonly dependencies: readonly string[];
+  readonly diffDigest: string;
+}
+
+export interface CouncilConflict {
+  readonly resource: string;
+  readonly participants: readonly string[];
+}
+
+export interface CouncilReport {
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participants: readonly CouncilParticipant[];
+  readonly pathConflicts: readonly CouncilConflict[];
+  readonly resourceConflicts: readonly CouncilConflict[];
+  readonly dependencyConflicts: readonly CouncilConflict[];
+  /** True only when every participant proved it can accept a cooperative pause. */
+  readonly atomic: boolean;
+  readonly collectedAt: string;
+}
+
+export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "active" | "aborted" | "completed";
+
+export interface CouncilAssignment {
+  readonly sessionId: string;
+  readonly paths: readonly string[];
+  readonly resources: readonly string[];
+}
+
+export interface CouncilEpoch {
+  readonly id: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participants: readonly CouncilParticipant[];
+  readonly assignments: Readonly<Record<string, CouncilAssignment>>;
+  readonly pauseAcknowledgedSessionIds: readonly string[];
+  readonly assignmentAcknowledgedSessionIds: readonly string[];
+  readonly status: CouncilEpochStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly abortReason?: string;
+}
+
+interface CouncilEpochSavedEvent { readonly epoch: CouncilEpoch; }
+
+export class CouncilError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CouncilError";
+  }
+}
+
+const necessaryAutomaticCapabilities: readonly Capability[] = ["registered", "observable", "controllable", "mediated"];
+
+function nonEmpty(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!normalized) throw new CouncilError(`${field} must be non-empty.`);
+  return normalized;
+}
+
+function unique(values: readonly string[], field: string): readonly string[] {
+  return [...new Set(values.map((value) => nonEmpty(value, field)))].sort();
+}
+
+function cloneParticipant(participant: CouncilParticipant): CouncilParticipant {
+  return {
+    ...participant,
+    capabilities: [...participant.capabilities],
+    plannedFiles: [...participant.plannedFiles],
+    resources: [...participant.resources],
+    dependencies: [...participant.dependencies]
+  };
+}
+
+function cloneEpoch(epoch: CouncilEpoch): CouncilEpoch {
+  return {
+    ...epoch,
+    participants: epoch.participants.map(cloneParticipant),
+    assignments: Object.fromEntries(Object.entries(epoch.assignments).map(([id, assignment]) => [id, {
+      ...assignment,
+      paths: [...assignment.paths],
+      resources: [...assignment.resources]
+    }])),
+    pauseAcknowledgedSessionIds: [...epoch.pauseAcknowledgedSessionIds],
+    assignmentAcknowledgedSessionIds: [...epoch.assignmentAcknowledgedSessionIds]
+  };
+}
+
+function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilEpoch> {
+  const result = new Map<string, CouncilEpoch>();
+  for (const entry of entries) {
+    if (entry.kind !== "council.epoch.saved") continue;
+    const epoch = (entry.payload as CouncilEpochSavedEvent | undefined)?.epoch;
+    if (!epoch || typeof epoch.id !== "string") throw new CouncilError("Protected Council epoch record is malformed.");
+    result.set(epoch.id, cloneEpoch(epoch));
+  }
+  return result;
+}
+
+function normalizedParticipant(input: CouncilParticipant): CouncilParticipant {
+  if (!input.capabilities.includes("registered") || !input.capabilities.includes("observable")) {
+    throw new CouncilError(`Participant ${input.id} lacks the Registered and Observable capabilities required for a Council report.`);
+  }
+  if (!Number.isFinite(Date.parse(input.lastHeartbeat))) throw new CouncilError(`Participant ${input.id} has an invalid heartbeat.`);
+  return {
+    id: nonEmpty(input.id, "participant id"),
+    targetSnapshotId: nonEmpty(input.targetSnapshotId, "participant targetSnapshotId"),
+    status: input.status,
+    capabilities: [...new Set(input.capabilities)],
+    lastHeartbeat: input.lastHeartbeat,
+    plannedFiles: unique(input.plannedFiles, "planned file"),
+    resources: unique(input.resources, "resource"),
+    dependencies: unique(input.dependencies, "dependency"),
+    diffDigest: nonEmpty(input.diffDigest, "diffDigest")
+  };
+}
+
+function assertAutomaticParticipant(participant: CouncilParticipant): void {
+  if (!necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))) {
+    throw new CouncilError(`Participant ${participant.id} lacks a proven automatic-coordination capability.`);
+  }
+  if (participant.status !== "running") {
+    throw new CouncilError(`Participant ${participant.id} is ${participant.status}; automatic Council requires a fresh running participant.`);
+  }
+}
+
+function conflicts(participants: readonly CouncilParticipant[], field: "plannedFiles" | "resources" | "dependencies"): readonly CouncilConflict[] {
+  const membership = new Map<string, string[]>();
+  for (const participant of participants) {
+    for (const value of participant[field]) {
+      membership.set(value, [...(membership.get(value) ?? []), participant.id]);
+    }
+  }
+  return [...membership.entries()]
+    .filter(([, ids]) => ids.length > 1)
+    .map(([resource, ids]) => ({ resource, participants: [...ids].sort() }))
+    .sort((a, b) => a.resource.localeCompare(b.resource));
+}
+
+function allAcknowledged(epoch: CouncilEpoch, field: "pauseAcknowledgedSessionIds" | "assignmentAcknowledgedSessionIds"): boolean {
+  const acknowledgements = new Set(epoch[field]);
+  return epoch.participants.every((participant) => acknowledgements.has(participant.id));
+}
+
+function equalStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+/**
+ * Durable Council state machinery. It can report and validate an epoch, but
+ * it cannot make arbitrary terminals cooperate or mutate worktrees. A
+ * separately mediated adapter must perform any actual isolation step.
+ */
+export class CouncilCoordinator {
+  private readonly store: ProtectedJsonStore;
+  private readonly clock: () => string;
+  private readonly idFactory: () => string;
+
+  constructor(store: ProtectedJsonStore, options: { readonly clock?: () => string; readonly idFactory?: () => string } = {}) {
+    this.store = store;
+    this.clock = options.clock ?? (() => new Date().toISOString());
+    this.idFactory = options.idFactory ?? randomUUID;
+  }
+
+  async report(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReport> {
+    const participants = input.participants.map(normalizedParticipant);
+    if (participants.length === 0) throw new CouncilError("Council needs at least one verified participant.");
+    if (new Set(participants.map((participant) => participant.id)).size !== participants.length) throw new CouncilError("Council participant IDs must be unique.");
+    return {
+      repositoryRoot: nonEmpty(input.repositoryRoot, "repositoryRoot"),
+      targetSnapshotId: nonEmpty(input.targetSnapshotId, "targetSnapshotId"),
+      participants: participants.map(cloneParticipant),
+      pathConflicts: conflicts(participants, "plannedFiles"),
+      resourceConflicts: conflicts(participants, "resources"),
+      dependencyConflicts: conflicts(participants, "dependencies"),
+      atomic: participants.every((participant) => participant.targetSnapshotId === input.targetSnapshotId
+        && participant.status === "running"
+        && necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))),
+      collectedAt: this.clock()
+    };
+  }
+
+  async beginAutomatic(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilEpoch> {
+    const report = await this.report(input);
+    if (!report.atomic) throw new CouncilError("Council automatic coordination requires every participant to accept a cooperative pause.");
+    for (const participant of report.participants) assertAutomaticParticipant(participant);
+    if (report.participants.some((participant) => participant.targetSnapshotId !== report.targetSnapshotId)) {
+      throw new CouncilError("Council automatic coordination requires every participant to share the exact verified TargetSnapshot.");
+    }
+    if (report.pathConflicts.length || report.resourceConflicts.length || report.dependencyConflicts.length) {
+      throw new CouncilError("Council automatic coordination stops on a path, resource, or dependency overlap.");
+    }
+    const now = this.clock();
+    const epoch: CouncilEpoch = {
+      id: nonEmpty(this.idFactory(), "Council epoch id"),
+      repositoryRoot: report.repositoryRoot,
+      targetSnapshotId: report.targetSnapshotId,
+      participants: report.participants,
+      assignments: {},
+      pauseAcknowledgedSessionIds: [],
+      assignmentAcknowledgedSessionIds: [],
+      status: "awaiting_pause_acknowledgements",
+      createdAt: now,
+      updatedAt: now
+    };
+    return this.store.transaction(async (transaction) => {
+      if (epochs(await transaction.readEntries()).has(epoch.id)) throw new CouncilError(`Council epoch already exists: ${epoch.id}`);
+      await transaction.append<CouncilEpochSavedEvent>("council.epoch.saved", { epoch });
+      return cloneEpoch(epoch);
+    });
+  }
+
+  async get(id: string): Promise<CouncilEpoch | undefined> {
+    const epoch = epochs(await this.store.readEntries()).get(id);
+    return epoch ? cloneEpoch(epoch) : undefined;
+  }
+
+  async acknowledgePause(id: string, sessionId: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_pause_acknowledgements") throw new CouncilError("Council pause acknowledgement is no longer accepted for this epoch.");
+      this.assertParticipant(epoch, sessionId);
+      return {
+        ...epoch,
+        pauseAcknowledgedSessionIds: unique([...epoch.pauseAcknowledgedSessionIds, sessionId], "session id")
+      };
+    });
+  }
+
+  async assign(id: string, sessionId: string, paths: readonly string[], resources: readonly string[]): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_pause_acknowledgements" && epoch.status !== "awaiting_assignment_acknowledgements") {
+        throw new CouncilError("Council assignments are not accepted for this epoch state.");
+      }
+      if (!allAcknowledged(epoch, "pauseAcknowledgedSessionIds")) throw new CouncilError("Every participant must acknowledge the cooperative pause before assignment.");
+      const participant = this.assertParticipant(epoch, sessionId);
+      const normalizedPaths = unique(paths, "assigned path");
+      const normalizedResources = unique(resources, "assigned resource");
+      if (!normalizedPaths.every((path) => participant.plannedFiles.includes(path))) throw new CouncilError("Council cannot assign a path outside the participant's verified plan.");
+      if (!normalizedResources.every((resource) => participant.resources.includes(resource))) throw new CouncilError("Council cannot assign a resource outside the participant's verified declaration.");
+      for (const [otherId, assignment] of Object.entries(epoch.assignments)) {
+        if (otherId === sessionId) continue;
+        if (normalizedPaths.some((path) => assignment.paths.includes(path)) || normalizedResources.some((resource) => assignment.resources.includes(resource))) {
+          throw new CouncilError("Council assignment overlaps an existing path or resource lease.");
+        }
+      }
+      return {
+        ...epoch,
+        assignments: { ...epoch.assignments, [sessionId]: { sessionId, paths: normalizedPaths, resources: normalizedResources } },
+        status: "awaiting_assignment_acknowledgements"
+      };
+    });
+  }
+
+  async acknowledgeAssignment(id: string, sessionId: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council assignment acknowledgement is not accepted for this epoch.");
+      this.assertParticipant(epoch, sessionId);
+      if (!epoch.assignments[sessionId]) throw new CouncilError("A participant cannot acknowledge an assignment it has not received.");
+      return {
+        ...epoch,
+        assignmentAcknowledgedSessionIds: unique([...epoch.assignmentAcknowledgedSessionIds, sessionId], "session id")
+      };
+    });
+  }
+
+  async resume(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council epoch cannot resume from its current state.");
+      if (Object.keys(epoch.assignments).length !== epoch.participants.length) throw new CouncilError("Every Council participant needs an explicit assignment before resuming.");
+      if (!allAcknowledged(epoch, "assignmentAcknowledgedSessionIds")) throw new CouncilError("Every Council participant must acknowledge its assignment before resuming.");
+      return { ...epoch, status: "active" };
+    });
+  }
+
+  /** A fresh unexpected diff, lease declaration, target, state, or heartbeat stops automatic coordination. */
+  async validate(id: string, observations: readonly CouncilParticipant[]): Promise<CouncilEpoch> {
+    const epoch = await this.get(id);
+    if (!epoch) throw new CouncilError(`Unknown Council epoch: ${id}`);
+    if (epoch.status !== "active") return epoch;
+    let reason: string | undefined;
+    try {
+      const normalized = observations.map((observation) => {
+        const participant = normalizedParticipant(observation);
+        assertAutomaticParticipant(participant);
+        return participant;
+      });
+      if (normalized.length !== epoch.participants.length) reason = "Council participant set changed during the epoch.";
+      const currentById = new Map(normalized.map((participant) => [participant.id, participant]));
+      for (const expected of epoch.participants) {
+        const current = currentById.get(expected.id);
+        if (!current) { reason = `Council participant ${expected.id} is missing.`; break; }
+        if (current.targetSnapshotId !== epoch.targetSnapshotId) { reason = `Council participant ${expected.id} changed TargetSnapshot.`; break; }
+        if (current.diffDigest !== expected.diffDigest) { reason = `Council participant ${expected.id} changed its diff during coordination.`; break; }
+        if (current.lastHeartbeat !== expected.lastHeartbeat) { reason = `Council participant ${expected.id} heartbeat changed; the epoch is no longer atomic.`; break; }
+        if (!equalStrings(current.plannedFiles, expected.plannedFiles) || !equalStrings(current.resources, expected.resources) || !equalStrings(current.dependencies, expected.dependencies)) {
+          reason = `Council participant ${expected.id} changed its declared plan or resource lease.`;
+          break;
+        }
+      }
+    } catch (error) {
+      reason = error instanceof Error ? error.message : "Council observation could not be verified.";
+    }
+    return reason ? this.abort(id, reason) : epoch;
+  }
+
+  async abort(id: string, reason: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status === "aborted") return epoch;
+      if (epoch.status === "completed") throw new CouncilError("A completed Council epoch cannot be aborted.");
+      return { ...epoch, status: "aborted", abortReason: nonEmpty(reason, "abort reason") };
+    });
+  }
+
+  private async mutate(id: string, mutate: (epoch: CouncilEpoch) => CouncilEpoch): Promise<CouncilEpoch> {
+    return this.store.transaction(async (transaction) => {
+      const existing = epochs(await transaction.readEntries()).get(id);
+      if (!existing) throw new CouncilError(`Unknown Council epoch: ${id}`);
+      const changed = { ...mutate(cloneEpoch(existing)), updatedAt: this.clock() };
+      await transaction.append<CouncilEpochSavedEvent>("council.epoch.saved", { epoch: changed });
+      return jsonClone(cloneEpoch(changed));
+    });
+  }
+
+  private assertParticipant(epoch: CouncilEpoch, sessionId: string): CouncilParticipant {
+    const found = epoch.participants.find((participant) => participant.id === sessionId);
+    if (!found) throw new CouncilError("Session is not a participant in this Council epoch.");
+    return found;
+  }
+}
