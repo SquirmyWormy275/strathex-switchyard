@@ -26,3 +26,4 @@ export * from "./snapshot-resolver.ts";
 export * from "./snapshot-ledger.ts";
 export * from "./snapshot.ts";
 export * from "./store.ts";
+export * from "./workflow-artifacts.ts";
