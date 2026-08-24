@@ -10,7 +10,7 @@
 - [x] Repository and documentation architecture
 - [x] Initial attribution and bibliography
 - [x] Template permission reviewed
-- [x] Software-only implementation and local-test audit
+- [x] Hardware-independent implementation and local-test audit
 - [ ] Hardware/public-release readiness decision
 - [ ] File-level licensing decision
 
@@ -25,15 +25,15 @@
 ## Phase 2 - control design
 
 - [x] Settled 22-key / 65-chord specification
-- [ ] Vial signal plan
-- [ ] Dispatcher contract
-- [ ] Adapter behavior matrix
-- [ ] Guarded-action design
+- [x] Logical Vial signal plan and generated canonical manifest
+- [x] Dispatcher contract
+- [x] Adapter behavior matrix
+- [x] Guarded-action design
 - [ ] Printable V2 legends and reference sheet
 
 ## Phase 3 - implementation
 
-- [ ] Vial configuration
+- [x] Logical Vial configuration source (physical import/acceptance remains Phase 4)
 - [x] TypeScript Windows companion and durable control plane
 - [x] VS Code lifecycle/bridge integration
 - [x] Agent/session, broker, and safe adapter interfaces
@@ -53,7 +53,8 @@
 - [ ] Two-week trial
 - [ ] Metrics and failure analysis
 - [ ] Mapping revisions
-- [ ] Reproducible release bundle
+- [x] Reproducible per-user release-bundle source and verification tooling
+- [ ] Signed/installed release artifact and rollback acceptance
 - [ ] Demonstration media
 - [ ] v1.0 technical manual
 - [ ] Maintainer approval for a hardware or production release

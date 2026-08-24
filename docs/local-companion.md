@@ -1,15 +1,16 @@
 # Local Windows companion and VS Code connection
 
-> **Candidate scope:** this is a local, current-Windows-user companion
-> connection. It is not a Windows service installation, a pipe-ACL review, an
-> OS mediation boundary, or acceptance evidence for any B122 gate.
+> **Scope:** this is the source-complete, local current-Windows-user companion
+> connection and its per-user release boundary. It is not a Windows service or
+> service-account installation, an independent pipe-ACL/same-user adversary
+> review, or acceptance evidence for any B122 gate.
 
-`@strathex/switchyard-companion` is a manually started local Node companion.
-It owns the protected journal, its endpoint record, and its local named pipe.
-It never listens on TCP and the VS Code extension cannot select a host, port,
-workspace path, or cleartext token.
+`@strathex/switchyard-companion` is a reviewed per-user Node companion. It owns
+the protected journal, its endpoint record, its single-instance record, and its
+local named pipe. It never listens on TCP and the VS Code extension cannot
+select a host, port, workspace path, or cleartext token.
 
-## Start a candidate companion
+## Start the local companion
 
 Use a current Node.js runtime on Windows. From the repository root:
 
@@ -18,17 +19,20 @@ npm run build:companion
 node apps/windows-companion/dist/apps/windows-companion/src/main.js
 ```
 
-For source-only development, `npm run start:companion` starts the same entry
-point with Node's TypeScript stripping support. The companion is deliberately
+`npm run start:companion` is a source-development shortcut; release evidence
+uses the built and packed declared binary instead. The companion is deliberately
 not installed as a Scheduled Task or login item. Starting it is a user-local
 choice; the repository never changes startup settings silently.
 
-At first start, the companion creates these host-owned files under
+At first start, the companion creates host-owned state under
 `%LOCALAPPDATA%\STRATHEX\switchyard`:
 
 - `protected-audit.jsonl` — append-only protected control-plane records;
 - `authenticated-pipe.json` — a version, a B122-only named-pipe path, and an
-  opaque DPAPI CurrentUser-sealed token.
+  opaque DPAPI CurrentUser-sealed token;
+- the strict single-instance record, runtime and sandbox pins, installed
+  network policy, credential-reference records, receipts, and bounded logs used
+  by configured routes.
 
 The endpoint record never contains a clear token. The companion decrypts the
 token only for the local pipe check and clears the buffer after use. Journal
@@ -53,9 +57,12 @@ stdio server, a TCP listener, a shell command, or another extension.
 
 An authenticated named-pipe request is still only input to the durable control
 plane. It cannot self-grant mediation, authority, a confirmation, acceptance
-evidence, a credential, a target, or a successful outcome. Missing mutation
-factories and adapters remain unavailable; high-consequence controls remain
-disabled by policy and gate evidence.
+evidence, a credential, a target, or a successful outcome. The installed host
+includes a reviewed Git-mutation queue and configured repository, sandbox,
+credential, network, provider, GitHub/CI, scanner, and Council adapters. Each
+remains unavailable until its exact host-attested configuration and external
+authorization are present. High-consequence controls remain disabled by policy
+and gate evidence even when an adapter is configured.
 
 The sealed token provides current-user protection at rest. It is not a claim
 that a malicious process running as the same Windows user cannot invoke DPAPI,
@@ -65,9 +72,10 @@ concerns.
 
 ## Local evidence
 
-The isolated tests cover a fake-protector transport round trip, token/frame/
-endpoint rejection, unauthenticated-frame rejection, canonical endpoint
-loading, and Windows CurrentUser DPAPI companion-to-extension interoperability.
+The isolated tests cover mutual client/server challenge proofs, token/frame/
+endpoint rejection, replay and unauthenticated-frame rejection, canonical
+endpoint loading, strict single-instance behavior, packaged declared-binary
+startup, and Windows CurrentUser DPAPI companion-to-extension interoperability.
 See [authenticated-pipe.test.ts](../apps/windows-companion/test/authenticated-pipe.test.ts)
 and [named-pipe-transport.test.ts](../apps/vscode-extension/test/named-pipe-transport.test.ts).
 

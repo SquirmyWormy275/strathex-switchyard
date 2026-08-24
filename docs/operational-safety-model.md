@@ -87,25 +87,31 @@ The manager deliberately contains no process launcher, provider call, or backgro
 
 ## Safe adapter and broker model
 
-Each external capability has an interface and a fail-closed default.
+Each external capability has an interface, a test-only in-memory implementation,
+and a fail-closed installed path. Installed source does not make a route active:
+the exact host-attested configuration and external authorization must also be
+present.
 
-| Capability | Safe behavior without a real integration |
+| Capability | Installed source and safe unavailable behavior |
 | --- | --- |
-| Desktop, provider, or browser navigation | UnavailableCommandAdapter reports the missing surface and never substitutes another provider. |
-| Command or process execution | InMemoryExecutionBroker accepts only a fixed executable/argument recipe, exact operation-bound permit, and registered handler; it never invokes a shell itself. |
-| Git mutation | InMemoryGitBroker accepts typed mutations only, rejects force semantics, validates task-owned canonical local-commit paths, and verifies the exact action/operation/target/session/authority permit binding. The concrete local-commit handler uses a private index, final target guard, hook-free fixed Git arguments, and shared-index reconciliation. No implicit push occurs. |
-| Credentials | InMemoryCredentialBroker returns an opaque scoped lease, not secret material, and only after permit/fence checks. |
-| Network | InMemoryNetworkBroker uses an allowlisted test response only; it does not fetch. |
-| Pipeline or Repair environment | InMemoryTestEnvironmentBroker creates a descriptor with deny-egress and a test database name, without inheriting process environment or opening a database. |
-| Full Sandbox or Quarantine | UnavailableIsolationRuntime refuses to claim isolation. The in-memory variant says simulated explicitly. |
-| Automation or agent workflow | InMemoryAutomationBroker runs only a registered trusted handler; otherwise no prompt or workflow is submitted. |
+| Desktop, provider, or browser navigation | Fixed VS Code host actions and configured provider adapters act only on approved surfaces. Missing handshakes or routes report unavailable and never substitute another provider. |
+| Command or process execution | Host-attested repository manifests bind absolute executable identities, arguments, environment, output/time limits, managed process IDs, and final effect guards. No manifest means no execution. |
+| Git mutation | The reviewed local-commit handler uses task-owned paths, a private index, final target guard, hook-free fixed Git arguments, and shared-index reconciliation. Configured remote push/PR/merge uses exact refs, GitHub routes, scoped credentials, and durable child operations. Direct Main remains gate-disabled and no implicit push occurs. |
+| Credentials | The DPAPI credential-reference vault exposes only purpose/repository-scoped leases at the adapter boundary. No clear secret is returned to a command or persisted in repository state. |
+| Network | Exact-route HTTPS denies proxies, redirects, private/reserved DNS results, unpinned resolution, oversized bodies, missing credentials, and containment changes. No installed policy means no external request. |
+| Pipeline, Shield, or Repair environment | Host-attested recipes and configured GitHub/scanner adapters bind the exact target and protected receipts. Security and validation recipes requiring isolation are sent through the installed Windows Sandbox boundary. Missing recipes, feeds, or isolation report unavailable/incomplete. |
+| Full Sandbox or Quarantine | The attested Windows Sandbox installation pins the repository catalog and fixed guest-helper digest and enforces its declared boundary. Missing Windows Sandbox, helper, catalog, or gate evidence blocks the action; no copy-only fallback is selected. |
+| Automation, provider, or agent workflow | Configured provider routes require a fresh exact-target handshake and scoped credentials. Durable Council additionally requires acknowledgements for every automatic phase. Missing capability or acknowledgement stops the workflow. |
 | Runtime governance | TargetSnapshotLedger records immutable target identity before dispatch; checkpoint capture and artifact verification, immediate complete same-ID target revalidation (including ignored inputs), durable budget admission, deadline/cancellation control, and no-replay recovery block or preserve the relevant risky/broker paths before an adapter is called. |
 
-These classes are intentional seams for a future real Windows service, Git adapter, credential vault, CI connector, and sandbox backend. They are useful for isolated local testing precisely because they cannot silently contact a real system.
+The in-memory classes remain useful for isolated tests precisely because they
+cannot contact a real system. The concrete installed adapters are likewise
+fail-closed: source availability is distinct from installed configuration,
+external authorization, and acceptance evidence.
 
 ## Test-data boundary
 
-Pipeline and Repair paths through this control plane do not inherit an ordinary terminal's environment. They need a repository-declared validation recipe and a test-environment broker that rejects configured production patterns and sensitive variables. With no verified recipe or no real isolation backend, the correct result is unavailable or blocked. This does not prevent an unmediated terminal from reaching its own environment; that bypass remains explicitly outside the claimed boundary.
+Pipeline and Repair paths through this control plane do not inherit an ordinary terminal's environment. They need a host-attested repository validation recipe and, where required, an active digest-pinned Windows Sandbox installation. With no verified recipe, helper, Windows feature, or configured external feed, the correct result is unavailable, incomplete, or blocked. This does not prevent an unmediated terminal from reaching its own environment; that bypass remains explicitly outside the claimed boundary.
 
 This design protects the test suite itself: unit tests use fakes, in-memory brokers, and temporary protected journals. They must never use a production database, production credentials, production data, or production endpoints.
 

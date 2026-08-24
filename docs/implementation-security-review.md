@@ -1,5 +1,12 @@
 # Post-PR #5 implementation structural and security review
 
+> **Historical point-in-time record:** this review records the PR #5/follow-up
+> branch boundary. Later hardware-independent adapter, sandbox, transport,
+> provisioning, and release work is documented in
+> [`software-only-completion-audit.md`](software-only-completion-audit.md).
+> “No unresolved material finding” below applies only to that reviewed revision
+> and is not a current production or acceptance claim.
+
 > **Correction:** the original review said there was no unresolved material
 > finding. The final adversarial audit found an asynchronous review-approval
 > bypass, incomplete dirty/untracked snapshot manifests, staged-diff Shield

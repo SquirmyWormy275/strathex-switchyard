@@ -1,83 +1,90 @@
 # B122 software residual ledger — local companion implementation
 
-**Revision:** durable default-composition reconciliation. “Implemented locally”
-means executable code with isolated evidence; it does not assert hardware,
-proprietary-provider, cloud, or operator acceptance.
+**Revision:** hardware-independent implementation reconciliation. “Implemented
+in source” means executable code with isolated evidence and a defined
+fail-closed installation/configuration path. It does not assert physical
+hardware, live-provider, cloud-account, Windows-host, or operator acceptance.
 
 ## Completed local software boundary
 
-All 65 settled assignments now reach the durable command catalog and either a
-named local handler/broker or an explicit policy-gated unavailable result. The
-installed companion composes canonical filesystem/Git inspection, a structured
-allowlisted process broker, scanner feed gate, scoped local credential and
-network brokers, isolated-test allocation, sandbox/containment persistence,
-Council persistence, and a Raw-HID loopback transport. The extension registers
-through the authenticated local pipe into the protected session registry; that
-registration is deliberately **Registered only**. A separate reviewed host
-attestation is required before a session receives Mediated capability or can
-invoke a concrete broker.
+All 65 settled assignments reach the durable command catalog and a named
+handler/broker or an explicit unavailable/blocked result. The installed
+companion composes canonical filesystem and Git inspection; reviewed local and
+remote Git; host-attested repository recipes; managed processes; DPAPI
+credential references; exact-route HTTPS; configured provider, GitHub/CI,
+scanner, and Council adapters; a digest-pinned Windows Sandbox/helper boundary;
+and the canonical Raw-HID helper protocol. The extension provides exact-target
+selection, reviewed inputs, fixed host actions, and trust-changing provisioning
+through the mutually authenticated local pipe.
 
-Direct evidence is `apps/windows-companion/src/default-composition.ts`,
-`apps/windows-companion/src/bootstrap.ts`, and
-`apps/windows-companion/test/bootstrap.test.ts`, which exercises a protected
-durable session, a disposable temporary Git repository, canonical filesystem
-validation, the allowlisted `git diff --check` Shield broker, Raw-HID loopback,
-and high-consequence containment denial. Authenticated installed-pipe and
-extension registration evidence is separately in
-`apps/windows-companion/test/durable-ipc.test.ts` and
-`apps/windows-companion/test/packaged-runtime.test.ts`.
+Extension registration remains **Registered only**. An exact-target provider
+handshake and reviewed current-user attestation are required before additional
+capabilities or trust-changing configuration are installed. High-consequence
+policy and acceptance gates remain independent of adapter availability.
+
+Direct composition evidence is in `apps/windows-companion/src/bootstrap.ts`,
+`default-composition.ts`, `repository-runtime.ts`, `remote-adapters.ts`,
+`remote-git.ts`, `pipeline-adapters.ts`, `council-runtime.ts`,
+`sandbox-installation.ts`, and `raw-hid-protocol.ts`. Isolated evidence includes
+`bootstrap.test.ts`, `repository-runtime.test.ts`, `remote-adapters.test.ts`,
+`remote-git.test.ts`, `pipeline-adapters.test.ts`, `council-runtime.test.ts`,
+`sandbox-installation.test.ts`, `raw-hid-protocol.test.ts`,
+`authenticated-pipe.test.ts`, and `packaged-runtime.test.ts`.
 
 ## Genuine external or hardware residuals
 
-- Physical Raw HID device discovery, transport authorization, and firmware
-  deployment require attached hardware; the loopback protocol/harness is
-  complete locally.
-- Claude, Codex, Voice, Compound, and GitHub/PR automation require their
-  respective installed-provider or external-account authorization. Their
-  local adapters and policy gates return unavailable rather than simulating a
+- Physical Raw HID discovery/authorization and firmware deployment require the
+  attached keyboard. Firmware, framing, handshake, simulator, and digest-bound
+  Windows helper source exist; device identity and lifecycle remain unaccepted.
+- Claude, Codex, Voice, Compound, GitHub/PR, CI, and scanner routes have
+  configured adapter source, but live use requires the exact installed
+  provider/account, host-attested handshake, network route, scoped credential,
+  and feed. Missing prerequisites return unavailable rather than simulating a
   success.
-- Full OS-enforced VM/container sandboxing and external scanner/advisory feeds
-  require a reviewed backend. The local containment, lease, isolation, and
-  deny-egress paths are present, while activation remains gate-disabled.
+- The Windows Sandbox catalog/helper and runtime are implemented and
+  digest-pinned. Actual Windows feature availability and adversarial isolation,
+  cleanup, and quarantine acceptance remain external evidence.
 - High-consequence actions remain disabled until their documented acceptance
   evidence is independently collected; no disabled action is represented as
   implemented or automatically executable.
 
-The tables below distinguish the implemented local pieces from these remaining
-software-only requirements. High-consequence flows remain safely blocked rather
-than being presented as implemented.
+The table distinguishes implemented source from missing runtime configuration
+and acceptance evidence. High-consequence flows remain gate-disabled even when
+their adapter source is present.
 
 | Control | Settled chords accounted for | Concrete local evidence | Honest residual |
 | --- | --- | --- | --- |
-| Re-anchor | normal | Local simulated-provider pause | Proprietary provider pause adapter |
-| Proof | normal, shift | Target-bound context/review packet injection | Cross-provider reviewer launch |
-| Option Provider | normal, shift | Target-bound decision packet injection | Provider response generation |
-| Plan Expander | normal | Target-bound alternatives packet injection | Provider response generation |
-| Plan Approval | normal | Authority/target checks in coordinator | Authenticated UI authority issuance |
-| Handoff | normal, shift, alt, shift-alt | Context packet; extension focus/queue UI | Planner native adapter |
-| Find Blocked | normal, shift | Observable discovery model; extension queue | Native provider status probe |
-| Find Finished | normal, shift | Observable discovery model; extension queue | Native provider status probe |
-| Authority Refresh | normal, shift | Scoped-authority validator and replay packet | Authenticated local authority UX |
-| Council | normal, shift, alt | Conflict/lease machinery and provider acknowledgements | Automatic mode remains gate-disabled |
-| Claude | normal, shift, alt | Managed-session records and unavailable truth | Claude Desktop/Code authorization |
-| ChatGPT | normal, shift, alt | Managed-session records and unavailable truth | Codex/Desktop authorization |
-| VS Code | normal, shift | Extension session registration/selection/status | Multiple-window live acceptance |
-| Terminal | normal, shift | Managed terminal creation/adoption | External-terminal focus adapter |
-| Commit | normal, shift, alt, shift-alt | Scoped private-index local-commit handler with exact confirmation and final target check | Push, PR, merge, and Direct Main stay unavailable/gate-disabled |
-| GitHub | normal, shift, alt, shift-alt | Explicit unavailable path | GitHub authorization/API adapter |
-| Compound | normal, shift, alt, shift-alt | Authority/receipt path | Compound installation/authorization |
-| Run | normal, shift, alt, shift-alt | Isolated recipe broker seam | Repository run/debug recipe |
-| Voice | normal, shift, alt, shift-alt | Selected-session UI and unavailable truth | Voice provider/binding authorization |
-| Pipeline | normal, shift, alt, shift-alt, ctrl-shift-alt | Local recipe runner, test isolation denial | Repository-specific recipe; Repair remains disabled |
-| Shield | normal, shift, alt, shift-alt, ctrl-shift-alt | Local diff secret-pattern scan and receipt route | Scanner/advisory integrations; containment release disabled |
-| Sandbox | normal, shift, alt, shift-alt, ctrl-shift-alt | Canonicalized filesystem and recoverable sandbox/quarantine leases | Full VM/container acceptance remains disabled |
+| Re-anchor | normal | Configured provider pause route with exact-target handshake | Live provider authorization/parity evidence |
+| Proof | normal, shift | Target-bound context/review packets and configured provider route | Live reviewer behavior acceptance |
+| Option Provider | normal, shift | Target-bound decision packets and configured provider route | Live provider response acceptance |
+| Plan Expander | normal | Target-bound alternatives packet and configured provider route | Live provider response acceptance |
+| Plan Approval | normal | Exact target/authority plus Windows current-user confirmation | End-user execution acceptance |
+| Handoff | normal, shift, alt, shift-alt | Durable context packet and extension focus/queue routing | Live provider planner acceptance |
+| Find Blocked | normal, shift | Exact-target provider-handshake status and extension queue | Live multi-provider observation evidence |
+| Find Finished | normal, shift | Exact-target provider-handshake status and extension queue | Live multi-provider observation evidence |
+| Authority Refresh | normal, shift | Protected scoped authority and Windows user-presence preparation | Independent identity/authority acceptance |
+| Council | normal, shift, alt | Durable conflicts, leases, epochs, and configured provider acknowledgements | Automatic mode remains gate-disabled pending live evidence |
+| Claude | normal, shift, alt | Fixed host actions, managed sessions, configured provider handshake | Installed Claude authorization/parity evidence |
+| ChatGPT | normal, shift, alt | Fixed host actions, managed sessions, configured provider handshake | Installed ChatGPT/Codex authorization/parity evidence |
+| VS Code | normal, shift | Installed extension registration, picker-or-stop, status, and fixed host actions | Multiple-window end-user acceptance |
+| Terminal | normal, shift | Managed terminal creation/adoption and fixed focus actions | External-terminal live acceptance |
+| Commit | normal, shift, alt, shift-alt | Reviewed private-index local commit plus configured exact-ref push/PR/merge handlers | Live branch-protection evidence; Direct Main remains gate-disabled |
+| GitHub | normal, shift, alt, shift-alt | Fixed navigation plus configured GitHub GraphQL/CI routes | External-account authorization and live acceptance |
+| Compound | normal, shift, alt, shift-alt | Fixed palette action and configured automation route | Installed Compound authorization; `lfg` remains gate-disabled |
+| Run | normal, shift, alt, shift-alt | Host-attested run/debug/web/stop recipes and managed processes | Repository-specific manifest installation and live acceptance |
+| Voice | normal, shift, alt, shift-alt | Selected-session UI and configured provider handshake | Live microphone/transcript/provider binding acceptance |
+| Pipeline | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested recipes, Windows Sandbox, configured GitHub CI status/trace | Installed routes/accounts; Repair remains gate-disabled |
+| Shield | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested scanner recipes, Windows Sandbox, protected receipts, configured feeds | Live scanner/advisory freshness evidence; containment release gate-disabled |
+| Sandbox | normal, shift, alt, shift-alt, ctrl-shift-alt | Attested catalog/helper, Windows Sandbox runtime, venv host action, durable quarantine state | Target-host isolation acceptance; high-consequence modes gate-disabled |
 
 All rows map to the canonical 65 entries in
 `packages/protocol/src/b122.ts`; intentionally unassigned chords are rejected
 there and in `ControlRouter`. Direct test evidence includes
 `apps/windows-companion/test/control-plane.test.ts`,
-`apps/windows-companion/test/local-runtime.test.ts`,
-`apps/windows-companion/test/router.test.ts`, and
+`apps/windows-companion/test/repository-runtime.test.ts`,
+`apps/windows-companion/test/remote-adapters.test.ts`,
+`apps/windows-companion/test/remote-git.test.ts`,
+`apps/windows-companion/test/sandbox-installation.test.ts`, and
 `apps/windows-companion/test/bootstrap.test.ts`.
 
 ## Acceptance status
@@ -87,6 +94,7 @@ Automated evidence covers live temporary Git repositories, stale-target
 rejection, target-bound review, filesystem allowlists, sandbox release approval,
 isolated recipe denial, local IPC authentication, protected session persistence,
 default composition, crash-safe receipt persistence, duplicate dispatch, and
-simulated provider lifecycle. Hardware, installed-provider, GitHub/cloud
-credential, real scanner-feed, and end-user Windows/VS Code acceptance require
+configured provider/GitHub/CI and Windows Sandbox failure boundaries. Hardware,
+live provider/account authorization, real scanner-feed freshness, pipe-ACL and
+same-user adversary review, and end-user Windows/VS Code acceptance require
 separate observed evidence.
