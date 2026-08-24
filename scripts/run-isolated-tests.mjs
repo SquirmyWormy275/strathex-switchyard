@@ -54,6 +54,7 @@ const mediatedGitTests = [
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
 export const requiredGroups = [
+  { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "build:companion", args: [npmCli, "run", "build:companion"] },
   ...(process.platform === "win32" ? [{
     file: "deployment/windows/Test-B122ManifestGenerators.ps1",
