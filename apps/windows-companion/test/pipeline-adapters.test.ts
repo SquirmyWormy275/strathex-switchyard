@@ -107,6 +107,23 @@ test("pipeline adapter refuses a response for a different head and rechecks the 
   assert.equal(calls, 1);
 });
 
+test("pipeline adapter binds remote and result URLs to the configured GitHub Enterprise host", async () => {
+  const enterpriseTarget = { ...target, canonicalRemote: "ssh://git@ghe.example.test/acme/project.git" };
+  const adapter = new ConfiguredGitHubPipelineAdapter({
+    async request() {
+      return { outcome: "passed", routeId: "github.graphql", detail: "ok", body: Buffer.from(JSON.stringify({ data: { repository: { object: { oid: enterpriseTarget.head, statusCheckRollup: { state: "FAILURE", contexts: { nodes: [
+        { __typename: "CheckRun", name: "enterprise-unit", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "https://ghe.example.test/acme/project/actions/runs/9", title: "Unit", summary: "failed", text: null }
+      ] } } } } } })) };
+    }
+  } as unknown as DynamicConfiguredNetworkClient, { async list() { return []; } }, { async resolve() { return { host: "ghe.example.test" }; } });
+  const result = await adapter.execute({ ...request("pipeline_failure_trace"), target: enterpriseTarget });
+  assert.equal(result.status, "completed");
+  assert.equal(((result.data?.failures as readonly { url?: string }[])[0]?.url), "https://ghe.example.test/acme/project/actions/runs/9");
+
+  const wrongHost = await adapter.execute(request("pipeline_status"));
+  assert.equal(wrongHost.status, "blocked");
+});
+
 test("composite pipeline status preserves local evidence when hosted CI is unavailable", async () => {
   const adapter = new CompositePipelineStatusAdapter(
     { id: "local", kind: "generic", async execute() { return { status: "completed", summary: "Local diff check passed.", effectDisposition: "committed" as const, data: { clean: true } }; } },

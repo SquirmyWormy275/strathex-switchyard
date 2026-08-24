@@ -3,6 +3,8 @@ import type { ProtectedReceipt } from "../../../packages/control-plane/src/contr
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 
+export interface PipelineGitHostResolver { resolve(): Promise<Readonly<{ host: string }>>; }
+
 export interface PipelineReceiptReader { list(): Promise<readonly ProtectedReceipt[]>; }
 
 /**
@@ -52,15 +54,19 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
   readonly kind = "generic" as const;
   private readonly network: DynamicConfiguredNetworkClient;
   private readonly receipts: PipelineReceiptReader;
+  private readonly hosts: PipelineGitHostResolver;
 
-  constructor(network: DynamicConfiguredNetworkClient, receipts: PipelineReceiptReader) { this.network = network; this.receipts = receipts; }
+  constructor(network: DynamicConfiguredNetworkClient, receipts: PipelineReceiptReader, hosts: PipelineGitHostResolver = { async resolve() { return { host: "github.com" }; } }) { this.network = network; this.receipts = receipts; this.hosts = hosts; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     if ((request.definition.action !== "pipeline_status" && request.definition.action !== "pipeline_failure_trace") || !request.operationId || !request.target?.head || !request.target.canonicalRemote) {
       return { status: "unavailable", summary: "Hosted pipeline inspection requires an exact durable operation, target HEAD, and canonical remote.", effectDisposition: "not_started" };
     }
-    const repository = githubRepository(request.target.canonicalRemote);
-    if (!repository) return { status: "blocked", summary: "Hosted pipeline inspection supports only the exact selected github.com repository.", effectDisposition: "not_started" };
+    let host: string;
+    try { host = exactHost((await this.hosts.resolve()).host); }
+    catch { return { status: "unavailable", summary: "Hosted pipeline inspection requires one exact configured GitHub host.", effectDisposition: "not_started" }; }
+    const repository = githubRepository(request.target.canonicalRemote, host);
+    if (!repository) return { status: "blocked", summary: "Hosted pipeline inspection requires the canonical remote to match the exact configured GitHub host.", effectDisposition: "not_started" };
     if (!request.effectGuard) return { status: "blocked", summary: "Hosted pipeline inspection requires a final target guard.", effectDisposition: "not_started" };
     if (request.executionControl && (Date.parse(request.executionControl.deadline) <= Date.now() || await request.executionControl.isCancellationRequested())) {
       return { status: Date.parse(request.executionControl.deadline) <= Date.now() ? "timed_out" : "cancelled", summary: "Hosted pipeline inspection stopped before its network effect.", effectDisposition: "not_started" };
@@ -83,7 +89,7 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
     } finally { control.dispose(); }
     if (response.outcome !== "passed" || !response.body) return { status: response.outcome === "blocked" ? "blocked" : response.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(response.detail), effectDisposition: response.effectDisposition };
     let observation: PipelineObservation;
-    try { observation = parseObservation(response.body, request.target.head); }
+    try { observation = parseObservation(response.body, request.target.head, host); }
     catch { return { status: "failed", summary: "GitHub returned an invalid exact-head pipeline response; no state was inferred.", effectDisposition: "ambiguous" }; }
 
     const local = (await this.receipts.list())
@@ -112,7 +118,7 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
   }
 }
 
-function parseObservation(bytes: Uint8Array, expectedHead: string): PipelineObservation {
+function parseObservation(bytes: Uint8Array, expectedHead: string, host: string): PipelineObservation {
   const root: unknown = JSON.parse(Buffer.from(bytes).toString("utf8"));
   if (!record(root) || Object.keys(root).length !== 1 || !record(root.data)) throw new Error("invalid envelope");
   const repository = requiredRecord(root.data, "repository");
@@ -121,36 +127,37 @@ function parseObservation(bytes: Uint8Array, expectedHead: string): PipelineObse
   const rollup = object.statusCheckRollup;
   if (rollup === null) return { oid: expectedHead, state: null, contexts: [] };
   if (!record(rollup) || !["SUCCESS", "FAILURE", "PENDING", "ERROR", "EXPECTED"].includes(String(rollup.state)) || !record(rollup.contexts) || !Array.isArray(rollup.contexts.nodes) || rollup.contexts.nodes.length > 50) throw new Error("invalid rollup");
-  const contexts = rollup.contexts.nodes.map(parseContext);
+  const contexts = rollup.contexts.nodes.map((value) => parseContext(value, host));
   return { oid: expectedHead, state: String(rollup.state), contexts };
 }
 
-function parseContext(value: unknown): PipelineContext {
+function parseContext(value: unknown, host: string): PipelineContext {
   if (!record(value)) throw new Error("invalid context");
   if (value.__typename === "CheckRun") {
     if (typeof value.name !== "string" || !bounded(value.name, 256) || !["QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED", "COMPLETED"].includes(String(value.status))
       || (value.conclusion !== null && !["ACTION_REQUIRED", "CANCELLED", "FAILURE", "NEUTRAL", "SKIPPED", "STALE", "STARTUP_FAILURE", "SUCCESS", "TIMED_OUT"].includes(String(value.conclusion)))) throw new Error("invalid check run");
     return {
       kind: "check", name: value.name, state: String(value.status), ...(typeof value.conclusion === "string" ? { conclusion: value.conclusion } : {}),
-      ...(safeUrl(value.detailsUrl) ? { url: value.detailsUrl as string } : {}),
+      ...(safeUrl(value.detailsUrl, host) ? { url: value.detailsUrl as string } : {}),
       ...(boundedNullable(value.summary, 4_096) || boundedNullable(value.text, 4_096) || boundedNullable(value.title, 512) ? { summary: boundedSummary([value.title, value.summary, value.text]) } : {})
     };
   }
   if (value.__typename === "StatusContext") {
     if (typeof value.context !== "string" || !bounded(value.context, 256) || !["ERROR", "EXPECTED", "FAILURE", "PENDING", "SUCCESS"].includes(String(value.state))) throw new Error("invalid status context");
-    return { kind: "status", name: value.context, state: String(value.state), ...(safeUrl(value.targetUrl) ? { url: value.targetUrl as string } : {}), ...(boundedNullable(value.description, 4_096) ? { summary: untrustedSummary(value.description as string) } : {}) };
+    return { kind: "status", name: value.context, state: String(value.state), ...(safeUrl(value.targetUrl, host) ? { url: value.targetUrl as string } : {}), ...(boundedNullable(value.description, 4_096) ? { summary: untrustedSummary(value.description as string) } : {}) };
   }
   throw new Error("unknown context type");
 }
 
 function failedContext(value: PipelineContext): boolean { return ["ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STARTUP_FAILURE", "STALE"].includes(value.conclusion ?? value.state); }
-function githubRepository(remote: string): { readonly owner: string; readonly name: string } | undefined { const match = /^(?:https:\/\/github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/i.exec(remote.trim()); return match ? { owner: match[1]!, name: match[2]! } : undefined; }
+function githubRepository(remote: string, expectedHost: string): { readonly owner: string; readonly name: string } | undefined { const match = /^(?:https:\/\/([A-Za-z0-9.-]+)\/|ssh:\/\/git@([A-Za-z0-9.-]+)\/|git@([A-Za-z0-9.-]+):)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/i.exec(remote.trim()); const host = (match?.[1] ?? match?.[2] ?? match?.[3])?.toLowerCase(); return match && host === expectedHost ? { owner: match[4]!, name: match[5]! } : undefined; }
 function requiredRecord(value: Record<string, unknown>, key: string): Record<string, unknown> { const result = value[key]; if (!record(result)) throw new Error("missing record"); return result; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function bounded(value: string, maximum: number): boolean { return !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value); }
 function boundedNullable(value: unknown, maximum: number): value is string { return typeof value === "string" && value.length <= maximum && !/\0/.test(value); }
 function boundedSummary(values: readonly unknown[]): string { return untrustedSummary(values.filter((value): value is string => typeof value === "string" && !!value.trim()).join(" | ").slice(0, 4_096)); }
-function safeUrl(value: unknown): value is string { try { if (typeof value !== "string" || value.length > 2_048) return false; const url = new URL(value); return url.protocol === "https:" && url.hostname === "github.com" && !url.username && !url.password; } catch { return false; } }
+function safeUrl(value: unknown, host: string): value is string { try { if (typeof value !== "string" || value.length > 2_048) return false; const url = new URL(value); return url.protocol === "https:" && url.hostname.toLowerCase() === host && !url.username && !url.password; } catch { return false; } }
+function exactHost(value: string): string { const host = value.toLowerCase(); if (host.startsWith(".") || host.endsWith(".") || !host.includes(".") || host.split(".").some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) throw new Error("invalid GitHub host"); return host; }
 function abortControl(request: AdapterRequest): { readonly signal: AbortSignal; dispose(): void } { const controller = new AbortController(); const deadline = request.executionControl ? Date.parse(request.executionControl.deadline) : Date.now() + 30_000; const timer = setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now())); timer.unref?.(); return { signal: controller.signal, dispose() { clearTimeout(timer); } }; }
 function observationData(outcome: AdapterOutcome): Readonly<Record<string, unknown>> { return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition ?? "ambiguous", data: outcome.data ?? {} }; }
 function combineDisposition(left: AdapterOutcome, right: AdapterOutcome): NonNullable<AdapterOutcome["effectDisposition"]> {

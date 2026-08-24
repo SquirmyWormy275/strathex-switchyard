@@ -118,7 +118,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   const hostActionAdapter = new DurableHostActionAdapter(hostActions);
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   if (dynamicNetwork) {
-    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store));
+    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), { resolve: async () => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve()) });
     adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));
     adapters.register("pipeline_failure_trace", pipeline);
   }

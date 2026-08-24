@@ -352,7 +352,7 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
 function githubPlan(request: AdapterRequest, page: "home" | "pr" | "issues" | "actions"): Readonly<{ hostAction: "open_external_url"; url: string }> | undefined {
   const repository = githubRepository(request.target?.canonicalRemote);
   if (!repository) return undefined;
-  const base = `https://github.com/${repository.owner}/${repository.name}`;
+  const base = `https://${repository.host}/${repository.owner}/${repository.name}`;
   if (page === "home") return { hostAction: "open_external_url", url: base };
   if (page === "issues") return { hostAction: "open_external_url", url: `${base}/issues` };
   const branch = request.target?.branch;
@@ -362,10 +362,12 @@ function githubPlan(request: AdapterRequest, page: "home" | "pr" | "issues" | "a
     : { hostAction: "open_external_url", url: `${base}/actions?query=branch%3A${encodeURIComponent(branch)}` };
 }
 
-function githubRepository(remote: string | undefined): Readonly<{ owner: string; name: string }> | undefined {
+function githubRepository(remote: string | undefined): Readonly<{ host: string; owner: string; name: string }> | undefined {
   if (!remote || /[\r\n\0]/.test(remote)) return undefined;
-  const match = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(remote);
-  return match ? { owner: match[1]!, name: match[2]! } : undefined;
+  const match = /^(?:https:\/\/([A-Za-z0-9.-]+)\/|git@([A-Za-z0-9.-]+):|ssh:\/\/git@([A-Za-z0-9.-]+)\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/i.exec(remote);
+  const host = (match?.[1] ?? match?.[2] ?? match?.[3])?.toLowerCase();
+  if (!host || host.startsWith(".") || host.endsWith(".") || !host.includes(".") || host.split(".").some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return undefined;
+  return { host, owner: match![4]!, name: match![5]! };
 }
 
 function boundedSummary(value: string): string {

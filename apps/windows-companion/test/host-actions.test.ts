@@ -46,6 +46,17 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
   assert.equal("toolVersions" in completion, false, "only typed runtime/scanner issuers may supply receipt tool evidence");
 });
 
+test("GitHub host actions preserve the exact canonical GitHub Enterprise host", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-ghe-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
+  const adapter = new DurableHostActionAdapter(queue);
+  const enterpriseTarget = { ...target, canonicalRemote: "ssh://git@ghe.example.test/acme/switchyard.git" };
+  const result = await adapter.execute({ definition: commandForAction("github_actions"), operationId: "operation-ghe", target: enterpriseTarget });
+  assert.equal(result.status, "running");
+  assert.equal(result.data?.hostActionUrl, "https://ghe.example.test/acme/switchyard/actions?query=branch%3Afeature%2Fhost-actions");
+});
+
 test("installed dispatch stays running until the authenticated host acknowledgement durably settles it", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-integration-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
