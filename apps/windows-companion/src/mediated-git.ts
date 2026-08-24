@@ -179,6 +179,7 @@ export class LocalMediatedGitHandler {
     let temporaryIndex: string | undefined;
     let temporaryInspectionIndex: string | undefined;
     let temporaryHooks: string | undefined;
+    let featureBranchChild: ChildOperationLease | undefined;
     let localCommitChild: ChildOperationLease | undefined;
     try {
       lock = await this.acquireLock(root);
@@ -202,6 +203,23 @@ export class LocalMediatedGitHandler {
         const beforeBranch = await this.verifyGitPreconditions(root, request);
         if (beforeBranch) return beforeBranch;
         const featureBranch = request.mutation.featureBranch!;
+        if (request.childSaga) {
+          featureBranchChild = await request.childSaga.begin({
+            action: "git.feature-branch",
+            idempotencyScope: "feature-branch-ref-update",
+            details: {
+              repositoryRoot: root,
+              beforeHead: request.target.head,
+              beforeBranch: request.target.branch ?? "<detached>",
+              featureBranch,
+              expectedIndexTree: request.target.indexTree
+            }
+          });
+          if (!featureBranchChild.mayExecute) {
+            return { status: "incomplete", summary: "A prior exact feature-branch generation requires read-only reconciliation and was not replayed.", effectDisposition: "ambiguous" };
+          }
+          await request.childSaga.markExecuting(featureBranchChild);
+        }
         const switched = await this.runner.run(["-c", `core.hooksPath=${temporaryHooks}`, "switch", "-c", featureBranch, request.target.head], { cwd: root });
         const [observedBranch, observedHead, observedIndex] = await Promise.all([
           this.currentBranch(root).catch(() => undefined),
@@ -209,6 +227,10 @@ export class LocalMediatedGitHandler {
           this.currentIndexTree(root).catch(() => undefined)
         ]);
         if (switched.exitCode === 0 && observedBranch === featureBranch && observedHead === request.target.head && observedIndex === request.target.indexTree) {
+          if (featureBranchChild) {
+            await request.childSaga!.markExternalCommitted(featureBranchChild, { observedBranch, observedHead, observedIndex });
+            await request.childSaga!.settle(featureBranchChild, "completed", { observedBranch, observedHead, observedIndex });
+          }
           return {
             status: "incomplete",
             summary: "Created and switched to the exact reviewed feature branch without committing. Capture the new target and review the local commit again.",
@@ -218,8 +240,10 @@ export class LocalMediatedGitHandler {
         }
         const branchRef = await this.runner.run(["show-ref", "--verify", "--hash", `refs/heads/${featureBranch}`], { cwd: root }).catch(() => undefined);
         if (observedBranch !== (request.target.branch ?? "") || observedHead !== request.target.head || branchRef?.exitCode === 0) {
-          return { status: "incomplete", summary: "Feature-branch creation did not settle to one exact state; repository reconciliation is required before retry." };
+          if (featureBranchChild) await request.childSaga!.settle(featureBranchChild, "ambiguous", { observedBranch: observedBranch ?? "<unavailable>", observedHead: observedHead ?? "<unavailable>", branchRefPresent: branchRef?.exitCode === 0 ? "true" : "false" });
+          return { status: "incomplete", summary: "Feature-branch creation did not settle to one exact state; repository reconciliation is required before retry.", effectDisposition: "ambiguous" };
         }
+        if (featureBranchChild) await request.childSaga!.settle(featureBranchChild, "failed", { observedBranch: observedBranch ?? "<detached>", observedHead: observedHead ?? "<unavailable>", branchRefPresent: "false" });
         return failedGit("The reviewed feature branch could not be created; the observed branch and HEAD remained unchanged.", switched, "not_started");
       }
 
@@ -316,6 +340,7 @@ export class LocalMediatedGitHandler {
       if (localCommitChild) await request.childSaga!.settle(localCommitChild, "failed", { observedHead: request.target.head });
       return failedGit("The reviewed local commit was rejected without changing the observed target HEAD.", commit, "not_started");
     } catch (error) {
+      if (featureBranchChild && request.childSaga) await request.childSaga.settle(featureBranchChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
       if (localCommitChild && request.childSaga) await request.childSaga.settle(localCommitChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
       return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous" };
     } finally {

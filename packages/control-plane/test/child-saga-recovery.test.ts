@@ -176,6 +176,55 @@ test("a pre-effect unavailable composite settles its boundary and remains intent
   });
 });
 
+test("an explicitly committed partial composite is recorded without replay on the stale target", async () => {
+  await withStore(async (store) => {
+    const now = "2026-08-23T12:00:00.000Z";
+    const target: TargetSnapshot = {
+      id: "snapshot-partial-commit", repositoryRoot: "C:/work/example", branch: "main", head: "abc", indexTree: "tree",
+      trackedManifest: "tracked", untrackedManifest: "untracked", submodules: {}, policyVersion: "policy-1",
+      environmentFingerprint: "env-1", capturedAt: now, completeness: "complete", reasons: []
+    };
+    const session: ManagedSession = {
+      id: "session-partial-commit", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
+      plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+    };
+    const authority: AuthorityGrant = {
+      id: "authority-partial-commit", repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["compound_capture"], prohibitedActions: [], issuedAt: now, expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "user"
+    };
+    const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const automation = new InMemoryAutomationBroker(policy);
+    let calls = 0;
+    automation.register("compound_capture", () => {
+      calls += 1;
+      return { status: "incomplete", summary: "One exact preparatory effect committed; capture a fresh target before continuing.", effectDisposition: "committed" };
+    });
+    const dispatcher = new CommandDispatcher({
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => id === authority.id ? authority : undefined },
+      operations: coordinator,
+      automation
+    });
+    const assignment = commandForAction("compound_capture").assignment!;
+    const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+
+    assert.equal((await dispatcher.dispatch(request)).status, "incomplete");
+    assert.equal((await dispatcher.dispatch(request)).status, "incomplete");
+    assert.equal(calls, 1, "the same stale target cannot replay a known committed partial effect");
+    const all = await operations.list();
+    const parent = all.find((operation) => !operation.parentId);
+    const boundary = all.find((operation) => operation.parentId && operation.action.endsWith(".composite"));
+    assert.equal(parent?.state, "recorded");
+    assert.equal(parent?.details.commandStatus, "incomplete");
+    assert.equal(parent?.details.noReplay, "true");
+    assert.equal(boundary?.state, "recorded");
+  });
+});
+
 test("an unavailable response without explicit no-effect proof remains ambiguous and cannot replay", async () => {
   await withStore(async (store) => {
     const now = "2026-08-23T12:00:00.000Z";

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CommandStatus, OperationRecord, OperationState, ReceiptResult } from "./contracts.ts";
+import type { CommandStatus, EffectDisposition, OperationRecord, OperationState, ReceiptResult } from "./contracts.ts";
 import { redactText } from "./redaction.ts";
 import { ReceiptLedger } from "./receipts.ts";
 import { jsonClone, sha256, stableJson, type JournalEntry, type JsonStoreTransaction, ProtectedJsonStore } from "./store.ts";
@@ -124,6 +124,7 @@ export interface DurableOperationResult {
   readonly authorityId?: string;
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly effectDisposition?: EffectDisposition;
   /** Gate-bearing receipts are issued only with explicit evidence metadata. */
   readonly policyVersion?: string;
   readonly evidenceDigest?: string;
@@ -295,6 +296,10 @@ export class OperationSagaStore {
         .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
       const active = matching.find((operation) => !isTerminal(operation.state));
       if (active) return { operation: cloneOperation(active), reused: true };
+      const latest = matching.at(-1);
+      if (latest?.state === "recorded" && latest.details.noReplay === "true") {
+        return { operation: cloneOperation(latest), reused: true };
+      }
       const generation = matching.length + 1;
       return this.beginWithin(transaction, {
         action: input.action,
@@ -801,10 +806,16 @@ function commandStatusFor(operation: OperationRecord): CommandStatus {
     case "external_committed":
     case "compensating": return "running";
     case "cancelling": return "running";
-    case "recorded": return "completed";
+    case "recorded": return recordedCommandStatus(operation.details.commandStatus);
     case "failed": return "failed";
     case "cancelled": return "cancelled";
   }
+}
+
+function recordedCommandStatus(value: string | undefined): CommandStatus {
+  return value === "completed" || value === "failed" || value === "timed_out" || value === "unavailable" || value === "incomplete" || value === "blocked" || value === "cancelled"
+    ? value
+    : "completed";
 }
 
 function receiptResultFor(status: CommandStatus): ReceiptResult {
@@ -917,7 +928,7 @@ export class DurableOperationCoordinator {
       throw new OperationSagaError(`Unsupported command status for durable operation: ${result.status}`);
     }
     let receiptId: string | undefined;
-    if (result.status === "completed") {
+    if (result.status === "completed" || result.effectDisposition === "committed") {
       await this.markExternalCommitted(lease, { commandStatus: result.status });
       operation = await this.requireOperation(lease.operationId);
     } else if (result.status === "cancelled") {
@@ -971,8 +982,13 @@ export class DurableOperationCoordinator {
     });
 
     operation = await this.requireOperation(lease.operationId);
-    if (result.status === "completed" && operation.state === "external_committed") {
-      await this.operations.advance(operation.id, "recorded", { commandStatus: result.status, ...(receiptId ? { receiptId } : {}) });
+    if ((result.status === "completed" || result.effectDisposition === "committed") && operation.state === "external_committed") {
+      await this.operations.advance(operation.id, "recorded", {
+        commandStatus: result.status,
+        ...(result.effectDisposition === "committed" ? { effectDisposition: "committed" } : {}),
+        ...(result.effectDisposition === "committed" && result.status !== "completed" ? { noReplay: "true" } : {}),
+        ...(receiptId ? { receiptId } : {})
+      });
     } else if (result.status === "cancelled" && operation.state === "cancelling") {
       await this.operations.advance(operation.id, "cancelled", { commandStatus: result.status });
     } else if (result.status !== "completed" && operation.state !== "external_committed") {

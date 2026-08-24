@@ -16,7 +16,7 @@ import type {
 } from "./brokers.ts";
 import { commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
 import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
-import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { ChildOperationLease, ChildOperationSaga } from "./operations.ts";
 import { PolicyEngine, type PolicyDecision, type PolicyPermit } from "./policy.ts";
 import { untrustedSummary } from "./redaction.ts";
@@ -64,6 +64,7 @@ export interface DurableDispatchLifecycle extends CommandOperationCoordinator {
     authorityId?: string;
     status: CommandStatus;
     summary: string;
+    effectDisposition?: EffectDisposition;
     policyVersion?: string;
     evidenceDigest?: string;
     toolVersions?: Readonly<Record<string, string>>;
@@ -452,7 +453,13 @@ export class CommandDispatcher {
         // return blocked/unavailable when its response is lost. Only an
         // explicit disposition from the trusted boundary can make a retry safe.
         const disposition = result.effectDisposition ?? "ambiguous";
-        if (result.status === "completed" && disposition === "committed") {
+        if (disposition === "committed") {
+          // The trusted boundary has positively identified the external
+          // effect.  It is therefore terminal even when the command result is
+          // intentionally incomplete (for example, creating a reviewed
+          // feature branch and requiring a fresh TargetSnapshot before the
+          // commit).  The parent may still record a non-green command result;
+          // the child receipt prevents both replay and false ambiguity.
           await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: disposition });
           await childSaga.settle(boundary, "completed");
         } else if (disposition === "not_started") {
@@ -462,9 +469,6 @@ export class CommandDispatcher {
           await childSaga.markCompensating(boundary);
           await childSaga.settle(boundary, "cancelled", { brokerStatus: result.status, externalEffect: disposition });
         } else {
-          if (disposition === "committed") {
-            await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: disposition });
-          }
           await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status, externalEffect: disposition });
         }
       }
@@ -497,6 +501,7 @@ export class CommandDispatcher {
       ...(authority ? { authorityId: authority.id } : {}),
       status: result.status,
       summary: result.summary,
+      ...(result.effectDisposition ? { effectDisposition: result.effectDisposition } : {}),
       ...(evidence ?? {})
     });
   }

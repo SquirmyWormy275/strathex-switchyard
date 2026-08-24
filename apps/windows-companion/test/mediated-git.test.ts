@@ -202,8 +202,14 @@ test("default-branch review creates a hook-disabled feature branch and requires 
     const firstBroker = new InMemoryGitBroker(first.policy);
     const handler = new LocalMediatedGitHandler({ stateDirectory: isolated.state });
     firstBroker.register("local_commit", (input) => handler.execute(input));
-    const branched = await firstBroker.execute({ ...first.request, mutation: { ...first.request.mutation, featureBranch: "feature/reviewed-from-main" } });
+    const saga = new RecordingChildSaga();
+    const branched = await firstBroker.execute({ ...first.request, childSaga: saga, mutation: { ...first.request.mutation, featureBranch: "feature/reviewed-from-main" } });
     assert.equal(branched.status, "incomplete", branched.summary);
+    const branchChild = saga.events.find((event) => event.kind === "begin")?.value as ChildOperationStart;
+    assert.equal(branchChild.action, "git.feature-branch");
+    assert.equal(branchChild.details?.beforeHead, target.head);
+    assert.equal(branchChild.details?.featureBranch, "feature/reviewed-from-main");
+    assert.equal(saga.events.at(-1)?.kind, "settle:completed");
     assert.equal(await requireCommand(isolated.root, "git", "branch", "--show-current"), "feature/reviewed-from-main");
     assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
 
