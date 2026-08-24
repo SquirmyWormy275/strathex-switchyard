@@ -26,9 +26,9 @@ export function validateReviewApproval(approval: ReviewApproval | undefined, act
   return undefined;
 }
 
-async function run(program: string, args: readonly string[], cwd: string, environment?: Record<string, string>): Promise<{ code: number; stdout: string; stderr: string }> {
+async function run(program: string, args: readonly string[], cwd: string, environment?: Record<string, string>, inheritEnvironment = true): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((done, fail) => {
-    const child = spawn(program, [...args], { cwd, shell: false, windowsHide: true, env: { ...process.env, ...environment } });
+    const child = spawn(program, [...args], { cwd, shell: false, windowsHide: true, env: inheritEnvironment ? { ...process.env, ...environment } : environment });
     let stdout = "", stderr = "";
     child.stdout.on("data", (chunk: Buffer) => { stdout += text(chunk); }); child.stderr.on("data", (chunk: Buffer) => { stderr += text(chunk); });
     child.once("error", fail); child.once("close", (code) => done({ code: code ?? -1, stdout, stderr }));
@@ -47,8 +47,13 @@ export async function captureLiveTargetSnapshot(directory: string, policyVersion
   const upstream = await git(gitRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]).catch(() => undefined);
   const head = await git(gitRoot, ["rev-parse", "HEAD"]);
   const indexTree = await git(gitRoot, ["write-tree"]);
-  const tracked = lineList(await git(gitRoot, ["status", "--porcelain=v1", "--untracked-files=no"]));
-  const untracked = lineList(await git(gitRoot, ["ls-files", "--others", "--exclude-standard"]));
+  const tracked = [
+    ...lineList(await git(gitRoot, ["status", "--porcelain=v1", "--untracked-files=no"])),
+    `worktree-diff:${hash(await git(gitRoot, ["diff", "--no-ext-diff", "--binary", "--", "."]))}`,
+    `index-diff:${hash(await git(gitRoot, ["diff", "--cached", "--no-ext-diff", "--binary", "--", "."]))}`
+  ];
+  const untrackedNames = lineList(await git(gitRoot, ["ls-files", "--others", "--exclude-standard"]));
+  const untracked = await Promise.all(untrackedNames.map(async (path) => `${path}:${await git(gitRoot, ["hash-object", "--", path])}`));
   const submodules = lineList(await git(gitRoot, ["submodule", "status", "--recursive"]));
   return captureTargetSnapshot({ gitRoot, remote, branch, upstream, head, indexTree, tracked, untracked, submodules, policyVersion,
     toolFingerprint: await git(gitRoot, ["--version"]), environmentFingerprint: `${process.platform}:${process.arch}:${process.version}` });
@@ -85,17 +90,27 @@ export class LocalRepositoryBroker {
   private readonly root: string; private readonly policy: RepositoryPolicy;
   constructor(root: string, policy: RepositoryPolicy = defaultRepositoryPolicy(root)) { this.root = root; this.policy = policy; }
   private async rootFor(target: TargetSnapshot): Promise<string> { const root = await new FilesystemBroker(this.policy).canonical(target.gitRoot); const expected = await realpath(resolve(this.root)).catch(() => resolve(this.root)); if (root !== expected) throw new Error("The target repository does not match this broker."); return root; }
-  async status(target: TargetSnapshot): Promise<GitStatus> { const root = await this.rootFor(target); return { branch: await git(root, ["branch", "--show-current"]), head: await git(root, ["rev-parse", "HEAD"]), porcelain: lineList(await git(root, ["status", "--porcelain=v1"])), diff: await git(root, ["diff", "--no-ext-diff", "--", "."]) }; }
+  async status(target: TargetSnapshot): Promise<GitStatus> {
+    const root = await this.rootFor(target);
+    const unstaged = await git(root, ["diff", "--no-ext-diff", "--", "."]);
+    const staged = await git(root, ["diff", "--cached", "--no-ext-diff", "--", "."]);
+    return { branch: await git(root, ["branch", "--show-current"]), head: await git(root, ["rev-parse", "HEAD"]), porcelain: lineList(await git(root, ["status", "--porcelain=v1"])), diff: `${unstaged}\n${staged}` };
+  }
   async revalidate(target: TargetSnapshot): Promise<string | undefined> { const current = await captureLiveTargetSnapshot(target.gitRoot, target.policyVersion); return current.digest === target.digest ? undefined : "Live repository state no longer matches the protected TargetSnapshot."; }
-  private async mutationGuard(action: string, target: TargetSnapshot, approval: ReviewApproval | undefined): Promise<string | undefined> { return this.revalidate(target) ?? validateReviewApproval(approval, action, target); }
+  private async mutationGuard(action: string, target: TargetSnapshot, approval: ReviewApproval | undefined): Promise<string | undefined> {
+    const stale = await this.revalidate(target);
+    return stale ?? validateReviewApproval(approval, action, target);
+  }
   async commit(target: TargetSnapshot, message: string, approval?: ReviewApproval): Promise<AdapterResult> {
     const denial = await this.mutationGuard("COMMIT:normal", target, approval); if (denial) return { outcome: "blocked", detail: denial };
     if (!message.trim()) return { outcome: "blocked", detail: "A non-empty reviewed commit message is required." };
+    if (!target.branch || target.branch === "main" || target.branch === "master") return { outcome: "blocked", detail: "Local commits require an isolated feature branch; the broker will not commit on a default or detached branch." };
     const root = await this.rootFor(target); const result = await run("git", ["commit", "-m", message], root);
     return result.code === 0 ? { outcome: "passed", detail: "Local commit completed after exact-target revalidation.", externalReference: await git(root, ["rev-parse", "HEAD"]) } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
   }
   async push(target: TargetSnapshot, approval?: ReviewApproval): Promise<AdapterResult> {
     if (this.policy.push !== "reviewed") return { outcome: "blocked", detail: "Policy forbids network push." };
+    if (!target.branch || target.branch === "main" || target.branch === "master") return { outcome: "blocked", detail: "PR upsert requires an isolated feature branch; the broker will not push a default or detached branch." };
     const denial = await this.mutationGuard("COMMIT:shift", target, approval); if (denial) return { outcome: "blocked", detail: denial };
     const root = await this.rootFor(target); const result = await run("git", ["push"], root);
     return result.code === 0 ? { outcome: "passed", detail: "Push completed after explicit review.", externalReference: "git-push" } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
@@ -120,7 +135,13 @@ export class LocalTestEnvironmentBroker implements TestEnvironmentBroker {
     if (Object.values(environment).some((value) => this.recipe!.productionDenyPatterns.some((pattern) => pattern.test(value)))) return { available: false, reason: "The test recipe contains a denied production-like endpoint or credential." };
     return { available: true, environment };
   }
-  async run(target: TargetSnapshot): Promise<AdapterResult> { const prepared = await this.prepare(target); if (!prepared.available) return { outcome: "unavailable", detail: prepared.reason! }; const result = await run(this.recipe!.command, this.recipe!.args, target.gitRoot, prepared.environment); return result.code === 0 ? { outcome: "passed", detail: redact(result.stdout || "Isolated local gate passed.") } : { outcome: "failed", detail: redact(result.stderr || result.stdout) }; }
+  async run(target: TargetSnapshot): Promise<AdapterResult> {
+    const prepared = await this.prepare(target); if (!prepared.available) return { outcome: "unavailable", detail: prepared.reason! };
+    const hostKeys = ["PATH", "PATHEXT", "SystemRoot", "ComSpec", "TEMP", "TMP", "HOME", "USERPROFILE"];
+    const hostEnvironment = Object.fromEntries(hostKeys.flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]!]]));
+    const result = await run(this.recipe!.command, this.recipe!.args, target.gitRoot, { ...hostEnvironment, ...prepared.environment }, false);
+    return result.code === 0 ? { outcome: "passed", detail: redact(result.stdout || "Isolated local gate passed.") } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
+  }
 }
 
 export class LocalProcessProviderAdapter implements ProviderSessionAdapter {

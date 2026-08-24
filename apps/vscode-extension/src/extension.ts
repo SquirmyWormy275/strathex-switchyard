@@ -20,7 +20,8 @@ async function register(context: vscode.ExtensionContext, provider: Provider, te
   const terminalProcessId = terminal ? await terminal.processId : undefined; const id = sessionId(provider, terminal?.name, terminalProcessId); const now = new Date().toISOString();
   const record: ManagedSessionRecord = { id, provider, terminalName: terminal?.name, terminalProcessId, workspaceRoots: workspaceRoots(), registeredAt: now, updatedAt: now,
     capability: { registered: true, observable: false, controllable: false, mediated: false }, status: "unknown", selected: true };
-  const rest = sessions(context).filter((item) => item.id !== id).map((item) => ({ ...item, selected: false })); await save(context, [...rest, record]); return record;
+  const rest = sessions(context).filter((item) => item.id !== id).map((item) => ({ ...item, selected: false })); await save(context, [...rest, record]);
+  await syncRegistration(context, record); return record;
 }
 async function choose(context: vscode.ExtensionContext): Promise<ManagedSessionRecord | undefined> {
   const current = sessions(context); const choice = await vscode.window.showQuickPick(current.map((item) => ({ label: item.id, description: `${item.status}; ${capabilityLabel(item.capability)}`, detail: item.workspaceRoots.join(", ") })), { placeHolder: "Select a verified managed session" });
@@ -37,6 +38,10 @@ async function callCompanion(context: vscode.ExtensionContext, method: string, p
     socket.on("data", (chunk: Buffer) => { response += chunk.toString(); if (response.includes("\n")) { socket.end(); const decoded = JSON.parse(response) as { ok: boolean; result?: unknown; error?: string }; decoded.ok ? resolve(decoded.result) : reject(new Error(decoded.error ?? "Companion rejected the request.")); } });
     socket.once("connect", () => socket.write(`${JSON.stringify({ id: randomUUID(), token: connection.token, method, params })}\n`));
   });
+}
+async function syncRegistration(context: vscode.ExtensionContext, record: ManagedSessionRecord): Promise<void> {
+  const root = record.workspaceRoots[0]; if (!root || !companion(context)) return;
+  try { await callCompanion(context, "register-vscode", { id: record.id, provider: record.provider, terminalName: record.terminalName, terminalProcessId: record.terminalProcessId, workspaceRoot: root }); } catch { /* Local registration remains useful when the companion is offline or the workspace is not a Git repository. */ }
 }
 async function invoke(context: vscode.ExtensionContext, record: ManagedSessionRecord, control: string, modifier: string): Promise<void> {
   const result = await callCompanion(context, "invoke", { control, modifier, sessionId: record.id }); await vscode.window.showInformationMessage(`SXSY-B122 ${control}/${modifier}: ${JSON.stringify(result)}`);
@@ -77,13 +82,9 @@ export function activate(context: vscode.ExtensionContext): void {
   }));
   context.subscriptions.push(vscode.commands.registerCommand("sxsy-b122.invokeControl", async () => {
     const record = await choose(context); if (!record) return;
-    const action = await vscode.window.showQuickPick([
-      { label: "REANCHOR", description: "normal" }, { label: "PROOF", description: "normal" }, { label: "PROOF", description: "shift" },
-      { label: "OPTION_PROVIDER", description: "normal" }, { label: "PLAN_EXPANDER", description: "normal" }, { label: "PLAN_APPROVAL", description: "normal" },
-      { label: "HANDOFF", description: "normal" }, { label: "FIND_BLOCKED_AGENT", description: "normal" }, { label: "FIND_FINISHED_AGENT", description: "normal" },
-      { label: "AUTHORITY_REFRESH", description: "normal" }, { label: "COUNCIL", description: "normal" }, { label: "PIPELINE", description: "normal" },
-      { label: "PIPELINE", description: "shift" }, { label: "SHIELD", description: "normal" }, { label: "SANDBOX", description: "normal" }
-    ], { placeHolder: "Invoke a B122 control through the local companion" }); if (!action) return;
+    let actions: readonly { control: string; modifier: string; summary: string }[];
+    try { actions = (await callCompanion(context, "assignments")) as readonly { control: string; modifier: string; summary: string }[]; } catch (error) { await vscode.window.showWarningMessage((error as Error).message); return; }
+    const action = await vscode.window.showQuickPick(actions.map((item) => ({ label: item.control, description: item.modifier, detail: item.summary })), { placeHolder: "Invoke a B122 control through the local companion" }); if (!action) return;
     try { await invoke(context, record, action.label, action.description ?? "normal"); } catch (error) { await vscode.window.showWarningMessage((error as Error).message); }
   }));
   context.subscriptions.push(vscode.commands.registerCommand("sxsy-b122.showBlockedAgents", async () => {
