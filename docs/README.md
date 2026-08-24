@@ -12,6 +12,9 @@
 - `adversarial-review.md` is a source-backed, implementation-oriented index of
   the review in section 9 of the complete design. It is not a substitute for
   that complete source.
+- `software-completion-audit.md` distinguishes the implemented, tested
+  software control-plane machinery from device, provider, and operational
+  acceptance evidence that remains unavailable in this checkout.
 
 The implementation follows the documented safety boundary: a keyboard signal
 may route an intent, but only mediated execution can enforce policy.
