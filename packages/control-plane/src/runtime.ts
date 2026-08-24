@@ -177,6 +177,14 @@ export interface DurableMediatedExecutorOptions {
   readonly targetResolver: TargetResolver;
   /** Empty by default; a high-consequence action must be enabled explicitly in host policy. */
   readonly enabledHighConsequenceActions?: readonly CommandAction[];
+  /**
+   * Optional protected host registry consulted for every fresh target. This is
+   * the production path for expiring, target-bound administrative activation;
+   * keyboard/bridge/provider input cannot implement this interface.
+   */
+  readonly highConsequenceActivations?: Readonly<{
+    enabledActions(targetSnapshotId: string, now: Date): Promise<readonly CommandAction[]>;
+  }>;
   readonly now?: () => Date;
   /**
    * Builds fresh broker/adapter dependencies for the same policy instance that
@@ -669,10 +677,13 @@ export class DurableMediatedExecutor {
   }
 
   private async createPolicy(target: TargetSnapshot | undefined): Promise<PolicyEngine> {
+    const dynamic = target && this.options.highConsequenceActivations
+      ? await this.options.highConsequenceActivations.enabledActions(target.id, this.now()).catch(() => [])
+      : [];
     return new PolicyEngine({
       version: this.options.policyVersion,
       gateEvidence: await this.gateEvidence.policyEvidence(target?.id, this.now().toISOString()),
-      highConsequenceActions: this.options.enabledHighConsequenceActions ?? [],
+      highConsequenceActions: [...new Set([...(this.options.enabledHighConsequenceActions ?? []), ...dynamic])],
       requireReauthenticationForHighConsequence: true,
       now: this.now
     });

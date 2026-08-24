@@ -30,7 +30,7 @@ const controlPlaneTests = [
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
+  "acceptance-administration", "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
   "council-runtime", "council-workspace-isolation", "durable-credentials",
   "durable-endpoint", "git-review", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning",

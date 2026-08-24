@@ -1,6 +1,6 @@
 /** Public software-only control-plane surface. All stateful components require a host-owned ProtectedJsonStore. */
 export { AllowlistedEvidenceAuthorizer, DenyEvidenceAuthorizer, GateEvidenceError, GateEvidenceLedger } from "./acceptance-evidence.ts";
-export type { EvidenceAuthorizer, GateEvidence, GateEvidenceInput, GateEvidenceStatus as AcceptanceEvidenceStatus } from "./acceptance-evidence.ts";
+export type { EvidenceArtifactVerifier, EvidenceAuthorizationRequest, EvidenceAuthorizer, GateEvidence, GateEvidenceInput, GateEvidenceStatus as AcceptanceEvidenceStatus } from "./acceptance-evidence.ts";
 export * from "./adapters.ts";
 export * from "./authority.ts";
 export * from "./brokers.ts";
