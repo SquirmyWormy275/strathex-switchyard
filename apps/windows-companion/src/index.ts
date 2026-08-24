@@ -67,6 +67,7 @@ export * from "./runtime-provisioning.ts";
 export * from "./sandbox-installation.ts";
 export * from "./host-provisioning.ts";
 export * from "./remote-adapters.ts";
+export * from "./provider-gateway.ts";
 export * from "./pipeline-adapters.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";

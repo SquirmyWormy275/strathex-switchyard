@@ -16,8 +16,14 @@ export interface DynamicConfiguredNetworkOptions {
   readonly credentials: CredentialAdapterPort;
 }
 
+export interface ProviderCommandTransport {
+  request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult>;
+  /** A host-known idempotency identity available before the provider effect. */
+  recoveryExternalId?(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined;
+}
+
 /** Re-resolves and digest-checks the attested policy immediately before each route. */
-export class DynamicConfiguredNetworkClient {
+export class DynamicConfiguredNetworkClient implements ProviderCommandTransport {
   private readonly options: DynamicConfiguredNetworkOptions;
   constructor(options: DynamicConfiguredNetworkOptions) { this.options = options; }
   async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
@@ -41,12 +47,12 @@ export interface ProviderHandshakeCoordinator {
  * is treated as a typed protocol record, never as executable instructions.
  */
 export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCoordinator {
-  private readonly network: DynamicConfiguredNetworkClient;
+  private readonly network: ProviderCommandTransport;
   private readonly targets: TargetResolver;
   private readonly presence: WindowsUserPresenceRunner;
   private readonly now: () => string;
 
-  constructor(network: DynamicConfiguredNetworkClient, targets: TargetResolver, presence: WindowsUserPresenceRunner, now: () => string = () => new Date().toISOString()) {
+  constructor(network: ProviderCommandTransport, targets: TargetResolver, presence: WindowsUserPresenceRunner, now: () => string = () => new Date().toISOString()) {
     this.network = network;
     this.targets = targets;
     this.presence = presence;
@@ -123,9 +129,9 @@ export interface WorkflowArtifactDispatchPort {
 export class ConfiguredProviderCommandAdapter implements CommandAdapter {
   readonly id = "configured-provider-v1";
   readonly kind = "provider" as const;
-  private readonly network: DynamicConfiguredNetworkClient;
+  private readonly network: ProviderCommandTransport;
   private readonly artifacts?: WorkflowArtifactDispatchPort;
-  constructor(network: DynamicConfiguredNetworkClient, artifacts?: WorkflowArtifactStore | WorkflowArtifactDispatchPort) { this.network = network; this.artifacts = artifacts; }
+  constructor(network: ProviderCommandTransport, artifacts?: WorkflowArtifactStore | WorkflowArtifactDispatchPort) { this.network = network; this.artifacts = artifacts; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const action = providerWorkflowAction(request.definition.action);
@@ -150,7 +156,8 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       if (artifact.status !== "submitted") return { status: "blocked", summary: "The durable provider workflow is not in a dispatchable submitted state.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
       if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before network dispatch.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
       const routeId = `provider.${request.definition.action}`;
-      const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest } }) : undefined;
+      const recoveryExternalId = this.network.recoveryExternalId?.({ routeId, operationId: request.operationId, provider: request.session.provider });
+      const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest, ...(recoveryExternalId ? { externalId: recoveryExternalId } : {}) } }) : undefined;
       if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
       if (child) await request.childSaga!.markExecuting(child);
       const finish = async (outcome: AdapterOutcome, response?: WorkflowProviderResponse): Promise<AdapterOutcome> => {
@@ -189,18 +196,48 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
   }
 }
 
-export function createConfiguredAutomationBroker(policy: PermitVerifier, containment: ContainmentGuard, network: DynamicConfiguredNetworkClient): AutomationBroker {
+export function createConfiguredAutomationBroker(policy: PermitVerifier, containment: ContainmentGuard, network: ProviderCommandTransport): AutomationBroker {
   const broker = new InMemoryAutomationBroker(policy, containment);
   for (const action of remoteAutomationActions) broker.register(action, async (request) => remoteAutomation(request, network));
   return broker;
 }
 
-async function remoteAutomation(request: AutomationRequest, network: DynamicConfiguredNetworkClient): Promise<BrokerOutcome> {
+async function remoteAutomation(request: AutomationRequest, network: ProviderCommandTransport): Promise<BrokerOutcome> {
   if (!request.effectGuard) return { status: "blocked", summary: "Configured automation requires a final dispatch-bound effect guard.", effectDisposition: "not_started" };
   const current = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
   if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
   const control = await operationAbort(request.executionControl);
   try {
+    const routeId = `automation.${request.action}`;
+    const recoveryExternalId = request.session ? network.recoveryExternalId?.({ routeId, operationId: request.operationId, provider: request.session.provider }) : undefined;
+    const child = request.childSaga ? await request.childSaga.begin({
+      action: routeId,
+      idempotencyScope: `${request.operationId}:${routeId}`,
+      details: {
+        repositoryRoot: request.target.repositoryRoot,
+        routeId,
+        targetSnapshotId: request.target.id,
+        ...(recoveryExternalId ? { externalId: recoveryExternalId } : {})
+      }
+    }) : undefined;
+    if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider automation effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous" };
+    if (child) await request.childSaga!.markExecuting(child);
+    const finish = async (outcome: BrokerOutcome): Promise<BrokerOutcome> => {
+      if (!child || !request.childSaga) return outcome;
+      const details = { routeId, ...(recoveryExternalId ? { externalId: recoveryExternalId } : {}), ...externalIdDetails(outcome.data) };
+      const disposition = outcome.effectDisposition ?? "ambiguous";
+      if (disposition === "not_started") await request.childSaga.settle(child, "failed", details);
+      else if (disposition === "committed") {
+        await request.childSaga.markExternalCommitted(child, details);
+        if (outcome.status === "completed") await request.childSaga.settle(child, "completed", details);
+        else await request.childSaga.settle(child, "ambiguous", details);
+      } else if (disposition === "compensated") {
+        await request.childSaga.markCompensating(child);
+        await request.childSaga.settle(child, "cancelled", details);
+      } else await request.childSaga.settle(child, "ambiguous", details);
+      return outcome;
+    };
+    if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled before dispatch.", effectDisposition: "not_started" });
     const document = {
       schema: "sxsy-b122.remote-automation",
       version: 1,
@@ -211,10 +248,20 @@ async function remoteAutomation(request: AutomationRequest, network: DynamicConf
       authorityId: request.authority?.id,
       testEnvironment: request.testEnvironment ? { id: request.testEnvironment.id, egress: request.testEnvironment.egress, databaseName: request.testEnvironment.databaseName } : undefined
     };
-    const result = await network.request({ routeId: `automation.${request.action}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal });
+    const final = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+    if (!final.allowed) return finish({ status: "blocked", summary: final.reason, effectDisposition: "not_started" });
+    if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled immediately before dispatch.", effectDisposition: "not_started" });
+    let result: ConfiguredNetworkResult;
+    try { result = await network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal }); }
+    catch { return finish({ status: "failed", summary: "The provider automation result was lost; exact observation is required.", effectDisposition: "ambiguous" }); }
     const outcome = adapterOutcome(result);
-    return { status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, ...(outcome.data ? { data: outcome.data } : {}) };
+    return finish({ status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, ...(outcome.data ? { data: outcome.data } : {}) });
   } finally { control.dispose(); }
+}
+
+function externalIdDetails(data: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, string>> {
+  const value = data?.externalId;
+  return typeof value === "string" && value.length <= 256 && !/[\0\r\n]/.test(value) ? { externalId: value } : {};
 }
 
 function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {

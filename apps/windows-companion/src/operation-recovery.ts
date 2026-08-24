@@ -64,7 +64,7 @@ export class HostOwnedOperationReconciler implements OperationReconciler {
       return repositoryRoot && owner && name && headOwner && headName && pullRequest && baseBranch && expectedHead && expectedState
         ? this.observations.pullRequest({ repositoryRoot, owner, name, headOwner, headName, number: pullRequest, baseBranch, expectedHead, expectedState }) : undefined;
     }
-    if (operation.action.startsWith("provider.")) {
+    if (operation.action.startsWith("provider.") || operation.action.startsWith("automation.")) {
       const repositoryRoot = detail(details, "repositoryRoot"); const routeId = detail(details, "routeId"); const externalId = detail(details, "externalId"); const targetSnapshotId = detail(details, "targetSnapshotId");
       return repositoryRoot && routeId && externalId && targetSnapshotId ? this.observations.provider({ repositoryRoot, routeId, externalId, targetSnapshotId }) : undefined;
     }
@@ -80,6 +80,9 @@ export class HostOwnedOperationReconciler implements OperationReconciler {
 export interface InstalledReadOnlyObservationOptions {
   readonly git: CheckpointGitRunner;
   readonly network?: Pick<DynamicConfiguredNetworkClient, "request">;
+  readonly providerOperations?: Readonly<{
+    observeProviderOperation(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation | undefined>;
+  }>;
   readonly networkPolicy?: Readonly<{ resolve(): Promise<ConfiguredNetworkPolicy> }>;
   readonly council?: Readonly<{ get(id: string): Promise<Readonly<{ status: string; targetSnapshotId: string; pauseAcknowledgedSessionIds: readonly string[]; assignmentAcknowledgedSessionIds: readonly string[] }> | undefined> }>;
   readonly hostActions?: Readonly<{ observeOperation(operationId: string, action?: string): Promise<Readonly<{ outcome: "committed" | "failed" | "cancelled" | "unresolved"; note: string }>> }>;
@@ -150,10 +153,16 @@ export class InstalledReadOnlyObservationPort implements InstalledOperationObser
   }
 
   async provider(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation> {
-    if (!this.options.network) return unresolved("No configured provider observation route is installed.");
     try {
       const repositoryRoot = await this.exactRepositoryRoot(input.repositoryRoot);
       if (!repositoryRoot) return unresolved("The protected provider repository root no longer resolves to its exact canonical path.");
+      if (this.options.providerOperations) {
+        let local: InstalledOperationObservation | undefined;
+        try { local = await this.options.providerOperations.observeProviderOperation({ ...input, repositoryRoot }); }
+        catch { return unresolved("The authenticated local provider observation failed safely; no fallback duplicated the probe."); }
+        if (local) return { outcome: local.outcome, note: boundedNote(local.note), details: safeDetails(local.details) };
+      }
+      if (!this.options.network) return unresolved("No configured provider observation route is installed.");
       const response = await this.options.network.request({ routeId: `${input.routeId}.observe`, repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.operation-observation-request", version: 1, externalId: input.externalId, targetSnapshotId: input.targetSnapshotId }) });
       if (response.outcome !== "passed" || !response.body) return unresolved("The configured provider observation was unavailable.");
       const value = JSON.parse(Buffer.from(response.body).toString("utf8")) as unknown;
@@ -195,7 +204,7 @@ function decision(observed: InstalledOperationObservation): ReconciliationDecisi
 
 function recognized(action: string): boolean {
   return action === "git.local-commit" || action === "git.push-reviewed-head" || action === "git.direct-main"
-    || action === "github.pr-upsert" || action === "github.pr-merge" || action.startsWith("provider.")
+    || action === "github.pr-upsert" || action === "github.pr-merge" || action.startsWith("provider.") || action.startsWith("automation.")
     || action === "council.pause" || action === "council.assignment" || action === "council.resume" || hostActions.has(action);
 }
 function detail(details: Readonly<Record<string, string>>, name: string): string | undefined { const value = details[name]; return value && value.length <= 2_048 && !/[\0\r\n]/.test(value) ? value : undefined; }

@@ -7,6 +7,7 @@ import { WorkspaceSnapshotResolver } from "../../../packages/control-plane/src/s
 import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
+import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
@@ -25,7 +26,7 @@ import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegis
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
-import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
@@ -50,6 +51,13 @@ import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { SessionFreshnessCoordinator } from "./session-freshness.ts";
 import { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
+import {
+  LocalProviderCommandGateway,
+  ProviderGatewayRouteRouter,
+  type AuthenticatedProviderGatewayClient,
+  type ProviderGatewayBackend,
+  type ProviderGatewayProvider
+} from "./provider-gateway.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -88,6 +96,10 @@ export interface DurableWindowsCompanionOptions {
   readonly rawHidHelperPath?: string;
   /** Isolated tests may replace only process creation, never the pinned path or identity. */
   readonly rawHidTransportFactory?: RawHidTransportFactory;
+  /** Installed Claude/Codex adapters. No provider is contacted when this is empty. */
+  readonly providerGatewayBackends?: readonly ProviderGatewayBackend[];
+  /** Explicit opt-in required for any backend that is not local to this host. */
+  readonly authorizedExternalProviderGatewayProviders?: readonly ProviderGatewayProvider[];
 }
 
 /**
@@ -113,6 +125,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly networkPolicyRegistry: DurableNetworkPolicyRegistry;
   readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  readonly providerGateway: AuthenticatedProviderGatewayClient;
   readonly hardwareSignals: DurableHardwareSignalInbox;
   readonly checkpointCapture: LocalCheckpointCapture | NonNullable<DurableMediatedExecutorOptions["checkpointCapture"]>;
   readonly checkpointVerifier: LocalRecoveryArtifactVerifier | NonNullable<DurableMediatedExecutorOptions["checkpointVerifier"]>;
@@ -135,6 +148,16 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   }
   const sessions = new SessionRegistry(store);
   const sessionFreshness = new SessionFreshnessCoordinator(sessions);
+  const providerGatewayToken = randomBytes(32).toString("hex");
+  const providerGateway = new LocalProviderCommandGateway({
+    store,
+    sessions,
+    authenticationToken: providerGatewayToken,
+    backends: options.providerGatewayBackends ?? [],
+    ...(options.authorizedExternalProviderGatewayProviders
+      ? { authorizedExternalProviders: options.authorizedExternalProviderGatewayProviders }
+      : {})
+  }).connect(providerGatewayToken);
   const localStateDirectory = resolve(options.localStateDirectory ?? dirname(store.filePath));
   const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
     stateRoot: resolve(localStateDirectory, "council-isolation")
@@ -175,7 +198,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const handoffs = new HandoffPackageStore(store);
   const voice = new VoiceCoordinator(store);
   const operationControl = new InstalledOperationControl({
-    queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals],
+    queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals, providerGateway],
     processes: repositoryRuntimes
   });
   let credentialVault!: DurableCredentialReferenceVault;
@@ -192,6 +215,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     containment: containmentManager,
     credentials: credentialVault.createAdapter("configured-network")
   });
+  const providerTransport = new ProviderGatewayRouteRouter(providerGateway, configuredNetwork);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
     : undefined;
@@ -241,7 +265,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   );
   const providerHandshakes = options.runtimePinPresence
     ? new AttestedProviderHandshakeCoordinator(
-        configuredNetwork,
+        providerTransport,
         targetResolver,
         options.runtimePinPresence
       )
@@ -249,6 +273,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const installedReconciler = new HostOwnedOperationReconciler(new InstalledReadOnlyObservationPort({
     git: new SpawnCheckpointGitRunner(),
     network: configuredNetwork,
+    providerOperations: providerGateway,
     networkPolicy: networkPolicyRegistry,
     council: new CouncilCoordinator(store),
     hostActions
@@ -257,6 +282,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     "git.local-commit", "git.push-reviewed-head", "git.direct-main", "github.pr-upsert", "github.pr-merge",
     "council.pause", "council.assignment", "council.resume",
     ...providerCommandActions.map((action) => `provider.${action}`),
+    ...remoteAutomationActions.map((action) => `automation.${action}`),
     ...hostActionCommandActions
   ];
   const operationReconcilers = {
@@ -297,6 +323,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           containmentManager,
           credentialVault,
           networkPolicyRegistry,
+          providerTransport,
           councilIsolation,
           councilAutomaticGate,
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
@@ -327,7 +354,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const containmentRelease = new AttestedContainmentReleaseCoordinator(executor);
   const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, containmentRelease, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
-    refreshSessions: () => sessionFreshness.refresh(),
+    refreshSessions: async () => {
+      await providerGateway.refreshSessions();
+      return sessionFreshness.refresh();
+    },
     startupRecovery: async () => {
       for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
       await repositoryRuntimes.recoverManagedProcesses();
@@ -346,6 +376,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     repositoryRuntimes,
     credentialVault,
     networkPolicyRegistry,
+    providerGateway,
     hardwareSignals,
     checkpointCapture,
     checkpointVerifier,

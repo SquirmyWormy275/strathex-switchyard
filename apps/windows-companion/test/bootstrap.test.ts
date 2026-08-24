@@ -18,6 +18,7 @@ import type { RawHidTransportEvents } from "../src/raw-hid-installation.ts";
 import { LocalCheckpointCapture, LocalRecoveryArtifactVerifier } from "../src/local-checkpoints.ts";
 import { InstalledOperationControl } from "../src/operation-control.ts";
 import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { DeterministicProviderGatewayBackend } from "../src/provider-gateway.ts";
 
 async function git(root: string, args: readonly string[]): Promise<void> {
   await new Promise<void>((resolveRun, reject) => {
@@ -82,6 +83,42 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   await workflowArtifacts.claimForDispatch({ action: "proof", targetSnapshotId: target.id, sessionId: "trusted", operationId: "provider-operation" });
   assert.equal((await companion.operationControl.cancel({ operationId: "provider-operation", reason: "operator cancelled" })).accepted, true);
   assert.equal((await workflowArtifacts.get("provider-artifact"))?.status, "cancelling");
+});
+
+test("installed bootstrap routes an authorized workflow through the authenticated local provider gateway", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-provider-bootstrap-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const backend = new DeterministicProviderGatewayBackend("codex");
+  const companion = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    targetResolver: { resolve: async () => target },
+    providerGatewayBackends: [backend]
+  });
+  const session = await companion.registerTrustedSession({
+    id: "gateway-session", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task", planRevision: "plan",
+    plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "gateway-test", metadata: {
+      "sxsy-b122.providerHandshake": "exact-route-v1",
+      "sxsy-b122.providerHandshakeTarget": target.id
+    }
+  });
+  await companion.workflowArtifacts.create({
+    id: "gateway-proof-artifact", action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: session.id,
+    taskId: "task", planRevision: "plan", payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["evidence"], requiredBackends: ["local"] }
+  });
+  const authority = await companion.executor.authorities.issue({
+    repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["proof"], prohibitedActions: [],
+    expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user"
+  });
+  const response = await companion.endpoint.handle({
+    version: companionBridgeVersion, id: "gateway-proof", method: "command.dispatch",
+    payload: { control: "PROOF", modifier: "normal", sessionId: session.id, authorityId: authority.id }
+  });
+  assert.equal(response.ok, true);
+  assert.equal((response.result as { command: { status: string } }).command.status, "completed", JSON.stringify(response));
+  assert.equal(backend.commandCalls, 1);
+  assert.ok(companion.providerGateway);
 });
 
 test("packaged restart finalizes a durable authenticated host effect without replaying it", async (context) => {

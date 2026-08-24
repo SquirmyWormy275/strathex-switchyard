@@ -127,3 +127,26 @@ test("recovery refuses a canonical repository-root change before any Git or netw
   assert.equal((await port.provider({ repositoryRoot: "C:\\repo", routeId: "provider.proof", externalId: "external", targetSnapshotId: "snapshot" })).outcome, "unresolved");
   assert.equal(probed, false);
 });
+
+test("installed recovery prefers the authenticated local provider gateway and never duplicates a network observation", async () => {
+  let localCalls = 0;
+  let networkCalls = 0;
+  const git: CheckpointGitRunner = { async run() { return { exitCode: 1, stdout: Buffer.alloc(0), stderr: "unused" }; } };
+  const providerOperations = {
+    async observeProviderOperation(input: { externalId: string; targetSnapshotId: string }) {
+      localCalls += 1;
+      assert.equal(input.externalId, "operation-provider-1");
+      assert.equal(input.targetSnapshotId, "snapshot-1");
+      return { outcome: "committed" as const, note: "The authenticated local gateway observed the exact operation.", details: { provider: "codex" } };
+    }
+  };
+  const network = { async request() { networkCalls += 1; throw new Error("must not duplicate local observation"); } } as unknown as DynamicConfiguredNetworkClient;
+  const port = new InstalledReadOnlyObservationPort({ git, providerOperations, network, canonicalRepositoryRoot: async (root) => root });
+  assert.deepEqual(await port.provider({ repositoryRoot: "C:\\repo", routeId: "provider.proof", externalId: "operation-provider-1", targetSnapshotId: "snapshot-1" }), {
+    outcome: "committed",
+    note: "The authenticated local gateway observed the exact operation.",
+    details: { provider: "codex" }
+  });
+  assert.equal(localCalls, 1);
+  assert.equal(networkCalls, 0);
+});

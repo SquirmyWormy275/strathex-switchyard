@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { WorkflowArtifact, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
-import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker } from "../src/remote-adapters.ts";
 
 const providerTargetId = "a".repeat(64);
 function proofArtifact(): WorkflowArtifact {
@@ -132,4 +132,62 @@ test("provider handshake refuses capability installation when target churns", as
     { async verify() { return { verified: true, operator: "operator" }; } }
   );
   await assert.rejects(() => coordinator.handshake({ repositoryRoot: "C:\\repo", session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "vscode", metadata: {} } }), /changed during provider handshake/);
+});
+
+test("configured automation creates one observable child saga and records the gateway recovery identity", async () => {
+  const childEvents: Array<readonly [string, unknown]> = [];
+  const transport = {
+    recoveryExternalId(input: { operationId: string; provider: string }) {
+      assert.equal(input.provider, "codex");
+      return input.operationId;
+    },
+    async request(input: { routeId: string; body?: string }) {
+      assert.equal(input.routeId, "automation.repair_mission");
+      const document = JSON.parse(input.body!) as Record<string, unknown>;
+      assert.equal(document.schema, "sxsy-b122.remote-automation");
+      return {
+        outcome: "passed" as const,
+        routeId: input.routeId,
+        detail: "local gateway",
+        effectDisposition: "ambiguous" as const,
+        body: Buffer.from(JSON.stringify({
+          schema: "sxsy-b122.remote-result",
+          version: 1,
+          status: "completed",
+          summary: "Repair completed in the deterministic provider.",
+          effectDisposition: "committed",
+          externalId: "automation-operation-1",
+          data: { simulated: true }
+        }))
+      };
+    }
+  };
+  const childSaga = {
+    async begin(input: unknown) { childEvents.push(["begin", input]); return { operationId: "child-automation-1", mayExecute: true }; },
+    async markExecuting(input: unknown) { childEvents.push(["executing", input]); },
+    async markExternalCommitted(_input: unknown, details: unknown) { childEvents.push(["external", details]); },
+    async markCancelling(input: unknown) { childEvents.push(["cancelling", input]); },
+    async markCompensating(input: unknown) { childEvents.push(["compensating", input]); },
+    async settle(_input: unknown, outcome: unknown, details: unknown) { childEvents.push([String(outcome), details]); }
+  };
+  const broker = createConfiguredAutomationBroker(
+    { verifyPermit() { return true; } },
+    { check() { return { allowed: true, reason: "clear" }; } },
+    transport as never
+  );
+  const outcome = await broker.execute({
+    action: "repair_mission",
+    operationId: "automation-operation-1",
+    target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
+    session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    permit: {} as never,
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+    childSaga: childSaga as never
+  });
+  assert.equal(outcome.status, "completed");
+  const begun = childEvents.find(([kind]) => kind === "begin")?.[1] as { action: string; details: Record<string, string> };
+  assert.equal(begun.action, "automation.repair_mission");
+  assert.equal(begun.details.externalId, "automation-operation-1");
+  assert.equal(childEvents.some(([kind]) => kind === "external"), true);
+  assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
 });

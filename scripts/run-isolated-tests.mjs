@@ -36,7 +36,7 @@ const companionTests = [
   "hardware-signal-service", "host-actions", "host-provisioning",
   "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
   "operation-recovery", "packaged-runtime", "pipeline-adapters",
-  "provider-desktop", "raw-hid-installation", "raw-hid-main-wiring",
+  "provider-desktop", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",
   "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
   "repository-process-supervisor", "repository-recipe-evidence",
   "repository-recipe-host-evidence", "repository-runner-helper",
