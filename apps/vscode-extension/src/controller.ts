@@ -157,6 +157,15 @@ export class ManagedSessionController {
       this.vscode.commands.registerCommand("sxsy-b122.revokeRepositoryRuntime", async () => {
         await this.revokeRepositoryRuntime();
       }),
+      this.vscode.commands.registerCommand("sxsy-b122.installWindowsSandbox", async () => {
+        await this.installWindowsSandbox();
+      }),
+      this.vscode.commands.registerCommand("sxsy-b122.listWindowsSandboxes", async () => {
+        await this.listWindowsSandboxes();
+      }),
+      this.vscode.commands.registerCommand("sxsy-b122.revokeWindowsSandbox", async () => {
+        await this.revokeWindowsSandbox();
+      }),
       this.vscode.commands.registerCommand("sxsy-b122.dispatch", async (argument: unknown) => {
         const command = parseChordArgument(argument);
         if (!command) {
@@ -249,6 +258,53 @@ export class ManagedSessionController {
     const items = this.gitRoots.map((root) => ({ label: root.gitRoot, description: root.branch ?? "unknown branch" }));
     const selected = await this.vscode.window.showQuickPick(items, { placeHolder });
     return selected ? this.gitRoots[items.indexOf(selected)] : undefined;
+  }
+
+  private async installWindowsSandbox(): Promise<void> {
+    const root = await this.chooseGitRoot("Choose the exact Git root for this Windows Sandbox recipe catalog");
+    if (!root) return;
+    const selected = await this.vscode.window.showOpenDialog?.({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, openLabel: "Review Sandbox Catalog", filters: { "SXSY-B122 sandbox catalog": ["json"] } });
+    const catalogPath = selected?.length === 1 ? selected[0]?.fsPath : undefined;
+    if (!catalogPath) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Windows Sandbox installation was cancelled; no catalog or helper was pinned.");
+      return;
+    }
+    const result = await this.bridge.installSandbox(root.gitRoot, catalogPath);
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Windows Sandbox was not installed: ${result.message}`);
+      return;
+    }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 installed the attested Windows Sandbox catalog ${result.value.catalogSha256.slice(0, 12)}… and packaged helper ${result.value.helperSha256.slice(0, 12)}….`);
+  }
+
+  private async listWindowsSandboxes(): Promise<void> {
+    const result = await this.bridge.listSandboxes();
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Windows Sandbox registry unavailable: ${result.message}`);
+      return;
+    }
+    const active = result.value.filter((pin) => pin.status === "active");
+    await this.vscode.window.showInformationMessage(`SXSY-B122 Windows Sandbox registry: ${active.length ? active.map((pin) => pin.canonicalRepositoryRoot).join("; ") : "No active OS-enforced sandbox installations."}`);
+  }
+
+  private async revokeWindowsSandbox(): Promise<void> {
+    const result = await this.bridge.listSandboxes();
+    if (!result.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Windows Sandbox registry unavailable: ${result.message}`);
+      return;
+    }
+    const active = result.value.filter((pin) => pin.status === "active");
+    if (!active.length) {
+      await this.vscode.window.showInformationMessage("SXSY-B122 has no active Windows Sandbox installation to revoke.");
+      return;
+    }
+    const items = active.map((pin) => ({ label: pin.canonicalRepositoryRoot, description: pin.catalogSha256.slice(0, 16) }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the exact Windows Sandbox installation to revoke" });
+    const pin = selected ? active[items.indexOf(selected)] : undefined;
+    if (!pin) return;
+    const revoked = await this.bridge.revokeSandbox(pin.canonicalRepositoryRoot);
+    if (!revoked.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 Windows Sandbox was not revoked: ${revoked.message}`);
+    else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the selected Windows Sandbox installation.");
   }
 
   private async refreshWorkspaceRegistration(): Promise<void> {

@@ -82,6 +82,16 @@ export interface RepositoryRuntimePin {
   readonly status: "active" | "revoked";
 }
 
+export interface SandboxInstallationPin {
+  readonly canonicalRepositoryRoot: string;
+  readonly catalogPath: string;
+  readonly catalogSha256: string;
+  readonly helperPath: string;
+  readonly helperSha256: string;
+  readonly installedAt: string;
+  readonly status: "active" | "revoked";
+}
+
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: string; readonly message: string };
@@ -97,6 +107,9 @@ export interface ExtensionCompanionBridge {
   installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
   listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>>;
   revokeRuntimePin(repositoryRoot: string): Promise<BridgeResult<RepositoryRuntimePin>>;
+  installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>>;
+  listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>>;
+  revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -170,6 +183,21 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return result.ok ? { ok: true, value: result.value.pin } : result;
   }
 
+  async installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>> {
+    const result = await this.call<{ installation: SandboxInstallationPin }>("sandbox.install", { repositoryRoot, catalogPath });
+    return result.ok ? { ok: true, value: result.value.installation } : result;
+  }
+
+  async listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>> {
+    const result = await this.call<{ installations: readonly SandboxInstallationPin[] }>("sandbox.list", undefined);
+    return result.ok ? { ok: true, value: result.value.installations } : result;
+  }
+
+  async revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>> {
+    const result = await this.call<{ installation: SandboxInstallationPin }>("sandbox.revoke", { repositoryRoot });
+    return result.ok ? { ok: true, value: result.value.installation } : result;
+  }
+
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
@@ -226,6 +254,9 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   installRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
   listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> { return this.unavailable(); }
   revokeRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
+  installSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
+  listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>> { return this.unavailable(); }
+  revokeSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 

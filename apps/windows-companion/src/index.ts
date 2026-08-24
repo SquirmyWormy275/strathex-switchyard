@@ -64,6 +64,7 @@ export {
 export * from "./repository-runtime.ts";
 export * from "./runtime-registry.ts";
 export * from "./runtime-provisioning.ts";
+export * from "./sandbox-installation.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";
 export * from "./git-review.ts";

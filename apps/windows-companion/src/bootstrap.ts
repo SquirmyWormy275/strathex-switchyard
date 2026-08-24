@@ -18,6 +18,7 @@ import { DurableGitMutationReviewQueue } from "./git-review.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
 import { AttestedRuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegistry, InstalledWindowsSandboxIsolationRuntime } from "./sandbox-installation.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -48,6 +49,8 @@ export interface DurableWindowsCompanionOptions {
   readonly networkPolicy?: ConfiguredNetworkPolicy;
   /** Host-owned Windows user-presence verifier for runtime pin changes. */
   readonly runtimePinPresence?: WindowsUserPresenceRunner;
+  /** Fixed packaged b122-sandbox-worker.exe. Omit to keep OS isolation unavailable. */
+  readonly sandboxHelperPath?: string;
 }
 
 /**
@@ -66,6 +69,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly gitReviews?: DurableGitMutationReviewQueue;
   readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry;
   readonly runtimePins?: AttestedRuntimePinCoordinator;
+  readonly sandboxInstallationRegistry?: DurableSandboxInstallationRegistry;
+  readonly sandboxInstallations?: AttestedSandboxInstallationCoordinator;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -79,6 +84,12 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
+    : undefined;
+  const sandboxInstallationRegistry = options.sandboxHelperPath
+    ? new DurableSandboxInstallationRegistry(store, options.sandboxHelperPath)
+    : undefined;
+  const sandboxInstallations = sandboxInstallationRegistry && options.runtimePinPresence && options.sandboxHelperPath
+    ? new AttestedSandboxInstallationCoordinator(sandboxInstallationRegistry, options.sandboxHelperPath, options.runtimePinPresence)
     : undefined;
   const targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
     new TargetSnapshotFactory(new GitCliInspector()),
@@ -105,6 +116,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           credentialProtector: options.credentialProtector ?? unavailableCredentialProtector,
           ...(options.networkPolicy ? { networkPolicy: options.networkPolicy } : {}),
           repositoryRuntimes,
+          ...(sandboxInstallationRegistry ? { isolationRuntime: new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy) } : {}),
           hostActions
         }
       );
@@ -123,7 +135,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}) });
+  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -137,6 +149,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     repositoryRuntimes,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
+    ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),
+    ...(sandboxInstallations ? { sandboxInstallations } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

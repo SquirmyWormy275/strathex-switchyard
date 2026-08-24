@@ -220,6 +220,22 @@ test("runtime pin routes accept paths only and delegate digest and presence auth
   assert.equal(fabricated.error?.code, "invalid_request");
 });
 
+test("Windows Sandbox installation routes cannot carry client-created digest or approval evidence", async () => {
+  const calls: unknown[] = [];
+  const installation = { canonicalRepositoryRoot: "C:\\repo", catalogPath: "C:\\repo\\sandbox.json", catalogSha256: "a".repeat(64), helperPath: "C:\\host\\b122-sandbox-worker.exe", helperSha256: "b".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" as const };
+  const service = new CompanionService({ sandboxInstallations: {
+    async install(payload) { calls.push(["install", payload]); return installation; },
+    async list() { calls.push(["list"]); return [installation]; },
+    async revoke(repositoryRoot) { calls.push(["revoke", repositoryRoot]); return { ...installation, status: "revoked" as const }; }
+  } });
+  assert.equal((await service.handle(request("install", "sandbox.install", { repositoryRoot: "C:\\repo", catalogPath: "C:\\repo\\sandbox.json" }))).ok, true);
+  assert.equal((await service.handle(request("list", "sandbox.list"))).ok, true);
+  assert.equal((await service.handle(request("revoke", "sandbox.revoke", { repositoryRoot: "C:\\repo" }))).ok, true);
+  assert.deepEqual(calls, [["install", { repositoryRoot: "C:\\repo", catalogPath: "C:\\repo\\sandbox.json" }], ["list"], ["revoke", "C:\\repo"]]);
+  const fabricated = await service.handle(request("fake", "sandbox.install", { repositoryRoot: "C:\\repo", catalogPath: "C:\\repo\\sandbox.json", helperSha256: "a".repeat(64), approved: true }));
+  assert.equal(fabricated.ok, false);
+});
+
 test("in-process and unavailable bridges retain request IDs and fail closed", async () => {
   const service = new CompanionService({ now: () => "2026-08-23T00:00:00.000Z", idFactory: () => "audit" });
   const inProcess = new InProcessCompanionBridge(service);

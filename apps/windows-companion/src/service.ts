@@ -5,6 +5,7 @@ import { commandActionIds, commandFor, type CommandAction } from "../../../packa
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { GitReviewResult } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
+import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
 import type {
   AuditEvent,
   Capability,
@@ -26,6 +27,8 @@ import {
   type GitReviewPayload,
   type RuntimePinInstallPayload,
   type RuntimePinRevokePayload,
+  type SandboxInstallPayload,
+  type SandboxRevokePayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -86,6 +89,7 @@ export interface CompanionServiceOptions {
   readonly hostActions?: HostActionCoordinator;
   readonly gitReviews?: GitMutationReviewCoordinator;
   readonly runtimePins?: RuntimePinCoordinator;
+  readonly sandboxInstallations?: SandboxInstallationCoordinator;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -109,6 +113,7 @@ export class CompanionService {
   private readonly hostActions?: HostActionCoordinator;
   private readonly gitReviews?: GitMutationReviewCoordinator;
   private readonly runtimePins?: RuntimePinCoordinator;
+  private readonly sandboxInstallations?: SandboxInstallationCoordinator;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
@@ -118,6 +123,7 @@ export class CompanionService {
     this.hostActions = options.hostActions;
     this.gitReviews = options.gitReviews;
     this.runtimePins = options.runtimePins;
+    this.sandboxInstallations = options.sandboxInstallations;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -159,6 +165,12 @@ export class CompanionService {
           return this.success(request.id, { pins: await this.listRuntimePins(request.payload) });
         case "runtime.pin.revoke":
           return this.success(request.id, { pin: await this.revokeRuntimePin(this.requireRuntimePinRevoke(request.payload)) });
+        case "sandbox.install":
+          return this.success(request.id, { installation: await this.installSandbox(this.requireSandboxInstall(request.payload)) });
+        case "sandbox.list":
+          return this.success(request.id, { installations: await this.listSandboxes(request.payload) });
+        case "sandbox.revoke":
+          return this.success(request.id, { installation: await this.revokeSandbox(this.requireSandboxRevoke(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
@@ -387,6 +399,38 @@ export class CompanionService {
     if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) {
       throw new CompanionServiceError("invalid_request", "Runtime pin revocation requires one bounded absolute repository path.");
     }
+    return { repositoryRoot: payload.repositoryRoot };
+  }
+
+  private async installSandbox(payload: SandboxInstallPayload) {
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    const installation = await this.sandboxInstallations.install(payload);
+    this.record("sandbox.install", "completed", "Installed one current-user-attested Windows Sandbox catalog and helper pin.");
+    return installation;
+  }
+
+  private async listSandboxes(payload: unknown) {
+    if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Windows Sandbox listing accepts no client options.");
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    return this.sandboxInstallations.list();
+  }
+
+  private async revokeSandbox(payload: SandboxRevokePayload) {
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    const installation = await this.sandboxInstallations.revoke(payload.repositoryRoot);
+    this.record("sandbox.revoke", "completed", "Revoked one current-user-attested Windows Sandbox installation.");
+    return installation;
+  }
+
+  private requireSandboxInstall(payload: unknown): SandboxInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "catalogPath"]) || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.catalogPath)) {
+      throw new CompanionServiceError("invalid_request", "Windows Sandbox installation requires only bounded absolute repository and catalog paths.");
+    }
+    return { repositoryRoot: payload.repositoryRoot, catalogPath: payload.catalogPath };
+  }
+
+  private requireSandboxRevoke(payload: unknown): SandboxRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Windows Sandbox revocation requires one bounded absolute repository path.");
     return { repositoryRoot: payload.repositoryRoot };
   }
 

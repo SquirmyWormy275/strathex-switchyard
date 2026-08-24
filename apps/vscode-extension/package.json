@@ -23,6 +23,9 @@
     "onCommand:sxsy-b122.installRepositoryRuntime",
     "onCommand:sxsy-b122.listRepositoryRuntimes",
     "onCommand:sxsy-b122.revokeRepositoryRuntime",
+    "onCommand:sxsy-b122.installWindowsSandbox",
+    "onCommand:sxsy-b122.listWindowsSandboxes",
+    "onCommand:sxsy-b122.revokeWindowsSandbox",
     "onCommand:sxsy-b122.dispatch",
     "onCommand:sxsy-b122.showIntent",
     "onCommand:sxsy-b122.chord.reanchor.normal",
@@ -120,6 +123,18 @@
       {
         "command": "sxsy-b122.revokeRepositoryRuntime",
         "title": "SXSY-B122: Revoke Repository Runtime"
+      },
+      {
+        "command": "sxsy-b122.installWindowsSandbox",
+        "title": "SXSY-B122: Install Windows Sandbox Catalog"
+      },
+      {
+        "command": "sxsy-b122.listWindowsSandboxes",
+        "title": "SXSY-B122: Show Windows Sandbox Installations"
+      },
+      {
+        "command": "sxsy-b122.revokeWindowsSandbox",
+        "title": "SXSY-B122: Revoke Windows Sandbox Installation"
       },
       {
         "command": "sxsy-b122.dispatch",

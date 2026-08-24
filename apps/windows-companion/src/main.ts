@@ -25,6 +25,7 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
   });
   const networkPolicy = await loadNetworkPolicy(join(stateDirectory, "network-policy.json"));
   const userPresence = new PowerShellWindowsUserPresenceRunner();
+  const sandboxHelperPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "sandbox-helper", "b122-sandbox-worker.exe");
   const companion = createDurableWindowsCompanion({
     policyVersion: process.env.SXSY_B122_POLICY_VERSION?.trim() || "b122-local-v1",
     store,
@@ -34,6 +35,7 @@ export async function runStandaloneCompanion(): Promise<{ stop(): Promise<void> 
     networkPolicy,
     runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor(userPresence) },
     runtimePinPresence: userPresence,
+    sandboxHelperPath,
     snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
   });
   await companion.endpoint.ready();
