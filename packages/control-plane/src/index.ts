@@ -27,3 +27,4 @@ export * from "./snapshot-ledger.ts";
 export * from "./snapshot.ts";
 export * from "./store.ts";
 export * from "./workflow-artifacts.ts";
+export * from "./voice.ts";
