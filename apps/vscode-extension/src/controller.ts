@@ -67,6 +67,7 @@ export class ManagedSessionController {
   private windowSessionId?: string;
   private gitRoots: readonly GitRootRegistration[] = [];
   private bridge: ExtensionCompanionBridge;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
 
   constructor(vscode: VscodeLike, context: ExtensionContextLike, bridge: ExtensionCompanionBridge, options: ManagedSessionControllerOptions = {}) {
     this.vscode = vscode;
@@ -82,7 +83,10 @@ export class ManagedSessionController {
   /** Allows a reviewed local transport to be attached after activation. */
   attachBridge(bridge: ExtensionCompanionBridge): void {
     this.bridge = bridge;
+    this.scheduleReconnect(0);
   }
+
+  stop(): void { if (this.reconnectTimer) clearTimeout(this.reconnectTimer); this.reconnectTimer = undefined; }
 
   async start(): Promise<void> {
     if (this.started) return;
@@ -172,7 +176,19 @@ export class ManagedSessionController {
       workspaceRoots: this.workspaceRoots(),
       updatedAt: this.now()
     } satisfies StoredWindowState);
+    if (result.ok) this.stop(); else this.scheduleReconnect();
     await this.registerGitRootSessions();
+  }
+
+  private scheduleReconnect(delayMs = 1_000): void {
+    if (this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      void this.bridge.health().then((health) => health.ok ? this.refreshWorkspaceRegistration() : undefined).catch(() => undefined).finally(() => {
+        if (!this.reconnectTimer) this.scheduleReconnect();
+      });
+    }, delayMs);
+    this.reconnectTimer.unref?.();
   }
 
   private async registerGitRootSessions(): Promise<void> {

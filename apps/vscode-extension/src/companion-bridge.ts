@@ -49,6 +49,7 @@ export type BridgeResult<T> =
   | { readonly ok: false; readonly code: string; readonly message: string };
 
 export interface ExtensionCompanionBridge {
+  health(): Promise<BridgeResult<Readonly<{ status?: string }>>>;
   registerSession(session: ExtensionManagedSession, kind?: "session" | "terminal" | "debug"): Promise<BridgeResult<ExtensionManagedSession>>;
   adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>>;
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
@@ -104,6 +105,8 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     this.transport = transport;
     this.idPrefix = idPrefix;
   }
+
+  health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.call("ping", undefined); }
 
   registerSession(session: ExtensionManagedSession, kind: "session" | "terminal" | "debug" = "session"): Promise<BridgeResult<ExtensionManagedSession>> {
     const method = kind === "terminal" ? "terminal.register" : kind === "debug" ? "debug.register" : "session.register";
@@ -168,6 +171,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
     this.reason = reason;
   }
 
+  health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.unavailable(); }
   registerSession(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   adoptTerminal(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }

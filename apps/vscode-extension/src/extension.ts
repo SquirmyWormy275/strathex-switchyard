@@ -30,6 +30,7 @@ function configuredBridge(host: VscodeLike): JsonLineCompanionBridge | Unavailab
 }
 
 export function deactivate(): void {
+  controller?.stop();
   // The extension owns no process, broker, terminal hook, or external action.
   controller = undefined;
 }

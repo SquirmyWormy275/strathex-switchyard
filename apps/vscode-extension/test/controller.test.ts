@@ -118,6 +118,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly dispatched: ForwardedCommand[] = [];
   nextDispatch?: ForwardedCommandResult;
 
+  async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
   async registerSession(session: ExtensionManagedSession): Promise<BridgeResult<ExtensionManagedSession>> {
     this.registered.push(session);
     return { ok: true, value: session };
