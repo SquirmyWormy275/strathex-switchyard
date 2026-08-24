@@ -120,8 +120,14 @@ export interface HardwareSignalDispatchResult { readonly command: ForwardedComma
 export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
 export interface HardwareSignalCompletionResult { readonly signalId: string; readonly outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; }
 export interface ExtensionHandoffPackage { readonly id: string; readonly digest: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly taskId: string; readonly planRevision: string; readonly recipientSessionId?: string; readonly status: "queued" | "immediate_focus_requested" | "acknowledged" | "cancelled" | "archived"; readonly executionAuthorized: false; }
-export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet" | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue" | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast" | "bind_voice_session";
-export interface ExtensionWorkflowArtifact { readonly id: string; readonly digest: string; readonly action: ExtensionWorkflowAction; readonly targetSnapshotId: string; readonly sessionId: string; readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled"; readonly executionAuthorized: false; }
+export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet" | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue" | "handoff_immediate" | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast" | "bind_voice_session";
+export type ExtensionWorkflowPreparationIntent =
+  | { readonly kind: "none" }
+  | { readonly kind: "decision"; readonly question: string; readonly context: string }
+  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "queue" | "immediate" }
+  | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
+  | { readonly kind: "plan_approval"; readonly confirmationToken: string };
+export interface ExtensionWorkflowArtifact { readonly id: string; readonly digest: string; readonly action: ExtensionWorkflowAction; readonly targetSnapshotId: string; readonly sessionId: string; readonly payload: Readonly<Record<string, unknown>>; readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled"; readonly executionAuthorized: false; }
 export type ExtensionVoiceProvider = "claude" | "chatgpt" | "system";
 export interface ExtensionVoiceConsent { readonly id: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly expiresAt: string; }
 export interface ExtensionVoiceBinding { readonly id: string; readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly status: "active" | "muted" | "interrupted" | "ended"; readonly transcriptDeletedAt?: string; }
@@ -169,7 +175,7 @@ export interface ExtensionCompanionBridge {
   archiveHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
   handoffRouting(): Promise<BridgeResult<"queue" | "immediate">>;
   setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">>;
-  prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
+  prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
   listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>>;
   grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>>;
   startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
@@ -392,7 +398,7 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return this.routingResult("handoff.routing.set", { routing });
   }
 
-  async prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
+  async prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
     const result = await this.call<unknown>("workflow.prepare", input);
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
@@ -687,7 +693,7 @@ function isExtensionVoiceBinding(value: unknown): value is ExtensionVoiceBinding
   return true;
 }
 
-function workflowAction(value: unknown): value is ExtensionWorkflowAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function workflowAction(value: unknown): value is ExtensionWorkflowAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
 function voiceProvider(value: unknown): value is ExtensionVoiceProvider { return value === "claude" || value === "chatgpt" || value === "system"; }
 function reference(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value); }
 function pathText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value); }

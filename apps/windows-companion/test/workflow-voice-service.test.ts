@@ -24,6 +24,14 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
       now: () => at,
       handoffs: new HandoffPackageStore(store, { clock: () => at, idFactory: () => "handoff-1" }),
       workflowArtifacts: new WorkflowArtifactStore(store, { clock: () => at, idFactory: () => "artifact-1" }),
+      workflowCoordinator: {
+        async prepare(request) {
+          assert.equal(request.action, "handoff_queue");
+          assert.equal(request.authorityId, "authority-1");
+          assert.deepEqual(request.intent, { kind: "handoff", recipientSessionId: "coder", route: "queue" });
+          return { kind: "handoff", packageId: "handoff-1", route: "queue", sourceSessionId: "planner", recipientSessionId: "coder", authorityId: "authority-1" };
+        }
+      },
       voice: new VoiceCoordinator(store, { clock: () => at, idFactory: () => `voice-${++id}` }),
       voicePresence: { async verify() { return { verified: true, operator: "DOMAIN\\operator" }; } }
     });
@@ -35,13 +43,16 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
       assert.equal(response.ok, true, response.error?.message);
       return response.result as Record<string, unknown>;
     };
-    const created = await call("handoff.create", { sessionId: "planner", recipientSessionId: "coder", routing: "queue", plan: "Implement the approved plan.", decisions: ["Use typed IPC."], documentation: ["docs/spec.md"], references: [], constraints: ["No authority in context."], openQuestions: [], nextActions: ["Read the plan."] });
+    const created = await call("handoff.create", { sessionId: "planner", recipientSessionId: "coder", routing: "queue", authorityId: "authority-1", plan: "Implement the approved plan.", decisions: ["Use typed IPC."], documentation: ["docs/spec.md"], references: [], constraints: ["No authority in context."], openQuestions: [], nextActions: ["Read the plan."] });
     const handoff = created.handoff as { id: string; digest: string; executionAuthorized: boolean };
     assert.equal(handoff.id, "handoff-1");
     assert.match(handoff.digest, /^[a-f0-9]{64}$/);
     assert.equal(handoff.executionAuthorized, false);
-    const prepared = await call("workflow.prepare", { action: "handoff_queue", sessionId: "planner", payload: { kind: "handoff", packageId: handoff.id, route: "queue", recipientSessionId: "coder" } });
+    const prepared = await call("workflow.prepare", { action: "handoff_queue", sessionId: "planner", authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "coder", route: "queue" } });
     assert.equal((prepared.artifact as { status: string }).status, "prepared");
+    const clientAuthored = await service.handle({ version: 1, id: "request-client-payload", method: "workflow.prepare", payload: { action: "proof", sessionId: "planner", authorityId: "authority-1", intent: { kind: "none" }, evidence: { shell: "git diff" } } });
+    assert.equal(clientAuthored.ok, false);
+    assert.equal(clientAuthored.error?.code, "invalid_request");
 
     const consentResult = await call("voice.consent", { handoffId: handoff.id, provider: "claude", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 });
     const consent = consentResult.consent as { id: string };

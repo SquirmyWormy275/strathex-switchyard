@@ -88,6 +88,7 @@ export interface ProviderGatewayWorkflowCommand {
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
   readonly sessionId: string;
+  readonly authorityId: string;
   readonly provider: ProviderGatewayProvider;
   readonly artifact: Readonly<{
     id: string;
@@ -95,6 +96,21 @@ export interface ProviderGatewayWorkflowCommand {
     taskId?: string;
     planRevision?: string;
     payload: WorkflowArtifactPayload;
+  }>;
+  readonly executionAuthorization?: Readonly<{
+    executionAuthorized: true;
+    executeOnce: true;
+    currentUserConfirmed: true;
+    confirmationDigest: string;
+    operationId: string;
+    artifactId: string;
+    artifactDigest: string;
+    targetSnapshotId: string;
+    sessionId: string;
+    authorityId: string;
+    planDigest: string;
+    planRevision: string;
+    originSessionId: string;
   }>;
 }
 
@@ -761,18 +777,62 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
   const target = object(value.target, "target");
   const session = object(value.session, "session");
   const artifact = object(value.artifact, "artifact");
+  if (!exact(value, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "artifact", ...(action === "plan_approval" ? ["executionAuthorization"] : [])])) throw new Error("The workflow gateway request contains unknown or missing fields.");
+  if (!allowedExact(target, ["id", "repositoryRoot", "policyVersion", "trackedManifest", "untrackedManifest"], ["branch", "head"])) throw new Error("The workflow target binding is malformed.");
+  if (!allowedExact(session, ["id", "provider", "surface", "capabilities", "plannedFiles"], ["taskId", "planRevision"])) throw new Error("The workflow session binding is malformed.");
+  if (!allowedExact(artifact, ["id", "digest", "payload", "executionAuthorized"], ["taskId", "planRevision"])) throw new Error("The workflow artifact binding is malformed.");
   if (artifact.executionAuthorized !== false) throw new Error("Provider workflow artifacts never authorize execution.");
   const payload = object(artifact.payload, "workflow payload") as unknown as WorkflowArtifactPayload;
+  const operationId = safeIdentifier(value.operationId, "operation ID");
+  const targetSnapshotId = digest(target.id, "target snapshot");
+  const sessionId = safeIdentifier(session.id, "session ID");
+  const authorityId = safeIdentifier(value.authorityId, "authority ID");
+  let executionAuthorization: ProviderGatewayWorkflowCommand["executionAuthorization"];
+  if (action === "plan_approval") {
+    const authorization = object(value.executionAuthorization, "plan execution authorization");
+    if (!exact(authorization, ["executionAuthorized", "executeOnce", "currentUserConfirmed", "confirmationDigest", "operationId", "artifactId", "artifactDigest", "targetSnapshotId", "sessionId", "authorityId", "planDigest", "planRevision", "originSessionId"])
+      || authorization.executionAuthorized !== true || authorization.executeOnce !== true || authorization.currentUserConfirmed !== true
+      || authorization.operationId !== operationId || authorization.artifactId !== artifact.id || authorization.artifactDigest !== artifact.digest
+      || authorization.targetSnapshotId !== targetSnapshotId || authorization.sessionId !== sessionId
+      || authorization.authorityId !== authorityId) {
+      throw new Error("Plan execution authorization does not exactly bind the confirmed immutable plan dispatch.");
+    }
+    const approval = approvalPayload(payload);
+    const plan = approval.plan;
+    if (approval.executorSessionId !== sessionId || approval.authorityId !== authorityId || approval.confirmationDigest !== authorization.confirmationDigest
+      || artifact.taskId !== plan.taskId || artifact.planRevision !== plan.revision || session.taskId !== plan.taskId || session.planRevision !== plan.revision) {
+      throw new Error("Plan execution authorization changed the immutable task, plan, executor, authority, or current-user confirmation binding.");
+    }
+    if (authorization.planDigest !== plan.digest || authorization.planRevision !== plan.revision || authorization.originSessionId !== plan.originSessionId) throw new Error("Plan execution authorization changed the immutable plan binding.");
+    executionAuthorization = {
+      executionAuthorized: true,
+      executeOnce: true,
+      currentUserConfirmed: true,
+      confirmationDigest: digest(authorization.confirmationDigest, "confirmation digest"),
+      operationId,
+      artifactId: safeIdentifier(authorization.artifactId, "artifact ID"),
+      artifactDigest: digest(authorization.artifactDigest, "artifact digest"),
+      targetSnapshotId,
+      sessionId,
+      authorityId: safeIdentifier(authorization.authorityId, "authority ID"),
+      planDigest: digest(authorization.planDigest, "plan digest"),
+      planRevision: safeIdentifier(authorization.planRevision, "plan revision"),
+      originSessionId: safeIdentifier(authorization.originSessionId, "plan origin session")
+    };
+  } else if (value.executionAuthorization !== undefined) {
+    throw new Error("Only Plan Approval may carry a mediated execution authorization.");
+  }
   boundedJson(value);
   return {
     kind: "workflow",
     routeId,
-    operationId: safeIdentifier(value.operationId, "operation ID"),
-    externalId: safeIdentifier(value.operationId, "operation ID"),
+    operationId,
+    externalId: operationId,
     action,
     repositoryRoot: exactRoot(target.repositoryRoot, repositoryRoot),
-    targetSnapshotId: digest(target.id, "target snapshot"),
-    sessionId: safeIdentifier(session.id, "session ID"),
+    targetSnapshotId,
+    sessionId,
+    authorityId,
     provider: providerIdentity(session.provider),
     artifact: {
       id: safeIdentifier(artifact.id, "artifact ID"),
@@ -780,8 +840,14 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
       ...(artifact.taskId === undefined ? {} : { taskId: safeIdentifier(artifact.taskId, "task ID") }),
       ...(artifact.planRevision === undefined ? {} : { planRevision: safeIdentifier(artifact.planRevision, "plan revision") }),
       payload
-    }
+    },
+    ...(executionAuthorization ? { executionAuthorization } : {})
   };
+}
+
+function approvalPayload(payload: WorkflowArtifactPayload): Extract<WorkflowArtifactPayload, { kind: "plan"; mode: "approve" }> {
+  if (payload.kind !== "plan" || payload.mode !== "approve" || payload.executeOnce !== true) throw new Error("Plan Approval requires one exact immutable execute-once plan payload.");
+  return payload;
 }
 
 function parseAutomationCommand(value: Record<string, unknown>, repositoryRoot: string, routeId: string): ProviderGatewayAutomationCommand {
@@ -893,15 +959,36 @@ function maximumRecordedClock(entries: readonly JournalEntry<unknown>[]): number
 function deterministicWorkflowResult(request: ProviderGatewayWorkflowCommand): WorkflowProviderResult {
   const payload = request.artifact.payload;
   switch (payload.kind) {
-    case "anchor": return { kind: "anchor", anchorDigest: sha256(stableJson(payload)) };
-    case "proof": return { kind: "proof", verifiedClaims: payload.claims, evidenceReferences: payload.evidenceReferences, backendResults: payload.requiredBackends.map((backend) => ({ backend, status: "passed" as const })) };
-    case "decision": return { kind: "decision", decisionPacketId: `packet:${request.artifact.id}` };
-    case "plan": return { kind: "plan", planRevision: request.artifact.planRevision ?? `plan:${request.artifact.id}`, acceptedStepIds: payload.steps.filter((step) => step.status === "approved").map((step) => step.id) };
+    case "anchor": return { kind: "anchor", anchorDigest: sha256(stableJson(payload)), discrepancies: [], questions: payload.unresolved, resumed: false };
+    case "proof": return { kind: "proof", verifiedClaims: payload.claims, evidenceReferences: workflowEvidenceReferences(payload.evidence), backendResults: payload.requiredBackends.map((backend) => ({ backend, status: "passed" as const })) };
+    case "decision": return {
+      kind: "decision",
+      decisionPacketId: `packet:${request.artifact.id}`,
+      decisions: payload.decisions.map((decision) => ({
+        decisionId: decision.id,
+        options: Array.from({ length: 5 }, (_, index) => ({ id: `${decision.id}:option-${index + 1}`, label: `Bounded option ${index + 1}`, tradeoffs: [`Tradeoff ${index + 1}`], risks: [`Risk ${index + 1}`] })),
+        recommendationId: `${decision.id}:option-1`
+      })),
+      userSelectionRequired: true
+    };
+    case "plan": return payload.mode === "expand"
+      ? { kind: "plan", mode: "expanded", planDigest: payload.plan.digest, alternatives: Array.from({ length: 15 }, (_, index) => ({ rank: index + 1, id: `alternative-${index + 1}`, summary: `Creative alternative ${index + 1}`, rationale: `Distinct reviewed approach ${index + 1}.`, risks: [] })) }
+      : { kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision, originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId, acknowledgementId: `ack:${request.operationId}`, executionStarted: true };
     case "handoff": return { kind: "handoff", packageId: payload.packageId, recipientSessionId: payload.recipientSessionId ?? request.sessionId, acknowledged: true };
-    case "focus": return { kind: "focus", selectedSessionId: payload.selectedSessionId, status: payload.expectedStatus };
-    case "authority": return { kind: "authority", grantId: payload.grantId, acceptedRecipientSessionIds: payload.recipientSessionIds };
+    case "focus": return { kind: "focus", selectedSessionId: payload.selectedSessionId, status: payload.expectedStatus, queueCycleId: payload.queueCycleId, resultDelivered: true };
+    case "authority": return { kind: "authority", acknowledgements: payload.packets.map((packet) => ({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true })) };
     case "voice_binding": return { kind: "voice_binding", bindingId: `binding:${request.artifact.id}`, active: true };
   }
+}
+
+function workflowEvidenceReferences(evidence: Extract<WorkflowArtifactPayload, { kind: "proof" }>["evidence"]): readonly string[] {
+  return [
+    ...evidence.instructions.map((entry) => `${entry.id}:${entry.digest}`),
+    ...evidence.documentation.map((entry) => `${entry.id}:${entry.digest}`),
+    `${evidence.diff.id}:${evidence.diff.digest}`,
+    ...evidence.files.map((entry) => `${entry.id}:${entry.digest}`),
+    ...evidence.tests.map((entry) => `${entry.id}:${entry.digest}:${entry.status}`)
+  ];
 }
 
 function outcomeForResponse(response: ProviderGatewayCommandResult): ProviderGatewayOperationOutcome {
@@ -952,6 +1039,8 @@ function boundedJson(value: unknown, depth = 0): void {
 }
 
 function object(value: unknown, field: string): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${field} is invalid.`); return value as Record<string, unknown>; }
+function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+function allowedExact(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean { const allowed = new Set([...required, ...optional]); return required.every((key) => key in value) && Object.keys(value).every((key) => allowed.has(key)); }
 function boolean(value: unknown, field: string): boolean { if (typeof value !== "boolean") throw new Error(`${field} is invalid.`); return value; }
 function safeIdentifier(value: unknown, field: string): string { if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value)) throw new Error(`${field} is invalid.`); return value; }
 function safeOperationId(value: unknown): value is string { try { safeIdentifier(value, "operation ID"); return true; } catch { return false; } }

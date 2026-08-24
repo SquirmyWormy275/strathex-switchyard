@@ -23,7 +23,7 @@ import { PolicyEngine } from "./policy.ts";
 import { ReceiptLedger } from "./receipts.ts";
 import { SessionRegistry } from "./session-registry.ts";
 import { TargetSnapshotLedger } from "./snapshot-ledger.ts";
-import { ProtectedJsonStore } from "./store.ts";
+import { ProtectedJsonStore, sha256 } from "./store.ts";
 
 export interface TargetResolver {
   /** Resolve a target only from trusted host/session identity; never from command input. */
@@ -271,6 +271,7 @@ export class DurableMediatedExecutor {
       authority = decision.grant;
     }
     const policy = await this.createPolicy(target);
+    const trustedConfirmationDigest = definition.requiresConfirmation && request.confirmationToken ? sha256(request.confirmationToken) : undefined;
     let confirmationToken = request.confirmationToken;
     if (definition.requiresConfirmation && confirmationToken) {
       // Check all non-confirmation policy conditions first. This avoids
@@ -348,7 +349,7 @@ export class DurableMediatedExecutor {
       ...(target ? { targetSnapshot: target } : {}),
       ...(authority ? { authorityId: authority.id } : {}),
       ...(confirmationToken ? { confirmationToken } : {})
-    });
+    }, trustedConfirmationDigest ? { confirmationDigest: trustedConfirmationDigest } : {});
     return result.operationId ? result : this.auditWithoutOperation(definition, result, target);
   }
 

@@ -5,7 +5,7 @@ import { assignmentFor, controls, type Control, type Modifier } from "../../../p
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { HandoffPackage, HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
-import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowArtifactPayload, WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowArtifactPayload, WorkflowArtifactStore, WorkflowPreparationCoordinator, WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { VoiceBinding, VoiceConsent, VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import type { GitReviewResult, GitReviewWorkspace } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
@@ -133,6 +133,7 @@ export interface CompanionServiceOptions {
   readonly hardwareSignals?: DurableHardwareSignalInbox;
   readonly handoffs?: HandoffPackageStore;
   readonly workflowArtifacts?: WorkflowArtifactStore;
+  readonly workflowCoordinator?: WorkflowPreparationCoordinator;
   readonly voice?: VoiceCoordinator;
   readonly voicePresence?: WindowsUserPresenceRunner;
   readonly canonicalizeHostPath?: (value: string) => Promise<string>;
@@ -169,6 +170,7 @@ export class CompanionService {
   private readonly hardwareSignals?: DurableHardwareSignalInbox;
   private readonly handoffs?: HandoffPackageStore;
   private readonly workflowArtifacts?: WorkflowArtifactStore;
+  private readonly workflowCoordinator?: WorkflowPreparationCoordinator;
   private readonly voice?: VoiceCoordinator;
   private readonly voicePresence?: WindowsUserPresenceRunner;
   private readonly canonicalizeHostPath: (value: string) => Promise<string>;
@@ -191,6 +193,7 @@ export class CompanionService {
     this.hardwareSignals = options.hardwareSignals;
     this.handoffs = options.handoffs;
     this.workflowArtifacts = options.workflowArtifacts;
+    this.workflowCoordinator = options.workflowCoordinator;
     this.voice = options.voice;
     this.voicePresence = options.voicePresence;
     this.canonicalizeHostPath = options.canonicalizeHostPath ?? realpath;
@@ -539,16 +542,23 @@ export class CompanionService {
     if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached.");
     const session = this.requireSession(payload.sessionId);
     if (!session.workspaceRoot || !session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "Workflow preparation requires an exact managed-session target.");
-    if ((payload.action === "handoff" || payload.action === "handoff_queue") && payload.payload.kind === "handoff") {
-      const handoff = this.handoffs ? await this.handoffs.get(payload.payload.packageId) : undefined;
-      if (!handoff || handoff.repositoryRoot !== session.workspaceRoot || handoff.targetSnapshotId !== session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "The workflow Handoff package is missing or bound to another target.");
-    }
-    if (payload.action === "bind_voice_session" && payload.payload.kind === "voice_binding") {
-      const consent = this.voice ? await this.voice.getConsent(payload.payload.consentId) : undefined;
+    let workflowPayload: WorkflowArtifactPayload;
+    if (payload.action === "bind_voice_session") {
+      if (payload.intent.kind !== "none") throw new CompanionServiceError("invalid_request", "Voice binding accepts no client-authored workflow fields.");
       const active = this.voice ? await this.voice.active() : undefined;
-      if (!consent || !active || active.voiceSessionId !== payload.payload.voiceSessionId || active.contextPackageId !== payload.payload.contextPackageId || active.managedSessionId !== session.id) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active consent, context, and managed session.");
+      const consent = active && this.voice ? await this.voice.getConsent(active.consentId) : undefined;
+      if (!consent || !active || active.managedSessionId !== session.id || active.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(active.repositoryRoot) !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active protected consent, context, and managed session.");
+      workflowPayload = { kind: "voice_binding", voiceSessionId: active.voiceSessionId, provider: active.provider === "claude" ? "claude" : "generic", contextPackageId: active.contextPackageId, consentId: active.consentId };
+    } else {
+      if (!this.workflowCoordinator) throw new CompanionServiceError("capability_denied", "No protected workflow preparation coordinator is attached; client-authored plans, evidence, options, and authority are rejected.");
+      workflowPayload = await this.workflowCoordinator.prepare({ action: payload.action, session, authorityId: payload.authorityId, intent: payload.intent });
     }
-    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), payload: payload.payload });
+    if ((payload.action === "handoff" || payload.action === "handoff_queue" || payload.action === "handoff_immediate") && workflowPayload.kind === "handoff") {
+      const handoff = this.handoffs ? await this.handoffs.get(workflowPayload.packageId) : undefined;
+      if (!handoff || handoff.repositoryRoot !== session.workspaceRoot || handoff.targetSnapshotId !== session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "The workflow Handoff package is missing or bound to another target.");
+      if (handoff.recipientSessionId !== workflowPayload.recipientSessionId || handoff.authorityId !== workflowPayload.authorityId || handoff.planRevision !== session.planRevision || handoff.taskId !== session.taskId) throw new CompanionServiceError("capability_denied", "The coordinator Handoff package changed its exact recipient, authority, task, or plan binding.");
+    }
+    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), payload: workflowPayload });
   }
 
   private async listWorkflowArtifacts(payload: unknown): Promise<readonly WorkflowArtifact[]> { requireEmptyPayload(payload, "Workflow artifact listing"); if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); return this.workflowArtifacts.list(); }
@@ -1017,8 +1027,8 @@ export class CompanionService {
   private requireHandoffRouting(payload: unknown): HandoffRoutingPayload { if (!isRecord(payload) || !exactKeys(payload, ["routing"]) || (payload.routing !== "queue" && payload.routing !== "immediate")) throw new CompanionServiceError("invalid_request", "Handoff routing must be exactly queue or immediate."); return { routing: payload.routing }; }
 
   private requireWorkflowPrepare(payload: unknown): WorkflowPreparePayload {
-    if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "payload"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !isRecord(payload.payload)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, and typed payload record.");
-    return { action: payload.action, sessionId: payload.sessionId, payload: payload.payload as unknown as WorkflowArtifactPayload };
+    if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "authorityId", "intent"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, host-issued authority, and bounded intent.");
+    return { action: payload.action, sessionId: payload.sessionId, authorityId: payload.authorityId, intent: workflowPreparationIntent(payload.intent) };
   }
 
   private requireVoiceConsent(payload: unknown): VoiceConsentPayload {
@@ -1238,7 +1248,17 @@ function sameHostRoots(left: readonly string[], right: readonly string[]): boole
 
 function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
 function boundedStringList(value: unknown, label: string): readonly string[] { if (!Array.isArray(value) || value.length > 512 || !value.every((item) => typeof item === "string" && item.trim() && item.length <= 16_384 && !/\0/.test(item))) throw new CompanionServiceError("invalid_request", `${label} must be a bounded string list.`); return [...new Set(value.map((item) => (item as string).trim()))]; }
-function workflowArtifactAction(value: unknown): value is WorkflowArtifactAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function workflowArtifactAction(value: unknown): value is WorkflowArtifactAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {
+  if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Workflow intent must be one exact bounded record.");
+  if (value.kind === "none" && exactKeys(value, ["kind"])) return { kind: "none" };
+  if (value.kind === "decision" && exactKeys(value, ["kind", "question", "context"]) && boundedWorkflowText(value.question) && boundedWorkflowText(value.context)) return { kind: "decision", question: value.question, context: value.context };
+  if (value.kind === "handoff" && exactKeys(value, ["kind", "recipientSessionId", "route"]) && boundedReferenceValue(value.recipientSessionId) && (value.route === "queue" || value.route === "immediate")) return { kind: "handoff", recipientSessionId: value.recipientSessionId, route: value.route };
+  if (value.kind === "authority_broadcast" && exactKeys(value, ["kind", "recipientSessionIds"]) && Array.isArray(value.recipientSessionIds) && value.recipientSessionIds.length >= 1 && value.recipientSessionIds.length <= 64 && value.recipientSessionIds.every(boundedReferenceValue)) return { kind: "authority_broadcast", recipientSessionIds: [...new Set(value.recipientSessionIds as string[])] };
+  if (value.kind === "plan_approval" && exactKeys(value, ["kind", "confirmationToken"]) && boundedReferenceValue(value.confirmationToken)) return { kind: "plan_approval", confirmationToken: value.confirmationToken };
+  throw new CompanionServiceError("invalid_request", "Workflow intent contains unsupported or unbounded client-authored fields.");
+}
+function boundedWorkflowText(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 16_384 && !/\0/.test(value); }
 function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
 function hardwareCompletionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
 

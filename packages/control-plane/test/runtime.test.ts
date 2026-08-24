@@ -13,7 +13,7 @@ import { DurableBudgetManager } from "../src/budgets.ts";
 import { DurableMediatedExecutor } from "../src/runtime.ts";
 import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
-import { ProtectedJsonStore } from "../src/store.ts";
+import { ProtectedJsonStore, sha256 } from "../src/store.ts";
 
 const now = "2026-08-23T12:00:00.000Z";
 const targetMaterial = {
@@ -123,7 +123,8 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
     const adapters = new AdapterRegistry();
     const adapter = new InMemoryCommandAdapter();
     let calls = 0;
-    adapter.register("proof_adversarial", () => { calls += 1; return { status: "completed", summary: "isolated adversarial proof", effectDisposition: "committed" }; });
+    let confirmationDigest: string | undefined;
+    adapter.register("proof_adversarial", (request) => { calls += 1; confirmationDigest = request.confirmation?.confirmationDigest; return { status: "completed", summary: "isolated adversarial proof", effectDisposition: "committed" }; });
     adapters.register("proof_adversarial", adapter);
     const runtime = new DurableMediatedExecutor({
       store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
@@ -139,6 +140,7 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
     });
     assert.equal(executed.status, "completed");
     assert.equal(calls, 1);
+    assert.equal(confirmationDigest, sha256(issued.token!));
     const replay = await runtime.execute({
       assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken: issued.token
     });

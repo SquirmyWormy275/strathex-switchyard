@@ -22,9 +22,12 @@ import { PolicyEngine, type PolicyDecision, type PolicyPermit } from "./policy.t
 import { untrustedSummary } from "./redaction.ts";
 import type { ExecutionControl } from "./execution-control.ts";
 import type { RepositoryRecipe } from "./recipes.ts";
+import { sha256 } from "./store.ts";
 
 export interface SessionLookup { get(id: string): ManagedSession | undefined; }
 export interface AuthorityLookup { get(id: string): AuthorityGrant | undefined; }
+/** Host-runtime context that cannot be supplied through the public command payload. */
+export interface TrustedDispatchContext { readonly confirmationDigest?: string; }
 export interface ExecutionRecipeFactory {
   /** Must resolve a companion-approved declarative recipe, never raw request input. */
   create(definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined;
@@ -184,7 +187,7 @@ export class CommandDispatcher {
     this.operations = dependencies.operations ?? new InMemoryCommandOperationCoordinator();
   }
 
-  async dispatch(request: CommandRequest): Promise<CommandResult> {
+  async dispatch(request: CommandRequest, trusted: TrustedDispatchContext = {}): Promise<CommandResult> {
     const definition = commandFor(request.control, request.modifier);
     if (!definition || definition.assignment !== request.assignment) {
       return { status: "blocked", summary: "Command assignment mismatch or intentionally unassigned chord; no action was routed." };
@@ -250,7 +253,7 @@ export class CommandDispatcher {
         };
       } else {
         await lifecycle?.markExecuting(lease);
-        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl, governanceAdmission.effectGuard);
+        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl, governanceAdmission.effectGuard, trusted.confirmationDigest);
       }
     } catch (error) {
       const label = governanceAdmission ? "Command adapter" : "Dispatch governance";
@@ -346,22 +349,30 @@ export class CommandDispatcher {
     return { session, authority };
   }
 
-  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl, effectGuard?: EffectGuard): Promise<CommandResult> {
+  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl, effectGuard?: EffectGuard, trustedConfirmationDigest?: string): Promise<CommandResult> {
     const operationId = lease.operationId;
     const target = request.targetSnapshot;
+    const confirmation = definition.requiresConfirmation && request.confirmationToken ? {
+      currentUserConfirmed: true as const,
+      confirmationDigest: trustedConfirmationDigest ?? sha256(request.confirmationToken),
+      action: definition.action,
+      ...(target ? { targetSnapshotId: target.id } : {}),
+      ...(session ? { sessionId: session.id } : {}),
+      ...(authority ? { authorityId: authority.id } : {})
+    } : undefined;
     const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}) } : undefined;
     switch (definition.executor) {
       case "adapter":
         return adapterResult(
           this.dependencies.adapters
-            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
             : { status: "unavailable", summary: "No verified adapter is registered for this command.", effectDisposition: "not_started" },
           operationId
         );
       case "agent":
         return this.executeComposite(definition, lease, async (childSaga) => adapterResult(
           this.dependencies.adapters
-            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), ...(childSaga ? { childSaga } : {}), untrustedInput: request.input })
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), ...(childSaga ? { childSaga } : {}), untrustedInput: request.input })
             : { status: "unavailable", summary: "No verified agent adapter is registered for this command.", effectDisposition: "not_started" },
           operationId
         ));

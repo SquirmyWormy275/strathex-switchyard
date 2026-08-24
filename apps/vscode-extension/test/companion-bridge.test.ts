@@ -220,7 +220,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   assert.equal((await bridge.createHandoff({ sessionId: session.id, recipientSessionId: "recipient-1", plan: handoff.plan, decisions: handoff.decisions, documentation: handoff.documentation, references: handoff.references, constraints: handoff.constraints, openQuestions: handoff.openQuestions, nextActions: handoff.nextActions })).ok, true);
   assert.equal((await bridge.listHandoffs()).ok, true);
   assert.deepEqual(await bridge.handoffRouting(), { ok: true, value: "queue" });
-  assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, payload: artifact.payload })).ok, true);
+  assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } })).ok, true);
   assert.equal((await bridge.listWorkflows()).ok, true);
   assert.equal((await bridge.grantVoiceConsent({ handoffId: handoff.id, provider: "claude", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 })).ok, true);
   assert.equal((await bridge.startVoice({ consentId: consent.id, voiceSessionId: binding.voiceSessionId, managedSessionId: session.id })).ok, true);
@@ -229,7 +229,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   assert.equal(methods.includes("voice.bind"), true);
 
   corrupt = true;
-  const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, payload: artifact.payload });
+  const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } });
   assert.equal(forgedAuthority.ok, false);
   if (!forgedAuthority.ok) assert.equal(forgedAuthority.code, "invalid_response");
 });

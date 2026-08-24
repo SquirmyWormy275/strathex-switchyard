@@ -6,7 +6,7 @@ import test from "node:test";
 
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
-import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import {
   DeterministicProviderGatewayBackend,
   LocalProviderCommandGateway,
@@ -66,11 +66,15 @@ function providerSession(provider: "claude" | "codex" = "codex"): ManagedSession
 }
 
 function workflowBody(operationId = "operation-proof-1", digest = artifactDigest): string {
+  const planMaterial = { revision: "plan-1", originSessionId: "codex-session", taskId: "task-1", objective: "Verify gateway", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/index.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
+  const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+  const evidenceMaterial = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
   return JSON.stringify({
     schema: "sxsy-b122.workflow-command",
     version: 1,
     action: "proof",
     operationId,
+    authorityId: "authority-proof",
     target: {
       id: targetId,
       repositoryRoot: "C:\\repo",
@@ -94,13 +98,30 @@ function workflowBody(operationId = "operation-proof-1", digest = artifactDigest
       planRevision: "plan-1",
       payload: {
         kind: "proof",
+        evidence: { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial },
         claims: ["claim"],
-        evidenceReferences: ["receipt:1"],
-        requiredBackends: ["local"]
+        requiredBackends: ["local"],
+        independentBackendRequired: false
       },
       executionAuthorized: false
     }
   });
+}
+
+function planApprovalBody(operationId = "operation-plan-1", includeAuthorization = true): string {
+  const value = JSON.parse(workflowBody(operationId, "8".repeat(64))) as Record<string, unknown>;
+  const artifact = value.artifact as Record<string, unknown>;
+  const proof = artifact.payload as { evidence: { plan: Record<string, unknown> } };
+  const plan = proof.evidence.plan;
+  value.action = "plan_approval";
+  value.authorityId = "authority-plan";
+  artifact.id = "artifact-plan-1";
+  artifact.payload = { kind: "plan", mode: "approve", plan, executorSessionId: "codex-session", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), executeOnce: true };
+  if (includeAuthorization) value.executionAuthorization = {
+    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), operationId, artifactId: artifact.id, artifactDigest: artifact.digest,
+    targetSnapshotId: targetId, sessionId: "codex-session", authorityId: "authority-plan", planDigest: plan.digest, planRevision: plan.revision, originSessionId: plan.originSessionId
+  };
+  return JSON.stringify(value);
 }
 
 test("gateway authentication is an exact local capability and external backends need explicit authorization", async (context) => {
@@ -138,6 +159,33 @@ test("workflow commands are exact-target and idempotent across duplicate deliver
   const stale = await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale-target") });
   assert.equal(stale.outcome, "blocked");
   assert.equal(setup.codex.commandCalls, 1);
+});
+
+test("Plan Approval gateway rejects missing or mismatched execution authorization and durably acknowledges one exact execution", async (context) => {
+  const setup = await fixture(context);
+  await setup.sessions.upsert(providerSession());
+
+  const missing = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: planApprovalBody("operation-plan-missing", false) });
+  assert.equal(missing.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
+  const mismatched = JSON.parse(planApprovalBody("operation-plan-mismatch")) as Record<string, unknown>;
+  (mismatched.executionAuthorization as Record<string, unknown>).sessionId = "other-session";
+  const changed = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: JSON.stringify(mismatched) });
+  assert.equal(changed.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
+  const changedConfirmation = JSON.parse(planApprovalBody("operation-plan-confirmation-mismatch")) as Record<string, unknown>;
+  (changedConfirmation.executionAuthorization as Record<string, unknown>).confirmationDigest = "7".repeat(64);
+  const changedConfirmationResult = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: JSON.stringify(changedConfirmation) });
+  assert.equal(changedConfirmationResult.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
+  const accepted = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: planApprovalBody() });
+  assert.equal(accepted.outcome, "passed");
+  assert.equal(setup.codex.commandCalls, 1);
+  const result = JSON.parse(Buffer.from(accepted.body!).toString("utf8")) as { result: { mode: string; executionStarted: boolean; planDigest: string } };
+  assert.deepEqual({ mode: result.result.mode, executionStarted: result.result.executionStarted }, { mode: "execution_ack", executionStarted: true });
 });
 
 test("host-owned observations renew exact sessions and centrally downgrade churn or outage", async (context) => {

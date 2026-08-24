@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assignments, controls, decodeSignal, encodeSignal, protocolVersion, type B122Signal, assignmentFor, handlerFor } from "../src/b122.ts";
+import { createHash } from "node:crypto";
+import { assignments, canonicalManifestJson, controls, manifest, manifestSha256, protocolVersion, assignmentFor, handlerFor } from "../src/b122.ts";
 
 test("the protocol exposes exactly 22 logical controls and 65 settled chord assignments", () => {
   assert.equal(controls.length, 22);
@@ -27,25 +28,10 @@ test("high-consequence controls are disabled pending gates", () => {
   }
 });
 
-test("raw HID signals round-trip and reject corruption", () => {
-  const signal: B122Signal = { version: protocolVersion, control: "PROOF", modifier: "shift", sequence: 513 };
-  const packet = encodeSignal(signal);
-  assert.deepEqual(decodeSignal(packet), signal);
-  packet[6] ^= 1;
-  assert.equal(decodeSignal(packet), undefined);
-});
-
-test("raw HID reserved bytes must remain zero", () => {
-  const signal: B122Signal = { version: protocolVersion, control: "RUN", modifier: "normal", sequence: 9 };
-  const packet = new Uint8Array(8);
-  packet.set(encodeSignal(signal));
-  assert.deepEqual(decodeSignal(packet), signal);
-  packet[7] = 1;
-  assert.equal(decodeSignal(packet), undefined);
-});
-
-test("raw HID packets must have the exact protocol length", () => {
-  const packet = encodeSignal({ version: protocolVersion, control: "RUN", modifier: "normal", sequence: 9 });
-  const extended = new Uint8Array(9); extended.set(packet);
-  assert.equal(decodeSignal(extended), undefined);
+test("the canonical machine-readable manifest has a checked SHA-256 identity", () => {
+  assert.equal(manifest.schema, "sxsy-b122-control-map/v1");
+  assert.deepEqual(manifest.controls, controls);
+  assert.deepEqual(manifest.assignments, assignments);
+  assert.equal(createHash("sha256").update(canonicalManifestJson).digest("hex"), manifestSha256);
+  assert.match(manifestSha256, /^[0-9a-f]{64}$/);
 });

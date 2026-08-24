@@ -2,15 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { WorkflowArtifact, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
+import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker } from "../src/remote-adapters.ts";
 
 const providerTargetId = "a".repeat(64);
+function proofEvidence() {
+  const planMaterial = { revision: "plan-1", originSessionId: "session-1", taskId: "task-1", objective: "Verify the provider route.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
+  const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+  const material = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
+  return { contextDigest: sha256(stableJson(material)), ...material };
+}
 function proofArtifact(): WorkflowArtifact {
   return {
     id: "artifact-proof-1", action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: providerTargetId,
     sessionId: "session-1", taskId: "task-1", planRevision: "plan-1",
-    payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["receipt:1"], requiredBackends: ["local"] },
+    payload: { kind: "proof", evidence: proofEvidence(), claims: ["claim"], requiredBackends: ["local"], independentBackendRequired: false },
     digest: "b".repeat(64), status: "submitted", operationId: "operation-1", executionAuthorized: false,
+    createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
+  };
+}
+function planApprovalArtifact(): WorkflowArtifact {
+  const plan = proofEvidence().plan;
+  return {
+    id: "artifact-plan-1", action: "plan_approval", repositoryRoot: "C:\\repo", targetSnapshotId: providerTargetId,
+    sessionId: "session-1", taskId: plan.taskId, planRevision: plan.revision,
+    payload: { kind: "plan", mode: "approve", plan, executorSessionId: "session-1", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), executeOnce: true },
+    digest: "8".repeat(64), status: "submitted", operationId: "operation-plan-1", executionAuthorized: false,
     createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
   };
 }
@@ -19,6 +37,7 @@ function providerRequest(untrustedInput?: Readonly<Record<string, string>>, chil
     definition: { action: "proof" }, operationId: "operation-1",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    authority: { id: "authority-proof" },
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
     ...(childSaga ? { childSaga } : {}),
     ...(untrustedInput ? { untrustedInput } : {})
@@ -54,6 +73,7 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   assert.equal(requests.length, 1);
   const document = JSON.parse(String((requests[0] as { body: string }).body)) as Record<string, unknown>;
   assert.equal(document.schema, "sxsy-b122.workflow-command");
+  assert.equal(document.authorityId, "authority-proof");
   assert.equal("input" in document, false);
   assert.deepEqual(document.artifact, { id: artifact.id, digest: artifact.digest, taskId: "task-1", planRevision: "plan-1", payload: artifact.payload, executionAuthorized: false });
   const started = childEvents.find(([kind]) => kind === "begin")?.[1] as { action: string; details: Record<string, string> };
@@ -73,6 +93,44 @@ test("configured provider adapter never acknowledges malformed provider output",
   assert.equal(outcome.status, "failed");
   assert.equal(outcome.effectDisposition, "ambiguous");
   assert.equal(acknowledgements, 0);
+});
+
+test("Plan Approval sends execution authorization only from dispatcher-proven current-user confirmation", async () => {
+  const artifact = planApprovalArtifact();
+  const requests: Array<{ body: string }> = [];
+  const network = {
+    async request(input: { body: string }) {
+      requests.push(input);
+      return { outcome: "passed", routeId: "provider.plan_approval", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({
+        schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId,
+        action: "plan_approval", status: "completed", effectDisposition: "committed", summary: "The exact plan execution was acknowledged.", externalId: "provider-plan-1",
+        result: { kind: "plan", mode: "execution_ack", planDigest: artifact.payload.kind === "plan" ? artifact.payload.plan.digest : "", planRevision: "plan-1", originSessionId: "session-1", executorSessionId: "session-1", authorityId: "authority-plan", acknowledgementId: "ack-plan-1", executionStarted: true }
+      })) };
+    }
+  } as unknown as DynamicConfiguredNetworkClient;
+  const artifacts = { async claimForDispatch() { return artifact; }, async acknowledge() { return { ...artifact, status: "acknowledged" as const }; } };
+  const adapter = new ConfiguredProviderCommandAdapter(network, artifacts);
+  const base = {
+    definition: { action: "plan_approval" }, operationId: "operation-plan-1",
+    target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
+    session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    authority: { id: "authority-plan" },
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), action: "plan_approval", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan" },
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
+  } as unknown as AdapterRequest;
+
+  assert.equal((await adapter.execute(base)).status, "completed");
+  const document = JSON.parse(requests[0]!.body) as { executionAuthorization: unknown };
+  assert.deepEqual(document.executionAuthorization, {
+    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), operationId: "operation-plan-1", artifactId: artifact.id, artifactDigest: artifact.digest,
+    targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan", planDigest: proofEvidence().plan.digest, planRevision: "plan-1", originSessionId: "session-1"
+  });
+
+  const refused = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: undefined } as never);
+  assert.equal(refused.status, "blocked");
+  const mismatchedConfirmation = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: { ...base.confirmation!, confirmationDigest: "7".repeat(64) } } as never);
+  assert.equal(mismatchedConfirmation.status, "blocked");
+  assert.equal(requests.length, 1);
 });
 
 test("configured provider adapter does not call the network without one prepared typed artifact", async () => {

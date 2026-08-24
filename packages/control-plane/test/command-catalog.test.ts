@@ -34,3 +34,11 @@ test("containment release exists as a separately gated administrative action, no
   assert.equal(release.requiresConfirmation, true);
   assert.ok(release.acceptanceGates.includes(20));
 });
+
+test("workflow navigation and Plan Approval declare the authority and confirmation needed by their durable coordinators", () => {
+  assert.equal(commandForAction("plan_approval").requiresConfirmation, true);
+  for (const action of ["handoff_immediate", "focus_blocked_agent", "focus_finished_agent"] as const) {
+    assert.equal(commandForAction(action).requiresAuthority, true, `${action} must receive exact scoped authority before workflow preparation`);
+  }
+  assert.equal(commandForAction("handoff_immediate").executor, "agent");
+});

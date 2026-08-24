@@ -15,6 +15,20 @@ export interface AdapterOutcome {
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * Created only by CommandDispatcher after the exact confirmation has passed
+ * policy validation. Provider artifacts and extension payloads cannot mint it.
+ */
+export interface AdapterConfirmation {
+  readonly currentUserConfirmed: true;
+  /** SHA-256 of the exact one-time policy confirmation; the token never leaves the dispatcher. */
+  readonly confirmationDigest: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
+}
+
 /** Typed context crosses the adapter boundary; untrusted text is data only. */
 export interface AdapterRequest {
   readonly definition: CommandDefinition;
@@ -23,6 +37,7 @@ export interface AdapterRequest {
   readonly target?: TargetSnapshot;
   readonly session?: ManagedSession;
   readonly authority?: AuthorityGrant;
+  readonly confirmation?: AdapterConfirmation;
   readonly executionControl?: ExecutionControl;
   /** Host-owned final target barrier, checked before an adapter side effect. */
   readonly effectGuard?: EffectGuard;

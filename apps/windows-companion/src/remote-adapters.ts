@@ -117,7 +117,7 @@ export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCo
 
 export const providerCommandActions: readonly CommandAction[] = [
   "reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval",
-  "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"
+  "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"
 ];
 export const remoteAutomationActions: readonly CommandAction[] = ["compound_capture", "compound_refresh", "lfg", "repair_mission"];
 
@@ -135,7 +135,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const action = providerWorkflowAction(request.definition.action);
-    if (!request.operationId || !request.target || !request.session || !action || !this.artifacts) return { status: "unavailable", summary: "Configured provider routing requires a typed artifact store, durable operation, managed session, and exact target.", effectDisposition: "not_started" };
+    if (!request.operationId || !request.target || !request.session || !request.authority || !action || !this.artifacts) return { status: "unavailable", summary: "Configured provider routing requires a typed artifact store, durable operation, managed session, scoped authority, and exact target.", effectDisposition: "not_started" };
     const control = await operationAbort(request.executionControl);
     try {
       if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch.", effectDisposition: "not_started" };
@@ -173,7 +173,9 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         } else await request.childSaga.settle(child, "ambiguous", { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
         return outcome;
       };
-      const body = JSON.stringify(providerDocument(request, artifact));
+      let body: string;
+      try { body = JSON.stringify(providerDocument(request, artifact)); }
+      catch { return finish({ status: "blocked", summary: "The provider workflow envelope lacks an exact trusted execution binding.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
       if (request.effectGuard) {
         const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, session: request.session, ...(request.authority ? { authority: request.authority } : {}) });
         if (!current.allowed) return finish({ status: "blocked", summary: current.reason, effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
@@ -265,6 +267,37 @@ function externalIdDetails(data: Readonly<Record<string, unknown>> | undefined):
 }
 
 function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
+  let planAuthorization = {};
+  if (artifact.action === "plan_approval") {
+    const session = request.session;
+    const authority = request.authority;
+    if (!session || !authority || artifact.payload.kind !== "plan" || artifact.payload.mode !== "approve" || !request.confirmation?.currentUserConfirmed
+      || request.confirmation.action !== "plan_approval" || request.confirmation.targetSnapshotId !== request.target?.id
+      || request.confirmation.sessionId !== session.id || request.confirmation.authorityId !== authority.id
+      || request.confirmation.confirmationDigest !== artifact.payload.confirmationDigest
+      || artifact.payload.executorSessionId !== session.id || artifact.payload.authorityId !== authority.id
+      || artifact.taskId !== artifact.payload.plan.taskId || artifact.planRevision !== artifact.payload.plan.revision
+      || session.taskId !== artifact.payload.plan.taskId || session.planRevision !== artifact.payload.plan.revision) {
+      throw new Error("Plan Approval requires dispatcher-proven current-user confirmation for the exact target, session, and authority.");
+    }
+    planAuthorization = {
+        executionAuthorization: {
+          executionAuthorized: true as const,
+          executeOnce: true as const,
+          currentUserConfirmed: true as const,
+          confirmationDigest: request.confirmation.confirmationDigest,
+          operationId: request.operationId!,
+          artifactId: artifact.id,
+          artifactDigest: artifact.digest,
+          targetSnapshotId: request.target!.id,
+          sessionId: request.session!.id,
+          authorityId: request.authority!.id,
+          planDigest: artifact.payload.plan.digest,
+          planRevision: artifact.payload.plan.revision,
+          originSessionId: artifact.payload.plan.originSessionId
+        }
+      };
+  }
   return {
     schema: "sxsy-b122.workflow-command",
     version: 1,
@@ -273,6 +306,7 @@ function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
     target: targetDocument(request.target!),
     session: sessionDocument(request.session!),
     authorityId: request.authority?.id,
+    ...planAuthorization,
     artifact: {
       id: artifact.id,
       digest: artifact.digest,

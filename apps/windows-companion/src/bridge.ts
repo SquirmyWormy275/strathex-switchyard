@@ -3,7 +3,7 @@ import type { CommandAction } from "../../../packages/control-plane/src/command-
 import type { CommandResult, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { HandoffPackageInput, HandoffRoutingDefault } from "../../../packages/control-plane/src/context-packages.ts";
-import type { WorkflowArtifactAction, WorkflowArtifactPayload } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { WorkflowArtifactAction, WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { VoiceProvider, VoiceTranscriptPolicy } from "../../../packages/control-plane/src/voice.ts";
 import type { CompanionService } from "./service.ts";
 import type { HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
@@ -215,7 +215,7 @@ export interface HardwareSignalCompletionPayload extends HardwareSignalBindingPa
 export interface HandoffCreatePayload extends Omit<HandoffPackageInput, "repositoryRoot" | "targetSnapshotId" | "taskId" | "planRevision" | "authorityId" | "id"> { readonly sessionId: string; readonly authorityId?: string; }
 export interface HandoffReferencePayload { readonly handoffId: string; readonly recipientSessionId?: string; }
 export interface HandoffRoutingPayload { readonly routing: HandoffRoutingDefault; }
-export interface WorkflowPreparePayload { readonly action: WorkflowArtifactAction; readonly sessionId: string; readonly payload: WorkflowArtifactPayload; }
+export interface WorkflowPreparePayload { readonly action: WorkflowArtifactAction; readonly sessionId: string; readonly authorityId: string; readonly intent: WorkflowPreparationIntent; }
 export interface VoiceConsentPayload { readonly handoffId: string; readonly provider: VoiceProvider; readonly transcript: VoiceTranscriptPolicy; readonly retentionMinutes: number; readonly expiresInMinutes: number; }
 export interface VoiceStartPayload { readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; }
 export interface VoiceSwitchPayload { readonly bindingId: string; readonly consentId: string; readonly voiceSessionId: string; }

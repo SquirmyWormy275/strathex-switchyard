@@ -9,6 +9,7 @@ import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../src/cont
 import { CommandDispatcher } from "../src/dispatch.ts";
 import { PolicyEngine } from "../src/policy.ts";
 import type { RepositoryRecipe } from "../src/recipes.ts";
+import { sha256 } from "../src/store.ts";
 
 const now = "2026-08-23T12:00:00.000Z";
 const target: TargetSnapshot = {
@@ -89,6 +90,31 @@ test("a registered low-risk adapter action completes only through its explicit a
   const assignment = commandForAction("focus_vscode").assignment!;
   const result = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier });
   assert.equal(result.status, "completed");
+});
+
+test("Plan Approval reaches an agent adapter only with dispatcher-proven current-user confirmation bound to the exact scope", async () => {
+  const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+  const adapters = new AdapterRegistry();
+  const adapter = new InMemoryCommandAdapter();
+  let observed: unknown;
+  adapter.register("plan_approval", (request) => {
+    observed = request.confirmation;
+    return { status: "completed", summary: "The exact approved plan started.", effectDisposition: "committed" };
+  });
+  adapters.register("plan_approval", adapter);
+  const definition = commandForAction("plan_approval");
+  const authority = grant("plan_approval");
+  const confirmation = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "approve exact plan", reauthenticated: true });
+  const controlPlane = new CommandDispatcher({ policy, sessions: { get: () => session }, authorities: { get: () => authority }, adapters });
+  const assignment = definition.assignment!;
+
+  const missing = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, targetSnapshot: target, authorityId: authority.id });
+  assert.equal(missing.status, "awaiting_confirmation");
+  assert.equal(observed, undefined);
+
+  const completed = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, targetSnapshot: target, authorityId: authority.id, confirmationToken: confirmation.token });
+  assert.equal(completed.status, "completed");
+  assert.deepEqual(observed, { currentUserConfirmed: true, confirmationDigest: sha256(confirmation.token), action: "plan_approval", targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id });
 });
 
 test("pipeline local gate crosses the disposable test-environment broker before its typed execution recipe", async () => {
