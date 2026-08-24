@@ -251,3 +251,19 @@ test("the final effect guard and canonical root check run immediately before spa
   assert.match(result.summary, /containment changed/i);
   assert.equal(checks, 2);
 });
+
+test("each invocation may supply its exact dispatch effect guard without weakening the default", async (context) => {
+  const setup = await fixture(context);
+  await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('guarded')", "utf8");
+  const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
+    venv: processRecipe()
+  }), setup.repositoryRoot);
+  const runtime = new RepositoryRuntime(loaded);
+
+  const denied = await runtime.execute("venv");
+  assert.equal(denied.status, "blocked");
+
+  const allowed = await runtime.execute("venv", { effectGuard: allowEffects });
+  assert.equal(allowed.status, "completed");
+  assert.equal(allowed.output, "guarded");
+});

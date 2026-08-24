@@ -66,7 +66,7 @@ test("bootstrap rejects a hash-chain-only store outside the isolated test overri
   }), /host-backed journal authenticator/i);
 });
 
-test("default installed composition uses canonical filesystem and allowlisted Git status, while high-consequence containment stays fail-closed", async (context) => {
+test("default installed composition refuses unpinned Shield recipes while high-consequence containment stays fail-closed", async (context) => {
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-default-composition-"));
   context.after(async () => { await rm(folder, { recursive: true, force: true }); });
   await git(folder, ["init"]); await git(folder, ["config", "user.email", "isolated@example.test"]); await git(folder, ["config", "user.name", "Isolated Test"]);
@@ -79,7 +79,8 @@ test("default installed composition uses canonical filesystem and allowlisted Gi
   const safeGrant = await companion.executor.authorities.issue({ repositoryRoot: folder, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["shield_change_scan"], prohibitedActions: [], expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user" });
   const status = await companion.endpoint.handle({ version: companionBridgeVersion, id: "scan", method: "command.dispatch", payload: { control: "SHIELD", modifier: "normal", sessionId: session.id, authorityId: safeGrant.id } });
   assert.equal(status.ok, true);
-  assert.equal((status.result as { command: { status: string; summary: string; data?: { broker?: string } } }).command.status, "completed", JSON.stringify(status.result));
+  assert.equal((status.result as { command: { status: string; summary: string; data?: { broker?: string } } }).command.status, "unavailable", JSON.stringify(status.result));
+  assert.match((status.result as { command: { summary: string } }).command.summary, /host-attested.*runtime pin/i);
   assert.ok(companion.localComponents);
   assert.equal(companion.localComponents?.filesystem, "canonical-allowlist");
   const epoch = companion.localComponents!.rawHid.connect("loopback-test");
@@ -131,7 +132,8 @@ test("installed composition synchronizes an authenticated extension session and 
   const authority = await companion.executor.authorities.issue({ repositoryRoot: folder, sessionId: "installed-extension", taskId: "task", planRevision: "plan", allowedActions: ["shield_change_scan"], prohibitedActions: [], expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user" });
   const safe = await bridge.dispatch({ control: "SHIELD", modifier: "normal", sessionId: "installed-extension", authorityId: authority.id });
   assert.equal(safe.ok, true);
-  assert.equal(safe.ok && safe.value.status, "completed", JSON.stringify(safe));
+  assert.equal(safe.ok && safe.value.status, "unavailable", JSON.stringify(safe));
+  assert.match(safe.ok ? safe.value.summary : "", /host-attested.*runtime pin/i);
   const unauthorized = await bridge.dispatch({ control: "SHIELD", modifier: "normal", sessionId: "installed-extension", authorityId: "not-issued" });
   assert.equal(unauthorized.ok, true);
   assert.equal(unauthorized.ok && unauthorized.value.status, "blocked");

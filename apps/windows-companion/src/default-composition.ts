@@ -1,9 +1,8 @@
 /** Concrete, conservative host composition for the installed companion. */
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AdapterRegistry, type AdapterOutcome, type AdapterRequest, type CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type ExecutionBroker, type ExecutionRequest, type ExecutionRecipe, type GitBroker, type GitRequest, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
+import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type GitBroker, type GitRequest, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { CouncilCoordinator, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
 import type { CouncilExecutor, CommandDispatcherDependencies, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
@@ -18,6 +17,9 @@ import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActi
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredHttpsNetworkBroker, type ConfiguredNetworkPolicy } from "./configured-network.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
+import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
+import { repositoryProcessActions, type RepositoryExecutionRootProvider, type RepositoryRuntimeAction } from "./repository-runtime.ts";
+import { RepositoryRuntimeExecutionBroker, repositoryRuntimeExecutionRecipe } from "./repository-runtime-broker.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -33,24 +35,7 @@ function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; exe
   return undefined;
 }
 
-class LocalStructuredExecutionBroker implements ExecutionBroker {
-  private readonly processes: LocalProcessBroker; private readonly scanner: ScannerFeedBroker;
-  constructor(processes: LocalProcessBroker, scanner: ScannerFeedBroker) { this.processes = processes; this.scanner = scanner; }
-  async execute(request: ExecutionRequest): Promise<BrokerOutcome> {
-    const denied = permit(request); if (denied) return denied;
-    if (request.executionControl && await request.executionControl.isCancellationRequested()) return { status: "cancelled", summary: "The local execution broker observed a durable cancellation request." };
-    if (request.recipe.id !== "b122.local.git-diff-check" || request.recipe.executable !== "git" || request.recipe.args.join("\u0000") !== "diff\u0000--check") return { status: "unavailable", summary: "No reviewed local execution recipe is configured; the companion will not infer a command." };
-    let canonicalRoot: string;
-    try { canonicalRoot = await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); }
-    catch { return { status: "blocked", summary: "The execution target is outside the canonical local filesystem allowlist." }; }
-    const feed = this.scanner.ingest("", Date.now()); if (feed.outcome !== "passed") return mapped(feed);
-    return mapped(await this.processes.execute("git", request.recipe.args, canonicalRoot));
-  }
-}
-
 class LocalIsolatedTestEnvironmentBroker implements TestEnvironmentBroker {
-  private readonly stateDirectory: string;
-  constructor(stateDirectory: string) { this.stateDirectory = stateDirectory; }
   async prepare(request: TestEnvironmentRequest): Promise<TestEnvironmentOutcome> {
     const denied = permit(request); if (denied) return denied;
     const filesystem = new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot));
@@ -59,8 +44,8 @@ class LocalIsolatedTestEnvironmentBroker implements TestEnvironmentBroker {
     const normalized = (value: string) => value.replaceAll("\\", "/").replace(/^\/\/\?\//, "").replace(/\/+$/, "").toLowerCase();
     if (normalized(root) !== normalized(recipeRoot)) return { status: "blocked", summary: "The declared test recipe does not bind to the exact canonical target root." };
     if (Object.entries(request.sourceEnvironment).some(([key, value]) => /(secret|token|password|credential|api[_-]?key)/i.test(key) || (value !== undefined && /production|postgres(?:ql)?:\/\//i.test(value)))) return { status: "blocked", summary: "The isolated test broker rejected an ambient secret or production-looking input." };
-    const base = join(this.stateDirectory, "isolated-tests"); await mkdir(base, { recursive: true }); const tempRoot = await mkdtemp(join(base, "run-")); const id = tempRoot.split(/[\\/]/).at(-1) ?? "isolated";
-    return { status: "completed", summary: "Allocated a disposable deny-egress local test environment.", environment: { id, tempRoot, databaseName: `sxsy_test_${id}`, egress: "deny", environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } };
+    const id = `isolation-required:${request.operationId}`;
+    return { status: "completed", summary: "Prepared a sanitized isolation requirement; the pinned runtime must still attest an OS-enforced disposable root before execution.", environment: { id, tempRoot: id, databaseName: `sxsy_test_${request.operationId}`, egress: "deny", environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } };
   }
 }
 
@@ -151,7 +136,7 @@ class LocalPipelineStatusAdapter implements CommandAdapter {
 }
 
 export interface DefaultLocalComposition {
-  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue;
+  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue; readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry;
 }
 export interface DefaultLocalCompositionOptions {
   readonly localGitStateDirectory?: string;
@@ -159,6 +144,7 @@ export interface DefaultLocalCompositionOptions {
   readonly hostActions?: DurableHostActionQueue;
   readonly credentialProtector: UserSecretProtector;
   readonly networkPolicy?: ConfiguredNetworkPolicy;
+  readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   let credentials: DurableCredentialReferenceVault | undefined;
@@ -175,6 +161,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     credentials.createAdapter("configured-network")
   );
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
+  const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
   const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
   const hostActionAdapter = new DurableHostActionAdapter(hostActions);
@@ -185,5 +172,6 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     git.register("local_commit", (request) => localGit.execute(request));
   }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
+  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: new RepositoryRuntimeExecutionBroker(repositoryRuntimes), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

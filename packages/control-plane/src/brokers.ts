@@ -8,7 +8,7 @@ import { redactRecord, untrustedSummary } from "./redaction.ts";
 import type { PermitBinding, PolicyPermit } from "./policy.ts";
 import { validateRecipe, type RepositoryRecipe } from "./recipes.ts";
 
-export type BrokerStatus = "completed" | "failed" | "unavailable" | "blocked" | "incomplete" | "cancelled" | "timed_out";
+export type BrokerStatus = "running" | "completed" | "failed" | "unavailable" | "blocked" | "incomplete" | "cancelled" | "timed_out";
 export interface BrokerOutcome {
   readonly status: BrokerStatus;
   readonly summary: string;

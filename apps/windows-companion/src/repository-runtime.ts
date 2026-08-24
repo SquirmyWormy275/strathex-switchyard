@@ -141,6 +141,8 @@ export interface RepositoryRuntimeResult {
 export interface RepositoryRuntimeExecuteOptions {
   readonly managedProcessId?: string;
   readonly signal?: AbortSignal;
+  /** Exact dispatch-bound final barrier; the constructor guard remains the fail-closed default. */
+  readonly effectGuard?: RuntimeEffectGuard;
 }
 
 export interface ManagedRepositoryProcess {
@@ -495,19 +497,20 @@ export class RepositoryRuntime {
   }
 
   async execute(action: RepositoryRuntimeAction, options: RepositoryRuntimeExecuteOptions = {}): Promise<RepositoryRuntimeResult> {
+    const effectGuard = options.effectGuard ?? this.effectGuard;
     const recipe = this.verified.manifest.recipes[action];
     if (!recipe) return { status: "unavailable", summary: `No verified repository runtime recipe is declared for ${action}.` };
     if (action === "stop_managed_run") {
       if (recipe.kind !== "stop") return { status: "blocked", summary: "The verified stop recipe has an invalid type." };
-      return this.stopManaged(recipe, options.managedProcessId);
+      return this.stopManaged(recipe, options.managedProcessId, effectGuard);
     }
     if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type." };
-    return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal);
+    return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard);
   }
 
-  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal?: AbortSignal): Promise<RepositoryRuntimeResult> {
+  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard): Promise<RepositoryRuntimeResult> {
     if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.` };
-    const admission = await this.effectGuard.check(action, this.verified.canonicalRepositoryRoot);
+    const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
     if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
     let lease: RepositoryExecutionRootLease;
     try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation }); }
@@ -530,7 +533,7 @@ export class RepositoryRuntime {
       const expectedExecutable = this.verified.executableIdentities.get(action);
       if (!expectedExecutable) return { status: "blocked", summary: "Verified executable identity is missing." };
       await assertExecutableUnchanged(expectedExecutable);
-      const finalGuard = await this.effectGuard.check(action, this.verified.canonicalRepositoryRoot);
+      const finalGuard = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
       if (!finalGuard.allowed) return { status: "blocked", summary: untrustedSummary(finalGuard.reason) };
       const finalRoot = await realpath(executionRoot);
       const finalCwd = await realpath(cwd);
@@ -543,7 +546,7 @@ export class RepositoryRuntime {
       const record = started.record;
       if (action === "launch_web_app") {
         const web = recipe.web!;
-        const healthy = await this.waitForHealth(record, web, signal);
+        const healthy = await this.waitForHealth(record, web, signal, effectGuard);
         if (!healthy.healthy) {
           await this.terminateRecord(record, 250, 1_000, signal?.aborted ? "cancelled" : "failed");
           return { status: signal?.aborted ? "cancelled" : "failed", summary: untrustedSummary(healthy.detail), managedProcessId: record.public.id, pid: record.public.pid, output: record.output.text(), outputTruncated: record.output.truncated };
@@ -638,13 +641,13 @@ export class RepositoryRuntime {
       : { status: "failed", summary: untrustedSummary(output || `${action} exited with code ${code}.`), exitCode: code, output, outputTruncated: record.output.truncated };
   }
 
-  private async waitForHealth(record: ManagedRecord, web: RepositoryWebRecipe, signal?: AbortSignal): Promise<{ healthy: boolean; detail: string }> {
+  private async waitForHealth(record: ManagedRecord, web: RepositoryWebRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard): Promise<{ healthy: boolean; detail: string }> {
     const deadline = Date.now() + web.healthTimeoutMs;
     let last = "Health probe did not succeed before its deadline.";
     while (Date.now() < deadline) {
       if (signal?.aborted) return { healthy: false, detail: "Web launch was cancelled before health verification." };
       if (record.child.exitCode !== null) return { healthy: false, detail: "Managed web process exited before health verification." };
-      const guard = await this.effectGuard.check("launch_web_app", this.verified.canonicalRepositoryRoot);
+      const guard = await effectGuard.check("launch_web_app", this.verified.canonicalRepositoryRoot);
       if (!guard.allowed) return { healthy: false, detail: guard.reason };
       const controller = new AbortController();
       const remaining = Math.max(1, deadline - Date.now());
@@ -662,7 +665,9 @@ export class RepositoryRuntime {
     return { healthy: false, detail: last };
   }
 
-  private async stopManaged(recipe: RepositoryStopRecipe, requestedId?: string): Promise<RepositoryRuntimeResult> {
+  private async stopManaged(recipe: RepositoryStopRecipe, requestedId: string | undefined, effectGuard: RuntimeEffectGuard): Promise<RepositoryRuntimeResult> {
+    const admission = await effectGuard.check("stop_managed_run", this.verified.canonicalRepositoryRoot);
+    if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
     const eligible = [...this.managed.values()].filter((record) => record.public.state === "running" && recipe.managedActions.includes(record.public.action));
     let record: ManagedRecord | undefined;
     if (requestedId) {
@@ -673,6 +678,8 @@ export class RepositoryRuntime {
       if (eligible.length > 1) return { status: "blocked", summary: "More than one managed Run process is active; an exact opaque identity is required." };
       record = eligible[0];
     }
+    const finalGuard = await effectGuard.check("stop_managed_run", this.verified.canonicalRepositoryRoot);
+    if (!finalGuard.allowed) return { status: "blocked", summary: untrustedSummary(finalGuard.reason) };
     await this.terminateRecord(record, recipe.gracefulTimeoutMs, recipe.forceTimeoutMs, "completed");
     return {
       status: record.public.state === "completed" ? "completed" : "failed",
