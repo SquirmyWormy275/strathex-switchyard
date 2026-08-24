@@ -9,6 +9,8 @@ import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import { dirname, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
+import { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import { LedgerCouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { DurableHostActionQueue } from "./host-actions.ts";
 import { hostActionCommandActions } from "./host-actions.ts";
@@ -264,6 +266,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     targetResolver,
     attestor: options.runtime.confirmationAttestor
   }) : undefined;
+  const gateEvidence = options.runtime?.gateEvidence ?? new GateEvidenceLedger(store);
+  const councilAutomaticGate = new LedgerCouncilAutomaticAcceptanceGate(gateEvidence);
   let localComponents: DefaultLocalComposition | undefined;
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
@@ -291,6 +295,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           credentialVault,
           networkPolicyRegistry,
           councilIsolation,
+          councilAutomaticGate,
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
           ...(repositorySandbox ? { repositorySandbox } : {}),
           hostActions
@@ -305,6 +310,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...options.runtime,
     store,
     sessions,
+    gateEvidence,
     policyVersion: options.policyVersion,
     targetResolver,
     enabledHighConsequenceActions: options.enabledHighConsequenceActions,

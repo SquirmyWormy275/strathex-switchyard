@@ -1,4 +1,6 @@
 import type { BrokerOutcome } from "../../../packages/control-plane/src/brokers.ts";
+import type { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CouncilExecutor } from "../../../packages/control-plane/src/dispatch.ts";
 import { CouncilCoordinator, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
@@ -19,6 +21,17 @@ export interface CouncilWorkspaceIsolator {
 export interface CouncilAutomaticAcceptanceGate {
   /** Independent acceptance evidence is host-owned; the executor never self-accepts. */
   accepted(request: CouncilRequest): Promise<boolean>;
+}
+
+/** Reads only independently attested, current-target evidence from the protected gate ledger. */
+export class LedgerCouncilAutomaticAcceptanceGate implements CouncilAutomaticAcceptanceGate {
+  constructor(private readonly evidence: GateEvidenceLedger) {}
+  async accepted(request: CouncilRequest): Promise<boolean> {
+    for (const gate of commandForAction("council_automatic").acceptanceGates) {
+      if ((await this.evidence.statusFor(gate, request.target.id)).status !== "passed") return false;
+    }
+    return true;
+  }
 }
 
 export interface DurableConfiguredCouncilOptions {
@@ -56,8 +69,8 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     if (participants.length < 2) return { status: "blocked", summary: "Automatic Council requires at least two fresh mediated participants on the exact target.", effectDisposition: "not_started" };
     if (!participants.every((participant) => participant.capabilities.includes("mediated") && participant.capabilities.includes("controllable") && participant.status === "running")) return { status: "blocked", summary: "Automatic Council requires every participant to be fresh, running, Controllable, and Mediated.", effectDisposition: "not_started" };
     if (!request.target.head) return { status: "blocked", summary: "Automatic Council requires an exact Git HEAD in the verified TargetSnapshot.", effectDisposition: "not_started" };
-    const defaultBranch = await this.exactDefaultBranch(participants);
-    if (!defaultBranch) return { status: "blocked", summary: "Automatic Council requires every participant to report the same host-observed default branch identity.", effectDisposition: "not_started" };
+    const defaultBranch = await this.exactDefaultBranch(request.target.defaultBranch, participants);
+    if (!defaultBranch) return { status: "blocked", summary: "Automatic Council requires one exact host-observed default branch identity consistent with every participant claim.", effectDisposition: "not_started" };
     let epoch;
     try { epoch = await this.council.beginAutomatic({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants }); }
     catch (error) { return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council automatic preconditions failed."), effectDisposition: "not_started" }; }
@@ -137,15 +150,15 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     } finally { control.dispose(); }
   }
 
-  private async exactDefaultBranch(participants: readonly CouncilParticipant[]): Promise<string | undefined> {
-    const branches = new Set<string>();
+  private async exactDefaultBranch(observed: string | undefined, participants: readonly CouncilParticipant[]): Promise<string | undefined> {
+    const branch = observed?.trim().replace(/^refs\/heads\//, "");
+    if (!branch || branch.length > 240 || branch.startsWith("-") || branch.endsWith("/") || branch.includes("..") || branch.includes("@{") || /[\s~^:?*\\\[]/.test(branch)) return undefined;
     for (const participant of participants) {
       const session = await this.sessions.get(participant.id);
-      const branch = session?.metadata["sxsy-b122.defaultBranch"]?.trim().replace(/^refs\/heads\//, "");
-      if (!branch || branch.length > 240 || branch.startsWith("-") || branch.endsWith("/") || branch.includes("..") || branch.includes("@{") || /[\s~^:?*\\\[]/.test(branch)) return undefined;
-      branches.add(branch);
+      const claimed = session?.metadata["sxsy-b122.defaultBranch"]?.trim().replace(/^refs\/heads\//, "");
+      if (claimed !== undefined && claimed !== branch) return undefined;
     }
-    return branches.size === 1 ? [...branches][0] : undefined;
+    return branch;
   }
 
   private async prepareIsolation(request: CouncilRequest, epochId: string, participants: readonly CouncilParticipant[], defaultBranch: string): Promise<CouncilIsolationPlan> {

@@ -5,15 +5,16 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
+import { AllowlistedEvidenceAuthorizer, GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
-import { DurableConfiguredCouncilExecutor, type CouncilAutomaticAcceptanceGate, type CouncilWorkspaceIsolator } from "../src/council-runtime.ts";
+import { DurableConfiguredCouncilExecutor, LedgerCouncilAutomaticAcceptanceGate, type CouncilAutomaticAcceptanceGate, type CouncilWorkspaceIsolator } from "../src/council-runtime.ts";
 import type { CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "../src/council-workspace-isolation.ts";
 import type { DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
 const at = "2026-08-24T12:00:00.000Z";
-const target: TargetSnapshot = { id: "a".repeat(64), repositoryRoot: "C:\\repo", branch: "feat/test", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "f".repeat(64), capturedAt: at, completeness: "complete", reasons: [] };
+const target: TargetSnapshot = { id: "a".repeat(64), repositoryRoot: "C:\\repo", branch: "feat/test", defaultBranch: "main", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "f".repeat(64), capturedAt: at, completeness: "complete", reasons: [] };
 const session = (id: string, provider: ManagedSession["provider"], plannedFiles: readonly string[]): ManagedSession => ({ id, provider, surface: "bridge", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: `task-${id}`, planRevision: "plan-1", plannedFiles, lastHeartbeat: at, adapterVersion: "provider-v1", metadata: { "sxsy-b122.providerHandshake": "exact-route-v1", "sxsy-b122.defaultBranch": "main", "sxsy-b122.resources": JSON.stringify([`port:${id === "one" ? "45101" : "45102"}`]), "sxsy-b122.dependencies": "[]", "sxsy-b122.diffDigest": (id === "one" ? "1" : "2").repeat(64) } });
 
 const acceptedGate: CouncilAutomaticAcceptanceGate = { async accepted() { return true; } };
@@ -108,6 +109,22 @@ test("automatic Council stays gate-disabled and does not allocate isolation with
     assert.equal(result.status, "unavailable");
     assert.match(result.summary, /acceptance|gate-disabled/i);
     assert.equal(isolation.prepared.length, 0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council gate requires every exact-target acceptance record and rejects stale target evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-evidence-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const ledger = new GateEvidenceLedger(store, new AllowlistedEvidenceAuthorizer(["independent-qa"]), { clock: () => at });
+    const gate = new LedgerCouncilAutomaticAcceptanceGate(ledger);
+    const request = { action: "council_automatic" as const, operationId: "operation-evidence", target, permit: {} as never };
+    assert.equal(await gate.accepted(request), false);
+    for (const gateNumber of [4, 10, 15, 21, 24, 27] as const) {
+      await ledger.record({ gate: gateNumber, status: "passed", targetSnapshotId: target.id, evidenceDigest: `sha256:gate-${gateNumber}`, policyVersion: "v1", evaluatedBy: "independent-qa", rationale: "Independent exact-target mechanism evidence." });
+    }
+    assert.equal(await gate.accepted(request), true);
+    assert.equal(await gate.accepted({ ...request, target: { ...target, id: "changed-target" } }), false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
