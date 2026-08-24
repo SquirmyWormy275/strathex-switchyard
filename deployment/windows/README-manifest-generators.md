@@ -1,6 +1,6 @@
 # B122 nonpersistent manifest generators
 
-These PowerShell 7 generators create reviewable files only. They do not install,
+These inbox Windows PowerShell 5.1-compatible generators create reviewable files only. They do not install,
 pin, attest, start, schedule, or persist the companion, helper, or any recipe.
 Installation remains a separate current-user-presence operation in the companion.
 
@@ -12,12 +12,12 @@ Installation remains a separate current-user-presence operation in the companion
    use the companion's user-attested provisioning path to pin the exact digest.
 
 ```powershell
-pwsh -NoProfile -File .\deployment\windows\New-B122RepositoryRuntimeManifest.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deployment\windows\New-B122RepositoryRuntimeManifest.ps1 `
   -RepositoryRoot C:\src\project `
   -PlanPath C:\src\project\b122-runtime-plan.json `
   -OutputPath C:\src\project\.b122\repository-runtime.json
 
-pwsh -NoProfile -File .\deployment\windows\New-B122WindowsSandboxCatalog.ps1 `
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deployment\windows\New-B122WindowsSandboxCatalog.ps1 `
   -RepositoryRoot C:\src\project `
   -PlanPath C:\src\project\b122-sandbox-plan.json `
   -OutputPath C:\src\project\.b122\windows-sandbox-catalog.json
