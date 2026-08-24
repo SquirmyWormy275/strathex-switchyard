@@ -155,7 +155,7 @@ test("a pre-effect unavailable composite settles its boundary and remains intent
     let calls = 0;
     automation.register("compound_capture", () => {
       calls += 1;
-      return { status: "unavailable", summary: "The exact provider route is not configured; no request was sent." };
+      return { status: "unavailable", summary: "The exact provider route is not configured; no request was sent.", effectDisposition: "not_started" };
     });
     const dispatcher = new CommandDispatcher({
       policy,
@@ -173,6 +173,98 @@ test("a pre-effect unavailable composite settles its boundary and remains intent
     const all = await operations.list();
     assert.equal(all.filter((operation) => !operation.parentId).length, 2);
     assert.equal(all.filter((operation) => operation.parentId).every((operation) => operation.state === "failed"), true);
+  });
+});
+
+test("an unavailable response without explicit no-effect proof remains ambiguous and cannot replay", async () => {
+  await withStore(async (store) => {
+    const now = "2026-08-23T12:00:00.000Z";
+    const target: TargetSnapshot = {
+      id: "snapshot-response-lost", repositoryRoot: "C:/work/example", branch: "feature/safe", head: "abc", indexTree: "tree",
+      trackedManifest: "tracked", untrackedManifest: "untracked", submodules: {}, policyVersion: "policy-1",
+      environmentFingerprint: "env-1", capturedAt: now, completeness: "complete", reasons: []
+    };
+    const session: ManagedSession = {
+      id: "session-response-lost", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
+      plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+    };
+    const authority: AuthorityGrant = {
+      id: "authority-response-lost", repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["compound_capture"], prohibitedActions: [], issuedAt: now, expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "user"
+    };
+    const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const automation = new InMemoryAutomationBroker(policy);
+    let calls = 0;
+    automation.register("compound_capture", () => {
+      calls += 1;
+      // A request may have been accepted before the response was lost. The
+      // status alone is deliberately insufficient to prove a safe retry.
+      return { status: "unavailable", summary: "Provider response was lost after submission." };
+    });
+    const dispatcher = new CommandDispatcher({
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => id === authority.id ? authority : undefined },
+      operations: coordinator,
+      automation
+    });
+    const assignment = commandForAction("compound_capture").assignment!;
+    const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+
+    assert.equal((await dispatcher.dispatch(request)).status, "failed", "durable recording refuses to terminalize an unresolved child");
+    assert.equal((await dispatcher.dispatch(request)).status, "running", "a repeated press focuses the unresolved operation");
+    assert.equal(calls, 1, "an ambiguous provider outcome is never replayed");
+    const boundary = (await operations.list()).find((operation) => operation.parentId && operation.action.endsWith(".composite"));
+    assert.equal(boundary?.state, "executing");
+    assert.equal(boundary?.details.externalEffect, "ambiguous");
+  });
+});
+
+test("a completed label without explicit commit proof remains ambiguous and cannot replay", async () => {
+  await withStore(async (store) => {
+    const now = "2026-08-23T12:00:00.000Z";
+    const target: TargetSnapshot = {
+      id: "snapshot-unproven-complete", repositoryRoot: "C:/work/example", branch: "feature/safe", head: "abc", indexTree: "tree",
+      trackedManifest: "tracked", untrackedManifest: "untracked", submodules: {}, policyVersion: "policy-1",
+      environmentFingerprint: "env-1", capturedAt: now, completeness: "complete", reasons: []
+    };
+    const session: ManagedSession = {
+      id: "session-unproven-complete", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
+      plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+    };
+    const authority: AuthorityGrant = {
+      id: "authority-unproven-complete", repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["compound_capture"], prohibitedActions: [], issuedAt: now, expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "user"
+    };
+    const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
+    const operations = new OperationSagaStore(store);
+    const coordinator = new DurableOperationCoordinator(operations, new ReceiptLedger(store));
+    const automation = new InMemoryAutomationBroker(policy);
+    let calls = 0;
+    automation.register("compound_capture", () => {
+      calls += 1;
+      return { status: "completed", summary: "A peer supplied a success label without an effect receipt." };
+    });
+    const dispatcher = new CommandDispatcher({
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => id === authority.id ? authority : undefined },
+      operations: coordinator,
+      automation
+    });
+    const assignment = commandForAction("compound_capture").assignment!;
+    const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+
+    assert.equal((await dispatcher.dispatch(request)).status, "failed");
+    assert.equal((await dispatcher.dispatch(request)).status, "running");
+    assert.equal(calls, 1);
+    const boundary = (await operations.list()).find((operation) => operation.parentId && operation.action.endsWith(".composite"));
+    assert.equal(boundary?.state, "executing");
+    assert.equal(boundary?.details.externalEffect, "ambiguous");
   });
 });
 
@@ -215,19 +307,19 @@ test("durable dispatch gives Git, automation, and Council handlers a scoped chil
     git.register("local_commit", async (request) => {
       assert.ok(request.childSaga);
       await settleChild(request.childSaga, "git.local_commit.write", "git:commit-1");
-      return { status: "completed", summary: "Simulated mediated local commit." };
+      return { status: "completed", summary: "Simulated mediated local commit.", effectDisposition: "committed" };
     });
     automation.register("compound_capture", async (request) => {
       assert.ok(request.childSaga);
       await settleChild(request.childSaga, "automation.compound_capture.write", "automation:packet-1");
-      return { status: "completed", summary: "Simulated mediated Compound capture." };
+      return { status: "completed", summary: "Simulated mediated Compound capture.", effectDisposition: "committed" };
     });
     const council = {
       execute: async (request: Readonly<{ action: "council_report" | "council_automatic" | "council_recommend"; childSaga?: ChildOperationSaga }>) => {
         assert.equal(request.action, "council_report");
         assert.ok(request.childSaga);
         await settleChild(request.childSaga, "council.report.assemble", "council:report-1");
-        return { status: "completed" as const, summary: "Simulated mediated Council report." };
+        return { status: "completed" as const, summary: "Simulated mediated Council report.", effectDisposition: "committed" as const };
       }
     };
     const dispatcher = new CommandDispatcher({

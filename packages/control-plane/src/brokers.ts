@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction } from "./command-catalog.ts";
 import type { ContainmentChannel } from "./containment.ts";
 import type { ExecutionControl } from "./execution-control.ts";
@@ -12,6 +12,8 @@ export type BrokerStatus = "running" | "completed" | "failed" | "unavailable" | 
 export interface BrokerOutcome {
   readonly status: BrokerStatus;
   readonly summary: string;
+  /** Omitted non-success dispositions are conservatively treated as ambiguous. */
+  readonly effectDisposition?: EffectDisposition;
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
@@ -56,10 +58,10 @@ type MaybePromise<T> = T | Promise<T>;
 
 async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): Promise<BrokerOutcome | undefined> {
   if (invocation.executionControl && Date.parse(invocation.executionControl.deadline) <= Date.now()) {
-    return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline has already elapsed." };
+    return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline has already elapsed.", effectDisposition: "not_started" };
   }
   if (invocation.executionControl && await invocation.executionControl.isCancellationRequested()) {
-    return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested." };
+    return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested.", effectDisposition: "not_started" };
   }
   if (!policy.verifyPermit(invocation.permit, {
     action: invocation.action,
@@ -68,7 +70,7 @@ async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): 
     ...(invocation.session ? { sessionId: invocation.session.id } : {}),
     ...(invocation.authority ? { authorityId: invocation.authority.id } : {})
   })) {
-    return { status: "blocked", summary: "Broker denied an absent, expired, forged, or mismatched policy permit." };
+    return { status: "blocked", summary: "Broker denied an absent, expired, forged, or mismatched policy permit.", effectDisposition: "not_started" };
   }
   if (invocation.effectGuard) {
     const result = await invocation.effectGuard.assertCurrent({
@@ -78,14 +80,14 @@ async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): 
       ...(invocation.session ? { session: invocation.session } : {}),
       ...(invocation.authority ? { authority: invocation.authority } : {})
     });
-    if (!result.allowed) return { status: "incomplete", summary: result.reason };
+    if (!result.allowed) return { status: "incomplete", summary: result.reason, effectDisposition: "not_started" };
   }
   return undefined;
 }
 
 async function fenced(containment: ContainmentGuard | undefined, invocation: BrokerInvocation, channel: ContainmentChannel): Promise<BrokerOutcome | undefined> {
   const result = containment ? await containment.check(invocation.target.repositoryRoot, channel) : undefined;
-  return result && !result.allowed ? { status: "blocked", summary: result.reason } : undefined;
+  return result && !result.allowed ? { status: "blocked", summary: result.reason, effectDisposition: "not_started" } : undefined;
 }
 
 function redacted(outcome: BrokerOutcome): BrokerOutcome {
@@ -140,7 +142,7 @@ export class InMemoryExecutionBroker {
     const validation = validateExecutionRecipe(request);
     if (validation) return validation;
     const handler = this.handlers.get(request.recipe.id);
-    if (!handler) return { status: "unavailable", summary: `No trusted execution handler is registered for recipe ${request.recipe.id}.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted execution handler is registered for recipe ${request.recipe.id}.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }
@@ -148,17 +150,17 @@ export class InMemoryExecutionBroker {
 function validateExecutionRecipe(request: ExecutionRequest): BrokerOutcome | undefined {
   const unknownRequest = request as unknown as Readonly<Record<string, unknown>>;
   if ("shell" in unknownRequest || "command" in unknownRequest) {
-    return { status: "blocked", summary: "Execution broker accepts structured executable/args only; shell command strings are forbidden." };
+    return { status: "blocked", summary: "Execution broker accepts structured executable/args only; shell command strings are forbidden.", effectDisposition: "not_started" };
   }
   const recipe = request.recipe;
   if (!recipe.id || !recipe.executable || /[\r\n\0;]/.test(recipe.executable)) {
-    return { status: "blocked", summary: "Execution recipe has an invalid executable." };
+    return { status: "blocked", summary: "Execution recipe has an invalid executable.", effectDisposition: "not_started" };
   }
   if (recipe.args.some((arg) => /[\r\n\0]/.test(arg))) {
-    return { status: "blocked", summary: "Execution recipe contains an unsafe argument." };
+    return { status: "blocked", summary: "Execution recipe contains an unsafe argument.", effectDisposition: "not_started" };
   }
   if (normalisePath(recipe.workingDirectory) !== normalisePath(request.target.repositoryRoot)) {
-    return { status: "blocked", summary: "Execution recipe working directory does not match the verified target root." };
+    return { status: "blocked", summary: "Execution recipe working directory does not match the verified target root.", effectDisposition: "not_started" };
   }
   return undefined;
 }
@@ -207,20 +209,20 @@ export class InMemoryGitBroker {
     if (denial) return denial;
     const unknownMutation = request.mutation as unknown as Readonly<Record<string, unknown>>;
     if ("force" in unknownMutation || "forceWithLease" in unknownMutation) {
-      return { status: "blocked", summary: "Force-push semantics are never accepted by the B122 Git broker." };
+      return { status: "blocked", summary: "Force-push semantics are never accepted by the B122 Git broker.", effectDisposition: "not_started" };
     }
     if (actionForGitMutation[request.mutation.kind] !== request.action) {
-      return { status: "blocked", summary: "Git mutation kind does not match the policy-authorized command action." };
+      return { status: "blocked", summary: "Git mutation kind does not match the policy-authorized command action.", effectDisposition: "not_started" };
     }
-    if (!validGitMutation(request.mutation)) return { status: "blocked", summary: "Git request omits an exact branch, head, receipt, or owned path requirement." };
+    if (!validGitMutation(request.mutation)) return { status: "blocked", summary: "Git request omits an exact branch, head, receipt, or owned path requirement.", effectDisposition: "not_started" };
     const ownership = validateLocalCommitOwnership(request);
-    if (ownership) return { status: "blocked", summary: ownership };
+    if (ownership) return { status: "blocked", summary: ownership, effectDisposition: "not_started" };
     // Containment includes a local commit: it must not be used as an escape
     // route when an incident fence was activated after policy admission.
     const fence = await fenced(this.containment, request, "git");
     if (fence) return fence;
     const handler = this.handlers.get(request.mutation.kind);
-    if (!handler) return { status: "unavailable", summary: `No trusted Git adapter is registered for ${request.mutation.kind}.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted Git adapter is registered for ${request.mutation.kind}.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }
@@ -315,7 +317,7 @@ export class InMemoryCredentialBroker {
       && candidate.actions.includes(request.action)
       && candidate.scopes.includes(request.scope)
       && new Date(candidate.expiresAt).getTime() > Date.now());
-    if (!credential) return { status: "unavailable", summary: "No current credential is scoped to this repository, action, and requested capability." };
+    if (!credential) return { status: "unavailable", summary: "No current credential is scoped to this repository, action, and requested capability.", effectDisposition: "not_started" };
     const lease: CredentialLease = {
       id: randomUUID(),
       credentialId: credential.id,
@@ -357,14 +359,14 @@ export class InMemoryNetworkBroker {
     const fence = await fenced(this.containment, request, "network");
     if (fence) return fence;
     const parsed = safeUrl(request.url);
-    if (!parsed) return { status: "blocked", summary: "Network broker rejected an invalid URL." };
+    if (!parsed) return { status: "blocked", summary: "Network broker rejected an invalid URL.", effectDisposition: "not_started" };
     const host = parsed.hostname.toLowerCase();
     const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
     if ((parsed.protocol !== "https:" && !(loopback && parsed.protocol === "http:")) || !request.allowedHosts.map((item) => item.toLowerCase()).includes(host)) {
-      return { status: "blocked", summary: "Network broker rejected a non-allowlisted or unsafe URL." };
+      return { status: "blocked", summary: "Network broker rejected a non-allowlisted or unsafe URL.", effectDisposition: "not_started" };
     }
     const response = this.responses.get(`${request.method}:${request.url}`);
-    if (!response) return { status: "unavailable", summary: "No trusted local response is registered for this network request." };
+    if (!response) return { status: "unavailable", summary: "No trusted local response is registered for this network request.", effectDisposition: "not_started" };
     return { status: "completed", summary: "Completed an allowlisted in-memory network exchange.", response: { ...response, body: untrustedSummary(response.body) }, data: { statusCode: response.statusCode } };
   }
 }
@@ -404,12 +406,12 @@ export class InMemoryTestEnvironmentBroker {
     const fence = await fenced(this.containment, request, "test_environment");
     if (fence) return fence;
     const validation = validateRecipe(request.recipe);
-    if (!validation.valid) return { status: "unavailable", summary: `Test recipe is incomplete: ${validation.errors.join(" ")}` };
+    if (!validation.valid) return { status: "unavailable", summary: `Test recipe is incomplete: ${validation.errors.join(" ")}`, effectDisposition: "not_started" };
     if (normalisePath(request.recipe.repositoryRoot) !== normalisePath(request.target.repositoryRoot)) {
-      return { status: "blocked", summary: "Test recipe repository does not match the verified target." };
+      return { status: "blocked", summary: "Test recipe repository does not match the verified target.", effectDisposition: "not_started" };
     }
     const production = findProductionInput(request.sourceEnvironment, request.recipe.productionHostPatterns);
-    if (production) return { status: "blocked", summary: "Test environment rejected a production host, DSN, or production-mode input." };
+    if (production) return { status: "blocked", summary: "Test environment rejected a production host, DSN, or production-mode input.", effectDisposition: "not_started" };
     const id = `test-${this.nextId++}`;
     const environment: Record<string, string> = { NODE_ENV: "test", SXSY_TEST_DATABASE: `sxsy_test_${id}` };
     for (const key of request.recipe.environmentAllowlist) {
@@ -457,7 +459,7 @@ export class UnavailableIsolationRuntime implements IsolationRuntime {
     if (denial) return denial;
     const fence = await fenced(this.containment, request, "isolation");
     if (fence) return fence;
-    return { status: "unavailable", summary: `${request.profile} has no proven isolation backend; refusing to claim enforcement.` };
+    return { status: "unavailable", summary: `${request.profile} has no proven isolation backend; refusing to claim enforcement.`, effectDisposition: "not_started" };
   }
 }
 
@@ -504,7 +506,7 @@ export class InMemoryAutomationBroker {
     const fence = await fenced(this.containment, request, "automation");
     if (fence) return fence;
     const handler = this.handlers.get(request.action);
-    if (!handler) return { status: "unavailable", summary: `No trusted automation adapter is registered for ${request.action}; no prompt or workflow was submitted.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted automation adapter is registered for ${request.action}; no prompt or workflow was submitted.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }

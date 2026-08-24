@@ -121,13 +121,13 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
   constructor(network: DynamicConfiguredNetworkClient) { this.network = network; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    if (!request.operationId || !request.target) return { status: "unavailable", summary: "Configured provider routing requires a durable operation and exact target." };
+    if (!request.operationId || !request.target) return { status: "unavailable", summary: "Configured provider routing requires a durable operation and exact target.", effectDisposition: "not_started" };
     const control = await operationAbort(request.executionControl);
     try {
-      if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch." };
+      if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch.", effectDisposition: "not_started" };
       if (request.effectGuard) {
         const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-        if (!current.allowed) return { status: "blocked", summary: current.reason };
+        if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
       }
       const body = JSON.stringify(providerDocument(request));
       const result = await this.network.request({ routeId: `provider.${request.definition.action}`, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal });
@@ -143,9 +143,9 @@ export function createConfiguredAutomationBroker(policy: PermitVerifier, contain
 }
 
 async function remoteAutomation(request: AutomationRequest, network: DynamicConfiguredNetworkClient): Promise<BrokerOutcome> {
-  if (!request.effectGuard) return { status: "blocked", summary: "Configured automation requires a final dispatch-bound effect guard." };
+  if (!request.effectGuard) return { status: "blocked", summary: "Configured automation requires a final dispatch-bound effect guard.", effectDisposition: "not_started" };
   const current = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-  if (!current.allowed) return { status: "blocked", summary: current.reason };
+  if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
   const control = await operationAbort(request.executionControl);
   try {
     const document = {
@@ -160,7 +160,7 @@ async function remoteAutomation(request: AutomationRequest, network: DynamicConf
     };
     const result = await network.request({ routeId: `automation.${request.action}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal });
     const outcome = adapterOutcome(result);
-    return { status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, ...(outcome.data ? { data: outcome.data } : {}) };
+    return { status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, ...(outcome.data ? { data: outcome.data } : {}) };
   } finally { control.dispose(); }
 }
 
@@ -181,13 +181,14 @@ function sessionDocument(session: NonNullable<AdapterRequest["session"]>) { retu
 function boundedInput(input: Readonly<Record<string, string>>): Readonly<Record<string, string>> { const result: Record<string, string> = {}; for (const [key, value] of Object.entries(input)) if (/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(key) && value.length <= 512) result[key] = value; return result; }
 
 function adapterOutcome(result: ConfiguredNetworkResult): AdapterOutcome {
-  if (result.outcome !== "passed" || !result.body) return { status: result.outcome === "blocked" ? "blocked" : result.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(result.detail) };
+  if (result.outcome !== "passed" || !result.body) return { status: result.outcome === "blocked" ? "blocked" : result.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(result.detail), effectDisposition: result.effectDisposition };
   let value: unknown;
-  try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { return { status: "failed", summary: "The configured remote adapter returned malformed JSON; no success was recorded." }; }
-  if (!record(value) || !exact(value, ["schema", "version", "status", "summary", ...(value.externalId === undefined ? [] : ["externalId"]), ...(value.data === undefined ? [] : ["data"])]) || value.schema !== "sxsy-b122.remote-result" || value.version !== 1 || !remoteStatus(value.status) || typeof value.summary !== "string" || !value.summary.trim() || value.summary.length > 512 || (value.externalId !== undefined && (typeof value.externalId !== "string" || value.externalId.length > 256)) || (value.data !== undefined && !record(value.data))) return { status: "failed", summary: "The configured remote adapter returned an invalid exact-v1 result; no success was recorded." };
-  return { status: value.status, summary: untrustedSummary(value.summary), data: redactRecord({ ...(value.externalId ? { externalId: value.externalId } : {}), ...(value.data ? value.data : {}) }) };
+  try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { return { status: "failed", summary: "The configured remote adapter returned malformed JSON; no success was recorded.", effectDisposition: "ambiguous" }; }
+  if (!record(value) || !exact(value, ["schema", "version", "status", "summary", "effectDisposition", ...(value.externalId === undefined ? [] : ["externalId"]), ...(value.data === undefined ? [] : ["data"])]) || value.schema !== "sxsy-b122.remote-result" || value.version !== 1 || !remoteStatus(value.status) || !effectDisposition(value.effectDisposition) || typeof value.summary !== "string" || !value.summary.trim() || value.summary.length > 512 || (value.externalId !== undefined && (typeof value.externalId !== "string" || value.externalId.length > 256)) || (value.data !== undefined && !record(value.data))) return { status: "failed", summary: "The configured remote adapter returned an invalid exact-v1 result; no success was recorded.", effectDisposition: "ambiguous" };
+  return { status: value.status, summary: untrustedSummary(value.summary), effectDisposition: value.effectDisposition, data: redactRecord({ ...(value.externalId ? { externalId: value.externalId } : {}), ...(value.data ? value.data : {}) }) };
 }
 function remoteStatus(value: unknown): value is AdapterOutcome["status"] { return typeof value === "string" && ["completed", "unavailable", "blocked", "failed", "awaiting_input", "awaiting_confirmation", "running", "cancelled", "timed_out"].includes(value); }
+function effectDisposition(value: unknown): value is NonNullable<AdapterOutcome["effectDisposition"]> { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
 

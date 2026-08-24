@@ -351,13 +351,19 @@ export class CommandDispatcher {
     const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}) } : undefined;
     switch (definition.executor) {
       case "adapter":
-      case "agent":
         return adapterResult(
           this.dependencies.adapters
             ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
-            : { status: "unavailable", summary: "No verified adapter is registered for this command." },
+            : { status: "unavailable", summary: "No verified adapter is registered for this command.", effectDisposition: "not_started" },
           operationId
         );
+      case "agent":
+        return this.executeComposite(definition, lease, async () => adapterResult(
+          this.dependencies.adapters
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
+            : { status: "unavailable", summary: "No verified agent adapter is registered for this command.", effectDisposition: "not_started" },
+          operationId
+        ));
       case "git": {
         if (!base) return unavailable("Git mediation requires a verified target.", operationId);
         if (!this.dependencies.git) return unavailable("No Git broker is configured.", operationId);
@@ -442,18 +448,24 @@ export class CommandDispatcher {
       }
       const result = await invoke(childSaga);
       if (childSaga && boundary) {
-        if (result.status === "completed") {
-          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status });
+        // A status is not evidence of effect. A remote peer can commit and then
+        // return blocked/unavailable when its response is lost. Only an
+        // explicit disposition from the trusted boundary can make a retry safe.
+        const disposition = result.effectDisposition ?? "ambiguous";
+        if (result.status === "completed" && disposition === "committed") {
+          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: disposition });
           await childSaga.settle(boundary, "completed");
-        } else if (["unavailable", "blocked", "awaiting_input", "awaiting_confirmation"].includes(result.status)) {
-          // These dispositions are defined as pre-effect refusals. Closing the
-          // boundary as a known failure lets the parent record the truthful
-          // result and permits a later intentional press after provisioning or
-          // reviewed input changes. Ambiguous provider/network failures must
-          // use failed/incomplete/running and remain reconcilable below.
-          await childSaga.settle(boundary, "failed", { brokerStatus: result.status, externalEffect: "not_started" });
+        } else if (disposition === "not_started") {
+          await childSaga.settle(boundary, "failed", { brokerStatus: result.status, externalEffect: disposition });
+        } else if (disposition === "compensated") {
+          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: "committed_before_compensation" });
+          await childSaga.markCompensating(boundary);
+          await childSaga.settle(boundary, "cancelled", { brokerStatus: result.status, externalEffect: disposition });
         } else {
-          await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status });
+          if (disposition === "committed") {
+            await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: disposition });
+          }
+          await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status, externalEffect: disposition });
         }
       }
       return result;
@@ -512,13 +524,13 @@ function policyResult(decision: PolicyDecision): CommandResult {
 }
 
 function brokerResult(outcome: BrokerOutcome, operationId: string): CommandResult {
-  return { status: outcome.status, summary: outcome.summary, operationId, data: outcome.data };
+  return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, operationId, data: outcome.data };
 }
 
 function adapterResult(outcome: AdapterOutcome, operationId: string): CommandResult {
-  return { status: outcome.status, summary: outcome.summary, operationId, data: outcome.data };
+  return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, operationId, data: outcome.data };
 }
 
 function unavailable(summary: string, operationId?: string): CommandResult {
-  return { status: "unavailable", summary, operationId };
+  return { status: "unavailable", summary, effectDisposition: "not_started", operationId };
 }

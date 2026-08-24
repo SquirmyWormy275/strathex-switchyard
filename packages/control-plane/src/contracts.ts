@@ -5,6 +5,12 @@ export type SessionStatus = "running" | "verified_blocked" | "verified_finished"
 export type CommandStatus = "queued" | "running" | "awaiting_input" | "awaiting_confirmation" | "cancelling" | "completed" | "failed" | "timed_out" | "unavailable" | "incomplete" | "blocked" | "cancelled";
 export type OperationState = "prepared" | "executing" | "external_committed" | "recorded" | "failed" | "cancelling" | "compensating" | "cancelled";
 export type ReceiptResult = "passed" | "failed" | "unavailable" | "incomplete" | "not_run";
+/**
+ * What is durably known about the external effect behind an outcome. Status
+ * describes the user-visible command state; it must never be used to infer
+ * whether a provider, network peer, or subprocess accepted an effect.
+ */
+export type EffectDisposition = "not_started" | "committed" | "ambiguous" | "compensated";
 
 export interface TargetSnapshot {
   readonly id: string;
@@ -109,6 +115,7 @@ export interface CommandRequest {
 export interface CommandResult {
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly effectDisposition?: EffectDisposition;
   readonly operationId?: string;
   readonly receiptId?: string;
   readonly data?: Readonly<Record<string, unknown>>;

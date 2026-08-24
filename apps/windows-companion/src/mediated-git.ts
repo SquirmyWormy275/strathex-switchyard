@@ -142,20 +142,20 @@ export class LocalMediatedGitHandler {
 
   async execute(request: GitRequest): Promise<BrokerOutcome> {
     if (request.mutation.kind !== "local_commit") {
-      return { status: "unavailable", summary: `${request.mutation.kind} has no enabled local B122 Git adapter.` };
+      return { status: "unavailable", summary: `${request.mutation.kind} has no enabled local B122 Git adapter.`, effectDisposition: "not_started" };
     }
     if (!request.effectGuard) {
-      return { status: "unavailable", summary: "Local Git mediation requires a host-owned final TargetSnapshot guard." };
+      return { status: "unavailable", summary: "Local Git mediation requires a host-owned final TargetSnapshot guard.", effectDisposition: "not_started" };
     }
     if (!request.target.head || !request.target.indexTree || !request.target.branch) {
-      return { status: "incomplete", summary: "Local Git mediation requires a complete TargetSnapshot with branch, HEAD, and index tree." };
+      return { status: "incomplete", summary: "Local Git mediation requires a complete TargetSnapshot with branch, HEAD, and index tree.", effectDisposition: "not_started" };
     }
     const defaultBranch = isDefaultBranch(request.target.branch);
     if (defaultBranch && (!request.mutation.featureBranch || !validFeatureBranch(request.mutation.featureBranch))) {
-      return { status: "blocked", summary: "A default-branch local commit requires one exact reviewed non-default feature branch." };
+      return { status: "blocked", summary: "A default-branch local commit requires one exact reviewed non-default feature branch.", effectDisposition: "not_started" };
     }
     if (!defaultBranch && request.mutation.featureBranch !== undefined) {
-      return { status: "blocked", summary: "A feature-branch local commit must not carry a branch-creation request." };
+      return { status: "blocked", summary: "A feature-branch local commit must not carry a branch-creation request.", effectDisposition: "not_started" };
     }
 
     const initial = await currentEffect(request);
@@ -165,7 +165,7 @@ export class LocalMediatedGitHandler {
     try {
       root = await this.verifyRepositoryRoot(request.target.repositoryRoot);
     } catch (error) {
-      return { status: "blocked", summary: redactText(errorMessage(error, "The verified repository root is unavailable.")) };
+      return { status: "blocked", summary: redactText(errorMessage(error, "The verified repository root is unavailable.")), effectDisposition: "not_started" };
     }
     const paths = await this.verifyOwnedFiles(root, request.mutation.paths);
     if ("outcome" in paths) return paths.outcome;
@@ -207,6 +207,7 @@ export class LocalMediatedGitHandler {
           return {
             status: "incomplete",
             summary: "Created and switched to the exact reviewed feature branch without committing. Capture the new target and review the local commit again.",
+            effectDisposition: "committed",
             data: { featureBranch, beforeHead: request.target.head, commitCreated: false, freshReviewRequired: true }
           };
         }
@@ -214,15 +215,15 @@ export class LocalMediatedGitHandler {
         if (observedBranch !== request.target.branch || observedHead !== request.target.head || branchRef?.exitCode === 0) {
           return { status: "incomplete", summary: "Feature-branch creation did not settle to one exact state; repository reconciliation is required before retry." };
         }
-        return failedGit("The reviewed feature branch could not be created; the observed branch and HEAD remained unchanged.", switched);
+        return failedGit("The reviewed feature branch could not be created; the observed branch and HEAD remained unchanged.", switched, "not_started");
       }
 
       const environment = { GIT_INDEX_FILE: temporaryIndex };
 
       const readTree = await this.runner.run(["read-tree", request.target.indexTree], { cwd: root, environment });
-      if (readTree.exitCode !== 0) return failedGit("The broker could not construct a private index from the reviewed target.", readTree);
+      if (readTree.exitCode !== 0) return failedGit("The broker could not construct a private index from the reviewed target.", readTree, "not_started");
       const stage = await this.runner.run(["add", "-A", "--", ...paths.paths], { cwd: root, environment });
-      if (stage.exitCode !== 0) return failedGit("The broker could not stage only the reviewed task-owned paths.", stage);
+      if (stage.exitCode !== 0) return failedGit("The broker could not stage only the reviewed task-owned paths.", stage, "not_started");
       const exact = await this.verifyPrivateIndex(root, environment, paths.canonical);
       if (exact) return exact;
 
@@ -256,7 +257,8 @@ export class LocalMediatedGitHandler {
         if (privateTree !== committedTree) {
           return {
             status: "incomplete",
-            summary: "Git advanced HEAD but the private reviewed index no longer matches the committed tree; reconciliation is required."
+            summary: "Git advanced HEAD but the private reviewed index no longer matches the committed tree; reconciliation is required.",
+            effectDisposition: "committed"
           };
         }
         try {
@@ -265,12 +267,14 @@ export class LocalMediatedGitHandler {
         } catch (error) {
           return {
             status: "incomplete",
-            summary: redactText(`Git advanced HEAD but the shared index could not be reconciled safely: ${errorMessage(error, "unknown index error")}`)
+            summary: redactText(`Git advanced HEAD but the shared index could not be reconciled safely: ${errorMessage(error, "unknown index error")}`),
+            effectDisposition: "committed"
           };
         }
         return {
           status: "completed",
           summary: "Scoped local commit completed through a private index after final target revalidation and shared-index reconciliation.",
+          effectDisposition: "committed",
           data: { beforeHead: request.target.head, postHead, privateIndex: true, sharedIndexReconciled: true, stagedPaths: [...paths.paths] }
         };
       }
@@ -280,12 +284,13 @@ export class LocalMediatedGitHandler {
         return {
           status: "incomplete",
           summary: "Git reported an error after the target HEAD changed; the commit outcome is ambiguous and requires reconciliation.",
+          effectDisposition: "committed",
           data: { beforeHead: request.target.head, observedHead }
         };
       }
-      return failedGit("The reviewed local commit was rejected without changing the observed target HEAD.", commit);
+      return failedGit("The reviewed local commit was rejected without changing the observed target HEAD.", commit, "not_started");
     } catch (error) {
-      return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")) };
+      return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous" };
     } finally {
       if (temporaryIndex) {
         await rm(temporaryIndex, { force: true }).catch(() => undefined);
@@ -315,16 +320,16 @@ export class LocalMediatedGitHandler {
     const canonical = new Set<string>();
     for (const requestedPath of requested) {
       const normalized = canonicalRepositoryPath(requestedPath);
-      if (!normalized) return { outcome: { status: "blocked", summary: "The Git handler received an unsafe task-owned path." } };
-      if (canonical.has(normalized)) return { outcome: { status: "blocked", summary: "The Git handler received duplicate task-owned paths." } };
+      if (!normalized) return { outcome: { status: "blocked", summary: "The Git handler received an unsafe task-owned path.", effectDisposition: "not_started" } };
+      if (canonical.has(normalized)) return { outcome: { status: "blocked", summary: "The Git handler received duplicate task-owned paths.", effectDisposition: "not_started" } };
       const candidate = resolve(root, normalized);
       const relation = relative(root, candidate);
       if (!relation || relation === ".." || relation.startsWith(`..${sep}`)) {
-        return { outcome: { status: "blocked", summary: "A task-owned path resolves outside the verified repository root." } };
+        return { outcome: { status: "blocked", summary: "A task-owned path resolves outside the verified repository root.", effectDisposition: "not_started" } };
       }
       try {
         const metadata = await lstat(candidate);
-        if (metadata.isSymbolicLink()) return { outcome: { status: "blocked", summary: "The Git handler refuses a task-owned symlink path." } };
+        if (metadata.isSymbolicLink()) return { outcome: { status: "blocked", summary: "The Git handler refuses a task-owned symlink path.", effectDisposition: "not_started" } };
       } catch {
         // Deleted tracked paths are valid reviewed commit inputs.  Git itself
         // checks that `add -A -- <path>` can resolve the deletion in the
@@ -344,21 +349,21 @@ export class LocalMediatedGitHandler {
       this.runner.run(["diff", "--cached", "--quiet", "--exit-code"], { cwd: root, ...(indexEnvironment ? { environment: indexEnvironment } : {}) })
     ]);
     if (head !== request.target.head || branch !== request.target.branch || indexTree !== request.target.indexTree) {
-      return { status: "incomplete", summary: "The repository HEAD, branch, or default index changed after target capture; no Git mutation was started." };
+      return { status: "incomplete", summary: "The repository HEAD, branch, or default index changed after target capture; no Git mutation was started.", effectDisposition: "not_started" };
     }
     if (staged.exitCode === 1) {
-      return { status: "blocked", summary: "The default Git index has staged changes; local mediation requires an untouched shared index." };
+      return { status: "blocked", summary: "The default Git index has staged changes; local mediation requires an untouched shared index.", effectDisposition: "not_started" };
     }
-    if (staged.exitCode !== 0) return failedGit("The broker could not inspect the default Git index.", staged);
+    if (staged.exitCode !== 0) return failedGit("The broker could not inspect the default Git index.", staged, "not_started");
     return undefined;
   }
 
   private async verifyPrivateIndex(root: string, environment: Readonly<Record<string, string>>, expected: ReadonlySet<string>): Promise<BrokerOutcome | undefined> {
     const result = await this.runner.run(["diff", "--cached", "--name-only", "-z"], { cwd: root, environment });
-    if (result.exitCode !== 0) return failedGit("The broker could not inspect its private index.", result);
+    if (result.exitCode !== 0) return failedGit("The broker could not inspect its private index.", result, "not_started");
     const actual = result.stdout.split("\0").filter(Boolean).map((path) => canonicalRepositoryPath(path));
     if (actual.some((path) => !path) || actual.length !== expected.size || actual.some((path) => !expected.has(path!))) {
-      return { status: "blocked", summary: "The private Git index contains paths outside the exact reviewed task-owned set." };
+      return { status: "blocked", summary: "The private Git index contains paths outside the exact reviewed task-owned set.", effectDisposition: "not_started" };
     }
     return undefined;
   }
@@ -459,7 +464,7 @@ async function currentEffect(request: GitRequest): Promise<BrokerOutcome | undef
     ...(request.session ? { session: request.session } : {}),
     ...(request.authority ? { authority: request.authority } : {})
   });
-  return result.allowed ? undefined : { status: "incomplete", summary: result.reason };
+  return result.allowed ? undefined : { status: "incomplete", summary: result.reason, effectDisposition: "not_started" };
 }
 
 function isDefaultBranch(branch: string): boolean {
@@ -483,7 +488,7 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function failedGit(prefix: string, result: LocalGitResult): BrokerOutcome {
+function failedGit(prefix: string, result: LocalGitResult, effectDisposition: NonNullable<BrokerOutcome["effectDisposition"]> = "ambiguous"): BrokerOutcome {
   const detail = (result.stderr || result.stdout || `exit ${result.exitCode}`).trim();
-  return { status: "failed", summary: `${prefix} ${redactText(detail).slice(0, 360)}` };
+  return { status: "failed", summary: `${prefix} ${redactText(detail).slice(0, 360)}`, effectDisposition };
 }

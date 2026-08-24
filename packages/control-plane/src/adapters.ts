@@ -1,4 +1,4 @@
-import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction, CommandDefinition } from "./command-catalog.ts";
 import type { ExecutionControl } from "./execution-control.ts";
 import type { ContainmentGuard, EffectGuard } from "./brokers.ts";
@@ -9,6 +9,8 @@ export type AdapterStatus = "completed" | "unavailable" | "blocked" | "failed" |
 export interface AdapterOutcome {
   readonly status: AdapterStatus;
   readonly summary: string;
+  /** Explicitly separates a refusal before effect from an uncertain remote result. */
+  readonly effectDisposition?: EffectDisposition;
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
@@ -50,7 +52,7 @@ export class UnavailableCommandAdapter implements CommandAdapter {
   }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    return { status: "unavailable", summary: `${request.definition.title} is unavailable: ${this.reason}` };
+    return { status: "unavailable", summary: `${request.definition.title} is unavailable: ${this.reason}`, effectDisposition: "not_started" };
   }
 }
 
@@ -78,7 +80,7 @@ export class InMemoryCommandAdapter implements CommandAdapter {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const handler = this.handlers.get(request.definition.action);
-    if (!handler) return { status: "unavailable", summary: `Adapter ${this.id} has no supported capability for ${request.definition.action}.` };
+    if (!handler) return { status: "unavailable", summary: `Adapter ${this.id} has no supported capability for ${request.definition.action}.`, effectDisposition: "not_started" };
     const outcome = await handler(request);
     return {
       ...outcome,
@@ -107,7 +109,7 @@ export class AdapterRegistry {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const adapter = this.adapters.get(request.definition.action);
-    if (!adapter) return { status: "unavailable", summary: `No verified adapter is registered for ${request.definition.title}.` };
+    if (!adapter) return { status: "unavailable", summary: `No verified adapter is registered for ${request.definition.title}.`, effectDisposition: "not_started" };
     if (request.effectGuard && request.target) {
       const current = await request.effectGuard.assertCurrent({
         action: request.definition.action,
@@ -116,11 +118,11 @@ export class AdapterRegistry {
         ...(request.session ? { session: request.session } : {}),
         ...(request.authority ? { authority: request.authority } : {})
       });
-      if (!current.allowed) return { status: "blocked", summary: current.reason };
+      if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
     }
     if (this.containment && request.target && adapterNeedsContainment(request.definition)) {
       const fence = await this.containment.check(request.target.repositoryRoot, "adapter");
-      if (!fence.allowed) return { status: "blocked", summary: fence.reason };
+      if (!fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "not_started" };
     }
     return adapter.execute(request);
   }

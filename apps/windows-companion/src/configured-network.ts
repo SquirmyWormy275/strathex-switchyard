@@ -4,6 +4,7 @@ import { BlockList, isIP, type LookupFunction } from "node:net";
 import { readFile } from "node:fs/promises";
 
 import type { ContainmentCheck } from "../../../packages/control-plane/src/containment.ts";
+import type { EffectDisposition } from "../../../packages/control-plane/src/contracts.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 
@@ -90,6 +91,8 @@ export interface ConfiguredNetworkResult {
   readonly outcome: "passed" | "failed" | "blocked" | "unavailable";
   readonly routeId: string;
   readonly detail: string;
+  /** Whether the configured transport was invoked; it never guesses provider semantics. */
+  readonly effectDisposition: Extract<EffectDisposition, "not_started" | "ambiguous">;
   readonly status?: number;
   /** Adapter-only response data. Receipts must retain `detail`, never this body. */
   readonly body?: Uint8Array;
@@ -217,6 +220,7 @@ export class ConfiguredHttpsNetworkBroker {
     const onCallerAbort = (): void => controller.abort();
     input.signal?.addEventListener("abort", onCallerAbort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let effectStarted = false;
     try {
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
       const url = new URL(route.url);
@@ -232,18 +236,21 @@ export class ConfiguredHttpsNetworkBroker {
           if (!clear || clear.length > 8_192 || /[\r\n\0]/.test(clear)) throw new Error("The protected credential is invalid for an HTTP header.");
           headers[route.credential.header.toLowerCase()] = `${route.credential.prefix ?? ""}${clear}`;
         }
-        return requireNetworkUncontained(this.containment, input.repositoryRoot).then(() => this.transport.send({
-          url: route.url,
-          method: route.method,
-          headers,
-          body,
-          timeoutMs,
-          maxResponseBytes: route.maxResponseBytes ?? 512 * 1024,
-          resolvedAddress,
-          rejectUnauthorized: true,
-          proxy: "direct",
-          signal: controller.signal
-        }));
+        return requireNetworkUncontained(this.containment, input.repositoryRoot).then(() => {
+          effectStarted = true;
+          return this.transport.send({
+            url: route.url,
+            method: route.method,
+            headers,
+            body,
+            timeoutMs,
+            maxResponseBytes: route.maxResponseBytes ?? 512 * 1024,
+            resolvedAddress,
+            rejectUnauthorized: true,
+            proxy: "direct",
+            signal: controller.signal
+          });
+        });
       };
       const response = route.credential
         ? this.credentials
@@ -255,17 +262,17 @@ export class ConfiguredHttpsNetworkBroker {
           }, dispatch)
           : undefined
         : await dispatch();
-      if (!response) return { outcome: "unavailable", routeId: route.id, detail: "The configured route requires a credential adapter." };
+      if (!response) return { outcome: "unavailable", routeId: route.id, detail: "The configured route requires a credential adapter.", effectDisposition: "not_started" };
       if (response.body.byteLength > (route.maxResponseBytes ?? 512 * 1024)) return blocked(route.id, "Network response exceeded the configured output cap.");
       if (response.status >= 300 && response.status < 400) return blocked(route.id, "Network redirects are denied by the exact-route policy.");
-      const common = { routeId: route.id, status: response.status, headers: safeResponseHeaders(response.headers), body: new Uint8Array(response.body) };
+      const common = { routeId: route.id, status: response.status, headers: safeResponseHeaders(response.headers), body: new Uint8Array(response.body), effectDisposition: "ambiguous" as const };
       return response.status >= 200 && response.status < 300
         ? { outcome: "passed", detail: `Configured network route ${route.id} completed.`, ...common }
         : { outcome: "failed", detail: `Configured network route ${route.id} returned HTTP ${response.status}.`, ...common };
     } catch (error) {
       const detail = redactText(error instanceof Error ? error.message : "Configured network route failed.").slice(0, 512);
       const failClosed = /containment|cancel|timed out|timeout|scope|lease|credential reference|public address|DNS|output cap/i.test(detail);
-      return { outcome: failClosed ? "blocked" : "failed", routeId: route.id, detail };
+      return { outcome: failClosed ? "blocked" : "failed", routeId: route.id, detail, effectDisposition: effectStarted ? "ambiguous" : "not_started" };
     } finally {
       clearTimeout(timer);
       input.signal?.removeEventListener("abort", onCallerAbort);
@@ -417,7 +424,7 @@ async function requireNetworkUncontained(containment: NetworkContainmentFence, r
 }
 
 function blocked(routeId: string, detail: string): ConfiguredNetworkResult {
-  return { outcome: "blocked", routeId, detail };
+  return { outcome: "blocked", routeId, detail, effectDisposition: "not_started" };
 }
 
 function safeResponseHeaders(headers: Readonly<Record<string, string>>): Readonly<Record<string, string>> {

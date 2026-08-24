@@ -30,13 +30,13 @@ export class ConfiguredRemoteGitHandler {
   constructor(pusher: ReviewedRemotePusher, github: ReviewedGitHubPort, receipts?: DirectMainReceiptVerifier, hostOpener?: ReviewedPullRequestHostOpener) { this.pusher = pusher; this.github = github; this.receipts = receipts; this.hostOpener = hostOpener; }
 
   async execute(request: GitRequest): Promise<BrokerOutcome> {
-    if (!request.effectGuard || !request.target.head || !request.target.branch || !request.target.canonicalRemote) return { status: "incomplete", summary: "Remote Git mediation requires a final effect guard and an exact branch, HEAD, and canonical remote." };
+    if (!request.effectGuard || !request.target.head || !request.target.branch || !request.target.canonicalRemote) return { status: "incomplete", summary: "Remote Git mediation requires a final effect guard and an exact branch, HEAD, and canonical remote.", effectDisposition: "not_started" };
     const repository = githubRepository(request.target.canonicalRemote);
-    if (!repository) return { status: "blocked", summary: "The configured GitHub adapter accepts only an exact github.com canonical remote." };
-    const cancellation = await cancelled(request); if (cancellation) return cancellation;
+    if (!repository) return { status: "blocked", summary: "The configured GitHub adapter accepts only an exact github.com canonical remote.", effectDisposition: "not_started" };
+    const cancellation = await cancelled(request); if (cancellation) return { ...cancellation, effectDisposition: "not_started" };
     switch (request.mutation.kind) {
       case "pr_upsert": {
-        if (request.mutation.headBranch !== request.target.branch || request.mutation.headBranch === request.mutation.baseBranch || !validBranch(request.mutation.headBranch) || !validBranch(request.mutation.baseBranch)) return { status: "blocked", summary: "The reviewed PR branches do not bind the current feature branch and a distinct base." };
+        if (request.mutation.headBranch !== request.target.branch || request.mutation.headBranch === request.mutation.baseBranch || !validBranch(request.mutation.headBranch) || !validBranch(request.mutation.baseBranch)) return { status: "blocked", summary: "The reviewed PR branches do not bind the current feature branch and a distinct base.", effectDisposition: "not_started" };
         const pushed = await this.child(request, "git.push-reviewed-head", async () => this.pusher.push({ repositoryRoot: request.target.repositoryRoot, sourceHead: request.target.head!, destinationBranch: request.mutation.kind === "pr_upsert" ? request.mutation.headBranch : "", request }));
         if (pushed.status !== "completed") return pushed;
         const current = await finalEffect(request); if (current) return current;
@@ -45,9 +45,9 @@ export class ConfiguredRemoteGitHandler {
           if ("status" in pull) return pull;
           if (this.hostOpener) {
             const opened = await this.hostOpener.open(request, pull.url);
-            return { ...opened, data: { ...opened.data, pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
+            return { ...opened, effectDisposition: "committed", data: { ...opened.data, pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
           }
-          return { status: "completed", summary: "Pushed the exact reviewed head and verified the GitHub pull request against its head, base, title, and body.", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
+          return { status: "completed", summary: "Pushed the exact reviewed head and verified the GitHub pull request against its head, base, title, and body.", effectDisposition: "committed", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
         } catch (error) { return failed(error, "GitHub PR upsert failed closed."); }
       }
       case "merge_pr": {
@@ -55,20 +55,20 @@ export class ConfiguredRemoteGitHandler {
         try {
           const pull = await this.child(request, "github.pr-merge", async () => this.github.merge({ repositoryRoot: request.target.repositoryRoot, ...repository, pullRequest: request.mutation.kind === "merge_pr" ? request.mutation.pullRequest : 0, head: request.mutation.kind === "merge_pr" ? request.mutation.head : "", baseBranch: request.mutation.kind === "merge_pr" ? request.mutation.baseBranch : "", request }));
           if ("status" in pull) return pull;
-          return pull.state === "MERGED" ? { status: "completed", summary: "GitHub merged the exact reviewed pull request head into the reviewed base.", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } } : { status: "incomplete", summary: "GitHub did not verify the pull request as merged after the mutation." };
+          return pull.state === "MERGED" ? { status: "completed", summary: "GitHub merged the exact reviewed pull request head into the reviewed base.", effectDisposition: "committed", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } } : { status: "incomplete", summary: "GitHub did not verify the pull request as merged after the mutation.", effectDisposition: "ambiguous" };
         } catch (error) { return failed(error, "GitHub PR merge failed closed."); }
       }
       case "direct_main": {
-        if (request.mutation.branch !== request.target.branch) return { status: "blocked", summary: "Direct Main source branch does not match the exact reviewed target branch." };
-        if (!this.receipts || !await this.receipts.verify(request.mutation.validationReceiptId, request.target.id)) return { status: "blocked", summary: "Direct Main requires a fresh complete Release Shield receipt bound to this exact TargetSnapshot." };
+        if (request.mutation.branch !== request.target.branch) return { status: "blocked", summary: "Direct Main source branch does not match the exact reviewed target branch.", effectDisposition: "not_started" };
+        if (!this.receipts || !await this.receipts.verify(request.mutation.validationReceiptId, request.target.id)) return { status: "blocked", summary: "Direct Main requires a fresh complete Release Shield receipt bound to this exact TargetSnapshot.", effectDisposition: "not_started" };
         try {
           const base = await this.github.defaultBranch({ repositoryRoot: request.target.repositoryRoot, ...repository, request });
-          if (base !== "main" && base !== "master") return { status: "blocked", summary: "Direct Main requires an exact GitHub default branch named main or master." };
+          if (base !== "main" && base !== "master") return { status: "blocked", summary: "Direct Main requires an exact GitHub default branch named main or master.", effectDisposition: "not_started" };
           const pushed = await this.child(request, "git.direct-main", async () => this.pusher.push({ repositoryRoot: request.target.repositoryRoot, sourceHead: request.target.head!, destinationBranch: base, request }));
-          return pushed.status === "completed" ? { status: "completed", summary: "Advanced the exact default branch without force after the high-consequence gate and reviewed receipt were admitted.", data: { branch: base, head: request.target.head } } : pushed;
+          return pushed.status === "completed" ? { status: "completed", summary: "Advanced the exact default branch without force after the high-consequence gate and reviewed receipt were admitted.", effectDisposition: "committed", data: { branch: base, head: request.target.head } } : pushed;
         } catch (error) { return failed(error, "Direct Main failed closed."); }
       }
-      case "local_commit": return { status: "unavailable", summary: "Local commit is owned by the private-index Git handler." };
+      case "local_commit": return { status: "unavailable", summary: "Local commit is owned by the private-index Git handler.", effectDisposition: "not_started" };
     }
   }
 

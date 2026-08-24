@@ -19,16 +19,16 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
 
   async execute(request: CouncilRequest): Promise<BrokerOutcome> {
     const participants = await this.participants(request);
-    if (!participants.length) return { status: "unavailable", summary: "Council found no fresh Observable session bound to the exact TargetSnapshot." };
+    if (!participants.length) return { status: "unavailable", summary: "Council found no fresh Observable session bound to the exact TargetSnapshot.", effectDisposition: "not_started" };
     const report = await this.council.report({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
     if (request.action === "council_report") return reportOutcome(report, "Collected a durable Council report from every fresh exact-target Observable session.");
     if (request.action === "council_recommend") return reportOutcome(report, "Prepared a confirmed deterministic Council recommendation; no participant state was changed.");
-    if (!this.network) return { status: "unavailable", summary: "Automatic Council requires configured exact-route provider adapters." };
-    if (participants.length < 2) return { status: "blocked", summary: "Automatic Council requires at least two fresh mediated participants on the exact target." };
-    if (!participants.every((participant) => participant.capabilities.includes("mediated") && participant.capabilities.includes("controllable") && participant.status === "running")) return { status: "blocked", summary: "Automatic Council requires every participant to be fresh, running, Controllable, and Mediated." };
+    if (!this.network) return { status: "unavailable", summary: "Automatic Council requires configured exact-route provider adapters.", effectDisposition: "not_started" };
+    if (participants.length < 2) return { status: "blocked", summary: "Automatic Council requires at least two fresh mediated participants on the exact target.", effectDisposition: "not_started" };
+    if (!participants.every((participant) => participant.capabilities.includes("mediated") && participant.capabilities.includes("controllable") && participant.status === "running")) return { status: "blocked", summary: "Automatic Council requires every participant to be fresh, running, Controllable, and Mediated.", effectDisposition: "not_started" };
     let epoch;
     try { epoch = await this.council.beginAutomatic({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants }); }
-    catch (error) { return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council automatic preconditions failed.") }; }
+    catch (error) { return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council automatic preconditions failed."), effectDisposition: "not_started" }; }
     try {
       for (const participant of participants) { await this.phase(request, epoch.id, participant, "pause"); await this.council.acknowledgePause(epoch.id, participant.id); }
       for (const participant of participants) {
@@ -38,10 +38,10 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       }
       const active = await this.council.resume(epoch.id);
       for (const participant of participants) await this.phase(request, epoch.id, participant, "resume");
-      return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint assignments, and resume through configured provider routes.", data: { epochId: active.id, participants: participants.length, status: active.status } };
+      return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, participants: participants.length, status: active.status } };
     } catch (error) {
       await this.council.abort(epoch.id, error instanceof Error ? error.message : "A Council provider acknowledgement failed.").catch(() => undefined);
-      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), data: { epochId: epoch.id, status: "aborted" } };
+      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), effectDisposition: "ambiguous", data: { epochId: epoch.id, status: "aborted" } };
     }
   }
 
@@ -90,7 +90,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   }
 }
 
-function reportOutcome(report: Awaited<ReturnType<CouncilCoordinator["report"]>>, summary: string): BrokerOutcome { return { status: "completed", summary, data: { participants: report.participants.length, atomic: report.atomic, pathConflicts: report.pathConflicts.length, resourceConflicts: report.resourceConflicts.length, dependencyConflicts: report.dependencyConflicts.length } }; }
+function reportOutcome(report: Awaited<ReturnType<CouncilCoordinator["report"]>>, summary: string): BrokerOutcome { return { status: "completed", summary, effectDisposition: "committed", data: { participants: report.participants.length, atomic: report.atomic, pathConflicts: report.pathConflicts.length, resourceConflicts: report.resourceConflicts.length, dependencyConflicts: report.dependencyConflicts.length } }; }
 function declarations(session: ManagedSession, key: string): readonly string[] { const raw = session.metadata[key]; if (!raw) return []; try { const value: unknown = JSON.parse(raw); return Array.isArray(value) && value.length <= 128 && value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 256 && !/[\r\n\0]/.test(item)) ? [...new Set(value)] : []; } catch { return []; } }
 function trustedDiff(session: ManagedSession): string | undefined { const value = session.metadata["sxsy-b122.diffDigest"]; return value && /^[a-f0-9]{64}$/i.test(value) ? value : undefined; }
 function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } if (!record(value) || Object.keys(value).length !== 7 || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true) return false; return true; }

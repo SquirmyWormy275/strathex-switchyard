@@ -29,8 +29,8 @@ import { ConfiguredGitHubPipelineAdapter } from "./pipeline-adapters.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
-  if (!request.permit || Date.parse(request.permit.expiresAt) <= Date.now()) return { status: "blocked", summary: "The local broker rejected an absent or expired durable permit." };
-  if (request.executionControl && Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "The local broker rejected an expired execution deadline." };
+  if (!request.permit || Date.parse(request.permit.expiresAt) <= Date.now()) return { status: "blocked", summary: "The local broker rejected an absent or expired durable permit.", effectDisposition: "not_started" };
+  if (request.executionControl && Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "The local broker rejected an expired execution deadline.", effectDisposition: "not_started" };
   return undefined;
 }
 
@@ -48,9 +48,9 @@ class LocalIsolatedTestEnvironmentBroker implements TestEnvironmentBroker {
   }
 }
 
-class LocalFailClosedAutomationBroker implements AutomationBroker { async execute(request: AutomationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: "No local provider automation adapter is installed; no prompt, workflow, credential, or network request was submitted." }; } }
+class LocalFailClosedAutomationBroker implements AutomationBroker { async execute(request: AutomationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: "No local provider automation adapter is installed; no prompt, workflow, credential, or network request was submitted.", effectDisposition: "not_started" }; } }
 class LocalFailClosedIsolationRuntime implements IsolationRuntime {
-  async start(request: IsolationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: `${request.profile} requires the installed OS-enforced sandbox backend; no weaker copy-based sandbox was started.` }; }
+  async start(request: IsolationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: `${request.profile} requires the installed OS-enforced sandbox backend; no weaker copy-based sandbox was started.`, effectDisposition: "not_started" }; }
 }
 class LocalPipelineStatusAdapter implements CommandAdapter {
   readonly id = "local-pipeline-status"; readonly kind = "generic" as const;
