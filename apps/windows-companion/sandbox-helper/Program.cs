@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -615,8 +614,7 @@ internal static class Program
         {
             throw new HelperException(66, "Helper executable identity is unavailable.");
         }
-        string? entryLocation = Assembly.GetEntryAssembly()?.Location;
-        if (!string.IsNullOrEmpty(entryLocation) && entryLocation.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        if (!Path.GetFileName(processPath).Equals("b122-sandbox-worker.exe", StringComparison.OrdinalIgnoreCase))
         {
             throw new HelperException(66, "Helper must run as the published fixed executable, not through a framework host.");
         }

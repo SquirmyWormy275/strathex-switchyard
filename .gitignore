@@ -6,3 +6,7 @@ dist/
 .sxsy-verification/
 .npm-cache/
 .npm-cache*/
+.tools/
+artifacts/
+**/bin/
+**/obj/

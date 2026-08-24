@@ -1,6 +1,7 @@
 {
   "name": "@strathex/switchyard-companion",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.2.0",
   "type": "module",
   "bin": { "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js" },

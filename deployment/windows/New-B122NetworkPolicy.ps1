@@ -37,5 +37,6 @@ if ($ProviderBaseUri) {
 }
 $policy=[ordered]@{version=1;proxy='direct';routes=$routes}
 $directory=Split-Path -Parent ([IO.Path]::GetFullPath($OutputPath)); New-Item -ItemType Directory -Path $directory -Force | Out-Null
-$policy | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath ([IO.Path]::GetFullPath($OutputPath)) -Encoding utf8NoBOM
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText([IO.Path]::GetFullPath($OutputPath), ($policy | ConvertTo-Json -Depth 8), $utf8NoBom)
 Write-Output "Wrote a secret-free exact-route policy for operator review: $OutputPath"

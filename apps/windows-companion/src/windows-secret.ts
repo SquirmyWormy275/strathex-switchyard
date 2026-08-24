@@ -58,9 +58,10 @@ export class WindowsDpapiCurrentUserProtector implements UserSecretProtector {
       : "Add-Type -AssemblyName System.Security;$in=[Console]::In.ReadToEnd();$raw=[Convert]::FromBase64String($in);$out=[Security.Cryptography.ProtectedData]::Unprotect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($out))";
     const input = Buffer.from(bytes).toString("base64");
     return new Promise<string>((resolve, reject) => {
-      const child = spawn("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
+      const child = spawn("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], {
         shell: false,
         windowsHide: true,
+        env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" },
         stdio: ["pipe", "pipe", "pipe"]
       });
       let output = "";

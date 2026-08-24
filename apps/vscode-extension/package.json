@@ -3,7 +3,7 @@
   "displayName": "SXSY-B122 Switchyard",
   "description": "Mediated SXSY-B122 VS Code control surface.",
   "publisher": "SquirmyWormy275",
-  "license": "SEE LICENSE IN ../../LICENSING.md",
+  "license": "UNLICENSED",
   "repository": { "type": "git", "url": "https://github.com/SquirmyWormy275/strathex-switchyard.git" },
   "private": true,
   "type": "commonjs",

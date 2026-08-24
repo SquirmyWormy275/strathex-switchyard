@@ -1,6 +1,7 @@
 {
   "name": "strathex-switchyard",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "version": "0.1.0",
   "description": "Safe SXSY-B122 firmware transport and host routing baseline",

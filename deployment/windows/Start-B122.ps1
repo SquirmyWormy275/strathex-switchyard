@@ -11,7 +11,8 @@ New-Item -ItemType Directory -Path $logs -Force | Out-Null
 foreach ($file in @($node,$main,$health)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
 $stdout = Join-Path $logs 'companion.stdout.log'
 $stderr = Join-Path $logs 'companion.stderr.log'
-$process = Start-Process -FilePath $node -ArgumentList @($main) -WorkingDirectory $current -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+if ($main.Contains('"')) { throw 'Installed SXSY-B122 paths containing quotation marks are unsupported.' }
+$process = Start-Process -FilePath $node -ArgumentList @("`"$main`"") -WorkingDirectory $current -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 if ($WaitForHealth) {
   $deadline = [DateTime]::UtcNow.AddSeconds(30)
   do {
