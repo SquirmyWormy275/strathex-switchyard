@@ -785,9 +785,19 @@ export class ManagedSessionController {
       await this.vscode.window.showWarningMessage("SXSY-B122 Git review stopped because the exact Git-root session is unavailable.");
       return false;
     }
+    const inspected = await this.bridge.inspectGitReview(sessionId);
+    if (!inspected.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Git inspection unavailable: ${inspected.message}`);
+      return false;
+    }
+    if (!samePath(inspected.value.repositoryRoot, root.gitRoot)) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Git review stopped because the host-observed repository changed.");
+      return false;
+    }
+    const git = inspected.value;
     let mutation: ReviewedGitMutation | undefined;
     if (action === "local_commit") {
-      const available = [...new Set(root.changedPaths ?? [])].filter((path) => path && !path.includes(","));
+      const available = [...new Set(git.changedPaths)].filter((path) => path && !path.includes(","));
       if (!available.length) {
         await this.vscode.window.showWarningMessage("SXSY-B122 found no structured changed-file list for a local commit; it will not infer paths from terminal text.");
         return false;
@@ -806,31 +816,34 @@ export class ManagedSessionController {
       const message = await input({ prompt: "Enter the exact local commit message", validateInput: (value) => value.trim() && value.length <= 120 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 120 characters." });
       if (!message) return false;
       let featureBranch: string | undefined;
-      if (/^(?:main|master|trunk)$/i.test(root.branch ?? "")) {
-        featureBranch = await input({ prompt: "Review the new feature branch (this press creates it, then a fresh press commits against the new target)", validateInput: (value) => validBranchInput(value) ?? (/^(?:main|master|trunk)$/i.test(value) ? "Choose a non-default feature branch." : undefined) });
+      if (git.detached || (git.branch !== undefined && git.branch === git.defaultBranch)) {
+        featureBranch = await input({ prompt: "Review the new feature branch (this press creates it, then a fresh press commits against the new target)", validateInput: (value) => validBranchInput(value) ?? (git.defaultBranch === value ? "Choose a non-default feature branch." : undefined) });
         if (!featureBranch) return false;
       }
       mutation = { kind: "local_commit", paths, message, ...(featureBranch ? { featureBranch } : {}) };
     } else if (action === "pr_upsert") {
-      if (!root.branch) return false;
-      const baseBranch = await input({ prompt: "Review the pull request base branch", value: "main", validateInput: validBranchInput });
+      if (!git.branch) return false;
+      const baseBranch = await input({ prompt: "Review the pull request base branch", ...(git.defaultBranch ? { value: git.defaultBranch } : {}), validateInput: validBranchInput });
       if (!baseBranch) return false;
-      const title = await input({ prompt: "Review the pull request title", value: `B122 reviewed changes from ${root.branch}`, validateInput: (value) => value.trim() && value.length <= 256 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 256 characters." });
+      const title = await input({ prompt: "Review the pull request title", value: `B122 reviewed changes from ${git.branch}`, validateInput: (value) => value.trim() && value.length <= 256 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 256 characters." });
       if (!title) return false;
       const body = await input({ prompt: "Review the pull request description (one bounded line; empty is allowed)", value: "Created through the SXSY-B122 reviewed Git mediator.", validateInput: (value) => value.length <= 16_384 && !/\0/.test(value) ? undefined : "Use at most 16384 characters without NUL bytes." });
       if (body === undefined) return false;
-      mutation = { kind: "pr_upsert", headBranch: root.branch, baseBranch, title, body };
+      mutation = { kind: "pr_upsert", headBranch: git.branch, baseBranch, title, body };
     } else if (action === "pr_merge") {
       const pullRequestText = await input({ prompt: "Enter the exact pull request number", validateInput: (value) => /^[1-9][0-9]{0,9}$/.test(value) ? undefined : "Enter a positive pull request number." });
       const head = pullRequestText ? await input({ prompt: "Enter the exact 40-character reviewed head SHA", validateInput: (value) => /^[a-f0-9]{40}$/i.test(value) ? undefined : "Enter the exact 40-character SHA." }) : undefined;
-      const baseBranch = head ? await input({ prompt: "Enter the exact reviewed base branch", value: "main", validateInput: validBranchInput }) : undefined;
+      const baseBranch = head ? await input({ prompt: "Enter the exact reviewed base branch", ...(git.defaultBranch ? { value: git.defaultBranch } : {}), validateInput: validBranchInput }) : undefined;
       if (!pullRequestText || !head || !baseBranch) return false;
       mutation = { kind: "merge_pr", pullRequest: Number(pullRequestText), head, baseBranch };
     } else {
-      if (!root.branch) return false;
+      if (!git.branch || !git.defaultBranch || git.branch !== git.defaultBranch) {
+        await this.vscode.window.showWarningMessage("SXSY-B122 Direct Main requires the exact host-observed current default branch.");
+        return false;
+      }
       const validationReceiptId = await input({ prompt: "Enter the exact Release Shield validation receipt ID", validateInput: (value) => /^receipt:[A-Za-z0-9._:-]{1,200}$/.test(value) ? undefined : "Enter a receipt ID beginning with receipt:." });
       if (!validationReceiptId) return false;
-      mutation = { kind: "direct_main", branch: root.branch, validationReceiptId };
+      mutation = { kind: "direct_main", branch: git.branch, validationReceiptId };
     }
     const reviewed = await this.bridge.reviewGitMutation({ action, sessionId, mutation });
     if (!reviewed.ok) {

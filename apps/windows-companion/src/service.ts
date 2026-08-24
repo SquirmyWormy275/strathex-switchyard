@@ -7,7 +7,7 @@ import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts
 import type { HandoffPackage, HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
 import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowArtifactPayload, WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { VoiceBinding, VoiceConsent, VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
-import type { GitReviewResult } from "./git-review.ts";
+import type { GitReviewResult, GitReviewWorkspace } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
 import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
@@ -35,6 +35,7 @@ import {
   type HostActionAuthorizationPayload,
   type HostActionCompletionPayload,
   type GitReviewPayload,
+  type GitReviewInspectPayload,
   type RuntimePinInstallPayload,
   type RuntimePinRevokePayload,
   type SandboxInstallPayload,
@@ -105,6 +106,7 @@ export interface HostActionCoordinator {
 }
 
 export interface GitMutationReviewCoordinator {
+  inspect(sessionId: string): Promise<GitReviewWorkspace>;
   review(payload: GitReviewPayload): Promise<GitReviewResult>;
 }
 
@@ -222,6 +224,8 @@ export class CompanionService {
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
         case "git.review.submit":
           return this.success(request.id, { review: await this.reviewGitMutation(this.requireGitReview(request.payload)) });
+        case "git.review.inspect":
+          return this.success(request.id, { workspace: await this.inspectGitReview(this.requireGitReviewInspect(request.payload)) });
         case "runtime.pin.install":
           return this.success(request.id, { pin: await this.installRuntimePin(this.requireRuntimePinInstall(request.payload)) });
         case "runtime.pin.list":
@@ -486,6 +490,13 @@ export class CompanionService {
     if (result.session) this.installTrustedSession(result.session);
     this.record("git.review.submit", result.status === "approved" ? "completed" : result.status, result.summary, payload.sessionId);
     return result;
+  }
+
+  private async inspectGitReview(payload: GitReviewInspectPayload): Promise<GitReviewWorkspace> {
+    if (!this.gitReviews) throw new CompanionServiceError("companion_unavailable", "No trusted Git review inspector is attached.");
+    const workspace = await this.gitReviews.inspect(payload.sessionId);
+    this.record("git.review.inspect", "completed", "Inspected the exact host-observed Git review target.", payload.sessionId, workspace.targetSnapshotId);
+    return workspace;
   }
 
   private async createHandoff(payload: HandoffCreatePayload): Promise<HandoffPackage> {
@@ -961,6 +972,13 @@ export class CompanionService {
       throw new CompanionServiceError("invalid_request", "Git review requires an exact action and managed session ID.");
     }
     return { action: payload.action, sessionId: payload.sessionId, mutation: parseGitMutation(payload.mutation) };
+  }
+
+  private requireGitReviewInspect(payload: unknown): GitReviewInspectPayload {
+    if (!isRecord(payload) || !boundedReferenceValue(payload.sessionId) || Object.keys(payload).length !== 1) {
+      throw new CompanionServiceError("invalid_request", "Git review inspection requires one exact managed session ID.");
+    }
+    return { sessionId: payload.sessionId };
   }
 
   private requireHandoffCreate(payload: unknown): HandoffCreatePayload {

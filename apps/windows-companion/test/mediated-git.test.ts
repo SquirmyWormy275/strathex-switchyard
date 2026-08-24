@@ -62,9 +62,13 @@ async function fixture(): Promise<Fixture> {
   await writeFile(join(root, "src-safe.ts"), "export const value = 'initial';\n", "utf8");
   await requireCommand(root, "git", "add", "src-safe.ts");
   await requireCommand(root, "git", "commit", "-m", "initial");
-  await requireCommand(root, "git", "checkout", "-b", "feature/mediated-git");
+  await requireCommand(root, "git", "branch", "-M", "main");
   await requireCommand(remote, "git", "init", "--bare");
+  await requireCommand(remote, "git", "symbolic-ref", "HEAD", "refs/heads/main");
   await requireCommand(root, "git", "remote", "add", "origin", remote);
+  await requireCommand(root, "git", "push", "-u", "origin", "main");
+  await requireCommand(root, "git", "remote", "set-head", "origin", "-a");
+  await requireCommand(root, "git", "checkout", "-b", "feature/mediated-git");
   await requireCommand(root, "git", "push", "-u", "origin", "feature/mediated-git");
   const factory = new TargetSnapshotFactory(new GitCliInspector({
     classifyUntracked: () => "included",
@@ -211,6 +215,28 @@ test("default-branch review creates a hook-disabled feature branch and requires 
     const committed = await secondBroker.execute(second.request);
     assert.equal(committed.status, "completed", committed.summary);
     assert.notEqual(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+  } finally {
+    await isolated.dispose();
+  }
+});
+
+test("detached-HEAD review creates an exact feature branch before any commit and requires a fresh target", async () => {
+  const isolated = await fixture();
+  try {
+    await requireCommand(isolated.root, "git", "checkout", "--detach", "HEAD");
+    await writeFile(join(isolated.root, "src-safe.ts"), "export const value = 'reviewed from detached';\n", "utf8");
+    const target = await isolated.capture();
+    assert.equal(target.branch, undefined);
+    assert.equal(target.detached, true);
+    assert.equal(target.defaultBranch, "main");
+    assert.equal(target.completeness, "complete", target.reasons.join(" "));
+    const first = permittedRequest(target, effectGuard(isolated));
+    const broker = new InMemoryGitBroker(first.policy);
+    broker.register("local_commit", (input) => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const branched = await broker.execute({ ...first.request, mutation: { ...first.request.mutation, featureBranch: "feature/reviewed-from-detached" } });
+    assert.equal(branched.status, "incomplete", branched.summary);
+    assert.equal(await requireCommand(isolated.root, "git", "branch", "--show-current"), "feature/reviewed-from-detached");
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
   } finally {
     await isolated.dispose();
   }

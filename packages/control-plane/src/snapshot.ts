@@ -19,6 +19,8 @@ export interface GitInspection {
   readonly repositoryRoot?: string;
   readonly canonicalRemote?: string;
   readonly branch?: string;
+  readonly defaultBranch?: string;
+  readonly detached?: true;
   readonly upstream?: string;
   readonly head?: string;
   readonly indexTree?: string;
@@ -73,6 +75,8 @@ export function targetSnapshotIdentity(snapshot: TargetSnapshotIdentityInput): R
     repositoryRoot: snapshot.repositoryRoot,
     canonicalRemote: snapshot.canonicalRemote ?? null,
     branch: snapshot.branch ?? null,
+    defaultBranch: snapshot.defaultBranch ?? null,
+    detached: snapshot.detached ?? false,
     upstream: snapshot.upstream ?? null,
     head: snapshot.head ?? null,
     indexTree: snapshot.indexTree ?? null,
@@ -100,6 +104,15 @@ export class IncompleteTargetSnapshotError extends Error {
 function nonEmpty(value: string | undefined, field: string, reasons: string[]): string | undefined {
   if (typeof value !== "string" || !value.trim()) {
     reasons.push(`${field} is unavailable.`);
+    return undefined;
+  }
+  return value.trim();
+}
+
+function optionalNonEmpty(value: string | undefined, field: string, reasons: string[]): string | undefined {
+  if (value === undefined) return undefined;
+  if (!value.trim()) {
+    reasons.push(`${field} was supplied but empty.`);
     return undefined;
   }
   return value.trim();
@@ -218,7 +231,10 @@ export class TargetSnapshotFactory {
     const reasons = [...(inspection.issues ?? [])];
     const repositoryRoot = nonEmpty(inspection.repositoryRoot, "Canonical Git root", reasons) ?? options.targetHint ?? "<unresolved>";
     const canonicalRemote = nonEmpty(inspection.canonicalRemote, "Canonical remote", reasons);
-    const branch = nonEmpty(inspection.branch, "Branch", reasons);
+    const branch = optionalNonEmpty(inspection.branch, "Branch", reasons);
+    const defaultBranch = optionalNonEmpty(inspection.defaultBranch, "Default branch", reasons);
+    const detached = inspection.detached === true;
+    if (branch && detached) reasons.push("Git target cannot be both branch-bound and detached.");
     const head = nonEmpty(inspection.head, "HEAD object id", reasons);
     const indexTree = nonEmpty(inspection.indexTree, "Index tree hash", reasons);
     const upstream = inspection.upstream?.trim() || undefined;
@@ -233,13 +249,15 @@ export class TargetSnapshotFactory {
       if (!canonicalRemote) reasons.push("Consequential work requires a canonical remote.");
     }
     if (options.requireBranch ?? true) {
-      if (!branch) reasons.push("Consequential work requires a verified branch.");
+      if (!branch && !detached) reasons.push("Consequential work requires a verified branch or detached-HEAD observation.");
     }
     const completeness = reasons.length === 0 ? "complete" : "incomplete";
     const identity: TargetSnapshotIdentityInput = {
       repositoryRoot,
       ...(canonicalRemote ? { canonicalRemote } : {}),
       ...(branch ? { branch } : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+      ...(detached ? { detached: true as const } : {}),
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),
@@ -256,6 +274,8 @@ export class TargetSnapshotFactory {
       repositoryRoot,
       ...(canonicalRemote ? { canonicalRemote } : {}),
       ...(branch ? { branch } : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+      ...(detached ? { detached: true as const } : {}),
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),

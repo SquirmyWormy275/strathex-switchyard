@@ -14,6 +14,7 @@ const target: TargetSnapshot = {
   id: "snapshot-review",
   repositoryRoot: "C:\\repo",
   branch: "feat/review",
+  defaultBranch: "main",
   head: "a".repeat(40),
   indexTree: "b".repeat(40),
   trackedManifest: "c".repeat(64),
@@ -98,6 +99,24 @@ test("default-branch review requires one exact non-default branch for a fresh-ta
   const missing = await queue.review({ action: "local_commit", sessionId: session.id, mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe" } });
   assert.equal(missing.status, "blocked");
   const approved = await queue.review({ action: "local_commit", sessionId: session.id, mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe", featureBranch: "feature/safe" } });
+  assert.equal(approved.status, "approved");
+});
+
+test("inspection reports the host-observed default branch and detached HEAD without guessing", async () => {
+  const detachedTarget: TargetSnapshot = { ...target, id: "snapshot-detached", branch: undefined, detached: true };
+  const { queue } = await setup(true, detachedTarget);
+  assert.deepEqual(await queue.inspect(session.id), {
+    repositoryRoot: target.repositoryRoot,
+    targetSnapshotId: "snapshot-detached",
+    defaultBranch: "main",
+    detached: true,
+    changedPaths: ["src/safe.ts", "README.md"]
+  });
+  const approved = await queue.review({
+    action: "local_commit",
+    sessionId: session.id,
+    mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe", featureBranch: "feature/from-detached" }
+  });
   assert.equal(approved.status, "approved");
 });
 

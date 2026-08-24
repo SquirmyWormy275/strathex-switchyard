@@ -28,6 +28,15 @@ export interface GitReviewResult {
   readonly session?: ManagedSession;
 }
 
+export interface GitReviewWorkspace {
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly branch?: string;
+  readonly defaultBranch?: string;
+  readonly detached: boolean;
+  readonly changedPaths: readonly string[];
+}
+
 export interface DurableGitMutationReviewQueueOptions {
   readonly store: ProtectedJsonStore;
   readonly sessions: SessionRegistry;
@@ -70,6 +79,26 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
     if (!Number.isSafeInteger(this.lifetimeMs) || this.lifetimeMs < 10_000 || this.lifetimeMs > 15 * 60_000) throw new Error("Git review lifetime is outside the safe bound.");
   }
 
+  /** Read-only, host-observed review material; the extension never guesses Git state. */
+  async inspect(sessionId: string): Promise<GitReviewWorkspace> {
+    const session = await this.options.sessions.get(sessionId);
+    if (!session?.workspaceRoot) throw new Error("Git review inspection requires an exact managed workspace session.");
+    const target = await this.options.targetResolver.resolve({ definition: commandForAction("local_commit"), session });
+    if (!target || target.completeness !== "complete" || !target.head || !target.indexTree || (!target.branch && target.detached !== true)) {
+      throw new Error("The trusted host could not capture a complete branch or detached-HEAD review target.");
+    }
+    if (!samePath(session.workspaceRoot, target.repositoryRoot)) throw new Error("The managed session no longer matches the inspected Git root.");
+    const changedPaths = await this.inspector.changedPaths(target.repositoryRoot);
+    return {
+      repositoryRoot: target.repositoryRoot,
+      targetSnapshotId: target.id,
+      ...(target.branch ? { branch: target.branch } : {}),
+      ...(target.defaultBranch ? { defaultBranch: target.defaultBranch } : {}),
+      detached: target.detached === true,
+      changedPaths
+    };
+  }
+
   async review(request: GitReviewRequest): Promise<GitReviewResult> {
     if (actionForMutation[request.mutation.kind] !== request.action) return blocked("Git review action and typed mutation do not match.");
     const definition = commandForAction(request.action);
@@ -79,7 +108,7 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
     let target: TargetSnapshot | undefined;
     try { target = await this.options.targetResolver.resolve({ definition, session }); }
     catch { return unavailable("The trusted target resolver could not capture the Git review target."); }
-    if (!target || target.completeness !== "complete" || !target.branch || !target.head || !target.indexTree) return unavailable("Git review requires a complete current TargetSnapshot.");
+    if (!target || target.completeness !== "complete" || !target.head || !target.indexTree || (!target.branch && target.detached !== true)) return unavailable("Git review requires a complete branch or detached-HEAD TargetSnapshot.");
     if (!samePath(session.workspaceRoot, target.repositoryRoot)) return blocked("The selected session and Git review target do not match.");
     const validation = await this.validateMutation(request.mutation, target);
     if (validation) return validation;
@@ -90,7 +119,14 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
 
     let updated = session;
     if (request.mutation.kind === "local_commit") {
-      updated = await this.options.sessions.updateBinding(session.id, { plannedFiles: request.mutation.paths });
+      updated = await this.options.sessions.updateBinding(session.id, {
+        plannedFiles: request.mutation.paths,
+        metadata: {
+          ...session.metadata,
+          ...(target.defaultBranch ? { "sxsy-b122.defaultBranch": target.defaultBranch } : {}),
+          "sxsy-b122.detached": String(target.detached === true)
+        }
+      });
       this.options.onSessionUpdated?.(updated);
     }
     const review: PendingReview = {
@@ -135,8 +171,10 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
   private async validateMutation(mutation: GitMutation, target: TargetSnapshot): Promise<GitReviewResult | undefined> {
     switch (mutation.kind) {
       case "local_commit": {
-        if (isDefaultBranch(target.branch!) !== (mutation.featureBranch !== undefined)) return blocked("A default-branch local commit review requires one exact new feature branch, and a feature-branch review must not carry one.");
-        if (mutation.featureBranch !== undefined && (!validBranch(mutation.featureBranch) || isDefaultBranch(mutation.featureBranch) || mutation.featureBranch === target.branch)) return blocked("Local commit review contains an invalid or default feature branch.");
+        if (!target.defaultBranch) return unavailable("Local commit review requires the host-observed default branch identity; no branch name was guessed.");
+        const requiresFeatureBranch = target.detached === true || target.branch === target.defaultBranch;
+        if (requiresFeatureBranch !== (mutation.featureBranch !== undefined)) return blocked("A default-branch or detached-HEAD local commit requires one exact new feature branch, while a current feature branch must not carry one.");
+        if (mutation.featureBranch !== undefined && (!validBranch(mutation.featureBranch) || mutation.featureBranch === target.defaultBranch || mutation.featureBranch === target.branch)) return blocked("Local commit review contains an invalid or default feature branch.");
         if (!mutation.paths.length || mutation.paths.length > 256 || !validCommitMessage(mutation.message)) return blocked("Local commit review requires bounded task-owned paths and a safe message.");
         const normalized = mutation.paths.map(canonicalRepositoryPath);
         if (normalized.some((path) => !path) || new Set(normalized).size !== normalized.length) return blocked("Local commit review contains an unsafe or duplicate path.");
@@ -148,7 +186,7 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
         return undefined;
       }
       case "pr_upsert":
-        if (!validBranch(mutation.headBranch) || !validBranch(mutation.baseBranch) || mutation.headBranch !== target.branch || mutation.headBranch === mutation.baseBranch
+        if (!target.branch || !validBranch(mutation.headBranch) || !validBranch(mutation.baseBranch) || mutation.headBranch !== target.branch || mutation.headBranch === mutation.baseBranch
           || !mutation.title.trim() || mutation.title.length > 256 || /[\r\n\0]/.test(mutation.title) || mutation.body.length > 16_384 || /\0/.test(mutation.body)) {
           return blocked("PR review does not match the exact current feature branch, base, title, and body.");
         }
@@ -157,7 +195,7 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
         if (!Number.isSafeInteger(mutation.pullRequest) || mutation.pullRequest <= 0 || !/^[a-f0-9]{40}$/i.test(mutation.head) || !validBranch(mutation.baseBranch)) return blocked("PR merge review requires an exact pull request, head SHA, and base branch.");
         return undefined;
       case "direct_main":
-        if (!validBranch(mutation.branch) || !/^receipt:[A-Za-z0-9._:-]{1,200}$/.test(mutation.validationReceiptId)) return blocked("Direct Main review lacks an exact branch or validation receipt.");
+        if (!target.branch || !target.defaultBranch || mutation.branch !== target.branch || mutation.branch !== target.defaultBranch || !validBranch(mutation.branch) || !/^receipt:[A-Za-z0-9._:-]{1,200}$/.test(mutation.validationReceiptId)) return blocked("Direct Main review lacks the exact host-observed current default branch or validation receipt.");
         return undefined;
     }
   }
@@ -211,5 +249,4 @@ function key(action: string, targetSnapshotId: string, sessionId: string): strin
 function samePath(left: string, right: string): boolean { const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase(); return normalize(left) === normalize(right); }
 function validCommitMessage(value: string): boolean { return !!value.trim() && value.length <= 120 && !/[\0\r\n]/.test(value); }
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/"); }
-function isDefaultBranch(value: string): boolean { return /^(main|master|trunk)$/i.test(value); }
 function cloneMutation<T extends GitMutation>(mutation: T): T { return JSON.parse(JSON.stringify(mutation)) as T; }

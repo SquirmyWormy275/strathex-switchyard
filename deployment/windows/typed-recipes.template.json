@@ -6,6 +6,10 @@
       "executable": "tools/REPLACE-WITH-PINNED-SANDBOX-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["full-sandbox", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
       "coverage": [{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"production_data","fixtureId":"REPLACE"},{"dimension":"ambient_credentials","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
     },
+    "rebuild_full_sandbox": {
+      "executable": "tools/REPLACE-WITH-PINNED-SANDBOX-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["rebuild-full-sandbox", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
+      "coverage": [{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"production_data","fixtureId":"REPLACE"},{"dimension":"ambient_credentials","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []
+    },
     "quarantine": {
       "executable": "tools/REPLACE-WITH-PINNED-QUARANTINE-TOOL.exe", "executableSha256": "0000000000000000000000000000000000000000000000000000000000000000", "arguments": ["quarantine", "{INPUT_ROOT}", "{WORK_ROOT}"], "workingRoot": "work", "workingDirectory": ".", "environment": {}, "timeoutMs": 3600000, "maxOutputBytes": 1048576,
       "coverage": [{"dimension":"isolation","fixtureId":"REPLACE"},{"dimension":"quarantine","fixtureId":"REPLACE"}], "scannerFixtureIds": [], "advisoryFixtureIds": []

@@ -156,7 +156,13 @@ export class GitCliInspector implements GitInspector {
     if (!repositoryRoot) return { ...(targetHint ? { repositoryRoot: targetHint } : {}), issues: [shortFailure("root discovery", rootResult)] };
 
     const remote = await this.optional(["remote", "get-url", "origin"], repositoryRoot, "canonical remote", issues);
-    const branch = await this.optional(["branch", "--show-current"], repositoryRoot, "branch", issues);
+    const branchResult = await this.runner.run(["branch", "--show-current"], repositoryRoot);
+    const branch = branchResult.exitCode === 0 ? cleanOutput(branchResult.stdout) : undefined;
+    if (branchResult.exitCode !== 0) issues.push(shortFailure("branch", branchResult));
+    const detached = branchResult.exitCode === 0 && !branch;
+    const remoteDefault = await this.optional(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], repositoryRoot, "default branch", issues, false);
+    const defaultBranch = remoteDefault?.startsWith("origin/") ? remoteDefault.slice("origin/".length) : undefined;
+    if (remoteDefault && !defaultBranch) issues.push("Git default branch reference is not bound to origin.");
     const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues, false);
     const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
     const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
@@ -170,6 +176,8 @@ export class GitCliInspector implements GitInspector {
       repositoryRoot,
       ...(remote ? { canonicalRemote: remote } : {}),
       ...(branch ? { branch } : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+      ...(detached ? { detached: true as const } : {}),
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),

@@ -202,6 +202,12 @@ class FakeBridge implements ExtensionCompanionBridge {
     this.prepared.push(command);
     return { ok: true, value: this.nextPreparation ?? { status: "prepared", summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" } };
   }
+  async inspectGitReview(sessionId: string) {
+    const session = this.registered.find((candidate) => candidate.id === sessionId);
+    if (!session?.workspaceRoot) return { ok: false, code: "not_found", message: "missing" } as const;
+    const branch = session.metadata["sxsy-b122.branch"];
+    return { ok: true, value: { repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId ?? "snapshot-review", ...(branch && branch !== "unknown" ? { branch } : {}), defaultBranch: "main", detached: !branch || branch === "unknown", changedPaths: ["src/safe.ts", "README.md"] } } as const;
+  }
   async reviewGitMutation(request: { action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }): Promise<BridgeResult<GitReviewResult>> {
     this.gitReviews.push(request);
     return { ok: true, value: { status: "approved", summary: "Reviewed by fake companion." } };

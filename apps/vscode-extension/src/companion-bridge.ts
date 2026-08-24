@@ -83,6 +83,15 @@ export interface GitReviewResult {
   readonly session?: ExtensionManagedSession;
 }
 
+export interface GitReviewWorkspace {
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly branch?: string;
+  readonly defaultBranch?: string;
+  readonly detached: boolean;
+  readonly changedPaths: readonly string[];
+}
+
 export interface RepositoryRuntimePin {
   readonly canonicalRepositoryRoot: string;
   readonly manifestPath: string;
@@ -128,6 +137,7 @@ export interface ExtensionCompanionBridge {
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
   prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>>;
+  inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>>;
   reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
   installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
   listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>>;
@@ -226,6 +236,21 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   async reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>> {
     const result = await this.call<{ review: GitReviewResult }>("git.review.submit", request);
     return result.ok ? { ok: true, value: result.value.review } : result;
+  }
+
+  async inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>> {
+    const result = await this.call<unknown>("git.review.inspect", { sessionId });
+    if (!result.ok) return result;
+    const workspace = isRecord(result.value) ? result.value.workspace : undefined;
+    if (!isRecord(workspace) || !allowedExactKeys(workspace, ["repositoryRoot", "targetSnapshotId", "detached", "changedPaths"], ["branch", "defaultBranch"])
+      || typeof workspace.repositoryRoot !== "string" || !workspace.repositoryRoot || workspace.repositoryRoot.length > 4_096 || /[\r\n\0]/.test(workspace.repositoryRoot)
+      || typeof workspace.targetSnapshotId !== "string" || !workspace.targetSnapshotId
+      || typeof workspace.detached !== "boolean"
+      || (workspace.branch !== undefined && (typeof workspace.branch !== "string" || !safeBranch(workspace.branch)))
+      || (workspace.defaultBranch !== undefined && (typeof workspace.defaultBranch !== "string" || !safeBranch(workspace.defaultBranch)))
+      || (workspace.detached === true && workspace.branch !== undefined)
+      || !Array.isArray(workspace.changedPaths) || workspace.changedPaths.length > 4_096 || !workspace.changedPaths.every((path) => typeof path === "string" && path.length > 0 && path.length <= 4_096 && !/[\r\n\0]/.test(path))) return invalidResponse();
+    return { ok: true, value: { repositoryRoot: workspace.repositoryRoot, targetSnapshotId: workspace.targetSnapshotId, detached: workspace.detached, changedPaths: workspace.changedPaths as string[], ...(typeof workspace.branch === "string" ? { branch: workspace.branch } : {}), ...(typeof workspace.defaultBranch === "string" ? { defaultBranch: workspace.defaultBranch } : {}) } };
   }
 
   async installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>> {
@@ -473,6 +498,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   prepareCommand(): Promise<BridgeResult<PreparedCommand>> { return this.unavailable(); }
+  inspectGitReview(): Promise<BridgeResult<GitReviewWorkspace>> { return this.unavailable(); }
   reviewGitMutation(): Promise<BridgeResult<GitReviewResult>> { return this.unavailable(); }
   installRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
   listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> { return this.unavailable(); }
@@ -552,6 +578,11 @@ function isLocalHostAction(value: string): value is LocalHostAction {
     "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
     "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv"
   ].includes(value);
+}
+
+function safeBranch(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,240}$/.test(value)
+    && !value.startsWith("-") && !value.endsWith("/") && !value.includes("..") && !value.includes("@{");
 }
 
 function hardwareClaimPayload(claim: HardwareSignalClaim, extra: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {

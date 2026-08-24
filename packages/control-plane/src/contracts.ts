@@ -17,6 +17,10 @@ export interface TargetSnapshot {
   readonly repositoryRoot: string;
   readonly canonicalRemote?: string;
   readonly branch?: string;
+  /** Host-observed default branch, usually from refs/remotes/origin/HEAD. */
+  readonly defaultBranch?: string;
+  /** True only when Git positively observed HEAD detached from every branch. */
+  readonly detached?: true;
   readonly upstream?: string;
   readonly head?: string;
   readonly indexTree?: string;

@@ -59,6 +59,7 @@ test("self-contained repository runner proves Job-Object child and grandchild co
 
   const recipeIds = [
     "full_sandbox",
+    "rebuild_full_sandbox",
     "quarantine",
     "pipeline_local_gate",
     "pipeline_clean_reproduction",

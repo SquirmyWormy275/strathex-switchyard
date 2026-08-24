@@ -31,6 +31,7 @@ export type CompanionMethod =
   | "command.prepare"
   | "confirmation.request"
   | "git.review.submit"
+  | "git.review.inspect"
   | "runtime.pin.install"
   | "runtime.pin.list"
   | "runtime.pin.revoke"
@@ -180,6 +181,7 @@ export interface GitReviewPayload {
   readonly sessionId: string;
   readonly mutation: GitMutation;
 }
+export interface GitReviewInspectPayload { readonly sessionId: string; }
 
 /** Paths are selection input only; digest and user-presence evidence are host-owned. */
 export interface RuntimePinInstallPayload {
@@ -271,7 +273,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
-    "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
+    "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake",
     "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",

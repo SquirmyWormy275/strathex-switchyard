@@ -99,7 +99,7 @@ internal static class Program
 
     private static async Task<int> RunTypedRecipeAsync(string recipeId, string inputArgument, string workArgument, string expectedConfigDigest)
     {
-        string[] supported = { "full_sandbox", "quarantine", "pipeline_local_gate", "pipeline_clean_reproduction", "shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield" };
+        string[] supported = { "full_sandbox", "rebuild_full_sandbox", "quarantine", "pipeline_local_gate", "pipeline_clean_reproduction", "shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield" };
         if (!supported.Contains(recipeId, StringComparer.Ordinal)) throw new RunnerException(64, "Recipe mode is not one of the fixed typed identifiers.");
         string inputRoot = RequireConcreteDirectory(inputArgument, "recipe input root");
         string workRoot = RequireConcreteDirectory(workArgument, "recipe work root");
@@ -269,7 +269,7 @@ internal static class Program
 
     private static string[] RequiredCoverage(string recipeId) => recipeId switch
     {
-        "full_sandbox" => new[] { "isolation", "production_data", "ambient_credentials" },
+        "full_sandbox" or "rebuild_full_sandbox" => new[] { "isolation", "production_data", "ambient_credentials" },
         "quarantine" => new[] { "isolation", "quarantine" },
         "pipeline_local_gate" => new[] { "correctness", "isolation", "production_data", "ambient_credentials" },
         "pipeline_clean_reproduction" => new[] { "correctness", "reproduction", "isolation", "production_data", "ambient_credentials" },

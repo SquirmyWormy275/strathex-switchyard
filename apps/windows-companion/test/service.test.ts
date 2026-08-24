@@ -191,7 +191,10 @@ test("provider handshake capabilities can enter only through the trusted coordin
 
 test("Git review accepts only an exact typed mutation and cannot carry force or shell fields", async () => {
   const reviewed: unknown[] = [];
-  const service = new CompanionService({ gitReviews: { async review(payload) { reviewed.push(payload); return { status: "approved", summary: "Exact mutation approved." }; } } });
+  const service = new CompanionService({ gitReviews: {
+    async inspect() { return { repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), branch: "feature/review", defaultBranch: "main", detached: false, changedPaths: ["src/safe.ts"] }; },
+    async review(payload) { reviewed.push(payload); return { status: "approved", summary: "Exact mutation approved." }; }
+  } });
   const response = await service.handle(request("review", "git.review.submit", {
     action: "local_commit",
     sessionId: "session-1",

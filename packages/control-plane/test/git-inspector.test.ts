@@ -38,6 +38,7 @@ test("read-only Git inspector uses fixed argument vectors and classifies every u
     "rev-parse --show-toplevel": result("C:/work/example\n"),
     "remote get-url origin": result("https://github.com/example/repo.git\n"),
     "branch --show-current": result("feature/safe\n"),
+    "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/main\n"),
     "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": result("origin/feature/safe\n"),
     "rev-parse HEAD": result("abc123\n"),
     "write-tree": result("tree123\n"),
@@ -54,6 +55,8 @@ test("read-only Git inspector uses fixed argument vectors and classifies every u
   });
   const inspection = await inspector.inspect("C:/work/example");
   assert.equal(inspection.repositoryRoot, "C:/work/example");
+  assert.equal(inspection.defaultBranch, "main");
+  assert.equal(inspection.detached, undefined);
   assert.equal(inspection.trackedFiles?.length, 2);
   assert.deepEqual(inspection.untrackedFiles, [{ path: "scratch.txt", digest: "sha256:scratch.txt", classification: "excluded", source: "untracked" }]);
   assert.deepEqual(inspection.ignoredFiles, [{ path: ".env.local", digest: "sha256:.env.local", classification: "excluded", source: "ignored" }]);
@@ -66,6 +69,7 @@ test("read-only Git inspector degrades an unreadable or unclassified file to an 
     "rev-parse --show-toplevel": result("C:/work/example\n"),
     "remote get-url origin": result("https://github.com/example/repo.git\n"),
     "branch --show-current": result("feature/safe\n"),
+    "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/main\n"),
     "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": result("origin/feature/safe\n"),
     "rev-parse HEAD": result("abc123\n"),
     "write-tree": result("tree123\n"),
@@ -79,4 +83,24 @@ test("read-only Git inspector degrades an unreadable or unclassified file to an 
   assert.equal(inspection.untrackedFiles?.[0]?.digest, undefined);
   assert.match(inspection.issues?.join(" ") ?? "", /unable to hash/i);
   assert.equal(inspection.ignoredFiles?.[0]?.classification, "unknown");
+});
+
+test("read-only Git inspector distinguishes a detached HEAD from an unavailable branch observation", async () => {
+  const runner = new ScriptedRunner({
+    "rev-parse --show-toplevel": result("C:/work/example\n"),
+    "remote get-url origin": result("https://github.com/example/repo.git\n"),
+    "branch --show-current": result("\n"),
+    "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/trunk\n"),
+    "rev-parse HEAD": result("abc123\n"),
+    "write-tree": result("tree123\n"),
+    "ls-files -z": result(""),
+    "ls-files --others --exclude-standard -z": result(""),
+    "ls-files --others --ignored --exclude-standard -z": result(""),
+    "submodule status --recursive": result("")
+  });
+  const inspection = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect("C:/work/example");
+  assert.equal(inspection.branch, undefined);
+  assert.equal(inspection.detached, true);
+  assert.equal(inspection.defaultBranch, "trunk");
+  assert.equal(inspection.issues?.some((issue) => /branch/i.test(issue)), false);
 });

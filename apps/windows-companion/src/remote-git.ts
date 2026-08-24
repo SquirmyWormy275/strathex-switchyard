@@ -105,7 +105,7 @@ export class ConfiguredRemoteGitHandler {
         if (!this.receipts || !await this.receipts.verify(request.mutation.validationReceiptId, request.target.id)) return { status: "blocked", summary: "Direct Main requires a fresh complete Release Shield receipt bound to this exact TargetSnapshot.", effectDisposition: "not_started" };
         try {
           const base = await this.github.defaultBranch({ repositoryRoot: request.target.repositoryRoot, ...repository, request });
-          if (base !== "main" && base !== "master") return { status: "blocked", summary: "Direct Main requires an exact GitHub default branch named main or master.", effectDisposition: "not_started" };
+          if (!validBranch(base)) return { status: "blocked", summary: "Direct Main requires the exact host-reported GitHub default branch identity.", effectDisposition: "not_started" };
           const pushed = await this.child(request, "git.direct-main", { repositoryRoot: request.target.repositoryRoot, remote: request.target.canonicalRemote, ref: `refs/heads/${base}`, expectedHead: request.target.head }, async () => this.pusher.push({ repositoryRoot: request.target.repositoryRoot, sourceHead: request.target.head!, destinationBranch: base, request }));
           return pushed.status === "completed" ? { status: "completed", summary: "Advanced the exact default branch without force after the high-consequence gate and reviewed receipt were admitted.", effectDisposition: "committed", data: { branch: base, head: request.target.head } } : pushed;
         } catch (error) { return failed(error, "Direct Main failed closed."); }
