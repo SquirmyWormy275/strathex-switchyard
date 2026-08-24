@@ -83,7 +83,11 @@ test("Council reports collisions and refuses automatic coordination on overlap, 
     await council.assign(epoch.id, "agent-b", ["src/b.ts"], ["port:4200"]);
     await council.acknowledgeAssignment(epoch.id, "agent-a");
     await council.acknowledgeAssignment(epoch.id, "agent-b");
-    assert.equal((await council.resume(epoch.id)).status, "active");
+    assert.equal((await council.beginResume(epoch.id)).status, "awaiting_resume_acknowledgements");
+    await council.acknowledgeResume(epoch.id, "agent-a");
+    assert.equal((await council.get(epoch.id))?.status, "awaiting_resume_acknowledgements");
+    await council.acknowledgeResume(epoch.id, "agent-b");
+    assert.equal((await council.activate(epoch.id)).status, "active");
 
     const stopped = await council.validate(epoch.id, [
       { ...session("agent-a", ["src/a.ts"], ["port:4100"]), diffDigest: "unexpected-edit" },
@@ -91,6 +95,25 @@ test("Council reports collisions and refuses automatic coordination on overlap, 
     ]);
     assert.equal(stopped.status, "aborted");
     assert.match(stopped.abortReason ?? "", /changed/i);
+  });
+});
+
+test("Council cannot become active before every durable resume acknowledgement and has an explicit completion transition", async () => {
+  await withStore(async (store) => {
+    const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "epoch-resume" });
+    const epoch = await council.beginAutomatic({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
+      session("agent-a", ["src/a.ts"], ["port:4100"]), session("agent-b", ["src/b.ts"], ["port:4200"])
+    ] });
+    for (const id of ["agent-a", "agent-b"]) await council.acknowledgePause(epoch.id, id);
+    await council.assign(epoch.id, "agent-a", ["src/a.ts"], ["port:4100"]);
+    await council.assign(epoch.id, "agent-b", ["src/b.ts"], ["port:4200"]);
+    for (const id of ["agent-a", "agent-b"]) await council.acknowledgeAssignment(epoch.id, id);
+    await council.beginResume(epoch.id);
+    await council.acknowledgeResume(epoch.id, "agent-a");
+    await assert.rejects(council.activate(epoch.id), /resume/i);
+    await council.acknowledgeResume(epoch.id, "agent-b");
+    await council.activate(epoch.id);
+    assert.equal((await council.complete(epoch.id)).status, "completed");
   });
 });
 
@@ -110,5 +133,23 @@ test("Council normal is truthful for an Observable-only participant instead of p
     await assert.rejects(council.beginAutomatic({
       repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: report.participants
     }), /cooperative pause/i);
+  });
+});
+
+test("Council recommendations are immutable durable artifacts and never authorize execution", async () => {
+  await withStore(async (store) => {
+    const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "recommendation-1" });
+    const prepared = await council.prepareRecommendation({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
+      session("agent-a", ["src/a.ts"], ["port:4100"]), session("agent-b", ["src/b.ts"], ["port:4200"])
+    ] });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(prepared.ready, true);
+    assert.equal(prepared.executionAuthorized, false);
+    const approved = await council.approveRecommendation(prepared.id, "operation-confirmed-1");
+    assert.equal(approved.status, "approved");
+    assert.equal(approved.approvalOperationId, "operation-confirmed-1");
+    assert.equal(approved.executionAuthorized, false);
+    const reloaded = new CouncilCoordinator(store);
+    assert.equal((await reloaded.getRecommendation(prepared.id))?.digest, prepared.digest);
   });
 });

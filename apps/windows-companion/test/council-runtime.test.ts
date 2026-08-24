@@ -39,7 +39,8 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
     await sessions.upsert(session("two", "claude", ["src/two.ts"]));
     const phases: string[] = [];
     const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; phases.push(`${input.routeId}:${document.phase}:${document.sessionId}`); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true })) }; } } as unknown as DynamicConfiguredNetworkClient;
-    const executor = new DurableConfiguredCouncilExecutor(new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-1" }), sessions, network, () => Date.parse(at));
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-1" });
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at));
     const result = await executor.execute({ action: "council_automatic", operationId: "operation-auto", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "completed");
     assert.equal(result.data?.status, "active");
@@ -48,6 +49,7 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
       "provider.council.codex:assignment:one", "provider.council.claude:assignment:two",
       "provider.council.codex:resume:one", "provider.council.claude:resume:two"
     ]);
+    assert.deepEqual((await council.get("epoch-1"))?.resumeAcknowledgedSessionIds, ["one", "two"]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -62,5 +64,22 @@ test("automatic Council aborts durably on a malformed provider acknowledgement",
     const result = await new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at)).execute({ action: "council_automatic", operationId: "operation-auto", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "incomplete");
     assert.equal((await council.get("epoch-2"))?.status, "aborted");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("confirmed Council recommendation persists an approved non-executing artifact", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-recommend-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "recommendation-1" });
+    const result = await new DurableConfiguredCouncilExecutor(council, sessions, undefined, () => Date.parse(at)).execute({ action: "council_recommend", operationId: "operation-recommend", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "completed");
+    assert.equal(result.data?.recommendationId, "recommendation-1");
+    const stored = await council.getRecommendation("recommendation-1");
+    assert.equal(stored?.status, "approved");
+    assert.equal(stored?.executionAuthorized, false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

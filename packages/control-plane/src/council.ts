@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { Capability, SessionStatus } from "./contracts.ts";
-import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
+import { jsonClone, type JournalEntry, ProtectedJsonStore, sha256, stableJson } from "./store.ts";
 
 export interface CouncilParticipant {
   readonly id: string;
@@ -32,7 +32,7 @@ export interface CouncilReport {
   readonly collectedAt: string;
 }
 
-export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "active" | "aborted" | "completed";
+export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "awaiting_resume_acknowledgements" | "active" | "aborted" | "completed";
 
 export interface CouncilAssignment {
   readonly sessionId: string;
@@ -48,13 +48,33 @@ export interface CouncilEpoch {
   readonly assignments: Readonly<Record<string, CouncilAssignment>>;
   readonly pauseAcknowledgedSessionIds: readonly string[];
   readonly assignmentAcknowledgedSessionIds: readonly string[];
+  readonly resumeAcknowledgedSessionIds: readonly string[];
   readonly status: CouncilEpochStatus;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly abortReason?: string;
 }
 
+export type CouncilRecommendationStatus = "prepared" | "approved" | "rejected";
+export interface CouncilRecommendation {
+  readonly id: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participantSessionIds: readonly string[];
+  readonly assignments: Readonly<Record<string, CouncilAssignment>>;
+  readonly reportDigest: string;
+  readonly digest: string;
+  readonly ready: boolean;
+  readonly status: CouncilRecommendationStatus;
+  readonly approvalOperationId?: string;
+  readonly rejectionReason?: string;
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 interface CouncilEpochSavedEvent { readonly epoch: CouncilEpoch; }
+interface CouncilRecommendationSavedEvent { readonly recommendation: CouncilRecommendation; }
 
 export class CouncilError extends Error {
   constructor(message: string) {
@@ -95,7 +115,17 @@ function cloneEpoch(epoch: CouncilEpoch): CouncilEpoch {
       resources: [...assignment.resources]
     }])),
     pauseAcknowledgedSessionIds: [...epoch.pauseAcknowledgedSessionIds],
-    assignmentAcknowledgedSessionIds: [...epoch.assignmentAcknowledgedSessionIds]
+    assignmentAcknowledgedSessionIds: [...epoch.assignmentAcknowledgedSessionIds],
+    resumeAcknowledgedSessionIds: [...(epoch.resumeAcknowledgedSessionIds ?? [])]
+  };
+}
+
+function cloneRecommendation(value: CouncilRecommendation): CouncilRecommendation {
+  return {
+    ...value,
+    participantSessionIds: [...value.participantSessionIds],
+    assignments: Object.fromEntries(Object.entries(value.assignments).map(([id, assignment]) => [id, { ...assignment, paths: [...assignment.paths], resources: [...assignment.resources] }])),
+    executionAuthorized: false
   };
 }
 
@@ -106,6 +136,18 @@ function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilE
     const epoch = (entry.payload as CouncilEpochSavedEvent | undefined)?.epoch;
     if (!epoch || typeof epoch.id !== "string") throw new CouncilError("Protected Council epoch record is malformed.");
     result.set(epoch.id, cloneEpoch(epoch));
+  }
+  return result;
+}
+
+function recommendations(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilRecommendation> {
+  const result = new Map<string, CouncilRecommendation>();
+  for (const entry of entries) {
+    if (entry.kind !== "council.recommendation.saved") continue;
+    const value = (entry.payload as CouncilRecommendationSavedEvent | undefined)?.recommendation;
+    if (!value || value.executionAuthorized !== false || !["prepared", "approved", "rejected"].includes(value.status)) throw new CouncilError("Protected Council recommendation is malformed.");
+    if (recommendationDigest(value) !== value.digest) throw new CouncilError("Protected Council recommendation digest is invalid.");
+    result.set(value.id, cloneRecommendation(value));
   }
   return result;
 }
@@ -150,7 +192,7 @@ function conflicts(participants: readonly CouncilParticipant[], field: "plannedF
     .sort((a, b) => a.resource.localeCompare(b.resource));
 }
 
-function allAcknowledged(epoch: CouncilEpoch, field: "pauseAcknowledgedSessionIds" | "assignmentAcknowledgedSessionIds"): boolean {
+function allAcknowledged(epoch: CouncilEpoch, field: "pauseAcknowledgedSessionIds" | "assignmentAcknowledgedSessionIds" | "resumeAcknowledgedSessionIds"): boolean {
   const acknowledgements = new Set(epoch[field]);
   return epoch.participants.every((participant) => acknowledgements.has(participant.id));
 }
@@ -212,6 +254,7 @@ export class CouncilCoordinator {
       assignments: {},
       pauseAcknowledgedSessionIds: [],
       assignmentAcknowledgedSessionIds: [],
+      resumeAcknowledgedSessionIds: [],
       status: "awaiting_pause_acknowledgements",
       createdAt: now,
       updatedAt: now
@@ -276,12 +319,74 @@ export class CouncilCoordinator {
     });
   }
 
-  async resume(id: string): Promise<CouncilEpoch> {
+  async beginResume(id: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council epoch cannot resume from its current state.");
       if (Object.keys(epoch.assignments).length !== epoch.participants.length) throw new CouncilError("Every Council participant needs an explicit assignment before resuming.");
       if (!allAcknowledged(epoch, "assignmentAcknowledgedSessionIds")) throw new CouncilError("Every Council participant must acknowledge its assignment before resuming.");
+      return { ...epoch, status: "awaiting_resume_acknowledgements", resumeAcknowledgedSessionIds: [] };
+    });
+  }
+
+  async prepareRecommendation(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilRecommendation> {
+    const report = await this.report(input);
+    const ready = report.atomic && report.pathConflicts.length === 0 && report.resourceConflicts.length === 0 && report.dependencyConflicts.length === 0;
+    const assignments = ready ? Object.fromEntries(report.participants.map((participant) => [participant.id, { sessionId: participant.id, paths: participant.plannedFiles, resources: participant.resources }])) : {};
+    const now = this.clock();
+    const base = {
+      id: nonEmpty(this.idFactory(), "Council recommendation id"), repositoryRoot: report.repositoryRoot, targetSnapshotId: report.targetSnapshotId,
+      participantSessionIds: report.participants.map((participant) => participant.id).sort(), assignments,
+      reportDigest: sha256(stableJson(report)), ready, createdAt: now
+    };
+    const recommendation: CouncilRecommendation = { ...base, digest: recommendationDigest(base), status: "prepared", executionAuthorized: false, updatedAt: now };
+    return this.store.transaction(async (transaction) => {
+      if (recommendations(await transaction.readEntries()).has(recommendation.id)) throw new CouncilError(`Council recommendation already exists: ${recommendation.id}`);
+      await transaction.append<CouncilRecommendationSavedEvent>("council.recommendation.saved", { recommendation });
+      return cloneRecommendation(recommendation);
+    });
+  }
+
+  async getRecommendation(id: string): Promise<CouncilRecommendation | undefined> {
+    const found = recommendations(await this.store.readEntries()).get(nonEmpty(id, "Council recommendation id"));
+    return found ? cloneRecommendation(found) : undefined;
+  }
+
+  async approveRecommendation(id: string, operationId: string): Promise<CouncilRecommendation> {
+    return this.mutateRecommendation(id, (value) => {
+      if (value.status === "approved" && value.approvalOperationId === operationId) return value;
+      if (value.status !== "prepared") throw new CouncilError(`Council recommendation is already ${value.status}.`);
+      if (!value.ready) throw new CouncilError("Council recommendation cannot be approved while participant, target, path, resource, or dependency conflicts remain.");
+      return { ...value, status: "approved", approvalOperationId: nonEmpty(operationId, "approval operation id"), executionAuthorized: false };
+    });
+  }
+
+  async rejectRecommendation(id: string, reason: string): Promise<CouncilRecommendation> {
+    return this.mutateRecommendation(id, (value) => {
+      if (value.status === "approved") throw new CouncilError("An approved Council recommendation cannot be silently rejected.");
+      return { ...value, status: "rejected", rejectionReason: nonEmpty(reason, "recommendation rejection reason"), executionAuthorized: false };
+    });
+  }
+
+  async acknowledgeResume(id: string, sessionId: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_resume_acknowledgements") throw new CouncilError("Council resume acknowledgement is not accepted for this epoch.");
+      this.assertParticipant(epoch, sessionId);
+      return { ...epoch, resumeAcknowledgedSessionIds: unique([...epoch.resumeAcknowledgedSessionIds, sessionId], "session id") };
+    });
+  }
+
+  async activate(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_resume_acknowledgements") throw new CouncilError("Council epoch cannot activate from its current state.");
+      if (!allAcknowledged(epoch, "resumeAcknowledgedSessionIds")) throw new CouncilError("Every Council participant must durably acknowledge resume before the epoch becomes active.");
       return { ...epoch, status: "active" };
+    });
+  }
+
+  async complete(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "active") throw new CouncilError("Only an active Council epoch can be completed.");
+      return { ...epoch, status: "completed" };
     });
   }
 
@@ -334,9 +439,23 @@ export class CouncilCoordinator {
     });
   }
 
+  private async mutateRecommendation(id: string, mutate: (value: CouncilRecommendation) => CouncilRecommendation): Promise<CouncilRecommendation> {
+    return this.store.transaction(async (transaction) => {
+      const existing = recommendations(await transaction.readEntries()).get(nonEmpty(id, "Council recommendation id"));
+      if (!existing) throw new CouncilError(`Unknown Council recommendation: ${id}`);
+      const changed = { ...mutate(cloneRecommendation(existing)), updatedAt: this.clock(), executionAuthorized: false as const };
+      await transaction.append<CouncilRecommendationSavedEvent>("council.recommendation.saved", { recommendation: changed });
+      return cloneRecommendation(changed);
+    });
+  }
+
   private assertParticipant(epoch: CouncilEpoch, sessionId: string): CouncilParticipant {
     const found = epoch.participants.find((participant) => participant.id === sessionId);
     if (!found) throw new CouncilError("Session is not a participant in this Council epoch.");
     return found;
   }
+}
+
+function recommendationDigest(value: Pick<CouncilRecommendation, "id" | "repositoryRoot" | "targetSnapshotId" | "participantSessionIds" | "assignments" | "reportDigest" | "ready" | "createdAt">): string {
+  return sha256(stableJson({ id: value.id, repositoryRoot: value.repositoryRoot, targetSnapshotId: value.targetSnapshotId, participantSessionIds: value.participantSessionIds, assignments: value.assignments, reportDigest: value.reportDigest, ready: value.ready, createdAt: value.createdAt }));
 }

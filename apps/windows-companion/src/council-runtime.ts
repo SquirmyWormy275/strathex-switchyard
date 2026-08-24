@@ -22,7 +22,15 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     if (!participants.length) return { status: "unavailable", summary: "Council found no fresh Observable session bound to the exact TargetSnapshot.", effectDisposition: "not_started" };
     const report = await this.council.report({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
     if (request.action === "council_report") return reportOutcome(report, "Collected a durable Council report from every fresh exact-target Observable session.");
-    if (request.action === "council_recommend") return reportOutcome(report, "Prepared a confirmed deterministic Council recommendation; no participant state was changed.");
+    if (request.action === "council_recommend") {
+      try {
+        const prepared = await this.council.prepareRecommendation({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
+        const approved = await this.council.approveRecommendation(prepared.id, request.operationId);
+        return { status: "completed", summary: "Durably prepared and approved one exact-target Council recommendation; no participant was resumed or mutated.", effectDisposition: "committed", data: { recommendationId: approved.id, recommendationDigest: approved.digest, status: approved.status, participants: approved.participantSessionIds.length, executionAuthorized: approved.executionAuthorized } };
+      } catch (error) {
+        return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council recommendation could not be approved."), effectDisposition: "not_started" };
+      }
+    }
     if (!this.network) return { status: "unavailable", summary: "Automatic Council requires configured exact-route provider adapters.", effectDisposition: "not_started" };
     if (participants.length < 2) return { status: "blocked", summary: "Automatic Council requires at least two fresh mediated participants on the exact target.", effectDisposition: "not_started" };
     if (!participants.every((participant) => participant.capabilities.includes("mediated") && participant.capabilities.includes("controllable") && participant.status === "running")) return { status: "blocked", summary: "Automatic Council requires every participant to be fresh, running, Controllable, and Mediated.", effectDisposition: "not_started" };
@@ -36,8 +44,12 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
         await this.phase(request, epoch.id, participant, "assignment");
         await this.council.acknowledgeAssignment(epoch.id, participant.id);
       }
-      const active = await this.council.resume(epoch.id);
-      for (const participant of participants) await this.phase(request, epoch.id, participant, "resume");
+      await this.council.beginResume(epoch.id);
+      for (const participant of participants) {
+        await this.phase(request, epoch.id, participant, "resume");
+        await this.council.acknowledgeResume(epoch.id, participant.id);
+      }
+      const active = await this.council.activate(epoch.id);
       return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, participants: participants.length, status: active.status } };
     } catch (error) {
       await this.council.abort(epoch.id, error instanceof Error ? error.message : "A Council provider acknowledgement failed.").catch(() => undefined);
