@@ -137,7 +137,7 @@ export function encodeSignal(signal: B122Signal): Uint8Array {
 }
 
 export function decodeSignal(packet: Uint8Array): B122Signal | undefined {
-  if (packet.length < 8 || packet[0] !== 0xb1 || packet[1] !== protocolVersion) return undefined;
+  if (packet.length !== 8 || packet[0] !== 0xb1 || packet[1] !== protocolVersion) return undefined;
   if (packet.slice(7).some((byte) => byte !== 0)) return undefined;
   const checksum = packet.slice(0, 6).reduce((value, byte) => value ^ byte, 0);
   const control = controlFromId(packet[2]);

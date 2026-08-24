@@ -33,6 +33,23 @@ test("registry preserves capability truth and never infers blocked or finished f
   assert.equal(registry.applyCapabilityReport("codex-1", { capability: { registered: true, observable: true, controllable: false, mediated: false }, status: "verified_finished", heartbeat: Date.now(), evidenceDigest: "provider-event" })?.status, "verified_finished");
 });
 
+test("capability reports cannot escalate to mediated or roll back a newer lifecycle event", () => {
+  const registry = new SessionRegistry(); const current = session(); registry.register(current);
+  assert.throws(() => registry.register({ ...current, capability: { registered: false, observable: false, controllable: true, mediated: true } }), /internally inconsistent/i);
+  assert.equal(registry.applyCapabilityReport(current.id, { capability: current.capability, status: "running", heartbeat: current.lastHeartbeat - 1, evidenceDigest: "old-report" }), undefined);
+  assert.equal(registry.applyCapabilityReport(current.id, { capability: { registered: false, observable: false, controllable: false, mediated: true }, status: "running", heartbeat: current.lastHeartbeat + 1, evidenceDigest: "bad-escalation" }), undefined);
+});
+
+test("controls require their independently proved provider capability", async () => {
+  const setup = await fixture();
+  try {
+    setup.registry.update(setup.selected.id, { capability: { registered: true, observable: false, controllable: false, mediated: true } });
+    const coordinator = new OperationCoordinator(setup.store, setup.registry, setup.authorities, new DeterministicAdapter());
+    assert.equal((await coordinator.dispatch({ control: "REANCHOR", modifier: "normal", sessionId: setup.selected.id, target: setup.selected.target })).status, "blocked");
+    assert.equal((await coordinator.dispatch({ control: "FIND_BLOCKED_AGENT", modifier: "normal", sessionId: setup.selected.id, target: setup.selected.target })).status, "blocked");
+  } finally { await rm(setup.directory, { recursive: true, force: true }); }
+});
+
 test("all 65 settled controls dispatch and intentionally unassigned chords do not", async () => {
   const setup = await fixture();
   try {
@@ -96,6 +113,42 @@ test("Pipeline uses an isolated test-environment broker before executing", async
     assert.equal(result.status, "recorded"); assert.deepEqual(execution.calls, ["PIPELINE:shift"]);
     const repeated = await coordinator.dispatch({ control: "PIPELINE", modifier: "shift", sessionId: setup.selected.id, authorityId: "expired", target: setup.selected.target });
     assert.equal(repeated.status, "recorded"); assert.deepEqual(execution.calls, ["PIPELINE:shift"]);
+  } finally { await rm(setup.directory, { recursive: true, force: true }); }
+});
+
+test("stale lifecycle state and idempotency-key confusion cannot reach an execution broker", async () => {
+  const setup = await fixture();
+  try {
+    const execution = new DeterministicExecutionBroker(); const coordinator = new OperationCoordinator(setup.store, setup.registry, setup.authorities, new DeterministicAdapter(), execution, new DeterministicTestEnvironmentBroker());
+    const stale = await coordinator.dispatch({ control: "PIPELINE", modifier: "shift", sessionId: setup.selected.id, authorityId: "authority", target: setup.selected.target, now: setup.selected.lastHeartbeat + 60_001 });
+    assert.equal(stale.status, "blocked"); assert.equal(execution.calls.length, 0);
+    const first = await coordinator.dispatch({ control: "PIPELINE", modifier: "shift", sessionId: setup.selected.id, authorityId: "authority", target: setup.selected.target, operationKey: "fixed" });
+    assert.equal(first.status, "recorded");
+    const confused = await coordinator.dispatch({ control: "RUN", modifier: "normal", sessionId: setup.selected.id, target: setup.selected.target, operationKey: "fixed" });
+    assert.equal(confused.status, "blocked"); assert.deepEqual(execution.calls, ["PIPELINE:shift"]);
+  } finally { await rm(setup.directory, { recursive: true, force: true }); }
+});
+
+test("simultaneous identical dispatches create one durable operation and one execution", async () => {
+  const setup = await fixture();
+  try {
+    const execution = new DeterministicExecutionBroker(); const coordinator = new OperationCoordinator(setup.store, setup.registry, setup.authorities, new DeterministicAdapter(), execution, new DeterministicTestEnvironmentBroker());
+    const request = { control: "PIPELINE" as const, modifier: "shift" as const, sessionId: setup.selected.id, authorityId: "authority", target: setup.selected.target, operationKey: "parallel" };
+    const results = await Promise.all([coordinator.dispatch(request), coordinator.dispatch(request)]);
+    assert.equal(results.filter((item) => item.status === "recorded").length, 1);
+    assert.equal(execution.calls.length, 1); assert.equal(setup.store.allOperations().length, 1);
+  } finally { await rm(setup.directory, { recursive: true, force: true }); }
+});
+
+test("child sagas cannot cross targets and are idempotent within their parent", async () => {
+  const setup = await fixture();
+  try {
+    const coordinator = new OperationCoordinator(setup.store, setup.registry, setup.authorities, new DeterministicAdapter());
+    const parent = { id: "parent", idempotencyKey: "parent", action: "COMMIT:shift", targetDigest: setup.selected.target!.digest, status: "recorded" as const, childIds: [], updatedAt: Date.now() };
+    await setup.store.putOperation(parent);
+    await assert.rejects(coordinator.child(parent.id, "push", snapshot("other")), /does not match/i);
+    const first = await coordinator.child(parent.id, "push", setup.selected.target!); const repeated = await coordinator.child(parent.id, "push", setup.selected.target!);
+    assert.equal(first.id, repeated.id); assert.equal(setup.store.allOperations().filter((item) => item.parentId === parent.id).length, 1);
   } finally { await rm(setup.directory, { recursive: true, force: true }); }
 });
 

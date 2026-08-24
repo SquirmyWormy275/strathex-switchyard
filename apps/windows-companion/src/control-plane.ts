@@ -26,14 +26,24 @@ export interface ManagedSession {
 }
 export interface CapabilityReport { capability: CapabilitySet; status: SessionStatus; heartbeat: number; evidenceDigest: string; }
 
+/** Capability labels are independent; only a registered surface may claim one. */
+export function capabilityReportIsConsistent(capability: CapabilitySet): boolean {
+  return capability.registered || (!capability.observable && !capability.controllable && !capability.mediated);
+}
+
 export class SessionRegistry {
   private readonly sessions = new Map<string, ManagedSession>();
-  register(session: ManagedSession): ManagedSession { this.sessions.set(session.id, { ...session, plannedFiles: [...session.plannedFiles] }); return this.get(session.id)!; }
-  get(id: string): ManagedSession | undefined { const item = this.sessions.get(id); return item && { ...item, plannedFiles: [...item.plannedFiles] }; }
-  list(): ManagedSession[] { return [...this.sessions.values()].map((item) => ({ ...item, plannedFiles: [...item.plannedFiles] })); }
+  register(session: ManagedSession): ManagedSession {
+    if (!capabilityReportIsConsistent(session.capability)) throw new Error("Managed-session capability report is internally inconsistent.");
+    this.sessions.set(session.id, { ...session, target: session.target && { ...session.target }, plannedFiles: [...session.plannedFiles] }); return this.get(session.id)!;
+  }
+  get(id: string): ManagedSession | undefined { const item = this.sessions.get(id); return item && { ...item, target: item.target && { ...item.target }, plannedFiles: [...item.plannedFiles] }; }
+  list(): ManagedSession[] { return [...this.sessions.values()].map((item) => ({ ...item, target: item.target && { ...item.target }, plannedFiles: [...item.plannedFiles] })); }
   update(id: string, patch: Partial<ManagedSession>): ManagedSession | undefined { const current = this.sessions.get(id); if (!current) return undefined; return this.register({ ...current, ...patch, id }); }
   applyCapabilityReport(id: string, report: CapabilityReport): ManagedSession | undefined {
-    if (!report.evidenceDigest) return undefined;
+    const current = this.get(id);
+    if (!current || !report.evidenceDigest || !Number.isFinite(report.heartbeat) || report.heartbeat < current.lastHeartbeat) return undefined;
+    if (!capabilityReportIsConsistent(report.capability)) return undefined;
     if ((report.status === "verified_blocked" || report.status === "verified_finished") && !report.capability.observable) return undefined;
     if (report.capability.mediated && !report.capability.registered) return undefined;
     return this.update(id, { capability: { ...report.capability }, status: report.status, lastHeartbeat: report.heartbeat });
@@ -83,18 +93,34 @@ export interface DurableOperation { id: string; parentId?: string; idempotencyKe
 export class ProtectedStore {
   private state: DurableDocument = { version: 1, containment: {}, operations: {}, receipts: [], audit: [] };
   private readonly path: string;
+  private writeChain: Promise<void> = Promise.resolve();
   constructor(path: string) { this.path = path; }
   async load(): Promise<void> { try { const loaded = JSON.parse(await readFile(this.path, "utf8")) as DurableDocument; this.verifyReceipts(loaded.receipts); this.state = loaded; } catch (error: unknown) { if ((error as { code?: string }).code !== "ENOENT") throw error; } }
   private verifyReceipts(receipts: readonly Receipt[]): void { let previousHash: string | undefined; for (const receipt of receipts) { const { hash, ...unsigned } = receipt; if (receipt.previousHash !== previousHash || digest(unsigned) !== hash) throw new Error("Protected receipt chain failed integrity verification."); previousHash = hash; } }
   private async save(): Promise<void> { await mkdir(dirname(this.path), { recursive: true }); const temporary = `${this.path}.${randomUUID()}.tmp`; await writeFile(temporary, JSON.stringify(this.state), "utf8"); await rename(temporary, this.path); }
+  private async mutate<T>(change: () => T): Promise<T> {
+    let result!: T;
+    const write = this.writeChain.then(async () => { result = change(); await this.save(); });
+    this.writeChain = write.catch(() => undefined);
+    await write;
+    return result;
+  }
   operation(key: string): DurableOperation | undefined { return Object.values(this.state.operations).find((operation) => operation.idempotencyKey === key); }
-  async putOperation(operation: DurableOperation): Promise<void> { this.state.operations[operation.id] = operation; await this.save(); }
-  async receipt(receipt: Omit<Receipt, "id" | "previousHash" | "hash">): Promise<Receipt> { const previousHash = this.state.receipts.at(-1)?.hash; const unsigned = { ...receipt, id: randomUUID(), previousHash }; const complete = { ...unsigned, hash: digest(unsigned) }; this.state.receipts.push(complete); await this.save(); return complete; }
+  async putOperation(operation: DurableOperation): Promise<void> { await this.mutate(() => { this.state.operations[operation.id] = { ...operation, childIds: [...operation.childIds] }; }); }
+  async createOperation(operation: DurableOperation): Promise<{ operation: DurableOperation; created: boolean }> {
+    return this.mutate(() => {
+      const existing = this.operation(operation.idempotencyKey);
+      if (existing) return { operation: existing, created: false };
+      this.state.operations[operation.id] = { ...operation, childIds: [...operation.childIds] };
+      return { operation: { ...operation, childIds: [...operation.childIds] }, created: true };
+    });
+  }
+  async receipt(receipt: Omit<Receipt, "id" | "previousHash" | "hash">): Promise<Receipt> { return this.mutate(() => { const previousHash = this.state.receipts.at(-1)?.hash; const unsigned = { ...receipt, id: randomUUID(), previousHash }; const complete = { ...unsigned, hash: digest(unsigned) }; this.state.receipts.push(complete); return complete; }); }
   receipts(): readonly Receipt[] { return this.state.receipts.map((receipt) => ({ ...receipt })); }
-  async audit(entry: AuditEntry): Promise<void> { this.state.audit.push({ ...entry, detail: redact(entry.detail) }); await this.save(); }
+  async audit(entry: AuditEntry): Promise<void> { await this.mutate(() => { this.state.audit.push({ ...entry, detail: redact(entry.detail) }); }); }
   isContained(targetDigest: string): boolean { return Boolean(this.state.containment[targetDigest]); }
-  async contain(targetDigest: string): Promise<void> { this.state.containment[targetDigest] = (this.state.containment[targetDigest] ?? 0) + 1; await this.save(); }
-  async release(targetDigest: string, reauthenticated: boolean, reason: string): Promise<boolean> { if (!reauthenticated || !reason.trim()) return false; delete this.state.containment[targetDigest]; await this.save(); return true; }
+  async contain(targetDigest: string): Promise<void> { await this.mutate(() => { this.state.containment[targetDigest] = (this.state.containment[targetDigest] ?? 0) + 1; }); }
+  async release(targetDigest: string, reauthenticated: boolean, reason: string): Promise<boolean> { if (!reauthenticated || !reason.trim()) return false; return this.mutate(() => { delete this.state.containment[targetDigest]; return true; }); }
   allOperations(): DurableOperation[] { return Object.values(this.state.operations).map((operation) => ({ ...operation, childIds: [...operation.childIds] })); }
 }
 export const redact = (value: string): string => value.replace(/(token|secret|password|authorization)\s*[:=]\s*[^\s,]+/gi, "$1=[REDACTED]").replace(/https?:\/\/[^\s]+/gi, "[URL REDACTED]");
@@ -164,8 +190,11 @@ export class DeterministicExecutionBroker implements ExecutionBroker { readonly 
 
 export interface DispatchRequest { control: Control; modifier: Modifier; sessionId?: string; authorityId?: string; target?: TargetSnapshot; operationKey?: string; now?: number; }
 export interface DispatchResult { status: OperationStatus | "preview" | "unassigned"; assignment?: Assignment; reason: string; operationId?: string; }
+export const maximumHeartbeatAgeMs = 60_000;
 const highRisk = new Set(["COUNCIL:shift", "COMMIT:alt", "COMMIT:shift_alt", "COMPOUND:shift_alt", "PIPELINE:ctrl_shift_alt", "SHIELD:ctrl_shift_alt", "SANDBOX:alt", "SANDBOX:shift_alt", "SANDBOX:ctrl_shift_alt"]);
 const requiresAuthority = new Set(["PLAN_APPROVAL", "AUTHORITY_REFRESH", "COMMIT", "COMPOUND", "PIPELINE", "SHIELD", "SANDBOX", "COUNCIL"]);
+const requiresControllableProvider = new Set<Control>(["REANCHOR", "PROOF", "OPTION_PROVIDER", "PLAN_EXPANDER", "PLAN_APPROVAL", "HANDOFF", "AUTHORITY_REFRESH"]);
+const requiresObservableProvider = new Set<Control>(["FIND_BLOCKED_AGENT", "FIND_FINISHED_AGENT", "COUNCIL"]);
 export class OperationCoordinator {
   private readonly store: ProtectedStore; private readonly registry: SessionRegistry; private readonly authorities: AuthorityLedger; private readonly adapter: ExternalAdapter; private readonly execution: ExecutionBroker; private readonly testEnvironment: TestEnvironmentBroker;
   constructor(store: ProtectedStore, registry: SessionRegistry, authorities: AuthorityLedger, adapter: ExternalAdapter, execution: ExecutionBroker = new SafeLocalExecutionBroker(), testEnvironment: TestEnvironmentBroker = new SafeLocalTestEnvironmentBroker()) { this.store = store; this.registry = registry; this.authorities = authorities; this.adapter = adapter; this.execution = execution; this.testEnvironment = testEnvironment; }
@@ -175,15 +204,30 @@ export class OperationCoordinator {
     const session = request.sessionId ? this.registry.get(request.sessionId) : this.registry.active();
     if (assignment.capability === "route_only") return { status: "preview", assignment, reason: routeBehavior(request.control, request.modifier, session) };
     if (!session) return { status: "blocked", assignment, reason: "No verified managed session is selected; picker-or-stop applies." };
-    if (!session.capability.mediated) return { status: "blocked", assignment, reason: "This action requires a Mediated session; registered, observable, and controllable are not mediation." };
+    const now = request.now ?? Date.now();
+    if (!session.capability.mediated || !capabilityReportIsConsistent(session.capability)) return { status: "blocked", assignment, reason: "This action requires a registered Mediated session; each capability must be separately proved." };
+    if (session.status !== "running" || session.lastHeartbeat + maximumHeartbeatAgeMs < now) return { status: "blocked", assignment, reason: "The selected managed session is not currently running with a fresh capability heartbeat." };
+    if (requiresControllableProvider.has(request.control) && !session.capability.controllable) return { status: "blocked", assignment, reason: "This action requires a Controllable provider session; mediation alone cannot pause or inject context." };
+    if (requiresObservableProvider.has(request.control) && !session.capability.observable) return { status: "blocked", assignment, reason: "This action requires an Observable provider session; state cannot be inferred from a window." };
     const target = request.target ?? session.target; if (!target) return { status: "incomplete", assignment, reason: "A complete TargetSnapshot is required." };
     if (!session.target || !sameTarget(target, session.target)) return { status: "blocked", assignment, reason: "The selected TargetSnapshot changed or is stale; revalidate immediately before the operation." };
-    const key = request.operationKey ?? `${request.control}:${request.modifier}:${session.id}:${target.digest}`; const existing = this.store.operation(key);
-    if (existing && ["prepared", "executing", "external_committed", "recorded"].includes(existing.status)) return { status: existing.status, assignment, reason: "An identical durable operation already exists; its status was focused.", operationId: existing.id };
+    const action = `${request.control}:${request.modifier}`;
+    const key = request.operationKey ?? `${action}:${session.id}:${target.digest}`; const existing = this.store.operation(key);
+    if (existing) {
+      if (existing.action !== action || existing.targetDigest !== target.digest) return { status: "blocked", assignment, reason: "The supplied idempotency key belongs to a different action or target." };
+      if (["prepared", "executing", "external_committed", "recorded"].includes(existing.status)) return { status: existing.status, assignment, reason: "An identical durable operation already exists; its status was focused.", operationId: existing.id };
+    }
     if (this.store.isContained(target.digest) && request.control !== "SHIELD") return { status: "blocked", assignment, reason: "Durable containment blocks this brokered repository action." };
     if (requiresAuthority.has(request.control)) { const error = this.authorities.validate(request.authorityId, session, `${request.control}:${request.modifier}`, request.now); if (error) return { status: "blocked", assignment, reason: error }; }
-    const operation: DurableOperation = { id: randomUUID(), idempotencyKey: key, action: `${request.control}:${request.modifier}`, targetDigest: target.digest, status: "prepared", childIds: [], updatedAt: Date.now() };
-    await this.store.putOperation(operation); await this.store.audit({ operationId: operation.id, action: operation.action, status: "prepared", detail: "Target and authority were validated.", at: Date.now() });
+    const candidate: DurableOperation = { id: randomUUID(), idempotencyKey: key, action, targetDigest: target.digest, status: "prepared", childIds: [], updatedAt: now };
+    const created = await this.store.createOperation(candidate);
+    if (!created.created) {
+      const operation = created.operation;
+      if (operation.action !== action || operation.targetDigest !== target.digest) return { status: "blocked", assignment, reason: "The supplied idempotency key belongs to a different action or target." };
+      return { status: operation.status, assignment, reason: "An identical durable operation was created concurrently; its status was focused.", operationId: operation.id };
+    }
+    const operation = created.operation;
+    await this.store.audit({ operationId: operation.id, action: operation.action, status: "prepared", detail: "Target and authority were validated.", at: now });
     if (highRisk.has(`${request.control}:${request.modifier}`)) {
       const blocked = { ...operation, status: "blocked" as const, updatedAt: Date.now() };
       await this.store.putOperation(blocked); await this.store.audit({ operationId: operation.id, action: operation.action, status: "blocked", detail: "Activation gate is not satisfied; no external action was attempted.", at: Date.now() });
@@ -200,7 +244,17 @@ export class OperationCoordinator {
     await this.store.receipt({ operationId: operation.id, outcome: result.outcome, target, authorityVersion: session.authorityVersion, evidenceDigest: digest(result), policyVersion: target.policyVersion, createdAt: Date.now(), expiresAt: Date.now() + 60_000 });
     return { status, assignment, reason: result.detail, operationId: operation.id };
   }
-  async child(parentId: string, action: string, target: TargetSnapshot): Promise<DurableOperation> { const parent = this.store.allOperations().find((item) => item.id === parentId); if (!parent) throw new Error("Parent operation is missing."); const child = { id: randomUUID(), parentId, idempotencyKey: `${parentId}:${action}`, action, targetDigest: target.digest, status: "prepared" as const, childIds: [], updatedAt: Date.now() }; await this.store.putOperation(child); await this.store.putOperation({ ...parent, childIds: [...parent.childIds, child.id], updatedAt: Date.now() }); return child; }
+  async child(parentId: string, action: string, target: TargetSnapshot): Promise<DurableOperation> {
+    const parent = this.store.allOperations().find((item) => item.id === parentId);
+    if (!parent) throw new Error("Parent operation is missing.");
+    if (parent.targetDigest !== target.digest) throw new Error("Child operation target does not match its parent saga.");
+    const candidate: DurableOperation = { id: randomUUID(), parentId, idempotencyKey: `${parentId}:${action}`, action, targetDigest: target.digest, status: "prepared", childIds: [], updatedAt: Date.now() };
+    const created = await this.store.createOperation(candidate);
+    const child = created.operation;
+    if (child.parentId !== parentId || child.targetDigest !== target.digest) throw new Error("Child idempotency key belongs to a different saga or target.");
+    if (!parent.childIds.includes(child.id)) await this.store.putOperation({ ...parent, childIds: [...parent.childIds, child.id], updatedAt: Date.now() });
+    return child;
+  }
 }
 
 /** Containment is durable and only governs traffic that actually uses the broker. */
