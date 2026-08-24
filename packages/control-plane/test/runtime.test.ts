@@ -81,10 +81,10 @@ test("durable mediated executor resolves protected session/authority/target stat
     });
     const adapters = new AdapterRegistry();
     const proofAdapter = new InMemoryCommandAdapter();
-    proofAdapter.register("proof", () => ({ status: "completed", summary: "isolated proof adapter result" }));
+    proofAdapter.register("proof", () => ({ status: "completed", summary: "isolated proof adapter result", effectDisposition: "committed" }));
     adapters.register("proof", proofAdapter);
     const runtime = new DurableMediatedExecutor({
-      store, sessions, authorities, policyVersion: "policy-runtime", targetResolver: { resolve: async () => target },
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       dependencies: () => ({ adapters })
     });
     const proof = commandForAction("proof").assignment!;
@@ -123,10 +123,10 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
     const adapters = new AdapterRegistry();
     const adapter = new InMemoryCommandAdapter();
     let calls = 0;
-    adapter.register("proof_adversarial", () => { calls += 1; return { status: "completed", summary: "isolated adversarial proof" }; });
+    adapter.register("proof_adversarial", () => { calls += 1; return { status: "completed", summary: "isolated adversarial proof", effectDisposition: "committed" }; });
     adapters.register("proof_adversarial", adapter);
     const runtime = new DurableMediatedExecutor({
-      store, sessions, authorities, policyVersion: "policy-runtime", targetResolver: { resolve: async () => target },
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       confirmationAttestor: { attest: async () => ({ reauthenticated: true, operator: "isolated-test-operator" }) },
       dependencies: () => ({ adapters })
     });
@@ -209,7 +209,7 @@ test("agent work receives a durable deadline signal and operation-ID cancellatio
     adapters.register("proof", proof);
     let cancelCalls = 0;
     const runtime = new DurableMediatedExecutor({
-      store, sessions, authorities, policyVersion: "policy-runtime", targetResolver: { resolve: async () => target },
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       operationControl: {
         cancel: async () => { cancelCalls += 1; return { accepted: true, summary: "isolated host cancellation accepted" }; }
       },
@@ -295,6 +295,7 @@ test("durable runtime captures a manual-only checkpoint and settles a running bu
       sessions,
       authorities,
       policyVersion: "policy-runtime",
+      now: () => new Date(now),
       targetResolver: { resolve: async () => target },
       budgetConfiguration: {
         version: "runtime-git-budget-v1",
@@ -319,7 +320,7 @@ test("durable runtime captures a manual-only checkpoint and settles a running bu
         const git = new InMemoryGitBroker(policy);
         git.register("local_commit", () => {
           brokerCalls += 1;
-          return { status: "completed", summary: "simulated scoped commit" };
+          return { status: "completed", summary: "simulated scoped commit", effectDisposition: "committed" };
         });
         return {
           git,
@@ -365,7 +366,7 @@ test("a consequential broker is not called when its required checkpoint capture 
     });
     let brokerCalls = 0;
     const runtime = new DurableMediatedExecutor({
-      store, sessions, authorities, policyVersion: "policy-runtime", targetResolver: { resolve: async () => target },
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       dependencies: ({ policy }) => {
         const git = new InMemoryGitBroker(policy);
         git.register("local_commit", () => { brokerCalls += 1; return { status: "completed", summary: "must not run" }; });
@@ -408,6 +409,7 @@ test("consequential work is revalidated after checkpoint capture and does not ru
       sessions,
       authorities,
       policyVersion: "policy-runtime",
+      now: () => new Date(now),
       targetResolver: { resolve: async () => (++resolves === 1 ? target : changedTarget) },
       checkpointCapture: {
         capture: async () => ({
@@ -456,7 +458,7 @@ test("a checkpoint with an unavailable or mismatched recovery artifact blocks it
     });
     let brokerCalls = 0;
     const runtime = new DurableMediatedExecutor({
-      store, sessions, authorities, policyVersion: "policy-runtime", targetResolver: { resolve: async () => target },
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       checkpointCapture: {
         capture: async () => ({
           reason: "Preserve state before commit.",
@@ -485,6 +487,7 @@ test("durable mediated executor never substitutes a target, authority, or accept
     const runtime = new DurableMediatedExecutor({
       store,
       policyVersion: "policy-runtime",
+      now: () => new Date(now),
       targetResolver: { resolve: async () => undefined }
     });
     const proof = commandForAction("proof").assignment!;
