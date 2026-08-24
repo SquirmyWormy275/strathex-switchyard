@@ -7,10 +7,14 @@
   "scripts": { "vscode:prepublish": "npm run build:vscode" },
   "files": ["dist", "package.json", "README.md"],
   "engines": { "vscode": "^1.85.0" },
-  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.showIntent"],
+  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.adoptManagedTerminal", "onCommand:sxsy-b122.selectManagedSession", "onCommand:sxsy-b122.showManagedSessions", "onCommand:sxsy-b122.createManagedAgentTerminal", "onCommand:sxsy-b122.showIntent"],
   "contributes": {
     "commands": [
       { "command": "sxsy-b122.registerManagedSession", "title": "SXSY-B122: Register Managed Session" },
+      { "command": "sxsy-b122.adoptManagedTerminal", "title": "SXSY-B122: Adopt Focused Terminal" },
+      { "command": "sxsy-b122.selectManagedSession", "title": "SXSY-B122: Select Managed Session" },
+      { "command": "sxsy-b122.showManagedSessions", "title": "SXSY-B122: Show Managed Sessions" },
+      { "command": "sxsy-b122.createManagedAgentTerminal", "title": "SXSY-B122: Create Managed Agent Terminal" },
       { "command": "sxsy-b122.showIntent", "title": "SXSY-B122: Show Routed Intent" }
     ]
   }
