@@ -11,7 +11,7 @@
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
     "package:vscode:dry-run": "npm pack --dry-run --workspace @strathex/switchyard-vscode",
     "package:companion:dry-run": "npm run build:companion && npm pack --dry-run --workspace @strathex/switchyard-companion",
-    "test": "node --experimental-strip-types --test packages/protocol/test/*.test.ts apps/windows-companion/test/*.test.ts",
+    "test": "node scripts/run-isolated-tests.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
