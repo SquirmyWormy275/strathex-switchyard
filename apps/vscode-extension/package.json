@@ -1,0 +1,17 @@
+{
+  "name": "@strathex/switchyard-vscode",
+  "private": true,
+  "type": "commonjs",
+  "version": "0.1.0",
+  "main": "./dist/extension.js",
+  "scripts": { "vscode:prepublish": "npm run build:vscode" },
+  "files": ["dist", "package.json", "README.md"],
+  "engines": { "vscode": "^1.85.0" },
+  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.showIntent"],
+  "contributes": {
+    "commands": [
+      { "command": "sxsy-b122.registerManagedSession", "title": "SXSY-B122: Register Managed Session" },
+      { "command": "sxsy-b122.showIntent", "title": "SXSY-B122: Show Routed Intent" }
+    ]
+  }
+}

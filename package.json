@@ -1,0 +1,17 @@
+{
+  "name": "strathex-switchyard",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Safe SXSY-B122 firmware transport and host routing baseline",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build:vscode": "tsc -p apps/vscode-extension/tsconfig.build.json",
+    "test": "node --experimental-strip-types --test packages/protocol/test/*.test.ts apps/windows-companion/test/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
