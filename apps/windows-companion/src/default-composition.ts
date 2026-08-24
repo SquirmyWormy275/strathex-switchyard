@@ -26,7 +26,7 @@ import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, providerCommandActions } from "./remote-adapters.ts";
 import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor } from "./council-runtime.ts";
-import { ConfiguredGitHubPipelineAdapter } from "./pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter } from "./pipeline-adapters.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
@@ -53,18 +53,18 @@ class LocalFailClosedAutomationBroker implements AutomationBroker { async execut
 class LocalFailClosedIsolationRuntime implements IsolationRuntime {
   async start(request: IsolationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: `${request.profile} requires the installed OS-enforced sandbox backend; no weaker copy-based sandbox was started.`, effectDisposition: "not_started" }; }
 }
-class LocalPipelineStatusAdapter implements CommandAdapter {
+export class LocalPipelineStatusAdapter implements CommandAdapter {
   readonly id = "local-pipeline-status"; readonly kind = "generic" as const;
   private readonly git: LocalGitRunner;
   constructor(git: LocalGitRunner = new SpawnLocalGitRunner()) { this.git = git; }
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target." };
-    try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist." }; }
-    if (request.effectGuard) { const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!current.allowed) return { status: "blocked", summary: current.reason }; }
+    if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target.", effectDisposition: "not_started" };
+    try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist.", effectDisposition: "not_started" }; }
+    if (request.effectGuard) { const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" }; }
     try {
       const checked = await this.git.run(["status", "--porcelain=v1", "--branch"], { cwd: request.target.repositoryRoot });
-      return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? "Inspected pipeline target status with the fixed absolute Git host." : "The fixed Git status inspection failed.", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")) } };
-    } catch { return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for pipeline status." }; }
+      return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? "Inspected pipeline target status with the fixed absolute Git host." : "The fixed Git status inspection failed.", effectDisposition: "committed", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")) } };
+    } catch { return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for pipeline status.", effectDisposition: "not_started" }; }
   }
 }
 
@@ -113,7 +113,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   if (dynamicNetwork) {
     const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store));
-    adapters.register("pipeline_status", pipeline);
+    adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));
     adapters.register("pipeline_failure_trace", pipeline);
   }
   const git = new InMemoryGitBroker(context.policy, containment);

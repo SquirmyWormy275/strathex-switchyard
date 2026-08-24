@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
-import { ConfiguredGitHubPipelineAdapter } from "../src/pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter } from "../src/pipeline-adapters.ts";
 import type { DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
 const target: TargetSnapshot = {
@@ -105,4 +105,28 @@ test("pipeline adapter refuses a response for a different head and rechecks the 
   const stale = await adapter.execute({ ...request("pipeline_status"), effectGuard: { async assertCurrent() { return { allowed: false, reason: "target changed" }; } } });
   assert.equal(stale.status, "blocked");
   assert.equal(calls, 1);
+});
+
+test("composite pipeline status preserves local evidence when hosted CI is unavailable", async () => {
+  const adapter = new CompositePipelineStatusAdapter(
+    { id: "local", kind: "generic", async execute() { return { status: "completed", summary: "Local diff check passed.", effectDisposition: "committed" as const, data: { clean: true } }; } },
+    { id: "hosted", kind: "generic", async execute() { return { status: "unavailable", summary: "No configured hosted route.", effectDisposition: "not_started" as const }; } }
+  );
+  const outcome = await adapter.execute(request("pipeline_status"));
+  assert.equal(outcome.status, "incomplete");
+  assert.match(outcome.summary, /not hosted CI evidence/);
+  assert.equal((outcome.data?.local as { status: string }).status, "completed");
+  assert.equal((outcome.data?.hosted as { status: string }).status, "unavailable");
+  assert.equal(outcome.data?.completeness, "partial");
+});
+
+test("composite pipeline status never lets hosted success overwrite a local inspection failure", async () => {
+  const adapter = new CompositePipelineStatusAdapter(
+    { id: "local", kind: "generic", async execute() { return { status: "failed", summary: "Local gate failed.", effectDisposition: "committed" as const }; } },
+    { id: "hosted", kind: "generic", async execute() { return { status: "completed", summary: "Hosted checks passed.", effectDisposition: "committed" as const }; } }
+  );
+  const outcome = await adapter.execute(request("pipeline_status"));
+  assert.equal(outcome.status, "failed");
+  assert.equal((outcome.data?.local as { status: string }).status, "failed");
+  assert.equal((outcome.data?.hosted as { status: string }).status, "completed");
 });
