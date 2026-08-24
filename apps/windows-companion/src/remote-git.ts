@@ -10,7 +10,7 @@ import { SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 
 const zeroOid = "0".repeat(40);
-const maximumPackBytes = 4 * 1024 * 1024;
+const defaultMaximumPushBytes = 4 * 1024 * 1024;
 
 export interface SmartPushResult { readonly status: BrokerOutcome["status"]; readonly summary: string; readonly oldHead?: string; readonly newHead?: string; }
 export interface ReviewedRemotePusher { push(input: Readonly<{ repositoryRoot: string; sourceHead: string; destinationBranch: string; request: GitRequest }>): Promise<SmartPushResult>; }
@@ -31,6 +31,8 @@ export interface ConfiguredGitHostIdentity {
   readonly graphqlRouteId: "github.graphql";
   readonly advertiseRouteId: "git.receive-pack.advertise";
   readonly receivePackRouteId: "git.receive-pack";
+  /** Exact installed receive-pack request cap, reviewed with the network policy. */
+  readonly maximumPushBytes: number;
   readonly [gitHostBrand]: true;
 }
 
@@ -52,7 +54,8 @@ export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): Co
   }
   return {
     host: urls[0]!.hostname.toLowerCase(), owner: advertisedRepository.owner, name: advertisedRepository.name,
-    graphqlRouteId: "github.graphql", advertiseRouteId: "git.receive-pack.advertise", receivePackRouteId: "git.receive-pack", [gitHostBrand]: true
+    graphqlRouteId: "github.graphql", advertiseRouteId: "git.receive-pack.advertise", receivePackRouteId: "git.receive-pack",
+    maximumPushBytes: boundedPushCap(receive.maxRequestBytes ?? defaultMaximumPushBytes), [gitHostBrand]: true
   };
 }
 
@@ -137,7 +140,7 @@ export class ConfiguredGitSmartHttpPusher implements ReviewedRemotePusher {
   private readonly git: LocalGitRunner;
   private readonly packer: GitPackRunner;
   private readonly host: ConfiguredGitHostIdentity;
-  constructor(network: DynamicConfiguredNetworkClient, host: ConfiguredGitHostIdentity, git: LocalGitRunner = new SpawnLocalGitRunner(), packer: GitPackRunner = new SpawnGitPackRunner()) { this.network = network; this.host = host; this.git = git; this.packer = packer; }
+  constructor(network: DynamicConfiguredNetworkClient, host: ConfiguredGitHostIdentity, git: LocalGitRunner = new SpawnLocalGitRunner(), packer: GitPackRunner = new SpawnGitPackRunner(undefined, host.maximumPushBytes)) { this.network = network; this.host = host; this.git = git; this.packer = packer; }
 
   async push(input: Readonly<{ repositoryRoot: string; sourceHead: string; destinationBranch: string; request: GitRequest }>): Promise<SmartPushResult> {
     if (!/^[a-f0-9]{40}$/i.test(input.sourceHead) || !validBranch(input.destinationBranch)) return { status: "blocked", summary: "Smart HTTP push requires an exact commit and safe destination branch." };
@@ -158,7 +161,7 @@ export class ConfiguredGitSmartHttpPusher implements ReviewedRemotePusher {
     const capabilities = ["report-status", ...(advertisement.capabilities.has("side-band-64k") ? ["side-band-64k"] : []), ...(advertisement.capabilities.has("ofs-delta") ? ["ofs-delta"] : []), "agent=sxsy-b122/1.0"].join(" ");
     const command = packet(`${oldHead} ${input.sourceHead} ${ref}\0${capabilities}\n`);
     const body = Buffer.concat([command, Buffer.from("0000", "ascii"), pack]);
-    if (body.byteLength > maximumPackBytes) { body.fill(0); pack.fill(0); return { status: "blocked", summary: "The reviewed Git pack exceeds the configured four-megabyte transport cap." }; }
+    if (body.byteLength > this.host.maximumPushBytes) { body.fill(0); pack.fill(0); return { status: "blocked", summary: `The reviewed Git update exceeds the installed ${this.host.maximumPushBytes}-byte receive-pack cap.` }; }
     try {
       const control = await operationSignal(input.request);
       let result;
@@ -185,17 +188,18 @@ export class ConfiguredGitSmartHttpPusher implements ReviewedRemotePusher {
 export interface GitPackRunner { pack(repositoryRoot: string, head: string, exclude?: string): Promise<Buffer>; }
 export class SpawnGitPackRunner implements GitPackRunner {
   private readonly candidates: readonly string[];
-  constructor(candidates: readonly string[] = ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]) { if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Git packer requires fixed absolute executables."); this.candidates = [...candidates]; }
+  private readonly maximumBytes: number;
+  constructor(candidates: readonly string[] | undefined = undefined, maximumBytes = defaultMaximumPushBytes) { const selected = candidates ?? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]; if (!selected.length || selected.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Git packer requires fixed absolute executables."); this.candidates = [...selected]; this.maximumBytes = boundedPushCap(maximumBytes); }
   async pack(repositoryRoot: string, head: string, exclude?: string): Promise<Buffer> {
     const executable = await fixedExecutable(this.candidates);
     const revisions = Buffer.from(`${head}\n${exclude ? `^${exclude}\n` : ""}`, "ascii");
     return new Promise<Buffer>((resolveResult, rejectResult) => {
       const child = spawn(executable, ["pack-objects", "--stdout", "--revs", "--thin", "--delta-base-offset"], { cwd: repositoryRoot, shell: false, windowsHide: true, env: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" }, stdio: ["pipe", "pipe", "pipe"] });
       const chunks: Buffer[] = []; let bytes = 0; let error = "";
-      child.stdout.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes <= maximumPackBytes) chunks.push(Buffer.from(chunk)); else child.kill(); });
+      child.stdout.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes <= this.maximumBytes) chunks.push(Buffer.from(chunk)); else child.kill(); });
       child.stderr.on("data", (chunk: Buffer) => { if (error.length < 4096) error += chunk.toString("utf8").slice(0, 4096 - error.length); });
       child.once("error", () => rejectResult(new Error("The fixed Git packer could not start.")));
-      child.once("close", (code) => code === 0 && bytes <= maximumPackBytes ? resolveResult(Buffer.concat(chunks)) : rejectResult(new Error(bytes > maximumPackBytes ? "The Git pack exceeded the transport cap." : `Git pack creation failed: ${redactText(error)}`)));
+      child.once("close", (code) => code === 0 && bytes <= this.maximumBytes ? resolveResult(Buffer.concat(chunks)) : rejectResult(new Error(bytes > this.maximumBytes ? "The Git pack exceeded the installed transport cap." : `Git pack creation failed: ${redactText(error)}`)));
       child.stdin.end(revisions);
     });
   }
@@ -265,6 +269,7 @@ function configuredRepository(url: URL, kind: "advertise" | "receive"): { readon
   } else if (url.search) return undefined;
   return { owner: match[1]!, name: match[2]! };
 }
+function boundedPushCap(value: number): number { if (!Number.isSafeInteger(value) || value < 1 || value > defaultMaximumPushBytes) throw new Error("Configured Git receive-pack cap is outside the supported bounded range."); return value; }
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") && !value.startsWith("-"); }
 async function fixedExecutable(candidates: readonly string[]): Promise<string> { for (const candidate of candidates) try { if ((await stat(candidate)).isFile()) return realpath(candidate); } catch { /* continue */ } throw new Error("A trusted absolute Git executable is unavailable."); }
 async function finalEffect(request: GitRequest): Promise<BrokerOutcome | undefined> { const cancellation = await cancelled(request); if (cancellation) return cancellation; const result = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); return result.allowed ? undefined : { status: "incomplete", summary: result.reason }; }

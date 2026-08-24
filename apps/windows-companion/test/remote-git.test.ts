@@ -10,10 +10,10 @@ import type { ConfiguredNetworkPolicy } from "../src/configured-network.ts";
 const pkt = (value: string): Buffer => { const body = Buffer.from(value); return Buffer.concat([Buffer.from((body.length + 4).toString(16).padStart(4, "0")), body]); };
 const advertisement = (branch: string, head: string): Buffer => Buffer.concat([pkt("# service=git-receive-pack\n"), Buffer.from("0000"), pkt(`${head} HEAD\0report-status side-band-64k ofs-delta\n`), pkt(`${head} refs/heads/${branch}\n`), Buffer.from("0000")]);
 const target = { id: "a".repeat(64), repositoryRoot: "C:\\repo", canonicalRemote: "https://github.com/acme/project.git", branch: "feat/test", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "f".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete" as const, reasons: [] };
-const gitPolicy = (host = "github.com"): ConfiguredNetworkPolicy => ({ version: 1, proxy: "direct", routes: [
+const gitPolicy = (host = "github.com", maximumPushBytes?: number): ConfiguredNetworkPolicy => ({ version: 1, proxy: "direct", routes: [
   { id: "github.graphql", method: "POST", url: `https://${host}/api/graphql`, redirects: "deny" },
   { id: "git.receive-pack.advertise", method: "GET", url: `https://${host}/acme/project.git/info/refs?service=git-receive-pack`, redirects: "deny" },
-  { id: "git.receive-pack", method: "POST", url: `https://${host}/acme/project.git/git-receive-pack`, redirects: "deny" }
+  { id: "git.receive-pack", method: "POST", url: `https://${host}/acme/project.git/git-receive-pack`, ...(maximumPushBytes ? { maxRequestBytes: maximumPushBytes } : {}), redirects: "deny" }
 ] });
 const gitHost = configuredGitHostFromPolicy(gitPolicy());
 const requestFor = (mutation: GitRequest["mutation"]): GitRequest => ({ action: mutation.kind === "pr_upsert" ? "pr_upsert" : mutation.kind === "merge_pr" ? "pr_merge" : mutation.kind === "direct_main" ? "direct_main" : "local_commit", operationId: "operation-1", target, mutation, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
@@ -40,6 +40,19 @@ test("smart HTTP push uses exact routes, no force, and verifies the remote head"
   assert.equal(result.status, "completed");
   assert.deepEqual(routes, ["git.receive-pack.advertise", "git.receive-pack", "git.receive-pack.advertise"]);
   assert.equal(commands.some((args) => args.includes("--force") || args.includes("--force-with-lease")), false);
+});
+
+test("smart HTTP push enforces the exact reviewed network-policy request cap before upload", async () => {
+  const cappedHost = configuredGitHostFromPolicy(gitPolicy("github.com", 512));
+  assert.equal(cappedHost.maximumPushBytes, 512);
+  const routes: string[] = [];
+  const network = { async request(input: { routeId: string }) { routes.push(input.routeId); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: advertisement("feat/test", "0".repeat(40)) }; } } as unknown as DynamicConfiguredNetworkClient;
+  const git: LocalGitRunner = { async run() { return { exitCode: 0, stdout: "", stderr: "" }; } };
+  const packer: GitPackRunner = { async pack() { return Buffer.alloc(1_024, 7); } };
+  const result = await new ConfiguredGitSmartHttpPusher(network, cappedHost, git, packer).push({ repositoryRoot: target.repositoryRoot, sourceHead: target.head!, destinationBranch: "feat/test", request: requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed change", body: "Exact reviewed body." }) });
+  assert.equal(result.status, "blocked");
+  assert.match(result.summary, /512-byte/);
+  assert.deepEqual(routes, ["git.receive-pack.advertise"], "the oversized update never reaches receive-pack");
 });
 
 test("reviewed remote Git handler pushes and upserts only the bound branch and head", async () => {
