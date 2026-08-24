@@ -164,6 +164,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly hardwareClaims: HardwareSignalClaim[] = [];
   readonly hardwareClaimBindings: Array<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }> = [];
   readonly rawHidInstallRequests: RawHidDeviceIdentity[] = [];
+  readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }> = [];
   nextDispatch?: ForwardedCommandResult;
   nextPreparation?: PreparedCommand;
   onHardwareClaim?: () => void;
@@ -260,19 +261,19 @@ class FakeBridge implements ExtensionCompanionBridge {
   async archiveHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return { ok: false, code: "not_found", message: "missing" }; }
   async handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return { ok: true, value: "queue" }; }
   async setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">> { return { ok: true, value: routing }; }
-  async prepareWorkflow(input: { action: ExtensionWorkflowAction; sessionId: string }): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return { ok: true, value: { id: "workflow-test", digest: "b".repeat(64), action: input.action, targetSnapshotId: "snapshot-test", sessionId: input.sessionId, status: "prepared", executionAuthorized: false } }; }
+  async prepareWorkflow(input: { action: ExtensionWorkflowAction; sessionId: string; payload: Readonly<Record<string, unknown>> }): Promise<BridgeResult<ExtensionWorkflowArtifact>> { this.workflowPrepared.push(input); return { ok: true, value: { id: "workflow-test", digest: "b".repeat(64), action: input.action, targetSnapshotId: "snapshot-test", sessionId: input.sessionId, status: "prepared", executionAuthorized: false } }; }
   async listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> { return { ok: true, value: [] }; }
   async grantVoiceConsent(input: { handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number }): Promise<BridgeResult<ExtensionVoiceConsent>> { return { ok: true, value: { id: "voice-consent-test", contextPackageId: input.handoffId, contextDigest: "c".repeat(64), provider: input.provider, transcript: input.transcript, retentionMinutes: input.retentionMinutes, expiresAt: "2099-01-01T00:00:00.000Z" } }; }
-  async startVoice(input: { consentId: string; voiceSessionId: string; managedSessionId?: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: "voice-binding-test", consentId: input.consentId, voiceSessionId: input.voiceSessionId, ...(input.managedSessionId ? { managedSessionId: input.managedSessionId } : {}), contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
+  async startVoice(input: { consentId: string; voiceSessionId: string; managedSessionId?: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: "voice-binding-test", consentId: input.consentId, voiceSessionId: input.voiceSessionId, ...(input.managedSessionId ? { managedSessionId: input.managedSessionId } : {}), repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active" } }; }
   async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return { ok: true, value: undefined }; }
-  async switchVoice(input: { bindingId: string; consentId: string; voiceSessionId: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: input.bindingId, consentId: input.consentId, voiceSessionId: input.voiceSessionId, contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
-  async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status: "active" } }; }
+  async switchVoice(input: { bindingId: string; consentId: string; voiceSessionId: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: input.bindingId, consentId: input.consentId, voiceSessionId: input.voiceSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active" } }; }
+  async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active" } }; }
   async muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "muted"); }
   async resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "active"); }
   async interruptVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "interrupted"); }
   async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   async deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
-  private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", status } }; }
+  private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status } }; }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };
@@ -340,6 +341,29 @@ test("provider connection command installs only capabilities returned by the com
   const connected = controller.listKnownSessions().find((session) => session.id === candidate.id)!;
   assert.deepEqual(connected.capabilities, ["registered", "observable", "controllable", "mediated"]);
   assert.equal(connected.workspaceRoot, "C:\\repo");
+});
+
+test("provider chords prepare one exact typed workflow artifact before durable dispatch", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/workflow" }] });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  bridge.nextPreparation = { status: "prepared", summary: "Exact workflow prepared.", session: { ...target, targetSnapshotId: "snapshot-test", taskId: "task-test", planRevision: "plan-test" } };
+  vscode.input("The exact implementation satisfies the accepted task.");
+  vscode.input("receipt:tests");
+  vscode.input("local");
+
+  const command = chordFor("PROOF", "normal");
+  assert.ok(command);
+  await controller.dispatchChord(command);
+
+  assert.equal(bridge.workflowPrepared.length, 1);
+  assert.deepEqual(bridge.workflowPrepared[0], {
+    action: "proof", sessionId: target.id,
+    payload: { kind: "proof", claims: ["The exact implementation satisfies the accepted task."], evidenceReferences: ["receipt:tests"], requiredBackends: ["local"] }
+  });
+  assert.equal(bridge.dispatched.length, 1);
 });
 
 test("local commit collects an exact structured Git review before dispatch", async () => {
@@ -538,6 +562,11 @@ test("only a focused VS Code window with nonempty exact roots polls and atomical
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }] });
   await controller.start();
   assert.equal(bridge.hardwareClaimBindings.length, 0);
+  const targetSession = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  bridge.nextPreparation = { status: "prepared", summary: "Prepared by fake companion.", session: { ...targetSession, targetSnapshotId: "snapshot-test", taskId: "task-test", planRevision: "plan-test" }, authorityId: "authority-test", confirmationToken: "confirmation-test" };
+  vscode.input("The selected implementation satisfies the plan.");
+  vscode.input("receipt:test");
+  vscode.input("local");
   const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
   bridge.hardwareClaims.push({ signalId: `hardware-signal:${"f".repeat(64)}`, claimToken: "claim-token-focus", deviceId: "a".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 5, control: "PROOF", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] });
   await vscode.fireFocus(true);
