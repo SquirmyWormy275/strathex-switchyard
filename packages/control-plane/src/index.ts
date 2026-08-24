@@ -1,0 +1,28 @@
+/** Public software-only control-plane surface. All stateful components require a host-owned ProtectedJsonStore. */
+export { AllowlistedEvidenceAuthorizer, DenyEvidenceAuthorizer, GateEvidenceError, GateEvidenceLedger } from "./acceptance-evidence.ts";
+export type { EvidenceAuthorizer, GateEvidence, GateEvidenceInput, GateEvidenceStatus as AcceptanceEvidenceStatus } from "./acceptance-evidence.ts";
+export * from "./adapters.ts";
+export * from "./authority.ts";
+export * from "./brokers.ts";
+export * from "./budgets.ts";
+export * from "./checkpoints.ts";
+export * from "./command-catalog.ts";
+export * from "./containment.ts";
+export * from "./confirmations.ts";
+export * from "./context-packages.ts";
+export * from "./contracts.ts";
+export * from "./council.ts";
+export * from "./dispatch.ts";
+export * from "./execution-control.ts";
+export * from "./git-inspector.ts";
+export * from "./operations.ts";
+export * from "./policy.ts";
+export * from "./receipts.ts";
+export * from "./recipes.ts";
+export * from "./redaction.ts";
+export * from "./runtime.ts";
+export * from "./session-registry.ts";
+export * from "./snapshot-resolver.ts";
+export * from "./snapshot-ledger.ts";
+export * from "./snapshot.ts";
+export * from "./store.ts";

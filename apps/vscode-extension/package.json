@@ -4,23 +4,376 @@
   "type": "commonjs",
   "version": "0.1.0",
   "main": "./dist/extension.js",
-  "scripts": { "vscode:prepublish": "npm run build:vscode" },
-  "files": ["dist", "package.json", "README.md"],
-  "engines": { "vscode": "^1.85.0" },
-  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.adoptManagedTerminal", "onCommand:sxsy-b122.selectManagedSession", "onCommand:sxsy-b122.showManagedSessions", "onCommand:sxsy-b122.createManagedAgentTerminal", "onCommand:sxsy-b122.showIntent", "onCommand:sxsy-b122.configureCompanion", "onCommand:sxsy-b122.showCompanionHealth", "onCommand:sxsy-b122.invokeControl", "onCommand:sxsy-b122.showBlockedAgents", "onCommand:sxsy-b122.showFinishedAgents"],
+  "scripts": {
+    "vscode:prepublish": "npm run build:vscode"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "onCommand:sxsy-b122.registerManagedSession",
+    "onCommand:sxsy-b122.adoptTerminal",
+    "onCommand:sxsy-b122.refreshManagedRegistry",
+    "onCommand:sxsy-b122.showManagedSessions",
+    "onCommand:sxsy-b122.dispatch",
+    "onCommand:sxsy-b122.showIntent",
+    "onCommand:sxsy-b122.chord.reanchor.normal",
+    "onCommand:sxsy-b122.chord.proof.normal",
+    "onCommand:sxsy-b122.chord.proof.shift",
+    "onCommand:sxsy-b122.chord.option_provider.normal",
+    "onCommand:sxsy-b122.chord.option_provider.shift",
+    "onCommand:sxsy-b122.chord.plan_expander.normal",
+    "onCommand:sxsy-b122.chord.plan_approval.normal",
+    "onCommand:sxsy-b122.chord.handoff.normal",
+    "onCommand:sxsy-b122.chord.handoff.shift",
+    "onCommand:sxsy-b122.chord.handoff.alt",
+    "onCommand:sxsy-b122.chord.handoff.shift_alt",
+    "onCommand:sxsy-b122.chord.find_blocked_agent.normal",
+    "onCommand:sxsy-b122.chord.find_blocked_agent.shift",
+    "onCommand:sxsy-b122.chord.find_finished_agent.normal",
+    "onCommand:sxsy-b122.chord.find_finished_agent.shift",
+    "onCommand:sxsy-b122.chord.authority_refresh.normal",
+    "onCommand:sxsy-b122.chord.authority_refresh.shift",
+    "onCommand:sxsy-b122.chord.council.normal",
+    "onCommand:sxsy-b122.chord.council.shift",
+    "onCommand:sxsy-b122.chord.council.alt",
+    "onCommand:sxsy-b122.chord.claude.normal",
+    "onCommand:sxsy-b122.chord.claude.shift",
+    "onCommand:sxsy-b122.chord.claude.alt",
+    "onCommand:sxsy-b122.chord.chatgpt.normal",
+    "onCommand:sxsy-b122.chord.chatgpt.shift",
+    "onCommand:sxsy-b122.chord.chatgpt.alt",
+    "onCommand:sxsy-b122.chord.vscode.normal",
+    "onCommand:sxsy-b122.chord.vscode.shift",
+    "onCommand:sxsy-b122.chord.terminal.normal",
+    "onCommand:sxsy-b122.chord.terminal.shift",
+    "onCommand:sxsy-b122.chord.commit.normal",
+    "onCommand:sxsy-b122.chord.commit.shift",
+    "onCommand:sxsy-b122.chord.commit.alt",
+    "onCommand:sxsy-b122.chord.commit.shift_alt",
+    "onCommand:sxsy-b122.chord.github.normal",
+    "onCommand:sxsy-b122.chord.github.shift",
+    "onCommand:sxsy-b122.chord.github.alt",
+    "onCommand:sxsy-b122.chord.github.shift_alt",
+    "onCommand:sxsy-b122.chord.compound.normal",
+    "onCommand:sxsy-b122.chord.compound.shift",
+    "onCommand:sxsy-b122.chord.compound.alt",
+    "onCommand:sxsy-b122.chord.compound.shift_alt",
+    "onCommand:sxsy-b122.chord.run.normal",
+    "onCommand:sxsy-b122.chord.run.shift",
+    "onCommand:sxsy-b122.chord.run.alt",
+    "onCommand:sxsy-b122.chord.run.shift_alt",
+    "onCommand:sxsy-b122.chord.voice.normal",
+    "onCommand:sxsy-b122.chord.voice.shift",
+    "onCommand:sxsy-b122.chord.voice.alt",
+    "onCommand:sxsy-b122.chord.voice.shift_alt",
+    "onCommand:sxsy-b122.chord.pipeline.normal",
+    "onCommand:sxsy-b122.chord.pipeline.shift",
+    "onCommand:sxsy-b122.chord.pipeline.alt",
+    "onCommand:sxsy-b122.chord.pipeline.shift_alt",
+    "onCommand:sxsy-b122.chord.pipeline.ctrl_shift_alt",
+    "onCommand:sxsy-b122.chord.shield.normal",
+    "onCommand:sxsy-b122.chord.shield.shift",
+    "onCommand:sxsy-b122.chord.shield.alt",
+    "onCommand:sxsy-b122.chord.shield.shift_alt",
+    "onCommand:sxsy-b122.chord.shield.ctrl_shift_alt",
+    "onCommand:sxsy-b122.chord.sandbox.normal",
+    "onCommand:sxsy-b122.chord.sandbox.shift",
+    "onCommand:sxsy-b122.chord.sandbox.alt",
+    "onCommand:sxsy-b122.chord.sandbox.shift_alt",
+    "onCommand:sxsy-b122.chord.sandbox.ctrl_shift_alt"
+  ],
   "contributes": {
     "commands": [
-      { "command": "sxsy-b122.registerManagedSession", "title": "SXSY-B122: Register Managed Session" },
-      { "command": "sxsy-b122.adoptManagedTerminal", "title": "SXSY-B122: Adopt Focused Terminal" },
-      { "command": "sxsy-b122.selectManagedSession", "title": "SXSY-B122: Select Managed Session" },
-      { "command": "sxsy-b122.showManagedSessions", "title": "SXSY-B122: Show Managed Sessions" },
-      { "command": "sxsy-b122.createManagedAgentTerminal", "title": "SXSY-B122: Create Managed Agent Terminal" },
-      { "command": "sxsy-b122.showIntent", "title": "SXSY-B122: Show Routed Intent" },
-      { "command": "sxsy-b122.configureCompanion", "title": "SXSY-B122: Configure Local Companion" },
-      { "command": "sxsy-b122.showCompanionHealth", "title": "SXSY-B122: Show Companion Health" },
-      { "command": "sxsy-b122.invokeControl", "title": "SXSY-B122: Invoke Control" },
-      { "command": "sxsy-b122.showBlockedAgents", "title": "SXSY-B122: Show Verified Blocked Agents" },
-      { "command": "sxsy-b122.showFinishedAgents", "title": "SXSY-B122: Show Verified Finished Agents" }
+      {
+        "command": "sxsy-b122.registerManagedSession",
+        "title": "SXSY-B122: Register/Refresh This VS Code Window"
+      },
+      {
+        "command": "sxsy-b122.adoptTerminal",
+        "title": "SXSY-B122: Adopt Terminal Once"
+      },
+      {
+        "command": "sxsy-b122.refreshManagedRegistry",
+        "title": "SXSY-B122: Refresh Managed Registry"
+      },
+      {
+        "command": "sxsy-b122.showManagedSessions",
+        "title": "SXSY-B122: Show Managed Sessions"
+      },
+      {
+        "command": "sxsy-b122.dispatch",
+        "title": "SXSY-B122: Dispatch Settled Chord"
+      },
+      {
+        "command": "sxsy-b122.showIntent",
+        "title": "SXSY-B122: Show Routed Intent"
+      },
+      {
+        "command": "sxsy-b122.chord.reanchor.normal",
+        "title": "SXSY-B122: Re-anchor"
+      },
+      {
+        "command": "sxsy-b122.chord.proof.normal",
+        "title": "SXSY-B122: Proof"
+      },
+      {
+        "command": "sxsy-b122.chord.proof.shift",
+        "title": "SXSY-B122: Shift Proof"
+      },
+      {
+        "command": "sxsy-b122.chord.option_provider.normal",
+        "title": "SXSY-B122: Option Provider"
+      },
+      {
+        "command": "sxsy-b122.chord.option_provider.shift",
+        "title": "SXSY-B122: Shift Option Provider"
+      },
+      {
+        "command": "sxsy-b122.chord.plan_expander.normal",
+        "title": "SXSY-B122: Plan Expander"
+      },
+      {
+        "command": "sxsy-b122.chord.plan_approval.normal",
+        "title": "SXSY-B122: Plan Approval"
+      },
+      {
+        "command": "sxsy-b122.chord.handoff.normal",
+        "title": "SXSY-B122: Handoff"
+      },
+      {
+        "command": "sxsy-b122.chord.handoff.shift",
+        "title": "SXSY-B122: Shift Handoff"
+      },
+      {
+        "command": "sxsy-b122.chord.handoff.alt",
+        "title": "SXSY-B122: Alt Handoff"
+      },
+      {
+        "command": "sxsy-b122.chord.handoff.shift_alt",
+        "title": "SXSY-B122: Shift Alt Handoff"
+      },
+      {
+        "command": "sxsy-b122.chord.find_blocked_agent.normal",
+        "title": "SXSY-B122: Find Blocked Agent"
+      },
+      {
+        "command": "sxsy-b122.chord.find_blocked_agent.shift",
+        "title": "SXSY-B122: Blocker Queue"
+      },
+      {
+        "command": "sxsy-b122.chord.find_finished_agent.normal",
+        "title": "SXSY-B122: Find Finished Agent"
+      },
+      {
+        "command": "sxsy-b122.chord.find_finished_agent.shift",
+        "title": "SXSY-B122: Done Queue"
+      },
+      {
+        "command": "sxsy-b122.chord.authority_refresh.normal",
+        "title": "SXSY-B122: Authority Refresh"
+      },
+      {
+        "command": "sxsy-b122.chord.authority_refresh.shift",
+        "title": "SXSY-B122: Authority Refresh Broadcast"
+      },
+      {
+        "command": "sxsy-b122.chord.council.normal",
+        "title": "SXSY-B122: Council Conflict Report"
+      },
+      {
+        "command": "sxsy-b122.chord.council.shift",
+        "title": "SXSY-B122: Council Guarded Automatic"
+      },
+      {
+        "command": "sxsy-b122.chord.council.alt",
+        "title": "SXSY-B122: Council Recommend and Approve"
+      },
+      {
+        "command": "sxsy-b122.chord.claude.normal",
+        "title": "SXSY-B122: Claude"
+      },
+      {
+        "command": "sxsy-b122.chord.claude.shift",
+        "title": "SXSY-B122: Fresh Claude"
+      },
+      {
+        "command": "sxsy-b122.chord.claude.alt",
+        "title": "SXSY-B122: Managed Claude Code Terminal"
+      },
+      {
+        "command": "sxsy-b122.chord.chatgpt.normal",
+        "title": "SXSY-B122: ChatGPT"
+      },
+      {
+        "command": "sxsy-b122.chord.chatgpt.shift",
+        "title": "SXSY-B122: Fresh ChatGPT"
+      },
+      {
+        "command": "sxsy-b122.chord.chatgpt.alt",
+        "title": "SXSY-B122: Managed Codex Terminal"
+      },
+      {
+        "command": "sxsy-b122.chord.vscode.normal",
+        "title": "SXSY-B122: Focus VS Code"
+      },
+      {
+        "command": "sxsy-b122.chord.vscode.shift",
+        "title": "SXSY-B122: New VS Code Window"
+      },
+      {
+        "command": "sxsy-b122.chord.terminal.normal",
+        "title": "SXSY-B122: External Terminal"
+      },
+      {
+        "command": "sxsy-b122.chord.terminal.shift",
+        "title": "SXSY-B122: Integrated Terminal"
+      },
+      {
+        "command": "sxsy-b122.chord.commit.normal",
+        "title": "SXSY-B122: Local Commit"
+      },
+      {
+        "command": "sxsy-b122.chord.commit.shift",
+        "title": "SXSY-B122: PR Upsert"
+      },
+      {
+        "command": "sxsy-b122.chord.commit.alt",
+        "title": "SXSY-B122: Merge PR"
+      },
+      {
+        "command": "sxsy-b122.chord.commit.shift_alt",
+        "title": "SXSY-B122: Direct Main"
+      },
+      {
+        "command": "sxsy-b122.chord.github.normal",
+        "title": "SXSY-B122: GitHub Repository"
+      },
+      {
+        "command": "sxsy-b122.chord.github.shift",
+        "title": "SXSY-B122: GitHub Pull Request"
+      },
+      {
+        "command": "sxsy-b122.chord.github.alt",
+        "title": "SXSY-B122: GitHub Issues"
+      },
+      {
+        "command": "sxsy-b122.chord.github.shift_alt",
+        "title": "SXSY-B122: GitHub Actions"
+      },
+      {
+        "command": "sxsy-b122.chord.compound.normal",
+        "title": "SXSY-B122: Compound Capture"
+      },
+      {
+        "command": "sxsy-b122.chord.compound.shift",
+        "title": "SXSY-B122: Compound Refresh"
+      },
+      {
+        "command": "sxsy-b122.chord.compound.alt",
+        "title": "SXSY-B122: Compound Workflow Palette"
+      },
+      {
+        "command": "sxsy-b122.chord.compound.shift_alt",
+        "title": "SXSY-B122: Compound Full Loop"
+      },
+      {
+        "command": "sxsy-b122.chord.run.normal",
+        "title": "SXSY-B122: Run"
+      },
+      {
+        "command": "sxsy-b122.chord.run.shift",
+        "title": "SXSY-B122: Debug"
+      },
+      {
+        "command": "sxsy-b122.chord.run.alt",
+        "title": "SXSY-B122: Stop Managed Run"
+      },
+      {
+        "command": "sxsy-b122.chord.run.shift_alt",
+        "title": "SXSY-B122: Launch Web App"
+      },
+      {
+        "command": "sxsy-b122.chord.voice.normal",
+        "title": "SXSY-B122: Voice Center"
+      },
+      {
+        "command": "sxsy-b122.chord.voice.shift",
+        "title": "SXSY-B122: Voice Provider"
+      },
+      {
+        "command": "sxsy-b122.chord.voice.alt",
+        "title": "SXSY-B122: Bind Voice Session"
+      },
+      {
+        "command": "sxsy-b122.chord.voice.shift_alt",
+        "title": "SXSY-B122: Voice Session Picker"
+      },
+      {
+        "command": "sxsy-b122.chord.pipeline.normal",
+        "title": "SXSY-B122: Pipeline Status"
+      },
+      {
+        "command": "sxsy-b122.chord.pipeline.shift",
+        "title": "SXSY-B122: Pipeline Local Gate"
+      },
+      {
+        "command": "sxsy-b122.chord.pipeline.alt",
+        "title": "SXSY-B122: Pipeline Failure Trace"
+      },
+      {
+        "command": "sxsy-b122.chord.pipeline.shift_alt",
+        "title": "SXSY-B122: Pipeline Clean Reproduction"
+      },
+      {
+        "command": "sxsy-b122.chord.pipeline.ctrl_shift_alt",
+        "title": "SXSY-B122: Repair Mission"
+      },
+      {
+        "command": "sxsy-b122.chord.shield.normal",
+        "title": "SXSY-B122: Shield Change Scan"
+      },
+      {
+        "command": "sxsy-b122.chord.shield.shift",
+        "title": "SXSY-B122: Shield Codebase Audit"
+      },
+      {
+        "command": "sxsy-b122.chord.shield.alt",
+        "title": "SXSY-B122: Shield Supply Chain"
+      },
+      {
+        "command": "sxsy-b122.chord.shield.shift_alt",
+        "title": "SXSY-B122: Release Shield"
+      },
+      {
+        "command": "sxsy-b122.chord.shield.ctrl_shift_alt",
+        "title": "SXSY-B122: Emergency Containment"
+      },
+      {
+        "command": "sxsy-b122.chord.sandbox.normal",
+        "title": "SXSY-B122: Sandbox Virtual Environment"
+      },
+      {
+        "command": "sxsy-b122.chord.sandbox.shift",
+        "title": "SXSY-B122: Fresh Virtual Environment"
+      },
+      {
+        "command": "sxsy-b122.chord.sandbox.alt",
+        "title": "SXSY-B122: Full Sandbox"
+      },
+      {
+        "command": "sxsy-b122.chord.sandbox.shift_alt",
+        "title": "SXSY-B122: Fresh Full Sandbox"
+      },
+      {
+        "command": "sxsy-b122.chord.sandbox.ctrl_shift_alt",
+        "title": "SXSY-B122: Quarantine"
+      }
     ]
   }
 }

@@ -1,5 +1,28 @@
+# Dependencies and generated packages
 node_modules/
 dist/
-*.log
+build/
+*.zip
+
+# Local secrets and environment
 .env
+.env.*
+!.env.example
+*.key
+*.pem
 .venv/
+
+# Editor and operating-system state
+.vscode/*.log
+.idea/
+Thumbs.db
+.DS_Store
+
+# Runtime output
+logs/
+tmp/
+*.log
+
+# Keep generated printable releases deliberate
+legends/printable/*.pdf
+!legends/printable/.gitkeep
