@@ -22,7 +22,7 @@ export interface ManagedSession {
   id: string; provider: "claude" | "codex" | "generic"; adapterVersion: string; surface: string;
   windowId: string; terminalId?: string; target?: TargetSnapshot; task?: string; planRevision?: string;
   plannedFiles: readonly string[]; capability: CapabilitySet; status: SessionStatus; lastHeartbeat: number;
-  authorityVersion?: string; focused?: boolean;
+  authorityVersion?: string; registrationEpoch?: string; focused?: boolean;
 }
 export interface CapabilityReport { capability: CapabilitySet; status: SessionStatus; heartbeat: number; evidenceDigest: string; }
 
@@ -75,6 +75,7 @@ export class AuthorityLedger {
   private readonly authorities = new Map<string, Authority>();
   issue(authority: Authority): void { this.authorities.set(authority.id, { ...authority, allowedActions: [...authority.allowedActions], prohibitions: [...authority.prohibitions] }); }
   revoke(id: string): void { const value = this.authorities.get(id); if (value) this.authorities.set(id, { ...value, revoked: true }); }
+  list(): Authority[] { return [...this.authorities.values()].map((item) => ({ ...item, allowedActions: [...item.allowedActions], prohibitions: [...item.prohibitions] })); }
   validate(id: string | undefined, session: ManagedSession, action: string, now = Date.now()): string | undefined {
     if (!id) return "No authenticated authority is bound to this operation."; const value = this.authorities.get(id);
     if (!value || value.revoked || value.expiresAt <= now) return "Authority is missing, revoked, or expired.";
@@ -194,7 +195,7 @@ export interface DispatchRequest {
   reviewApproval?: { id: string; action: string; targetDigest: string; issuedAt: number; expiresAt: number; actor: string };
   commitMessage?: string;
 }
-export interface DispatchResult { status: OperationStatus | "preview" | "unassigned"; assignment?: Assignment; reason: string; operationId?: string; }
+export interface DispatchResult { status: OperationStatus | "unassigned"; assignment?: Assignment; reason: string; operationId?: string; }
 export const maximumHeartbeatAgeMs = 60_000;
 const highRisk = new Set(["COUNCIL:shift", "COMMIT:alt", "COMMIT:shift_alt", "COMPOUND:shift_alt", "PIPELINE:ctrl_shift_alt", "SHIELD:ctrl_shift_alt", "SANDBOX:alt", "SANDBOX:shift_alt", "SANDBOX:ctrl_shift_alt"]);
 const requiresAuthority = new Set(["PLAN_APPROVAL", "AUTHORITY_REFRESH", "COMMIT", "COMPOUND", "PIPELINE", "SHIELD", "SANDBOX", "COUNCIL"]);
@@ -207,13 +208,13 @@ export class OperationCoordinator {
   async dispatch(request: DispatchRequest): Promise<DispatchResult> {
     const assignment = assignmentFor(request.control, request.modifier); if (!assignment) return { status: "unassigned", reason: "This B122 chord is intentionally unassigned." };
     const session = request.sessionId ? this.registry.get(request.sessionId) : this.registry.active();
-    if (assignment.capability === "route_only") return { status: "preview", assignment, reason: routeBehavior(request.control, request.modifier, session) };
     if (!session) return { status: "blocked", assignment, reason: "No verified managed session is selected; picker-or-stop applies." };
     const now = request.now ?? Date.now();
-    if (!session.capability.mediated || !capabilityReportIsConsistent(session.capability)) return { status: "blocked", assignment, reason: "This action requires a registered Mediated session; each capability must be separately proved." };
+    if (!capabilityReportIsConsistent(session.capability)) return { status: "blocked", assignment, reason: "The selected session capability report is internally inconsistent." };
+    if (assignment.capability === "requires_mediation" && !session.capability.mediated) return { status: "blocked", assignment, reason: "This action requires a registered Mediated session; each capability must be separately proved." };
     if (session.status !== "running" || session.lastHeartbeat + maximumHeartbeatAgeMs < now) return { status: "blocked", assignment, reason: "The selected managed session is not currently running with a fresh capability heartbeat." };
-    if (requiresControllableProvider.has(request.control) && !session.capability.controllable) return { status: "blocked", assignment, reason: "This action requires a Controllable provider session; mediation alone cannot pause or inject context." };
-    if (requiresObservableProvider.has(request.control) && !session.capability.observable) return { status: "blocked", assignment, reason: "This action requires an Observable provider session; state cannot be inferred from a window." };
+    if (assignment.capability === "requires_mediation" && requiresControllableProvider.has(request.control) && !session.capability.controllable) return { status: "blocked", assignment, reason: "This action requires a Controllable provider session; mediation alone cannot pause or inject context." };
+    if (assignment.capability === "requires_mediation" && requiresObservableProvider.has(request.control) && !session.capability.observable) return { status: "blocked", assignment, reason: "This action requires an Observable provider session; state cannot be inferred from a window." };
     const target = request.target ?? session.target; if (!target) return { status: "incomplete", assignment, reason: "A complete TargetSnapshot is required." };
     if (!session.target || !sameTarget(target, session.target)) return { status: "blocked", assignment, reason: "The selected TargetSnapshot changed or is stale; revalidate immediately before the operation." };
     const action = `${request.control}:${request.modifier}`;
@@ -271,8 +272,3 @@ export class ContainmentController {
   async release(target: TargetSnapshot, reauthenticated: boolean, reason: string): Promise<boolean> { return this.store.release(target.digest, reauthenticated, reason); }
 }
 
-function routeBehavior(control: Control, modifier: Modifier, session?: ManagedSession): string {
-  const selected = session ? ` for ${session.id}` : "";
-  const behavior = assignments.find((item) => item.control === control && item.modifier === modifier)?.summary ?? "Route a visible intent.";
-  return `${behavior}${selected}. This is a non-mutating visible route; it does not submit prompts, approve permissions, commit, push, merge, force-push, or release containment.`;
-}

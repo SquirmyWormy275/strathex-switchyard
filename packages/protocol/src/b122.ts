@@ -14,17 +14,22 @@ export const controls = [
 export type Control = (typeof controls)[number];
 export type Modifier = "normal" | "shift" | "alt" | "shift_alt" | "ctrl" | "ctrl_shift" | "ctrl_alt" | "ctrl_shift_alt";
 export type Capability = "route_only" | "requires_mediation" | "disabled_pending_gates";
+export type Chord = `${Control}:${Modifier}`;
+/** A stable, typed handler identity.  A chord never falls through a generic route. */
+export type HandlerName = `b122.${Chord}`;
 
 export interface Assignment {
   readonly control: Control;
   readonly modifier: Modifier;
   readonly summary: string;
   readonly capability: Capability;
+  readonly handler: HandlerName;
 }
 
-const route = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "route_only" });
-const mediated = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "requires_mediation" });
-const disabled = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "disabled_pending_gates" });
+export const handlerFor = (control: Control, modifier: Modifier): HandlerName => `b122.${control}:${modifier}`;
+const route = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "route_only", handler: handlerFor(control, modifier) });
+const mediated = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "requires_mediation", handler: handlerFor(control, modifier) });
+const disabled = (control: Control, modifier: Modifier, summary: string): Assignment => ({ control, modifier, summary, capability: "disabled_pending_gates", handler: handlerFor(control, modifier) });
 
 // These are the 65 settled chord assignments. Gesture-only behaviours are
 // documented separately and never broaden this protocol's chord surface.

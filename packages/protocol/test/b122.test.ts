@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assignments, controls, decodeSignal, encodeSignal, protocolVersion, type B122Signal, assignmentFor } from "../src/b122.ts";
+import { assignments, controls, decodeSignal, encodeSignal, protocolVersion, type B122Signal, assignmentFor, handlerFor } from "../src/b122.ts";
 
 test("the protocol exposes exactly 22 logical controls and 65 settled chord assignments", () => {
   assert.equal(controls.length, 22);
   assert.equal(assignments.length, 65);
   assert.equal(new Set(assignments.map((item) => `${item.control}:${item.modifier}`)).size, 65);
+  assert.equal(new Set(assignments.map((item) => item.handler)).size, 65);
+  for (const assignment of assignments) assert.equal(assignment.handler, handlerFor(assignment.control, assignment.modifier));
 });
 
 test("unassigned Ctrl combinations stay unassigned", () => {
