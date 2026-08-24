@@ -41,13 +41,16 @@ export type LocalHostAction =
   | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
   | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
   | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
-  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace";
+  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv";
 
 export interface ForwardedHostAction {
   readonly id: string;
   readonly kind: LocalHostAction;
   readonly expiresAt: string;
   readonly url?: string;
+  readonly workspaceRoot?: string;
+  readonly debugConfiguration?: string;
+  readonly pythonInterpreter?: string;
 }
 
 export interface PreparedCommand {
@@ -60,8 +63,8 @@ export interface PreparedCommand {
 }
 
 export type ReviewedGitMutation =
-  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string }
-  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string }
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string }
+  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
   | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
   | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
 
@@ -299,11 +302,17 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
   const kind = result.data?.hostActionKind;
   const expiresAt = result.data?.hostActionExpiresAt;
   const url = result.data?.hostActionUrl;
+  const workspaceRoot = result.data?.hostActionWorkspaceRoot;
+  const debugConfiguration = result.data?.hostActionDebugConfiguration;
+  const pythonInterpreter = result.data?.hostActionPythonInterpreter;
   if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
     || typeof kind !== "string" || !isLocalHostAction(kind)
     || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
-    || (url !== undefined && typeof url !== "string")) return undefined;
-  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}) };
+    || (url !== undefined && typeof url !== "string")
+    || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
+    || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
+    || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}) };
 }
 
 function isLocalHostAction(value: string): value is LocalHostAction {
@@ -311,7 +320,7 @@ function isLocalHostAction(value: string): value is LocalHostAction {
     "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
     "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
     "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace"
+    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv"
   ].includes(value);
 }
 

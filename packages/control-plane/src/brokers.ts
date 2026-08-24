@@ -168,8 +168,8 @@ function normalisePath(path: string): string {
 }
 
 export type GitMutation =
-  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string }
-  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string }
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string }
+  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
   | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
   | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
 
@@ -227,8 +227,8 @@ export class InMemoryGitBroker {
 
 function validGitMutation(mutation: GitMutation): boolean {
   switch (mutation.kind) {
-    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim();
-    case "pr_upsert": return !!mutation.headBranch && !!mutation.baseBranch;
+    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim() && (mutation.featureBranch === undefined || !!mutation.featureBranch.trim());
+    case "pr_upsert": return !!mutation.headBranch && !!mutation.baseBranch && !!mutation.title.trim() && mutation.title.length <= 256 && mutation.body.length <= 16_384;
     case "merge_pr": return mutation.pullRequest > 0 && !!mutation.head && !!mutation.baseBranch;
     case "direct_main": return !!mutation.branch && !!mutation.validationReceiptId;
   }

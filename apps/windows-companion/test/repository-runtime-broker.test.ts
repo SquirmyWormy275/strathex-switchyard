@@ -81,6 +81,73 @@ test("missing host pin remains unavailable and never falls back to recipe comman
   assert.match(unavailable.summary, /host-attested.*pin/i);
 });
 
+test("healthy web launch queues only its exact URL through the durable authenticated host boundary", async () => {
+  const queued: unknown[] = [];
+  let cleanups = 0;
+  const runtime = {
+    async execute(): Promise<RepositoryRuntimeResult> {
+      return { status: "running", summary: "healthy", managedProcessId: `managed:${"b".repeat(64)}`, pid: 4317, url: "http://127.0.0.1:4317/" };
+    },
+    async terminateManagedForContainment(): Promise<boolean> { cleanups += 1; return true; }
+  };
+  const broker = new RepositoryRuntimeExecutionBroker(
+    { async resolve() { return runtime as unknown as RepositoryRuntime; } },
+    {
+      containment: { async check() { return { allowed: true, reason: "clear", fenceEpoch: 0 }; } },
+      hostActions: { async enqueue(input, plan) { queued.push({ input, plan }); return { version: 1, id: `host-action:${"c".repeat(64)}`, operationId: input.operationId!, commandAction: input.definition.action, hostAction: plan.hostAction, url: plan.url, createdAt: "2026-08-24T00:00:00.000Z", expiresAt: "2026-08-24T00:01:00.000Z" }; } }
+    }
+  );
+  const outcome = await broker.execute(request({ action: "launch_web_app", recipe: repositoryRuntimeExecutionRecipe("launch_web_app", target) }));
+  assert.equal(outcome.status, "running");
+  assert.equal(outcome.data?.hostActionKind, "open_external_url");
+  assert.equal(outcome.data?.hostActionUrl, "http://127.0.0.1:4317/");
+  assert.equal(queued.length, 1);
+  assert.equal(cleanups, 0);
+});
+
+test("web launch stops its exact managed child if a final host URL is unsafe", async () => {
+  let cleanups = 0;
+  const runtime = {
+    async execute(): Promise<RepositoryRuntimeResult> { return { status: "running", summary: "unexpected URL", managedProcessId: `managed:${"d".repeat(64)}`, pid: 77, url: "http://attacker.example/" }; },
+    async terminateManagedForContainment(): Promise<boolean> { cleanups += 1; return true; }
+  };
+  const broker = new RepositoryRuntimeExecutionBroker(
+    { async resolve() { return runtime as unknown as RepositoryRuntime; } },
+    { hostActions: { async enqueue() { throw new Error("must not queue"); } } }
+  );
+  const outcome = await broker.execute(request({ action: "launch_web_app", recipe: repositoryRuntimeExecutionRecipe("launch_web_app", target) }));
+  assert.equal(outcome.status, "blocked");
+  assert.equal(cleanups, 1);
+});
+
+test("debug routes one exact attested launch configuration through the authenticated VS Code host", async () => {
+  const queued: unknown[] = [];
+  const runtime = { async execute(): Promise<RepositoryRuntimeResult> { return { status: "running", summary: "ready", debugConfiguration: "Launch test" }; } };
+  const broker = new RepositoryRuntimeExecutionBroker(
+    { async resolve() { return runtime as unknown as RepositoryRuntime; } },
+    { hostActions: { async enqueue(input, plan) { queued.push({ input, plan }); return { version: 1, id: `host-action:${"f".repeat(64)}`, operationId: input.operationId!, commandAction: input.definition.action, hostAction: plan.hostAction, workspaceRoot: input.target?.repositoryRoot, debugConfiguration: plan.debugConfiguration, createdAt: "2026-08-24T00:00:00.000Z", expiresAt: "2026-08-24T00:01:00.000Z" }; } } }
+  );
+  const outcome = await broker.execute(request({ action: "debug_target", recipe: repositoryRuntimeExecutionRecipe("debug_target", target) }));
+  assert.equal(outcome.status, "running");
+  assert.equal(outcome.data?.hostActionKind, "start_vscode_debug");
+  assert.equal(outcome.data?.hostActionWorkspaceRoot, target.repositoryRoot);
+  assert.equal(outcome.data?.hostActionDebugConfiguration, "Launch test");
+  assert.equal(queued.length, 1);
+});
+
+test("venv completion selects only the exact repo-local interpreter through the authenticated VS Code host", async () => {
+  const interpreter = `${target.repositoryRoot}\\.venv\\Scripts\\python.exe`;
+  const runtime = { async execute(): Promise<RepositoryRuntimeResult> { return { status: "completed", summary: "venv ready", pythonInterpreter: interpreter }; } };
+  const broker = new RepositoryRuntimeExecutionBroker(
+    { async resolve() { return runtime as unknown as RepositoryRuntime; } },
+    { hostActions: { async enqueue(input, plan) { return { version: 1, id: `host-action:${"1".repeat(64)}`, operationId: input.operationId!, commandAction: input.definition.action, hostAction: plan.hostAction, workspaceRoot: input.target?.repositoryRoot, pythonInterpreter: plan.pythonInterpreter, createdAt: "2026-08-24T00:00:00.000Z", expiresAt: "2026-08-24T00:01:00.000Z" }; } } }
+  );
+  const outcome = await broker.execute(request({ action: "venv", recipe: repositoryRuntimeExecutionRecipe("venv", target) }));
+  assert.equal(outcome.status, "running");
+  assert.equal(outcome.data?.hostActionKind, "configure_python_venv");
+  assert.equal(outcome.data?.hostActionPythonInterpreter, interpreter);
+});
+
 test("pipeline and security recipes always route through the OS sandbox runner", async () => {
   let hostResolutions = 0;
   const actions: string[] = [];

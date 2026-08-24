@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile } from "node:fs/promises";
-import { relative, resolve, sep } from "node:path";
+import { lstat, readFile, realpath, stat } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 
 import type { GitInspection, GitInspector, ManifestFile } from "./snapshot.ts";
@@ -40,9 +40,35 @@ export interface GitCliInspectorOptions {
  * mutation. The only write-tree query creates no ref or worktree change.
  */
 export class NodeGitCommandRunner implements GitCommandRunner {
+  private readonly candidates: readonly string[];
+
+  constructor(candidates: readonly string[] = [
+    "C:\\Program Files\\Git\\cmd\\git.exe",
+    "C:\\Program Files\\Git\\bin\\git.exe",
+    "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
+  ]) {
+    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) {
+      throw new Error("Target inspection requires fixed absolute Git executable candidates.");
+    }
+    this.candidates = [...candidates];
+  }
+
   async run(args: readonly string[], workingDirectory?: string): Promise<GitCommandResult> {
+    const executable = await this.fixedExecutable();
     return new Promise((resolveResult, reject) => {
-      const child = spawn("git", [...args], { cwd: workingDirectory, shell: false, windowsHide: true });
+      const child = spawn(executable, [...args], {
+        cwd: workingDirectory,
+        shell: false,
+        windowsHide: true,
+        env: {
+          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
+          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          GIT_CONFIG_NOSYSTEM: "1",
+          GIT_TERMINAL_PROMPT: "0",
+          GIT_OPTIONAL_LOCKS: "0",
+          LC_ALL: "C"
+        }
+      });
       const stdout: Buffer[] = [];
       const stderr: Buffer[] = [];
       child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
@@ -54,6 +80,15 @@ export class NodeGitCommandRunner implements GitCommandRunner {
         stderr: Buffer.concat(stderr).toString("utf8")
       }));
     });
+  }
+
+  private async fixedExecutable(): Promise<string> {
+    for (const candidate of this.candidates) {
+      try {
+        if ((await stat(candidate)).isFile()) return realpath(candidate);
+      } catch { /* continue */ }
+    }
+    throw new Error("A trusted absolute Git executable is unavailable for target inspection.");
   }
 }
 
@@ -122,7 +157,7 @@ export class GitCliInspector implements GitInspector {
 
     const remote = await this.optional(["remote", "get-url", "origin"], repositoryRoot, "canonical remote", issues);
     const branch = await this.optional(["branch", "--show-current"], repositoryRoot, "branch", issues);
-    const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues);
+    const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues, false);
     const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
     const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
     const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
@@ -146,14 +181,14 @@ export class GitCliInspector implements GitInspector {
     };
   }
 
-  private async optional(args: readonly string[], cwd: string, label: string, issues: string[]): Promise<string | undefined> {
+  private async optional(args: readonly string[], cwd: string, label: string, issues: string[], required = true): Promise<string | undefined> {
     const result = await this.runner.run(args, cwd);
     if (result.exitCode !== 0) {
-      issues.push(shortFailure(label, result));
+      if (required) issues.push(shortFailure(label, result));
       return undefined;
     }
     const value = cleanOutput(result.stdout);
-    if (!value) issues.push(`Git ${label} is empty.`);
+    if (!value && required) issues.push(`Git ${label} is empty.`);
     return value;
   }
 

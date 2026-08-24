@@ -731,14 +731,19 @@ function parseGitMutation(value: unknown): GitMutation {
   if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Git review requires a typed mutation record.");
   switch (value.kind) {
     case "local_commit":
-      exactMutationKeys(value, ["kind", "paths", "message"]);
+      exactMutationKeys(value, ["kind", "paths", "message", ...(value.featureBranch === undefined ? [] : ["featureBranch"])]);
       if (!Array.isArray(value.paths) || !value.paths.length || value.paths.length > 256 || !value.paths.every((path) => typeof path === "string" && path.length <= 512)
-        || typeof value.message !== "string" || !value.message.trim() || value.message.length > 120) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths and message.");
-      return { kind: "local_commit", paths: value.paths, message: value.message };
+        || typeof value.message !== "string" || !value.message.trim() || value.message.length > 120
+        || (value.featureBranch !== undefined && typeof value.featureBranch !== "string")) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths, message, and optional feature branch.");
+      return { kind: "local_commit", paths: value.paths, message: value.message, ...(typeof value.featureBranch === "string" ? { featureBranch: value.featureBranch } : {}) };
     case "pr_upsert":
-      exactMutationKeys(value, ["kind", "headBranch", "baseBranch"]);
-      if (typeof value.headBranch !== "string" || typeof value.baseBranch !== "string") throw new CompanionServiceError("invalid_request", "PR review requires exact head and base branches.");
-      return { kind: "pr_upsert", headBranch: value.headBranch, baseBranch: value.baseBranch };
+      exactMutationKeys(value, ["kind", "headBranch", "baseBranch", "title", "body"]);
+      if (typeof value.headBranch !== "string" || typeof value.baseBranch !== "string"
+        || typeof value.title !== "string" || !value.title.trim() || value.title.length > 256 || /[\r\n\0]/.test(value.title)
+        || typeof value.body !== "string" || value.body.length > 16_384 || /\0/.test(value.body)) {
+        throw new CompanionServiceError("invalid_request", "PR review requires exact bounded head, base, title, and body fields.");
+      }
+      return { kind: "pr_upsert", headBranch: value.headBranch, baseBranch: value.baseBranch, title: value.title, body: value.body };
     case "merge_pr":
       exactMutationKeys(value, ["kind", "pullRequest", "head", "baseBranch"]);
       if (!Number.isSafeInteger(value.pullRequest) || typeof value.head !== "string" || typeof value.baseBranch !== "string") throw new CompanionServiceError("invalid_request", "PR merge review requires exact pull request, head, and base values.");

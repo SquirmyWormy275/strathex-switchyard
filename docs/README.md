@@ -15,6 +15,10 @@
 - `software-completion-audit.md` distinguishes the implemented, tested
   software control-plane machinery from device, provider, and operational
   acceptance evidence that remains unavailable in this checkout.
+- `provider-adapter-protocol.md` specifies exact capability, command,
+  automatic-Council, Git smart-HTTP, and GitHub adapter contracts.
+- `windows-release-and-installation.md` defines the verified Windows bundle,
+  per-user state boundary, checksums, SBOM, and installation evidence.
 
 The implementation follows the documented safety boundary: a keyboard signal
 may route an intent, but only mediated execution can enforce policy.

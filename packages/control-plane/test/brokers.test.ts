@@ -114,7 +114,7 @@ test("Git broker refuses force semantics and containment fences every Git mutati
   const outbound = new InMemoryGitBroker(pr.policy, containment);
   let writes = 0;
   outbound.register("pr_upsert", () => { writes += 1; return { status: "completed", summary: "simulated PR" }; });
-  const result = await outbound.execute({ ...pr.invocation, mutation: { kind: "pr_upsert", headBranch: target.branch!, baseBranch: "main" } });
+  const result = await outbound.execute({ ...pr.invocation, mutation: { kind: "pr_upsert", headBranch: target.branch!, baseBranch: "main", title: "Reviewed change", body: "Exact reviewed body." } });
   assert.equal(result.status, "blocked");
   assert.equal(writes, 0);
 

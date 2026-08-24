@@ -50,6 +50,8 @@ class FakeVscode {
   readonly createdTerminals: FakeTerminal[] = [];
   readonly started: Array<{ folder: WorkspaceFolderLike | undefined; configuration: DebugConfigurationLike; noDebug?: boolean }> = [];
   readonly stopped: DebugSessionLike[] = [];
+  readonly configurationUpdates: Array<{ section: string; key: string; value: unknown; target?: boolean | number | null }> = [];
+  readonly terminalOptions: Array<{ name: string; cwd?: string; env?: Readonly<Record<string, string | null | undefined>> }> = [];
   readonly terminals: FakeTerminal[];
   activeTerminal?: FakeTerminal;
   workspaceFolders: WorkspaceFolderLike[];
@@ -80,6 +82,7 @@ class FakeVscode {
         get terminals(): readonly TerminalLike[] { return self.terminals; },
         get activeTerminal(): TerminalLike | undefined { return self.activeTerminal; },
         createTerminal(options): TerminalLike {
+          self.terminalOptions.push(options);
           const terminal = new FakeTerminal(options.name);
           self.createdTerminals.push(terminal);
           self.terminals.push(terminal);
@@ -99,12 +102,16 @@ class FakeVscode {
       },
       workspace: {
         get workspaceFolders(): readonly WorkspaceFolderLike[] { return self.workspaceFolders; },
-        getConfiguration(): { get<T>(key: string): T | undefined } {
-          return { get: <T>(key: string): T | undefined => key === "configurations" ? self.debugConfigurations as T : undefined };
+        getConfiguration(section = ""): { get<T>(key: string): T | undefined; update(key: string, value: unknown, target?: boolean | number | null): Promise<void> } {
+          return {
+            get: <T>(key: string): T | undefined => section === "launch" && key === "configurations" ? self.debugConfigurations as T : undefined,
+            update: async (key, value, target) => { self.configurationUpdates.push({ section, key, value, ...(target !== undefined ? { target } : {}) }); }
+          };
         },
         onDidChangeWorkspaceFolders(listener): DisposableLike { self.workspaceListeners.push(listener); return new FakeDisposable(); }
       },
       debug: {
+        async startDebugging(folder, configuration, options): Promise<boolean> { self.started.push({ folder, configuration: typeof configuration === "string" ? { name: configuration } : configuration, noDebug: options?.noDebug }); return true; },
         onDidStartDebugSession(listener): DisposableLike { self.debugStartListeners.push(listener); return new FakeDisposable(); },
         onDidTerminateDebugSession(listener): DisposableLike { self.debugStopListeners.push(listener); return new FakeDisposable(); }
       }
@@ -284,6 +291,38 @@ test("local commit collects an exact structured Git review before dispatch", asy
   assert.equal(bridge.dispatched.at(-1)?.control, "COMMIT");
 });
 
+test("PR upsert reviews title and body and opens only the companion-verified PR URL", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const opened: string[] = [];
+  bridge.nextDispatch = {
+    status: "running",
+    summary: "The exact PR is verified.",
+    data: {
+      hostActionId: `host-action:${"c".repeat(64)}`,
+      hostActionKind: "open_external_url",
+      hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+      hostActionUrl: "https://github.com/acme/project/pull/12"
+    }
+  };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-23T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/review", changedPaths: [] }],
+    openExternal: async (url) => { opened.push(url); return true; }
+  });
+  await controller.start();
+  vscode.input("main");
+  vscode.input("Reviewed PR title");
+  vscode.input("Reviewed PR body");
+
+  await vscode.invoke("sxsy-b122.chord.commit.shift");
+
+  assert.deepEqual(bridge.gitReviews.at(-1)?.mutation, { kind: "pr_upsert", headBranch: "feature/review", baseBranch: "main", title: "Reviewed PR title", body: "Reviewed PR body" });
+  assert.deepEqual(opened, ["https://github.com/acme/project/pull/12"]);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+});
+
 test("picker-or-stop selects one Git target and forwards only companion-prepared authority and confirmation", async () => {
   const vscode = new FakeVscode([], ["C:\\repo-a", "C:\\repo-b"]);
   const bridge = new FakeBridge();
@@ -316,13 +355,15 @@ test("picker-or-stop selects one Git target and forwards only companion-prepared
 test("forwards Run/Debug to the companion and performs only safe local host actions", async () => {
   const vscode = new FakeVscode();
   const bridge = new FakeBridge();
-  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { now: () => "2026-08-23T00:00:00.000Z", idFactory: sequenceFactory() });
+  const opened: string[] = [];
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { now: () => "2026-08-23T00:00:00.000Z", idFactory: sequenceFactory(), openExternal: async (url) => { opened.push(url); return true; } });
   await controller.start();
 
   await vscode.invoke("sxsy-b122.chord.claude.alt");
   assert.equal(bridge.dispatched.at(-1)?.control, "CLAUDE");
   assert.equal(vscode.createdTerminals.length, 1);
-  assert.deepEqual(vscode.createdTerminals[0].sent, ["claude"]);
+  assert.deepEqual(vscode.createdTerminals[0].sent, []);
+  assert.match(vscode.warnings.at(-1) ?? "", /did not launch an unverified provider executable/i);
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 
   bridge.nextDispatch = { status: "unavailable", summary: "No verified execution broker is attached." };
@@ -341,10 +382,27 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
   assert.equal(vscode.stopped.length, 0);
   assert.match(vscode.warnings.at(-1) ?? "", /malformed host-action/i);
 
+  bridge.nextDispatch = { status: "running", summary: "Verified debugger awaits host acknowledgement.", data: { hostActionId: `host-action:${"e".repeat(64)}`, hostActionKind: "start_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test" } };
+  await vscode.invoke("sxsy-b122.chord.run.shift");
+  assert.equal(vscode.started.length, 1);
+  assert.equal(vscode.started[0]?.configuration.name, "Launch test");
+  assert.equal(vscode.started[0]?.noDebug, false);
+
+  bridge.nextDispatch = { status: "running", summary: "Healthy web app awaits host acknowledgement.", data: { hostActionId: `host-action:${"d".repeat(64)}`, hostActionKind: "open_external_url", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionUrl: "http://127.0.0.1:4317/" } };
+  await vscode.invoke("sxsy-b122.chord.run.shift_alt");
+  assert.deepEqual(opened, ["http://127.0.0.1:4317/"]);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+
+  bridge.nextDispatch = { status: "running", summary: "Venv awaits host acknowledgement.", data: { hostActionId: `host-action:${"2".repeat(64)}`, hostActionKind: "configure_python_venv", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo", hostActionPythonInterpreter: "C:\\repo\\.venv\\Scripts\\python.exe" } };
+  await vscode.invoke("sxsy-b122.chord.sandbox.normal");
+  assert.deepEqual(vscode.configurationUpdates.at(-1), { section: "python", key: "defaultInterpreterPath", value: "C:\\repo\\.venv\\Scripts\\python.exe", target: 3 });
+  assert.equal(vscode.terminalOptions.at(-1)?.cwd, "C:\\repo");
+  assert.equal(vscode.terminalOptions.at(-1)?.env?.VIRTUAL_ENV, "C:\\repo\\.venv");
+
   bridge.nextDispatch = { status: "blocked", summary: "Acceptance evidence is incomplete." };
   await vscode.invoke("sxsy-b122.chord.pipeline.ctrl_shift_alt");
   assert.match(vscode.warnings.at(-1) ?? "", /blocked/i);
-  assert.equal(vscode.createdTerminals.length, 1);
+  assert.equal(vscode.createdTerminals.length, 2);
 });
 
 test("a disconnected or malicious companion cannot cause a host action", async () => {

@@ -135,7 +135,8 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
   private async validateMutation(mutation: GitMutation, target: TargetSnapshot): Promise<GitReviewResult | undefined> {
     switch (mutation.kind) {
       case "local_commit": {
-        if (isDefaultBranch(target.branch!)) return blocked("Local commit review refuses the default branch.");
+        if (isDefaultBranch(target.branch!) !== (mutation.featureBranch !== undefined)) return blocked("A default-branch local commit review requires one exact new feature branch, and a feature-branch review must not carry one.");
+        if (mutation.featureBranch !== undefined && (!validBranch(mutation.featureBranch) || isDefaultBranch(mutation.featureBranch) || mutation.featureBranch === target.branch)) return blocked("Local commit review contains an invalid or default feature branch.");
         if (!mutation.paths.length || mutation.paths.length > 256 || !validCommitMessage(mutation.message)) return blocked("Local commit review requires bounded task-owned paths and a safe message.");
         const normalized = mutation.paths.map(canonicalRepositoryPath);
         if (normalized.some((path) => !path) || new Set(normalized).size !== normalized.length) return blocked("Local commit review contains an unsafe or duplicate path.");
@@ -147,7 +148,10 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
         return undefined;
       }
       case "pr_upsert":
-        if (!validBranch(mutation.headBranch) || !validBranch(mutation.baseBranch) || mutation.headBranch !== target.branch || mutation.headBranch === mutation.baseBranch) return blocked("PR review does not match the exact current feature branch and base.");
+        if (!validBranch(mutation.headBranch) || !validBranch(mutation.baseBranch) || mutation.headBranch !== target.branch || mutation.headBranch === mutation.baseBranch
+          || !mutation.title.trim() || mutation.title.length > 256 || /[\r\n\0]/.test(mutation.title) || mutation.body.length > 16_384 || /\0/.test(mutation.body)) {
+          return blocked("PR review does not match the exact current feature branch, base, title, and body.");
+        }
         return undefined;
       case "merge_pr":
         if (!Number.isSafeInteger(mutation.pullRequest) || mutation.pullRequest <= 0 || !/^[a-f0-9]{40}$/i.test(mutation.head) || !validBranch(mutation.baseBranch)) return blocked("PR merge review requires an exact pull request, head SHA, and base branch.");

@@ -42,7 +42,7 @@ const session: ManagedSession = {
   metadata: { "sxsy-b122.kind": "git-root" }
 };
 
-async function setup(attested = true) {
+async function setup(attested = true, resolvedTarget: TargetSnapshot = target) {
   const root = await mkdtemp(join(tmpdir(), "b122-git-review-"));
   const store = new ProtectedJsonStore({ filePath: join(root, "journal.jsonl") });
   const sessions = new SessionRegistry(store);
@@ -50,7 +50,7 @@ async function setup(attested = true) {
   const queue = new DurableGitMutationReviewQueue({
     store,
     sessions,
-    targetResolver: { async resolve() { return target; } },
+    targetResolver: { async resolve() { return resolvedTarget; } },
     attestor: { async attest() { return attested ? { reauthenticated: true, operator: "TEST\\operator" } : undefined; } },
     inspector: { async changedPaths() { return ["src/safe.ts", "README.md"]; } },
     now: () => new Date("2026-08-23T12:00:00.000Z")
@@ -90,6 +90,15 @@ test("review refuses paths absent from the exact Git change set and absent user 
     mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe" }
   });
   assert.equal(denied.status, "blocked");
+});
+
+test("default-branch review requires one exact non-default branch for a fresh-target handoff", async () => {
+  const mainTarget = { ...target, id: "snapshot-main", branch: "main" };
+  const { queue } = await setup(true, mainTarget);
+  const missing = await queue.review({ action: "local_commit", sessionId: session.id, mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe" } });
+  assert.equal(missing.status, "blocked");
+  const approved = await queue.review({ action: "local_commit", sessionId: session.id, mutation: { kind: "local_commit", paths: ["src/safe.ts"], message: "safe", featureBranch: "feature/safe" } });
+  assert.equal(approved.status, "approved");
 });
 
 test("review rejects mutation/action confusion and stale target bindings", async () => {

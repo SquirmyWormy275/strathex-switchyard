@@ -166,6 +166,37 @@ test("mediated local commit uses an exact task-owned private index and reconcile
   }
 });
 
+test("default-branch review creates a hook-disabled feature branch and requires a fresh target before committing", async () => {
+  const isolated = await fixture();
+  try {
+    await requireCommand(isolated.root, "git", "branch", "-f", "main", "HEAD");
+    await requireCommand(isolated.root, "git", "switch", "main");
+    await writeFile(join(isolated.root, "src-safe.ts"), "export const value = 'reviewed from main';\n", "utf8");
+    const target = await isolated.capture();
+    assert.equal(target.branch, "main");
+    assert.equal(target.completeness, "complete", target.reasons.join(" "));
+    const first = permittedRequest(target, effectGuard(isolated));
+    const firstBroker = new InMemoryGitBroker(first.policy);
+    const handler = new LocalMediatedGitHandler({ stateDirectory: isolated.state });
+    firstBroker.register("local_commit", (input) => handler.execute(input));
+    const branched = await firstBroker.execute({ ...first.request, mutation: { ...first.request.mutation, featureBranch: "feature/reviewed-from-main" } });
+    assert.equal(branched.status, "incomplete", branched.summary);
+    assert.equal(await requireCommand(isolated.root, "git", "branch", "--show-current"), "feature/reviewed-from-main");
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+
+    const freshTarget = await isolated.capture();
+    assert.equal(freshTarget.completeness, "complete", freshTarget.reasons.join(" "));
+    const second = permittedRequest(freshTarget, effectGuard(isolated));
+    const secondBroker = new InMemoryGitBroker(second.policy);
+    secondBroker.register("local_commit", (input) => handler.execute(input));
+    const committed = await secondBroker.execute(second.request);
+    assert.equal(committed.status, "completed", committed.summary);
+    assert.notEqual(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+  } finally {
+    await isolated.dispose();
+  }
+});
+
 test("mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change", async () => {
   const isolated = await fixture();
   try {

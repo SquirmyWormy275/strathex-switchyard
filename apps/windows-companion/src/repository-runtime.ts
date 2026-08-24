@@ -55,6 +55,7 @@ export interface RepositoryProcessRecipe {
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
   readonly web?: RepositoryWebRecipe;
+  readonly python?: Readonly<{ readonly interpreter: string }>;
 }
 
 export interface RepositoryStopRecipe {
@@ -64,7 +65,13 @@ export interface RepositoryStopRecipe {
   readonly forceTimeoutMs: number;
 }
 
-export type RepositoryRuntimeRecipe = RepositoryProcessRecipe | RepositoryStopRecipe;
+export interface RepositoryVscodeDebugRecipe {
+  readonly kind: "vscode_debug";
+  /** Exact operator-attested launch.json configuration name. */
+  readonly configuration: string;
+}
+
+export type RepositoryRuntimeRecipe = RepositoryProcessRecipe | RepositoryStopRecipe | RepositoryVscodeDebugRecipe;
 
 export interface RepositoryRuntimeManifest {
   readonly schema: typeof repositoryRuntimeManifestSchema;
@@ -136,6 +143,8 @@ export interface RepositoryRuntimeResult {
   readonly output?: string;
   readonly outputTruncated?: boolean;
   readonly url?: string;
+  readonly debugConfiguration?: string;
+  readonly pythonInterpreter?: string;
 }
 
 export interface RepositoryRuntimeExecuteOptions {
@@ -167,7 +176,7 @@ const forbiddenEnvironmentName = /(?:^|_)(?:PASSWORD|PASSWD|SECRET|TOKEN|CREDENT
 const filesystemTraversal = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
 const supportedActionSet = new Set<string>([...repositoryProcessActions, "stop_managed_run"]);
 const processActionSet = new Set<string>(repositoryProcessActions);
-const managedActionSet = new Set<string>(["run_target", "debug_target", "launch_web_app"]);
+const managedActionSet = new Set<string>(["run_target", "launch_web_app"]);
 const disposableRequired = new Set<RepositoryProcessAction>(["pipeline_local_gate", "pipeline_clean_reproduction", "release_shield"]);
 
 class RuntimeUnavailableError extends Error {}
@@ -264,6 +273,7 @@ function validateManifest(value: unknown): RepositoryRuntimeManifest {
       if (!supportedActionSet.has(action)) { errors.push(`Manifest has unsupported recipe action ${action}.`); continue; }
       if (!isRecord(recipe)) { errors.push(`Manifest recipe ${action} must be an object.`); continue; }
       if (action === "stop_managed_run") recipes.stop_managed_run = validateStopRecipe(recipe, errors);
+      else if (action === "debug_target") recipes.debug_target = validateVscodeDebugRecipe(recipe, errors);
       else recipes[action as RepositoryProcessAction] = validateProcessRecipe(action as RepositoryProcessAction, recipe, allowedHttpsUrls, errors);
     }
   }
@@ -275,6 +285,15 @@ function validateManifest(value: unknown): RepositoryRuntimeManifest {
     allowedHttpsUrls,
     recipes
   };
+}
+
+function validateVscodeDebugRecipe(value: Record<string, unknown>, errors: string[]): RepositoryVscodeDebugRecipe {
+  exactKeys(value, ["kind", "configuration"], ["kind", "configuration"], "debug_target", errors);
+  if (value.kind !== "vscode_debug") errors.push("debug_target must use a vscode_debug recipe.");
+  if (!boundedString(value.configuration, "debug_target.configuration", errors, 256) || /[\r\n\0]/.test(String(value.configuration))) {
+    errors.push("debug_target.configuration must be one exact bounded launch configuration name.");
+  }
+  return { kind: "vscode_debug", configuration: typeof value.configuration === "string" ? value.configuration : "" };
 }
 
 function validateStopRecipe(value: Record<string, unknown>, errors: string[]): RepositoryStopRecipe {
@@ -297,7 +316,7 @@ function validateStopRecipe(value: Record<string, unknown>, errors: string[]): R
 }
 
 function validateProcessRecipe(action: RepositoryProcessAction, value: Record<string, unknown>, allowedHttpsUrls: readonly string[], errors: string[]): RepositoryProcessRecipe {
-  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
+  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
   if (value.kind !== "process") errors.push(`${action} must use a process recipe.`);
   if (!boundedString(value.executable, `${action}.executable`, errors, 2_048) || !isAbsolute(value.executable as string)) errors.push(`${action}.executable must be an exact absolute executable path.`);
   const args: string[] = [];
@@ -332,6 +351,10 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
   const web = value.web === undefined ? undefined : validateWebRecipe(action, value.web, allowedHttpsUrls, errors);
   if (action === "launch_web_app" && !web) errors.push("launch_web_app requires exact web and health URLs.");
   if (action !== "launch_web_app" && value.web !== undefined) errors.push(`${action} cannot declare a web URL.`);
+  const python = value.python === undefined ? undefined : validatePythonRecipe(action, value.python, errors);
+  if ((action === "venv" || action === "rebuild_venv") && !python) errors.push(`${action} requires an exact repo-local Python interpreter postcondition.`);
+  if (action !== "venv" && action !== "rebuild_venv" && value.python !== undefined) errors.push(`${action} cannot declare a Python interpreter postcondition.`);
+  if ((action === "venv" || action === "rebuild_venv") && isolation !== "repository") errors.push(`${action} must prepare the verified repository-local environment.`);
   return {
     kind: "process",
     executable: typeof value.executable === "string" ? value.executable : "",
@@ -342,8 +365,20 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
     isolation,
     timeoutMs: typeof value.timeoutMs === "number" ? value.timeoutMs : 1_000,
     maxOutputBytes: typeof value.maxOutputBytes === "number" ? value.maxOutputBytes : 4_096,
-    ...(web ? { web } : {})
+    ...(web ? { web } : {}),
+    ...(python ? { python } : {})
   };
+}
+
+function validatePythonRecipe(action: RepositoryProcessAction, value: unknown, errors: string[]): Readonly<{ readonly interpreter: string }> | undefined {
+  if (!isRecord(value)) { errors.push(`${action}.python must be an object.`); return undefined; }
+  exactKeys(value, ["interpreter"], ["interpreter"], `${action}.python`, errors);
+  const interpreter = boundedString(value.interpreter, `${action}.python.interpreter`, errors, 512) ? value.interpreter : "";
+  const normalized = interpreter.replaceAll("\\", "/");
+  if (filesystemTraversal.test(normalized) || normalized.startsWith("/") || isAbsolute(interpreter) || normalized.toLowerCase() !== ".venv/scripts/python.exe") {
+    errors.push(`${action}.python.interpreter must be the exact repo-local .venv/Scripts/python.exe path.`);
+  }
+  return { interpreter };
 }
 
 function validateWebRecipe(action: RepositoryProcessAction, value: unknown, allowedHttpsUrls: readonly string[], errors: string[]): RepositoryWebRecipe | undefined {
@@ -496,6 +531,18 @@ export class RepositoryRuntime {
     return [...this.managed.values()].map((record) => ({ ...record.public, outputTruncated: record.output.truncated }));
   }
 
+  /**
+   * Exact emergency cleanup for a child that was started by this runtime but
+   * cannot be handed to the authenticated host because a final fence changed.
+   * It cannot target an arbitrary PID and never broadens the pinned recipe.
+   */
+  async terminateManagedForContainment(managedProcessId: string): Promise<boolean> {
+    const record = this.managed.get(managedProcessId);
+    if (!record || (record.public.state !== "running" && record.public.state !== "stopping")) return false;
+    await this.terminateRecord(record, 250, 1_000, "cancelled");
+    return (record.public.state as ManagedRepositoryProcess["state"]) === "cancelled";
+  }
+
   async execute(action: RepositoryRuntimeAction, options: RepositoryRuntimeExecuteOptions = {}): Promise<RepositoryRuntimeResult> {
     const effectGuard = options.effectGuard ?? this.effectGuard;
     const recipe = this.verified.manifest.recipes[action];
@@ -503,6 +550,15 @@ export class RepositoryRuntime {
     if (action === "stop_managed_run") {
       if (recipe.kind !== "stop") return { status: "blocked", summary: "The verified stop recipe has an invalid type." };
       return this.stopManaged(recipe, options.managedProcessId, effectGuard);
+    }
+    if (action === "debug_target") {
+      if (recipe.kind !== "vscode_debug") return { status: "blocked", summary: "The verified debug recipe has an invalid type." };
+      if (options.signal?.aborted) return { status: "cancelled", summary: "debug_target was cancelled before the host action." };
+      const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
+      if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
+      const finalGuard = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
+      if (!finalGuard.allowed) return { status: "blocked", summary: untrustedSummary(finalGuard.reason) };
+      return { status: "running", summary: "The exact verified VS Code debug configuration is ready for authenticated host execution.", debugConfiguration: recipe.configuration };
     }
     if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type." };
     return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard);
@@ -542,7 +598,17 @@ export class RepositoryRuntime {
       const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal);
       if ("result" in started) return started.result;
       transferredLease = recipe.lifecycle === "managed";
-      if (recipe.lifecycle === "foreground") return await this.waitForeground(action, recipe, started.record, signal);
+      if (recipe.lifecycle === "foreground") {
+        const result = await this.waitForeground(action, recipe, started.record, signal);
+        if (result.status === "completed" && (action === "venv" || action === "rebuild_venv")) {
+          const interpreter = await realpath(resolve(this.verified.canonicalRepositoryRoot, recipe.python!.interpreter)).catch(() => "");
+          if (!interpreter || !inside(interpreter, this.verified.canonicalRepositoryRoot) || !(await stat(interpreter).catch(() => undefined))?.isFile()) {
+            return { status: "failed", summary: `${action} exited successfully but did not produce the exact verified repo-local Python interpreter.` };
+          }
+          return { ...result, pythonInterpreter: interpreter };
+        }
+        return result;
+      }
       const record = started.record;
       if (action === "launch_web_app") {
         const web = recipe.web!;

@@ -27,7 +27,7 @@ export interface TerminalLike {
   sendText?(text: string, addNewLine?: boolean): void;
 }
 
-export interface TerminalOptionsLike { readonly name: string; }
+export interface TerminalOptionsLike { readonly name: string; readonly cwd?: string; readonly env?: Readonly<Record<string, string | null | undefined>>; }
 
 export interface DebugConfigurationLike {
   readonly name?: string;
@@ -68,10 +68,11 @@ export interface VscodeLike {
   };
   readonly workspace: {
     readonly workspaceFolders: readonly WorkspaceFolderLike[] | undefined;
-    getConfiguration(section?: string): { get<T>(key: string): T | undefined; };
+    getConfiguration(section?: string, scope?: unknown): { get<T>(key: string): T | undefined; update?(key: string, value: unknown, target?: boolean | number | null): PromiseLike<void>; };
     onDidChangeWorkspaceFolders(listener: () => unknown): DisposableLike;
   };
   readonly debug: {
+    startDebugging(folder: WorkspaceFolderLike | undefined, configuration: string | DebugConfigurationLike, options?: { readonly noDebug?: boolean }): PromiseLike<boolean>;
     onDidStartDebugSession(listener: (session: DebugSessionLike) => unknown): DisposableLike;
     onDidTerminateDebugSession(listener: (session: DebugSessionLike) => unknown): DisposableLike;
   };

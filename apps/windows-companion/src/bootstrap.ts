@@ -108,7 +108,14 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ? new AttestedSandboxInstallationCoordinator(sandboxInstallationRegistry, options.sandboxHelperPath, options.runtimePinPresence)
     : undefined;
   const targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
-    new TargetSnapshotFactory(new GitCliInspector()),
+    new TargetSnapshotFactory(new GitCliInspector({
+      // The installed companion hashes every present untracked and ignored
+      // regular file into the target identity.  It never silently treats an
+      // ignored input as absent; unreadable/special files still make the
+      // snapshot incomplete and stop consequential work.
+      classifyUntracked: () => "included",
+      classifyIgnored: () => "included"
+    })),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
   const providerHandshakes = options.runtimePinPresence

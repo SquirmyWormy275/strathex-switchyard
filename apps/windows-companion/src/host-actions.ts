@@ -10,7 +10,7 @@ export const localHostActionKinds = [
   "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
   "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
   "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-  "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace"
+  "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv"
 ] as const;
 
 export type LocalHostActionKind = (typeof localHostActionKinds)[number];
@@ -22,7 +22,10 @@ export interface HostActionIntent {
   readonly commandAction: CommandAction;
   readonly hostAction: LocalHostActionKind;
   readonly targetSnapshotId?: string;
+  readonly workspaceRoot?: string;
   readonly url?: string;
+  readonly debugConfiguration?: string;
+  readonly pythonInterpreter?: string;
   readonly createdAt: string;
   readonly expiresAt: string;
 }
@@ -55,7 +58,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     }
   }
 
-  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string }>): Promise<HostActionIntent> {
+  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }>): Promise<HostActionIntent> {
     if (!request.operationId) throw new Error("A durable operation ID is required before a host action can be queued.");
     const now = this.now();
     const intent: HostActionIntent = {
@@ -65,7 +68,10 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       commandAction: request.definition.action,
       hostAction: plan.hostAction,
       ...(request.target ? { targetSnapshotId: request.target.id } : {}),
+      ...(request.target ? { workspaceRoot: request.target.repositoryRoot } : {}),
       ...(plan.url ? { url: plan.url } : {}),
+      ...(plan.debugConfiguration ? { debugConfiguration: plan.debugConfiguration } : {}),
+      ...(plan.pythonInterpreter ? { pythonInterpreter: plan.pythonInterpreter } : {}),
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + this.lifetimeMs).toISOString()
     };
@@ -74,7 +80,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       const existing = events.find((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued" && event.intent.id === intent.id)?.intent;
       if (existing) {
         if (existing.operationId !== intent.operationId || existing.commandAction !== intent.commandAction || existing.hostAction !== intent.hostAction
-          || existing.targetSnapshotId !== intent.targetSnapshotId || existing.url !== intent.url) {
+          || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
+          || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
         }
         return existing;
@@ -136,7 +143,10 @@ export class DurableHostActionAdapter implements CommandAdapter {
         hostActionId: intent.id,
         hostActionKind: intent.hostAction,
         hostActionExpiresAt: intent.expiresAt,
-        ...(intent.url ? { hostActionUrl: intent.url } : {})
+        ...(intent.workspaceRoot ? { hostActionWorkspaceRoot: intent.workspaceRoot } : {}),
+        ...(intent.url ? { hostActionUrl: intent.url } : {}),
+        ...(intent.debugConfiguration ? { hostActionDebugConfiguration: intent.debugConfiguration } : {}),
+        ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {})
       }
     };
   }
@@ -150,7 +160,7 @@ export const hostActionCommandActions: readonly CommandAction[] = [
   "switch_voice_provider", "voice_session_picker", "pipeline_failure_trace"
 ];
 
-function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHostActionKind; url?: string }> | undefined {
+function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }> | undefined {
   switch (request.definition.action) {
     case "handoff_immediate": return { hostAction: "show_handoff_queue" };
     case "handoff_routing_default": return { hostAction: "toggle_handoff_routing" };

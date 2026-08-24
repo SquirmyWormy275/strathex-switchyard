@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { GitCliInspector, type GitCommandResult, type GitCommandRunner, type FileDigestReader } from "../src/git-inspector.ts";
+import { GitCliInspector, NodeGitCommandRunner, type GitCommandResult, type GitCommandRunner, type FileDigestReader } from "../src/git-inspector.ts";
 
 class ScriptedRunner implements GitCommandRunner {
   readonly calls: string[] = [];
@@ -26,6 +26,12 @@ class FakeDigests implements FileDigestReader {
 }
 
 const result = (stdout: string): GitCommandResult => ({ exitCode: 0, stdout, stderr: "" });
+
+test("default Git command runner accepts only fixed absolute git.exe identities", () => {
+  assert.throws(() => new NodeGitCommandRunner(["git"]), /fixed absolute/i);
+  assert.throws(() => new NodeGitCommandRunner(["C:\\tools\\not-git.cmd"]), /fixed absolute/i);
+  assert.doesNotThrow(() => new NodeGitCommandRunner(["C:\\Program Files\\Git\\cmd\\git.exe"]));
+});
 
 test("read-only Git inspector uses fixed argument vectors and classifies every untracked input", async () => {
   const runner = new ScriptedRunner({

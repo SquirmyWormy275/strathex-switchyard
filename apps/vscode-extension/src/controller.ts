@@ -1,3 +1,4 @@
+import { delimiter, dirname, resolve } from "node:path";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
 import {
   forwardedHostAction,
@@ -659,12 +660,21 @@ export class ManagedSessionController {
       if (!paths.length || paths.some((path) => !available.includes(path))) return false;
       const message = await input({ prompt: "Enter the exact local commit message", validateInput: (value) => value.trim() && value.length <= 120 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 120 characters." });
       if (!message) return false;
-      mutation = { kind: "local_commit", paths, message };
+      let featureBranch: string | undefined;
+      if (/^(?:main|master|trunk)$/i.test(root.branch ?? "")) {
+        featureBranch = await input({ prompt: "Review the new feature branch (this press creates it, then a fresh press commits against the new target)", validateInput: (value) => validBranchInput(value) ?? (/^(?:main|master|trunk)$/i.test(value) ? "Choose a non-default feature branch." : undefined) });
+        if (!featureBranch) return false;
+      }
+      mutation = { kind: "local_commit", paths, message, ...(featureBranch ? { featureBranch } : {}) };
     } else if (action === "pr_upsert") {
       if (!root.branch) return false;
       const baseBranch = await input({ prompt: "Review the pull request base branch", value: "main", validateInput: validBranchInput });
       if (!baseBranch) return false;
-      mutation = { kind: "pr_upsert", headBranch: root.branch, baseBranch };
+      const title = await input({ prompt: "Review the pull request title", value: `B122 reviewed changes from ${root.branch}`, validateInput: (value) => value.trim() && value.length <= 256 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 256 characters." });
+      if (!title) return false;
+      const body = await input({ prompt: "Review the pull request description (one bounded line; empty is allowed)", value: "Created through the SXSY-B122 reviewed Git mediator.", validateInput: (value) => value.length <= 16_384 && !/\0/.test(value) ? undefined : "Use at most 16384 characters without NUL bytes." });
+      if (body === undefined) return false;
+      mutation = { kind: "pr_upsert", headBranch: root.branch, baseBranch, title, body };
     } else if (action === "pr_merge") {
       const pullRequestText = await input({ prompt: "Enter the exact pull request number", validateInput: (value) => /^[1-9][0-9]{0,9}$/.test(value) ? undefined : "Enter a positive pull request number." });
       const head = pullRequestText ? await input({ prompt: "Enter the exact 40-character reviewed head SHA", validateInput: (value) => /^[a-f0-9]{40}$/i.test(value) ? undefined : "Enter the exact 40-character SHA." }) : undefined;
@@ -713,11 +723,39 @@ export class ManagedSessionController {
         return "Opened the verified external destination.";
       }
       case "create_claude_terminal":
-        await this.createManagedAgentTerminal("SXSY-B122 Claude Code", "claude");
-        return "Created the managed Claude terminal and registered its identity.";
+        await this.createManagedAgentTerminal("SXSY-B122 Claude Code");
+        return "Created the tagged Claude terminal and registered its identity; no unverified provider executable was launched.";
       case "create_codex_terminal":
-        await this.createManagedAgentTerminal("SXSY-B122 Codex", "codex");
-        return "Created the managed Codex terminal and registered its identity.";
+        await this.createManagedAgentTerminal("SXSY-B122 Codex");
+        return "Created the tagged Codex terminal and registered its identity; no unverified provider executable was launched.";
+      case "start_vscode_debug": {
+        if (!action.workspaceRoot || !action.debugConfiguration) throw new Error("The companion did not bind debug to an exact workspace and launch configuration.");
+        const workspaceRoot = action.workspaceRoot;
+        const debugConfiguration = action.debugConfiguration;
+        const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
+        if (!folder) throw new Error("The exact debug workspace is not open in this VS Code host.");
+        const matches = this.debugConfigurations().filter((configuration) => configuration.name === debugConfiguration);
+        if (matches.length !== 1) throw new Error("The exact verified debug configuration is missing or ambiguous in this VS Code host.");
+        if (!await this.vscode.debug.startDebugging(folder, debugConfiguration, { noDebug: false })) throw new Error("VS Code refused to start the exact verified debug configuration.");
+        return `Started VS Code debug configuration ${debugConfiguration}.`;
+      }
+      case "configure_python_venv": {
+        if (!action.workspaceRoot || !action.pythonInterpreter) throw new Error("The companion did not bind the Python environment to an exact workspace and interpreter.");
+        const workspaceRoot = action.workspaceRoot;
+        const interpreter = action.pythonInterpreter;
+        if (!samePath(resolve(workspaceRoot, ".venv", "Scripts", "python.exe"), interpreter)) throw new Error("The companion supplied a Python interpreter outside the exact repo-local .venv boundary.");
+        const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
+        if (!folder) throw new Error("The exact Python workspace is not open in this VS Code host.");
+        const python = this.vscode.workspace.getConfiguration("python", folder.uri);
+        if (!python.update) throw new Error("This VS Code host cannot persist an exact workspace-folder interpreter selection.");
+        await python.update("defaultInterpreterPath", interpreter, 3);
+        const scripts = dirname(interpreter);
+        const inheritedPath = process.env.Path ?? process.env.PATH ?? "";
+        const terminal = this.vscode.window.createTerminal({ name: "SXSY-B122 .venv", cwd: workspaceRoot, env: { VIRTUAL_ENV: dirname(scripts), PATH: inheritedPath ? `${scripts}${delimiter}${inheritedPath}` : scripts } });
+        terminal.show();
+        await this.registerTerminal(terminal);
+        return "Selected the exact repo-local Python interpreter and opened a terminal with that environment activated.";
+      }
       case "focus_vscode":
         await this.executeCommand("workbench.action.focusActiveEditorGroup");
         return "Focused the active VS Code editor group.";
@@ -756,14 +794,16 @@ export class ManagedSessionController {
     if (!selected) throw new Error("Session selection was cancelled.");
   }
 
-  private async createManagedAgentTerminal(name: string, executable: "claude" | "codex"): Promise<void> {
+  private async createManagedAgentTerminal(name: string): Promise<void> {
     const terminal = this.vscode.window.createTerminal({ name });
     terminal.show();
-    // Fixed, local executable names only. No repository text, provider output,
-    // task packet, prompt, credential, or command argument is injected here.
-    terminal.sendText?.(executable, true);
+    // A bare executable name would be resolved through the user's PATH and is
+    // not a trustworthy provider identity.  The extension creates and tags the
+    // surface only; an installed provider must attach through the companion's
+    // attested handshake before gaining Observable/Controllable/Mediated
+    // capabilities.
     await this.registerTerminal(terminal);
-    await this.vscode.window.showWarningMessage(`SXSY-B122 opened ${name} as Registered only. The terminal is not Mediated and its agent activity remains outside enforcement.`);
+    await this.vscode.window.showWarningMessage(`SXSY-B122 opened ${name} as Registered only and did not launch an unverified provider executable. Attach an installed provider through the companion handshake before treating it as Observable, Controllable, or Mediated.`);
   }
 
   private async focusIntegratedTerminal(): Promise<void> {
@@ -835,8 +875,9 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
     "CHATGPT:normal": "open_external_url", "CHATGPT:shift": "open_external_url", "CHATGPT:alt": "create_codex_terminal",
     "VSCODE:normal": "focus_vscode", "VSCODE:shift": "new_vscode_window",
     "TERMINAL:normal": "focus_external_terminal", "TERMINAL:shift": "focus_integrated_terminal",
+    "COMMIT:shift": "open_external_url",
     "GITHUB:normal": "open_external_url", "GITHUB:shift": "open_external_url", "GITHUB:alt": "open_external_url", "GITHUB:shift_alt": "open_external_url",
-    "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "open_external_url", "VOICE:shift": "switch_voice_provider",
+    "RUN:shift": "start_vscode_debug", "RUN:shift_alt": "open_external_url", "SANDBOX:normal": "configure_python_venv", "SANDBOX:shift": "configure_python_venv", "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "open_external_url", "VOICE:shift": "switch_voice_provider",
     "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];
@@ -853,7 +894,9 @@ function requiresExactTarget(command: ChordCommand): boolean {
 function trustedExternalUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && ["github.com", "claude.ai", "chatgpt.com"].includes(url.hostname) && !url.username && !url.password;
+    if (url.username || url.password || !url.hostname) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
   } catch { return false; }
 }
 

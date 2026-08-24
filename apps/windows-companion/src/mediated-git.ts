@@ -150,8 +150,12 @@ export class LocalMediatedGitHandler {
     if (!request.target.head || !request.target.indexTree || !request.target.branch) {
       return { status: "incomplete", summary: "Local Git mediation requires a complete TargetSnapshot with branch, HEAD, and index tree." };
     }
-    if (isDefaultBranch(request.target.branch)) {
-      return { status: "blocked", summary: "Local Git mediation refuses a default branch; use an isolated feature branch." };
+    const defaultBranch = isDefaultBranch(request.target.branch);
+    if (defaultBranch && (!request.mutation.featureBranch || !validFeatureBranch(request.mutation.featureBranch))) {
+      return { status: "blocked", summary: "A default-branch local commit requires one exact reviewed non-default feature branch." };
+    }
+    if (!defaultBranch && request.mutation.featureBranch !== undefined) {
+      return { status: "blocked", summary: "A feature-branch local commit must not carry a branch-creation request." };
     }
 
     const initial = await currentEffect(request);
@@ -186,6 +190,33 @@ export class LocalMediatedGitHandler {
       temporaryIndex = join(operationDirectory, `index-${randomUUID()}`);
       temporaryHooks = join(operationDirectory, `hooks-${randomUUID()}`);
       await mkdir(temporaryHooks, { recursive: true, mode: 0o700 });
+
+      if (defaultBranch) {
+        const final = await currentEffect(request);
+        if (final) return final;
+        const beforeBranch = await this.verifyGitPreconditions(root, request);
+        if (beforeBranch) return beforeBranch;
+        const featureBranch = request.mutation.featureBranch!;
+        const switched = await this.runner.run(["-c", `core.hooksPath=${temporaryHooks}`, "switch", "-c", featureBranch, request.target.head], { cwd: root });
+        const [observedBranch, observedHead, observedIndex] = await Promise.all([
+          this.currentBranch(root).catch(() => undefined),
+          this.currentHead(root).catch(() => undefined),
+          this.currentIndexTree(root).catch(() => undefined)
+        ]);
+        if (switched.exitCode === 0 && observedBranch === featureBranch && observedHead === request.target.head && observedIndex === request.target.indexTree) {
+          return {
+            status: "incomplete",
+            summary: "Created and switched to the exact reviewed feature branch without committing. Capture the new target and review the local commit again.",
+            data: { featureBranch, beforeHead: request.target.head, commitCreated: false, freshReviewRequired: true }
+          };
+        }
+        const branchRef = await this.runner.run(["show-ref", "--verify", "--hash", `refs/heads/${featureBranch}`], { cwd: root }).catch(() => undefined);
+        if (observedBranch !== request.target.branch || observedHead !== request.target.head || branchRef?.exitCode === 0) {
+          return { status: "incomplete", summary: "Feature-branch creation did not settle to one exact state; repository reconciliation is required before retry." };
+        }
+        return failedGit("The reviewed feature branch could not be created; the observed branch and HEAD remained unchanged.", switched);
+      }
+
       const environment = { GIT_INDEX_FILE: temporaryIndex };
 
       const readTree = await this.runner.run(["read-tree", request.target.indexTree], { cwd: root, environment });
@@ -432,7 +463,12 @@ async function currentEffect(request: GitRequest): Promise<BrokerOutcome | undef
 }
 
 function isDefaultBranch(branch: string): boolean {
-  return branch === "main" || branch === "master";
+  return /^(main|master|trunk)$/i.test(branch);
+}
+
+function validFeatureBranch(branch: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(branch)
+    && !branch.includes("..") && !branch.endsWith("/") && !branch.startsWith("-") && !isDefaultBranch(branch);
 }
 
 function samePath(left: string, right: string): boolean {

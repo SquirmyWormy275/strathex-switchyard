@@ -12,20 +12,22 @@ const maximumPackBytes = 4 * 1024 * 1024;
 
 export interface SmartPushResult { readonly status: BrokerOutcome["status"]; readonly summary: string; readonly oldHead?: string; readonly newHead?: string; }
 export interface ReviewedRemotePusher { push(input: Readonly<{ repositoryRoot: string; sourceHead: string; destinationBranch: string; request: GitRequest }>): Promise<SmartPushResult>; }
-export interface GitHubPullRequestResult { readonly number: number; readonly url: string; readonly head: string; readonly base: string; readonly state: "OPEN" | "MERGED" | "CLOSED"; }
+export interface GitHubPullRequestResult { readonly number: number; readonly url: string; readonly head: string; readonly base: string; readonly state: "OPEN" | "MERGED" | "CLOSED"; readonly title: string; readonly body: string; }
 export interface ReviewedGitHubPort {
-  upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
+  upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
   merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
   defaultBranch(input: Readonly<{ repositoryRoot: string; owner: string; name: string; request: GitRequest }>): Promise<string>;
 }
 export interface DirectMainReceiptVerifier { verify(receiptId: string, targetSnapshotId: string): Promise<boolean>; }
+export interface ReviewedPullRequestHostOpener { open(request: GitRequest, url: string): Promise<BrokerOutcome>; }
 
 /** Reviewed remote Git handler; policy, permit, containment, and ownership run in InMemoryGitBroker first. */
 export class ConfiguredRemoteGitHandler {
   private readonly pusher: ReviewedRemotePusher;
   private readonly github: ReviewedGitHubPort;
   private readonly receipts?: DirectMainReceiptVerifier;
-  constructor(pusher: ReviewedRemotePusher, github: ReviewedGitHubPort, receipts?: DirectMainReceiptVerifier) { this.pusher = pusher; this.github = github; this.receipts = receipts; }
+  private readonly hostOpener?: ReviewedPullRequestHostOpener;
+  constructor(pusher: ReviewedRemotePusher, github: ReviewedGitHubPort, receipts?: DirectMainReceiptVerifier, hostOpener?: ReviewedPullRequestHostOpener) { this.pusher = pusher; this.github = github; this.receipts = receipts; this.hostOpener = hostOpener; }
 
   async execute(request: GitRequest): Promise<BrokerOutcome> {
     if (!request.effectGuard || !request.target.head || !request.target.branch || !request.target.canonicalRemote) return { status: "incomplete", summary: "Remote Git mediation requires a final effect guard and an exact branch, HEAD, and canonical remote." };
@@ -39,9 +41,13 @@ export class ConfiguredRemoteGitHandler {
         if (pushed.status !== "completed") return pushed;
         const current = await finalEffect(request); if (current) return current;
         try {
-          const pull = await this.child(request, "github.pr-upsert", async () => this.github.upsert({ repositoryRoot: request.target.repositoryRoot, ...repository, headBranch: request.mutation.kind === "pr_upsert" ? request.mutation.headBranch : "", baseBranch: request.mutation.kind === "pr_upsert" ? request.mutation.baseBranch : "", expectedHead: request.target.head!, request }));
+          const pull = await this.child(request, "github.pr-upsert", async () => this.github.upsert({ repositoryRoot: request.target.repositoryRoot, ...repository, headBranch: request.mutation.kind === "pr_upsert" ? request.mutation.headBranch : "", baseBranch: request.mutation.kind === "pr_upsert" ? request.mutation.baseBranch : "", title: request.mutation.kind === "pr_upsert" ? request.mutation.title : "", body: request.mutation.kind === "pr_upsert" ? request.mutation.body : "", expectedHead: request.target.head!, request }));
           if ("status" in pull) return pull;
-          return { status: "completed", summary: "Pushed the exact reviewed head and verified the GitHub pull request against its head and base.", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
+          if (this.hostOpener) {
+            const opened = await this.hostOpener.open(request, pull.url);
+            return { ...opened, data: { ...opened.data, pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
+          }
+          return { status: "completed", summary: "Pushed the exact reviewed head and verified the GitHub pull request against its head, base, title, and body.", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } };
         } catch (error) { return failed(error, "GitHub PR upsert failed closed."); }
       }
       case "merge_pr": {
@@ -154,32 +160,40 @@ export class SpawnGitPackRunner implements GitPackRunner {
 export class ConfiguredGitHubGraphqlPort implements ReviewedGitHubPort {
   private readonly network: DynamicConfiguredNetworkClient;
   constructor(network: DynamicConfiguredNetworkClient) { this.network = network; }
-  async upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
+  async upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
     let pull = await this.lookup(input);
     if (pull && pull.head !== input.expectedHead) throw new Error("The open pull request head does not match the reviewed pushed head.");
     if (!pull) {
       const repository = await this.graphql(input, `query B122Repository($owner:String!,$name:String!){repository(owner:$owner,name:$name){id}}`, { owner: input.owner, name: input.name });
       const repositoryId = nestedString(repository, ["repository", "id"]);
-      const created = await this.graphql(input, `mutation B122CreatePull($repositoryId:ID!,$base:String!,$head:String!,$title:String!,$body:String!){createPullRequest(input:{repositoryId:$repositoryId,baseRefName:$base,headRefName:$head,title:$title,body:$body}){pullRequest{number url headRefOid headRefName baseRefName state}}}`, { repositoryId, base: input.baseBranch, head: input.headBranch, title: `B122 reviewed changes from ${input.headBranch}`, body: `Created by the SXSY-B122 reviewed Git mediator for exact head ${input.expectedHead}.` });
+      const created = await this.graphql(input, `mutation B122CreatePull($repositoryId:ID!,$base:String!,$head:String!,$title:String!,$body:String!){createPullRequest(input:{repositoryId:$repositoryId,baseRefName:$base,headRefName:$head,title:$title,body:$body}){pullRequest{id number url headRefOid headRefName baseRefName state title body}}}`, { repositoryId, base: input.baseBranch, head: input.headBranch, title: input.title, body: input.body });
       pull = parsePull(nestedRecord(created, ["createPullRequest", "pullRequest"]));
+    } else if (pull.title !== input.title || pull.body !== input.body) {
+      const updated = await this.graphql(input, `mutation B122UpdatePull($id:ID!,$title:String!,$body:String!){updatePullRequest(input:{pullRequestId:$id,title:$title,body:$body}){pullRequest{id number url headRefOid headRefName baseRefName state title body}}}`, { id: pull.id, title: input.title, body: input.body });
+      pull = parsePull(nestedRecord(updated, ["updatePullRequest", "pullRequest"]));
     }
     const verified = await this.lookup(input);
-    if (!verified || verified.number !== pull.number || verified.head !== input.expectedHead || verified.base !== input.baseBranch || verified.state !== "OPEN") throw new Error("GitHub did not verify the exact open pull request after upsert.");
+    if (!verified || verified.number !== pull.number || verified.head !== input.expectedHead || verified.base !== input.baseBranch || verified.state !== "OPEN" || verified.title !== input.title || verified.body !== input.body) throw new Error("GitHub did not verify the exact open pull request after upsert.");
     return verified;
   }
   async merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
     const before = await this.lookupNumber(input);
     if (!before || before.number !== input.pullRequest || before.head !== input.head || before.base !== input.baseBranch || before.state !== "OPEN") throw new Error("The GitHub pull request no longer matches the reviewed head, base, and open state.");
+    if (before.isDraft || before.mergeable !== "MERGEABLE" || before.mergeStateStatus !== "CLEAN"
+      || (before.reviewDecision !== null && before.reviewDecision !== "APPROVED")
+      || (before.checkState !== null && before.checkState !== "SUCCESS")) {
+      throw new Error("The GitHub pull request has not proven current checks, review requirements, and mergeability.");
+    }
     const current = await finalEffect(input.request); if (current) throw new Error(current.summary);
-    await this.graphql(input, `mutation B122MergePull($id:ID!,$head:GitObjectID!){mergePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head,mergeMethod:SQUASH}){pullRequest{number url headRefOid headRefName baseRefName state}}}`, { id: before.id, head: input.head });
+    await this.graphql(input, `mutation B122MergePull($id:ID!,$head:GitObjectID!){mergePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head,mergeMethod:SQUASH}){pullRequest{id number url headRefOid headRefName baseRefName state title body}}}`, { id: before.id, head: input.head });
     const after = await this.lookupNumber(input);
     if (!after || after.state !== "MERGED" || after.head !== input.head || after.base !== input.baseBranch) throw new Error("GitHub did not verify the exact pull request as merged.");
     return after;
   }
   async defaultBranch(input: Readonly<{ repositoryRoot: string; owner: string; name: string; request: GitRequest }>): Promise<string> { const data = await this.graphql(input, `query B122DefaultBranch($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{name}}}`, { owner: input.owner, name: input.name }); return nestedString(data, ["repository", "defaultBranchRef", "name"]); }
 
-  private async lookup(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; request: GitRequest }>): Promise<(GitHubPullRequestResult & { readonly id: string }) | undefined> { const data = await this.graphql(input, `query B122Pull($owner:String!,$name:String!,$head:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(first:10,states:OPEN,headRefName:$head,baseRefName:$base){nodes{id number url headRefOid headRefName baseRefName state}}}}`, { owner: input.owner, name: input.name, head: input.headBranch, base: input.baseBranch }); const nodes = nestedArray(data, ["repository", "pullRequests", "nodes"]); if (nodes.length > 1) throw new Error("GitHub returned multiple open pull requests for the exact head and base."); return nodes.length ? parsePull(nodes[0]!) : undefined; }
-  private async lookupNumber(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; request: GitRequest }>): Promise<(GitHubPullRequestResult & { readonly id: string }) | undefined> { const data = await this.graphql(input, `query B122PullNumber($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number url headRefOid headRefName baseRefName state}}}`, { owner: input.owner, name: input.name, number: input.pullRequest }); const value = nestedOptional(data, ["repository", "pullRequest"]); if (value === null || value === undefined) return undefined; if (!record(value)) throw new Error("GitHub pull request response is not a record."); return parsePull(value); }
+  private async lookup(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; request: GitRequest }>): Promise<(GitHubPullRequestResult & { readonly id: string }) | undefined> { const data = await this.graphql(input, `query B122Pull($owner:String!,$name:String!,$head:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(first:10,states:OPEN,headRefName:$head,baseRefName:$base){nodes{id number url headRefOid headRefName baseRefName state title body}}}}`, { owner: input.owner, name: input.name, head: input.headBranch, base: input.baseBranch }); const nodes = nestedArray(data, ["repository", "pullRequests", "nodes"]); if (nodes.length > 1) throw new Error("GitHub returned multiple open pull requests for the exact head and base."); return nodes.length ? parsePull(nodes[0]!) : undefined; }
+  private async lookupNumber(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; request: GitRequest }>): Promise<GitHubMergePullRecord | undefined> { const data = await this.graphql(input, `query B122PullNumber($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number url headRefOid headRefName baseRefName state title body isDraft mergeable mergeStateStatus reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}`, { owner: input.owner, name: input.name, number: input.pullRequest }); const value = nestedOptional(data, ["repository", "pullRequest"]); if (value === null || value === undefined) return undefined; if (!record(value)) throw new Error("GitHub pull request response is not a record."); return parseMergePull(value); }
   private async graphql(input: Readonly<{ repositoryRoot: string; request: GitRequest }>, query: string, variables: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>> { const current = await finalEffect(input.request); if (current) throw new Error(current.summary); const control = await operationSignal(input.request); let result; try { result = await this.network.request({ routeId: "github.graphql", repositoryRoot: input.repositoryRoot, body: JSON.stringify({ query, variables }), signal: control.signal }); } finally { control.dispose(); } if (result.outcome !== "passed" || !result.body) throw new Error("The configured GitHub GraphQL route did not complete."); let parsed: unknown; try { parsed = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { throw new Error("GitHub returned malformed JSON."); } if (!record(parsed) || !exactRoot(parsed) || !record(parsed.data)) throw new Error("GitHub returned an invalid GraphQL envelope."); return parsed.data; }
 }
 
@@ -201,4 +215,48 @@ function nestedOptional(value: unknown, path: readonly string[]): unknown { let 
 function nestedRecord(value: unknown, path: readonly string[]): Record<string, unknown> { const result = nestedOptional(value, path); if (!record(result)) throw new Error("GitHub response field is not a record."); return result; }
 function nestedString(value: unknown, path: readonly string[]): string { const result = nestedOptional(value, path); if (typeof result !== "string" || !result || result.length > 512) throw new Error("GitHub response field is not a bounded string."); return result; }
 function nestedArray(value: unknown, path: readonly string[]): readonly Record<string, unknown>[] { const result = nestedOptional(value, path); if (!Array.isArray(result) || result.length > 20 || !result.every(record)) throw new Error("GitHub response field is not a bounded record array."); return result; }
-function parsePull(value: Record<string, unknown>): GitHubPullRequestResult & { readonly id: string } { const keys = Object.keys(value); if (keys.length !== 7 || !["id", "number", "url", "headRefOid", "headRefName", "baseRefName", "state"].every((key) => key in value) || typeof value.id !== "string" || !Number.isSafeInteger(value.number) || (value.number as number) <= 0 || typeof value.url !== "string" || !/^https:\/\/github\.com\//.test(value.url) || typeof value.headRefOid !== "string" || !/^[a-f0-9]{40}$/i.test(value.headRefOid) || typeof value.headRefName !== "string" || !validBranch(value.headRefName) || typeof value.baseRefName !== "string" || !validBranch(value.baseRefName) || (value.state !== "OPEN" && value.state !== "MERGED" && value.state !== "CLOSED")) throw new Error("GitHub returned an invalid exact pull-request record."); return { id: value.id, number: value.number as number, url: value.url, head: value.headRefOid, base: value.baseRefName, state: value.state }; }
+function parsePull(value: Record<string, unknown>): GitHubPullRequestResult & { readonly id: string } {
+  const keys = Object.keys(value);
+  if (keys.length !== 9 || !["id", "number", "url", "headRefOid", "headRefName", "baseRefName", "state", "title", "body"].every((key) => key in value)
+    || typeof value.id !== "string" || !Number.isSafeInteger(value.number) || (value.number as number) <= 0
+    || typeof value.url !== "string" || !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*$/.test(value.url)
+    || typeof value.headRefOid !== "string" || !/^[a-f0-9]{40}$/i.test(value.headRefOid)
+    || typeof value.headRefName !== "string" || !validBranch(value.headRefName)
+    || typeof value.baseRefName !== "string" || !validBranch(value.baseRefName)
+    || (value.state !== "OPEN" && value.state !== "MERGED" && value.state !== "CLOSED")
+    || typeof value.title !== "string" || !value.title.trim() || value.title.length > 256 || /[\r\n\0]/.test(value.title)
+    || typeof value.body !== "string" || value.body.length > 16_384 || /\0/.test(value.body)) {
+    throw new Error("GitHub returned an invalid exact pull-request record.");
+  }
+  return { id: value.id, number: value.number as number, url: value.url, head: value.headRefOid, base: value.baseRefName, state: value.state, title: value.title, body: value.body };
+}
+
+interface GitHubMergePullRecord extends GitHubPullRequestResult {
+  readonly id: string;
+  readonly isDraft: boolean;
+  readonly mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  readonly mergeStateStatus: "BEHIND" | "BLOCKED" | "CLEAN" | "DIRTY" | "DRAFT" | "HAS_HOOKS" | "UNKNOWN" | "UNSTABLE";
+  readonly reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+  readonly checkState: "SUCCESS" | "FAILURE" | "PENDING" | "ERROR" | "EXPECTED" | null;
+}
+
+function parseMergePull(value: Record<string, unknown>): GitHubMergePullRecord {
+  const baseKeys = ["id", "number", "url", "headRefOid", "headRefName", "baseRefName", "state", "title", "body"];
+  const keys = Object.keys(value);
+  if (keys.length !== 14 || ![...baseKeys, "isDraft", "mergeable", "mergeStateStatus", "reviewDecision", "commits"].every((key) => key in value)) throw new Error("GitHub returned an invalid merge-readiness record.");
+  const base = parsePull(Object.fromEntries(baseKeys.map((key) => [key, value[key]])));
+  if (typeof value.isDraft !== "boolean" || !["MERGEABLE", "CONFLICTING", "UNKNOWN"].includes(String(value.mergeable))
+    || !["BEHIND", "BLOCKED", "CLEAN", "DIRTY", "DRAFT", "HAS_HOOKS", "UNKNOWN", "UNSTABLE"].includes(String(value.mergeStateStatus))
+    || (value.reviewDecision !== null && !["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"].includes(String(value.reviewDecision)))) {
+    throw new Error("GitHub returned invalid merge readiness state.");
+  }
+  const commits = nestedArray(value, ["commits", "nodes"]);
+  if (commits.length !== 1) throw new Error("GitHub did not return one exact reviewed head commit.");
+  const rollup = nestedOptional(commits[0], ["commit", "statusCheckRollup"]);
+  let checkState: GitHubMergePullRecord["checkState"] = null;
+  if (rollup !== null) {
+    if (!record(rollup) || Object.keys(rollup).length !== 1 || !["SUCCESS", "FAILURE", "PENDING", "ERROR", "EXPECTED"].includes(String(rollup.state))) throw new Error("GitHub returned invalid status-check readiness.");
+    checkState = rollup.state as Exclude<GitHubMergePullRecord["checkState"], null>;
+  }
+  return { ...base, isDraft: value.isDraft, mergeable: value.mergeable as GitHubMergePullRecord["mergeable"], mergeStateStatus: value.mergeStateStatus as GitHubMergePullRecord["mergeStateStatus"], reviewDecision: value.reviewDecision as GitHubMergePullRecord["reviewDecision"], checkState };
+}

@@ -176,6 +176,21 @@ test("managed runs have opaque identities and stop never targets an arbitrary PI
   assert.equal(runtime.listManagedProcesses().filter((item) => item.state === "running").length, 0);
 });
 
+test("debug_target resolves only an exact attested VS Code configuration and never spawns a process", async (context) => {
+  const setup = await fixture(context);
+  const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
+    debug_target: { kind: "vscode_debug", configuration: "Python: Current File" }
+  }), setup.repositoryRoot);
+  const result = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("debug_target");
+  assert.equal(result.status, "running");
+  assert.equal(result.debugConfiguration, "Python: Current File");
+  assert.equal(result.pid, undefined);
+
+  await assert.rejects(writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
+    debug_target: processRecipe({ lifecycle: "managed" })
+  }), setup.repositoryRoot), /vscode_debug|debug_target/i);
+});
+
 test("timeouts terminate exact children and foreground failures stay bounded", async (context) => {
   const setup = await fixture(context);
   await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('before-timeout'); setInterval(() => {}, 1000);", "utf8");
@@ -237,7 +252,7 @@ test("the final effect guard and canonical root check run immediately before spa
   const setup = await fixture(context);
   await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('must-not-run')", "utf8");
   const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
-    venv: processRecipe()
+    venv: processRecipe({ python: { interpreter: ".venv/Scripts/python.exe" } })
   }), setup.repositoryRoot);
   let checks = 0;
   const lateFence: RuntimeEffectGuard = {
@@ -255,8 +270,10 @@ test("the final effect guard and canonical root check run immediately before spa
 test("each invocation may supply its exact dispatch effect guard without weakening the default", async (context) => {
   const setup = await fixture(context);
   await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('guarded')", "utf8");
+  await mkdir(join(setup.repositoryRoot, ".venv", "Scripts"), { recursive: true });
+  await writeFile(join(setup.repositoryRoot, ".venv", "Scripts", "python.exe"), "isolated-test-interpreter", "utf8");
   const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
-    venv: processRecipe()
+    venv: processRecipe({ python: { interpreter: ".venv/Scripts/python.exe" } })
   }), setup.repositoryRoot);
   const runtime = new RepositoryRuntime(loaded);
 
@@ -266,4 +283,5 @@ test("each invocation may supply its exact dispatch effect guard without weakeni
   const allowed = await runtime.execute("venv", { effectGuard: allowEffects });
   assert.equal(allowed.status, "completed");
   assert.equal(allowed.output, "guarded");
+  assert.match((allowed.pythonInterpreter ?? "").replaceAll("\\", "/"), /\/repository\/\.venv\/Scripts\/python\.exe$/i);
 });
