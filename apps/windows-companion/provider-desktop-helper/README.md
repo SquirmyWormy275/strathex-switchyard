@@ -17,6 +17,13 @@ Example release build:
 dotnet publish .\Sxsy.B122.ProviderDesktopHelper.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
+`deployment/windows/Build-B122Release.ps1` builds this helper by default, runs
+its typed self-test, places it under the companion's `provider-desktop`
+directory, and binds its SHA-256 into the release checksum/SBOM inventory and
+`release.json`. A prebuilt helper is accepted only with an explicit reviewed
+SHA-256. Packaging is not evidence that Claude Desktop or ChatGPT Desktop is
+installed, signed in, reachable, or independently accepted on a target host.
+
 The helper uses a kill-on-close Job Object until a newly launched process has
 produced a new, exact-identity top-level window. If the helper is cancelled or
 terminated before that proof, Windows kills only that task-owned launch tree.

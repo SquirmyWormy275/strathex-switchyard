@@ -9,7 +9,8 @@ $health = Join-Path $root 'scripts\Test-B122Health.mjs'
 $sandboxHelper = Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper\b122-sandbox-worker.exe'
 $repositoryRuntimeHelper = Join-Path $root 'app\dist\apps\windows-companion\repository-runtime\b122-repository-runner.exe'
 $rawHidHelper = Join-Path $root 'app\dist\apps\windows-companion\raw-hid\strathex-b122-hid-helper.exe'
-foreach ($file in @($node, $main, $health, $sandboxHelper, $repositoryRuntimeHelper, $rawHidHelper)) {
+$providerDesktopHelper = Join-Path $root 'app\dist\apps\windows-companion\provider-desktop\sxsy-b122-provider-desktop-helper.exe'
+foreach ($file in @($node, $main, $health, $sandboxHelper, $repositoryRuntimeHelper, $rawHidHelper, $providerDesktopHelper)) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Portable SXSY-B122 file is missing: $file" }
   if ($file.Contains('"')) { throw 'Portable bundle paths containing quotation marks are unsupported.' }
 }
@@ -17,6 +18,10 @@ $repositoryRuntimeSelfTestRaw = & $repositoryRuntimeHelper --self-test
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRuntimeSelfTestRaw)) { throw 'The portable repository runtime helper failed its Job-Object self-test.' }
 $repositoryRuntimeSelfTest = $repositoryRuntimeSelfTestRaw | ConvertFrom-Json
 if ($repositoryRuntimeSelfTest.schema -cne 'sxsy-b122.repository-runner-self-test' -or $repositoryRuntimeSelfTest.childTreeTerminated -ne $true -or $repositoryRuntimeSelfTest.noSurvivors -ne $true) { throw 'The portable repository runtime helper returned an invalid containment receipt.' }
+$providerDesktopSelfTestRaw = & $providerDesktopHelper --self-test
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($providerDesktopSelfTestRaw)) { throw 'The portable provider-desktop helper failed its self-test.' }
+$providerDesktopSelfTest = $providerDesktopSelfTestRaw | ConvertFrom-Json
+if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' -or $providerDesktopSelfTest.version -ne 1 -or $providerDesktopSelfTest.status -cne 'ok') { throw 'The portable provider-desktop helper returned an invalid self-test receipt.' }
 
 $temporaryBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
 $testRoot = [IO.Path]::GetFullPath((Join-Path $temporaryBase ("sxsy-b122-portable-smoke-" + [guid]::NewGuid().ToString('N'))))
@@ -46,7 +51,9 @@ try {
       if ($unexpectedRawHid.Count -ne 0) { throw 'The unprovisioned portable companion launched the Raw-HID helper.' }
       $unexpectedRepositoryRuntime = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'b122-repository-runner.exe' })
       if ($unexpectedRepositoryRuntime.Count -ne 0) { throw 'The unprovisioned portable companion launched the repository runtime helper.' }
-      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); sandboxHelperPresent=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; rawHidHelperPresent=$true } | ConvertTo-Json -Compress
+      $unexpectedProviderDesktop = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'sxsy-b122-provider-desktop-helper.exe' })
+      if ($unexpectedProviderDesktop.Count -ne 0) { throw 'The unprovisioned portable companion launched the provider-desktop helper.' }
+      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); sandboxHelperPresent=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; rawHidHelperPresent=$true; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true } | ConvertTo-Json -Compress
       return
     }
   } while ([DateTime]::UtcNow -lt $deadline)

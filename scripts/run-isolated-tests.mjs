@@ -36,7 +36,7 @@ const companionTests = [
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
   "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
   "operation-recovery", "packaged-runtime", "pipeline-adapters",
-  "provider-desktop", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",
+  "provider-desktop", "provider-desktop-adapter", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",
   "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
   "repository-process-supervisor", "repository-recipe-evidence",
   "repository-recipe-host-evidence", "repository-runner-helper",
@@ -65,6 +65,10 @@ export const requiredGroups = [
     file: "deployment/windows/Test-B122InstallLifecycle.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122InstallLifecycle.ps1"]
+  }, {
+    file: "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
+    executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ProviderDesktopRelease.ps1"]
   }] : []),
   { file: "packages/protocol/test/b122.test.ts" },
   { file: "packages/protocol/test/raw-hid.test.ts" },

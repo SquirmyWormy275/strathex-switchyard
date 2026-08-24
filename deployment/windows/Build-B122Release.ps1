@@ -10,6 +10,8 @@ param(
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RepositoryRuntimeHelperSha256,
   [string]$RawHidHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RawHidHelperSha256,
+  [string]$ProviderDesktopHelperPath,
+  [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ProviderDesktopHelperSha256,
   [switch]$SkipVerification
 )
 $ErrorActionPreference = 'Stop'
@@ -120,9 +122,32 @@ if ($RawHidHelperPath) {
   if (-not $RawHidHelperSha256) { throw '-RawHidHelperSha256 is required with a prebuilt Raw-HID helper.' }
   if (-not ((Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.Equals($RawHidHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The Raw-HID helper digest does not match the reviewed value.' }
 }
+
+$providerDesktopHelper = $ProviderDesktopHelperPath
+if (-not $providerDesktopHelper) {
+  if ($ProviderDesktopHelperSha256) { throw '-ProviderDesktopHelperSha256 is valid only with -ProviderDesktopHelperPath.' }
+  $dotnet = (Get-Command dotnet.exe -ErrorAction SilentlyContinue).Source
+  if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -ProviderDesktopHelperPath is required to build the fixed provider-desktop helper.' }
+  $providerDesktopPublish = Join-Path $output '.provider-desktop-helper-publish'
+  Assert-Child $output $providerDesktopPublish
+  & $dotnet publish (Join-Path $repo 'apps\windows-companion\provider-desktop-helper\Sxsy.B122.ProviderDesktopHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $providerDesktopPublish
+  if ($LASTEXITCODE -ne 0) { throw 'Provider-desktop native helper build failed.' }
+  $providerDesktopHelper = Join-Path $providerDesktopPublish 'sxsy-b122-provider-desktop-helper.exe'
+}
+$providerDesktopHelper = [IO.Path]::GetFullPath($providerDesktopHelper)
+if (-not (Test-Path -LiteralPath $providerDesktopHelper -PathType Leaf)) { throw 'The fixed provider-desktop helper executable is missing.' }
+if ($ProviderDesktopHelperPath) {
+  if (-not $ProviderDesktopHelperSha256) { throw '-ProviderDesktopHelperSha256 is required with a prebuilt provider-desktop helper.' }
+  if (-not ((Get-FileHash -LiteralPath $providerDesktopHelper -Algorithm SHA256).Hash.Equals($ProviderDesktopHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The provider-desktop helper digest does not match the reviewed value.' }
+}
+$providerDesktopSelfTestRaw = & $providerDesktopHelper --self-test
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($providerDesktopSelfTestRaw)) { throw 'Provider-desktop helper self-test failed.' }
+$providerDesktopSelfTest = $providerDesktopSelfTestRaw | ConvertFrom-Json
+if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' -or $providerDesktopSelfTest.version -ne 1 -or $providerDesktopSelfTest.status -cne 'ok') { throw 'Provider-desktop helper returned an invalid self-test receipt.' }
 $helperDigest = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
 $repositoryRuntimeHelperDigest = (Get-FileHash -LiteralPath $repositoryRuntimeHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 $rawHidHelperDigest = (Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.ToLowerInvariant()
+$providerDesktopHelperDigest = (Get-FileHash -LiteralPath $providerDesktopHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 
 $runtimeExtract = Join-Path $output '.node-runtime'
 Assert-Child $output $runtimeExtract
@@ -154,6 +179,9 @@ Copy-Item -LiteralPath $repositoryRuntimeHelper -Destination (Join-Path $reposit
 $rawHidDestination = Join-Path $app 'dist\apps\windows-companion\raw-hid'
 New-Item -ItemType Directory -Path $rawHidDestination | Out-Null
 Copy-Item -LiteralPath $rawHidHelper -Destination (Join-Path $rawHidDestination 'strathex-b122-hid-helper.exe')
+$providerDesktopDestination = Join-Path $app 'dist\apps\windows-companion\provider-desktop'
+New-Item -ItemType Directory -Path $providerDesktopDestination | Out-Null
+Copy-Item -LiteralPath $providerDesktopHelper -Destination (Join-Path $providerDesktopDestination 'sxsy-b122-provider-desktop-helper.exe')
 Copy-Item -LiteralPath $node.FullName -Destination (Join-Path $runtime 'node.exe')
 Copy-Item -LiteralPath $nodeLicense.FullName -Destination (Join-Path $runtime 'NODE-LICENSE.txt')
 
@@ -206,6 +234,7 @@ Remove-Item -LiteralPath $vsixRoot -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $output '.helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.repository-runtime-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.repository-runtime-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.raw-hid-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.raw-hid-helper-publish') -Recurse -Force }
+if (Test-Path -LiteralPath (Join-Path $output '.provider-desktop-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.provider-desktop-helper-publish') -Recurse -Force }
 
 $portableSmoke = & (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($portableSmoke)) { throw 'Portable bundle smoke verification failed.' }
@@ -235,7 +264,7 @@ for ($index = 0; $index -lt $payload.Count; $index++) {
 }
 Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='SPDX-2.3'; dataLicense='CC0-1.0'; SPDXID='SPDXRef-DOCUMENT'; name='SXSY-B122 Windows bundle'; documentNamespace=('https://strathex.invalid/spdx/b122/' + [guid]::NewGuid()); creationInfo=[ordered]@{ created=(Get-Date).ToUniversalTime().ToString('o'); creators=@('Tool: SXSY-B122 Build-B122Release.ps1') }; packages=$packages; files=$spdxFiles; relationships=$relationships } | ConvertTo-Json -Depth 10)
 $sourceCommit = (& git.exe rev-parse HEAD).Trim()
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; providerDesktopHelperSha256=$providerDesktopHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 Write-Output "Built verified SXSY-B122 Windows bundle: $output"
