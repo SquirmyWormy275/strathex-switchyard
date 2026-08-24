@@ -10,7 +10,8 @@ const sessionMutationMethods = new Set([
   "session.adopt",
   "terminal.adopt",
   "session.status",
-  "session.heartbeat"
+  "session.heartbeat",
+  "provider.handshake"
 ]);
 
 /**

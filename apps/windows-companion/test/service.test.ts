@@ -176,6 +176,19 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("provider handshake capabilities can enter only through the trusted coordinator", async () => {
+  const service = new CompanionService({
+    now: () => "2026-08-24T00:00:00.000Z",
+    providerHandshakes: { async handshake(input) { return { ...input.session, provider: "codex", workspaceRoot: input.repositoryRoot, targetSnapshotId: "a".repeat(64), capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "provider-v1" }; } }
+  });
+  const registered = await service.handle(request("register-handshake", "session.register", { session: session("provider-session") }));
+  assert.deepEqual((registered.result as ManagedSession).capabilities, ["registered"]);
+  const elevated = await service.handle(request("provider-handshake", "provider.handshake", { sessionId: "provider-session", repositoryRoot: "C:\\safe\\repo" }));
+  assert.equal(elevated.ok, true);
+  assert.deepEqual((elevated.result as ManagedSession).capabilities, ["registered", "observable", "controllable", "mediated"]);
+  assert.equal((elevated.result as ManagedSession).targetSnapshotId, "a".repeat(64));
+});
+
 test("Git review accepts only an exact typed mutation and cannot carry force or shell fields", async () => {
   const reviewed: unknown[] = [];
   const service = new CompanionService({ gitReviews: { async review(payload) { reviewed.push(payload); return { status: "approved", summary: "Exact mutation approved." }; } } });

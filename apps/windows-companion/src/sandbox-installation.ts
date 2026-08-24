@@ -175,6 +175,10 @@ export class InstalledWindowsSandboxIsolationRuntime implements IsolationRuntime
   ) { this.registry = registry; this.stateDirectory = stateDirectory; this.permitVerifier = permitVerifier; }
 
   async start(request: IsolationRequest): Promise<BrokerOutcome> {
+    return this.runRecipe(request, request.profile);
+  }
+
+  async runRecipe(request: IsolationRequest, recipeId: string): Promise<BrokerOutcome> {
     let pin: SandboxInstallationPin;
     try { pin = await this.registry.resolve(request.target.repositoryRoot); }
     catch { return { status: "unavailable", summary: "No unchanged current-user-attested Windows Sandbox installation is available for the exact target." }; }
@@ -198,7 +202,7 @@ export class InstalledWindowsSandboxIsolationRuntime implements IsolationRuntime
       permitVerifier: this.permitVerifier,
       recipeCatalogDigest: pin.catalogSha256,
       helperDigest: pin.helperSha256
-    }).start(request);
+    }).executeRecipe(request, recipeId);
   }
 }
 

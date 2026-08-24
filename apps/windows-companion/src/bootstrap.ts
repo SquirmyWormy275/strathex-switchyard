@@ -22,6 +22,7 @@ import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegis
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -78,6 +79,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly credentialProvisioning?: AttestedCredentialProvisioningCoordinator;
   readonly networkPolicyRegistry: DurableNetworkPolicyRegistry;
   readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
+  readonly providerHandshakes?: ProviderHandshakeCoordinator;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -109,6 +111,13 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     new TargetSnapshotFactory(new GitCliInspector()),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  const providerHandshakes = options.runtimePinPresence
+    ? new AttestedProviderHandshakeCoordinator(
+        new DynamicConfiguredNetworkClient({ registry: networkPolicyRegistry, containment: containmentManager, credentials: credentialVault.createAdapter("configured-network") }),
+        targetResolver,
+        options.runtimePinPresence
+      )
+    : undefined;
   const hostActions = new DurableHostActionQueue(store);
   const gitReviews = options.runtime?.confirmationAttestor ? new DurableGitMutationReviewQueue({
     store,
@@ -120,6 +129,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
     if (!defaultDependencies) {
+      const installedSandbox = sandboxInstallationRegistry
+        ? new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy)
+        : undefined;
       const composed = createDefaultLocalComposition(
         context,
         store,
@@ -133,7 +145,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           containmentManager,
           credentialVault,
           networkPolicyRegistry,
-          ...(sandboxInstallationRegistry ? { isolationRuntime: new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy) } : {}),
+          ...(installedSandbox ? { isolationRuntime: installedSandbox, repositorySandbox: installedSandbox } : {}),
           hostActions
         }
       );
@@ -152,7 +164,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}) });
+  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -172,6 +184,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...(sandboxInstallations ? { sandboxInstallations } : {}),
     ...(credentialProvisioning ? { credentialProvisioning } : {}),
     ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}),
+    ...(providerHandshakes ? { providerHandshakes } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

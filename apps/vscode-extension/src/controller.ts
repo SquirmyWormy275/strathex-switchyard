@@ -152,6 +152,9 @@ export class ManagedSessionController {
         const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
         await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
       }),
+      this.vscode.commands.registerCommand("sxsy-b122.connectProviderAdapter", async () => {
+        await this.connectProviderAdapter();
+      }),
       this.vscode.commands.registerCommand("sxsy-b122.installRepositoryRuntime", async () => {
         await this.installRepositoryRuntime();
       }),
@@ -220,6 +223,23 @@ export class ManagedSessionController {
       return;
     }
     await this.vscode.window.showInformationMessage(`SXSY-B122 installed the current-user-attested runtime digest ${result.value.expectedSha256.slice(0, 12)}… for the selected Git root.`);
+  }
+
+  private async connectProviderAdapter(): Promise<void> {
+    if (!this.sessions.size) await this.refreshWorkspaceRegistration();
+    const candidates = [...this.sessions.values()].filter((session) => session.capabilities.includes("registered") && session.status !== "unreachable" && session.status !== "stale");
+    if (!candidates.length) { await this.vscode.window.showWarningMessage("SXSY-B122 has no current Registered session available for a provider handshake."); return; }
+    const items = candidates.map((session) => ({ label: `${session.provider}: ${session.id}`, description: session.workspaceRoot ?? session.surface }));
+    const picked = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the exact Registered session to connect through its configured provider route" });
+    const session = picked ? candidates[items.indexOf(picked)] : undefined;
+    if (!session) return;
+    let root = session.workspaceRoot ? this.gitRoots.find((candidate) => normalizePath(candidate.gitRoot) === normalizePath(session.workspaceRoot!)) : undefined;
+    root ??= await this.chooseGitRoot("Choose the exact Git target for this provider handshake");
+    if (!root) return;
+    const result = await this.bridge.providerHandshake(session.id, root.gitRoot);
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 provider handshake was not installed: ${result.message}`); return; }
+    this.sessions.set(result.value.id, result.value);
+    await this.vscode.window.showInformationMessage(`SXSY-B122 connected ${result.value.provider} with adapter-proven ${result.value.capabilities.join(", ")} capabilities for the exact selected target.`);
   }
 
   private async listRepositoryRuntimes(): Promise<void> {
@@ -853,6 +873,8 @@ function splitReviewedPaths(value: string): readonly string[] {
 function splitIdentifiers(value: string): readonly string[] {
   return [...new Set(value.split(",").map((item) => item.trim()).filter((item) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item)))];
 }
+
+function normalizePath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
 
 function validBranchInput(value: string): string | undefined {
   return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") ? undefined : "Enter a valid exact branch name.";

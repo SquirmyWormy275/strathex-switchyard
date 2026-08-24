@@ -1,10 +1,13 @@
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
 import { InMemoryAutomationBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type ContainmentGuard, type PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
-import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import type { Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import type { TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type NetworkContainmentFence } from "./configured-network.ts";
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
 export interface DynamicConfiguredNetworkOptions {
   readonly registry: DurableNetworkPolicyRegistry;
@@ -19,6 +22,86 @@ export class DynamicConfiguredNetworkClient {
   async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
     const policy = await this.options.registry.resolve();
     return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
+  }
+}
+
+export interface ProviderHandshakeRequest {
+  readonly session: ManagedSession;
+  readonly repositoryRoot: string;
+}
+
+export interface ProviderHandshakeCoordinator {
+  handshake(input: ProviderHandshakeRequest): Promise<ManagedSession>;
+}
+
+/**
+ * Elevates a Registered record only after an operator-attested, exact-route
+ * provider handshake bound to a complete TargetSnapshot. The provider result
+ * is treated as a typed protocol record, never as executable instructions.
+ */
+export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCoordinator {
+  private readonly network: DynamicConfiguredNetworkClient;
+  private readonly targets: TargetResolver;
+  private readonly presence: WindowsUserPresenceRunner;
+  private readonly now: () => string;
+
+  constructor(network: DynamicConfiguredNetworkClient, targets: TargetResolver, presence: WindowsUserPresenceRunner, now: () => string = () => new Date().toISOString()) {
+    this.network = network;
+    this.targets = targets;
+    this.presence = presence;
+    this.now = now;
+  }
+
+  async handshake(input: ProviderHandshakeRequest): Promise<ManagedSession> {
+    if (!providerIdentity(input.session.provider) || !boundedAbsoluteRoot(input.repositoryRoot)) throw new Error("Provider handshake fields are invalid.");
+    if (!input.session.capabilities.includes("registered")) throw new Error("Provider handshake requires an existing Registered session.");
+    const definition = commandForAction("authority_refresh");
+    const before = await this.targets.resolve({ definition, session: { ...input.session, workspaceRoot: input.repositoryRoot } });
+    requireHandshakeTarget(before, input.repositoryRoot);
+    const approval = await this.presence.verify(`Connect the selected ${input.session.provider} adapter to this exact SXSY-B122 managed session and Git target.`);
+    if (!approval.verified || !approval.operator?.trim()) throw new Error("Current-user presence did not approve the provider handshake.");
+    const requestedAt = this.now();
+    const result = await this.network.request({
+      routeId: `provider.handshake.${input.session.provider}`,
+      repositoryRoot: before.repositoryRoot,
+      body: JSON.stringify({
+        schema: "sxsy-b122.provider-handshake-request",
+        version: 1,
+        sessionId: input.session.id,
+        provider: input.session.provider,
+        targetSnapshotId: before.id,
+        repositoryRoot: before.repositoryRoot,
+        branch: before.branch,
+        head: before.head,
+        requestedAt
+      })
+    });
+    const response = parseProviderHandshake(result);
+    if (response.sessionId !== input.session.id || response.provider !== input.session.provider || response.targetSnapshotId !== before.id || normalizeRoot(response.repositoryRoot) !== normalizeRoot(before.repositoryRoot)) throw new Error("The configured provider handshake did not bind the exact requested session and target.");
+    const after = await this.targets.resolve({ definition, session: { ...input.session, workspaceRoot: input.repositoryRoot } });
+    requireHandshakeTarget(after, input.repositoryRoot);
+    if (after.id !== before.id) throw new Error("The target changed during provider handshake; no capability was installed.");
+    const capabilities = normalizeHandshakeCapabilities(response.capabilities);
+    if ((response.status === "verified_blocked" || response.status === "verified_finished") && !capabilities.includes("observable")) throw new Error("The provider status requires an Observable capability.");
+    return {
+      ...input.session,
+      provider: response.provider,
+      capabilities,
+      status: response.status,
+      workspaceRoot: before.repositoryRoot,
+      targetSnapshotId: before.id,
+      ...(response.taskId ? { taskId: response.taskId } : {}),
+      ...(response.planRevision ? { planRevision: response.planRevision } : {}),
+      plannedFiles: response.plannedFiles,
+      lastHeartbeat: this.now(),
+      adapterVersion: response.adapterVersion,
+      metadata: {
+        ...input.session.metadata,
+        "sxsy-b122.providerHandshake": "exact-route-v1",
+        "sxsy-b122.providerHandshakeTarget": before.id,
+        "sxsy-b122.providerHandshakeAt": requestedAt
+      }
+    };
   }
 }
 
@@ -104,6 +187,68 @@ function adapterOutcome(result: ConfiguredNetworkResult): AdapterOutcome {
 function remoteStatus(value: unknown): value is AdapterOutcome["status"] { return typeof value === "string" && ["completed", "unavailable", "blocked", "failed", "awaiting_input", "awaiting_confirmation", "running", "cancelled", "timed_out"].includes(value); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+
+interface ProviderHandshakeResponse {
+  readonly sessionId: string;
+  readonly provider: ManagedSession["provider"];
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly capabilities: readonly Capability[];
+  readonly status: SessionStatus;
+  readonly adapterVersion: string;
+  readonly taskId?: string;
+  readonly planRevision?: string;
+  readonly plannedFiles: readonly string[];
+}
+
+function parseProviderHandshake(result: ConfiguredNetworkResult): ProviderHandshakeResponse {
+  if (result.outcome !== "passed" || !result.body) throw new Error("The configured provider handshake route did not complete successfully.");
+  let value: unknown;
+  try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { throw new Error("The provider handshake returned malformed JSON."); }
+  if (!record(value)) throw new Error("The provider handshake returned a non-record response.");
+  const optional = [value.taskId === undefined ? undefined : "taskId", value.planRevision === undefined ? undefined : "planRevision"].filter((item): item is string => !!item);
+  if (!exact(value, ["schema", "version", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "capabilities", "status", "adapterVersion", "plannedFiles", ...optional])
+    || value.schema !== "sxsy-b122.provider-handshake" || value.version !== 1
+    || typeof value.sessionId !== "string" || !boundedOpaque(value.sessionId, 256)
+    || !providerIdentity(value.provider) || typeof value.targetSnapshotId !== "string" || !/^[a-f0-9]{64}$/i.test(value.targetSnapshotId)
+    || !boundedAbsoluteRoot(value.repositoryRoot) || !Array.isArray(value.capabilities) || !value.capabilities.every(capability)
+    || !sessionStatus(value.status) || typeof value.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(value.adapterVersion)
+    || !Array.isArray(value.plannedFiles) || value.plannedFiles.length > 512 || !value.plannedFiles.every(safePlannedFile)
+    || (value.taskId !== undefined && (typeof value.taskId !== "string" || !boundedOpaque(value.taskId, 256)))
+    || (value.planRevision !== undefined && (typeof value.planRevision !== "string" || !boundedOpaque(value.planRevision, 256)))) {
+    throw new Error("The provider handshake returned an invalid exact-v1 response.");
+  }
+  return {
+    sessionId: value.sessionId,
+    provider: value.provider,
+    targetSnapshotId: value.targetSnapshotId,
+    repositoryRoot: value.repositoryRoot,
+    capabilities: value.capabilities as Capability[],
+    status: value.status,
+    adapterVersion: value.adapterVersion,
+    ...(typeof value.taskId === "string" ? { taskId: value.taskId } : {}),
+    ...(typeof value.planRevision === "string" ? { planRevision: value.planRevision } : {}),
+    plannedFiles: value.plannedFiles as string[]
+  };
+}
+
+function normalizeHandshakeCapabilities(values: readonly Capability[]): readonly Capability[] {
+  const result = [...new Set(values)];
+  if (!result.includes("registered")) throw new Error("A provider handshake must retain Registered capability.");
+  if (result.includes("mediated") && (!result.includes("observable") || !result.includes("controllable"))) throw new Error("Mediated capability requires Observable and Controllable.");
+  if (result.includes("controllable") && !result.includes("observable")) throw new Error("Controllable capability requires Observable.");
+  return result;
+}
+function requireHandshakeTarget(target: TargetSnapshot | undefined, repositoryRoot: string): asserts target is TargetSnapshot {
+  if (!target || target.completeness !== "complete" || normalizeRoot(target.repositoryRoot) !== normalizeRoot(repositoryRoot)) throw new Error("Provider handshake requires a complete exact TargetSnapshot.");
+}
+function boundedAbsoluteRoot(value: unknown): value is string { return typeof value === "string" && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value) && value.length <= 4_096 && !/[\r\n\0]/.test(value); }
+function normalizeRoot(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
+function boundedOpaque(value: string, maximum: number): boolean { return !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value); }
+function providerIdentity(value: unknown): value is ManagedSession["provider"] { return value === "claude" || value === "codex" || value === "generic" || value === "voice"; }
+function capability(value: unknown): value is Capability { return value === "registered" || value === "observable" || value === "controllable" || value === "mediated"; }
+function sessionStatus(value: unknown): value is SessionStatus { return value === "running" || value === "verified_blocked" || value === "verified_finished" || value === "unreachable" || value === "stale" || value === "unknown"; }
+function safePlannedFile(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value) && !/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value) && !value.split(/[\\/]/).includes(".."); }
 
 async function operationAbort(control: AutomationRequest["executionControl"] | AdapterRequest["executionControl"]): Promise<{ signal: AbortSignal; dispose(): void }> {
   const controller = new AbortController();

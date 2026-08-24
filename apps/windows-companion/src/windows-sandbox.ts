@@ -670,6 +670,10 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
     this.options = options;
   }
   async start(request: IsolationRequest): Promise<BrokerOutcome> {
+    return this.executeRecipe(request, request.profile);
+  }
+  async executeRecipe(request: IsolationRequest, recipeId: string): Promise<BrokerOutcome> {
+    if (!safeIdentifier.test(recipeId)) return { status: "blocked", summary: "Windows Sandbox rejected an invalid exact recipe identity." };
     if (!this.options.permitVerifier.verifyPermit(request.permit, {
       action: request.action,
       operationId: request.operationId,
@@ -705,7 +709,7 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
       const result = await this.backend.execute({
         targetRoot: request.target.repositoryRoot,
         destinationRoot: this.options.destinationRoot,
-        recipeId: request.profile,
+        recipeId,
         expectedRecipeCatalogSha256: this.options.recipeCatalogDigest,
         expectedHelperSha256: this.options.helperDigest,
         signal: controller.signal,

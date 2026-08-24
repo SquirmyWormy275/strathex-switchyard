@@ -1,7 +1,7 @@
 /** Control-plane broker for exact, host-pinned repository runtimes. */
 import { createHash } from "node:crypto";
 
-import type { BrokerOutcome, ExecutionBroker, ExecutionRecipe, ExecutionRequest } from "../../../packages/control-plane/src/brokers.ts";
+import type { BrokerOutcome, ExecutionBroker, ExecutionRecipe, ExecutionRequest, IsolationRequest } from "../../../packages/control-plane/src/brokers.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
@@ -16,10 +16,12 @@ import {
 const recipePrefix = "sxsy-b122.repository-runtime:";
 const markerExecutable = "@sxsy-b122/host-pinned-runtime";
 const actions = new Set<CommandAction>([...repositoryProcessActions, "stop_managed_run"]);
+const sandboxRequiredActions = new Set<RepositoryRuntimeAction>(["pipeline_local_gate", "pipeline_clean_reproduction", "shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"]);
 
 export interface RepositoryRuntimeResolver {
   resolve(repositoryRoot: string): Promise<RepositoryRuntime>;
 }
+export interface SandboxRepositoryRecipeRunner { runRecipe(request: IsolationRequest, recipeId: string): Promise<BrokerOutcome>; }
 
 export function repositoryRuntimeExecutionRecipe(action: RepositoryRuntimeAction, target: TargetSnapshot): ExecutionRecipe {
   return {
@@ -91,6 +93,29 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
     deadlineTimer.unref?.();
     cancellationTimer?.unref?.();
     return () => { clearTimeout(deadlineTimer); if (cancellationTimer) clearInterval(cancellationTimer); };
+  }
+}
+
+/** Sends every pipeline/security recipe through the installed OS sandbox; ordinary run/debug recipes retain the host-pinned runtime. */
+export class SandboxedRepositoryExecutionBroker implements ExecutionBroker {
+  private readonly host: RepositoryRuntimeExecutionBroker;
+  private readonly sandbox: SandboxRepositoryRecipeRunner;
+  constructor(runtimes: RepositoryRuntimeResolver, sandbox: SandboxRepositoryRecipeRunner) { this.host = new RepositoryRuntimeExecutionBroker(runtimes); this.sandbox = sandbox; }
+  async execute(request: ExecutionRequest): Promise<BrokerOutcome> {
+    if (!sandboxRequiredActions.has(request.action as RepositoryRuntimeAction)) return this.host.execute(request);
+    if (!exactMarker(request, request.action as RepositoryRuntimeAction)) return { status: "blocked", summary: "The sandboxed repository recipe marker does not exactly bind the requested action." };
+    if (!request.effectGuard) return { status: "blocked", summary: "Sandboxed repository validation requires an exact final effect guard." };
+    return this.sandbox.runRecipe({
+      action: request.action,
+      operationId: request.operationId,
+      target: request.target,
+      ...(request.session ? { session: request.session } : {}),
+      ...(request.authority ? { authority: request.authority } : {}),
+      ...(request.permit ? { permit: request.permit } : {}),
+      ...(request.executionControl ? { executionControl: request.executionControl } : {}),
+      effectGuard: request.effectGuard,
+      profile: "full_sandbox"
+    }, request.action);
   }
 }
 

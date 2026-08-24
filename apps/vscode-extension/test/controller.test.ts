@@ -192,6 +192,10 @@ class FakeBridge implements ExtensionCompanionBridge {
   async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: sourcePath, sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" } }; }
   async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return { ok: true, value: undefined }; }
   async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: "C:\\state\\network-policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } }; }
+  async providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> {
+    const existing = this.registered.find((session) => session.id === sessionId);
+    return existing ? { ok: true, value: { ...existing, workspaceRoot: repositoryRoot, capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "fake-provider" } } : { ok: false, code: "not_found", message: "missing" };
+  }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };
@@ -245,6 +249,20 @@ test("tracks terminal, workspace, and debug lifecycle events as identities rathe
   assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.kind"] === "debug-session"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "unreachable"), true);
   assert.equal(bridge.statuses.some((status) => status.status === "verified_finished"), false);
+});
+
+test("provider connection command installs only capabilities returned by the companion handshake", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const context = new FakeContext();
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, context, bridge, { idFactory: (() => { let id = 0; return () => `session-${++id}`; })(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feat/test" }] });
+  await controller.start();
+  const candidate = controller.listKnownSessions()[0]!;
+  vscode.choose(`${candidate.provider}: ${candidate.id}`);
+  await vscode.invoke("sxsy-b122.connectProviderAdapter");
+  const connected = controller.listKnownSessions().find((session) => session.id === candidate.id)!;
+  assert.deepEqual(connected.capabilities, ["registered", "observable", "controllable", "mediated"]);
+  assert.equal(connected.workspaceRoot, "C:\\repo");
 });
 
 test("local commit collects an exact structured Git review before dispatch", async () => {

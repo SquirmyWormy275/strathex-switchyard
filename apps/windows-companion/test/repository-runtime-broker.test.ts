@@ -5,6 +5,7 @@ import type { ExecutionRequest } from "../../../packages/control-plane/src/broke
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import {
   RepositoryRuntimeExecutionBroker,
+  SandboxedRepositoryExecutionBroker,
   repositoryRuntimeExecutionRecipe
 } from "../src/repository-runtime-broker.ts";
 import type { RepositoryRuntime, RepositoryRuntimeExecuteOptions, RepositoryRuntimeResult } from "../src/repository-runtime.ts";
@@ -78,4 +79,19 @@ test("missing host pin remains unavailable and never falls back to recipe comman
   const unavailable = await broker.execute(request());
   assert.equal(unavailable.status, "unavailable");
   assert.match(unavailable.summary, /host-attested.*pin/i);
+});
+
+test("pipeline and security recipes always route through the OS sandbox runner", async () => {
+  let hostResolutions = 0;
+  const actions: string[] = [];
+  const broker = new SandboxedRepositoryExecutionBroker(
+    { async resolve() { hostResolutions += 1; throw new Error("host runtime must not run"); } },
+    { async runRecipe(invocation, recipeId) { actions.push(`${invocation.action}:${recipeId}:${invocation.profile}`); return { status: "completed", summary: "OS sandbox receipt verified", data: { enforced: true } }; } }
+  );
+  const pipeline = await broker.execute(request({ action: "pipeline_local_gate", recipe: { ...repositoryRuntimeExecutionRecipe("pipeline_local_gate", target), environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } }));
+  const shield = await broker.execute(request({ action: "shield_change_scan", recipe: repositoryRuntimeExecutionRecipe("shield_change_scan", target) }));
+  assert.equal(pipeline.status, "completed");
+  assert.equal(shield.status, "completed");
+  assert.deepEqual(actions, ["pipeline_local_gate:pipeline_local_gate:full_sandbox", "shield_change_scan:shield_change_scan:full_sandbox"]);
+  assert.equal(hostResolutions, 0);
 });

@@ -11,17 +11,19 @@ import type { CommandDefinition } from "../../../packages/control-plane/src/comm
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { ReceiptLedger } from "../../../packages/control-plane/src/receipts.ts";
 import { captureLiveTargetSnapshot, FilesystemBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
-import { LocalMediatedGitHandler } from "./mediated-git.ts";
+import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredHttpsNetworkBroker, type ConfiguredNetworkPolicy } from "./configured-network.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
 import { repositoryProcessActions, type RepositoryExecutionRootProvider, type RepositoryRuntimeAction } from "./repository-runtime.ts";
-import { RepositoryRuntimeExecutionBroker, repositoryRuntimeExecutionRecipe } from "./repository-runtime-broker.ts";
+import { RepositoryRuntimeExecutionBroker, SandboxedRepositoryExecutionBroker, repositoryRuntimeExecutionRecipe, type SandboxRepositoryRecipeRunner } from "./repository-runtime-broker.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, providerCommandActions } from "./remote-adapters.ts";
+import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler } from "./remote-git.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -127,13 +129,16 @@ class LocalCouncilExecutor implements CouncilExecutor {
 }
 class LocalPipelineStatusAdapter implements CommandAdapter {
   readonly id = "local-pipeline-status"; readonly kind = "generic" as const;
-  private readonly processes: LocalProcessBroker;
-  constructor(processes: LocalProcessBroker) { this.processes = processes; }
+  private readonly git: LocalGitRunner;
+  constructor(git: LocalGitRunner = new SpawnLocalGitRunner()) { this.git = git; }
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target." };
     try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist." }; }
-    const checked = await this.processes.execute("git", ["status", "--porcelain=v1", "--branch"], request.target.repositoryRoot);
-    return { status: checked.outcome === "passed" ? "completed" : checked.outcome === "blocked" ? "blocked" : checked.outcome === "unavailable" ? "unavailable" : "failed", summary: checked.detail, data: { broker: "filesystem+process+git" } };
+    if (request.effectGuard) { const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!current.allowed) return { status: "blocked", summary: current.reason }; }
+    try {
+      const checked = await this.git.run(["status", "--porcelain=v1", "--branch"], { cwd: request.target.repositoryRoot });
+      return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? "Inspected pipeline target status with the fixed absolute Git host." : "The fixed Git status inspection failed.", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")) } };
+    } catch { return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for pipeline status." }; }
   }
 }
 
@@ -149,6 +154,7 @@ export interface DefaultLocalCompositionOptions {
   readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
   readonly repositoryRuntimes?: DurableRepositoryRuntimeRegistry;
   readonly isolationRuntime?: IsolationRuntime;
+  readonly repositorySandbox?: SandboxRepositoryRecipeRunner;
   readonly containmentManager?: DurableContainmentManager;
   readonly credentialVault?: DurableCredentialReferenceVault;
   readonly networkPolicyRegistry?: DurableNetworkPolicyRegistry;
@@ -169,7 +175,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   );
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
   const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
-  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter());
   const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
   if (dynamicNetwork) {
     const provider = new ConfiguredProviderCommandAdapter(dynamicNetwork);
@@ -183,7 +189,14 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory });
     git.register("local_commit", (request) => localGit.execute(request));
   }
+  if (dynamicNetwork) {
+    const receiptLedger = new ReceiptLedger(store);
+    const remoteGit = new ConfiguredRemoteGitHandler(new ConfiguredGitSmartHttpPusher(dynamicNetwork), new ConfiguredGitHubGraphqlPort(dynamicNetwork), { async verify(receiptId, targetSnapshotId) { const receipt = await receiptLedger.get(receiptId); return !!receipt && receipt.action === "release_shield" && await receiptLedger.isFresh(receipt, targetSnapshotId); } });
+    git.register("pr_upsert", (request) => remoteGit.execute(request));
+    git.register("merge_pr", (request) => remoteGit.execute(request));
+    git.register("direct_main", (request) => remoteGit.execute(request));
+  }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
   const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: new RepositoryRuntimeExecutionBroker(repositoryRuntimes), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }
