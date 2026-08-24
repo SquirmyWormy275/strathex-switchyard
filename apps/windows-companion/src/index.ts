@@ -7,3 +7,9 @@ export {
   type ContextPackage, type CouncilReport, type DispatchRequest, type DispatchResult, type DurableOperation, type ExecutionBroker,
   type ManagedSession, type ProviderSessionAdapter, type Receipt, type ResourceLease, type ReviewPackage, type SessionStatus, type TargetSnapshot, type TestEnvironmentBroker
 } from "./control-plane.ts";
+export {
+  callCompanion, captureLiveTargetSnapshot, CompanionIpcServer, createCompanionConfiguration, createReviewApproval,
+  FilesystemBroker, LocalControlExecutionBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker,
+  LocalTestEnvironmentBroker, validateReviewApproval, type CompanionConfiguration, type GitStatus, type RepositoryPolicy,
+  type ReviewApproval, type SandboxLease, type TestRecipe
+} from "./local-runtime.ts";

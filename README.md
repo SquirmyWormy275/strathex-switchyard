@@ -58,4 +58,8 @@ safe local policy, durable lifecycle, recovery, and VS Code extension build.
 They do **not** prove hardware identity, live provider capability, Windows UI
 automation, broker-enforced OS isolation, provider parity, or all 27 acceptance
 gates. See [`docs/software-completion-audit.md`](docs/software-completion-audit.md)
+
+For the concrete local companion, setup, and post-PR #4 software residual
+boundary, see [`docs/local-companion.md`](docs/local-companion.md) and
+[`docs/software-residual-ledger.md`](docs/software-residual-ledger.md).
 for the requirement-by-requirement boundary.
