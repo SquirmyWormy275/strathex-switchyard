@@ -73,6 +73,28 @@ test("malformed or mismatched local-companion replies fail closed in the extensi
   if (!mismatchedResult.ok) assert.equal(mismatchedResult.code, "invalid_response");
 });
 
+test("host-action authorization accepts only the exact one-time companion token shape", async () => {
+  const hostActionId = `host-action:${"a".repeat(64)}`;
+  let malformed = false;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      assert.equal(request.method, "host-action.authorize");
+      assert.deepEqual(request.payload, { hostActionId, adapterVersion: "extension-1" });
+      const authorization = malformed
+        ? { hostActionId, authorizationToken: "client-selected", expiresAt: "2099-01-01T00:00:00.000Z" }
+        : { hostActionId, authorizationToken: `host-action-auth:${"b".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z" };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { authorization } });
+    }
+  });
+  const accepted = await bridge.authorizeHostAction(hostActionId, "extension-1");
+  assert.equal(accepted.ok, true);
+  malformed = true;
+  const rejected = await bridge.authorizeHostAction(hostActionId, "extension-1");
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
+});
+
 test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
   const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
   const signalId = `hardware-signal:${"a".repeat(64)}`;

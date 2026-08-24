@@ -156,6 +156,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
+  readonly authorizedHostActions: Array<{ id: string; adapterVersion: string }> = [];
   readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string }> = [];
   readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
   readonly hardwarePrepared: HardwareSignalClaim[] = [];
@@ -274,7 +275,11 @@ class FakeBridge implements ExtensionCompanionBridge {
   async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   async deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status } }; }
-  async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
+  async authorizeHostAction(id: string, adapterVersion: string) {
+    this.authorizedHostActions.push({ id, adapterVersion });
+    return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z" } } as const;
+  }
+  async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string, _authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };
   }
@@ -414,6 +419,7 @@ test("PR upsert reviews title and body and opens only the companion-verified PR 
 
   assert.deepEqual(bridge.gitReviews.at(-1)?.mutation, { kind: "pr_upsert", headBranch: "feature/review", baseBranch: "main", title: "Reviewed PR title", body: "Reviewed PR body" });
   assert.deepEqual(opened, ["https://github.com/acme/project/pull/12"]);
+  assert.equal(bridge.authorizedHostActions.at(-1)?.id, `host-action:${"c".repeat(64)}`);
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 });
 

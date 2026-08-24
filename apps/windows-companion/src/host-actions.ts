@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
-import type { HostActionCompletionPayload } from "./bridge.ts";
+import type { HostActionAuthorizationPayload, HostActionCompletionPayload } from "./bridge.ts";
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
 
 export const localHostActionKinds = [
@@ -22,6 +22,7 @@ export interface HostActionIntent {
   readonly commandAction: CommandAction;
   readonly hostAction: LocalHostActionKind;
   readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
   readonly workspaceRoot?: string;
   readonly url?: string;
   readonly debugConfiguration?: string;
@@ -30,14 +31,31 @@ export interface HostActionIntent {
   readonly expiresAt: string;
 }
 
+export interface HostActionAuthorization {
+  readonly version: 1;
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly authorizationToken: string;
+  readonly adapterVersion: string;
+  readonly authorizedAt: string;
+  readonly expiresAt: string;
+}
+
+export interface HostActionFinalAuthorizer {
+  authorize(intent: HostActionIntent): Promise<Readonly<{ allowed: boolean; reason: string }>>;
+}
+
 type HostActionEvent =
   | { readonly version: 1; readonly event: "queued"; readonly intent: HostActionIntent }
+  | { readonly version: 1; readonly event: "authorized"; readonly authorization: HostActionAuthorization }
   | { readonly version: 1; readonly event: "settled"; readonly record: HostActionCompletionRecord }
   | { readonly version: 1; readonly event: "cancelled"; readonly hostActionId: string; readonly operationId: string; readonly reason: string; readonly at: string };
 
 export interface DurableHostActionQueueOptions {
   readonly now?: () => Date;
   readonly lifetimeMs?: number;
+  readonly authorizationLifetimeMs?: number;
+  readonly finalAuthorizer?: HostActionFinalAuthorizer;
 }
 
 /**
@@ -49,13 +67,20 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   private readonly store: ProtectedJsonStore;
   private readonly now: () => Date;
   private readonly lifetimeMs: number;
+  private readonly authorizationLifetimeMs: number;
+  private readonly finalAuthorizer?: HostActionFinalAuthorizer;
 
   constructor(store: ProtectedJsonStore, options: DurableHostActionQueueOptions = {}) {
     this.store = store;
     this.now = options.now ?? (() => new Date());
     this.lifetimeMs = options.lifetimeMs ?? 30_000;
+    this.authorizationLifetimeMs = options.authorizationLifetimeMs ?? 5_000;
+    this.finalAuthorizer = options.finalAuthorizer;
     if (!Number.isSafeInteger(this.lifetimeMs) || this.lifetimeMs < 1_000 || this.lifetimeMs > 5 * 60_000) {
       throw new Error("The host-action acknowledgement lifetime is outside safe bounds.");
+    }
+    if (!Number.isSafeInteger(this.authorizationLifetimeMs) || this.authorizationLifetimeMs < 500 || this.authorizationLifetimeMs > this.lifetimeMs) {
+      throw new Error("The host-action authorization lifetime is outside safe bounds.");
     }
   }
 
@@ -69,6 +94,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       commandAction: request.definition.action,
       hostAction: plan.hostAction,
       ...(request.target ? { targetSnapshotId: request.target.id } : {}),
+      ...(request.session ? { sessionId: request.session.id } : {}),
       ...(request.target ? { workspaceRoot: request.target.repositoryRoot } : {}),
       ...(plan.url ? { url: plan.url } : {}),
       ...(plan.debugConfiguration ? { debugConfiguration: plan.debugConfiguration } : {}),
@@ -82,6 +108,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       if (existing) {
         if (existing.operationId !== intent.operationId || existing.commandAction !== intent.commandAction || existing.hostAction !== intent.hostAction
           || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
+          || existing.sessionId !== intent.sessionId
           || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
         }
@@ -89,6 +116,44 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       }
       await transaction.append<HostActionEvent>("host_action", { version: 1, event: "queued", intent });
       return intent;
+    });
+  }
+
+  /**
+   * Issues one short-lived, single-effect authorization only after the trusted
+   * host revalidates the exact queued target immediately before the VS Code
+   * effect. An authorization is never reissued after an ambiguous response.
+   */
+  async authorize(payload: HostActionAuthorizationPayload): Promise<HostActionAuthorization> {
+    if (!this.finalAuthorizer) throw new Error("No trusted final host-action authorizer is installed.");
+    const adapterVersion = boundedVersion(payload.adapterVersion);
+    const hostActionId = exactHostActionId(payload.hostActionId);
+    const events = await this.events();
+    const intent = pendingIntent(events, hostActionId, this.now());
+    if (events.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === hostActionId)) {
+      throw new Error("The host action was already authorized; its outcome requires reconciliation and cannot be replayed.");
+    }
+    const decision = await this.finalAuthorizer.authorize(intent);
+    if (!decision.allowed) throw new Error(boundedSummary(decision.reason));
+    const now = this.now();
+    const authorization: HostActionAuthorization = {
+      version: 1,
+      hostActionId: intent.id,
+      operationId: intent.operationId,
+      authorizationToken: `host-action-auth:${randomBytes(32).toString("hex")}`,
+      adapterVersion,
+      authorizedAt: now.toISOString(),
+      expiresAt: new Date(Math.min(Date.parse(intent.expiresAt), now.getTime() + this.authorizationLifetimeMs)).toISOString()
+    };
+    return this.store.transaction(async (transaction) => {
+      const current = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
+      const exactIntent = pendingIntent(current, hostActionId, this.now());
+      if (!sameIntent(exactIntent, intent)) throw new Error("The durable host-action intent changed during final authorization.");
+      if (current.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === hostActionId)) {
+        throw new Error("The host action was already authorized; its outcome requires reconciliation and cannot be replayed.");
+      }
+      await transaction.append<HostActionEvent>("host_action", { version: 1, event: "authorized", authorization });
+      return authorization;
     });
   }
 
@@ -100,6 +165,13 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === payload.hostActionId)) {
         throw new Error("A cancelled host action cannot be acknowledged as completed.");
       }
+      const authorization = events.find((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === payload.hostActionId)?.authorization;
+      if (payload.succeeded && !authorization) throw new Error("A successful host action requires a trusted final-effect authorization.");
+      if (payload.authorizationToken !== undefined) {
+        if (!authorization || authorization.authorizationToken !== payload.authorizationToken || authorization.adapterVersion !== boundedVersion(payload.adapterVersion)) {
+          throw new Error("The host-action completion does not match its exact final-effect authorization.");
+        }
+      } else if (payload.succeeded) throw new Error("A successful host action is missing its one-time authorization token.");
       const priorEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === payload.hostActionId)?.record;
       const prior = priorEvent ? safeCompletion(priorEvent, queued) : undefined;
       if (priorEvent && !prior) throw new Error("The protected host-action completion does not match its exact durable intent.");
@@ -111,7 +183,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         ...(queued.targetSnapshotId ? { targetSnapshotId: queued.targetSnapshotId } : {}),
         status: expired ? "failed" : payload.succeeded ? "completed" : "failed",
         summary: expired ? "The authenticated host acknowledgement arrived after the bounded action deadline." : boundedSummary(payload.summary),
-        completionDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !expired && payload.succeeded, adapterVersion: boundedVersion(payload.adapterVersion) })),
+        completionDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !expired && payload.succeeded, adapterVersion: boundedVersion(payload.adapterVersion), authorization: authorization ? digest(authorization.authorizationToken) : "none" })),
         completedAt: this.now().toISOString()
       };
       if (prior) {
@@ -204,6 +276,12 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       return { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." };
     }
     return { outcome: "unresolved", note: "The exact durable host action remains queued; no host effect was inferred or replayed." };
+  }
+
+  private async events(): Promise<readonly HostActionEvent[]> {
+    return (await this.store.readEntries<HostActionEvent>())
+      .filter((entry) => entry.kind === "host_action")
+      .map((entry) => entry.payload);
   }
 }
 
@@ -299,6 +377,24 @@ function boundedSummary(value: string): string {
 function boundedVersion(value: string): string {
   if (!/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The host adapter version is invalid.");
   return value;
+}
+
+function exactHostActionId(value: string): string {
+  if (!/^host-action:[a-f0-9]{64}$/.test(value)) throw new Error("The host-action authorization requires an exact durable ID.");
+  return value;
+}
+
+function pendingIntent(events: readonly HostActionEvent[], hostActionId: string, now: Date): HostActionIntent {
+  const queued = events.find((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued" && event.intent.id === hostActionId)?.intent;
+  if (!queued) throw new Error("The host-action authorization does not match a durable queued intent.");
+  if (events.some((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === hostActionId)) throw new Error("A settled host action cannot be authorized again.");
+  if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === hostActionId)) throw new Error("A cancelled host action cannot be authorized.");
+  if (Date.parse(queued.expiresAt) <= now.getTime()) throw new Error("The host-action authorization deadline elapsed before the effect.");
+  return queued;
+}
+
+function sameIntent(left: HostActionIntent, right: HostActionIntent): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function boundedReference(value: string, field: string): string {

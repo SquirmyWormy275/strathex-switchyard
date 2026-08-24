@@ -32,6 +32,7 @@ import {
   type DispatchPayload,
   type CommandPreparationPayload,
   type ConfirmationRequestPayload,
+  type HostActionAuthorizationPayload,
   type HostActionCompletionPayload,
   type GitReviewPayload,
   type RuntimePinInstallPayload,
@@ -99,6 +100,7 @@ export interface HostActionCompletionRecord {
 }
 
 export interface HostActionCoordinator {
+  authorize(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string }>>;
   settle(payload: HostActionCompletionPayload): Promise<HostActionCompletionRecord>;
 }
 
@@ -262,6 +264,8 @@ export class CompanionService {
           return this.success(request.id, await this.dispatchHardwareSignal(this.requireHardwareSignalDispatch(request.payload)));
         case "hardware-signal.complete":
           return this.success(request.id, { completion: await this.completeHardwareSignal(this.requireHardwareSignalCompletion(request.payload)) });
+        case "host-action.authorize":
+          return this.success(request.id, { authorization: await this.authorizeHostAction(this.requireHostActionAuthorization(request.payload)) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         case "handoff.create": return this.success(request.id, { handoff: await this.createHandoff(this.requireHandoffCreate(request.payload)) });
@@ -467,6 +471,13 @@ export class CompanionService {
     const result = await this.executor.completeExternalOperation(record);
     this.record("host-action.complete", result.status, result.summary, undefined, result.operationId);
     return result;
+  }
+
+  private async authorizeHostAction(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string }>> {
+    if (!this.hostActions) throw new CompanionServiceError("companion_unavailable", "No durable final host-action authorization boundary is attached.");
+    const authorization = await this.hostActions.authorize(payload);
+    this.record("host-action.authorize", "completed", "Authorized one exact queued host action after final host revalidation.", undefined, authorization.hostActionId);
+    return { hostActionId: authorization.hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt };
   }
 
   private async reviewGitMutation(payload: GitReviewPayload): Promise<GitReviewResult> {
@@ -925,10 +936,24 @@ export class CompanionService {
       || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
       || typeof payload.succeeded !== "boolean"
       || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
-      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)) {
+      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "summary", "adapterVersion", "authorizationToken"].includes(key))) {
       throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
     }
-    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, summary: payload.summary, adapterVersion: payload.adapterVersion };
+    if (payload.authorizationToken !== undefined && (typeof payload.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(payload.authorizationToken))) {
+      throw new CompanionServiceError("invalid_request", "The host-action completion authorization token is malformed.");
+    }
+    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}) };
+  }
+
+  private requireHostActionAuthorization(payload: unknown): HostActionAuthorizationPayload {
+    if (!isRecord(payload)
+      || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
+      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || Object.keys(payload).some((key) => key !== "hostActionId" && key !== "adapterVersion")) {
+      throw new CompanionServiceError("invalid_request", "Host-action authorization requires an exact durable ID and adapter version.");
+    }
+    return { hostActionId: payload.hostActionId, adapterVersion: payload.adapterVersion };
   }
 
   private requireGitReview(payload: unknown): GitReviewPayload {

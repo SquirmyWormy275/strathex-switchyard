@@ -104,11 +104,13 @@ test("packaged restart finalizes a durable authenticated host effect without rep
   });
   assert.equal(dispatched.ok, true);
   const command = (dispatched.result as { command: { operationId: string; data: { hostActionId: string } } }).command;
+  const authorization = await first.hostActions.authorize({ hostActionId: command.data.hostActionId, adapterVersion: "installed-test-1" });
   await first.hostActions.settle({
     hostActionId: command.data.hostActionId,
     succeeded: true,
     summary: "The installed VS Code host completed the exact durable action before the companion crashed.",
-    adapterVersion: "installed-test-1"
+    adapterVersion: "installed-test-1",
+    authorizationToken: authorization.authorizationToken
   });
   assert.equal((await first.executor.operations.get(command.operationId))?.state, "executing");
 

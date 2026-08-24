@@ -696,14 +696,19 @@ export class ManagedSessionController {
       }
       let succeeded = false;
       let summary = "The VS Code host action failed before completion.";
+      let authorizationToken: string | undefined;
       try {
         if (Date.parse(action.expiresAt) <= Date.parse(this.now())) throw new Error("The host-action acknowledgement deadline elapsed.");
+        const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion);
+        if (!authorization.ok) throw new Error(`The companion refused the final host-action barrier: ${authorization.message}`);
+        if (authorization.value.hostActionId !== action.id || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The final host-action authorization is mismatched or expired.");
+        authorizationToken = authorization.value.authorizationToken;
         summary = await this.executeLocalHostAction(action, command);
         succeeded = true;
       } catch (error) {
         summary = error instanceof Error && error.message ? error.message : summary;
       }
-      const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion);
+      const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion, authorizationToken);
       if (!completion.ok) {
         await this.vscode.window.showWarningMessage(`SXSY-B122 host action requires reconciliation: ${completion.message}`);
         if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The local host action may have occurred but durable settlement failed.", dispatchReceiptId, selectedSession);

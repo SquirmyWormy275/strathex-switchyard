@@ -52,6 +52,7 @@ export type CompanionMethod =
   | "hardware-signal.prepare"
   | "hardware-signal.dispatch"
   | "hardware-signal.complete"
+  | "host-action.authorize"
   | "host-action.complete"
   | "handoff.create"
   | "handoff.list"
@@ -166,6 +167,12 @@ export interface HostActionCompletionPayload {
   readonly succeeded: boolean;
   readonly summary: string;
   readonly adapterVersion: string;
+  readonly authorizationToken?: string;
+}
+
+export interface HostActionAuthorizationPayload {
+  readonly hostActionId: string;
+  readonly adapterVersion: string;
 }
 
 export interface GitReviewPayload {
@@ -266,7 +273,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake",
-    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.complete",
+    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"
   ].includes(value);

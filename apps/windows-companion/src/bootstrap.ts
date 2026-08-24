@@ -1,4 +1,4 @@
-import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
@@ -141,7 +141,31 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     processSupervisor: options.repositoryProcessSupervisor ?? new UnavailableInstalledRepositoryProcessSupervisor()
   });
   const hardwareSignals = new DurableHardwareSignalInbox(store);
-  const hostActions = new DurableHostActionQueue(store);
+  let targetResolver!: TargetResolver;
+  let containmentManager!: DurableContainmentManager;
+  const hostActions = new DurableHostActionQueue(store, {
+    finalAuthorizer: {
+      async authorize(intent) {
+        try {
+          if (intent.workspaceRoot) {
+            const containment = await containmentManager.check(intent.workspaceRoot, "adapter");
+            if (!containment.allowed) return { allowed: false, reason: containment.reason };
+          }
+          if (!intent.targetSnapshotId) return { allowed: true, reason: "The queued UI action has no repository effect target." };
+          if (!intent.sessionId || !intent.workspaceRoot) return { allowed: false, reason: "The queued target-bound host action has no exact managed session and workspace." };
+          const session = await sessions.get(intent.sessionId);
+          if (!session) return { allowed: false, reason: "The exact managed session is no longer durable." };
+          const actual = await targetResolver.resolve({ definition: commandForAction(intent.commandAction), session });
+          if (!actual || actual.completeness !== "complete" || actual.id !== intent.targetSnapshotId || resolve(actual.repositoryRoot).toLowerCase() !== resolve(intent.workspaceRoot).toLowerCase()) {
+            return { allowed: false, reason: "The exact TargetSnapshot changed before the VS Code host effect." };
+          }
+          return { allowed: true, reason: "The exact TargetSnapshot and containment boundary remain current." };
+        } catch {
+          return { allowed: false, reason: "The trusted host could not revalidate the exact queued effect target." };
+        }
+      }
+    }
+  });
   const workflowArtifacts = new WorkflowArtifactStore(store);
   const handoffs = new HandoffPackageStore(store);
   const voice = new VoiceCoordinator(store);
@@ -150,7 +174,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     processes: repositoryRuntimes
   });
   let credentialVault!: DurableCredentialReferenceVault;
-  const containmentManager = new DurableContainmentManager(store, {
+  containmentManager = new DurableContainmentManager(store, {
     revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot),
     cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
   });
@@ -199,7 +223,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const rawHidSupervisor = rawHidInstallationRegistry && rawHidFactory
     ? new InstalledRawHidSupervisor(rawHidInstallationRegistry, hardwareSignals, rawHidFactory)
     : undefined;
-  const targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
+  targetResolver = options.targetResolver ?? new WorkspaceSnapshotResolver(
     new TargetSnapshotFactory(new GitCliInspector({
       // The installed companion hashes every present untracked and ignored
       // regular file into the target identity.  It never silently treats an

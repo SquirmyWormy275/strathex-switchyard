@@ -53,6 +53,12 @@ export interface ForwardedHostAction {
   readonly pythonInterpreter?: string;
 }
 
+export interface ForwardedHostActionAuthorization {
+  readonly hostActionId: string;
+  readonly authorizationToken: string;
+  readonly expiresAt: string;
+}
+
 export interface PreparedCommand {
   readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
   readonly summary: string;
@@ -164,7 +170,8 @@ export interface ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
-  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
+  authorizeHostAction(hostActionId: string, adapterVersion: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
+  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
 /** A line round-trip owned by a deliberately started local companion process. */
@@ -382,8 +389,19 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
 
-  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
-    const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
+  async authorizeHostAction(hostActionId: string, adapterVersion: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
+    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion });
+    if (!result.ok) return result;
+    const authorization = isRecord(result.value) ? result.value.authorization : undefined;
+    if (!isRecord(authorization) || !exactKeys(authorization, ["hostActionId", "authorizationToken", "expiresAt"])
+      || authorization.hostActionId !== hostActionId
+      || typeof authorization.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(authorization.authorizationToken)
+      || typeof authorization.expiresAt !== "string" || !Number.isFinite(Date.parse(authorization.expiresAt))) return invalidResponse();
+    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt } };
+  }
+
+  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}) });
     return result.ok ? { ok: true, value: result.value.command } : result;
   }
 
@@ -497,6 +515,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   endVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
   deleteVoiceTranscript(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  authorizeHostAction(): Promise<BridgeResult<ForwardedHostActionAuthorization>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 
   private async unavailable<T>(): Promise<BridgeResult<T>> {

@@ -29,7 +29,8 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   let tick = 0;
   const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }), {
-    now: () => new Date(`2026-08-23T00:00:0${tick++}.000Z`)
+    now: () => new Date(`2026-08-23T00:00:0${tick++}.000Z`),
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact target remains current" }; } }
   });
   const adapter = new DurableHostActionAdapter(queue);
   const request = { definition: commandForAction("github_pr"), operationId: "operation-github", target };
@@ -39,7 +40,8 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
   assert.deepEqual(second.data, first.data);
   assert.equal(first.data?.hostActionUrl, "https://github.com/acme/switchyard/pulls?q=is%3Apr+is%3Aopen+head%3Afeature%2Fhost-actions");
   assert.equal((await queue.listPending()).length, 1);
-  const completion = await queue.settle({ hostActionId: String(first.data?.hostActionId), succeeded: true, summary: "Opened the exact reviewed host destination.", adapterVersion: "isolated-extension-1" });
+  const authorization = await queue.authorize({ hostActionId: String(first.data?.hostActionId), adapterVersion: "isolated-extension-1" });
+  const completion = await queue.settle({ hostActionId: String(first.data?.hostActionId), succeeded: true, summary: "Opened the exact reviewed host destination.", adapterVersion: "isolated-extension-1", authorizationToken: authorization.authorizationToken });
   assert.equal("evidenceDigest" in completion, false, "host UI acknowledgement must not mint gate-bearing receipt evidence");
   assert.equal("toolVersions" in completion, false, "only typed runtime/scanner issuers may supply receipt tool evidence");
 });
@@ -61,11 +63,20 @@ test("installed dispatch stays running until the authenticated host acknowledgem
   assert.match(String(command.data?.hostActionId), /^host-action:[a-f0-9]{64}$/);
   assert.equal((await companion.hostActions.listPending()).length, 1);
 
+  const authorized = await companion.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "authorize-claude",
+    method: "host-action.authorize",
+    payload: { hostActionId: command.data!.hostActionId, adapterVersion: "test-extension-1" }
+  });
+  assert.equal(authorized.ok, true);
+  const authorizationToken = (authorized.result as { authorization: { authorizationToken: string } }).authorization.authorizationToken;
+
   const completed = await companion.endpoint.handle({
     version: companionBridgeVersion,
     id: "ack-claude",
     method: "host-action.complete",
-    payload: { hostActionId: command.data!.hostActionId, succeeded: true, summary: "VS Code opened the trusted Claude destination.", adapterVersion: "test-extension-1" }
+    payload: { hostActionId: command.data!.hostActionId, succeeded: true, summary: "VS Code opened the trusted Claude destination.", adapterVersion: "test-extension-1", authorizationToken }
   });
   assert.equal(completed.ok, true);
   const result = (completed.result as { command: { status: string; operationId?: string } }).command;
@@ -73,6 +84,26 @@ test("installed dispatch stays running until the authenticated host acknowledgem
   assert.equal(result.operationId, command.operationId);
   assert.equal((await companion.hostActions.listPending()).length, 0);
   assert.equal((await companion.executor.operations.get(command.operationId!))?.state, "recorded");
+});
+
+test("host actions fail closed on target churn, missing authorization, and authorization replay", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-final-barrier-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let current = false;
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }), {
+    now: () => new Date("2026-08-24T12:00:00.000Z"),
+    finalAuthorizer: { async authorize() { return { allowed: current, reason: current ? "current" : "TargetSnapshot changed before the host effect." }; } }
+  });
+  const intent = await queue.enqueue({ definition: commandForAction("github_home"), operationId: "operation-barrier", target }, { hostAction: "open_external_url", url: "https://github.com/acme/switchyard" });
+  await assert.rejects(queue.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" }), /TargetSnapshot changed/i);
+  await assert.rejects(queue.settle({ hostActionId: intent.id, succeeded: true, summary: "forged success", adapterVersion: "extension-1" }), /authorization/i);
+
+  current = true;
+  const authorization = await queue.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" });
+  await assert.rejects(queue.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" }), /already authorized|reconciliation/i);
+  await assert.rejects(queue.settle({ hostActionId: intent.id, succeeded: true, summary: "wrong token", adapterVersion: "extension-1", authorizationToken: `host-action-auth:${"0".repeat(64)}` }), /authorization/i);
+  const settled = await queue.settle({ hostActionId: intent.id, succeeded: true, summary: "exact effect completed", adapterVersion: "extension-1", authorizationToken: authorization.authorizationToken });
+  assert.equal(settled.status, "completed");
 });
 
 test("an unknown or conflicting host acknowledgement cannot finalize an operation", async (context) => {
