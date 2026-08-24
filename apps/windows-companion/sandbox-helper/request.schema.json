@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sxsy.invalid/schemas/b122-windows-sandbox-request-v1.json",
+  "title": "SXSY-B122 Windows Sandbox exact request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "requestId", "leaseId", "recipeId", "recipeCatalogDigest", "helperDigest"],
+  "properties": {
+    "schema": { "const": "sxsy-b122.windows-sandbox-request" },
+    "version": { "const": 1 },
+    "requestId": { "type": "string", "pattern": "^sandbox-request:[a-fA-F0-9-]{36}$" },
+    "leaseId": { "type": "string", "pattern": "^sandbox:[a-fA-F0-9-]{36}$" },
+    "recipeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "recipeCatalogDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "helperDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}

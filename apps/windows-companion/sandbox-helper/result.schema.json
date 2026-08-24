@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sxsy.invalid/schemas/b122-windows-sandbox-result-v1.json",
+  "title": "SXSY-B122 Windows Sandbox exact result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "requestId", "leaseId", "recipeId", "recipeCatalogDigest", "outcome", "summary", "outputs"],
+  "properties": {
+    "schema": { "const": "sxsy-b122.windows-sandbox-result" },
+    "version": { "const": 1 },
+    "requestId": { "type": "string" },
+    "leaseId": { "type": "string" },
+    "recipeId": { "type": "string" },
+    "recipeCatalogDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "outcome": { "const": "completed" },
+    "summary": { "type": "string", "maxLength": 1024 },
+    "outputs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "size": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}
