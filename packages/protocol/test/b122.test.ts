@@ -41,3 +41,9 @@ test("raw HID reserved bytes must remain zero", () => {
   packet[7] = 1;
   assert.equal(decodeSignal(packet), undefined);
 });
+
+test("raw HID packets must have the exact protocol length", () => {
+  const packet = encodeSignal({ version: protocolVersion, control: "RUN", modifier: "normal", sequence: 9 });
+  const extended = new Uint8Array(9); extended.set(packet);
+  assert.equal(decodeSignal(extended), undefined);
+});

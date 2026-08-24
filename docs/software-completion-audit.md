@@ -1,8 +1,13 @@
-# B122 software-only completion audit
+# B122 software-foundation audit (superseded by post-merge audit)
 
 **Audit date:** 2026-08-23  
 **Authority:** `SXSY-B122-complete-key-specification-and-audit.md`  
 **Scope:** software that can be implemented and deterministically tested without the physical B122, an installed proprietary provider, or production credentials.
+
+> **Correction:** this document predates the adversarial post-merge audit.
+> It describes the safe control-plane foundation, not completion of each named
+> B122 behavior. See [`post-merge-adversarial-audit.md`](post-merge-adversarial-audit.md)
+> for the current evidence boundary.
 
 ## What is implemented
 
@@ -14,7 +19,7 @@ Provider adapters have a complete discovery/focus/pause/context-injection contra
 
 ## Dispatch audit — all settled chord assignments
 
-`packages/protocol/src/b122.ts` remains the single canonical manifest: 22 controls, 65 settled chord assignments, and 111 intentionally unassigned slots. `OperationCoordinator.dispatch` covers every assignment. Route-only actions produce a visible, non-mutating route; mediation-required actions validate selected session, complete snapshot, durable containment, authority, idempotency, and operation state before passing to a broker. The safe local broker returns `unavailable`; it does not perform filesystem, Git, credentials, process, network, or prompt-submission actions. High-consequence controls first receive a durable blocked operation and audit entry, then remain activation-gated.
+`packages/protocol/src/b122.ts` remains the single canonical manifest: 22 controls, 65 settled chord assignments, and 111 intentionally unassigned slots. `OperationCoordinator.dispatch` covers every assignment as a generic safe route or broker request; it does **not** itself implement the named Windows, provider, Git, GitHub, scanner, voice, or isolation behaviors. The safe local broker returns `unavailable`; it does not perform filesystem, Git, credentials, process, network, or prompt-submission actions. High-consequence controls first receive a durable blocked operation and audit entry, then remain activation-gated.
 
 | Control | Settled modes covered | Software result |
 | --- | --- | --- |
