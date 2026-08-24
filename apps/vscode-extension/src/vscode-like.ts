@@ -50,6 +50,7 @@ export interface QuickPickItemLike {
 export interface VscodeLike {
   readonly commands: {
     registerCommand(command: string, callback: (...args: unknown[]) => unknown): DisposableLike;
+    executeCommand?(command: string, ...args: unknown[]): PromiseLike<unknown>;
   };
   readonly window: {
     readonly terminals: readonly TerminalLike[];

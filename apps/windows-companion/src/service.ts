@@ -16,6 +16,7 @@ import {
   type CompanionResponse,
   type DispatchPayload,
   type ConfirmationRequestPayload,
+  type HostActionCompletionPayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -41,10 +42,31 @@ export interface ConfirmationCapableMediatedCommandExecutor extends MediatedComm
   requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string }>): Promise<Readonly<{ status: string; summary: string; token?: string; expiresAt?: string }>>;
 }
 
+export interface HostActionCompletionRecord {
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly status: "completed" | "failed";
+  readonly summary: string;
+  readonly evidenceDigest: string;
+  readonly toolVersions: Readonly<Record<string, string>>;
+  readonly completedAt: string;
+}
+
+export interface HostActionCoordinator {
+  settle(payload: HostActionCompletionPayload): Promise<HostActionCompletionRecord>;
+}
+
+export interface ExternalCompletionCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  completeExternalOperation(record: HostActionCompletionRecord): Promise<CommandResult>;
+}
+
 export interface CompanionServiceOptions {
   readonly now?: () => string;
   readonly idFactory?: () => string;
   readonly executor?: MediatedCommandExecutor;
+  readonly hostActions?: HostActionCoordinator;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -65,12 +87,14 @@ export class CompanionService {
   private readonly now: () => string;
   private readonly idFactory: () => string;
   private readonly executor?: MediatedCommandExecutor;
+  private readonly hostActions?: HostActionCoordinator;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? (() => `audit-${crypto.randomUUID()}`);
     this.executor = options.executor;
+    this.hostActions = options.hostActions;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -102,6 +126,8 @@ export class CompanionService {
           return this.success(request.id, { command: await this.cancelOperation(this.requireCancellation(request.payload)) });
         case "confirmation.request":
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
+        case "host-action.complete":
+          return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
           return this.failure(request.id, "unknown_method", "Unknown SXSY-B122 companion method.");
       }
@@ -268,6 +294,16 @@ export class CompanionService {
     return this.executor.requestConfirmation(payload);
   }
 
+  private async completeHostAction(payload: HostActionCompletionPayload): Promise<CommandResult> {
+    if (!this.hostActions || !isExternalCompletionExecutor(this.executor)) {
+      return { status: "unavailable", summary: "No durable host-action settlement boundary is attached; the acknowledgement was not accepted." };
+    }
+    const record = await this.hostActions.settle(payload);
+    const result = await this.executor.completeExternalOperation(record);
+    this.record("host-action.complete", result.status, result.summary, undefined, result.operationId);
+    return result;
+  }
+
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
     if (!isRecord(payload) || !isRecord(payload.session)) throw new CompanionServiceError("invalid_request", "A session registration requires a session record.");
     return { session: payload.session as unknown as ManagedSession };
@@ -326,6 +362,17 @@ export class CompanionService {
       throw new CompanionServiceError("invalid_request", "A confirmation request requires a known action, bounded reason, and optional opaque session/authority references.");
     }
     return { action: payload.action as CommandAction, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(payload.authorityId ? { authorityId: payload.authorityId } : {}) };
+  }
+
+  private requireHostActionCompletion(payload: unknown): HostActionCompletionPayload {
+    if (!isRecord(payload)
+      || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
+      || typeof payload.succeeded !== "boolean"
+      || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
+      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)) {
+      throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
+    }
+    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, summary: payload.summary, adapterVersion: payload.adapterVersion };
   }
 
   private requireSession(id: string): ManagedSession {
@@ -453,6 +500,10 @@ function isCancellableExecutor(value: MediatedCommandExecutor | undefined): valu
 
 function isConfirmationCapableExecutor(value: MediatedCommandExecutor | undefined): value is ConfirmationCapableMediatedCommandExecutor {
   return !!value && typeof (value as Partial<ConfirmationCapableMediatedCommandExecutor>).requestConfirmation === "function";
+}
+
+function isExternalCompletionExecutor(value: MediatedCommandExecutor | undefined): value is ExternalCompletionCapableMediatedCommandExecutor {
+  return !!value && typeof (value as Partial<ExternalCompletionCapableMediatedCommandExecutor>).completeExternalOperation === "function";
 }
 
 function isControl(value: unknown): value is Control {

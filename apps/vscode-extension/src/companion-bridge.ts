@@ -38,9 +38,17 @@ export interface ForwardedCommandResult {
 }
 
 export type LocalHostAction =
-  | "create_claude_terminal"
-  | "create_codex_terminal"
-  | "focus_integrated_terminal";
+  | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
+  | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
+  | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
+  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace";
+
+export interface ForwardedHostAction {
+  readonly id: string;
+  readonly kind: LocalHostAction;
+  readonly expiresAt: string;
+  readonly url?: string;
+}
 
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -53,6 +61,7 @@ export interface ExtensionCompanionBridge {
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
+  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
 /** A line round-trip owned by a deliberately started local companion process. */
@@ -96,6 +105,11 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
 
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("command.dispatch", command);
+    return result.ok ? { ok: true, value: result.value.command } : result;
+  }
+
+  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
   }
 
@@ -146,6 +160,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 
   private async unavailable<T>(): Promise<BridgeResult<T>> {
     return { ok: false, code: "companion_unavailable", message: this.reason };
@@ -153,10 +168,28 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
 }
 
 export function localHostAction(result: ForwardedCommandResult): LocalHostAction | undefined {
-  const candidate = result.data?.localAction;
-  return candidate === "create_claude_terminal" || candidate === "create_codex_terminal" || candidate === "focus_integrated_terminal"
-    ? candidate
-    : undefined;
+  return forwardedHostAction(result)?.kind;
+}
+
+export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHostAction | undefined {
+  const id = result.data?.hostActionId;
+  const kind = result.data?.hostActionKind;
+  const expiresAt = result.data?.hostActionExpiresAt;
+  const url = result.data?.hostActionUrl;
+  if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
+    || typeof kind !== "string" || !isLocalHostAction(kind)
+    || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
+    || (url !== undefined && typeof url !== "string")) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}) };
+}
+
+function isLocalHostAction(value: string): value is LocalHostAction {
+  return [
+    "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
+    "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
+    "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
+    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace"
+  ].includes(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -22,7 +22,8 @@ export type CompanionMethod =
   | "debug.register"
   | "command.dispatch"
   | "operation.cancel"
-  | "confirmation.request";
+  | "confirmation.request"
+  | "host-action.complete";
 
 export interface CompanionRequest {
   readonly version: typeof companionBridgeVersion;
@@ -104,6 +105,14 @@ export interface ConfirmationRequestPayload {
   readonly reason: string;
 }
 
+/** A typed result from the installed VS Code host, never an execution request. */
+export interface HostActionCompletionPayload {
+  readonly hostActionId: string;
+  readonly succeeded: boolean;
+  readonly summary: string;
+  readonly adapterVersion: string;
+}
+
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
   request(request: CompanionRequest): Promise<CompanionResponse>;
@@ -156,7 +165,8 @@ export function isCompanionRequest(value: unknown): value is CompanionRequest {
 export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
-    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "confirmation.request"
+    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "confirmation.request",
+    "host-action.complete"
   ].includes(value);
 }
 

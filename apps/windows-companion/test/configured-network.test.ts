@@ -1,0 +1,179 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import {
+  ConfiguredHttpsNetworkBroker,
+  loadConfiguredNetworkPolicy,
+  type NetworkAddressResolver,
+  type NetworkContainmentFence,
+  type PinnedNetworkTransport,
+  type PinnedNetworkTransportRequest
+} from "../src/configured-network.ts";
+import { DurableCredentialReferenceVault, type CredentialContainmentFence } from "../src/durable-credentials.ts";
+import type { UserSecretProtector } from "../src/windows-secret.ts";
+
+class MemoryProtector implements UserSecretProtector {
+  readonly provider = "network-test-protector";
+  private readonly values = new Map<string, Uint8Array>();
+  async seal(cleartext: Uint8Array): Promise<string> { const key = `sealed-${this.values.size + 1}`; this.values.set(key, new Uint8Array(cleartext)); return key; }
+  async open(sealed: string): Promise<Uint8Array> { const value = this.values.get(sealed); if (!value) throw new Error("missing"); return new Uint8Array(value); }
+}
+
+class ToggleFence implements CredentialContainmentFence, NetworkContainmentFence {
+  credentialBlocked = false;
+  networkBlocked = false;
+  async check(_root: string, channel: "credential" | "network") {
+    const blocked = channel === "credential" ? this.credentialBlocked : this.networkBlocked;
+    return blocked ? { allowed: false, reason: `${channel} containment active`, fenceEpoch: 4 } : { allowed: true, reason: "clear" };
+  }
+}
+
+class FakeResolver implements NetworkAddressResolver {
+  readonly addresses: readonly { address: string; family: 4 | 6 }[];
+  constructor(addresses: readonly { address: string; family: 4 | 6 }[]) { this.addresses = addresses; }
+  async resolve(): Promise<readonly { address: string; family: 4 | 6 }[]> { return this.addresses; }
+}
+
+class RecordingTransport implements PinnedNetworkTransport {
+  readonly requests: PinnedNetworkTransportRequest[] = [];
+  response: { status: number; headers: Record<string, string>; body: Uint8Array } = { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from("{\"ok\":true}") };
+  async send(request: PinnedNetworkTransportRequest) {
+    this.requests.push({ ...request, headers: { ...request.headers }, body: request.body ? new Uint8Array(request.body) : undefined });
+    return this.response;
+  }
+}
+
+const repositoryRoot = join(tmpdir(), "sxsy-b122-network-owned-repository");
+const route = {
+  id: "github-create-pr",
+  method: "POST",
+  url: "https://api.github.com/repos/example/repo/pulls",
+  staticHeaders: { accept: "application/vnd.github+json", "content-type": "application/json" },
+  credential: { reference: "github-primary", purpose: "github-pr-upsert", header: "authorization", prefix: "Bearer " },
+  timeoutMs: 2_000,
+  maxRequestBytes: 4_096,
+  maxResponseBytes: 4_096,
+  redirects: "deny"
+} as const;
+
+async function fixture(context: test.TestContext) {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-network-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const fence = new ToggleFence();
+  const vault = new DurableCredentialReferenceVault(new ProtectedJsonStore({ filePath: join(directory, "credentials.jsonl") }), new MemoryProtector(), fence);
+  await vault.provision({ reference: "github-primary", scopes: [{ repositoryRoot, adapterId: "configured-network", purpose: "github-pr-upsert" }] }, Buffer.from("network-only-token", "utf8"));
+  const transport = new RecordingTransport();
+  const broker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [route] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), transport, fence, vault.createAdapter("configured-network"));
+  return { directory, fence, vault, transport, broker };
+}
+
+test("configured HTTPS route pins public DNS and injects a scoped credential only at transport dispatch", async (context) => {
+  const setup = await fixture(context);
+  const response = await setup.broker.request({ routeId: route.id, repositoryRoot, body: "{\"title\":\"safe\"}" });
+  assert.equal(response.outcome, "passed");
+  assert.equal(response.status, 200);
+  assert.equal(Buffer.from(response.body!).toString("utf8"), "{\"ok\":true}");
+  assert.equal(setup.transport.requests.length, 1);
+  const sent = setup.transport.requests[0]!;
+  assert.equal(sent.url, route.url);
+  assert.deepEqual(sent.resolvedAddress, { address: "93.184.216.34", family: 4 });
+  assert.equal(sent.rejectUnauthorized, true);
+  assert.equal(sent.proxy, "direct");
+  assert.equal(sent.headers.authorization, "Bearer network-only-token");
+  assert.equal(JSON.stringify(response).includes("network-only-token"), false);
+});
+
+test("network policy rejects non-HTTPS, credential-bearing URLs, query secrets, redirects, and mismatched routes", async (context) => {
+  const setup = await fixture(context);
+  for (const url of [
+    "http://api.github.com/repos/example/repo/pulls",
+    "https://user:pass@api.github.com/repos/example/repo/pulls",
+    "https://api.github.com/repos/example/repo/pulls?access_token=secret"
+  ]) {
+    assert.throws(() => new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [{ ...route, url }] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), setup.transport, setup.fence), /HTTPS|credential|query/i);
+  }
+  assert.throws(() => new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "environment", routes: [route] } as never, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), setup.transport, setup.fence), /proxy/i);
+  assert.equal((await setup.broker.request({ routeId: "missing", repositoryRoot })).outcome, "blocked");
+
+  setup.transport.response = { status: 302, headers: { location: "https://example.com/redirect" }, body: Buffer.alloc(0) };
+  const redirected = await setup.broker.request({ routeId: route.id, repositoryRoot });
+  assert.equal(redirected.outcome, "blocked");
+  assert.match(redirected.detail, /redirect/i);
+});
+
+test("private, loopback, mixed, empty, and malformed DNS answers fail before transport", async (context) => {
+  const setup = await fixture(context);
+  for (const addresses of [
+    [{ address: "127.0.0.1", family: 4 as const }],
+    [{ address: "10.0.0.8", family: 4 as const }],
+    [{ address: "::1", family: 6 as const }],
+    [{ address: "::ffff:a00:1", family: 6 as const }],
+    [{ address: "93.184.216.34", family: 4 as const }, { address: "169.254.169.254", family: 4 as const }],
+    [],
+    [{ address: "not-an-address", family: 4 as const }]
+  ]) {
+    const transport = new RecordingTransport();
+    const broker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [route] }, new FakeResolver(addresses), transport, setup.fence, setup.vault.createAdapter("configured-network"));
+    const result = await broker.request({ routeId: route.id, repositoryRoot });
+    assert.equal(result.outcome, "blocked");
+    assert.equal(transport.requests.length, 0);
+  }
+});
+
+test("the final containment recheck and deadline stop effects after DNS resolution", async (context) => {
+  const setup = await fixture(context);
+  let networkChecks = 0;
+  const lateFence: NetworkContainmentFence = {
+    async check() {
+      networkChecks += 1;
+      return networkChecks >= 3 ? { allowed: false, reason: "late containment", fenceEpoch: 9 } : { allowed: true, reason: "clear" };
+    }
+  };
+  const transport = new RecordingTransport();
+  const fenced = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [route] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), transport, lateFence, setup.vault.createAdapter("configured-network"));
+  assert.equal((await fenced.request({ routeId: route.id, repositoryRoot })).outcome, "blocked");
+  assert.equal(transport.requests.length, 0);
+
+  const slow: PinnedNetworkTransport = {
+    send: async (request) => new Promise((_resolve, reject) => request.signal.addEventListener("abort", () => reject(new Error("Network request was cancelled.")), { once: true }))
+  };
+  const timed = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [{ ...route, id: "short-deadline", timeoutMs: 10 }] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), slow, setup.fence, setup.vault.createAdapter("configured-network"));
+  const result = await timed.request({ routeId: "short-deadline", repositoryRoot });
+  assert.equal(result.outcome, "blocked");
+  assert.match(result.detail, /cancel/i);
+});
+
+test("containment rechecks, cancellation, timeout, and response caps fail closed with redacted details", async (context) => {
+  const setup = await fixture(context);
+  setup.fence.networkBlocked = true;
+  assert.equal((await setup.broker.request({ routeId: route.id, repositoryRoot })).outcome, "blocked");
+  assert.equal(setup.transport.requests.length, 0);
+
+  setup.fence.networkBlocked = false;
+  setup.fence.credentialBlocked = true;
+  assert.equal((await setup.broker.request({ routeId: route.id, repositoryRoot })).outcome, "blocked");
+  setup.fence.credentialBlocked = false;
+
+  setup.transport.response = { status: 200, headers: {}, body: Buffer.alloc(route.maxResponseBytes + 1, 1) };
+  assert.equal((await setup.broker.request({ routeId: route.id, repositoryRoot })).outcome, "blocked");
+
+  const controller = new AbortController();
+  controller.abort();
+  assert.equal((await setup.broker.request({ routeId: route.id, repositoryRoot, signal: controller.signal })).outcome, "blocked");
+
+  const failing: PinnedNetworkTransport = { send: async () => { throw new Error("token=network-only-token host failed"); } };
+  const failed = await new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [route] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), failing, setup.fence, setup.vault.createAdapter("configured-network")).request({ routeId: route.id, repositoryRoot });
+  assert.equal(failed.outcome, "failed");
+  assert.equal(failed.detail.includes("network-only-token"), false);
+});
+
+test("policy loader validates host-owned configuration without contacting the network", async (context) => {
+  const setup = await fixture(context);
+  const filePath = join(setup.directory, "network-policy.json");
+  await writeFile(filePath, JSON.stringify({ version: 1, proxy: "direct", routes: [route] }), "utf8");
+  assert.deepEqual(await loadConfiguredNetworkPolicy(filePath), { version: 1, proxy: "direct", routes: [route] });
+});

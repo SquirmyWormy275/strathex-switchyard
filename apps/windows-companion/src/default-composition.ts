@@ -14,6 +14,7 @@ import type { RepositoryRecipe } from "../../../packages/control-plane/src/recip
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { captureLiveTargetSnapshot, FilesystemBroker, LocalCredentialBroker, LocalNetworkBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
 import { LocalMediatedGitHandler } from "./mediated-git.ts";
+import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -147,21 +148,25 @@ class LocalPipelineStatusAdapter implements CommandAdapter {
 }
 
 export interface DefaultLocalComposition {
-  readonly filesystem: "canonical-allowlist"; readonly credentials: LocalCredentialBroker; readonly network: LocalNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator;
+  readonly filesystem: "canonical-allowlist"; readonly credentials: LocalCredentialBroker; readonly network: LocalNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue;
 }
 export interface DefaultLocalCompositionOptions {
   readonly localGitStateDirectory?: string;
   readonly localGitMutationFactory?: GitMutationFactory;
+  readonly hostActions?: DurableHostActionQueue;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory = dirname(store.filePath), options: DefaultLocalCompositionOptions = {}): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   const credentials = new LocalCredentialBroker(); const network = new LocalNetworkBroker(new Set(), { send: async () => { throw new Error("No approved network transport is configured."); } }, credentials);
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const containment = new DurableContainmentManager(store); const council = new CouncilCoordinator(store);
-  const adapters = new AdapterRegistry(); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+  const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
+  const hostActionAdapter = new DurableHostActionAdapter(hostActions);
+  for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   const git = new InMemoryGitBroker(context.policy, containment);
   if (options.localGitStateDirectory) {
     const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory });
     git.register("local_commit", (request) => localGit.execute(request));
   }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

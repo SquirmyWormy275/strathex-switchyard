@@ -96,6 +96,16 @@ export interface RuntimeConfirmationResult {
   readonly expiresAt?: string;
 }
 
+export interface ExternalOperationCompletion {
+  readonly operationId: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly status: "completed" | "failed" | "cancelled" | "incomplete";
+  readonly summary: string;
+  readonly evidenceDigest?: string;
+  readonly toolVersions?: Readonly<Record<string, string>>;
+}
+
 export interface DeadlineSchedule {
   cancel(): void;
 }
@@ -338,6 +348,38 @@ export class DurableMediatedExecutor {
       };
     } catch {
       return { status: "cancelling", summary: "Cancellation intent is durable, but the host adapter did not confirm delivery; reconciliation is required.", operationId };
+    }
+  }
+
+  /**
+   * Finalizes a two-phase external host action without replaying it. The
+   * operation/action/target binding comes from the protected journal, not the
+   * bridge acknowledgement, and repeated identical completion is idempotent.
+   */
+  async completeExternalOperation(completion: ExternalOperationCompletion): Promise<CommandResult> {
+    const operation = await this.operations.get(completion.operationId);
+    if (!operation) return { status: "unavailable", summary: "The durable external operation is unavailable and was not fabricated.", operationId: completion.operationId };
+    if (operation.action !== completion.action) return { status: "blocked", summary: "The external acknowledgement action does not match its durable operation.", operationId: operation.id };
+    const targetSnapshotId = operation.targetSnapshotId.startsWith("<no-target:") ? undefined : operation.targetSnapshotId;
+    if (completion.targetSnapshotId && completion.targetSnapshotId !== targetSnapshotId) {
+      return { status: "blocked", summary: "The external acknowledgement target does not match its durable operation.", operationId: operation.id };
+    }
+    const lease = { operationId: operation.id, existing: false } as const;
+    try {
+      const recorded = await this.operationCoordinator.recordResult(lease, {
+        action: completion.action,
+        ...(targetSnapshotId ? { targetSnapshotId } : {}),
+        status: completion.status,
+        summary: completion.summary,
+        ...(targetSnapshotId && completion.evidenceDigest && completion.toolVersions ? {
+          policyVersion: this.options.policyVersion,
+          evidenceDigest: completion.evidenceDigest,
+          toolVersions: completion.toolVersions
+        } : {})
+      });
+      return { status: completion.status, summary: completion.summary, operationId: operation.id, ...(recorded.receiptId ? { receiptId: recorded.receiptId } : {}) };
+    } catch {
+      return { status: "incomplete", summary: "The external effect was acknowledged, but its durable final result requires reconciliation.", operationId: operation.id };
     }
   }
 

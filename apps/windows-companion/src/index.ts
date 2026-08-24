@@ -33,6 +33,7 @@ export {
   type UserSecretProtector
 } from "./windows-secret.ts";
 export { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner, type MediatedGitHandlerOptions } from "./mediated-git.ts";
+export { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions, localHostActionKinds, type HostActionIntent, type LocalHostActionKind } from "./host-actions.ts";
 export { runStandaloneCompanion } from "./main.ts";
 
 /**

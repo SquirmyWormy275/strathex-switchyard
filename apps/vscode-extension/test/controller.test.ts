@@ -8,6 +8,7 @@ import {
   type ExtensionSessionStatus,
   type ForwardedCommand,
   type ForwardedCommandResult,
+  type LocalHostAction,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
@@ -35,6 +36,7 @@ class FakeContext implements ExtensionContextLike {
 
 class FakeVscode {
   readonly commandCallbacks = new Map<string, (...args: unknown[]) => unknown>();
+  readonly executedCommands: string[] = [];
   readonly information: string[] = [];
   readonly warnings: string[] = [];
   readonly createdTerminals: FakeTerminal[] = [];
@@ -62,7 +64,8 @@ class FakeVscode {
         registerCommand(command, callback): DisposableLike {
           self.commandCallbacks.set(command, callback);
           return new FakeDisposable();
-        }
+        },
+        async executeCommand(command): Promise<void> { self.executedCommands.push(command); }
       },
       window: {
         get terminals(): readonly TerminalLike[] { return self.terminals; },
@@ -116,6 +119,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly adopted: Array<{ sessionId: string; adoptionKey: string; provider: Exclude<ExtensionProvider, "voice"> }> = [];
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
+  readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string }> = [];
   nextDispatch?: ForwardedCommandResult;
 
   async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return { ok: true, value: { status: "healthy" } }; }
@@ -142,7 +146,13 @@ class FakeBridge implements ExtensionCompanionBridge {
     this.dispatched.push(command);
     if (this.nextDispatch) return { ok: true, value: this.nextDispatch };
     const action = directAction(command);
-    return { ok: true, value: { status: "completed", summary: "Routed by fake companion.", data: action ? { localAction: action } : { intentOnly: true } } };
+    return action
+      ? { ok: true, value: { status: "running", summary: "Awaiting host acknowledgement.", data: { hostActionId: `host-action:${"a".repeat(64)}`, hostActionKind: action, hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } } }
+      : { ok: true, value: { status: "completed", summary: "Routed by fake companion." } };
+  }
+  async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
+    this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
+    return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };
   }
 }
 
@@ -205,6 +215,7 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
   assert.equal(bridge.dispatched.at(-1)?.control, "CLAUDE");
   assert.equal(vscode.createdTerminals.length, 1);
   assert.deepEqual(vscode.createdTerminals[0].sent, ["claude"]);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 
   bridge.nextDispatch = { status: "unavailable", summary: "No verified execution broker is attached." };
   await vscode.invoke("sxsy-b122.chord.run.normal");
@@ -220,7 +231,7 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
   assert.equal(bridge.dispatched.at(-1)?.modifier, "shift");
   assert.equal(vscode.started.length, 0);
   assert.equal(vscode.stopped.length, 0);
-  assert.match(vscode.warnings.at(-1) ?? "", /unrecognized local host action/i);
+  assert.match(vscode.warnings.at(-1) ?? "", /malformed host-action/i);
 
   bridge.nextDispatch = { status: "blocked", summary: "Acceptance evidence is incomplete." };
   await vscode.invoke("sxsy-b122.chord.pipeline.ctrl_shift_alt");
@@ -238,7 +249,7 @@ test("a disconnected or malicious companion cannot cause a host action", async (
 
   const vscode = new FakeVscode();
   const bridge = new FakeBridge();
-  bridge.nextDispatch = { status: "completed", summary: "bad response", data: { localAction: "create_codex_terminal" } };
+  bridge.nextDispatch = { status: "running", summary: "bad response", data: { hostActionId: `host-action:${"b".repeat(64)}`, hostActionKind: "create_codex_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
   await controller.start();
   await vscode.invoke("sxsy-b122.chord.claude.alt");
@@ -246,8 +257,8 @@ test("a disconnected or malicious companion cannot cause a host action", async (
   assert.match(vscode.warnings.at(-1) ?? "", /unexpected local host action/i);
 });
 
-function directAction(command: ForwardedCommand): string | undefined {
-  const actions: Record<string, string> = {
+function directAction(command: ForwardedCommand): LocalHostAction | undefined {
+  const actions: Partial<Record<string, LocalHostAction>> = {
     "CLAUDE:alt": "create_claude_terminal",
     "CHATGPT:alt": "create_codex_terminal",
     "TERMINAL:shift": "focus_integrated_terminal"

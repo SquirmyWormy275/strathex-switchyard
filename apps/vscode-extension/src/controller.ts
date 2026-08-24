@@ -1,10 +1,11 @@
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
 import {
-  localHostAction,
+  forwardedHostAction,
   type ExtensionCompanionBridge,
   type ExtensionManagedSession,
   type ExtensionProvider,
   type ForwardedCommand,
+  type ForwardedHostAction,
   type LocalHostAction
 } from "./companion-bridge.ts";
 import type {
@@ -38,6 +39,10 @@ export interface ManagedSessionControllerOptions {
   readonly extensionVersion?: string;
   /** Optional built-in Git adapter; an absent adapter is recorded as unknown. */
   readonly resolveGitRoots?: () => Promise<readonly GitRootRegistration[]>;
+  /** Real activation wires VS Code's URI API; tests inject a deterministic boundary. */
+  readonly openExternal?: (url: string) => Promise<boolean>;
+  /** Fixed VS Code commands only; B122 input never selects a command string. */
+  readonly executeCommand?: (command: string) => Promise<void>;
 }
 
 export interface GitRootRegistration {
@@ -59,6 +64,8 @@ export class ManagedSessionController {
   private readonly idFactory: () => string;
   private readonly extensionVersion: string;
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
+  private readonly openExternal: (url: string) => Promise<boolean>;
+  private readonly executeCommand: (command: string) => Promise<void>;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
   private readonly debugSessionIds = new WeakMap<DebugSessionLike, string>();
@@ -78,6 +85,11 @@ export class ManagedSessionController {
     this.idFactory = options.idFactory ?? (() => `vscode-${Date.now().toString(36)}-${++counter}`);
     this.extensionVersion = options.extensionVersion ?? "0.2.0";
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
+    this.openExternal = options.openExternal ?? (async () => false);
+    this.executeCommand = options.executeCommand ?? (async (command) => {
+      if (!this.vscode.commands.executeCommand) throw new Error("The VS Code host command boundary is unavailable.");
+      await this.vscode.commands.executeCommand(command);
+    });
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
@@ -333,14 +345,14 @@ export class ManagedSessionController {
       return;
     }
 
-    const requestedLocalAction = result.value.data?.localAction;
-    const action = localHostAction(result.value);
-    if (requestedLocalAction !== undefined && !action) {
-      await this.vscode.window.showWarningMessage("SXSY-B122 rejected an unrecognized local host action from the companion.");
+    const action = forwardedHostAction(result.value);
+    const attemptedHostAction = result.value.data?.hostActionId !== undefined || result.value.data?.hostActionKind !== undefined || result.value.data?.localAction !== undefined;
+    if (attemptedHostAction && !action) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected malformed host-action data from the companion.");
       return;
     }
     const expected = expectedLocalAction(command);
-    if (action && action !== expected) {
+    if (action && action.kind !== expected) {
       await this.vscode.window.showWarningMessage("SXSY-B122 rejected an unexpected local host action from the companion.");
       return;
     }
@@ -348,22 +360,96 @@ export class ManagedSessionController {
       await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.value.status}: ${result.value.summary}`);
       return;
     }
-    if (action) await this.executeLocalHostAction(action);
+    if (action) {
+      if (result.value.status !== "running") {
+        await this.vscode.window.showWarningMessage("SXSY-B122 rejected a host action that was not bound to a running durable operation.");
+        return;
+      }
+      let succeeded = false;
+      let summary = "The VS Code host action failed before completion.";
+      try {
+        if (Date.parse(action.expiresAt) <= Date.parse(this.now())) throw new Error("The host-action acknowledgement deadline elapsed.");
+        summary = await this.executeLocalHostAction(action);
+        succeeded = true;
+      } catch (error) {
+        summary = error instanceof Error && error.message ? error.message : summary;
+      }
+      const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion);
+      if (!completion.ok) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 host action requires reconciliation: ${completion.message}`);
+        return;
+      }
+      const show = completion.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
+      await show(`SXSY-B122 ${completion.value.status}: ${completion.value.summary}`);
+      return;
+    }
     await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.value.summary}`);
   }
 
-  private async executeLocalHostAction(action: LocalHostAction): Promise<void> {
-    switch (action) {
+  private async executeLocalHostAction(action: ForwardedHostAction): Promise<string> {
+    switch (action.kind) {
+      case "show_handoff_queue":
+        await this.showSessionQueue("all", "Choose a managed session for the handoff queue");
+        return "Opened the managed handoff queue.";
+      case "toggle_handoff_routing": {
+        const key = "sxsy-b122.handoffRoutingAlternate";
+        const enabled = this.context.workspaceState.get<boolean>(key) === true;
+        await this.context.workspaceState.update(key, !enabled);
+        return `Handoff routing default changed to ${enabled ? "primary" : "alternate"}.`;
+      }
+      case "show_blocker_queue":
+        await this.showSessionQueue("verified_blocked", "Verified blocked sessions");
+        return "Opened the verified blocker queue.";
+      case "show_done_queue":
+        await this.showSessionQueue("verified_finished", "Verified finished sessions");
+        return "Opened the verified finished queue.";
+      case "open_external_url": {
+        if (!action.url || !trustedExternalUrl(action.url)) throw new Error("The companion supplied an untrusted external URL.");
+        if (!await this.openExternal(action.url)) throw new Error("VS Code did not confirm opening the trusted external URL.");
+        return "Opened the verified external destination.";
+      }
       case "create_claude_terminal":
         await this.createManagedAgentTerminal("SXSY-B122 Claude Code", "claude");
-        return;
+        return "Created the managed Claude terminal and registered its identity.";
       case "create_codex_terminal":
         await this.createManagedAgentTerminal("SXSY-B122 Codex", "codex");
-        return;
+        return "Created the managed Codex terminal and registered its identity.";
+      case "focus_vscode":
+        await this.executeCommand("workbench.action.focusActiveEditorGroup");
+        return "Focused the active VS Code editor group.";
+      case "new_vscode_window":
+        await this.executeCommand("workbench.action.newWindow");
+        return "Opened a new VS Code window.";
+      case "focus_external_terminal":
+        await this.executeCommand("workbench.action.terminal.openNativeConsole");
+        return "Opened the configured external terminal.";
       case "focus_integrated_terminal":
         await this.focusIntegratedTerminal();
-        return;
+        return "Focused the integrated VS Code terminal.";
+      case "open_compound_palette":
+        await this.executeCommand("workbench.action.showCommands");
+        return "Opened the VS Code command palette for installed Compound commands.";
+      case "switch_voice_provider": {
+        const provider = await this.vscode.window.showQuickPick(["chatgpt", "claude", "system"] as const, { placeHolder: "Choose the active voice provider" });
+        if (!provider) throw new Error("Voice provider selection was cancelled.");
+        await this.context.workspaceState.update("sxsy-b122.voiceProvider", provider);
+        return `Selected ${provider} as the voice provider.`;
+      }
+      case "show_voice_session_picker":
+        await this.showSessionQueue("all", "Choose the single session to bind to voice");
+        return "Opened the single-target voice session picker.";
+      case "show_pipeline_failure_trace":
+        await this.executeCommand("workbench.action.output.toggleOutput");
+        return "Opened the VS Code output surface for the pipeline failure trace.";
     }
+  }
+
+  private async showSessionQueue(status: ExtensionManagedSession["status"] | "all", placeHolder: string): Promise<void> {
+    const candidates = [...this.sessions.values()].filter((session) => status === "all" || session.status === status);
+    if (!candidates.length) throw new Error(status === "all" ? "No managed sessions are registered." : `No ${status.replace("verified_", "verified ")} sessions are available.`);
+    const items = candidates.map((session) => ({ label: `${session.provider}: ${session.id}`, description: `${session.surface} / ${session.status}` }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder });
+    if (!selected) throw new Error("Session selection was cancelled.");
   }
 
   private async createManagedAgentTerminal(name: string, executable: "claude" | "codex"): Promise<void> {
@@ -423,11 +509,24 @@ export class ManagedSessionController {
 function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined {
   const key = `${command.control}:${command.modifier}`;
   const actions: Readonly<Record<string, LocalHostAction>> = {
-    "CLAUDE:alt": "create_claude_terminal",
-    "CHATGPT:alt": "create_codex_terminal",
-    "TERMINAL:shift": "focus_integrated_terminal"
+    "HANDOFF:alt": "show_handoff_queue", "HANDOFF:shift_alt": "toggle_handoff_routing",
+    "FIND_BLOCKED_AGENT:shift": "show_blocker_queue", "FIND_FINISHED_AGENT:shift": "show_done_queue",
+    "CLAUDE:normal": "open_external_url", "CLAUDE:shift": "open_external_url", "CLAUDE:alt": "create_claude_terminal",
+    "CHATGPT:normal": "open_external_url", "CHATGPT:shift": "open_external_url", "CHATGPT:alt": "create_codex_terminal",
+    "VSCODE:normal": "focus_vscode", "VSCODE:shift": "new_vscode_window",
+    "TERMINAL:normal": "focus_external_terminal", "TERMINAL:shift": "focus_integrated_terminal",
+    "GITHUB:normal": "open_external_url", "GITHUB:shift": "open_external_url", "GITHUB:alt": "open_external_url", "GITHUB:shift_alt": "open_external_url",
+    "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "open_external_url", "VOICE:shift": "switch_voice_provider",
+    "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];
+}
+
+function trustedExternalUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ["github.com", "claude.ai", "chatgpt.com"].includes(url.hostname) && !url.username && !url.password;
+  } catch { return false; }
 }
 
 function parseChordArgument(value: unknown): ChordCommand | undefined {

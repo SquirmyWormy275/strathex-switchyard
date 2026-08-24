@@ -10,6 +10,7 @@ import type { ManagedSession } from "../../../packages/control-plane/src/contrac
 import { dirname } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
+import { DurableHostActionQueue } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
 
 export interface DurableWindowsCompanionOptions {
@@ -49,6 +50,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly service: CompanionService;
   readonly endpoint: DurableCompanionEndpoint;
   readonly localComponents?: DefaultLocalComposition;
+  readonly hostActions: DurableHostActionQueue;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -63,6 +65,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     new TargetSnapshotFactory(new GitCliInspector()),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  const hostActions = new DurableHostActionQueue(store);
   let localComponents: DefaultLocalComposition | undefined;
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
@@ -73,7 +76,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         options.localStateDirectory ?? dirname(store.filePath),
         {
           ...(options.localGitStateDirectory ? { localGitStateDirectory: options.localGitStateDirectory } : {}),
-          ...(options.localGitMutationFactory ? { localGitMutationFactory: options.localGitMutationFactory } : {})
+          ...(options.localGitMutationFactory ? { localGitMutationFactory: options.localGitMutationFactory } : {}),
+          hostActions
         }
       );
       localComponents = composed.components;
@@ -91,7 +95,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor });
+  const service = new CompanionService({ executor, hostActions });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -101,6 +105,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     executor,
     service,
     endpoint,
+    hostActions,
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

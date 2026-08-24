@@ -15,7 +15,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
     configuredCompanionBridge(),
-    { resolveGitRoots: createVscodeGitRootResolver(vscode) }
+    {
+      resolveGitRoots: createVscodeGitRootResolver(vscode),
+      openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
+      executeCommand: async (command) => { await vscode.commands.executeCommand(command); }
+    }
   );
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
