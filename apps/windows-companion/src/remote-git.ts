@@ -16,8 +16,8 @@ export interface SmartPushResult { readonly status: BrokerOutcome["status"]; rea
 export interface ReviewedRemotePusher { push(input: Readonly<{ repositoryRoot: string; sourceHead: string; destinationBranch: string; request: GitRequest }>): Promise<SmartPushResult>; }
 export interface GitHubPullRequestResult { readonly number: number; readonly url: string; readonly head: string; readonly headRepository: string; readonly base: string; readonly state: "OPEN" | "MERGED" | "CLOSED"; readonly title: string; readonly body: string; }
 export interface ReviewedGitHubPort {
-  upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
-  merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
+  upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
+  merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult>;
   defaultBranch(input: Readonly<{ repositoryRoot: string; owner: string; name: string; request: GitRequest }>): Promise<string>;
 }
 export interface DirectMainReceiptVerifier { verify(receiptId: string, targetSnapshotId: string): Promise<boolean>; }
@@ -25,9 +25,16 @@ export interface ReviewedPullRequestHostOpener { open(request: GitRequest, url: 
 
 const gitHostBrand: unique symbol = Symbol("configured-git-host");
 export interface ConfiguredGitHostIdentity {
+  /** Browser/Git host, for example github.com or the exact Enterprise host. */
   readonly host: string;
+  /** GraphQL transport host. Public GitHub uses api.github.com. */
+  readonly apiHost: string;
+  /** Exact base repository receiving pull requests. */
   readonly owner: string;
   readonly name: string;
+  /** Exact smart-HTTP repository receiving reviewed branch pushes. */
+  readonly headOwner: string;
+  readonly headName: string;
   readonly graphqlRouteId: "github.graphql";
   readonly advertiseRouteId: "git.receive-pack.advertise";
   readonly receivePackRouteId: "git.receive-pack";
@@ -39,12 +46,18 @@ export interface ConfiguredGitHostIdentity {
 /** Derives one exact Git provider host only from the installed network policy. */
 export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): ConfiguredGitHostIdentity {
   const route = (id: string) => policy.routes.find((candidate) => candidate.id === id);
-  const graphql = route("github.graphql"); const advertise = route("git.receive-pack.advertise"); const receive = route("git.receive-pack");
+  const graphql = route("github.graphql"); const repositoryRoute = route("github.repository"); const advertise = route("git.receive-pack.advertise"); const receive = route("git.receive-pack");
   if (!graphql || !advertise || !receive) throw new Error("Configured Git requires exact GraphQL, advertise, and receive-pack routes.");
   const urls = [graphql.url, advertise.url, receive.url].map((value) => new URL(value));
   if (urls.some((value) => value.protocol !== "https:" || value.username || value.password || value.port)) throw new Error("Configured Git routes require credential-free default-port HTTPS URLs.");
-  const hosts = new Set(urls.map((value) => value.hostname.toLowerCase()));
-  if (hosts.size !== 1) throw new Error("Configured Git routes must bind one exact GitHub or GitHub Enterprise host.");
+  const apiHost = urls[0]!.hostname.toLowerCase();
+  const gitHosts = new Set(urls.slice(1).map((value) => value.hostname.toLowerCase()));
+  if (gitHosts.size !== 1) throw new Error("Configured Git advertise and receive-pack routes must bind one exact GitHub host.");
+  const host = urls[1]!.hostname.toLowerCase();
+  if (apiHost !== host && !(host === "github.com" && apiHost === "api.github.com")) throw new Error("Configured GraphQL and Git routes do not form one exact GitHub or GitHub Enterprise identity.");
+  const expectedGraphqlPath = host === "github.com" ? "/graphql" : "/api/graphql";
+  if (graphql.method !== "POST" || urls[0]!.pathname !== expectedGraphqlPath || urls[0]!.search || urls[0]!.hash
+    || advertise.method !== "GET" || receive.method !== "POST") throw new Error("Configured Git routes do not use the exact GraphQL and smart-HTTP methods/paths.");
   const advertisedRepository = configuredRepository(urls[1]!, "advertise");
   const receiveRepository = configuredRepository(urls[2]!, "receive");
   if (!advertisedRepository || !receiveRepository
@@ -52,8 +65,19 @@ export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): Co
     || advertisedRepository.name.toLowerCase() !== receiveRepository.name.toLowerCase()) {
     throw new Error("Configured Git advertise and receive-pack routes must bind one exact repository.");
   }
+  let baseRepository = advertisedRepository;
+  if (repositoryRoute) {
+    const repositoryUrl = new URL(repositoryRoute.url);
+    if (repositoryRoute.method !== "HEAD" || repositoryUrl.protocol !== "https:" || repositoryUrl.hostname.toLowerCase() !== host || repositoryUrl.search || repositoryUrl.hash || repositoryUrl.username || repositoryUrl.password || repositoryUrl.port) {
+      throw new Error("Configured GitHub repository identity must be an exact credential-free HEAD route on the Git host.");
+    }
+    const match = /^\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/.exec(repositoryUrl.pathname);
+    if (!match) throw new Error("Configured GitHub repository identity route must name one exact owner/repository.");
+    baseRepository = { owner: match[1]!, name: match[2]! };
+  }
   return {
-    host: urls[0]!.hostname.toLowerCase(), owner: advertisedRepository.owner, name: advertisedRepository.name,
+    host, apiHost, owner: baseRepository.owner, name: baseRepository.name,
+    headOwner: advertisedRepository.owner, headName: advertisedRepository.name,
     graphqlRouteId: "github.graphql", advertiseRouteId: "git.receive-pack.advertise", receivePackRouteId: "git.receive-pack",
     maximumPushBytes: boundedPushCap(receive.maxRequestBytes ?? defaultMaximumPushBytes), [gitHostBrand]: true
   };
@@ -63,6 +87,11 @@ export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): Co
 export function configuredGitRemoteMatchesPolicy(remote: string, policy: ConfiguredNetworkPolicy): boolean {
   try { return gitRepository(remote, configuredGitHostFromPolicy(policy)) !== undefined; }
   catch { return false; }
+}
+
+/** Exact canonical remote parser shared by navigation and mutation adapters. */
+export function configuredGitRepository(remote: string, identity: ConfiguredGitHostIdentity): { readonly owner: string; readonly name: string } | undefined {
+  return gitRepository(remote, identity);
 }
 
 /** Reviewed remote Git handler; policy, permit, containment, and ownership run in InMemoryGitBroker first. */
@@ -78,6 +107,7 @@ export class ConfiguredRemoteGitHandler {
     if (!request.effectGuard || !request.target.head || !request.target.branch || !request.target.canonicalRemote) return { status: "incomplete", summary: "Remote Git mediation requires a final effect guard and an exact branch, HEAD, and canonical remote.", effectDisposition: "not_started" };
     const repository = gitRepository(request.target.canonicalRemote, this.host);
     if (!repository) return { status: "blocked", summary: "The canonical remote does not match the exact installed GitHub or GitHub Enterprise host.", effectDisposition: "not_started" };
+    const baseRepository = { owner: this.host.owner, name: this.host.name };
     const cancellation = await cancelled(request); if (cancellation) return { ...cancellation, effectDisposition: "not_started" };
     switch (request.mutation.kind) {
       case "pr_upsert": {
@@ -86,7 +116,7 @@ export class ConfiguredRemoteGitHandler {
         if (pushed.status !== "completed") return pushed;
         const current = await finalEffect(request); if (current) return current;
         try {
-          const pull = await this.child(request, "github.pr-upsert", { repositoryRoot: request.target.repositoryRoot, owner: repository.owner, name: repository.name, headOwner: repository.owner, headName: repository.name, headBranch: request.mutation.headBranch, baseBranch: request.mutation.baseBranch, expectedHead: request.target.head, expectedState: "OPEN", titleSha256: textDigest(request.mutation.title), bodySha256: textDigest(request.mutation.body) }, async () => this.github.upsert({ repositoryRoot: request.target.repositoryRoot, ...repository, headBranch: request.mutation.kind === "pr_upsert" ? request.mutation.headBranch : "", baseBranch: request.mutation.kind === "pr_upsert" ? request.mutation.baseBranch : "", title: request.mutation.kind === "pr_upsert" ? request.mutation.title : "", body: request.mutation.kind === "pr_upsert" ? request.mutation.body : "", expectedHead: request.target.head!, request }));
+          const pull = await this.child(request, "github.pr-upsert", { repositoryRoot: request.target.repositoryRoot, owner: baseRepository.owner, name: baseRepository.name, headOwner: repository.owner, headName: repository.name, headBranch: request.mutation.headBranch, baseBranch: request.mutation.baseBranch, expectedHead: request.target.head, expectedState: "OPEN", titleSha256: textDigest(request.mutation.title), bodySha256: textDigest(request.mutation.body) }, async () => this.github.upsert({ repositoryRoot: request.target.repositoryRoot, ...baseRepository, headOwner: repository.owner, headName: repository.name, headBranch: request.mutation.kind === "pr_upsert" ? request.mutation.headBranch : "", baseBranch: request.mutation.kind === "pr_upsert" ? request.mutation.baseBranch : "", title: request.mutation.kind === "pr_upsert" ? request.mutation.title : "", body: request.mutation.kind === "pr_upsert" ? request.mutation.body : "", expectedHead: request.target.head!, request }));
           if ("status" in pull) return pull;
           if (this.hostOpener) {
             const opened = await this.hostOpener.open(request, pull.url);
@@ -98,16 +128,17 @@ export class ConfiguredRemoteGitHandler {
       case "merge_pr": {
         const current = await finalEffect(request); if (current) return current;
         try {
-          const pull = await this.child(request, "github.pr-merge", { repositoryRoot: request.target.repositoryRoot, owner: repository.owner, name: repository.name, pullRequest: String(request.mutation.pullRequest), headOwner: repository.owner, headName: repository.name, baseBranch: request.mutation.baseBranch, expectedHead: request.mutation.head, expectedState: "MERGED" }, async () => this.github.merge({ repositoryRoot: request.target.repositoryRoot, ...repository, pullRequest: request.mutation.kind === "merge_pr" ? request.mutation.pullRequest : 0, head: request.mutation.kind === "merge_pr" ? request.mutation.head : "", baseBranch: request.mutation.kind === "merge_pr" ? request.mutation.baseBranch : "", request }));
+          const pull = await this.child(request, "github.pr-merge", { repositoryRoot: request.target.repositoryRoot, owner: baseRepository.owner, name: baseRepository.name, pullRequest: String(request.mutation.pullRequest), headOwner: repository.owner, headName: repository.name, baseBranch: request.mutation.baseBranch, expectedHead: request.mutation.head, expectedState: "MERGED" }, async () => this.github.merge({ repositoryRoot: request.target.repositoryRoot, ...baseRepository, headOwner: repository.owner, headName: repository.name, pullRequest: request.mutation.kind === "merge_pr" ? request.mutation.pullRequest : 0, head: request.mutation.kind === "merge_pr" ? request.mutation.head : "", baseBranch: request.mutation.kind === "merge_pr" ? request.mutation.baseBranch : "", request }));
           if ("status" in pull) return pull;
           return pull.state === "MERGED" ? { status: "completed", summary: "GitHub merged the exact reviewed pull request head into the reviewed base.", effectDisposition: "committed", data: { pullRequest: pull.number, url: pull.url, head: pull.head, base: pull.base, state: pull.state } } : { status: "incomplete", summary: "GitHub did not verify the pull request as merged after the mutation.", effectDisposition: "ambiguous" };
         } catch (error) { return failed(error, "GitHub PR merge failed closed."); }
       }
       case "direct_main": {
+        if (repository.owner.toLowerCase() !== baseRepository.owner.toLowerCase() || repository.name.toLowerCase() !== baseRepository.name.toLowerCase()) return { status: "blocked", summary: "Direct Main cannot advance a configured fork; the exact push repository must be the configured base repository.", effectDisposition: "not_started" };
         if (request.mutation.branch !== request.target.branch) return { status: "blocked", summary: "Direct Main source branch does not match the exact reviewed target branch.", effectDisposition: "not_started" };
         if (!this.receipts || !await this.receipts.verify(request.mutation.validationReceiptId, request.target.id)) return { status: "blocked", summary: "Direct Main requires a fresh complete Release Shield receipt bound to this exact TargetSnapshot.", effectDisposition: "not_started" };
         try {
-          const base = await this.github.defaultBranch({ repositoryRoot: request.target.repositoryRoot, ...repository, request });
+          const base = await this.github.defaultBranch({ repositoryRoot: request.target.repositoryRoot, ...baseRepository, request });
           if (!validBranch(base)) return { status: "blocked", summary: "Direct Main requires the exact host-reported GitHub default branch identity.", effectDisposition: "not_started" };
           const pushed = await this.child(request, "git.direct-main", { repositoryRoot: request.target.repositoryRoot, remote: request.target.canonicalRemote, ref: `refs/heads/${base}`, expectedHead: request.target.head }, async () => this.pusher.push({ repositoryRoot: request.target.repositoryRoot, sourceHead: request.target.head!, destinationBranch: base, request }));
           return pushed.status === "completed" ? { status: "completed", summary: "Advanced the exact default branch without force after the high-consequence gate and reviewed receipt were admitted.", effectDisposition: "committed", data: { branch: base, head: request.target.head } } : pushed;
@@ -209,25 +240,27 @@ export class ConfiguredGitHubGraphqlPort implements ReviewedGitHubPort {
   private readonly network: DynamicConfiguredNetworkClient;
   private readonly host: ConfiguredGitHostIdentity;
   constructor(network: DynamicConfiguredNetworkClient, host: ConfiguredGitHostIdentity) { this.network = network; this.host = host; }
-  async upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
+  async upsert(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; headBranch: string; baseBranch: string; expectedHead: string; title: string; body: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
     let pull = await this.lookup(input);
     if (pull && pull.head !== input.expectedHead) throw new Error("The open pull request head does not match the reviewed pushed head.");
     if (!pull) {
-      const repository = await this.graphql(input, `query B122Repository($owner:String!,$name:String!){repository(owner:$owner,name:$name){id}}`, { owner: input.owner, name: input.name });
-      const repositoryId = nestedString(repository, ["repository", "id"]);
-      const created = await this.graphql(input, `mutation B122CreatePull($repositoryId:ID!,$base:String!,$head:String!,$title:String!,$body:String!){createPullRequest(input:{repositoryId:$repositoryId,baseRefName:$base,headRefName:$head,title:$title,body:$body}){pullRequest{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}`, { repositoryId, base: input.baseBranch, head: input.headBranch, title: input.title, body: input.body });
+      const repositories = await this.graphql(input, `query B122Repositories($owner:String!,$name:String!,$headOwner:String!,$headName:String!){base:repository(owner:$owner,name:$name){id} head:repository(owner:$headOwner,name:$headName){id}}`, { owner: input.owner, name: input.name, headOwner: input.headOwner, headName: input.headName });
+      const repositoryId = nestedString(repositories, ["base", "id"]); const headRepositoryId = nestedString(repositories, ["head", "id"]);
+      const created = await this.graphql(input, `mutation B122CreatePull($repositoryId:ID!,$headRepositoryId:ID!,$base:String!,$head:String!,$title:String!,$body:String!){createPullRequest(input:{repositoryId:$repositoryId,headRepositoryId:$headRepositoryId,baseRefName:$base,headRefName:$head,title:$title,body:$body}){pullRequest{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}`, { repositoryId, headRepositoryId, base: input.baseBranch, head: input.headBranch, title: input.title, body: input.body });
       pull = parsePull(nestedRecord(created, ["createPullRequest", "pullRequest"]), this.host.host);
     } else if (pull.title !== input.title || pull.body !== input.body) {
       const updated = await this.graphql(input, `mutation B122UpdatePull($id:ID!,$title:String!,$body:String!){updatePullRequest(input:{pullRequestId:$id,title:$title,body:$body}){pullRequest{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}`, { id: pull.id, title: input.title, body: input.body });
       pull = parsePull(nestedRecord(updated, ["updatePullRequest", "pullRequest"]), this.host.host);
     }
     const verified = await this.lookup(input);
-    if (!verified || verified.number !== pull.number || verified.head !== input.expectedHead || verified.headRepository.toLowerCase() !== `${input.owner}/${input.name}`.toLowerCase() || verified.base !== input.baseBranch || verified.state !== "OPEN" || verified.title !== input.title || verified.body !== input.body) throw new Error("GitHub did not verify the exact open pull request after upsert.");
+    if (!verified || verified.number !== pull.number || verified.head !== input.expectedHead || verified.headRepository.toLowerCase() !== `${input.headOwner}/${input.headName}`.toLowerCase() || verified.base !== input.baseBranch || verified.state !== "OPEN" || verified.title !== input.title || verified.body !== input.body) throw new Error("GitHub did not verify the exact open pull request after upsert.");
     return verified;
   }
-  async merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
+  async merge(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; pullRequest: number; head: string; baseBranch: string; request: GitRequest }>): Promise<GitHubPullRequestResult> {
     const before = await this.lookupNumber(input);
-    if (!before || before.number !== input.pullRequest || before.head !== input.head || before.headRepository.toLowerCase() !== `${input.owner}/${input.name}`.toLowerCase() || before.base !== input.baseBranch || before.state !== "OPEN") throw new Error("The GitHub pull request no longer matches the reviewed repository, head, base, and open state.");
+    if (!before || before.number !== input.pullRequest || before.head !== input.head || before.headRepository.toLowerCase() !== `${input.headOwner}/${input.headName}`.toLowerCase() || before.base !== input.baseBranch) throw new Error("The GitHub pull request no longer matches the reviewed repository, head, and base identity.");
+    if (before.state === "MERGED") return before;
+    if (before.state !== "OPEN") throw new Error("The GitHub pull request is neither the exact open review target nor an already-merged idempotent result.");
     if (before.isDraft || before.mergeable !== "MERGEABLE" || before.mergeStateStatus !== "CLEAN"
       || (before.reviewDecision !== null && before.reviewDecision !== "APPROVED")
       || (before.checkState !== null && before.checkState !== "SUCCESS")) {
@@ -236,12 +269,12 @@ export class ConfiguredGitHubGraphqlPort implements ReviewedGitHubPort {
     const current = await finalEffect(input.request); if (current) throw new Error(current.summary);
     await this.graphql(input, `mutation B122MergePull($id:ID!,$head:GitObjectID!){mergePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head,mergeMethod:SQUASH}){pullRequest{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}`, { id: before.id, head: input.head });
     const after = await this.lookupNumber(input);
-    if (!after || after.state !== "MERGED" || after.head !== input.head || after.base !== input.baseBranch) throw new Error("GitHub did not verify the exact pull request as merged.");
+    if (!after || after.state !== "MERGED" || after.head !== input.head || after.headRepository.toLowerCase() !== `${input.headOwner}/${input.headName}`.toLowerCase() || after.base !== input.baseBranch) throw new Error("GitHub did not verify the exact pull request as merged.");
     return after;
   }
   async defaultBranch(input: Readonly<{ repositoryRoot: string; owner: string; name: string; request: GitRequest }>): Promise<string> { const data = await this.graphql(input, `query B122DefaultBranch($owner:String!,$name:String!){repository(owner:$owner,name:$name){defaultBranchRef{name}}}`, { owner: input.owner, name: input.name }); return nestedString(data, ["repository", "defaultBranchRef", "name"]); }
 
-  private async lookup(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headBranch: string; baseBranch: string; request: GitRequest }>): Promise<(GitHubPullRequestResult & { readonly id: string }) | undefined> { const data = await this.graphql(input, `query B122Pull($owner:String!,$name:String!,$head:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(first:10,states:OPEN,headRefName:$head,baseRefName:$base){nodes{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}}`, { owner: input.owner, name: input.name, head: input.headBranch, base: input.baseBranch }); const nodes = nestedArray(data, ["repository", "pullRequests", "nodes"]).map((node) => parsePull(node, this.host.host)).filter((pull) => pull.headRepository.toLowerCase() === `${input.owner}/${input.name}`.toLowerCase()); if (nodes.length > 1) throw new Error("GitHub returned multiple open pull requests for the exact head repository, branch, and base."); return nodes[0]; }
+  private async lookup(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; headBranch: string; baseBranch: string; request: GitRequest }>): Promise<(GitHubPullRequestResult & { readonly id: string }) | undefined> { const data = await this.graphql(input, `query B122Pull($owner:String!,$name:String!,$head:String!,$base:String!){repository(owner:$owner,name:$name){pullRequests(first:10,states:OPEN,headRefName:$head,baseRefName:$base){nodes{id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body}}}}`, { owner: input.owner, name: input.name, head: input.headBranch, base: input.baseBranch }); const nodes = nestedArray(data, ["repository", "pullRequests", "nodes"]).map((node) => parsePull(node, this.host.host)).filter((pull) => pull.headRepository.toLowerCase() === `${input.headOwner}/${input.headName}`.toLowerCase()); if (nodes.length > 1) throw new Error("GitHub returned multiple open pull requests for the exact head repository, branch, and base."); return nodes[0]; }
   private async lookupNumber(input: Readonly<{ repositoryRoot: string; owner: string; name: string; pullRequest: number; request: GitRequest }>): Promise<GitHubMergePullRecord | undefined> { const data = await this.graphql(input, `query B122PullNumber($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id number url headRefOid headRefName headRepository{nameWithOwner} baseRefName state title body isDraft mergeable mergeStateStatus reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}`, { owner: input.owner, name: input.name, number: input.pullRequest }); const value = nestedOptional(data, ["repository", "pullRequest"]); if (value === null || value === undefined) return undefined; if (!record(value)) throw new Error("GitHub pull request response is not a record."); return parseMergePull(value, this.host.host); }
   private async graphql(input: Readonly<{ repositoryRoot: string; request: GitRequest }>, query: string, variables: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>> { if (!input.request.target.canonicalRemote || !gitRepository(input.request.target.canonicalRemote, this.host)) throw new Error("The GraphQL request target does not match the exact installed Git host."); const current = await finalEffect(input.request); if (current) throw new Error(current.summary); const control = await operationSignal(input.request); let result; try { result = await this.network.request({ routeId: this.host.graphqlRouteId, repositoryRoot: input.repositoryRoot, body: JSON.stringify({ query, variables }), signal: control.signal }); } finally { control.dispose(); } if (result.outcome !== "passed" || !result.body) throw new Error("The configured GitHub GraphQL route did not complete."); let parsed: unknown; try { parsed = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { throw new Error("GitHub returned malformed JSON."); } if (!record(parsed) || !exactRoot(parsed) || !record(parsed.data)) throw new Error("GitHub returned an invalid GraphQL envelope."); return parsed.data; }
 }
@@ -255,7 +288,7 @@ function gitRepository(remote: string, identity: ConfiguredGitHostIdentity): { r
   const escaped = identity.host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const cleaned = remote.trim().replace(/\.git$/i, "");
   const match = new RegExp(`^(?:https://${escaped}/|ssh://git@${escaped}/|git@${escaped}:)([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)$`, "i").exec(cleaned);
-  if (!match || match[1]!.toLowerCase() !== identity.owner.toLowerCase() || match[2]!.toLowerCase() !== identity.name.toLowerCase()) return undefined;
+  if (!match || match[1]!.toLowerCase() !== identity.headOwner.toLowerCase() || match[2]!.toLowerCase() !== identity.headName.toLowerCase()) return undefined;
   return { owner: match[1]!, name: match[2]! };
 }
 function configuredRepository(url: URL, kind: "advertise" | "receive"): { readonly owner: string; readonly name: string } | undefined {

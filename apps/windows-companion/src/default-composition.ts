@@ -27,7 +27,8 @@ import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, creat
 import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor, type CouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
 import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter } from "./pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor } from "./pipeline-adapters.ts";
+import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
@@ -115,10 +116,11 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     for (const action of providerCommandActions) adapters.register(action, provider);
   }
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
-  const hostActionAdapter = new DurableHostActionAdapter(hostActions);
+  const configuredGitHost = options.networkPolicyRegistry ? { resolve: async () => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve()) } : undefined;
+  const hostActionAdapter = new DurableHostActionAdapter(hostActions, dynamicNetwork && configuredGitHost ? new ConfiguredGitHubNavigationResolver(dynamicNetwork, configuredGitHost) : undefined);
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   if (dynamicNetwork) {
-    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), { resolve: async () => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve()) });
+    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), configuredGitHost!, new DurablePipelineFailureCursor(store));
     adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));
     adapters.register("pipeline_failure_trace", pipeline);
   }

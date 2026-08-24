@@ -96,6 +96,22 @@ test("installed Git recovery refuses a configured route bound to another reposit
   assert.equal(requested, false);
 });
 
+test("installed PR recovery binds a fork head repository separately from the exact base repository", async () => {
+  const head = "a".repeat(40); let requests = 0;
+  const network = { async request(input: { routeId: string }) { requests += 1; assert.equal(input.routeId, "github.graphql"); return { outcome: "passed", routeId: input.routeId, detail: "read", body: Buffer.from(JSON.stringify({ data: { repository: { pullRequest: { number: 7, headRefOid: head, headRepository: { nameWithOwner: "contributor/project" }, baseRefName: "main", state: "MERGED" } } } })) }; } } as unknown as DynamicConfiguredNetworkClient;
+  const networkPolicy = { async resolve() { return { version: 1 as const, proxy: "direct" as const, routes: [
+    { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" as const },
+    { id: "github.repository", method: "HEAD", url: "https://github.com/acme/project", redirects: "deny" as const },
+    { id: "git.receive-pack.advertise", method: "GET", url: "https://github.com/contributor/project.git/info/refs?service=git-receive-pack", redirects: "deny" as const },
+    { id: "git.receive-pack", method: "POST", url: "https://github.com/contributor/project.git/git-receive-pack", redirects: "deny" as const }
+  ] }; } };
+  const git: CheckpointGitRunner = { async run() { return { exitCode: 1, stdout: Buffer.alloc(0), stderr: "unused" }; } };
+  const port = new InstalledReadOnlyObservationPort({ git, network, networkPolicy, canonicalRepositoryRoot: async (root) => root });
+  assert.equal((await port.pullRequest({ repositoryRoot: "C:\\repo", owner: "acme", name: "project", headOwner: "contributor", headName: "project", number: 7, baseBranch: "main", expectedHead: head, expectedState: "MERGED" })).outcome, "committed");
+  assert.equal((await port.pullRequest({ repositoryRoot: "C:\\repo", owner: "acme", name: "project", headOwner: "attacker", headName: "project", number: 7, baseBranch: "main", expectedHead: head, expectedState: "MERGED" })).outcome, "unresolved");
+  assert.equal(requests, 1, "a mismatched fork identity is rejected before GraphQL observation");
+});
+
 test("installed provider, PR, and Council observers require exact typed identities and never mutate", async () => {
   const head = "b".repeat(40);
   const calls: string[] = [];

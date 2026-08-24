@@ -2,6 +2,9 @@
 param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9_.-]+$')][string]$GitHubOwner,
   [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9_.-]+$')][string]$GitHubRepository,
+  [ValidatePattern('^[A-Za-z0-9.-]+$')][string]$GitHubHost = 'github.com',
+  [ValidatePattern('^[A-Za-z0-9_.-]+$')][string]$GitHubBaseOwner,
+  [ValidatePattern('^[A-Za-z0-9_.-]+$')][string]$GitHubBaseRepository,
   [string]$GitHubApiCredentialReference = 'github-api-token',
   [string]$GitHubGitCredentialReference = 'github-git-basic',
   [Uri]$ProviderBaseUri,
@@ -9,8 +12,11 @@ param(
   [Parameter(Mandatory=$true)][string]$OutputPath
 )
 $ErrorActionPreference='Stop'
-if (-not [IO.Path]::IsPathFullyQualified($OutputPath)) { throw 'OutputPath must be absolute.' }
+if ($OutputPath -notmatch '^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+[\\/])') { throw 'OutputPath must be absolute.' }
 if ($ProviderBaseUri -and ($ProviderBaseUri.Scheme -ne 'https' -or $ProviderBaseUri.UserInfo -or $ProviderBaseUri.Fragment -or $ProviderBaseUri.Query)) { throw 'ProviderBaseUri must be an exact HTTPS base without credentials, query, or fragment.' }
+if ($GitHubHost.StartsWith('.') -or $GitHubHost.EndsWith('.') -or -not $GitHubHost.Contains('.') -or @($GitHubHost.Split('.') | Where-Object { $_ -notmatch '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$' }).Count) { throw 'GitHubHost must be one exact canonical DNS host.' }
+if (-not $GitHubBaseOwner) { $GitHubBaseOwner = $GitHubOwner }
+if (-not $GitHubBaseRepository) { $GitHubBaseRepository = $GitHubRepository }
 function Route([string]$id,[string]$method,[string]$url,[hashtable]$headers,[hashtable]$credential,[int]$requestCap=262144,[int]$responseCap=524288) {
   $value=[ordered]@{ id=$id; method=$method; url=$url; redirects='deny'; timeoutMs=30000; maxRequestBytes=$requestCap; maxResponseBytes=$responseCap }
   if ($headers.Count) { $value.staticHeaders=$headers }
@@ -19,10 +25,12 @@ function Route([string]$id,[string]$method,[string]$url,[hashtable]$headers,[has
 }
 $apiCredential=@{reference=$GitHubApiCredentialReference;purpose='github-api';header='authorization';prefix='Bearer '}
 $gitCredential=@{reference=$GitHubGitCredentialReference;purpose='github-git';header='authorization';prefix='Basic '}
+$graphqlUrl = if ($GitHubHost -ceq 'github.com') { 'https://api.github.com/graphql' } else { "https://$GitHubHost/api/graphql" }
 $routes=@(
-  (Route 'github.graphql' 'POST' 'https://api.github.com/graphql' @{'content-type'='application/json';'accept'='application/vnd.github+json';'x-github-api-version'='2022-11-28';'user-agent'='SXSY-B122/1.0'} $apiCredential),
-  (Route 'git.receive-pack.advertise' 'GET' ("https://github.com/$GitHubOwner/$GitHubRepository.git/info/refs?service=git-receive-pack") @{'accept'='application/x-git-receive-pack-advertisement';'user-agent'='SXSY-B122/1.0'} $gitCredential 1 4194304),
-  (Route 'git.receive-pack' 'POST' ("https://github.com/$GitHubOwner/$GitHubRepository.git/git-receive-pack") @{'content-type'='application/x-git-receive-pack-request';'accept'='application/x-git-receive-pack-result';'user-agent'='SXSY-B122/1.0'} $gitCredential 4194304 4194304)
+  (Route 'github.graphql' 'POST' $graphqlUrl @{'content-type'='application/json';'accept'='application/vnd.github+json';'x-github-api-version'='2022-11-28';'user-agent'='SXSY-B122/1.0'} $apiCredential),
+  (Route 'github.repository' 'HEAD' ("https://$GitHubHost/$GitHubBaseOwner/$GitHubBaseRepository") @{'accept'='application/vnd.github+json';'user-agent'='SXSY-B122/1.0'} $apiCredential 1 4096),
+  (Route 'git.receive-pack.advertise' 'GET' ("https://$GitHubHost/$GitHubOwner/$GitHubRepository.git/info/refs?service=git-receive-pack") @{'accept'='application/x-git-receive-pack-advertisement';'user-agent'='SXSY-B122/1.0'} $gitCredential 1 4194304),
+  (Route 'git.receive-pack' 'POST' ("https://$GitHubHost/$GitHubOwner/$GitHubRepository.git/git-receive-pack") @{'content-type'='application/x-git-receive-pack-request';'accept'='application/x-git-receive-pack-result';'user-agent'='SXSY-B122/1.0'} $gitCredential 4194304 4194304)
 )
 if ($ProviderBaseUri) {
   $providerCredential=@{reference=$ProviderCredentialReference;purpose='provider-api';header='authorization';prefix='Bearer '}

@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter } from "../src/pipeline-adapters.ts";
+import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor } from "../src/pipeline-adapters.ts";
+import { configuredGitHostFromPolicy } from "../src/remote-git.ts";
 import type { DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
 const target: TargetSnapshot = {
@@ -30,6 +35,14 @@ function request(action: "pipeline_status" | "pipeline_failure_trace") {
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
   };
 }
+
+const host = configuredGitHostFromPolicy({ version: 1, proxy: "direct", routes: [
+  { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },
+  { id: "github.repository", method: "HEAD", url: "https://github.com/acme/project", redirects: "deny" },
+  { id: "git.receive-pack.advertise", method: "GET", url: "https://github.com/acme/project.git/info/refs?service=git-receive-pack", redirects: "deny" },
+  { id: "git.receive-pack", method: "POST", url: "https://github.com/acme/project.git/git-receive-pack", redirects: "deny" }
+] });
+const hostResolver = { async resolve() { return host; } };
 
 test("pipeline adapter binds GitHub status to the exact target head and protected local receipts", async () => {
   const calls: unknown[] = [];
@@ -75,7 +88,7 @@ test("pipeline adapter binds GitHub status to the exact target head and protecte
         createdAt: "2026-08-24T00:00:00.000Z"
       }] as never;
     }
-  });
+  }, hostResolver);
 
   const status = await adapter.execute(request("pipeline_status"));
   assert.equal(status.status, "completed");
@@ -86,7 +99,8 @@ test("pipeline adapter binds GitHub status to the exact target head and protecte
 
   const trace = await adapter.execute(request("pipeline_failure_trace"));
   assert.equal(trace.status, "completed");
-  assert.match(trace.summary, /unit=FAILURE/);
+  assert.match(trace.summary, /Failure 1 of 1.*unit.*test assertion/i);
+  assert.equal(trace.data?.repeatAvailable, false);
   assert.equal(calls.length, 2);
 });
 
@@ -98,7 +112,7 @@ test("pipeline adapter refuses a response for a different head and rechecks the 
       return { outcome: "passed", routeId: "github.graphql", detail: "ok", body: Buffer.from(JSON.stringify({ data: { repository: { object: { oid: "f".repeat(40), statusCheckRollup: null } } } })) };
     }
   } as unknown as DynamicConfiguredNetworkClient;
-  const adapter = new ConfiguredGitHubPipelineAdapter(network, { async list() { return []; } });
+  const adapter = new ConfiguredGitHubPipelineAdapter(network, { async list() { return []; } }, hostResolver);
   const wrongHead = await adapter.execute(request("pipeline_status"));
   assert.equal(wrongHead.status, "failed");
 
@@ -115,13 +129,42 @@ test("pipeline adapter binds remote and result URLs to the configured GitHub Ent
         { __typename: "CheckRun", name: "enterprise-unit", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "https://ghe.example.test/acme/project/actions/runs/9", title: "Unit", summary: "failed", text: null }
       ] } } } } } })) };
     }
-  } as unknown as DynamicConfiguredNetworkClient, { async list() { return []; } }, { async resolve() { return { host: "ghe.example.test" }; } });
+  } as unknown as DynamicConfiguredNetworkClient, { async list() { return []; } }, { async resolve() { return configuredGitHostFromPolicy({ version: 1, proxy: "direct", routes: [
+    { id: "github.graphql", method: "POST", url: "https://ghe.example.test/api/graphql", redirects: "deny" },
+    { id: "github.repository", method: "HEAD", url: "https://ghe.example.test/acme/project", redirects: "deny" },
+    { id: "git.receive-pack.advertise", method: "GET", url: "https://ghe.example.test/acme/project.git/info/refs?service=git-receive-pack", redirects: "deny" },
+    { id: "git.receive-pack", method: "POST", url: "https://ghe.example.test/acme/project.git/git-receive-pack", redirects: "deny" }
+  ] }); } });
   const result = await adapter.execute({ ...request("pipeline_failure_trace"), target: enterpriseTarget });
   assert.equal(result.status, "completed");
-  assert.equal(((result.data?.failures as readonly { url?: string }[])[0]?.url), "https://ghe.example.test/acme/project/actions/runs/9");
+  assert.equal((result.data?.selectedFailure as { url?: string })?.url, "https://ghe.example.test/acme/project/actions/runs/9");
 
   const wrongHost = await adapter.execute(request("pipeline_status"));
   assert.equal(wrongHost.status, "blocked");
+});
+
+test("failure trace retrieves bounded authenticated output, diagnoses it, and cycles durably across restart", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-pipeline-cursor-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const authenticator: JournalAuthenticator = { provider: "pipeline-test", async seal(hash) { return `test:${hash}`; }, async verify(hash, tag) { return tag === `test:${hash}`; } };
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const response = () => ({ outcome: "passed", routeId: "github.graphql", detail: "ok", body: Buffer.from(JSON.stringify({ data: { repository: { object: { oid: target.head, statusCheckRollup: { state: "FAILURE", contexts: { nodes: [
+    { __typename: "CheckRun", name: "unit", status: "COMPLETED", conclusion: "FAILURE", detailsUrl: "https://github.com/acme/project/actions/runs/10/job/2", title: "Unit", summary: "AssertionError: expected 2 but received 3", text: "token=ghp_must_not_escape", startedAt: "2026-08-24T10:00:00.000Z", completedAt: "2026-08-24T10:01:00.000Z" },
+    { __typename: "CheckRun", name: "build", status: "COMPLETED", conclusion: "TIMED_OUT", detailsUrl: "https://github.com/acme/project/actions/runs/11/job/3", title: "Build", summary: "Process timed out after 30 minutes", text: "x".repeat(10_000), startedAt: "2026-08-24T11:00:00.000Z", completedAt: "2026-08-24T11:30:00.000Z" }
+  ] } } } } } })) });
+  const network = { async request() { return response(); } } as unknown as DynamicConfiguredNetworkClient;
+  const receipts = { async list() { return []; } };
+  const first = await new ConfiguredGitHubPipelineAdapter(network, receipts, hostResolver, new DurablePipelineFailureCursor(store)).execute(request("pipeline_failure_trace"));
+  assert.equal(first.status, "completed");
+  assert.equal((first.data?.selectedFailure as { name: string }).name, "unit");
+  assert.match(String(first.data?.diagnosis), /test assertion/i);
+  assert.doesNotMatch(JSON.stringify(first.data), /ghp_must_not_escape/);
+
+  const restarted = await new ConfiguredGitHubPipelineAdapter(network, receipts, hostResolver, new DurablePipelineFailureCursor(store)).execute(request("pipeline_failure_trace"));
+  assert.equal((restarted.data?.selectedFailure as { name: string }).name, "build");
+  assert.match(String(restarted.data?.diagnosis), /time budget/i);
+  assert.ok(String(restarted.data?.logExcerpt).length <= 4_096);
+  assert.equal(restarted.data?.repeatAvailable, true);
 });
 
 test("composite pipeline status preserves local evidence when hosted CI is unavailable", async () => {

@@ -11,7 +11,7 @@ const pkt = (value: string): Buffer => { const body = Buffer.from(value); return
 const advertisement = (branch: string, head: string): Buffer => Buffer.concat([pkt("# service=git-receive-pack\n"), Buffer.from("0000"), pkt(`${head} HEAD\0report-status side-band-64k ofs-delta\n`), pkt(`${head} refs/heads/${branch}\n`), Buffer.from("0000")]);
 const target = { id: "a".repeat(64), repositoryRoot: "C:\\repo", canonicalRemote: "https://github.com/acme/project.git", branch: "feat/test", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "f".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete" as const, reasons: [] };
 const gitPolicy = (host = "github.com", maximumPushBytes?: number): ConfiguredNetworkPolicy => ({ version: 1, proxy: "direct", routes: [
-  { id: "github.graphql", method: "POST", url: `https://${host}/api/graphql`, redirects: "deny" },
+  { id: "github.graphql", method: "POST", url: host === "github.com" ? "https://api.github.com/graphql" : `https://${host}/api/graphql`, redirects: "deny" },
   { id: "git.receive-pack.advertise", method: "GET", url: `https://${host}/acme/project.git/info/refs?service=git-receive-pack`, redirects: "deny" },
   { id: "git.receive-pack", method: "POST", url: `https://${host}/acme/project.git/git-receive-pack`, ...(maximumPushBytes ? { maxRequestBytes: maximumPushBytes } : {}), redirects: "deny" }
 ] });
@@ -81,7 +81,7 @@ test("GitHub PR upsert creates or updates exactly one reviewed head/base/title/b
   const pull = (title: string, body: string, headRepository = "acme/project") => ({ id: "PR_kwDO123", number: 12, url: "https://github.com/acme/project/pull/12", headRefOid: target.head, headRefName: "feat/test", headRepository: { nameWithOwner: headRepository }, baseRefName: "main", state: "OPEN", title, body });
   const responses = [
     { repository: { pullRequests: { nodes: [] } } },
-    { repository: { id: "R_kgDO123" } },
+    { base: { id: "R_kgDO123" }, head: { id: "R_kgDO123" } },
     { createPullRequest: { pullRequest: pull("Reviewed title", "Reviewed body") } },
     { repository: { pullRequests: { nodes: [pull("Reviewed title", "Reviewed body")] } } }
   ];
@@ -91,7 +91,7 @@ test("GitHub PR upsert creates or updates exactly one reviewed head/base/title/b
     calls.push(parsed);
     return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: responses.shift() })) };
   } } as unknown as DynamicConfiguredNetworkClient;
-  const result = await new ConfiguredGitHubGraphqlPort(network, gitHost).upsert({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headBranch: "feat/test", baseBranch: "main", expectedHead: target.head!, title: "Reviewed title", body: "Reviewed body", request: requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed title", body: "Reviewed body" }) });
+  const result = await new ConfiguredGitHubGraphqlPort(network, gitHost).upsert({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "acme", headName: "project", headBranch: "feat/test", baseBranch: "main", expectedHead: target.head!, title: "Reviewed title", body: "Reviewed body", request: requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed title", body: "Reviewed body" }) });
   assert.equal(result.number, 12);
   assert.equal(result.title, "Reviewed title");
   assert.equal(calls.some((call) => call.query.includes("createPullRequest") && call.variables.title === "Reviewed title" && call.variables.body === "Reviewed body"), true);
@@ -107,7 +107,7 @@ test("GitHub merge refuses unproven readiness and mutates only a clean exact PR"
   });
   const blockedNetwork = { async request(input: { routeId: string }) { return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: { repository: { pullRequest: pull("OPEN", "BLOCKED") } } })) }; } } as unknown as DynamicConfiguredNetworkClient;
   const mergeRequest = requestFor({ kind: "merge_pr", pullRequest: 9, head: target.head!, baseBranch: "main" });
-  await assert.rejects(() => new ConfiguredGitHubGraphqlPort(blockedNetwork, gitHost).merge({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", pullRequest: 9, head: target.head!, baseBranch: "main", request: mergeRequest }), /not proven current checks/i);
+  await assert.rejects(() => new ConfiguredGitHubGraphqlPort(blockedNetwork, gitHost).merge({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "acme", headName: "project", pullRequest: 9, head: target.head!, baseBranch: "main", request: mergeRequest }), /not proven current checks/i);
 
   let index = 0;
   const calls: string[] = [];
@@ -121,10 +121,24 @@ test("GitHub merge refuses unproven readiness and mutates only a clean exact PR"
     calls.push(requestBody.query);
     return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: responses[index++] })) };
   } } as unknown as DynamicConfiguredNetworkClient;
-  const merged = await new ConfiguredGitHubGraphqlPort(cleanNetwork, gitHost).merge({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", pullRequest: 9, head: target.head!, baseBranch: "main", request: mergeRequest });
+  const merged = await new ConfiguredGitHubGraphqlPort(cleanNetwork, gitHost).merge({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "acme", headName: "project", pullRequest: 9, head: target.head!, baseBranch: "main", request: mergeRequest });
   assert.equal(merged.state, "MERGED");
   assert.equal(calls.filter((query) => query.includes("mergePullRequest")).length, 1);
   assert.equal(index, 3);
+});
+
+test("a fresh explicit generation observes an already-merged exact PR without replaying the merge mutation", async () => {
+  const record = {
+    id: "PR_kwDO123", number: 9, url: "https://github.com/acme/project/pull/9", headRefOid: target.head,
+    headRefName: "feat/test", headRepository: { nameWithOwner: "acme/project" }, baseRefName: "main", state: "MERGED", title: "Reviewed title", body: "Reviewed body",
+    isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", reviewDecision: "APPROVED",
+    commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] }
+  };
+  const queries: string[] = [];
+  const network = { async request(input: { routeId: string; body?: Uint8Array }) { const requestBody = JSON.parse(Buffer.from(input.body ?? []).toString("utf8")); queries.push(requestBody.query); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: { repository: { pullRequest: record } } })) }; } } as unknown as DynamicConfiguredNetworkClient;
+  const result = await new ConfiguredGitHubGraphqlPort(network, gitHost).merge({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "acme", headName: "project", pullRequest: 9, head: target.head!, baseBranch: "main", request: requestFor({ kind: "merge_pr", pullRequest: 9, head: target.head!, baseBranch: "main" }) });
+  assert.equal(result.state, "MERGED");
+  assert.equal(queries.some((query) => query.includes("mutation B122MergePull")), false);
 });
 
 test("configured Git host identity supports exact GitHub Enterprise routes and rejects another host", async () => {
@@ -151,7 +165,55 @@ test("same branch name in another fork cannot alias the reviewed PR identity", a
     { repository: { pullRequests: { nodes: [pull("fork/project", 11), pull("acme/project", 12)] } } }
   ];
   const network = { async request(input: { routeId: string }) { assert.equal(input.routeId, "github.graphql"); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: responses.shift() })) }; } } as unknown as DynamicConfiguredNetworkClient;
-  const result = await new ConfiguredGitHubGraphqlPort(network, gitHost).upsert({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headBranch: "feat/test", baseBranch: "main", expectedHead: target.head!, title: "Reviewed title", body: "Reviewed body", request: requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed title", body: "Reviewed body" }) });
+  const result = await new ConfiguredGitHubGraphqlPort(network, gitHost).upsert({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "acme", headName: "project", headBranch: "feat/test", baseBranch: "main", expectedHead: target.head!, title: "Reviewed title", body: "Reviewed body", request: requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed title", body: "Reviewed body" }) });
   assert.equal(result.number, 12);
   assert.equal(result.headRepository, "acme/project");
+});
+
+test("fork PR upsert pushes the exact head repository while creating into the separately configured base", async () => {
+  const forkPolicy: ConfiguredNetworkPolicy = { version: 1, proxy: "direct", routes: [
+    { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },
+    { id: "github.repository", method: "HEAD", url: "https://github.com/acme/project", redirects: "deny" },
+    { id: "git.receive-pack.advertise", method: "GET", url: "https://github.com/contributor/project.git/info/refs?service=git-receive-pack", redirects: "deny" },
+    { id: "git.receive-pack", method: "POST", url: "https://github.com/contributor/project.git/git-receive-pack", redirects: "deny" }
+  ] };
+  const identity = configuredGitHostFromPolicy(forkPolicy);
+  assert.deepEqual({ host: identity.host, apiHost: identity.apiHost, base: `${identity.owner}/${identity.name}`, head: `${identity.headOwner}/${identity.headName}` }, { host: "github.com", apiHost: "api.github.com", base: "acme/project", head: "contributor/project" });
+  const forkTarget = { ...target, canonicalRemote: "git@github.com:contributor/project.git" };
+  const forkRequest: GitRequest = { ...requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Fork title", body: "Fork body" }), target: forkTarget };
+  const effects: string[] = [];
+  const pusher: ReviewedRemotePusher = { async push(input) { effects.push(`push:${identity.headOwner}/${identity.headName}:${input.destinationBranch}`); return { status: "completed", summary: "pushed" }; } };
+  const github: ReviewedGitHubPort = {
+    async upsert(input) { effects.push(`pr:${input.owner}/${input.name}<-${input.headOwner}/${input.headName}:${input.headBranch}`); return { number: 44, url: "https://github.com/acme/project/pull/44", head: input.expectedHead, headRepository: `${input.headOwner}/${input.headName}`, base: input.baseBranch, state: "OPEN", title: input.title, body: input.body }; },
+    async merge() { throw new Error("not used"); }, async defaultBranch() { return "main"; }
+  };
+  const result = await new ConfiguredRemoteGitHandler(pusher, github, identity).execute(forkRequest);
+  assert.equal(result.status, "completed");
+  assert.deepEqual(effects, ["push:contributor/project:feat/test", "pr:acme/project<-contributor/project:feat/test"]);
+});
+
+test("GraphQL fork creation binds both exact repository IDs and rejects another fork with the same branch", async () => {
+  const forkPolicy: ConfiguredNetworkPolicy = { version: 1, proxy: "direct", routes: [
+    { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },
+    { id: "github.repository", method: "HEAD", url: "https://github.com/acme/project", redirects: "deny" },
+    { id: "git.receive-pack.advertise", method: "GET", url: "https://github.com/contributor/project.git/info/refs?service=git-receive-pack", redirects: "deny" },
+    { id: "git.receive-pack", method: "POST", url: "https://github.com/contributor/project.git/git-receive-pack", redirects: "deny" }
+  ] };
+  const identity = configuredGitHostFromPolicy(forkPolicy);
+  const forkTarget = { ...target, canonicalRemote: "https://github.com/contributor/project.git" };
+  const forkRequest: GitRequest = { ...requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Fork title", body: "Fork body" }), target: forkTarget };
+  const pull = (headRepository: string, number = 44) => ({ id: `PR_${number}`, number, url: `https://github.com/acme/project/pull/${number}`, headRefOid: target.head, headRefName: "feat/test", headRepository: { nameWithOwner: headRepository }, baseRefName: "main", state: "OPEN", title: "Fork title", body: "Fork body" });
+  const responses = [
+    { repository: { pullRequests: { nodes: [pull("attacker/project", 43)] } } },
+    { base: { id: "R_BASE" }, head: { id: "R_HEAD" } },
+    { createPullRequest: { pullRequest: pull("contributor/project") } },
+    { repository: { pullRequests: { nodes: [pull("attacker/project", 43), pull("contributor/project")] } } }
+  ];
+  const calls: Array<{ query: string; variables: Record<string, unknown> }> = [];
+  const network = { async request(input: { routeId: string; body?: Uint8Array }) { const body = JSON.parse(Buffer.from(input.body ?? []).toString("utf8")); calls.push(body); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ data: responses.shift() })) }; } } as unknown as DynamicConfiguredNetworkClient;
+  const result = await new ConfiguredGitHubGraphqlPort(network, identity).upsert({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", headOwner: "contributor", headName: "project", headBranch: "feat/test", baseBranch: "main", expectedHead: target.head!, title: "Fork title", body: "Fork body", request: forkRequest });
+  assert.equal(result.headRepository, "contributor/project");
+  const create = calls.find((call) => call.query.includes("createPullRequest"));
+  assert.equal(create?.variables.repositoryId, "R_BASE");
+  assert.equal(create?.variables.headRepositoryId, "R_HEAD");
 });

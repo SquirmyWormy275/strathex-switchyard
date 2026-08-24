@@ -90,6 +90,22 @@ try {
     Assert-True $duplicateRejected 'exact duplicate JSON field rejected before conversion'
     Assert-True (-not [IO.File]::Exists($duplicateOutput)) 'duplicate-key plan produced no output'
 
+    $networkOutput = Join-Path $output 'network-policy.json'
+    & (Join-Path $PSScriptRoot 'New-B122NetworkPolicy.ps1') -GitHubOwner 'contributor' -GitHubRepository 'project' -GitHubBaseOwner 'acme' -GitHubBaseRepository 'project' -OutputPath $networkOutput | Out-Null
+    $network = Get-Content -LiteralPath $networkOutput -Raw | ConvertFrom-Json
+    $networkRoutes = @{}; foreach ($route in $network.routes) { $networkRoutes[$route.id] = $route }
+    Assert-True ($networkRoutes['github.graphql'].url -ceq 'https://api.github.com/graphql') 'public GitHub API host'
+    Assert-True ($networkRoutes['github.repository'].url -ceq 'https://github.com/acme/project') 'fork base repository identity'
+    Assert-True ($networkRoutes['git.receive-pack'].url -ceq 'https://github.com/contributor/project.git/git-receive-pack') 'fork head repository push identity'
+
+    $enterpriseOutput = Join-Path $output 'network-policy-enterprise.json'
+    & (Join-Path $PSScriptRoot 'New-B122NetworkPolicy.ps1') -GitHubHost 'ghe.example.test' -GitHubOwner 'contributor' -GitHubRepository 'project' -GitHubBaseOwner 'acme' -GitHubBaseRepository 'project' -OutputPath $enterpriseOutput | Out-Null
+    $enterprise = Get-Content -LiteralPath $enterpriseOutput -Raw | ConvertFrom-Json
+    $enterpriseRoutes = @{}; foreach ($route in $enterprise.routes) { $enterpriseRoutes[$route.id] = $route }
+    Assert-True ($enterpriseRoutes['github.graphql'].url -ceq 'https://ghe.example.test/api/graphql') 'Enterprise GraphQL host'
+    Assert-True ($enterpriseRoutes['github.repository'].url -ceq 'https://ghe.example.test/acme/project') 'Enterprise base repository identity'
+    Assert-True ($enterpriseRoutes['git.receive-pack'].url -ceq 'https://ghe.example.test/contributor/project.git/git-receive-pack') 'Enterprise fork head repository push identity'
+
     "B122 manifest generator tests: PASS`nRuntime SHA-256: $($runtimeResult.Sha256)`nSandbox SHA-256: $($sandboxResult.Sha256)"
 } finally {
     $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd([IO.Path]::DirectorySeparatorChar)

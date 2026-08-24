@@ -5,6 +5,7 @@ import type { CommandAction } from "../../../packages/control-plane/src/command-
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { HostActionAuthorizationPayload, HostActionCompletionPayload } from "./bridge.ts";
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
+import type { GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
 
 export const localHostActionKinds = [
   "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
@@ -289,11 +290,20 @@ export class DurableHostActionAdapter implements CommandAdapter {
   readonly id = "durable-vscode-host-actions";
   readonly kind = "vscode" as const;
   private readonly queue: DurableHostActionQueue;
+  private readonly github?: GitHubNavigationResolver;
 
-  constructor(queue: DurableHostActionQueue) { this.queue = queue; }
+  constructor(queue: DurableHostActionQueue, github?: GitHubNavigationResolver) { this.queue = queue; this.github = github; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    const plan = hostActionPlan(request);
+    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }> | undefined;
+    const githubPage = navigationPage(request.definition.action);
+    if (githubPage) {
+      if (!this.github) return { status: "unavailable", summary: "Exact GitHub navigation requires an installed authenticated GitHub route; no search URL was guessed.", effectDisposition: "not_started" };
+      const resolved = await this.github.resolve(request, githubPage);
+      if (resolved.kind === "picker") return { status: "awaiting_input", summary: resolved.summary, effectDisposition: "committed", data: { githubNavigationKind: githubPage, githubCandidates: resolved.candidates } };
+      if (resolved.kind !== "open") return { status: resolved.kind === "blocked" ? "blocked" : resolved.kind === "unavailable" ? "unavailable" : "failed", summary: resolved.summary, effectDisposition: resolved.kind === "failed" ? "ambiguous" : "not_started" };
+      plan = { hostAction: "open_external_url", url: resolved.url };
+    } else plan = hostActionPlan(request);
     if (!plan) return { status: "unavailable", summary: `No installed host action is configured for ${request.definition.title}.` };
     const intent = await this.queue.enqueue(request, plan);
     return {
@@ -336,10 +346,10 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
     case "new_vscode": return { hostAction: "new_vscode_window" };
     case "focus_terminal": return { hostAction: "focus_external_terminal" };
     case "focus_vscode_terminal": return { hostAction: "focus_integrated_terminal" };
-    case "github_home": return githubPlan(request, "home");
-    case "github_pr": return githubPlan(request, "pr");
-    case "github_issues": return githubPlan(request, "issues");
-    case "github_actions": return githubPlan(request, "actions");
+    case "github_home": return undefined;
+    case "github_pr": return undefined;
+    case "github_issues": return undefined;
+    case "github_actions": return undefined;
     case "compound_palette": return { hostAction: "open_compound_palette" };
     case "open_voice": return { hostAction: "open_external_url", url: "https://chatgpt.com/" };
     case "switch_voice_provider": return { hostAction: "switch_voice_provider" };
@@ -349,26 +359,7 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
   }
 }
 
-function githubPlan(request: AdapterRequest, page: "home" | "pr" | "issues" | "actions"): Readonly<{ hostAction: "open_external_url"; url: string }> | undefined {
-  const repository = githubRepository(request.target?.canonicalRemote);
-  if (!repository) return undefined;
-  const base = `https://${repository.host}/${repository.owner}/${repository.name}`;
-  if (page === "home") return { hostAction: "open_external_url", url: base };
-  if (page === "issues") return { hostAction: "open_external_url", url: `${base}/issues` };
-  const branch = request.target?.branch;
-  if (!branch) return undefined;
-  return page === "pr"
-    ? { hostAction: "open_external_url", url: `${base}/pulls?q=is%3Apr+is%3Aopen+head%3A${encodeURIComponent(branch)}` }
-    : { hostAction: "open_external_url", url: `${base}/actions?query=branch%3A${encodeURIComponent(branch)}` };
-}
-
-function githubRepository(remote: string | undefined): Readonly<{ host: string; owner: string; name: string }> | undefined {
-  if (!remote || /[\r\n\0]/.test(remote)) return undefined;
-  const match = /^(?:https:\/\/([A-Za-z0-9.-]+)\/|git@([A-Za-z0-9.-]+):|ssh:\/\/git@([A-Za-z0-9.-]+)\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/i.exec(remote);
-  const host = (match?.[1] ?? match?.[2] ?? match?.[3])?.toLowerCase();
-  if (!host || host.startsWith(".") || host.endsWith(".") || !host.includes(".") || host.split(".").some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) return undefined;
-  return { host, owner: match![4]!, name: match![5]! };
-}
+function navigationPage(action: CommandAction): GitHubNavigationPage | undefined { return action === "github_home" ? "home" : action === "github_pr" ? "pr" : action === "github_issues" ? "issues" : action === "github_actions" ? "actions" : undefined; }
 
 function boundedSummary(value: string): string {
   const summary = value.replace(/[\r\n\0]/g, " ").trim().slice(0, 512);

@@ -424,6 +424,59 @@ export class OperationSagaStore {
     return results;
   }
 
+  /**
+   * Bootstrap recovery may prove every child terminal after the original
+   * process lost its broker result. Settle derived composite boundaries first,
+   * then their roots, but only as incomplete/failed/cancelled. This never
+   * manufactures a completed result or receipt; it merely releases the active
+   * dispatch scope so a fresh explicit generation can re-observe provider state.
+   */
+  async settleRecoveredParents(): Promise<readonly ReconciliationResult[]> {
+    const results: ReconciliationResult[] = [];
+    for (;;) {
+      const operations = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      let candidate: OperationRecord | undefined;
+      let evidence: readonly OperationRecord[] = [];
+
+      // Composite boundaries are siblings of their concrete effect children.
+      for (const parent of operations.values()) {
+        const children = parent.childIds.map((id) => operations.get(id)).filter((child): child is OperationRecord => !!child);
+        const boundary = children.find((child) => !isTerminal(child.state) && child.action.endsWith(".composite"));
+        const siblings = boundary ? children.filter((child) => child.id !== boundary.id) : [];
+        if (boundary && siblings.length && siblings.every((child) => isTerminal(child.state))) { candidate = boundary; evidence = siblings; break; }
+      }
+
+      // Once all child boundaries/effects are terminal, release the root scope.
+      if (!candidate) {
+        candidate = [...operations.values()].find((operation) => !operation.parentId && !isTerminal(operation.state) && operation.childIds.length > 0
+          && operation.childIds.every((id) => { const child = operations.get(id); return !!child && isTerminal(child.state); }));
+        if (candidate) evidence = candidate.childIds.map((id) => operations.get(id)!).filter(Boolean);
+      }
+      if (!candidate) break;
+
+      const recordedEffect = evidence.some((operation) => operation.state === "recorded");
+      const target: OperationState = recordedEffect ? "recorded" : evidence.some((operation) => operation.state === "failed") ? "failed" : "cancelled";
+      const note = recordedEffect
+        ? "All durable children are terminal and at least one external effect was recorded; the lost root result is incomplete and must be explicitly re-observed."
+        : target === "failed" ? "All durable children are terminal and a child failed; the lost root result was closed as failed without replay."
+          : "All durable children are terminal and cancelled; the lost root result was closed without replay.";
+      const details = recordedEffect
+        ? { commandStatus: "incomplete", recoveryDisposition: "child-effects-recorded", recoveredWithoutReceipt: "true" }
+        : { commandStatus: target, recoveryDisposition: `children-${target}`, recoveredWithoutReceipt: "true" };
+      try {
+        await this.advanceReconciled(candidate, target, details);
+        await this.recordReconciliation(candidate.id, target, note);
+        results.push({ operationId: candidate.id, outcome: target, note });
+      } catch {
+        const failedNote = "Terminal child state could not safely settle the recovered parent; it remains fail-closed.";
+        await this.recordReconciliation(candidate.id, "unresolved", failedNote);
+        results.push({ operationId: candidate.id, outcome: "unresolved", note: failedNote });
+        break;
+      }
+    }
+    return results;
+  }
+
   async acquireLease(request: LeaseRequest): Promise<ResourceLease> {
     const now = request.now ?? this.clock();
     const nowMs = parseTimestamp(now, "lease timestamp");
@@ -775,7 +828,7 @@ export class NoReplayOperationRecovery {
   }
 
   async recoverPending(): Promise<readonly ReconciliationResult[]> {
-    return this.operations.reconcilePending({
+    const results = [...await this.operations.reconcilePending({
       reconcile: async (operation) => {
         const reconciler = this.reconcilers.get(operation.action);
         if (!reconciler) {
@@ -795,7 +848,12 @@ export class NoReplayOperationRecovery {
         }
         return decision;
       }
-    });
+    })];
+    for (const settled of await this.operations.settleRecoveredParents()) {
+      const prior = results.findIndex((result) => result.operationId === settled.operationId);
+      if (prior >= 0) results[prior] = settled; else results.push(settled);
+    }
+    return results;
   }
 }
 

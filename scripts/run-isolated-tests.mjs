@@ -33,7 +33,7 @@ const companionTests = [
   "acceptance-administration", "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
   "council-runtime", "council-workspace-isolation", "durable-credentials",
   "durable-endpoint", "git-review", "hardware-signal-queue",
-  "hardware-signal-service", "host-actions", "host-provisioning",
+  "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
   "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
   "operation-recovery", "packaged-runtime", "pipeline-adapters",
   "provider-desktop", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",

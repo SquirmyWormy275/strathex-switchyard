@@ -136,7 +136,8 @@ export class InstalledReadOnlyObservationPort implements InstalledOperationObser
       if (!repositoryRoot) return unresolved("The protected pull-request repository root no longer resolves to its exact canonical path.");
       if (this.options.networkPolicy) {
         const identity = configuredGitHostFromPolicy(await this.options.networkPolicy.resolve());
-        if (identity.owner.toLowerCase() !== input.owner.toLowerCase() || identity.name.toLowerCase() !== input.name.toLowerCase()) {
+        if (identity.owner.toLowerCase() !== input.owner.toLowerCase() || identity.name.toLowerCase() !== input.name.toLowerCase()
+          || identity.headOwner.toLowerCase() !== input.headOwner.toLowerCase() || identity.headName.toLowerCase() !== input.headName.toLowerCase()) {
           return unresolved("The installed GraphQL observation route is not bound to the protected repository identity.");
         }
       }

@@ -86,11 +86,13 @@ test("broker child sagas prevent replay, preserve ambiguity, and reconcile only 
     assert.equal(observations, 1);
     assert.equal(recovered.find((result) => result.operationId === child.operationId)?.outcome, "recorded");
     assert.equal((await operations.get(child.operationId))?.state, "recorded");
-    // The root is deliberately not made green by bootstrap recovery; receipt
-    // issuance still goes through normal durable result recording.
-    assert.equal((await operations.get(parent.operationId))?.state, "external_committed");
+    // Bootstrap recovery closes the lost root only as incomplete. It mints no
+    // green receipt and releases the scope for a fresh explicit generation.
+    assert.equal((await operations.get(parent.operationId))?.state, "recorded");
+    assert.equal((await operations.get(parent.operationId))?.details.commandStatus, "incomplete");
+    assert.equal((await receipts.list()).length, 0);
 
-    const recorded = await coordinator.recordResult(parent, {
+    const staleRecording = await coordinator.recordResult(parent, {
       action: "pr_upsert",
       targetSnapshotId: "snapshot-1",
       status: "completed",
@@ -99,8 +101,10 @@ test("broker child sagas prevent replay, preserve ambiguity, and reconcile only 
       evidenceDigest: "evidence-1",
       toolVersions: { git: "2.50" }
     });
-    assert.ok(recorded.receiptId);
-    assert.equal((await operations.get(parent.operationId))?.state, "recorded");
+    assert.equal(staleRecording.receiptId, undefined, "a restarted caller cannot backfill a green receipt onto the recovered incomplete root");
+    const next = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    assert.equal(next.existing, false);
+    assert.notEqual(next.operationId, parent.operationId);
   });
 });
 
@@ -127,7 +131,53 @@ test("a crash after durable child creation is reconciled instead of becoming rep
     });
     await recovery.recoverPending();
     assert.equal((await operations.get(child.operationId))?.state, "failed");
-    assert.equal((await operations.get(parent.operationId))?.state, "executing");
+    assert.equal((await operations.get(parent.operationId))?.state, "failed");
+    const retry = await coordinator.claim({ action: "compound_capture", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    assert.equal(retry.existing, false);
+  });
+});
+
+test("restart closes push-to-PR and PR-to-merge partial roots as incomplete without replay or a green receipt", async () => {
+  await withStore(async (store) => {
+    const operations = new OperationSagaStore(store, { idFactory: (() => { let id = 0; return () => `recovery-${++id}`; })() });
+    const receipts = new ReceiptLedger(store);
+    const coordinator = new DurableOperationCoordinator(operations, receipts);
+
+    const upsert = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-upsert", sessionId: "session-1" });
+    await coordinator.markExecuting(upsert);
+    const upsertSaga = coordinator.childSaga(upsert);
+    const upsertBoundary = await upsertSaga.begin({ action: "pr_upsert.composite", idempotencyScope: "dispatch-boundary" });
+    await upsertSaga.markExecuting(upsertBoundary);
+    await upsertSaga.settle(upsertBoundary, "ambiguous", { brokerStatus: "crashed" });
+    const pushed = await upsertSaga.begin({ action: "git.push-reviewed-head", idempotencyScope: "push" });
+    await upsertSaga.markExecuting(pushed); await upsertSaga.markExternalCommitted(pushed); await upsertSaga.settle(pushed, "completed");
+    const createPull = await upsertSaga.begin({ action: "github.pr-upsert", idempotencyScope: "pull" });
+    await upsertSaga.markExecuting(createPull); await upsertSaga.settle(createPull, "ambiguous", { providerObservation: "response_lost" });
+
+    const merge = await coordinator.claim({ action: "pr_merge", targetSnapshotId: "snapshot-merge", sessionId: "session-1" });
+    await coordinator.markExecuting(merge);
+    const mergeSaga = coordinator.childSaga(merge);
+    const mergeBoundary = await mergeSaga.begin({ action: "pr_merge.composite", idempotencyScope: "dispatch-boundary" });
+    await mergeSaga.markExecuting(mergeBoundary); await mergeSaga.settle(mergeBoundary, "ambiguous", { brokerStatus: "crashed" });
+    const merged = await mergeSaga.begin({ action: "github.pr-merge", idempotencyScope: "merge" });
+    await mergeSaga.markExecuting(merged); await mergeSaga.markExternalCommitted(merged, { pullRequest: "17" });
+
+    const recovery = coordinator.createNoReplayRecovery();
+    recovery.register("github.pr-upsert", { reconcile: async () => ({ state: "failed", note: "No exact PR exists; creation did not commit." }) });
+    recovery.register("github.pr-merge", { reconcile: async () => ({ state: "recorded", note: "Exact PR #17 is merged at the reviewed head." }) });
+    const recovered = await recovery.recoverPending();
+
+    assert.equal((await operations.get(createPull.operationId))?.state, "failed");
+    assert.equal((await operations.get(merged.operationId))?.state, "recorded");
+    assert.equal((await operations.get(upsertBoundary.operationId))?.details.commandStatus, "incomplete");
+    assert.equal((await operations.get(mergeBoundary.operationId))?.details.commandStatus, "incomplete");
+    assert.equal((await operations.get(upsert.operationId))?.details.commandStatus, "incomplete");
+    assert.equal((await operations.get(merge.operationId))?.details.commandStatus, "incomplete");
+    assert.equal(recovered.find((result) => result.operationId === upsert.operationId)?.outcome, "recorded");
+    assert.equal(recovered.find((result) => result.operationId === merge.operationId)?.outcome, "recorded");
+    assert.deepEqual(await receipts.list(), []);
+    assert.equal((await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-upsert", sessionId: "session-1" })).existing, false);
+    assert.equal((await coordinator.claim({ action: "pr_merge", targetSnapshotId: "snapshot-merge", sessionId: "session-1" })).existing, false);
   });
 });
 

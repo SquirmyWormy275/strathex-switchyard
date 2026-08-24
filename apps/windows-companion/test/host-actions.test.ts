@@ -32,13 +32,16 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
     now: () => new Date(`2026-08-23T00:00:0${tick++}.000Z`),
     finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact target remains current" }; } }
   });
-  const adapter = new DurableHostActionAdapter(queue);
+  const adapter = new DurableHostActionAdapter(queue, { async resolve(_request, page) {
+    assert.equal(page, "pr");
+    return { kind: "open", url: "https://github.com/acme/switchyard/pull/23", summary: "resolved exact current-branch PR" };
+  } });
   const request = { definition: commandForAction("github_pr"), operationId: "operation-github", target };
   const first = await adapter.execute(request);
   const second = await adapter.execute(request);
   assert.equal(first.status, "running");
   assert.deepEqual(second.data, first.data);
-  assert.equal(first.data?.hostActionUrl, "https://github.com/acme/switchyard/pulls?q=is%3Apr+is%3Aopen+head%3Afeature%2Fhost-actions");
+  assert.equal(first.data?.hostActionUrl, "https://github.com/acme/switchyard/pull/23");
   assert.equal((await queue.listPending()).length, 1);
   const authorization = await queue.authorize({ hostActionId: String(first.data?.hostActionId), adapterVersion: "isolated-extension-1" });
   const completion = await queue.settle({ hostActionId: String(first.data?.hostActionId), succeeded: true, summary: "Opened the exact reviewed host destination.", adapterVersion: "isolated-extension-1", authorizationToken: authorization.authorizationToken });
@@ -50,11 +53,33 @@ test("GitHub host actions preserve the exact canonical GitHub Enterprise host", 
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-ghe-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
-  const adapter = new DurableHostActionAdapter(queue);
+  const adapter = new DurableHostActionAdapter(queue, { async resolve(_request, page) {
+    assert.equal(page, "actions");
+    return { kind: "open", url: "https://ghe.example.test/acme/switchyard/actions/runs/9", summary: "resolved exact current-head run" };
+  } });
   const enterpriseTarget = { ...target, canonicalRemote: "ssh://git@ghe.example.test/acme/switchyard.git" };
   const result = await adapter.execute({ definition: commandForAction("github_actions"), operationId: "operation-ghe", target: enterpriseTarget });
   assert.equal(result.status, "running");
-  assert.equal(result.data?.hostActionUrl, "https://ghe.example.test/acme/switchyard/actions?query=branch%3Afeature%2Fhost-actions");
+  assert.equal(result.data?.hostActionUrl, "https://ghe.example.test/acme/switchyard/actions/runs/9");
+});
+
+test("ambiguous GitHub identities return a bounded picker without queuing a guessed host effect", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-picker-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
+  const adapter = new DurableHostActionAdapter(queue, { async resolve() { return { kind: "picker", summary: "Select an exact PR.", candidates: [
+    { id: "pull:2", label: "PR #2", description: "to main", url: "https://github.com/acme/switchyard/pull/2" },
+    { id: "pull:3", label: "PR #3", description: "to release", url: "https://github.com/acme/switchyard/pull/3" }
+  ] }; } });
+  const result = await adapter.execute({ definition: commandForAction("github_pr"), operationId: "operation-picker", target });
+  assert.equal(result.status, "awaiting_input");
+  assert.equal((result.data?.githubCandidates as readonly unknown[]).length, 2);
+  assert.deepEqual(await queue.listPending(), []);
+
+  const unconfigured = await new DurableHostActionAdapter(queue).execute({ definition: commandForAction("github_home"), operationId: "operation-no-route", target: { ...target, canonicalRemote: "https://gitlab.example/acme/switchyard.git" } });
+  assert.equal(unconfigured.status, "unavailable");
+  assert.match(unconfigured.summary, /no search URL was guessed/i);
+  assert.deepEqual(await queue.listPending(), []);
 });
 
 test("installed dispatch stays running until the authenticated host acknowledgement durably settles it", async (context) => {
