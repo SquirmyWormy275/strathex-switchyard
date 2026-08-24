@@ -43,6 +43,7 @@
     "onCommand:sxsy-b122.installNetworkPolicy",
     "onCommand:sxsy-b122.showNetworkPolicy",
     "onCommand:sxsy-b122.revokeNetworkPolicy",
+    "onCommand:sxsy-b122.releaseContainment",
     "onCommand:sxsy-b122.dispatch",
     "onCommand:sxsy-b122.showIntent",
     "onCommand:sxsy-b122.chord.reanchor.normal",
@@ -196,6 +197,10 @@
       {
         "command": "sxsy-b122.revokeNetworkPolicy",
         "title": "SXSY-B122: Revoke Exact HTTPS Route Policy"
+      },
+      {
+        "command": "sxsy-b122.releaseContainment",
+        "title": "SXSY-B122: Release Repository Containment"
       },
       {
         "command": "sxsy-b122.dispatch",

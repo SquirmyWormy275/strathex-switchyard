@@ -153,6 +153,7 @@ export interface ExtensionCompanionBridge {
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>>;
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
+  releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>>;
   installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
@@ -234,6 +235,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("command.dispatch", command);
     return result.ok ? { ok: true, value: result.value.command } : result;
+  }
+
+  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<unknown>("containment.release", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
   }
 
   async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>> {
@@ -522,6 +530,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return this.unavailable(); }
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return this.unavailable(); }

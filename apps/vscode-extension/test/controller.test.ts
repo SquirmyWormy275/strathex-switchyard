@@ -240,6 +240,7 @@ class FakeBridge implements ExtensionCompanionBridge {
     const existing = this.registered.find((session) => session.id === sessionId);
     return existing ? { ok: true, value: { ...existing, workspaceRoot: repositoryRoot, capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "fake-provider", metadata: { ...existing.metadata, "sxsy-b122.providerHandshake": "exact-route-v1" } } } : { ok: false, code: "not_found", message: "missing" };
   }
+  async releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return { ok: true, value: { status: "completed", summary: "Authenticated containment release recorded." } }; }
   async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
     this.rawHidInstallRequests.push(identity);
     return { ok: true, value: { installation: { identity, helperPath: "C:\\host\\strathex-b122-hid-helper.exe", helperSha256: "a".repeat(64), protocolVersion: 1, mapFingerprint: "0123456789abcdef", installedAt: "2026-08-24T00:00:00.000Z", status: "active" }, supervisor: { state: "running", generation: 1, detail: "ready" } } };

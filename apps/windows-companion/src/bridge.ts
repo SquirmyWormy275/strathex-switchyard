@@ -45,6 +45,7 @@ export type CompanionMethod =
   | "network-policy.current"
   | "network-policy.revoke"
   | "provider.handshake"
+  | "containment.release"
   | "raw-hid.install"
   | "raw-hid.list"
   | "raw-hid.revoke"
@@ -204,6 +205,7 @@ export interface CredentialProvisionPayload { readonly reference: string; readon
 export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
 export interface NetworkPolicyInstallPayload { readonly sourcePath: string; }
 export interface ProviderHandshakePayload { readonly sessionId: string; readonly repositoryRoot: string; }
+export interface ContainmentReleasePayload { readonly sessionId: string; readonly reason: string; readonly incidentStatus: "rotation_complete" | "not_required"; }
 export type RawHidInstallPayload = RawHidDeviceIdentity;
 export interface HardwareSignalBindingPayload { readonly signalId: string; readonly claimToken: string; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
 export interface HardwareSignalClaimPayload { readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; readonly focused: true; }
@@ -274,7 +276,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
-    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake",
+    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake", "containment.release",
     "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"

@@ -207,6 +207,7 @@ export class ManagedSessionController {
       this.vscode.commands.registerCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.releaseContainment", async () => { await this.releaseContainment(); }),
       this.vscode.commands.registerCommand("sxsy-b122.installRawHid", async () => { await this.installRawHid(); }),
       this.vscode.commands.registerCommand("sxsy-b122.listRawHid", async () => { await this.listRawHid(); }),
       this.vscode.commands.registerCommand("sxsy-b122.showRawHidStatus", async () => { await this.showRawHidStatus(); }),
@@ -452,6 +453,21 @@ export class ManagedSessionController {
     const result = await this.bridge.revokeRawHid();
     if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 Raw-HID was not revoked: ${result.message}`); return; }
     await this.vscode.window.showInformationMessage("SXSY-B122 revoked the active Raw-HID pin and stopped its helper generation.");
+  }
+
+  private async releaseContainment(): Promise<void> {
+    let session: ExtensionManagedSession | undefined;
+    try { session = await this.showSessionQueue("all", "Choose the exact contained repository session"); }
+    catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release stopped: ${error instanceof Error ? error.message : "session selection unavailable"}`); return; }
+    if (!session?.workspaceRoot) { await this.vscode.window.showWarningMessage("SXSY-B122 containment release requires an exact repository-bound managed session."); return; }
+    const reason = await this.vscode.window.showInputBox?.({ prompt: "Record the incident review and why containment may be released", validateInput: (value) => value.trim() && value.length <= 2_048 && !/\0/.test(value) ? undefined : "Enter a bounded non-empty incident-review reason." });
+    if (!reason) return;
+    const rotation = await this.vscode.window.showQuickPick(["Credential rotation complete", "Credential rotation not required"] as const, { placeHolder: "Confirm credential-rotation disposition before Windows reauthentication" });
+    if (!rotation) return;
+    const result = await this.bridge.releaseContainment({ sessionId: session.id, reason, incidentStatus: rotation === "Credential rotation complete" ? "rotation_complete" : "not_required" });
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release unavailable: ${result.message}`); return; }
+    const show = result.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
+    await show(`SXSY-B122 containment release ${result.value.status}: ${result.value.summary}`);
   }
 
   private async refreshWorkspaceRegistration(): Promise<void> {

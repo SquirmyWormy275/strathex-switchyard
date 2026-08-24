@@ -12,6 +12,7 @@ import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
 import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
 import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import type { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
@@ -44,6 +45,7 @@ import {
   type CredentialRevokePayload,
   type NetworkPolicyInstallPayload,
   type ProviderHandshakePayload,
+  type ContainmentReleasePayload,
   type RawHidInstallPayload,
   type HardwareSignalBindingPayload,
   type HardwareSignalClaimPayload,
@@ -125,6 +127,7 @@ export interface CompanionServiceOptions {
   readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
   readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -160,6 +163,7 @@ export class CompanionService {
   private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
   private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   private readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -181,6 +185,7 @@ export class CompanionService {
     this.credentialProvisioning = options.credentialProvisioning;
     this.networkPolicyProvisioning = options.networkPolicyProvisioning;
     this.providerHandshakes = options.providerHandshakes;
+    this.containmentRelease = options.containmentRelease;
     this.rawHidInstallations = options.rawHidInstallations;
     this.rawHidSupervisor = options.rawHidSupervisor;
     this.hardwareSignals = options.hardwareSignals;
@@ -252,6 +257,8 @@ export class CompanionService {
           return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
         case "provider.handshake":
           return this.success(request.id, await this.providerHandshake(this.requireProviderHandshake(request.payload)));
+        case "containment.release":
+          return this.success(request.id, { command: await this.releaseContainment(this.requireContainmentRelease(request.payload)) });
         case "raw-hid.install":
           return this.success(request.id, await this.installRawHid(this.requireRawHidInstall(request.payload)));
         case "raw-hid.list":
@@ -683,6 +690,13 @@ export class CompanionService {
     return cloneSession(trusted);
   }
 
+  private async releaseContainment(payload: ContainmentReleasePayload): Promise<CommandResult> {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No host-attested containment-release boundary is attached.");
+    const result = await this.containmentRelease.release(payload);
+    this.record("containment.release", result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
   private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
     if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "repositoryRoot", "purposes", "sealedSecret"], ["replaceExisting"])
       || typeof payload.reference !== "string" || !boundedHostPath(payload.repositoryRoot) || !Array.isArray(payload.purposes) || !payload.purposes.every((value) => typeof value === "string") || typeof payload.sealedSecret !== "string" || (payload.replaceExisting !== undefined && typeof payload.replaceExisting !== "boolean")) throw new CompanionServiceError("invalid_request", "Credential provisioning requires only a reference, exact repository, bounded purposes, and a DPAPI-sealed secret.");
@@ -692,6 +706,7 @@ export class CompanionService {
   private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
   private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
   private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
+  private requireContainmentRelease(payload: unknown): ContainmentReleasePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "incidentStatus"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /\0/.test(payload.reason) || (payload.incidentStatus !== "rotation_complete" && payload.incidentStatus !== "not_required")) throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, bounded incident-review reason, and completed-or-not-required credential rotation status."); return { sessionId: payload.sessionId, reason: payload.reason.trim(), incidentStatus: payload.incidentStatus }; }
 
   private async installRawHid(payload: RawHidInstallPayload) {
     if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");

@@ -49,6 +49,7 @@ import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-ev
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { SessionFreshnessCoordinator } from "./session-freshness.ts";
+import { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -323,7 +324,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
+  const containmentRelease = new AttestedContainmentReleaseCoordinator(executor);
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, containmentRelease, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: () => sessionFreshness.refresh(),
     startupRecovery: async () => {

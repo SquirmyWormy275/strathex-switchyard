@@ -8,12 +8,14 @@ import { DurableConfirmationLedger } from "./confirmations.ts";
 import type { AuthorityGrant, CommandRequest, CommandResult, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import {
   CommandDispatcher,
+  type ContainmentReleaseCommandRequest,
   type CommandDispatcherDependencies,
   type DispatchGovernance,
   type DispatchGovernanceAdmission,
   type DispatchGovernanceRequest,
   type DispatchReceiptEvidenceFactory
 } from "./dispatch.ts";
+import type { IncidentStatus } from "./containment.ts";
 import { DurableOperationCoordinator, NoReplayOperationRecovery, OperationSagaStore, type OperationReconciler, type ReconciliationResult } from "./operations.ts";
 import { ExecutionControlRegistry, type ExecutionControl, type OperationControlAdapter } from "./execution-control.ts";
 import type { EffectGuard } from "./brokers.ts";
@@ -94,6 +96,14 @@ export interface RuntimeConfirmationResult {
   readonly summary: string;
   readonly token?: string;
   readonly expiresAt?: string;
+}
+
+export interface RuntimeContainmentReleaseRequest {
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly confirmationToken: string;
+  readonly reason: string;
+  readonly incidentStatus: IncidentStatus;
 }
 
 export interface RuntimeCommandPreparationRequest {
@@ -601,6 +611,53 @@ export class DurableMediatedExecutor {
       ...(confirmationToken ? { confirmationToken } : {}),
       ...(confirmationExpiresAt ? { confirmationExpiresAt } : {})
     };
+  }
+
+  /** Administrative-only containment release; there is deliberately no keyboard chord. */
+  async releaseContainment(request: RuntimeContainmentReleaseRequest): Promise<CommandResult> {
+    const definition = commandForAction("containment_release");
+    const session = await this.sessions.get(request.sessionId);
+    if (!session) return this.auditWithoutOperation(definition, { status: "unavailable", summary: "Containment release requires one exact protected managed session." });
+    let target = await this.resolveTarget(definition, session);
+    if (!target) return this.auditWithoutOperation(definition, { status: "unavailable", summary: "Containment release could not resolve the exact protected repository target." });
+    try { target = await this.snapshots.record(target); }
+    catch { return this.auditWithoutOperation(definition, { status: "unavailable", summary: "Containment release could not record the exact TargetSnapshot." }, target); }
+    if (target.completeness !== "complete") return this.auditWithoutOperation(definition, { status: "incomplete", summary: "Containment release requires a complete TargetSnapshot." }, target);
+    const authorityDecision = await this.authorities.evaluate({
+      authorityId: request.authorityId,
+      repositoryRoot: target.repositoryRoot,
+      sessionId: session.id,
+      ...(session.taskId ? { taskId: session.taskId } : {}),
+      ...(session.planRevision ? { planRevision: session.planRevision } : {}),
+      action: definition.action,
+      now: this.now().toISOString()
+    });
+    if (!authorityDecision.allowed || !authorityDecision.grant) return this.auditWithoutOperation(definition, { status: "blocked", summary: authorityDecision.reason }, target);
+    const authority = authorityDecision.grant;
+    const policy = await this.createPolicy(target);
+    const preliminary = policy.authorize({ definition, target, session, authority });
+    if (preliminary.status !== "awaiting_confirmation") return this.auditWithoutOperation(definition, { status: policyStatus(preliminary.status), summary: preliminary.reason }, target);
+    const consumed = await this.confirmations.consume({ token: request.confirmationToken, action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id });
+    if (!consumed.allowed || !consumed.record) return this.auditWithoutOperation(definition, { status: "blocked", summary: consumed.reason }, target);
+    const ephemeral = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: consumed.record.reason, reauthenticated: consumed.record.reauthenticated });
+    const context: RuntimeDispatcherContext = { policy, sessions: this.sessions, authorities: this.authorities, operationCoordinator: this.operationCoordinator, receiptEvidence: this.options.receiptEvidence };
+    const configured = this.options.dependencies?.(context) ?? { adapters: new AdapterRegistry() };
+    const dispatcher = new CommandDispatcher({
+      ...configured,
+      policy,
+      sessions: { get: (id) => id === session.id ? session : undefined },
+      authorities: { get: (id) => id === authority.id ? authority : undefined },
+      operations: this.operationCoordinator,
+      ...(this.options.receiptEvidence ? { receiptEvidence: this.options.receiptEvidence } : {})
+    });
+    const release: ContainmentReleaseCommandRequest = {
+      targetSnapshot: target,
+      sessionId: session.id,
+      authorityId: authority.id,
+      confirmationToken: ephemeral.token,
+      review: { reauthenticated: true, reason: request.reason, incidentStatus: request.incidentStatus }
+    };
+    return dispatcher.dispatchContainmentRelease(release);
   }
 
   private async resolveTarget(definition: CommandDefinition, session: ManagedSession | undefined): Promise<TargetSnapshot | undefined> {
