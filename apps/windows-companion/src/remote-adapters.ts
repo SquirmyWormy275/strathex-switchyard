@@ -99,7 +99,10 @@ export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCo
         ...input.session.metadata,
         "sxsy-b122.providerHandshake": "exact-route-v1",
         "sxsy-b122.providerHandshakeTarget": before.id,
-        "sxsy-b122.providerHandshakeAt": requestedAt
+        "sxsy-b122.providerHandshakeAt": requestedAt,
+        "sxsy-b122.resources": JSON.stringify(response.resources),
+        "sxsy-b122.dependencies": JSON.stringify(response.dependencies),
+        "sxsy-b122.diffDigest": response.diffDigest
       }
     };
   }
@@ -199,6 +202,9 @@ interface ProviderHandshakeResponse {
   readonly taskId?: string;
   readonly planRevision?: string;
   readonly plannedFiles: readonly string[];
+  readonly resources: readonly string[];
+  readonly dependencies: readonly string[];
+  readonly diffDigest: string;
 }
 
 function parseProviderHandshake(result: ConfiguredNetworkResult): ProviderHandshakeResponse {
@@ -207,13 +213,16 @@ function parseProviderHandshake(result: ConfiguredNetworkResult): ProviderHandsh
   try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { throw new Error("The provider handshake returned malformed JSON."); }
   if (!record(value)) throw new Error("The provider handshake returned a non-record response.");
   const optional = [value.taskId === undefined ? undefined : "taskId", value.planRevision === undefined ? undefined : "planRevision"].filter((item): item is string => !!item);
-  if (!exact(value, ["schema", "version", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "capabilities", "status", "adapterVersion", "plannedFiles", ...optional])
+  if (!exact(value, ["schema", "version", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "capabilities", "status", "adapterVersion", "plannedFiles", "resources", "dependencies", "diffDigest", ...optional])
     || value.schema !== "sxsy-b122.provider-handshake" || value.version !== 1
     || typeof value.sessionId !== "string" || !boundedOpaque(value.sessionId, 256)
     || !providerIdentity(value.provider) || typeof value.targetSnapshotId !== "string" || !/^[a-f0-9]{64}$/i.test(value.targetSnapshotId)
     || !boundedAbsoluteRoot(value.repositoryRoot) || !Array.isArray(value.capabilities) || !value.capabilities.every(capability)
     || !sessionStatus(value.status) || typeof value.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(value.adapterVersion)
     || !Array.isArray(value.plannedFiles) || value.plannedFiles.length > 512 || !value.plannedFiles.every(safePlannedFile)
+    || !Array.isArray(value.resources) || value.resources.length > 128 || !value.resources.every(safeDeclaration)
+    || !Array.isArray(value.dependencies) || value.dependencies.length > 128 || !value.dependencies.every(safeDeclaration)
+    || typeof value.diffDigest !== "string" || !/^[a-f0-9]{64}$/i.test(value.diffDigest)
     || (value.taskId !== undefined && (typeof value.taskId !== "string" || !boundedOpaque(value.taskId, 256)))
     || (value.planRevision !== undefined && (typeof value.planRevision !== "string" || !boundedOpaque(value.planRevision, 256)))) {
     throw new Error("The provider handshake returned an invalid exact-v1 response.");
@@ -228,7 +237,10 @@ function parseProviderHandshake(result: ConfiguredNetworkResult): ProviderHandsh
     adapterVersion: value.adapterVersion,
     ...(typeof value.taskId === "string" ? { taskId: value.taskId } : {}),
     ...(typeof value.planRevision === "string" ? { planRevision: value.planRevision } : {}),
-    plannedFiles: value.plannedFiles as string[]
+    plannedFiles: value.plannedFiles as string[],
+    resources: value.resources as string[],
+    dependencies: value.dependencies as string[],
+    diffDigest: value.diffDigest
   };
 }
 
@@ -249,6 +261,7 @@ function providerIdentity(value: unknown): value is ManagedSession["provider"] {
 function capability(value: unknown): value is Capability { return value === "registered" || value === "observable" || value === "controllable" || value === "mediated"; }
 function sessionStatus(value: unknown): value is SessionStatus { return value === "running" || value === "verified_blocked" || value === "verified_finished" || value === "unreachable" || value === "stale" || value === "unknown"; }
 function safePlannedFile(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value) && !/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value) && !value.split(/[\\/]/).includes(".."); }
+function safeDeclaration(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\r\n\0]/.test(value); }
 
 async function operationAbort(control: AutomationRequest["executionControl"] | AdapterRequest["executionControl"]): Promise<{ signal: AbortSignal; dispose(): void }> {
   const controller = new AbortController();

@@ -24,7 +24,7 @@ test("provider handshake elevates only an exact current target after user presen
   const target = { id: targetId, repositoryRoot: "C:\\repo", branch: "feat/test", head: "b".repeat(40), trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete", reasons: [] } as const;
   let resolutions = 0;
   const coordinator = new AttestedProviderHandshakeCoordinator(
-    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "codex-adapter-1", taskId: "task-1", planRevision: "plan-1", plannedFiles: ["src/index.ts"] })) }; } } as unknown as DynamicConfiguredNetworkClient,
+    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "codex-adapter-1", taskId: "task-1", planRevision: "plan-1", plannedFiles: ["src/index.ts"], resources: ["port:4100"], dependencies: [], diffDigest: "f".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
     { async resolve() { resolutions += 1; return target; } },
     { async verify() { return { verified: true, operator: "DOMAIN\\operator" }; } },
     () => "2026-08-24T00:00:01.000Z"
@@ -40,7 +40,7 @@ test("provider handshake refuses capability installation when target churns", as
   const ids = ["a".repeat(64), "f".repeat(64)];
   let index = 0;
   const coordinator = new AttestedProviderHandshakeCoordinator(
-    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: ids[0], repositoryRoot: "C:\\repo", capabilities: ["registered", "observable"], status: "running", adapterVersion: "adapter", plannedFiles: [] })) }; } } as unknown as DynamicConfiguredNetworkClient,
+    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: ids[0], repositoryRoot: "C:\\repo", capabilities: ["registered", "observable"], status: "running", adapterVersion: "adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "e".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
     { async resolve() { const id = ids[Math.min(index++, 1)]!; return { id, repositoryRoot: "C:\\repo", trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete" as const, reasons: [] }; } },
     { async verify() { return { verified: true, operator: "operator" }; } }
   );
