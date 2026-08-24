@@ -113,7 +113,7 @@ test("composite pipeline status preserves local evidence when hosted CI is unava
     { id: "hosted", kind: "generic", async execute() { return { status: "unavailable", summary: "No configured hosted route.", effectDisposition: "not_started" as const }; } }
   );
   const outcome = await adapter.execute(request("pipeline_status"));
-  assert.equal(outcome.status, "incomplete");
+  assert.equal(outcome.status, "unavailable");
   assert.match(outcome.summary, /not hosted CI evidence/);
   assert.equal((outcome.data?.local as { status: string }).status, "completed");
   assert.equal((outcome.data?.hosted as { status: string }).status, "unavailable");

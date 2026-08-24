@@ -25,8 +25,8 @@ export class CompositePipelineStatusAdapter implements CommandAdapter {
     const hosted = await this.hosted.execute(request);
     const data = { local: observationData(local), hosted: observationData(hosted), completeness: local.status === "completed" && hosted.status === "completed" ? "local_and_hosted" : "partial" };
     if (local.status === "failed") return { status: "failed", summary: `Local pipeline inspection failed; hosted observation was ${hosted.status}.`, effectDisposition: combineDisposition(local, hosted), data };
-    if (hosted.status !== "completed") return { status: "incomplete", summary: `Local status was ${local.status}; hosted exact-head status was ${hosted.status}. Local evidence is not hosted CI evidence.`, effectDisposition: combineDisposition(local, hosted), data };
-    if (local.status !== "completed") return { status: "incomplete", summary: `Hosted exact-head status was observed, but local status was ${local.status}; the observations remain separate.`, effectDisposition: combineDisposition(local, hosted), data };
+    if (hosted.status !== "completed") return { status: "unavailable", summary: `Local status was ${local.status}; hosted exact-head status was ${hosted.status}. Local evidence is not hosted CI evidence.`, effectDisposition: combineDisposition(local, hosted), data };
+    if (local.status !== "completed") return { status: "unavailable", summary: `Hosted exact-head status was observed, but local status was ${local.status}; the observations remain separate.`, effectDisposition: combineDisposition(local, hosted), data };
     return { status: "completed", summary: "Observed both live local repository status and exact-head hosted pipeline status as separate evidence.", effectDisposition: combineDisposition(local, hosted), data };
   }
 }
