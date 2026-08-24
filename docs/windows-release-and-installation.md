@@ -1,15 +1,19 @@
 # Windows Release and Installation
 
-The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, VS Code VSIX, the runtime/sandbox manifest generators and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, checksums, a portable-startup receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. A prebuilt sandbox helper likewise requires its reviewed SHA-256.
+The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, fixed native Raw-HID helper, VS Code VSIX, the runtime/sandbox manifest generators and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, checksums, a portable-startup receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. Prebuilt sandbox and Raw-HID helpers likewise require their reviewed SHA-256 values.
 
 ```powershell
 .\deployment\windows\Build-B122Release.ps1 `
   -NodeRuntimeZip C:\reviewed\node-v24-win-x64.zip `
   -NodeRuntimeSha256 <reviewed-64-character-sha256> `
-  -NodeRuntimeSourceUri https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
+  -NodeRuntimeSourceUri https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip `
+  -SandboxHelperPath C:\reviewed\b122-sandbox-worker.exe `
+  -SandboxHelperSha256 <reviewed-64-character-sha256> `
+  -RawHidHelperPath C:\reviewed\strathex-b122-hid-helper.exe `
+  -RawHidHelperSha256 <reviewed-64-character-sha256>
 ```
 
-The release build runs the isolated test suite, TypeScript checks, both builds, the sandbox-helper build, creates the VSIX, and launches the assembled bundle against an isolated temporary state root for an authenticated DPAPI/named-pipe health check. It records the exact source commit, reviewed runtime URL and archive digest, helper digest, payload checksums, and a structurally validated SPDX inventory. `-SkipVerification` exists only for iterative packaging and is not release evidence; it does not skip the final portable-bundle smoke or artifact-integrity checks.
+The release build runs the isolated test suite, TypeScript checks, both builds, both native-helper builds, creates the VSIX, and launches the assembled bundle against an isolated temporary state root for an authenticated DPAPI/named-pipe health check. It records the exact source commit, reviewed runtime URL and archive digest, both helper digests, payload checksums, and a structurally validated SPDX inventory. `-SkipVerification` exists only for iterative packaging and is not release evidence; it does not skip the final portable-bundle smoke or artifact-integrity checks.
 
 The installed companion uses `%LOCALAPPDATA%\STRATHEX\switchyard` for the authenticated journal, DPAPI-sealed endpoint record, runtime/network/sandbox pins, receipts, and bounded logs. Product bytes live separately under `%LOCALAPPDATA%\STRATHEX\switchyard-product`. The companion has a strict single-instance record and mutual authenticated named-pipe health probe. Repository files cannot choose either location.
 

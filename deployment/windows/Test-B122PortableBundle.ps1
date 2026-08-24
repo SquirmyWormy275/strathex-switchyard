@@ -6,7 +6,9 @@ $root = if ($BundleRoot) { [IO.Path]::GetFullPath($BundleRoot) } else { [IO.Path
 $node = Join-Path $root 'runtime\node.exe'
 $main = Join-Path $root 'app\dist\apps\windows-companion\src\main.js'
 $health = Join-Path $root 'scripts\Test-B122Health.mjs'
-foreach ($file in @($node, $main, $health)) {
+$sandboxHelper = Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper\b122-sandbox-worker.exe'
+$rawHidHelper = Join-Path $root 'app\dist\apps\windows-companion\raw-hid\strathex-b122-hid-helper.exe'
+foreach ($file in @($node, $main, $health, $sandboxHelper, $rawHidHelper)) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Portable SXSY-B122 file is missing: $file" }
   if ($file.Contains('"')) { throw 'Portable bundle paths containing quotation marks are unsupported.' }
 }
@@ -35,7 +37,9 @@ try {
     $configuration = Join-Path $state 'authenticated-pipe.json'
     $healthProcess = Start-Process -FilePath $node -ArgumentList @("`"$health`"", '--configuration', "`"$configuration`"") -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput $healthStdout -RedirectStandardError $healthStderr -Wait -PassThru
     if ($healthProcess.ExitCode -eq 0) {
-      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); helperPresent=(Test-Path -LiteralPath (Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper\b122-sandbox-worker.exe') -PathType Leaf) } | ConvertTo-Json -Compress
+      $unexpectedRawHid = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'strathex-b122-hid-helper.exe' })
+      if ($unexpectedRawHid.Count -ne 0) { throw 'The unprovisioned portable companion launched the Raw-HID helper.' }
+      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); sandboxHelperPresent=$true; rawHidHelperPresent=$true } | ConvertTo-Json -Compress
       return
     }
   } while ([DateTime]::UtcNow -lt $deadline)

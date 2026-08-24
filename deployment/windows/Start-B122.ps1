@@ -12,6 +12,8 @@ New-Item -ItemType Directory -Path $logs -Force | Out-Null
 foreach ($file in @($node,$main,$health,$validator)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
 $validation = & $validator -BundleRoot $current
 if ([string]::IsNullOrWhiteSpace($validation)) { throw 'The installed SXSY-B122 bundle failed integrity validation.' }
+$validationRecord = $validation | ConvertFrom-Json
+if ($validationRecord.schema -cne 'sxsy-b122.release-validation' -or $validationRecord.version -ne 1 -or $validationRecord.status -cne 'passed') { throw 'The installed SXSY-B122 bundle returned an invalid integrity receipt.' }
 $stdout = Join-Path $logs 'companion.stdout.log'
 $stderr = Join-Path $logs 'companion.stderr.log'
 if ($main.Contains('"')) { throw 'Installed SXSY-B122 paths containing quotation marks are unsupported.' }

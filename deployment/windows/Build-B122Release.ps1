@@ -6,6 +6,8 @@ param(
   [string]$OutputDirectory,
   [string]$SandboxHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$SandboxHelperSha256,
+  [string]$RawHidHelperPath,
+  [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RawHidHelperSha256,
   [switch]$SkipVerification
 )
 $ErrorActionPreference = 'Stop'
@@ -63,6 +65,26 @@ if ($SandboxHelperPath) {
   if (-not ((Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.Equals($SandboxHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The sandbox helper digest does not match the reviewed value.' }
 }
 
+$rawHidHelper = $RawHidHelperPath
+if (-not $rawHidHelper) {
+  if ($RawHidHelperSha256) { throw '-RawHidHelperSha256 is valid only with -RawHidHelperPath.' }
+  $dotnet = (Get-Command dotnet.exe -ErrorAction SilentlyContinue).Source
+  if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -RawHidHelperPath is required to build the fixed Windows Raw-HID helper.' }
+  $rawHidPublish = Join-Path $output '.raw-hid-helper-publish'
+  Assert-Child $output $rawHidPublish
+  & $dotnet publish (Join-Path $repo 'firmware\windows-hid-helper\Strathex.B122.RawHidHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $rawHidPublish
+  if ($LASTEXITCODE -ne 0) { throw 'Windows Raw-HID helper build failed.' }
+  $rawHidHelper = Join-Path $rawHidPublish 'strathex-b122-hid-helper.exe'
+}
+$rawHidHelper = [IO.Path]::GetFullPath($rawHidHelper)
+if (-not (Test-Path -LiteralPath $rawHidHelper -PathType Leaf)) { throw 'The fixed Raw-HID helper executable is missing.' }
+if ($RawHidHelperPath) {
+  if (-not $RawHidHelperSha256) { throw '-RawHidHelperSha256 is required with a prebuilt Raw-HID helper.' }
+  if (-not ((Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.Equals($RawHidHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The Raw-HID helper digest does not match the reviewed value.' }
+}
+$helperDigest = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
+$rawHidHelperDigest = (Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.ToLowerInvariant()
+
 $runtimeExtract = Join-Path $output '.node-runtime'
 Assert-Child $output $runtimeExtract
 Expand-Archive -LiteralPath $nodeRuntimeArchive -DestinationPath $runtimeExtract
@@ -86,6 +108,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\README.md') -Des
 $helperDestination = Join-Path $app 'dist\apps\windows-companion\sandbox-helper'
 New-Item -ItemType Directory -Path $helperDestination | Out-Null
 Copy-Item -LiteralPath $helper -Destination (Join-Path $helperDestination 'b122-sandbox-worker.exe')
+$rawHidDestination = Join-Path $app 'dist\apps\windows-companion\raw-hid'
+New-Item -ItemType Directory -Path $rawHidDestination | Out-Null
+Copy-Item -LiteralPath $rawHidHelper -Destination (Join-Path $rawHidDestination 'strathex-b122-hid-helper.exe')
 Copy-Item -LiteralPath $node.FullName -Destination (Join-Path $runtime 'node.exe')
 Copy-Item -LiteralPath $nodeLicense.FullName -Destination (Join-Path $runtime 'NODE-LICENSE.txt')
 
@@ -131,6 +156,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'ATTRIBUTION.md') -Destination $output
 Remove-Item -LiteralPath $runtimeExtract -Recurse -Force
 Remove-Item -LiteralPath $vsixRoot -Recurse -Force
 if (Test-Path -LiteralPath (Join-Path $output '.helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.helper-publish') -Recurse -Force }
+if (Test-Path -LiteralPath (Join-Path $output '.raw-hid-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.raw-hid-helper-publish') -Recurse -Force }
 
 $portableSmoke = & (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($portableSmoke)) { throw 'Portable bundle smoke verification failed.' }
@@ -156,9 +182,8 @@ for ($index = 0; $index -lt $payload.Count; $index++) {
   $relationships += [ordered]@{ spdxElementId=$owner; relationshipType='CONTAINS'; relatedSpdxElement=$fileId }
 }
 Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='SPDX-2.3'; dataLicense='CC0-1.0'; SPDXID='SPDXRef-DOCUMENT'; name='SXSY-B122 Windows bundle'; documentNamespace=('https://strathex.invalid/spdx/b122/' + [guid]::NewGuid()); creationInfo=[ordered]@{ created=(Get-Date).ToUniversalTime().ToString('o'); creators=@('Tool: SXSY-B122 Build-B122Release.ps1') }; packages=$packages; files=$spdxFiles; relationships=$relationships } | ConvertTo-Json -Depth 10)
-$helperDigest = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
 $sourceCommit = (& git.exe rev-parse HEAD).Trim()
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; sandboxHelperSha256=$helperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; sandboxHelperSha256=$helperDigest; rawHidHelperSha256=$rawHidHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 Write-Output "Built verified SXSY-B122 Windows bundle: $output"
