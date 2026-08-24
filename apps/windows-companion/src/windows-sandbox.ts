@@ -158,6 +158,9 @@ export interface WindowsSandboxExecutionRequest {
   readonly destinationRoot?: string;
   /** Selects a recipe in the fixed repository catalog; never a command line. */
   readonly recipeId?: string;
+  /** Host-attested digests; repository bytes cannot authorize themselves. */
+  readonly expectedRecipeCatalogSha256: string;
+  readonly expectedHelperSha256: string;
   readonly signal?: AbortSignal;
   readonly effectGuard?: WindowsSandboxEffectGuard;
 }
@@ -367,6 +370,9 @@ export class WindowsSandboxBackend {
   async execute(request: WindowsSandboxExecutionRequest): Promise<WindowsSandboxExecutionResult> {
     const recipeId = request.recipeId ?? "full_sandbox";
     if (!safeIdentifier.test(recipeId)) return { status: "blocked", summary: "Windows Sandbox rejected an invalid repository recipe identifier." };
+    if (!validDigest(request.expectedRecipeCatalogSha256) || !validDigest(request.expectedHelperSha256)) {
+      return { status: "blocked", summary: "Windows Sandbox requires exact host-attested catalog and helper digests." };
+    }
     const destinationAddress = request.destinationRoot ?? this.options.defaultDestinationRoot;
     if (!destinationAddress) return { status: "unavailable", summary: "Windows Sandbox has no host-owned validated output destination." };
     if (request.signal?.aborted) return { status: "cancelled", summary: "Windows Sandbox was cancelled before preparation." };
@@ -391,10 +397,12 @@ export class WindowsSandboxBackend {
       const helper = await this.filesystem.lstat(helperPath);
       if (!helper.isFile || helper.isSymbolicLink) throw new SandboxBlockedError("Windows Sandbox fixed guest helper is absent or is a symbolic link.");
       const helperDigest = sha256(await this.filesystem.readBytes(helperPath));
+      if (!sameDigest(helperDigest, request.expectedHelperSha256)) throw new SandboxBlockedError("Windows Sandbox fixed guest helper changed after host attestation.");
       const manifestPath = join(targetRoot, this.options.jobManifestRelativePath);
       const manifest = await this.filesystem.lstat(manifestPath);
       if (!manifest.isFile || manifest.isSymbolicLink || manifest.size <= 0 || manifest.size > maximumManifestBytes) throw new SandboxBlockedError("Windows Sandbox repository recipe catalog is absent, linked, empty, or oversized.");
       const recipeCatalogDigest = sha256(await this.filesystem.readBytes(manifestPath));
+      if (!sameDigest(recipeCatalogDigest, request.expectedRecipeCatalogSha256)) throw new SandboxBlockedError("Windows Sandbox recipe catalog changed after host attestation.");
 
       const leaseRoot = join(stateRoot, "leases", rawId);
       const exchangeRoot = join(leaseRoot, "exchange");
@@ -649,6 +657,8 @@ export class WindowsSandboxBackend {
 export interface WindowsSandboxIsolationRuntimeOptions {
   readonly destinationRoot: string;
   readonly permitVerifier: PermitVerifier;
+  readonly recipeCatalogDigest: string;
+  readonly helperDigest: string;
 }
 
 /** Control-plane wrapper; success is reported only for a concrete completed backend receipt. */
@@ -696,6 +706,8 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
         targetRoot: request.target.repositoryRoot,
         destinationRoot: this.options.destinationRoot,
         recipeId: request.profile,
+        expectedRecipeCatalogSha256: this.options.recipeCatalogDigest,
+        expectedHelperSha256: this.options.helperDigest,
         signal: controller.signal,
         effectGuard: controlPlaneGuard
       });
@@ -758,6 +770,11 @@ function xml(value: string): string {
 function boundedInteger(value: number, minimum: number, maximum: number, label: string): number {
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) throw new Error(`Windows Sandbox ${label} is outside its safe bound.`);
   return value;
+}
+
+function validDigest(value: string): boolean { return /^[a-f0-9]{64}$/i.test(value); }
+function sameDigest(left: string, right: string): boolean {
+  return validDigest(left) && validDigest(right) && left.toLowerCase() === right.toLowerCase();
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

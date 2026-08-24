@@ -80,6 +80,16 @@ function sha256(contents: Uint8Array | string): string {
   return createHash("sha256").update(contents).digest("hex");
 }
 
+async function sandboxRequest(setup: Awaited<ReturnType<typeof fixture>>, overrides: Readonly<Record<string, unknown>> = {}) {
+  return {
+    targetRoot: setup.targetRoot,
+    destinationRoot: setup.destinationRoot,
+    expectedRecipeCatalogSha256: sha256(await readFile(join(setup.targetRoot, "sandbox-job.json"))),
+    expectedHelperSha256: sha256(await readFile(join(setup.toolsRoot, "b122-sandbox-worker.exe"))),
+    ...overrides
+  };
+}
+
 function successfulRunner(assertSpec?: (spec: WindowsSandboxRunSpec) => Promise<void> | void): WindowsSandboxProcessRunner {
   return {
     async run(spec, signal, onStarted) {
@@ -139,7 +149,7 @@ test("fails closed before launch when the Windows Sandbox feature is unavailable
   const backend = createBackend(setup, { async run() { launches += 1; throw new Error("must not run"); } }, [], {
     featureProbe: { async check() { return { available: false, reason: "Containers-DisposableClientVM is disabled" }; } }
   });
-  const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup));
   assert.equal(result.status, "unavailable");
   assert.match(result.summary, /disabled/i);
   assert.equal(launches, 0);
@@ -158,7 +168,7 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
     configuration = await readFile(spec.args[0]!, "utf8");
   }), guardCalls);
 
-  const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup));
   assert.equal(result.status, "completed");
   assert.equal(result.leaseId, "sandbox:11111111-2222-4333-8444-555555555555");
   assert.equal(result.processId, "sandbox-process:11111111-2222-4333-8444-555555555555");
@@ -177,13 +187,32 @@ test("launches the fixed Windows Sandbox executable without a shell and extracts
   assert.equal(receipt.resultRoot, result.resultRoot);
 });
 
+test("host-attested catalog and helper digests are rechecked immediately before launch", async (context) => {
+  const setup = await fixture(context);
+  let launches = 0;
+  const backend = createBackend(setup, { async run() { launches += 1; throw new Error("must not launch changed bytes"); } }, []);
+  const request = await sandboxRequest(setup);
+  await writeFile(join(setup.targetRoot, "sandbox-job.json"), JSON.stringify({ version: 2 }), "utf8");
+  const changedCatalog = await backend.run(request);
+  assert.equal(changedCatalog.status, "blocked");
+  assert.match(changedCatalog.summary, /catalog changed/i);
+
+  await writeFile(join(setup.targetRoot, "sandbox-job.json"), JSON.stringify({ version: 1 }), "utf8");
+  const fresh = await sandboxRequest(setup);
+  await writeFile(join(setup.toolsRoot, "b122-sandbox-worker.exe"), "changed helper", "utf8");
+  const changedHelper = await backend.run(fresh);
+  assert.equal(changedHelper.status, "blocked");
+  assert.match(changedHelper.summary, /helper changed/i);
+  assert.equal(launches, 0);
+});
+
 test("the final launch effect guard runs after canonical rechecks and prevents process creation", async (context) => {
   const setup = await fixture(context);
   let launches = 0;
   const backend = createBackend(setup, { async run() { launches += 1; throw new Error("must not run"); } }, [], {
     effectGuard: { async check(input) { return { allowed: false, reason: `${input.phase} containment revoked` }; } }
   });
-  const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup));
   assert.equal(result.status, "blocked");
   assert.match(result.summary, /launch containment revoked/i);
   assert.equal(launches, 0);
@@ -213,7 +242,7 @@ test("invalid quarantine content fails closed without copying any output", async
     }
   };
   const backend = createBackend(setup, runner, []);
-  const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup));
   assert.equal(result.status, "failed");
   assert.match(result.summary, /digest/i);
   await assert.rejects(readFile(join(setup.destinationRoot, "sandbox-11111111-2222-4333-8444-555555555555", "report.txt")), /ENOENT/);
@@ -236,7 +265,7 @@ test("timeout and cancellation receipts remain bounded and never extract output"
         };
       }
     }, [], { idFactory: () => mode === "timeout" ? "aaaaaaaa-2222-4333-8444-555555555555" : "bbbbbbbb-2222-4333-8444-555555555555" });
-    const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+    const result = await backend.run(await sandboxRequest(setup));
     assert.equal(result.status, mode === "timeout" ? "timed_out" : "cancelled");
     const receipt = JSON.parse(await readFile(result.receiptPath!, "utf8")) as { processOutput: string };
     assert.ok(Buffer.byteLength(receipt.processOutput, "utf8") <= 256);
@@ -248,7 +277,7 @@ test("rejects mapped roots outside the canonical task-owned allowlist", async (c
   const outside = await mkdtemp(join(tmpdir(), "sxsy-b122-outside-"));
   context.after(async () => { await rm(outside, { recursive: true, force: true }); });
   const backend = createBackend(setup, successfulRunner(), []);
-  const result = await backend.run({ targetRoot: outside, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup, { targetRoot: outside }));
   assert.equal(result.status, "blocked");
   assert.match(result.summary, /allowlisted task root/i);
 });
@@ -266,7 +295,7 @@ test("a late extraction fence blocks all writes outside quarantine", async (cont
       }
     }
   });
-  const result = await backend.run({ targetRoot: setup.targetRoot, destinationRoot: setup.destinationRoot });
+  const result = await backend.run(await sandboxRequest(setup));
   assert.equal(result.status, "blocked");
   assert.match(result.summary, /authority changed/i);
   assert.deepEqual(phases, ["launch", "extract"]);
@@ -278,7 +307,9 @@ test("the control-plane wrapper claims enforcement only for a completed concrete
   const backend = createBackend(setup, successfulRunner(), []);
   const runtime = new WindowsSandboxIsolationRuntime(backend, {
     destinationRoot: setup.destinationRoot,
-    permitVerifier: { verifyPermit: () => true }
+    permitVerifier: { verifyPermit: () => true },
+    recipeCatalogDigest: sha256(await readFile(join(setup.targetRoot, "sandbox-job.json"))),
+    helperDigest: sha256(await readFile(join(setup.toolsRoot, "b122-sandbox-worker.exe")))
   });
   const outcome = await runtime.start({
     action: "full_sandbox",
