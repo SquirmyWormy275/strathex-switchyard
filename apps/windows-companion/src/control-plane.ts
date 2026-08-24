@@ -188,7 +188,12 @@ export class SafeLocalExecutionBroker implements ExecutionBroker { async execute
 export class DeterministicTestEnvironmentBroker implements TestEnvironmentBroker { async prepare(): Promise<{ available: boolean; environment: Record<string, string> }> { return { available: true, environment: { SXSY_TEST_MODE: "1", DATABASE_URL: "sqlite::memory:", SXSY_NETWORK: "deny" } }; } }
 export class DeterministicExecutionBroker implements ExecutionBroker { readonly calls: string[] = []; async execute(action: string): Promise<AdapterResult> { this.calls.push(action); return { outcome: "passed", detail: "deterministic broker completed in isolated test mode" }; } }
 
-export interface DispatchRequest { control: Control; modifier: Modifier; sessionId?: string; authorityId?: string; target?: TargetSnapshot; operationKey?: string; now?: number; }
+export interface DispatchRequest {
+  control: Control; modifier: Modifier; sessionId?: string; authorityId?: string; target?: TargetSnapshot; operationKey?: string; now?: number;
+  /** Present only after the local UI has shown the exact action/target review. */
+  reviewApproval?: { id: string; action: string; targetDigest: string; issuedAt: number; expiresAt: number; actor: string };
+  commitMessage?: string;
+}
 export interface DispatchResult { status: OperationStatus | "preview" | "unassigned"; assignment?: Assignment; reason: string; operationId?: string; }
 export const maximumHeartbeatAgeMs = 60_000;
 const highRisk = new Set(["COUNCIL:shift", "COMMIT:alt", "COMMIT:shift_alt", "COMPOUND:shift_alt", "PIPELINE:ctrl_shift_alt", "SHIELD:ctrl_shift_alt", "SANDBOX:alt", "SANDBOX:shift_alt", "SANDBOX:ctrl_shift_alt"]);

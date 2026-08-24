@@ -7,7 +7,7 @@
   "scripts": { "vscode:prepublish": "npm run build:vscode" },
   "files": ["dist", "package.json", "README.md"],
   "engines": { "vscode": "^1.85.0" },
-  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.adoptManagedTerminal", "onCommand:sxsy-b122.selectManagedSession", "onCommand:sxsy-b122.showManagedSessions", "onCommand:sxsy-b122.createManagedAgentTerminal", "onCommand:sxsy-b122.showIntent"],
+  "activationEvents": ["onCommand:sxsy-b122.registerManagedSession", "onCommand:sxsy-b122.adoptManagedTerminal", "onCommand:sxsy-b122.selectManagedSession", "onCommand:sxsy-b122.showManagedSessions", "onCommand:sxsy-b122.createManagedAgentTerminal", "onCommand:sxsy-b122.showIntent", "onCommand:sxsy-b122.configureCompanion", "onCommand:sxsy-b122.showCompanionHealth", "onCommand:sxsy-b122.invokeControl", "onCommand:sxsy-b122.showBlockedAgents", "onCommand:sxsy-b122.showFinishedAgents"],
   "contributes": {
     "commands": [
       { "command": "sxsy-b122.registerManagedSession", "title": "SXSY-B122: Register Managed Session" },
@@ -15,7 +15,12 @@
       { "command": "sxsy-b122.selectManagedSession", "title": "SXSY-B122: Select Managed Session" },
       { "command": "sxsy-b122.showManagedSessions", "title": "SXSY-B122: Show Managed Sessions" },
       { "command": "sxsy-b122.createManagedAgentTerminal", "title": "SXSY-B122: Create Managed Agent Terminal" },
-      { "command": "sxsy-b122.showIntent", "title": "SXSY-B122: Show Routed Intent" }
+      { "command": "sxsy-b122.showIntent", "title": "SXSY-B122: Show Routed Intent" },
+      { "command": "sxsy-b122.configureCompanion", "title": "SXSY-B122: Configure Local Companion" },
+      { "command": "sxsy-b122.showCompanionHealth", "title": "SXSY-B122: Show Companion Health" },
+      { "command": "sxsy-b122.invokeControl", "title": "SXSY-B122: Invoke Control" },
+      { "command": "sxsy-b122.showBlockedAgents", "title": "SXSY-B122: Show Verified Blocked Agents" },
+      { "command": "sxsy-b122.showFinishedAgents", "title": "SXSY-B122: Show Verified Finished Agents" }
     ]
   }
 }
