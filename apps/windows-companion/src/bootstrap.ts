@@ -11,6 +11,7 @@ import { dirname, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { DurableHostActionQueue } from "./host-actions.ts";
+import { hostActionCommandActions } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
@@ -22,7 +23,7 @@ import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegis
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
-import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
@@ -33,6 +34,13 @@ import {
   type RawHidTransportFactory
 } from "./raw-hid-installation.ts";
 import { WindowsRawHidTransport } from "./raw-hid-protocol.ts";
+import { LocalCheckpointCapture, LocalRecoveryArtifactVerifier } from "./local-checkpoints.ts";
+import { HostActionOperationQueueControl, InstalledOperationControl, UnavailableInstalledRepositoryProcessSupervisor, WorkflowArtifactOperationQueueControl } from "./operation-control.ts";
+import { HostOwnedOperationReconciler, InstalledReadOnlyObservationPort } from "./operation-recovery.ts";
+import { SpawnCheckpointGitRunner } from "./local-checkpoints.ts";
+import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
+import type { RepositoryProcessSupervisor } from "./repository-runtime.ts";
+import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -63,6 +71,8 @@ export interface DurableWindowsCompanionOptions {
   readonly networkPolicy?: ConfiguredNetworkPolicy;
   /** Host-owned Windows user-presence verifier for runtime pin changes. */
   readonly runtimePinPresence?: WindowsUserPresenceRunner;
+  /** Fixed-helper process supervisor used by installed repository recipes. */
+  readonly repositoryProcessSupervisor?: RepositoryProcessSupervisor;
   /** Fixed packaged b122-sandbox-worker.exe. Omit to keep OS isolation unavailable. */
   readonly sandboxHelperPath?: string;
   /** Fixed packaged strathex-b122-hid-helper.exe. Never supplied by a client. */
@@ -95,6 +105,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly hardwareSignals: DurableHardwareSignalInbox;
+  readonly checkpointCapture: LocalCheckpointCapture | NonNullable<DurableMediatedExecutorOptions["checkpointCapture"]>;
+  readonly checkpointVerifier: LocalRecoveryArtifactVerifier | NonNullable<DurableMediatedExecutorOptions["checkpointVerifier"]>;
+  readonly operationControl: InstalledOperationControl;
   readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
@@ -108,14 +121,34 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     throw new Error("The durable B122 companion requires a host-backed journal authenticator; unprotected hash-chain storage is rejected.");
   }
   const sessions = new SessionRegistry(store);
+  const localStateDirectory = resolve(options.localStateDirectory ?? dirname(store.filePath));
+  const checkpointCapture = options.runtime?.checkpointCapture ?? new LocalCheckpointCapture({ stateDirectory: localStateDirectory });
+  const checkpointVerifier = options.runtime?.checkpointVerifier ?? new LocalRecoveryArtifactVerifier(localStateDirectory);
   const credentialProtector = options.credentialProtector ?? unavailableCredentialProtector;
+  const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store, {
+    processSupervisor: options.repositoryProcessSupervisor ?? new UnavailableInstalledRepositoryProcessSupervisor()
+  });
+  const hardwareSignals = new DurableHardwareSignalInbox(store);
+  const hostActions = new DurableHostActionQueue(store);
+  const workflowArtifacts = new WorkflowArtifactStore(store);
+  const operationControl = new InstalledOperationControl({
+    queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals],
+    processes: repositoryRuntimes
+  });
   let credentialVault!: DurableCredentialReferenceVault;
-  const containmentManager = new DurableContainmentManager(store, { revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot) });
+  const containmentManager = new DurableContainmentManager(store, {
+    revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot),
+    cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
+  });
   credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
   const networkPolicyRegistry = new DurableNetworkPolicyRegistry(store, resolve(options.localStateDirectory ?? dirname(store.filePath), "network-policy.json"));
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
-  const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store);
+  const configuredNetwork = new DynamicConfiguredNetworkClient({
+    registry: networkPolicyRegistry,
+    containment: containmentManager,
+    credentials: credentialVault.createAdapter("configured-network")
+  });
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
     : undefined;
@@ -125,7 +158,6 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const sandboxInstallations = sandboxInstallationRegistry && options.runtimePinPresence && options.sandboxHelperPath
     ? new AttestedSandboxInstallationCoordinator(sandboxInstallationRegistry, options.sandboxHelperPath, options.runtimePinPresence)
     : undefined;
-  const hardwareSignals = new DurableHardwareSignalInbox(store);
   const rawHidInstallationRegistry = options.rawHidHelperPath
     ? new DurableRawHidInstallationRegistry(store, {
         helperPath: options.rawHidHelperPath,
@@ -166,12 +198,28 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   );
   const providerHandshakes = options.runtimePinPresence
     ? new AttestedProviderHandshakeCoordinator(
-        new DynamicConfiguredNetworkClient({ registry: networkPolicyRegistry, containment: containmentManager, credentials: credentialVault.createAdapter("configured-network") }),
+        configuredNetwork,
         targetResolver,
         options.runtimePinPresence
       )
     : undefined;
-  const hostActions = new DurableHostActionQueue(store);
+  const installedReconciler = new HostOwnedOperationReconciler(new InstalledReadOnlyObservationPort({
+    git: new SpawnCheckpointGitRunner(),
+    network: configuredNetwork,
+    networkPolicy: networkPolicyRegistry,
+    council: new CouncilCoordinator(store),
+    hostActions
+  }));
+  const installedReconciliationActions = [
+    "git.local-commit", "git.push-reviewed-head", "git.direct-main", "github.pr-upsert", "github.pr-merge",
+    "council.pause", "council.assignment", "council.resume",
+    ...providerCommandActions.map((action) => `provider.${action}`),
+    ...hostActionCommandActions
+  ];
+  const operationReconcilers = {
+    ...Object.fromEntries(installedReconciliationActions.map((action) => [action, installedReconciler])),
+    ...(options.runtime?.operationReconcilers ?? {})
+  };
   const gitReviews = options.runtime?.confirmationAttestor ? new DurableGitMutationReviewQueue({
     store,
     sessions,
@@ -214,12 +262,21 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     policyVersion: options.policyVersion,
     targetResolver,
     enabledHighConsequenceActions: options.enabledHighConsequenceActions,
+    checkpointCapture,
+    checkpointVerifier,
+    operationControl: options.runtime?.operationControl ?? operationControl,
+    operationReconcilers,
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, workflowArtifacts, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
-    startupRecovery: async () => { await executor.recoverAfterRestart(); await hardwareSignals.recoverAfterRestart(); }
+    startupRecovery: async () => {
+      for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
+      await repositoryRuntimes.recoverManagedProcesses();
+      await executor.recoverAfterRestart();
+      await hardwareSignals.recoverAfterRestart();
+    }
   });
   return {
     store,
@@ -232,6 +289,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     credentialVault,
     networkPolicyRegistry,
     hardwareSignals,
+    checkpointCapture,
+    checkpointVerifier,
+    operationControl,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),

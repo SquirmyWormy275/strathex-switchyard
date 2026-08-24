@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,12 +15,26 @@ import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
 import { AuthenticatedPipeServer, createPipeConfiguration } from "../src/authenticated-pipe.ts";
 import { FakeUserSecretProtector } from "../src/windows-secret.ts";
 import type { RawHidTransportEvents } from "../src/raw-hid-installation.ts";
+import { LocalCheckpointCapture, LocalRecoveryArtifactVerifier } from "../src/local-checkpoints.ts";
+import { InstalledOperationControl } from "../src/operation-control.ts";
+import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 
 async function git(root: string, args: readonly string[]): Promise<void> {
   await new Promise<void>((resolveRun, reject) => {
     const child = spawn("git", [...args], { cwd: root, shell: false, windowsHide: true });
     let stderr = ""; child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
     child.once("error", reject); child.once("close", (code) => code === 0 ? resolveRun() : reject(new Error(stderr || `git ${args[0]} failed`)));
+  });
+}
+
+async function gitText(root: string, args: readonly string[]): Promise<string> {
+  return new Promise<string>((resolveRun, reject) => {
+    const child = spawn("git", [...args], { cwd: root, shell: false, windowsHide: true });
+    let stdout = ""; let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.once("error", reject);
+    child.once("close", (code) => code === 0 ? resolveRun(stdout.trim()) : reject(new Error(stderr || `git ${args[0]} failed`)));
   });
 }
 
@@ -57,6 +71,106 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   assert.equal(response.ok, true);
   assert.equal((response.result as { command: { status: string } }).command.status, "blocked");
   assert.equal((await companion.endpoint.listSessions()).length, 1);
+  assert.ok(companion.checkpointCapture instanceof LocalCheckpointCapture);
+  assert.ok(companion.checkpointVerifier instanceof LocalRecoveryArtifactVerifier);
+  assert.ok(companion.operationControl instanceof InstalledOperationControl);
+  const workflowArtifacts = new WorkflowArtifactStore(companion.store, { idFactory: () => "provider-artifact" });
+  await workflowArtifacts.create({
+    action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: "trusted",
+    payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["evidence"], requiredBackends: ["provider"] }
+  });
+  await workflowArtifacts.claimForDispatch({ action: "proof", targetSnapshotId: target.id, sessionId: "trusted", operationId: "provider-operation" });
+  assert.equal((await companion.operationControl.cancel({ operationId: "provider-operation", reason: "operator cancelled" })).accepted, true);
+  assert.equal((await workflowArtifacts.get("provider-artifact"))?.status, "cancelling");
+});
+
+test("packaged restart finalizes a durable authenticated host effect without replaying it", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-host-restart-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const filePath = join(folder, "protected.jsonl");
+  const firstStore = new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator });
+  const first = createDurableWindowsCompanion({
+    store: firstStore,
+    policyVersion: "policy-1",
+    localStateDirectory: folder,
+    targetResolver: { resolve: async () => undefined }
+  });
+  await first.endpoint.ready();
+  const dispatched = await first.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "crash-after-host-effect",
+    method: "command.dispatch",
+    payload: { control: "CLAUDE", modifier: "normal" }
+  });
+  assert.equal(dispatched.ok, true);
+  const command = (dispatched.result as { command: { operationId: string; data: { hostActionId: string } } }).command;
+  await first.hostActions.settle({
+    hostActionId: command.data.hostActionId,
+    succeeded: true,
+    summary: "The installed VS Code host completed the exact durable action before the companion crashed.",
+    adapterVersion: "installed-test-1"
+  });
+  assert.equal((await first.executor.operations.get(command.operationId))?.state, "executing");
+
+  const restartedStore = new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator });
+  const restarted = createDurableWindowsCompanion({
+    store: restartedStore,
+    policyVersion: "policy-1",
+    localStateDirectory: folder,
+    targetResolver: { resolve: async () => undefined }
+  });
+  await restarted.endpoint.ready();
+  assert.equal((await restarted.executor.operations.get(command.operationId))?.state, "recorded");
+  assert.equal((await restarted.hostActions.listPending()).length, 0);
+  assert.equal((await restarted.hostActions.listSettled()).length, 1);
+  assert.equal((await restartedStore.readEntries()).filter((entry) => entry.kind === "host_action" && (entry.payload as { event?: string }).event === "queued").length, 1);
+});
+
+test("packaged restart reconciles an exact crash-after-local-commit child by read-only HEAD and tree observation", async (context) => {
+  const folder = await realpath(await mkdtemp(join(tmpdir(), "sxsy-b122-git-restart-")));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  await git(folder, ["init"]);
+  await git(folder, ["config", "user.email", "isolated@example.test"]);
+  await git(folder, ["config", "user.name", "Isolated Test"]);
+  await writeFile(join(folder, "README.md"), "baseline\n", "utf8");
+  await git(folder, ["add", "README.md"]);
+  await git(folder, ["commit", "-m", "baseline"]);
+  const beforeHead = await gitText(folder, ["rev-parse", "HEAD"]);
+  await writeFile(join(folder, "README.md"), "reviewed change\n", "utf8");
+  await git(folder, ["add", "README.md"]);
+  const expectedTree = await gitText(folder, ["write-tree"]);
+
+  const filePath = join(folder, "state", "protected.jsonl");
+  const first = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    localStateDirectory: join(folder, "state"),
+    targetResolver: { resolve: async () => undefined }
+  });
+  await first.endpoint.ready();
+  const parent = (await first.executor.operations.begin({ action: "test.composite", targetSnapshotId: "snapshot-git", idempotencyKey: "restart-parent" })).operation;
+  await first.executor.operations.advance(parent.id, "executing");
+  const child = (await first.executor.operations.beginChild(parent.id, {
+    action: "git.local-commit",
+    targetSnapshotId: "snapshot-git",
+    idempotencyKey: "restart-local-child",
+    details: { repositoryRoot: folder, beforeHead, expectedTree }
+  })).operation;
+  await first.executor.operations.advance(child.id, "executing");
+  await git(folder, ["commit", "--no-verify", "-m", "reviewed change"]);
+  const postHead = await gitText(folder, ["rev-parse", "HEAD"]);
+
+  const restarted = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    localStateDirectory: join(folder, "state"),
+    targetResolver: { resolve: async () => undefined }
+  });
+  await restarted.endpoint.ready();
+  assert.equal((await restarted.executor.operations.get(child.id))?.state, "recorded");
+  assert.equal((await restarted.executor.operations.get(parent.id))?.state, "executing");
+  assert.equal(await gitText(folder, ["rev-parse", "HEAD"]), postHead);
+  assert.equal((await gitText(folder, ["rev-list", "--count", "HEAD"])), "2");
 });
 
 test("bootstrap rejects a hash-chain-only store outside the isolated test override", () => {

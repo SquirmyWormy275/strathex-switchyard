@@ -32,7 +32,8 @@ export interface HostActionIntent {
 
 type HostActionEvent =
   | { readonly version: 1; readonly event: "queued"; readonly intent: HostActionIntent }
-  | { readonly version: 1; readonly event: "settled"; readonly record: HostActionCompletionRecord };
+  | { readonly version: 1; readonly event: "settled"; readonly record: HostActionCompletionRecord }
+  | { readonly version: 1; readonly event: "cancelled"; readonly hostActionId: string; readonly operationId: string; readonly reason: string; readonly at: string };
 
 export interface DurableHostActionQueueOptions {
   readonly now?: () => Date;
@@ -96,7 +97,12 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
       const queued = events.find((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued" && event.intent.id === payload.hostActionId)?.intent;
       if (!queued) throw new Error("The host-action acknowledgement does not match a durable queued intent.");
-      const prior = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === payload.hostActionId)?.record;
+      if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === payload.hostActionId)) {
+        throw new Error("A cancelled host action cannot be acknowledged as completed.");
+      }
+      const priorEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === payload.hostActionId)?.record;
+      const prior = priorEvent ? safeCompletion(priorEvent, queued) : undefined;
+      if (priorEvent && !prior) throw new Error("The protected host-action completion does not match its exact durable intent.");
       const expired = Date.parse(queued.expiresAt) <= this.now().getTime();
       const record: HostActionCompletionRecord = {
         hostActionId: queued.id,
@@ -105,12 +111,14 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         ...(queued.targetSnapshotId ? { targetSnapshotId: queued.targetSnapshotId } : {}),
         status: expired ? "failed" : payload.succeeded ? "completed" : "failed",
         summary: expired ? "The authenticated host acknowledgement arrived after the bounded action deadline." : boundedSummary(payload.summary),
-        evidenceDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !expired && payload.succeeded, adapterVersion: payload.adapterVersion })),
-        toolVersions: { vscodeExtension: boundedVersion(payload.adapterVersion) },
+        completionDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !expired && payload.succeeded, adapterVersion: boundedVersion(payload.adapterVersion) })),
         completedAt: this.now().toISOString()
       };
       if (prior) {
-        if (prior.status !== record.status || prior.summary !== record.summary) throw new Error("A settled host action cannot be acknowledged with a different outcome.");
+        if (prior.status !== record.status || prior.summary !== record.summary
+          || (prior.completionDigest !== undefined && prior.completionDigest !== record.completionDigest)) {
+          throw new Error("A settled host action cannot be acknowledged with a different outcome.");
+        }
         return prior;
       }
       await transaction.append<HostActionEvent>("host_action", { version: 1, event: "settled", record });
@@ -121,7 +129,81 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   async listPending(): Promise<readonly HostActionIntent[]> {
     const events = (await this.store.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
     const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
-    return events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued" && !settled.has(event.intent.id)).map((event) => event.intent);
+    const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+    return events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued" && !settled.has(event.intent.id) && !cancelled.has(event.intent.id)).map((event) => event.intent);
+  }
+
+  /** Returns durable authenticated completions for idempotent restart recovery. */
+  async listSettled(): Promise<readonly HostActionCompletionRecord[]> {
+    const events = (await this.store.readEntries<HostActionEvent>())
+      .filter((entry) => entry.kind === "host_action")
+      .map((entry) => entry.payload);
+    const queued = new Map(events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued").map((event) => [event.intent.id, event.intent]));
+    const records = new Map<string, HostActionCompletionRecord>();
+    for (const event of events) {
+      if (event.event === "settled" && !records.has(event.record.hostActionId)) {
+        const intent = queued.get(event.record.hostActionId);
+        const completion = intent ? safeCompletion(event.record, intent) : undefined;
+        if (completion) records.set(event.record.hostActionId, completion);
+      }
+    }
+    return [...records.values()];
+  }
+
+  /** Cancels only durable intents already bound to this exact operation. */
+  async cancelPendingByOperation(operationId: string, reason: string): Promise<number> {
+    const exactOperation = boundedReference(operationId, "host-action operation ID");
+    const exactReason = boundedSummary(reason);
+    return this.store.transaction(async (transaction) => {
+      const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
+      const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
+      const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+      const pending = events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
+        && event.intent.operationId === exactOperation && !settled.has(event.intent.id) && !cancelled.has(event.intent.id));
+      for (const event of pending) {
+        await transaction.append<HostActionEvent>("host_action", {
+          version: 1, event: "cancelled", hostActionId: event.intent.id, operationId: exactOperation, reason: exactReason, at: this.now().toISOString()
+        });
+      }
+      return pending.length;
+    });
+  }
+
+  /** Cancels only queued intents already bound to this exact repository root. */
+  async cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number> {
+    const exactRoot = normalizePath(repositoryRoot);
+    const exactReason = boundedSummary(reason);
+    return this.store.transaction(async (transaction) => {
+      const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
+      const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
+      const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+      const pending = events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
+        && event.intent.workspaceRoot !== undefined && normalizePath(event.intent.workspaceRoot) === exactRoot
+        && !settled.has(event.intent.id) && !cancelled.has(event.intent.id));
+      for (const event of pending) await transaction.append<HostActionEvent>("host_action", {
+        version: 1, event: "cancelled", hostActionId: event.intent.id, operationId: event.intent.operationId, reason: exactReason, at: this.now().toISOString()
+      });
+      return pending.length;
+    });
+  }
+
+  /** Read-only observation used by startup reconciliation; it never executes an intent. */
+  async observeOperation(operationId: string, action?: string): Promise<Readonly<{ outcome: "committed" | "failed" | "cancelled" | "unresolved"; note: string }>> {
+    const exactOperation = boundedReference(operationId, "host-action operation ID");
+    const exactAction = action === undefined ? undefined : boundedReference(action, "host-action command action");
+    const events = (await this.store.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
+    const queued = events.find((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
+      && event.intent.operationId === exactOperation && (exactAction === undefined || event.intent.commandAction === exactAction))?.intent;
+    if (!queued) return { outcome: "unresolved", note: "No exact durable host-action intent was observed; nothing was replayed." };
+    const completedEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === queued.id)?.record;
+    const completed = completedEvent ? safeCompletion(completedEvent, queued) : undefined;
+    if (completed) return completed.status === "completed"
+      ? { outcome: "committed", note: "The authenticated host completion is durable for the exact operation." }
+      : { outcome: "failed", note: "The authenticated host reported failure for the exact operation." };
+    if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === queued.id)) {
+      return { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." };
+    }
+    return { outcome: "unresolved", note: "The exact durable host action remains queued; no host effect was inferred or replayed." };
   }
 }
 
@@ -217,6 +299,35 @@ function boundedSummary(value: string): string {
 function boundedVersion(value: string): string {
   if (!/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The host adapter version is invalid.");
   return value;
+}
+
+function boundedReference(value: string, field: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 512 || /[\r\n\0]/.test(value)) throw new Error(`The ${field} is invalid.`);
+  return value;
+}
+
+function safeCompletion(value: HostActionCompletionRecord, intent: HostActionIntent): HostActionCompletionRecord | undefined {
+  if (!value || value.hostActionId !== intent.id || value.operationId !== intent.operationId || value.action !== intent.commandAction
+    || value.targetSnapshotId !== intent.targetSnapshotId || (value.status !== "completed" && value.status !== "failed")
+    || typeof value.summary !== "string" || boundedSummary(value.summary) !== value.summary
+    || typeof value.completedAt !== "string" || !Number.isFinite(Date.parse(value.completedAt))
+    || (value.completionDigest !== undefined && !/^[a-f0-9]{64}$/.test(value.completionDigest))) return undefined;
+  return {
+    hostActionId: intent.id,
+    operationId: intent.operationId,
+    action: intent.commandAction,
+    ...(intent.targetSnapshotId ? { targetSnapshotId: intent.targetSnapshotId } : {}),
+    status: value.status,
+    summary: value.summary,
+    ...(value.completionDigest ? { completionDigest: value.completionDigest } : {}),
+    completedAt: value.completedAt
+  };
+}
+
+function normalizePath(value: string): string {
+  const bounded = boundedReference(value, "host-action repository root").replaceAll("\\", "/").replace(/\/+$/, "");
+  if (!/^(?:[A-Za-z]:\/|\/|\/\/)/.test(bounded)) throw new Error("The host-action repository root must be absolute.");
+  return process.platform === "win32" ? bounded.toLowerCase() : bounded;
 }
 
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }

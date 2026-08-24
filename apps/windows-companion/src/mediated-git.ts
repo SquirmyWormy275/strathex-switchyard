@@ -20,6 +20,7 @@ import {
   type GitRequest
 } from "../../../packages/control-plane/src/brokers.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
+import type { ChildOperationLease } from "../../../packages/control-plane/src/operations.ts";
 
 export interface LocalGitResult {
   readonly exitCode: number;
@@ -175,6 +176,7 @@ export class LocalMediatedGitHandler {
     let temporaryIndex: string | undefined;
     let temporaryInspectionIndex: string | undefined;
     let temporaryHooks: string | undefined;
+    let localCommitChild: ChildOperationLease | undefined;
     try {
       lock = await this.acquireLock(root);
       // Revalidate while the companion-held worktree lock is active.  A
@@ -245,6 +247,18 @@ export class LocalMediatedGitHandler {
       await copyFile(sharedIndexLock.indexPath, temporaryInspectionIndex);
       const indexLockedPrecondition = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
       if (indexLockedPrecondition) return indexLockedPrecondition;
+      const expectedTree = await this.currentIndexTree(root, environment);
+      if (request.childSaga) {
+        localCommitChild = await request.childSaga.begin({
+          action: "git.local-commit",
+          idempotencyScope: "local-commit-ref-update",
+          details: { repositoryRoot: root, beforeHead: request.target.head, expectedTree }
+        });
+        if (!localCommitChild.mayExecute) {
+          return { status: "incomplete", summary: "A prior exact local-commit generation requires read-only reconciliation and was not replayed.", effectDisposition: "ambiguous" };
+        }
+        await request.childSaga.markExecuting(localCommitChild);
+      }
       const commit = await this.runner.run([
         "-c", `core.hooksPath=${temporaryHooks}`,
         "-c", "commit.gpgSign=false",
@@ -254,6 +268,10 @@ export class LocalMediatedGitHandler {
         const postHead = await this.currentHead(root);
         const committedTree = await this.currentHeadTree(root);
         const privateTree = await this.currentIndexTree(root, environment);
+        if (localCommitChild) {
+          await request.childSaga!.markExternalCommitted(localCommitChild, { postHead, committedTree });
+          await request.childSaga!.settle(localCommitChild, "completed", { postHead, committedTree });
+        }
         if (privateTree !== committedTree) {
           return {
             status: "incomplete",
@@ -281,6 +299,10 @@ export class LocalMediatedGitHandler {
 
       const observedHead = await this.currentHead(root).catch(() => undefined);
       if (observedHead && observedHead !== request.target.head) {
+        if (localCommitChild) {
+          await request.childSaga!.markExternalCommitted(localCommitChild, { observedHead });
+          await request.childSaga!.settle(localCommitChild, "ambiguous", { observedHead });
+        }
         return {
           status: "incomplete",
           summary: "Git reported an error after the target HEAD changed; the commit outcome is ambiguous and requires reconciliation.",
@@ -288,8 +310,10 @@ export class LocalMediatedGitHandler {
           data: { beforeHead: request.target.head, observedHead }
         };
       }
+      if (localCommitChild) await request.childSaga!.settle(localCommitChild, "failed", { observedHead: request.target.head });
       return failedGit("The reviewed local commit was rejected without changing the observed target HEAD.", commit, "not_started");
     } catch (error) {
+      if (localCommitChild && request.childSaga) await request.childSaga.settle(localCommitChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
       return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous" };
     } finally {
       if (temporaryIndex) {

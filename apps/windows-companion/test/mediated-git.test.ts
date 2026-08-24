@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -13,6 +13,17 @@ import { GitCliInspector } from "../../../packages/control-plane/src/git-inspect
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
 import { LocalMediatedGitHandler } from "../src/mediated-git.ts";
+import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
+
+class RecordingChildSaga implements ChildOperationSaga {
+  readonly events: Array<Readonly<{ kind: string; value?: unknown }>> = [];
+  async begin(input: ChildOperationStart): Promise<ChildOperationLease> { this.events.push({ kind: "begin", value: input }); return { operationId: "local-child", parentOperationId: "operation-safe", action: input.action, targetSnapshotId: "target", existing: false, state: "prepared", mayExecute: true }; }
+  async markExecuting(lease: ChildOperationLease) { this.events.push({ kind: "executing", value: lease.operationId }); }
+  async markExternalCommitted(_lease: ChildOperationLease, details?: Readonly<Record<string, string>>) { this.events.push({ kind: "external", value: details }); }
+  async markCancelling() { throw new Error("not used"); }
+  async markCompensating() { throw new Error("not used"); }
+  async settle(_lease: ChildOperationLease, outcome: ChildOperationOutcome, details?: Readonly<Record<string, string>>) { this.events.push({ kind: `settle:${outcome}`, value: details }); }
+}
 
 async function command(cwd: string, ...args: string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> {
   return new Promise((resolveResult, reject) => {
@@ -150,7 +161,8 @@ test("mediated local commit uses an exact task-owned private index and reconcile
     const broker = new InMemoryGitBroker(policy);
     broker.register("local_commit", (input) => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
     const before = await requireCommand(isolated.root, "git", "rev-parse", "HEAD");
-    const result = await broker.execute(request);
+    const saga = new RecordingChildSaga();
+    const result = await broker.execute({ ...request, childSaga: saga });
     assert.equal(result.status, "completed", result.summary);
     const after = await requireCommand(isolated.root, "git", "rev-parse", "HEAD");
     assert.notEqual(after, before);
@@ -161,6 +173,13 @@ test("mediated local commit uses an exact task-owned private index and reconcile
     );
     assert.equal((await command(isolated.root, "git", "diff", "--cached", "--quiet", "--exit-code")).code, 0, "shared index has no phantom staged change");
     assert.equal((await command(isolated.root, "git", "status", "--porcelain")).stdout.trim(), "");
+    const begun = saga.events.find((event) => event.kind === "begin")?.value as ChildOperationStart;
+    assert.equal(begun.action, "git.local-commit");
+    assert.equal(begun.details?.repositoryRoot, await realpath(isolated.root));
+    assert.equal(begun.details?.beforeHead, before);
+    assert.equal(begun.details?.expectedTree, await requireCommand(isolated.root, "git", "rev-parse", "HEAD^{tree}"));
+    assert.equal((saga.events.find((event) => event.kind === "external")?.value as Record<string, string>).postHead, after);
+    assert.equal(saga.events.at(-1)?.kind, "settle:completed");
   } finally {
     await isolated.dispose();
   }

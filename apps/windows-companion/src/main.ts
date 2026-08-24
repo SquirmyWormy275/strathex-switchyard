@@ -1,5 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { lstat, readFile, realpath } from "node:fs/promises";
 
 import { createDurableWindowsCompanion } from "./bootstrap.ts";
 import { AuthenticatedPipeServer, createPipeConfiguration, loadPipeConfiguration, savePipeConfiguration } from "./authenticated-pipe.ts";
@@ -9,6 +11,10 @@ import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./con
 import { PowerShellWindowsUserPresenceRunner, WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
 import { acquireCompanionInstance } from "./instance-lifecycle.ts";
 import type { InstalledRawHidSupervisor } from "./raw-hid-installation.ts";
+import { loadOrCreateHostReceiptEvidenceFactory } from "./receipt-evidence.ts";
+import { WindowsJobObjectProcessSupervisor } from "./windows-job-supervisor.ts";
+import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
+import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -35,6 +41,35 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   const userPresence = new PowerShellWindowsUserPresenceRunner();
   const sandboxHelperPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "sandbox-helper", "b122-sandbox-worker.exe");
   const rawHidHelperPath = packagedRawHidHelperPath(mainPath);
+  const repositoryRuntimeHelperPath = packagedRepositoryRuntimeHelperPath(mainPath);
+  const [sandboxHelperIdentity, rawHidHelperIdentity, repositoryRuntimeHelperIdentity] = await Promise.all([
+    installedHelperIdentity(sandboxHelperPath),
+    installedHelperIdentity(rawHidHelperPath),
+    installedHelperIdentity(repositoryRuntimeHelperPath)
+  ]);
+  const exactVersions = {
+    companion: "@strathex/switchyard-companion@0.2.0",
+    node: process.version,
+    sandboxHelper: sandboxHelperIdentity,
+    rawHidHelper: rawHidHelperIdentity,
+    repositoryRuntimeHelper: repositoryRuntimeHelperIdentity,
+    repositoryRuntimeHelperVersion: "sxsy-b122-repository-runner-v1",
+    rawHidProtocol: String(protocolVersion),
+    rawHidMap: Buffer.from(mapFingerprint).toString("hex")
+  };
+  const receiptEvidence = await loadOrCreateHostReceiptEvidenceFactory({
+    filePath: join(stateDirectory, "receipt-evidence-key.json"),
+    protector,
+    policyVersion: "b122-local-v1",
+    exactVersions
+  });
+  const repositoryProcessSupervisor = repositoryRuntimeHelperIdentity.startsWith("sha256:")
+    ? new WindowsJobObjectProcessSupervisor({
+        helperPath: repositoryRuntimeHelperPath,
+        helperSha256: repositoryRuntimeHelperIdentity.slice("sha256:".length),
+        stateRoot: join(stateDirectory, "repository-supervisors")
+      })
+    : undefined;
   const companion = createDurableWindowsCompanion({
     policyVersion: "b122-local-v1",
     store,
@@ -42,11 +77,13 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
     localGitStateDirectory: stateDirectory,
     credentialProtector: protector,
     networkPolicy,
+    receiptEvidence,
     runtime: { confirmationAttestor: new WindowsHelloConfirmationAttestor(userPresence) },
     runtimePinPresence: userPresence,
     sandboxHelperPath,
     rawHidHelperPath,
-    snapshotEnvironmentFor: () => ({ toolVersions: { companion: "b122-windows-local-v1" } })
+    ...(repositoryProcessSupervisor ? { repositoryProcessSupervisor } : {}),
+    snapshotEnvironmentFor: () => ({ toolVersions: exactVersions })
   });
   rawHidSupervisor = companion.rawHidSupervisor;
   await companion.endpoint.ready();
@@ -74,6 +111,26 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
 /** Fixed packaged location; no command line, environment, or workspace input participates. */
 export function packagedRawHidHelperPath(mainModulePath: string): string {
   return resolve(dirname(mainModulePath), "..", "raw-hid", "strathex-b122-hid-helper.exe");
+}
+
+/** Fixed Windows release-bundle location; no workspace or environment input participates. */
+export function packagedRepositoryRuntimeHelperPath(mainModulePath: string): string {
+  return resolve(dirname(mainModulePath), "..", "repository-runtime", "b122-repository-runner.exe");
+}
+
+async function installedHelperIdentity(path: string): Promise<string> {
+  try {
+    const metadata = await lstat(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size <= 0 || metadata.size > 256 * 1024 * 1024) {
+      throw new Error("A packaged B122 helper is not a bounded regular file.");
+    }
+    const canonical = await realpath(path);
+    if (resolve(canonical).toLowerCase() !== resolve(path).toLowerCase()) throw new Error("A packaged B122 helper path traverses an unexpected filesystem alias.");
+    return `sha256:${createHash("sha256").update(await readFile(canonical)).digest("hex")}`;
+  } catch (error) {
+    if (isMissingFile(error)) return "unavailable:not-installed";
+    throw error;
+  }
 }
 
 async function loadNetworkPolicy(path: string): Promise<ConfiguredNetworkPolicy> {

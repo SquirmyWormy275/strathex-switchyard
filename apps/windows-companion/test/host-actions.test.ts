@@ -39,6 +39,9 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
   assert.deepEqual(second.data, first.data);
   assert.equal(first.data?.hostActionUrl, "https://github.com/acme/switchyard/pulls?q=is%3Apr+is%3Aopen+head%3Afeature%2Fhost-actions");
   assert.equal((await queue.listPending()).length, 1);
+  const completion = await queue.settle({ hostActionId: String(first.data?.hostActionId), succeeded: true, summary: "Opened the exact reviewed host destination.", adapterVersion: "isolated-extension-1" });
+  assert.equal("evidenceDigest" in completion, false, "host UI acknowledgement must not mint gate-bearing receipt evidence");
+  assert.equal("toolVersions" in completion, false, "only typed runtime/scanner issuers may supply receipt tool evidence");
 });
 
 test("installed dispatch stays running until the authenticated host acknowledgement durably settles it", async (context) => {
@@ -89,4 +92,52 @@ test("an unknown or conflicting host acknowledgement cannot finalize an operatio
   });
   assert.equal(response.ok, false);
   assert.equal(response.error?.code, "invalid_request");
+});
+
+test("host-owned cancellation settles only exact queued operation intents and is restart-durable", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-cancel-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const queue = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:00.000Z") });
+  const adapter = new DurableHostActionAdapter(queue);
+  await adapter.execute({ definition: commandForAction("open_claude"), operationId: "operation-cancel", target });
+  await adapter.execute({ definition: commandForAction("open_chatgpt"), operationId: "operation-keep", target });
+
+  assert.equal(await queue.cancelPendingByOperation("operation-cancel", "Operator cancelled exact durable work."), 1);
+  assert.equal(await queue.cancelPendingByOperation("operation-cancel", "Operator cancelled exact durable work."), 0);
+  assert.deepEqual((await queue.listPending()).map((item) => item.operationId), ["operation-keep"]);
+
+  assert.equal(await queue.cancelQueuedForRepository("C:\\unrelated", "containment"), 0);
+  assert.equal(await queue.cancelQueuedForRepository(target.repositoryRoot, "containment"), 1);
+
+  const restarted = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:01.000Z") });
+  assert.deepEqual(await restarted.observeOperation("operation-cancel", "open_claude"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
+  assert.deepEqual(await restarted.observeOperation("operation-keep", "open_chatgpt"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
+  assert.deepEqual(await restarted.listSettled(), []);
+});
+
+test("restart recovery sanitizes legacy host completions so UI evidence can never become a gate receipt", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-legacy-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const queue = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:00.000Z") });
+  const intent = await queue.enqueue({ definition: commandForAction("open_claude"), operationId: "operation-legacy", target }, { hostAction: "open_external_url", url: "https://claude.ai/new" });
+  await store.transaction(async (transaction) => {
+    await transaction.append("host_action", {
+      version: 1,
+      event: "settled",
+      record: {
+        hostActionId: intent.id, operationId: intent.operationId, action: intent.commandAction,
+        targetSnapshotId: intent.targetSnapshotId, status: "completed", summary: "legacy completion",
+        completedAt: "2026-08-24T12:00:00.000Z", evidenceDigest: "a".repeat(64), toolVersions: { ui: "legacy" }
+      }
+    });
+  });
+  const [recovered] = await queue.listSettled();
+  assert.ok(recovered);
+  assert.equal("evidenceDigest" in recovered, false);
+  assert.equal("toolVersions" in recovered, false);
+  assert.deepEqual(await queue.observeOperation(intent.operationId, intent.commandAction), {
+    outcome: "committed", note: "The authenticated host completion is durable for the exact operation."
+  });
 });

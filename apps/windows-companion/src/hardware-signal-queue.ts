@@ -11,7 +11,7 @@ const dispatchedKind = "b122.hardware-signal.dispatched.v1";
 const completedKind = "b122.hardware-signal.completed.v1";
 
 export type CanonicalHardwareSignal = Extract<RawHidFrame, { type: "signal" }>;
-export type HardwareSignalCompletionOutcome = "handled" | "failed_before_dispatch" | "needs_reconciliation";
+export type HardwareSignalCompletionOutcome = "handled" | "failed_before_dispatch" | "needs_reconciliation" | "cancelled";
 
 export interface HardwareSignalAcceptance {
   readonly status: "accepted" | "duplicate";
@@ -105,6 +105,7 @@ interface MutableSignalState {
   claim?: ClaimedPayload;
   claimedAt?: string;
   dispatch?: DispatchedPayload;
+  completion?: CompletedPayload;
 }
 
 export interface DurableHardwareSignalInboxOptions {
@@ -292,6 +293,57 @@ export class DurableHardwareSignalInbox {
     });
   }
 
+  /** Cancels only a live claimed signal whose server dispatch is bound to this exact durable operation. */
+  async cancelByOperation(operationId: string, reason: string): Promise<number> {
+    if (!boundedReference(operationId)) throw new Error("The hardware cancellation operation ID is invalid.");
+    const exactOperation = operationId;
+    const summary = boundedSummary(reason);
+    const cancelled = await this.store.transaction(async (transaction) => {
+      const states = await stateFrom(transaction);
+      const matches = [...states.values()].filter((current) => current.phase === "claimed" && current.claim && current.dispatch?.operationId === exactOperation);
+      for (const current of matches) await appendCancellation(transaction, current, summary);
+      return matches.map((current) => current.accepted.signalId);
+    });
+    for (const signalId of cancelled) this.liveClaims.delete(signalId);
+    return cancelled.length;
+  }
+
+  /** Cancels only claims already bound to the exact canonical repository; unbound pending signals are not guessed. */
+  async cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number> {
+    if (!boundedAbsolute(repositoryRoot)) throw new Error("The hardware cancellation repository root is invalid.");
+    const canonicalRoot = resolve(repositoryRoot);
+    const summary = boundedSummary(reason);
+    const cancelled = await this.store.transaction(async (transaction) => {
+      const states = await stateFrom(transaction);
+      const matches = [...states.values()].filter((current) => current.phase === "claimed" && current.claim
+        && current.claim.workspaceRoots.some((root) => samePath(root, canonicalRoot)));
+      for (const current of matches) await appendCancellation(transaction, current, summary);
+      return matches.map((current) => current.accepted.signalId);
+    });
+    for (const signalId of cancelled) this.liveClaims.delete(signalId);
+    return cancelled.length;
+  }
+
+  /** Observes only a durable dispatch already bound to this exact operation. */
+  async observeOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
+    if (!boundedReference(operationId)) throw new Error("The hardware observation operation ID is invalid.");
+    const states = await this.store.transaction(stateFrom);
+    const matches = [...states.values()].filter((current) => current.dispatch?.operationId === operationId);
+    if (matches.length === 0) {
+      return { settled: false, summary: "No exact durable hardware dispatch is bound to this operation; nothing was replayed." };
+    }
+    if (matches.some((current) => current.phase === "claimed" || current.phase === "needs_reconciliation" || !current.completion)) {
+      return { settled: false, summary: "The exact hardware dispatch needs reconciliation after restart; it was not replayed." };
+    }
+    if (matches.every((current) => current.completion?.outcome === "cancelled")) {
+      return { settled: true, summary: "The exact hardware dispatch was durably cancelled." };
+    }
+    if (matches.every((current) => current.completion?.outcome === "handled")) {
+      return { settled: true, summary: "The exact hardware dispatch has a durable handled completion." };
+    }
+    return { settled: false, summary: "The exact hardware dispatch has no terminal trusted completion; nothing was replayed." };
+  }
+
   async status(): Promise<HardwareSignalInboxStatus> {
     const states = await this.store.transaction(stateFrom);
     const result: HardwareSignalInboxStatus = { pending: 0, claimed: 0, completed: 0, needsReconciliation: 0 };
@@ -349,10 +401,14 @@ function applyEntry(entry: JournalEntry<JsonValue>, states: Map<string, MutableS
     }
     if (payload.outcome === "handled" && (!current.dispatch || payload.dispatchReceiptId !== current.dispatch.dispatchReceiptId)) throw new Error("The protected hardware completion lacks its exact server dispatch receipt.");
     if (payload.outcome === "failed_before_dispatch" && (current.dispatch || payload.dispatchReceiptId !== undefined)) throw new Error("The protected hardware journal requeues a signal after dispatch.");
-    current.phase = payload.outcome === "failed_before_dispatch" ? "pending" : payload.outcome === "handled" ? "completed" : "needs_reconciliation";
+    if (payload.outcome === "cancelled" && (current.dispatch
+      ? payload.dispatchReceiptId !== current.dispatch.dispatchReceiptId
+      : payload.dispatchReceiptId !== undefined)) throw new Error("The protected hardware cancellation does not match its exact dispatch boundary.");
+    current.phase = payload.outcome === "failed_before_dispatch" ? "pending" : payload.outcome === "handled" || payload.outcome === "cancelled" ? "completed" : "needs_reconciliation";
     current.claim = undefined;
     current.claimedAt = undefined;
-    current.dispatch = undefined;
+    current.completion = payload;
+    if (payload.outcome === "failed_before_dispatch") current.dispatch = undefined;
   }
 }
 
@@ -443,6 +499,7 @@ function sameAccepted(left: AcceptedPayload, right: AcceptedPayload): boolean {
   return left.signalId === right.signalId && left.deviceId === right.deviceId && left.connectionEpoch === right.connectionEpoch && left.bootNonce === right.bootNonce && left.counter === right.counter && left.control === right.control && left.modifier === right.modifier;
 }
 function sameRoots(left: readonly string[], right: readonly string[]): boolean { return left.length === right.length && left.every((root, index) => pathKey(root) === pathKey(right[index]!)); }
+function samePath(left: string, right: string): boolean { return pathKey(left) === pathKey(right); }
 function pathKey(value: string): string { return resolve(value).replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase(); }
 function boundedAbsolute(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\0\r\n]/.test(value) && (isAbsolute(value) || /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value)); }
 function boundedReference(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\0\r\n]/.test(value); }
@@ -450,7 +507,21 @@ function boundedClaimToken(value: string): string { if (!/^[A-Za-z0-9_-]{8,256}$
 function boundedSummary(value: string): string { if (typeof value !== "string" || !value.trim() || value.length > 512 || /\0/.test(value)) throw new Error("The hardware signal completion summary is invalid."); return value.replace(/[\r\n]/g, " ").trim(); }
 function validateSignalId(value: string): void { if (!/^hardware-signal:[a-f0-9]{64}$/.test(value)) throw new Error("The hardware signal ID is invalid."); }
 function validateDispatchReceiptId(value: string): void { if (!/^hardware-dispatch:[a-f0-9]{64}$/.test(value)) throw new Error("The hardware dispatch receipt ID is invalid."); }
-function completionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
+function completionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation" || value === "cancelled"; }
 function record(value: unknown): value is Record<string, JsonValue> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
 function allowedExact(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean { const keys = Object.keys(value); const allowed = new Set([...required, ...optional]); return required.every((key) => key in value) && keys.every((key) => allowed.has(key)); }
+
+async function appendCancellation(transaction: JsonStoreTransaction, current: MutableSignalState, summary: string): Promise<void> {
+  if (!current.claim) throw new Error("Only a claimed hardware signal can be cancelled.");
+  const payload: CompletedPayload = {
+    signalId: current.accepted.signalId,
+    claimToken: current.claim.claimToken,
+    windowSessionId: current.claim.windowSessionId,
+    workspaceRoots: current.claim.workspaceRoots,
+    outcome: "cancelled",
+    summary,
+    ...(current.dispatch ? { dispatchReceiptId: current.dispatch.dispatchReceiptId } : {})
+  };
+  await transaction.append(completedKind, payload as unknown as JsonValue);
+}

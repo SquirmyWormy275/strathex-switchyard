@@ -137,11 +137,16 @@ test("only explicit failure before dispatch requeues; a crashed claim becomes re
   const second = await inbox.claim(binding);
   assert.ok(second);
   assert.notEqual(second.claimToken, first.claimToken);
+  await inbox.recordDispatch({ ...second, handler: "b122.SHIELD:normal", resultStatus: "running", operationId: "operation-crashed-hardware" });
 
   const restarted = new DurableHardwareSignalInbox(store, { claimTokenFactory: () => "restart-token" });
   await restarted.recoverAfterRestart();
   assert.equal(await restarted.claim(binding), undefined);
   assert.deepEqual(await restarted.status(), { pending: 0, claimed: 0, completed: 0, needsReconciliation: 1 });
+  assert.deepEqual(await restarted.observeOperation("operation-crashed-hardware"), {
+    settled: false,
+    summary: "The exact hardware dispatch needs reconciliation after restart; it was not replayed."
+  });
 });
 
 test("a protected-store failure prevents acceptance so firmware can retry without an ACK", async (context) => {
@@ -150,4 +155,33 @@ test("a protected-store failure prevents acceptance so firmware can retry withou
   broken.store = { async transaction() { throw new Error("durable append failed"); } };
   await assert.rejects(() => inbox.accept(deviceId, signal), /durable append failed/i);
   assert.deepEqual(await inbox.status().catch(() => undefined), undefined);
+});
+
+test("host cancellation terminates only the exact operation-bound hardware claim and survives restart", async (context) => {
+  const { inbox, store } = await fixture(context);
+  await inbox.accept(deviceId, signal);
+  const claim = await inbox.claim(binding);
+  assert.ok(claim);
+  await inbox.recordDispatch({ ...claim, handler: "b122.SHIELD:normal", resultStatus: "running", operationId: "operation-hardware" });
+
+  assert.equal(await inbox.cancelByOperation("operation-hardware", "Operator cancelled exact durable work."), 1);
+  assert.equal(await inbox.cancelByOperation("operation-hardware", "Operator cancelled exact durable work."), 0);
+  await assert.rejects(() => inbox.complete({ ...claim, outcome: "handled", summary: "late completion" }), /claim|completed|cancel/i);
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 0, completed: 1, needsReconciliation: 0 });
+  const restarted = new DurableHardwareSignalInbox(store);
+  assert.deepEqual(await restarted.status(), { pending: 0, claimed: 0, completed: 1, needsReconciliation: 0 });
+  assert.deepEqual(await restarted.observeOperation("operation-hardware"), {
+    settled: true,
+    summary: "The exact hardware dispatch was durably cancelled."
+  });
+});
+
+test("containment cancels a claimed pre-dispatch signal only for its exact canonical repository binding", async (context) => {
+  const { inbox } = await fixture(context);
+  await inbox.accept(deviceId, signal);
+  const claim = await inbox.claim(binding);
+  assert.ok(claim);
+  assert.equal(await inbox.cancelQueuedForRepository("C:\\other", "unrelated containment"), 0);
+  assert.equal(await inbox.cancelQueuedForRepository("C:\\repo", "repository containment"), 1);
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 0, completed: 1, needsReconciliation: 0 });
 });

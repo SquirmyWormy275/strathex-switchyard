@@ -78,6 +78,13 @@ test("packed companion's declared binary starts with DPAPI protection and accept
   context.after(async () => { if (child.exitCode === null) await terminateOwnedProcessTree(child, environment); await rm(testRoot, { recursive: true, force: true }); });
   const configurationPath = join(state, "authenticated-pipe.json");
   await waitFor(configurationPath).catch((error) => { throw new Error(`${error instanceof Error ? error.message : String(error)}\nchildExit=${child.exitCode}\n${stderr}`); });
+  const receiptKeyPath = join(state, "receipt-evidence-key.json");
+  await waitFor(receiptKeyPath).catch((error) => { throw new Error(`${error instanceof Error ? error.message : String(error)}\nchildExit=${child.exitCode}\n${stderr}`); });
+  const receiptKey = JSON.parse(await readFile(receiptKeyPath, "utf8")) as Record<string, unknown>;
+  assert.equal(receiptKey.schema, "sxsy-b122.receipt-evidence-key");
+  assert.equal(receiptKey.protector, "windows-dpapi-current-user");
+  assert.equal(typeof receiptKey.sealedKey, "string");
+  assert.equal(Object.keys(receiptKey).includes("authenticationKey"), false);
   const bridge = new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(configurationPath, new WindowsDpapiSecretReader()));
   const registered = await registerWhenReady(bridge);
   assert.equal(registered.ok, true, registered.ok ? stderr : `${registered.code}: ${registered.message}\n${stderr}`);
