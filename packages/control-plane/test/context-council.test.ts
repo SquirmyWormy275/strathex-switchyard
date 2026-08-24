@@ -37,6 +37,7 @@ test("handoff packages persist only context, never create authority or execution
     });
     assert.equal(packet.id, "handoff-1");
     assert.equal(packet.status, "queued");
+    assert.match(packet.digest, /^[a-f0-9]{64}$/);
     assert.equal(packet.authorityId, "grant-9");
     assert.equal(packet.executionAuthorized, false);
 
@@ -45,6 +46,7 @@ test("handoff packages persist only context, never create authority or execution
     await handoffs.acknowledge(packet.id, "coder-1");
     const reloaded = new HandoffPackageStore(store);
     assert.equal((await reloaded.get(packet.id))?.status, "acknowledged");
+    assert.equal((await reloaded.get(packet.id))?.digest, packet.digest);
     assert.equal((await reloaded.get(packet.id))?.executionAuthorized, false);
   });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { redactText } from "./redaction.ts";
-import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
+import { jsonClone, type JournalEntry, ProtectedJsonStore, sha256, stableJson } from "./store.ts";
 
 export type HandoffStatus = "queued" | "immediate_focus_requested" | "acknowledged" | "cancelled" | "archived";
 export type HandoffRoutingDefault = "queue" | "immediate";
@@ -13,6 +13,7 @@ export type HandoffRoutingDefault = "queue" | "immediate";
  */
 export interface HandoffPackage {
   readonly id: string;
+  readonly digest: string;
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
   readonly taskId: string;
@@ -90,7 +91,7 @@ function packets(entries: readonly JournalEntry<unknown>[]): Map<string, Handoff
   for (const entry of entries) {
     if (entry.kind !== "handoff.saved") continue;
     const packet = (entry.payload as HandoffSavedEvent | undefined)?.packet;
-    if (!packet || typeof packet.id !== "string" || packet.executionAuthorized !== false) {
+    if (!packet || typeof packet.id !== "string" || packet.executionAuthorized !== false || packetDigest(packet) !== packet.digest) {
       throw new HandoffPackageError("Protected handoff record is malformed.");
     }
     result.set(packet.id, clonePacket(packet));
@@ -127,7 +128,7 @@ export class HandoffPackageStore {
 
   async create(input: HandoffPackageInput): Promise<HandoffPackage> {
     const now = this.clock();
-    const packet: HandoffPackage = {
+    const immutable = {
       id: nonEmpty(input.id ?? this.idFactory(), "handoff id"),
       repositoryRoot: nonEmpty(input.repositoryRoot, "repositoryRoot"),
       targetSnapshotId: nonEmpty(input.targetSnapshotId, "targetSnapshotId"),
@@ -141,7 +142,11 @@ export class HandoffPackageStore {
       constraints: list(input.constraints, "constraint"),
       openQuestions: list(input.openQuestions, "open question"),
       nextActions: list(input.nextActions, "next action"),
-      ...(input.recipientSessionId ? { recipientSessionId: nonEmpty(input.recipientSessionId, "recipientSessionId") } : {}),
+      ...(input.recipientSessionId ? { recipientSessionId: nonEmpty(input.recipientSessionId, "recipientSessionId") } : {})
+    };
+    const packet: HandoffPackage = {
+      ...immutable,
+      digest: sha256(stableJson(immutable)),
       status: input.routing === "immediate" ? "immediate_focus_requested" : "queued",
       executionAuthorized: false,
       createdAt: now,
@@ -211,4 +216,13 @@ export class HandoffPackageStore {
       return clonePacket(updated);
     });
   }
+}
+
+function packetDigest(packet: HandoffPackage): string {
+  return sha256(stableJson({
+    id: packet.id, repositoryRoot: packet.repositoryRoot, targetSnapshotId: packet.targetSnapshotId, taskId: packet.taskId,
+    planRevision: packet.planRevision, ...(packet.authorityId ? { authorityId: packet.authorityId } : {}), plan: packet.plan,
+    decisions: packet.decisions, documentation: packet.documentation, references: packet.references, constraints: packet.constraints,
+    openQuestions: packet.openQuestions, nextActions: packet.nextActions, ...(packet.recipientSessionId ? { recipientSessionId: packet.recipientSessionId } : {})
+  }));
 }
