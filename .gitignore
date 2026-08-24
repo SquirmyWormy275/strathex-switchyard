@@ -4,3 +4,4 @@ dist/
 .env
 .venv/
 .sxsy-verification/
+.npm-cache/
