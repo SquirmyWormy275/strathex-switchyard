@@ -14,18 +14,20 @@ function proofArtifact(): WorkflowArtifact {
     createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
   };
 }
-function providerRequest(untrustedInput?: Readonly<Record<string, string>>) {
+function providerRequest(untrustedInput?: Readonly<Record<string, string>>, childSaga?: unknown) {
   return {
     definition: { action: "proof" }, operationId: "operation-1",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+    ...(childSaga ? { childSaga } : {}),
     ...(untrustedInput ? { untrustedInput } : {})
   } as never;
 }
 
 test("configured provider adapter dispatches and acknowledges only an exact typed workflow artifact", async () => {
   const requests: unknown[] = [];
+  const childEvents: Array<readonly [string, unknown]> = [];
   const artifact = proofArtifact();
   let acknowledged: WorkflowProviderResponse | undefined;
   const adapter = new ConfiguredProviderCommandAdapter({
@@ -37,7 +39,14 @@ test("configured provider adapter dispatches and acknowledges only an exact type
     async claimForDispatch(input) { assert.deepEqual(input, { action: "proof", targetSnapshotId: providerTargetId, sessionId: "session-1", operationId: "operation-1" }); return artifact; },
     async acknowledge(response) { acknowledged = response; return { ...artifact, status: "acknowledged", providerExternalId: response.externalId }; }
   });
-  const outcome = await adapter.execute(providerRequest({ injectedPrompt: "must-not-cross-boundary" }));
+  const childSaga = {
+    async begin(input: unknown) { childEvents.push(["begin", input]); return { id: "child-provider-1", mayExecute: true }; },
+    async markExecuting(input: unknown) { childEvents.push(["executing", input]); },
+    async markExternalCommitted(_input: unknown, details: unknown) { childEvents.push(["external", details]); },
+    async markCompensating(input: unknown) { childEvents.push(["compensating", input]); },
+    async settle(_input: unknown, state: unknown, details: unknown) { childEvents.push([String(state), details]); }
+  };
+  const outcome = await adapter.execute(providerRequest({ injectedPrompt: "must-not-cross-boundary" }, childSaga));
   assert.equal(outcome.status, "completed");
   assert.equal(outcome.effectDisposition, "committed");
   assert.equal(outcome.data?.artifactId, artifact.id);
@@ -47,6 +56,11 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   assert.equal(document.schema, "sxsy-b122.workflow-command");
   assert.equal("input" in document, false);
   assert.deepEqual(document.artifact, { id: artifact.id, digest: artifact.digest, taskId: "task-1", planRevision: "plan-1", payload: artifact.payload, executionAuthorized: false });
+  const started = childEvents.find(([kind]) => kind === "begin")?.[1] as { action: string; details: Record<string, string> };
+  assert.equal(started.action, "provider.proof");
+  assert.deepEqual(started.details, { repositoryRoot: "C:\\repo", routeId: "provider.proof", targetSnapshotId: providerTargetId, artifactId: artifact.id, artifactDigest: artifact.digest });
+  assert.deepEqual(childEvents.find(([kind]) => kind === "external")?.[1], { artifactId: artifact.id, routeId: "provider.proof", externalId: "provider-proof-1" });
+  assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
 });
 
 test("configured provider adapter never acknowledges malformed provider output", async () => {

@@ -144,18 +144,37 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         return { status: "blocked", summary: "The prepared provider workflow artifact is missing, ambiguous, corrupt, or bound to another operation.", effectDisposition: "not_started" };
       }
       if (!artifact) return { status: "awaiting_input", summary: "Prepare and explicitly select one typed workflow artifact before provider dispatch.", effectDisposition: "not_started" };
+      const routeId = `provider.${request.definition.action}`;
+      const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest } }) : undefined;
+      if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
+      if (child) await request.childSaga!.markExecuting(child);
+      const finish = async (outcome: AdapterOutcome, response?: WorkflowProviderResponse): Promise<AdapterOutcome> => {
+        if (!child || !request.childSaga) return outcome;
+        const disposition = outcome.effectDisposition ?? "ambiguous";
+        if (disposition === "not_started") await request.childSaga.settle(child, "failed", { artifactId: artifact.id, routeId });
+        else if (disposition === "committed") {
+          await request.childSaga.markExternalCommitted(child, { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
+          if (outcome.status === "completed") await request.childSaga.settle(child, "completed", { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
+        } else if (disposition === "compensated") {
+          await request.childSaga.markCompensating(child);
+          await request.childSaga.settle(child, "cancelled", { artifactId: artifact.id, routeId });
+        } else await request.childSaga.settle(child, "ambiguous", { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
+        return outcome;
+      };
       const body = JSON.stringify(providerDocument(request, artifact));
-      const result = await this.network.request({ routeId: `provider.${request.definition.action}`, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal });
-      if (result.outcome !== "passed" || !result.body) return adapterOutcome(result);
+      let result: ConfiguredNetworkResult;
+      try { result = await this.network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal }); }
+      catch { return finish({ status: "failed", summary: "The configured provider transport failed after dispatch may have begun; reconciliation is required.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
+      if (result.outcome !== "passed" || !result.body) return finish(adapterOutcome(result));
       let value: unknown;
       try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); }
-      catch { return { status: "failed", summary: "The configured provider returned malformed workflow JSON; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }; }
+      catch { return finish({ status: "failed", summary: "The configured provider returned malformed workflow JSON; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
       let response: WorkflowProviderResponse;
       try { response = parseWorkflowProviderResponse(value, artifact); }
-      catch { return { status: "failed", summary: "The configured provider returned a result that did not match the exact typed artifact; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }; }
+      catch { return finish({ status: "failed", summary: "The configured provider returned a result that did not match the exact typed artifact; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
       try { await this.artifacts.acknowledge(response); }
-      catch { return { status: "failed", summary: "The provider result was valid but could not be durably acknowledged; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }; }
-      return { status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) };
+      catch { return finish({ status: "failed", summary: "The provider result was valid but could not be durably acknowledged; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response); }
+      return finish({ status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
     } finally { control.dispose(); }
   }
 }

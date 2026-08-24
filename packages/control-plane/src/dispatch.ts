@@ -358,9 +358,9 @@ export class CommandDispatcher {
           operationId
         );
       case "agent":
-        return this.executeComposite(definition, lease, async () => adapterResult(
+        return this.executeComposite(definition, lease, async (childSaga) => adapterResult(
           this.dependencies.adapters
-            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), ...(childSaga ? { childSaga } : {}), untrustedInput: request.input })
             : { status: "unavailable", summary: "No verified agent adapter is registered for this command.", effectDisposition: "not_started" },
           operationId
         ));

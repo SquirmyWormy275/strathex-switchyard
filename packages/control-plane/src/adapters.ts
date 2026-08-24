@@ -1,6 +1,7 @@
 import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction, CommandDefinition } from "./command-catalog.ts";
 import type { ExecutionControl } from "./execution-control.ts";
+import type { ChildOperationSaga } from "./operations.ts";
 import type { ContainmentGuard, EffectGuard } from "./brokers.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 
@@ -25,6 +26,8 @@ export interface AdapterRequest {
   readonly executionControl?: ExecutionControl;
   /** Host-owned final target barrier, checked before an adapter side effect. */
   readonly effectGuard?: EffectGuard;
+  /** Durable child effects for provider/host adapters; absent only in simple previews/tests. */
+  readonly childSaga?: ChildOperationSaga;
   readonly untrustedInput?: Readonly<Record<string, string>>;
 }
 

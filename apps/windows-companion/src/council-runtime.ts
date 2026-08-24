@@ -86,7 +86,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     const current = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final effect guard." };
     if (!current.allowed) throw new Error(current.reason);
     if (request.executionControl && (Date.parse(request.executionControl.deadline) <= this.now() || await request.executionControl.isCancellationRequested())) throw new Error("Automatic Council was cancelled or exceeded its durable deadline.");
-    const child = request.childSaga ? await request.childSaga.begin({ action: `council.${phase}`, idempotencyScope: `${epochId}:${participant.id}:${phase}`, details: { sessionId: participant.id, target: request.target.id } }) : undefined;
+    const child = request.childSaga ? await request.childSaga.begin({ action: `council.${phase}`, idempotencyScope: `${epochId}:${participant.id}:${phase}`, details: { epochId, phase, sessionId: participant.id, target: request.target.id } }) : undefined;
     if (child && !child.mayExecute) throw new Error(`Council ${phase} for ${participant.id} requires reconciliation and was not replayed.`);
     if (child) await request.childSaga!.markExecuting(child);
     const control = operationSignal(request);
