@@ -44,6 +44,20 @@ export class WindowsDpapiSecretReader implements ExtensionSecretReader {
       child.stdin.end(sealed, "utf8");
     });
   }
+
+  async seal(cleartext: Uint8Array): Promise<string> {
+    if (process.platform !== "win32" || cleartext.byteLength < 1 || cleartext.byteLength > 64 * 1024) throw new Error("Windows DPAPI cannot seal this credential value.");
+    const script = "Add-Type -AssemblyName System.Security;$in=[Console]::In.ReadToEnd();$raw=[Convert]::FromBase64String($in);$out=[Security.Cryptography.ProtectedData]::Protect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Array]::Clear($raw,0,$raw.Length);[Console]::Out.Write([Convert]::ToBase64String($out));[Array]::Clear($out,0,$out.Length)";
+    const input = Buffer.from(cleartext).toString("base64");
+    return new Promise<string>((resolve, reject) => {
+      const child = spawn("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], { shell: false, windowsHide: true, env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" }, stdio: ["pipe", "pipe", "pipe"] });
+      let output = "";
+      child.stdout.on("data", (chunk: Buffer) => { if (output.length < 256 * 1024) output += chunk.toString("utf8").slice(0, 256 * 1024 - output.length); });
+      child.once("error", () => reject(new Error("Windows DPAPI could not be started.")));
+      child.once("close", (code) => { const sealed = output.trim(); if (code !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(sealed)) reject(new Error("Windows DPAPI could not seal the credential value.")); else resolve(sealed); });
+      child.stdin.end(input, "utf8");
+    });
+  }
 }
 
 /**

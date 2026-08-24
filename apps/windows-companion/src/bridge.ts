@@ -32,6 +32,12 @@ export type CompanionMethod =
   | "sandbox.install"
   | "sandbox.list"
   | "sandbox.revoke"
+  | "credential.provision"
+  | "credential.list"
+  | "credential.revoke"
+  | "network-policy.install"
+  | "network-policy.current"
+  | "network-policy.revoke"
   | "host-action.complete";
 
 export interface CompanionRequest {
@@ -152,6 +158,10 @@ export interface SandboxInstallPayload {
 
 export interface SandboxRevokePayload { readonly repositoryRoot: string; }
 
+export interface CredentialProvisionPayload { readonly reference: string; readonly repositoryRoot: string; readonly purposes: readonly string[]; readonly sealedSecret: string; readonly replaceExisting?: boolean; }
+export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
+export interface NetworkPolicyInstallPayload { readonly sourcePath: string; }
+
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
   request(request: CompanionRequest): Promise<CompanionResponse>;
@@ -205,7 +215,8 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
-    "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke", "host-action.complete"
+    "git.review.submit", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
+    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "host-action.complete"
   ].includes(value);
 }
 

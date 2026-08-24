@@ -6,6 +6,7 @@ import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts
 import type { GitReviewResult } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
+import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
 import type {
   AuditEvent,
   Capability,
@@ -29,6 +30,9 @@ import {
   type RuntimePinRevokePayload,
   type SandboxInstallPayload,
   type SandboxRevokePayload,
+  type CredentialProvisionPayload,
+  type CredentialRevokePayload,
+  type NetworkPolicyInstallPayload,
   type OperationCancellationPayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
@@ -90,6 +94,8 @@ export interface CompanionServiceOptions {
   readonly gitReviews?: GitMutationReviewCoordinator;
   readonly runtimePins?: RuntimePinCoordinator;
   readonly sandboxInstallations?: SandboxInstallationCoordinator;
+  readonly credentialProvisioning?: CredentialProvisioningCoordinator;
+  readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -114,6 +120,8 @@ export class CompanionService {
   private readonly gitReviews?: GitMutationReviewCoordinator;
   private readonly runtimePins?: RuntimePinCoordinator;
   private readonly sandboxInstallations?: SandboxInstallationCoordinator;
+  private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
+  private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
@@ -124,6 +132,8 @@ export class CompanionService {
     this.gitReviews = options.gitReviews;
     this.runtimePins = options.runtimePins;
     this.sandboxInstallations = options.sandboxInstallations;
+    this.credentialProvisioning = options.credentialProvisioning;
+    this.networkPolicyProvisioning = options.networkPolicyProvisioning;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
@@ -171,6 +181,18 @@ export class CompanionService {
           return this.success(request.id, { installations: await this.listSandboxes(request.payload) });
         case "sandbox.revoke":
           return this.success(request.id, { installation: await this.revokeSandbox(this.requireSandboxRevoke(request.payload)) });
+        case "credential.provision":
+          return this.success(request.id, { credential: await this.provisionCredential(this.requireCredentialProvision(request.payload)) });
+        case "credential.list":
+          return this.success(request.id, { credentials: await this.listCredentials(request.payload) });
+        case "credential.revoke":
+          return this.success(request.id, { revoked: await this.revokeCredential(this.requireCredentialRevoke(request.payload)) });
+        case "network-policy.install":
+          return this.success(request.id, { policy: await this.installNetworkPolicy(this.requireNetworkPolicyInstall(request.payload)) });
+        case "network-policy.current":
+          return this.success(request.id, { policy: await this.currentNetworkPolicy(request.payload) });
+        case "network-policy.revoke":
+          return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
         case "host-action.complete":
           return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
         default:
@@ -434,6 +456,45 @@ export class CompanionService {
     return { repositoryRoot: payload.repositoryRoot };
   }
 
+  private async provisionCredential(payload: CredentialProvisionPayload) {
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    const credential = await this.credentialProvisioning.provision(payload);
+    this.record("credential.provision", "completed", "Provisioned one DPAPI-sealed, repository-and-purpose-scoped credential reference.");
+    return credential;
+  }
+
+  private async listCredentials(payload: unknown) {
+    requireEmptyPayload(payload, "Credential listing");
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    return this.credentialProvisioning.list();
+  }
+
+  private async revokeCredential(payload: CredentialRevokePayload): Promise<boolean> {
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    const revoked = await this.credentialProvisioning.revoke(payload.reference, payload.reason);
+    this.record("credential.revoke", revoked ? "completed" : "unavailable", revoked ? "Revoked the selected credential reference." : "The selected live credential reference was not found.");
+    return revoked;
+  }
+
+  private async installNetworkPolicy(payload: NetworkPolicyInstallPayload) {
+    if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached.");
+    const policy = await this.networkPolicyProvisioning.install(payload.sourcePath);
+    this.record("network-policy.install", "completed", "Installed one current-user-attested exact-route HTTPS policy.");
+    return policy;
+  }
+
+  private async currentNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy inspection"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return this.networkPolicyProvisioning.current(); }
+  private async revokeNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy revocation"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await this.networkPolicyProvisioning.revoke(); this.record("network-policy.revoke", "completed", "Revoked the active exact-route HTTPS policy."); return policy; }
+
+  private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "repositoryRoot", "purposes", "sealedSecret"], ["replaceExisting"])
+      || typeof payload.reference !== "string" || !boundedHostPath(payload.repositoryRoot) || !Array.isArray(payload.purposes) || !payload.purposes.every((value) => typeof value === "string") || typeof payload.sealedSecret !== "string" || (payload.replaceExisting !== undefined && typeof payload.replaceExisting !== "boolean")) throw new CompanionServiceError("invalid_request", "Credential provisioning requires only a reference, exact repository, bounded purposes, and a DPAPI-sealed secret.");
+    return { reference: payload.reference, repositoryRoot: payload.repositoryRoot, purposes: payload.purposes as string[], sealedSecret: payload.sealedSecret, ...(payload.replaceExisting === true ? { replaceExisting: true } : {}) };
+  }
+
+  private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
+  private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
+
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
     if (!isRecord(payload) || !isRecord(payload.session)) throw new CompanionServiceError("invalid_request", "A session registration requires a session record.");
     return { session: payload.session as unknown as ManagedSession };
@@ -681,6 +742,16 @@ function exactMutationKeys(value: Record<string, unknown>, expected: readonly st
 function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
   const keys = Object.keys(value);
   return keys.length === expected.length && expected.every((key) => key in value);
+}
+
+function allowedExactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => key in value) && keys.every((key) => allowed.has(key));
+}
+
+function requireEmptyPayload(payload: unknown, label: string): void {
+  if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", `${label} accepts no client options.`);
 }
 
 function boundedHostPath(value: unknown): value is string {

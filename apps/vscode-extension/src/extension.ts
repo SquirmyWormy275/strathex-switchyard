@@ -12,14 +12,16 @@ export { ManagedSessionController, type ManagedSessionControllerOptions } from "
 let controller: ManagedSessionController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
+  const secretProtector = new WindowsDpapiSecretReader();
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
-    configuredCompanionBridge(),
+    configuredCompanionBridge(secretProtector),
     {
       resolveGitRoots: createVscodeGitRootResolver(vscode),
       openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
-      executeCommand: async (command) => { await vscode.commands.executeCommand(command); }
+      executeCommand: async (command) => { await vscode.commands.executeCommand(command); },
+      sealSecret: (cleartext) => secretProtector.seal(cleartext)
     }
   );
   void controller.start().catch(async () => {
@@ -33,10 +35,10 @@ export function activate(context: vscode.ExtensionContext): void {
  * unavailable; neither workspace settings nor an extension command selects an
  * endpoint.
  */
-export function configuredCompanionBridge(): ExtensionCompanionBridge {
+export function configuredCompanionBridge(secretReader: WindowsDpapiSecretReader = new WindowsDpapiSecretReader()): ExtensionCompanionBridge {
   if (process.platform !== "win32") return new UnavailableExtensionCompanionBridge("The SXSY-B122 companion is available only on Windows.");
   try {
-    return new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(undefined, new WindowsDpapiSecretReader()));
+    return new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(undefined, secretReader));
   } catch {
     return new UnavailableExtensionCompanionBridge("The authenticated SXSY-B122 local companion pipe configuration is invalid.");
   }

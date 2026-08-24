@@ -92,6 +92,9 @@ export interface SandboxInstallationPin {
   readonly status: "active" | "revoked";
 }
 
+export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string }[]; readonly revokedAt?: string; }
+export interface InstalledNetworkPolicy { readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: string; readonly message: string };
@@ -110,6 +113,12 @@ export interface ExtensionCompanionBridge {
   installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>>;
   listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>>;
   revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>>;
+  provisionCredential(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>>;
+  listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>>;
+  revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>>;
+  installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
+  revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>>;
 }
@@ -198,6 +207,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return result.ok ? { ok: true, value: result.value.installation } : result;
   }
 
+  async provisionCredential(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>> { const result = await this.call<{ credential: CredentialReferenceSummary }>("credential.provision", input); return result.ok ? { ok: true, value: result.value.credential } : result; }
+  async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { const result = await this.call<{ credentials: readonly CredentialReferenceSummary[] }>("credential.list", undefined); return result.ok ? { ok: true, value: result.value.credentials } : result; }
+  async revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>> { const result = await this.call<{ revoked: boolean }>("credential.revoke", { reference, reason }); return result.ok ? { ok: true, value: result.value.revoked } : result; }
+  async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
+
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion });
     return result.ok ? { ok: true, value: result.value.command } : result;
@@ -257,6 +273,12 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   installSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
   listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>> { return this.unavailable(); }
   revokeSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
+  provisionCredential(): Promise<BridgeResult<CredentialReferenceSummary>> { return this.unavailable(); }
+  listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { return this.unavailable(); }
+  revokeCredential(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
+  currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return this.unavailable(); }
+  revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 

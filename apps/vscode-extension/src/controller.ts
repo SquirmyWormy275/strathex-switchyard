@@ -45,6 +45,8 @@ export interface ManagedSessionControllerOptions {
   readonly openExternal?: (url: string) => Promise<boolean>;
   /** Fixed VS Code commands only; B122 input never selects a command string. */
   readonly executeCommand?: (command: string) => Promise<void>;
+  /** DPAPI CurrentUser sealing owned by the installed extension host. */
+  readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
 }
 
 export interface GitRootRegistration {
@@ -69,6 +71,7 @@ export class ManagedSessionController {
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
+  private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
   private readonly debugSessionIds = new WeakMap<DebugSessionLike, string>();
@@ -93,6 +96,7 @@ export class ManagedSessionController {
       if (!this.vscode.commands.executeCommand) throw new Error("The VS Code host command boundary is unavailable.");
       await this.vscode.commands.executeCommand(command);
     });
+    this.sealSecret = options.sealSecret;
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
@@ -166,6 +170,12 @@ export class ManagedSessionController {
       this.vscode.commands.registerCommand("sxsy-b122.revokeWindowsSandbox", async () => {
         await this.revokeWindowsSandbox();
       }),
+      this.vscode.commands.registerCommand("sxsy-b122.provisionCredential", async () => { await this.provisionCredential(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.listCredentials", async () => { await this.listCredentials(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.revokeCredential", async () => { await this.revokeCredential(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.dispatch", async (argument: unknown) => {
         const command = parseChordArgument(argument);
         if (!command) {
@@ -306,6 +316,53 @@ export class ManagedSessionController {
     if (!revoked.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 Windows Sandbox was not revoked: ${revoked.message}`);
     else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the selected Windows Sandbox installation.");
   }
+
+  private async provisionCredential(): Promise<void> {
+    const root = await this.chooseGitRoot("Choose the exact Git root for this credential reference");
+    const input = this.vscode.window.showInputBox;
+    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed Windows DPAPI host."); return; }
+    const reference = await input({ prompt: "Credential reference name", value: "github-token", validateInput: (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? undefined : "Use a bounded reference name." });
+    const purposesText = reference ? await input({ prompt: "Exact allowed purposes (comma-separated)", value: "github-api", validateInput: (value) => splitIdentifiers(value).length ? undefined : "Enter at least one bounded purpose." }) : undefined;
+    const secretText = purposesText ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
+    if (!reference || !purposesText || !secretText) return;
+    const bytes = Buffer.from(secretText, "utf8");
+    let sealedSecret: string;
+    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with Windows DPAPI; nothing was sent."); return; } finally { bytes.fill(0); }
+    const existing = await this.bridge.listCredentials();
+    const replaceExisting = existing.ok && existing.value.some((item) => item.reference === reference && !item.revokedAt);
+    const result = await this.bridge.provisionCredential({ reference, repositoryRoot: root.gitRoot, purposes: splitIdentifiers(purposesText), sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
+    if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not provisioned: ${result.message}`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for the selected root.`);
+  }
+
+  private async listCredentials(): Promise<void> {
+    const result = await this.bridge.listCredentials();
+    if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 credential registry unavailable: ${result.message}`); return; }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 credential registry: ${result.value.length ? result.value.map((item) => `${item.reference} g${item.generation}${item.revokedAt ? " revoked" : ""}`).join("; ") : "No credential references."}`);
+  }
+
+  private async revokeCredential(): Promise<void> {
+    const listed = await this.bridge.listCredentials();
+    if (!listed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 credential registry unavailable: ${listed.message}`); return; }
+    const active = listed.value.filter((item) => !item.revokedAt);
+    const selected = await this.vscode.window.showQuickPick(active.map((item) => item.reference), { placeHolder: "Choose the credential reference to revoke" });
+    if (!selected) return;
+    const result = await this.bridge.revokeCredential(selected, "Revoked from the installed VS Code credential registry.");
+    if (!result.ok || !result.value) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not revoked: ${result.ok ? "reference not found" : result.message}`);
+    else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the selected credential reference and its outstanding leases.");
+  }
+
+  private async installNetworkPolicy(): Promise<void> {
+    const selected = await this.vscode.window.showOpenDialog?.({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, openLabel: "Review HTTPS Route Policy", filters: { "SXSY-B122 network policy": ["json"] } });
+    const sourcePath = selected?.length === 1 ? selected[0]?.fsPath : undefined;
+    if (!sourcePath) return;
+    const result = await this.bridge.installNetworkPolicy(sourcePath);
+    if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not installed: ${result.message}`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 installed the attested exact-route HTTPS policy ${result.value.sha256.slice(0, 12)}….`);
+  }
+
+  private async showNetworkPolicy(): Promise<void> { const result = await this.bridge.currentNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy registry unavailable: ${result.message}`); else await this.vscode.window.showInformationMessage(`SXSY-B122 network policy: ${result.value?.status === "active" ? `active ${result.value.sha256.slice(0, 12)}…` : "no active policy"}`); }
+  private async revokeNetworkPolicy(): Promise<void> { const result = await this.bridge.revokeNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not revoked: ${result.message}`); else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the active exact-route HTTPS policy."); }
 
   private async refreshWorkspaceRegistration(): Promise<void> {
     this.gitRoots = await this.resolveGitRoots();
@@ -791,6 +848,10 @@ function gitReviewAction(command: ChordCommand): "local_commit" | "pr_upsert" | 
 
 function splitReviewedPaths(value: string): readonly string[] {
   return [...new Set(value.split(",").map((path) => path.trim().replaceAll("\\", "/")).filter(Boolean))];
+}
+
+function splitIdentifiers(value: string): readonly string[] {
+  return [...new Set(value.split(",").map((item) => item.trim()).filter((item) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item)))];
 }
 
 function validBranchInput(value: string): string | undefined {

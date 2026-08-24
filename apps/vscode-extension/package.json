@@ -26,6 +26,12 @@
     "onCommand:sxsy-b122.installWindowsSandbox",
     "onCommand:sxsy-b122.listWindowsSandboxes",
     "onCommand:sxsy-b122.revokeWindowsSandbox",
+    "onCommand:sxsy-b122.provisionCredential",
+    "onCommand:sxsy-b122.listCredentials",
+    "onCommand:sxsy-b122.revokeCredential",
+    "onCommand:sxsy-b122.installNetworkPolicy",
+    "onCommand:sxsy-b122.showNetworkPolicy",
+    "onCommand:sxsy-b122.revokeNetworkPolicy",
     "onCommand:sxsy-b122.dispatch",
     "onCommand:sxsy-b122.showIntent",
     "onCommand:sxsy-b122.chord.reanchor.normal",
@@ -135,6 +141,30 @@
       {
         "command": "sxsy-b122.revokeWindowsSandbox",
         "title": "SXSY-B122: Revoke Windows Sandbox Installation"
+      },
+      {
+        "command": "sxsy-b122.provisionCredential",
+        "title": "SXSY-B122: Provision Protected Credential Reference"
+      },
+      {
+        "command": "sxsy-b122.listCredentials",
+        "title": "SXSY-B122: Show Protected Credential References"
+      },
+      {
+        "command": "sxsy-b122.revokeCredential",
+        "title": "SXSY-B122: Revoke Protected Credential Reference"
+      },
+      {
+        "command": "sxsy-b122.installNetworkPolicy",
+        "title": "SXSY-B122: Install Exact HTTPS Route Policy"
+      },
+      {
+        "command": "sxsy-b122.showNetworkPolicy",
+        "title": "SXSY-B122: Show Exact HTTPS Route Policy"
+      },
+      {
+        "command": "sxsy-b122.revokeNetworkPolicy",
+        "title": "SXSY-B122: Revoke Exact HTTPS Route Policy"
       },
       {
         "command": "sxsy-b122.dispatch",

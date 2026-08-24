@@ -1,0 +1,121 @@
+import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
+import { InMemoryAutomationBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type ContainmentGuard, type PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
+import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type NetworkContainmentFence } from "./configured-network.ts";
+import type { CredentialAdapterPort } from "./durable-credentials.ts";
+import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+
+export interface DynamicConfiguredNetworkOptions {
+  readonly registry: DurableNetworkPolicyRegistry;
+  readonly containment: NetworkContainmentFence;
+  readonly credentials: CredentialAdapterPort;
+}
+
+/** Re-resolves and digest-checks the attested policy immediately before each route. */
+export class DynamicConfiguredNetworkClient {
+  private readonly options: DynamicConfiguredNetworkOptions;
+  constructor(options: DynamicConfiguredNetworkOptions) { this.options = options; }
+  async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
+    const policy = await this.options.registry.resolve();
+    return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
+  }
+}
+
+export const providerCommandActions: readonly CommandAction[] = [
+  "reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval",
+  "handoff", "handoff_queue", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"
+];
+export const remoteAutomationActions: readonly CommandAction[] = ["compound_capture", "compound_refresh", "lfg", "repair_mission"];
+
+export class ConfiguredProviderCommandAdapter implements CommandAdapter {
+  readonly id = "configured-provider-v1";
+  readonly kind = "provider" as const;
+  private readonly network: DynamicConfiguredNetworkClient;
+  constructor(network: DynamicConfiguredNetworkClient) { this.network = network; }
+
+  async execute(request: AdapterRequest): Promise<AdapterOutcome> {
+    if (!request.operationId || !request.target) return { status: "unavailable", summary: "Configured provider routing requires a durable operation and exact target." };
+    const control = await operationAbort(request.executionControl);
+    try {
+      if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch." };
+      if (request.effectGuard) {
+        const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+        if (!current.allowed) return { status: "blocked", summary: current.reason };
+      }
+      const body = JSON.stringify(providerDocument(request));
+      const result = await this.network.request({ routeId: `provider.${request.definition.action}`, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal });
+      return adapterOutcome(result);
+    } finally { control.dispose(); }
+  }
+}
+
+export function createConfiguredAutomationBroker(policy: PermitVerifier, containment: ContainmentGuard, network: DynamicConfiguredNetworkClient): AutomationBroker {
+  const broker = new InMemoryAutomationBroker(policy, containment);
+  for (const action of remoteAutomationActions) broker.register(action, async (request) => remoteAutomation(request, network));
+  return broker;
+}
+
+async function remoteAutomation(request: AutomationRequest, network: DynamicConfiguredNetworkClient): Promise<BrokerOutcome> {
+  if (!request.effectGuard) return { status: "blocked", summary: "Configured automation requires a final dispatch-bound effect guard." };
+  const current = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+  if (!current.allowed) return { status: "blocked", summary: current.reason };
+  const control = await operationAbort(request.executionControl);
+  try {
+    const document = {
+      schema: "sxsy-b122.remote-automation",
+      version: 1,
+      action: request.action,
+      operationId: request.operationId,
+      target: targetDocument(request.target),
+      session: request.session ? sessionDocument(request.session) : undefined,
+      authorityId: request.authority?.id,
+      testEnvironment: request.testEnvironment ? { id: request.testEnvironment.id, egress: request.testEnvironment.egress, databaseName: request.testEnvironment.databaseName } : undefined
+    };
+    const result = await network.request({ routeId: `automation.${request.action}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal });
+    const outcome = adapterOutcome(result);
+    return { status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, ...(outcome.data ? { data: outcome.data } : {}) };
+  } finally { control.dispose(); }
+}
+
+function providerDocument(request: AdapterRequest) {
+  return {
+    schema: "sxsy-b122.provider-command",
+    version: 1,
+    action: request.definition.action,
+    operationId: request.operationId,
+    target: targetDocument(request.target!),
+    session: request.session ? sessionDocument(request.session) : undefined,
+    authorityId: request.authority?.id,
+    input: request.untrustedInput ? boundedInput(request.untrustedInput) : undefined
+  };
+}
+function targetDocument(target: NonNullable<AdapterRequest["target"]>) { return { id: target.id, repositoryRoot: target.repositoryRoot, branch: target.branch, head: target.head, policyVersion: target.policyVersion, trackedManifest: target.trackedManifest, untrackedManifest: target.untrackedManifest }; }
+function sessionDocument(session: NonNullable<AdapterRequest["session"]>) { return { id: session.id, provider: session.provider, surface: session.surface, capabilities: session.capabilities, taskId: session.taskId, planRevision: session.planRevision, plannedFiles: session.plannedFiles }; }
+function boundedInput(input: Readonly<Record<string, string>>): Readonly<Record<string, string>> { const result: Record<string, string> = {}; for (const [key, value] of Object.entries(input)) if (/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(key) && value.length <= 512) result[key] = value; return result; }
+
+function adapterOutcome(result: ConfiguredNetworkResult): AdapterOutcome {
+  if (result.outcome !== "passed" || !result.body) return { status: result.outcome === "blocked" ? "blocked" : result.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(result.detail) };
+  let value: unknown;
+  try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); } catch { return { status: "failed", summary: "The configured remote adapter returned malformed JSON; no success was recorded." }; }
+  if (!record(value) || !exact(value, ["schema", "version", "status", "summary", ...(value.externalId === undefined ? [] : ["externalId"]), ...(value.data === undefined ? [] : ["data"])]) || value.schema !== "sxsy-b122.remote-result" || value.version !== 1 || !remoteStatus(value.status) || typeof value.summary !== "string" || !value.summary.trim() || value.summary.length > 512 || (value.externalId !== undefined && (typeof value.externalId !== "string" || value.externalId.length > 256)) || (value.data !== undefined && !record(value.data))) return { status: "failed", summary: "The configured remote adapter returned an invalid exact-v1 result; no success was recorded." };
+  return { status: value.status, summary: untrustedSummary(value.summary), data: redactRecord({ ...(value.externalId ? { externalId: value.externalId } : {}), ...(value.data ? value.data : {}) }) };
+}
+function remoteStatus(value: unknown): value is AdapterOutcome["status"] { return typeof value === "string" && ["completed", "unavailable", "blocked", "failed", "awaiting_input", "awaiting_confirmation", "running", "cancelled", "timed_out"].includes(value); }
+function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+
+async function operationAbort(control: AutomationRequest["executionControl"] | AdapterRequest["executionControl"]): Promise<{ signal: AbortSignal; dispose(): void }> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let poll: ReturnType<typeof setInterval> | undefined;
+  if (control) {
+    const remaining = Date.parse(control.deadline) - Date.now();
+    if (remaining <= 0 || await control.isCancellationRequested()) controller.abort();
+    else {
+      timer = setTimeout(() => controller.abort(), remaining);
+      poll = setInterval(() => { void control.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }); }, 100);
+    }
+  }
+  return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } };
+}

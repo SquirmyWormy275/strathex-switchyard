@@ -7,7 +7,7 @@ import { WorkspaceSnapshotResolver } from "../../../packages/control-plane/src/s
 import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { DurableHostActionQueue } from "./host-actions.ts";
@@ -19,6 +19,9 @@ import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
 import { AttestedRuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegistry, InstalledWindowsSandboxIsolationRuntime } from "./sandbox-installation.ts";
+import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
+import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
+import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -71,6 +74,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly runtimePins?: AttestedRuntimePinCoordinator;
   readonly sandboxInstallationRegistry?: DurableSandboxInstallationRegistry;
   readonly sandboxInstallations?: AttestedSandboxInstallationCoordinator;
+  readonly credentialVault: DurableCredentialReferenceVault;
+  readonly credentialProvisioning?: AttestedCredentialProvisioningCoordinator;
+  readonly networkPolicyRegistry: DurableNetworkPolicyRegistry;
+  readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
@@ -81,6 +88,13 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     throw new Error("The durable B122 companion requires a host-backed journal authenticator; unprotected hash-chain storage is rejected.");
   }
   const sessions = new SessionRegistry(store);
+  const credentialProtector = options.credentialProtector ?? unavailableCredentialProtector;
+  let credentialVault!: DurableCredentialReferenceVault;
+  const containmentManager = new DurableContainmentManager(store, { revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot) });
+  credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
+  const networkPolicyRegistry = new DurableNetworkPolicyRegistry(store, resolve(options.localStateDirectory ?? dirname(store.filePath), "network-policy.json"));
+  const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
+  const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
   const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
@@ -116,6 +130,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           credentialProtector: options.credentialProtector ?? unavailableCredentialProtector,
           ...(options.networkPolicy ? { networkPolicy: options.networkPolicy } : {}),
           repositoryRuntimes,
+          containmentManager,
+          credentialVault,
+          networkPolicyRegistry,
           ...(sandboxInstallationRegistry ? { isolationRuntime: new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy) } : {}),
           hostActions
         }
@@ -135,7 +152,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}) });
+  const service = new CompanionService({ executor, hostActions, ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     startupRecovery: async () => { await executor.recoverAfterRestart(); }
   });
@@ -147,10 +164,14 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     endpoint,
     hostActions,
     repositoryRuntimes,
+    credentialVault,
+    networkPolicyRegistry,
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),
     ...(sandboxInstallations ? { sandboxInstallations } : {}),
+    ...(credentialProvisioning ? { credentialProvisioning } : {}),
+    ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}),
     get localComponents() { return localComponents; },
     async registerTrustedSession(session: ManagedSession): Promise<ManagedSession> {
       await endpoint.ready();

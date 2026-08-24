@@ -14,6 +14,8 @@ import {
   type ReviewedGitMutation,
   type RepositoryRuntimePin,
   type SandboxInstallationPin,
+  type CredentialReferenceSummary,
+  type InstalledNetworkPolicy,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { ManagedSessionController } from "../src/controller.ts";
@@ -184,6 +186,12 @@ class FakeBridge implements ExtensionCompanionBridge {
   async revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>> {
     return { ok: true, value: { canonicalRepositoryRoot: repositoryRoot, catalogPath: "C:\\repo\\sandbox.json", catalogSha256: "a".repeat(64), helperPath: "C:\\host\\b122-sandbox-worker.exe", helperSha256: "b".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } };
   }
+  async provisionCredential(input: { reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }): Promise<BridgeResult<CredentialReferenceSummary>> { return { ok: true, value: { reference: input.reference, protectorProvider: "fake", generation: 1, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", scopes: input.purposes.map((purpose) => ({ repositoryRoot: input.repositoryRoot, adapterId: "configured-network", purpose })) } }; }
+  async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { return { ok: true, value: [] }; }
+  async revokeCredential(): Promise<BridgeResult<boolean>> { return { ok: true, value: true }; }
+  async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: sourcePath, sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" } }; }
+  async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return { ok: true, value: undefined }; }
+  async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: "C:\\state\\network-policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } }; }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };

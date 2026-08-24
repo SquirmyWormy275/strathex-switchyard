@@ -20,6 +20,8 @@ import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
 import { repositoryProcessActions, type RepositoryExecutionRootProvider, type RepositoryRuntimeAction } from "./repository-runtime.ts";
 import { RepositoryRuntimeExecutionBroker, repositoryRuntimeExecutionRecipe } from "./repository-runtime-broker.ts";
+import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, providerCommandActions } from "./remote-adapters.ts";
 
 // Every default process recipe is structured and shell-free. Keep the shared
 // allowlist narrow: reviewed commit summaries use hyphen/underscore words,
@@ -147,16 +149,19 @@ export interface DefaultLocalCompositionOptions {
   readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
   readonly repositoryRuntimes?: DurableRepositoryRuntimeRegistry;
   readonly isolationRuntime?: IsolationRuntime;
+  readonly containmentManager?: DurableContainmentManager;
+  readonly credentialVault?: DurableCredentialReferenceVault;
+  readonly networkPolicyRegistry?: DurableNetworkPolicyRegistry;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
-  let credentials: DurableCredentialReferenceVault | undefined;
-  const containment = new DurableContainmentManager(store, {
+  let credentials: DurableCredentialReferenceVault | undefined = options.credentialVault;
+  const containment = options.containmentManager ?? new DurableContainmentManager(store, {
     revokeCredentialLeases: async ({ repositoryRoot }) => {
       if (!credentials) throw new Error("The durable credential vault is unavailable during containment.");
       await credentials.revokeRepositoryLeases(repositoryRoot);
     }
   });
-  credentials = new DurableCredentialReferenceVault(store, options.credentialProtector, containment);
+  credentials ??= new DurableCredentialReferenceVault(store, options.credentialProtector, containment);
   const network = createDirectConfiguredNetworkBroker(
     options.networkPolicy ?? { version: 1, proxy: "direct", routes: [] },
     containment,
@@ -165,6 +170,11 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
   const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
   const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+  const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
+  if (dynamicNetwork) {
+    const provider = new ConfiguredProviderCommandAdapter(dynamicNetwork);
+    for (const action of providerCommandActions) adapters.register(action, provider);
+  }
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
   const hostActionAdapter = new DurableHostActionAdapter(hostActions);
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
@@ -175,5 +185,5 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
   const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: new RepositoryRuntimeExecutionBroker(repositoryRuntimes), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: new RepositoryRuntimeExecutionBroker(repositoryRuntimes), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }
