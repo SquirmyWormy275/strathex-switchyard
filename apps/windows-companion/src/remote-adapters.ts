@@ -4,6 +4,7 @@ import { commandForAction, type CommandAction } from "../../../packages/control-
 import type { Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
+import { parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type NetworkContainmentFence } from "./configured-network.ts";
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
@@ -114,14 +115,21 @@ export const providerCommandActions: readonly CommandAction[] = [
 ];
 export const remoteAutomationActions: readonly CommandAction[] = ["compound_capture", "compound_refresh", "lfg", "repair_mission"];
 
+export interface WorkflowArtifactDispatchPort {
+  claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string }>): Promise<WorkflowArtifact | undefined>;
+  acknowledge(response: WorkflowProviderResponse): Promise<WorkflowArtifact>;
+}
+
 export class ConfiguredProviderCommandAdapter implements CommandAdapter {
   readonly id = "configured-provider-v1";
   readonly kind = "provider" as const;
   private readonly network: DynamicConfiguredNetworkClient;
-  constructor(network: DynamicConfiguredNetworkClient) { this.network = network; }
+  private readonly artifacts?: WorkflowArtifactDispatchPort;
+  constructor(network: DynamicConfiguredNetworkClient, artifacts?: WorkflowArtifactStore | WorkflowArtifactDispatchPort) { this.network = network; this.artifacts = artifacts; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    if (!request.operationId || !request.target) return { status: "unavailable", summary: "Configured provider routing requires a durable operation and exact target.", effectDisposition: "not_started" };
+    const action = providerWorkflowAction(request.definition.action);
+    if (!request.operationId || !request.target || !request.session || !action || !this.artifacts) return { status: "unavailable", summary: "Configured provider routing requires a typed artifact store, durable operation, managed session, and exact target.", effectDisposition: "not_started" };
     const control = await operationAbort(request.executionControl);
     try {
       if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch.", effectDisposition: "not_started" };
@@ -129,9 +137,25 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
         if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
       }
-      const body = JSON.stringify(providerDocument(request));
+      let artifact: WorkflowArtifact | undefined;
+      try {
+        artifact = await this.artifacts.claimForDispatch({ action, targetSnapshotId: request.target.id, sessionId: request.session.id, operationId: request.operationId });
+      } catch {
+        return { status: "blocked", summary: "The prepared provider workflow artifact is missing, ambiguous, corrupt, or bound to another operation.", effectDisposition: "not_started" };
+      }
+      if (!artifact) return { status: "awaiting_input", summary: "Prepare and explicitly select one typed workflow artifact before provider dispatch.", effectDisposition: "not_started" };
+      const body = JSON.stringify(providerDocument(request, artifact));
       const result = await this.network.request({ routeId: `provider.${request.definition.action}`, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal });
-      return adapterOutcome(result);
+      if (result.outcome !== "passed" || !result.body) return adapterOutcome(result);
+      let value: unknown;
+      try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); }
+      catch { return { status: "failed", summary: "The configured provider returned malformed workflow JSON; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }; }
+      let response: WorkflowProviderResponse;
+      try { response = parseWorkflowProviderResponse(value, artifact); }
+      catch { return { status: "failed", summary: "The configured provider returned a result that did not match the exact typed artifact; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }; }
+      try { await this.artifacts.acknowledge(response); }
+      catch { return { status: "failed", summary: "The provider result was valid but could not be durably acknowledged; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }; }
+      return { status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) };
     } finally { control.dispose(); }
   }
 }
@@ -164,21 +188,31 @@ async function remoteAutomation(request: AutomationRequest, network: DynamicConf
   } finally { control.dispose(); }
 }
 
-function providerDocument(request: AdapterRequest) {
+function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
   return {
-    schema: "sxsy-b122.provider-command",
+    schema: "sxsy-b122.workflow-command",
     version: 1,
     action: request.definition.action,
     operationId: request.operationId,
     target: targetDocument(request.target!),
-    session: request.session ? sessionDocument(request.session) : undefined,
+    session: sessionDocument(request.session!),
     authorityId: request.authority?.id,
-    input: request.untrustedInput ? boundedInput(request.untrustedInput) : undefined
+    artifact: {
+      id: artifact.id,
+      digest: artifact.digest,
+      taskId: artifact.taskId,
+      planRevision: artifact.planRevision,
+      payload: artifact.payload,
+      executionAuthorized: false
+    }
   };
 }
 function targetDocument(target: NonNullable<AdapterRequest["target"]>) { return { id: target.id, repositoryRoot: target.repositoryRoot, branch: target.branch, head: target.head, policyVersion: target.policyVersion, trackedManifest: target.trackedManifest, untrackedManifest: target.untrackedManifest }; }
 function sessionDocument(session: NonNullable<AdapterRequest["session"]>) { return { id: session.id, provider: session.provider, surface: session.surface, capabilities: session.capabilities, taskId: session.taskId, planRevision: session.planRevision, plannedFiles: session.plannedFiles }; }
-function boundedInput(input: Readonly<Record<string, string>>): Readonly<Record<string, string>> { const result: Record<string, string> = {}; for (const [key, value] of Object.entries(input)) if (/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(key) && value.length <= 512) result[key] = value; return result; }
+function providerWorkflowAction(action: CommandAction): WorkflowArtifactAction | undefined { return (providerCommandActions as readonly string[]).includes(action) ? action as WorkflowArtifactAction : undefined; }
+function workflowOutcomeData(artifact: WorkflowArtifact, response: WorkflowProviderResponse): Readonly<Record<string, unknown>> {
+  return redactRecord({ artifactId: artifact.id, artifactDigest: artifact.digest, resultKind: response.result.kind, ...(response.externalId ? { externalId: response.externalId } : {}) });
+}
 
 function adapterOutcome(result: ConfiguredNetworkResult): AdapterOutcome {
   if (result.outcome !== "passed" || !result.body) return { status: result.outcome === "blocked" ? "blocked" : result.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(result.detail), effectDisposition: result.effectDisposition };

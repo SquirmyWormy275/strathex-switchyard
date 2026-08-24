@@ -1,24 +1,75 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { WorkflowArtifact, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
-test("configured provider adapter accepts only an exact authenticated route result", async () => {
+const providerTargetId = "a".repeat(64);
+function proofArtifact(): WorkflowArtifact {
+  return {
+    id: "artifact-proof-1", action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: providerTargetId,
+    sessionId: "session-1", taskId: "task-1", planRevision: "plan-1",
+    payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["receipt:1"], requiredBackends: ["local"] },
+    digest: "b".repeat(64), status: "submitted", operationId: "operation-1", executionAuthorized: false,
+    createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
+  };
+}
+function providerRequest(untrustedInput?: Readonly<Record<string, string>>) {
+  return {
+    definition: { action: "proof" }, operationId: "operation-1",
+    target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
+    session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+    ...(untrustedInput ? { untrustedInput } : {})
+  } as never;
+}
+
+test("configured provider adapter dispatches and acknowledges only an exact typed workflow artifact", async () => {
   const requests: unknown[] = [];
+  const artifact = proofArtifact();
+  let acknowledged: WorkflowProviderResponse | undefined;
   const adapter = new ConfiguredProviderCommandAdapter({
-    async request(input: unknown) { requests.push(input); return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.remote-result", version: 1, status: "completed", summary: "Provider returned durable proof.", effectDisposition: "committed" })) }; }
-  } as unknown as DynamicConfiguredNetworkClient);
-  const outcome = await adapter.execute({ definition: { action: "proof" } as never, operationId: "operation-1", target: { id: "target-1", repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" } as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    async request(input: unknown) {
+      requests.push(input);
+      return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId, action: "proof", status: "completed", summary: "Provider returned durable proof.", effectDisposition: "committed", externalId: "provider-proof-1", result: { kind: "proof", verifiedClaims: ["claim"], evidenceReferences: ["receipt:1"], backendResults: [{ backend: "local", status: "passed" }] } })) };
+    }
+  } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch(input) { assert.deepEqual(input, { action: "proof", targetSnapshotId: providerTargetId, sessionId: "session-1", operationId: "operation-1" }); return artifact; },
+    async acknowledge(response) { acknowledged = response; return { ...artifact, status: "acknowledged", providerExternalId: response.externalId }; }
+  });
+  const outcome = await adapter.execute(providerRequest({ injectedPrompt: "must-not-cross-boundary" }));
   assert.equal(outcome.status, "completed");
   assert.equal(outcome.effectDisposition, "committed");
+  assert.equal(outcome.data?.artifactId, artifact.id);
+  assert.equal(acknowledged?.artifactId, artifact.id);
   assert.equal(requests.length, 1);
+  const document = JSON.parse(String((requests[0] as { body: string }).body)) as Record<string, unknown>;
+  assert.equal(document.schema, "sxsy-b122.workflow-command");
+  assert.equal("input" in document, false);
+  assert.deepEqual(document.artifact, { id: artifact.id, digest: artifact.digest, taskId: "task-1", planRevision: "plan-1", payload: artifact.payload, executionAuthorized: false });
 });
 
-test("configured provider adapter never converts malformed provider output into completion", async () => {
-  const adapter = new ConfiguredProviderCommandAdapter({ async request() { return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from("{}") }; } } as unknown as DynamicConfiguredNetworkClient);
-  const outcome = await adapter.execute({ definition: { action: "proof" } as never, operationId: "operation-1", target: { id: "target-1", repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" } as never });
+test("configured provider adapter never acknowledges malformed provider output", async () => {
+  const artifact = proofArtifact();
+  let acknowledgements = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({ async request() { return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from("{}") }; } } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { return artifact; }, async acknowledge() { acknowledgements += 1; return artifact; }
+  });
+  const outcome = await adapter.execute(providerRequest());
   assert.equal(outcome.status, "failed");
   assert.equal(outcome.effectDisposition, "ambiguous");
+  assert.equal(acknowledgements, 0);
+});
+
+test("configured provider adapter does not call the network without one prepared typed artifact", async () => {
+  let requests = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({ async request() { requests += 1; throw new Error("must not dispatch"); } } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { return undefined; }, async acknowledge() { throw new Error("must not acknowledge"); }
+  });
+  const outcome = await adapter.execute(providerRequest());
+  assert.equal(outcome.status, "awaiting_input");
+  assert.equal(outcome.effectDisposition, "not_started");
+  assert.equal(requests, 0);
 });
 
 test("provider handshake elevates only an exact current target after user presence", async () => {

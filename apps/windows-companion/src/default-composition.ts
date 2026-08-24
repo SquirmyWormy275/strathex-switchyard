@@ -12,6 +12,7 @@ import type { TargetSnapshot } from "../../../packages/control-plane/src/contrac
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { ReceiptLedger } from "../../../packages/control-plane/src/receipts.ts";
+import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { FilesystemBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
 import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
@@ -68,7 +69,7 @@ class LocalPipelineStatusAdapter implements CommandAdapter {
 }
 
 export interface DefaultLocalComposition {
-  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue; readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry;
+  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue; readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry; readonly workflowArtifacts: WorkflowArtifactStore;
 }
 export interface DefaultLocalCompositionOptions {
   readonly localGitStateDirectory?: string;
@@ -99,11 +100,12 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     credentials.createAdapter("configured-network")
   );
   const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
+  const workflowArtifacts = new WorkflowArtifactStore(store);
   const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
   const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter());
   const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
   if (dynamicNetwork) {
-    const provider = new ConfiguredProviderCommandAdapter(dynamicNetwork);
+    const provider = new ConfiguredProviderCommandAdapter(dynamicNetwork, workflowArtifacts);
     for (const action of providerCommandActions) adapters.register(action, provider);
   }
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
@@ -145,5 +147,5 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
   const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
   const executionOptions = { containment, hostActions };
-  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, dynamicNetwork), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: dynamicNetwork ? createConfiguredAutomationBroker(context.policy, containment, dynamicNetwork) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, dynamicNetwork), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

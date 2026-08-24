@@ -141,7 +141,13 @@ export class WorkflowArtifactStore {
       const parsed = parseWorkflowProviderResponse(response, found);
       if (found.status === "acknowledged" && found.providerExternalId === parsed.externalId) return clone(found);
       if (found.status !== "submitted") throw new WorkflowArtifactError(`Workflow artifact is already ${found.status}.`);
-      const finalStatus: WorkflowArtifactStatus = parsed.status === "completed" && parsed.effectDisposition === "committed" ? "acknowledged" : "rejected";
+      const finalStatus: WorkflowArtifactStatus = parsed.status === "completed" && parsed.effectDisposition === "committed"
+        ? "acknowledged"
+        : parsed.effectDisposition === "not_started"
+          ? "rejected"
+          : parsed.effectDisposition === "compensated"
+            ? "cancelled"
+            : "submitted";
       const updated: WorkflowArtifact = {
         ...found,
         status: finalStatus,
