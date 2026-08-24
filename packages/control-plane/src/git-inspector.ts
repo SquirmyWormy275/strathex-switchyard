@@ -1,0 +1,188 @@
+import { createHash } from "node:crypto";
+import { lstat, readFile } from "node:fs/promises";
+import { relative, resolve, sep } from "node:path";
+import { spawn } from "node:child_process";
+
+import type { GitInspection, GitInspector, ManifestFile } from "./snapshot.ts";
+
+export interface GitCommandResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+/** A narrow dependency so tests can run with no Git repository and no shell. */
+export interface GitCommandRunner {
+  run(args: readonly string[], workingDirectory?: string): Promise<GitCommandResult>;
+}
+
+export interface FileDigestReader {
+  digest(repositoryRoot: string, relativePath: string): Promise<string>;
+}
+
+export type UntrackedClassification = "included" | "excluded" | "unknown";
+
+export interface GitCliInspectorOptions {
+  readonly runner?: GitCommandRunner;
+  readonly digestReader?: FileDigestReader;
+  readonly classifyUntracked?: (relativePath: string) => UntrackedClassification;
+  /**
+   * Every ignored input receives an explicit policy decision. The safe default
+   * is unknown so a present ignored config file makes a consequential snapshot
+   * incomplete rather than silently invisible.
+   */
+  readonly classifyIgnored?: (relativePath: string) => UntrackedClassification;
+}
+
+/**
+ * Uses `spawn` with a fixed Git executable and literal argv vectors. It never
+ * invokes a shell, accepts command text from a key press, or performs a Git
+ * mutation. The only write-tree query creates no ref or worktree change.
+ */
+export class NodeGitCommandRunner implements GitCommandRunner {
+  async run(args: readonly string[], workingDirectory?: string): Promise<GitCommandResult> {
+    return new Promise((resolveResult, reject) => {
+      const child = spawn("git", [...args], { cwd: workingDirectory, shell: false, windowsHide: true });
+      const stdout: Buffer[] = [];
+      const stderr: Buffer[] = [];
+      child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+      child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+      child.once("error", reject);
+      child.once("close", (exitCode) => resolveResult({
+        exitCode: exitCode ?? 1,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8")
+      }));
+    });
+  }
+}
+
+/** Hashes files only beneath the resolved repository root and rejects symlink traversal. */
+export class NodeFileDigestReader implements FileDigestReader {
+  async digest(repositoryRoot: string, relativePath: string): Promise<string> {
+    const root = resolve(repositoryRoot);
+    const candidate = resolve(root, relativePath);
+    const relation = relative(root, candidate);
+    if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || resolve(root, relation) !== candidate) {
+      throw new Error("Path escapes the verified repository root.");
+    }
+    const metadata = await lstat(candidate);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
+    const contents = await readFile(candidate);
+    return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+  }
+}
+
+function cleanOutput(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized || undefined;
+}
+
+function nulPaths(value: string): readonly string[] {
+  return value.split("\0").filter(Boolean).map((path) => path.replaceAll("\\", "/").replace(/^\.\//, ""));
+}
+
+function parseSubmodules(value: string): Readonly<Record<string, string>> {
+  const result: Record<string, string> = {};
+  for (const line of value.split(/\r?\n/)) {
+    const match = line.match(/^[-+U ]?([0-9a-f]{7,64})\s+([^\s]+)/i);
+    if (match) result[match[2]!.replaceAll("\\", "/")] = match[1]!;
+  }
+  return result;
+}
+
+function shortFailure(label: string, result: GitCommandResult): string {
+  const detail = cleanOutput(result.stderr) ?? `exit ${result.exitCode}`;
+  return `Git ${label} is unavailable (${detail.slice(0, 180)}).`;
+}
+
+/**
+ * Read-only target discovery for the Windows companion. Failed Git commands
+ * and unreadable worktree inputs become snapshot issues; they never cause the
+ * caller to guess a repository, branch, untracked-file policy, or remote.
+ */
+export class GitCliInspector implements GitInspector {
+  private readonly runner: GitCommandRunner;
+  private readonly digestReader: FileDigestReader;
+  private readonly classifyUntracked: (relativePath: string) => UntrackedClassification;
+  private readonly classifyIgnored: (relativePath: string) => UntrackedClassification;
+
+  constructor(options: GitCliInspectorOptions = {}) {
+    this.runner = options.runner ?? new NodeGitCommandRunner();
+    this.digestReader = options.digestReader ?? new NodeFileDigestReader();
+    this.classifyUntracked = options.classifyUntracked ?? (() => "unknown");
+    this.classifyIgnored = options.classifyIgnored ?? (() => "unknown");
+  }
+
+  async inspect(targetHint?: string): Promise<GitInspection> {
+    const issues: string[] = [];
+    const rootResult = await this.runner.run(["rev-parse", "--show-toplevel"], targetHint);
+    const repositoryRoot = rootResult.exitCode === 0 ? cleanOutput(rootResult.stdout) : undefined;
+    if (!repositoryRoot) return { ...(targetHint ? { repositoryRoot: targetHint } : {}), issues: [shortFailure("root discovery", rootResult)] };
+
+    const remote = await this.optional(["remote", "get-url", "origin"], repositoryRoot, "canonical remote", issues);
+    const branch = await this.optional(["branch", "--show-current"], repositoryRoot, "branch", issues);
+    const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues);
+    const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
+    const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
+    const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
+    const untracked = await this.paths(["ls-files", "--others", "--exclude-standard", "-z"], repositoryRoot, "untracked file list", issues);
+    const ignored = await this.paths(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repositoryRoot, "ignored file list", issues);
+    const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
+    const submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
+
+    return {
+      repositoryRoot,
+      ...(remote ? { canonicalRemote: remote } : {}),
+      ...(branch ? { branch } : {}),
+      ...(upstream ? { upstream } : {}),
+      ...(head ? { head } : {}),
+      ...(indexTree ? { indexTree } : {}),
+      trackedFiles: await this.hashFiles(repositoryRoot, tracked, undefined, issues),
+      untrackedFiles: await this.hashFiles(repositoryRoot, untracked, this.classifyUntracked, issues, "untracked"),
+      ignoredFiles: await this.hashFiles(repositoryRoot, ignored, this.classifyIgnored, issues, "ignored"),
+      submodules,
+      issues
+    };
+  }
+
+  private async optional(args: readonly string[], cwd: string, label: string, issues: string[]): Promise<string | undefined> {
+    const result = await this.runner.run(args, cwd);
+    if (result.exitCode !== 0) {
+      issues.push(shortFailure(label, result));
+      return undefined;
+    }
+    const value = cleanOutput(result.stdout);
+    if (!value) issues.push(`Git ${label} is empty.`);
+    return value;
+  }
+
+  private async paths(args: readonly string[], cwd: string, label: string, issues: string[]): Promise<readonly string[]> {
+    const result = await this.runner.run(args, cwd);
+    if (result.exitCode !== 0) {
+      issues.push(shortFailure(label, result));
+      return [];
+    }
+    return nulPaths(result.stdout);
+  }
+
+  private async hashFiles(
+    repositoryRoot: string,
+    paths: readonly string[],
+    classifier: ((relativePath: string) => UntrackedClassification) | undefined,
+    issues: string[],
+    source?: "untracked" | "ignored"
+  ): Promise<readonly ManifestFile[]> {
+    const output: ManifestFile[] = [];
+    for (const path of paths) {
+      try {
+        const digest = await this.digestReader.digest(repositoryRoot, path);
+        output.push(classifier ? { path, digest, classification: classifier(path), ...(source ? { source } : {}) } : { path, digest });
+      } catch {
+        issues.push(`Unable to hash ${source ?? (classifier ? "untracked" : "tracked")} file ${path}; snapshot is incomplete.`);
+        output.push(classifier ? { path, classification: classifier(path), ...(source ? { source } : {}) } : { path });
+      }
+    }
+    return output;
+  }
+}

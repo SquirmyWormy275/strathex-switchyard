@@ -1,0 +1,114 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { CouncilCoordinator } from "../src/council.ts";
+import { HandoffPackageStore } from "../src/context-packages.ts";
+import { ProtectedJsonStore } from "../src/store.ts";
+
+async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-context-test-"));
+  try {
+    await run(new ProtectedJsonStore({ filePath: join(directory, "protected-audit.jsonl") }));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test("handoff packages persist only context, never create authority or execution", async () => {
+  await withStore(async (store) => {
+    const handoffs = new HandoffPackageStore(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "handoff-1" });
+    const packet = await handoffs.create({
+      repositoryRoot: "C:/repos/safe",
+      targetSnapshotId: "snapshot-1",
+      taskId: "task-7",
+      planRevision: "plan-3",
+      authorityId: "grant-9",
+      plan: "Implement the declared unit behind tests.",
+      decisions: ["Use the existing protocol."],
+      documentation: ["docs/SXSY-B122-complete-key-specification-and-audit.md"],
+      references: ["https://example.invalid/reference"],
+      constraints: ["No external side effects."],
+      openQuestions: ["Which adapter is available?"],
+      nextActions: ["Read the test."],
+      recipientSessionId: "coder-1"
+    });
+    assert.equal(packet.id, "handoff-1");
+    assert.equal(packet.status, "queued");
+    assert.equal(packet.authorityId, "grant-9");
+    assert.equal(packet.executionAuthorized, false);
+
+    await handoffs.setRoutingDefault("immediate");
+    assert.equal(await handoffs.routingDefault(), "immediate");
+    await handoffs.acknowledge(packet.id, "coder-1");
+    const reloaded = new HandoffPackageStore(store);
+    assert.equal((await reloaded.get(packet.id))?.status, "acknowledged");
+    assert.equal((await reloaded.get(packet.id))?.executionAuthorized, false);
+  });
+});
+
+const session = (id: string, plannedFiles: readonly string[], resources: readonly string[] = []) => ({
+  id,
+  targetSnapshotId: "snapshot-1",
+  status: "running" as const,
+  capabilities: ["registered", "observable", "controllable", "mediated"] as const,
+  lastHeartbeat: "2026-08-23T10:00:00.000Z",
+  plannedFiles,
+  resources,
+  dependencies: [] as readonly string[],
+  diffDigest: `${id}-diff`
+});
+
+test("Council reports collisions and refuses automatic coordination on overlap, stale state, or missing acknowledgements", async () => {
+  await withStore(async (store) => {
+    const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "epoch-1" });
+    const colliding = await council.report({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
+      session("agent-a", ["src/shared.ts"]),
+      session("agent-b", ["src/shared.ts"])
+    ] });
+    assert.equal(colliding.atomic, true);
+    assert.deepEqual(colliding.pathConflicts[0]?.participants, ["agent-a", "agent-b"]);
+    await assert.rejects(council.beginAutomatic({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: colliding.participants }), /overlap/i);
+
+    const epoch = await council.beginAutomatic({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
+      session("agent-a", ["src/a.ts"], ["port:4100"]),
+      session("agent-b", ["src/b.ts"], ["port:4200"])
+    ] });
+    assert.equal(epoch.status, "awaiting_pause_acknowledgements");
+    await council.acknowledgePause(epoch.id, "agent-a");
+    await council.acknowledgePause(epoch.id, "agent-b");
+    await council.assign(epoch.id, "agent-a", ["src/a.ts"], ["port:4100"]);
+    await council.assign(epoch.id, "agent-b", ["src/b.ts"], ["port:4200"]);
+    await council.acknowledgeAssignment(epoch.id, "agent-a");
+    await council.acknowledgeAssignment(epoch.id, "agent-b");
+    assert.equal((await council.resume(epoch.id)).status, "active");
+
+    const stopped = await council.validate(epoch.id, [
+      { ...session("agent-a", ["src/a.ts"], ["port:4100"]), diffDigest: "unexpected-edit" },
+      session("agent-b", ["src/b.ts"], ["port:4200"])
+    ]);
+    assert.equal(stopped.status, "aborted");
+    assert.match(stopped.abortReason ?? "", /changed/i);
+  });
+});
+
+test("Council normal is truthful for an Observable-only participant instead of pretending it can pause or isolate", async () => {
+  await withStore(async (store) => {
+    const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z" });
+    const report = await council.report({
+      repositoryRoot: "C:/repos/safe",
+      targetSnapshotId: "snapshot-1",
+      participants: [{
+        ...session("observer", ["docs/notes.md"]),
+        capabilities: ["registered", "observable"],
+        status: "verified_blocked"
+      }]
+    });
+    assert.equal(report.atomic, false);
+    await assert.rejects(council.beginAutomatic({
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: report.participants
+    }), /cooperative pause/i);
+  });
+});

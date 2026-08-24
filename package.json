@@ -7,7 +7,8 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "build:vscode": "tsc -p apps/vscode-extension/tsconfig.build.json",
-    "test": "node --experimental-strip-types --test packages/protocol/test/*.test.ts apps/windows-companion/test/*.test.ts",
+    "start:companion": "node --experimental-strip-types apps/windows-companion/src/main.ts",
+    "test": "node --experimental-strip-types --test packages/protocol/test/*.test.ts packages/control-plane/test/*.test.ts apps/windows-companion/test/*.test.ts apps/vscode-extension/test/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

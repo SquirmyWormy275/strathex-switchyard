@@ -11,7 +11,7 @@
 - Fresh state plus receipts is stronger than standing prompts for Re-anchor,
   Proof, Council, and repair-like workflows.
 
-## Risks that shape this baseline
+## Risks that shape this implementation
 
 - Keyboard firmware is the smallest part; a usable product needs a companion,
   extension, registry, adapters, brokers, protected receipts, and recovery.
@@ -31,7 +31,10 @@
 1. No companion command may silently commit, push, merge, force-push, approve
    permissions, or submit a prompt.
 2. Multi-repo or multi-window ambiguity must stop or open a picker.
-3. All baseline host output is an intent/preview; no green status implies a
-   missing credential, unavailable adapter, stale receipt, or untested gate.
+3. Route-only controls produce an intent/preview. A typed local result reflects
+   only a specifically installed software mechanism; it never implies a
+   credential, provider, hardware result, or acceptance gate. Missing adapters,
+   stale evidence, or incomplete state remain unavailable, incomplete, or
+   blocked.
 4. High-consequence control paths are hard-disabled in code until mediated
    execution and their acceptance evidence exist.
