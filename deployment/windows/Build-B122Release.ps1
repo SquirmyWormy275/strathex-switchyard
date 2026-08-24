@@ -41,6 +41,20 @@ if (-not $SkipVerification) {
   if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed.' }
   & npm.cmd test
   if ($LASTEXITCODE -ne 0) { throw 'Test verification failed.' }
+  & node.exe firmware\verify.mjs
+  if ($LASTEXITCODE -ne 0) { throw 'Firmware and Raw-HID protocol verification failed.' }
+  & git.exe diff --quiet
+  if ($LASTEXITCODE -ne 0) { throw 'Firmware verification changed generated source; commit the canonical generated artifacts first.' }
+  $previousNpmCache = $env:npm_config_cache
+  try {
+    $env:npm_config_cache = Join-Path $repo '.npm-cache-release'
+    & npm.cmd run package:vscode:dry-run
+    if ($LASTEXITCODE -ne 0) { throw 'VS Code extension package dry-run failed.' }
+    & npm.cmd run package:companion:dry-run
+    if ($LASTEXITCODE -ne 0) { throw 'Companion package dry-run failed.' }
+  } finally {
+    if ($null -eq $previousNpmCache) { Remove-Item Env:npm_config_cache -ErrorAction SilentlyContinue } else { $env:npm_config_cache = $previousNpmCache }
+  }
 }
 & npm.cmd run build:companion
 if ($LASTEXITCODE -ne 0) { throw 'Companion build failed.' }
