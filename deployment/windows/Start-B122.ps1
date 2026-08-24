@@ -5,10 +5,13 @@ $current = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $node = Join-Path $current 'runtime\node.exe'
 $main = Join-Path $current 'app\dist\apps\windows-companion\src\main.js'
 $health = Join-Path $current 'scripts\Test-B122Health.mjs'
+$validator = Join-Path $current 'scripts\Test-B122ReleaseArtifact.ps1'
 $state = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'STRATHEX\switchyard'
 $logs = Join-Path $state 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
-foreach ($file in @($node,$main,$health)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
+foreach ($file in @($node,$main,$health,$validator)) { if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Installed SXSY-B122 file is missing: $file" } }
+$validation = & $validator -BundleRoot $current
+if ([string]::IsNullOrWhiteSpace($validation)) { throw 'The installed SXSY-B122 bundle failed integrity validation.' }
 $stdout = Join-Path $logs 'companion.stdout.log'
 $stderr = Join-Path $logs 'companion.stderr.log'
 if ($main.Contains('"')) { throw 'Installed SXSY-B122 paths containing quotation marks are unsupported.' }

@@ -50,4 +50,12 @@ try {
   }
 } finally { $archive.Dispose() }
 
+$sourcePath = Join-Path $root 'source\sxsy-b122-source.zip'
+$sourceArchive = [IO.Compression.ZipFile]::OpenRead($sourcePath)
+try {
+  foreach ($entryName in @('package.json', 'firmware/qmk/keymaps/b122/keymap.c', 'docs/SXSY-B122-complete-key-specification-and-audit.md', 'docs/historical-interview-notes-reconstructed.md', 'docs/adversarial-review.md')) {
+    if ($null -eq $sourceArchive.GetEntry($entryName)) { throw "Source archive entry is missing: $entryName" }
+  }
+} finally { $sourceArchive.Dispose() }
+
 [ordered]@{ schema='sxsy-b122.release-validation'; version=1; status='passed'; payloadCount=$checksums.Count; spdxFiles=$sbomFiles.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Compress

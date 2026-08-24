@@ -74,7 +74,12 @@ $app = Join-Path $output 'app'
 $runtime = Join-Path $output 'runtime'
 $extension = Join-Path $output 'extension'
 $scripts = Join-Path $output 'scripts'
-New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts | Out-Null
+$provisioning = Join-Path $scripts 'provisioning'
+$documentation = Join-Path $output 'docs'
+$source = Join-Path $output 'source'
+New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts,$provisioning,$documentation,$source | Out-Null
+& git.exe archive --format=zip --output (Join-Path $source 'sxsy-b122-source.zip') HEAD
+if ($LASTEXITCODE -ne 0) { throw 'The exact source-commit archive could not be created.' }
 Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\dist') -Destination (Join-Path $app 'dist') -Recurse
 Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\package.json') -Destination $app
 Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\README.md') -Destination $app
@@ -110,6 +115,15 @@ Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\dist') -Destinati
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\package.json') -Destination $extension
 Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\README.md') -Destination $extension
 foreach ($name in @('Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $scripts }
+foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $provisioning }
+$documentationSource = [IO.Path]::GetFullPath((Join-Path $repo 'docs')).TrimEnd('\')
+foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Recurse | Sort-Object FullName)) {
+  $relativeDocument = $document.FullName.Substring($documentationSource.Length + 1)
+  $documentDestination = Join-Path $documentation $relativeDocument
+  New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($documentDestination)) | Out-Null
+  Copy-Item -LiteralPath $document.FullName -Destination $documentDestination
+}
+Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'SECURITY.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSING.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repo 'ATTRIBUTION.md') -Destination $output
