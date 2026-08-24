@@ -13,6 +13,8 @@ export {
 } from "./bridge.ts";
 export { CompanionService, type CompanionServiceOptions, type LocalHostAction, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor } from "./service.ts";
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
+export { DurableLocalIpcServer } from "./durable-ipc.ts";
+export { WindowsDpapiJournalAuthenticator } from "./windows-authenticator.ts";
 export { createDurableWindowsCompanion, type DurableWindowsCompanionOptions } from "./bootstrap.ts";
 export { handleJsonLine, runCompanionStdio, serveJsonLines, type CompanionRequestHandler } from "./stdio.ts";
 export { runStandaloneCompanion } from "./main.ts";

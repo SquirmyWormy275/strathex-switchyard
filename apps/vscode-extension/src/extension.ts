@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { UnavailableExtensionCompanionBridge } from "./companion-bridge.ts";
+import { AuthenticatedLocalPipeTransport, JsonLineCompanionBridge, readLocalCompanionConfiguration, UnavailableExtensionCompanionBridge } from "./companion-bridge.ts";
 import { ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
@@ -9,18 +9,24 @@ export { ManagedSessionController, type ManagedSessionControllerOptions } from "
 let controller: ManagedSessionController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Deployment supplies a reviewed local JSON-lines transport before replacing
-  // this fail-closed bridge. Until then the extension records local identity
-  // but presents every command as unavailable rather than executing it.
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
-    new UnavailableExtensionCompanionBridge(),
+    configuredBridge(vscode as unknown as VscodeLike),
     { resolveGitRoots: createVscodeGitRootResolver(vscode) }
   );
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
   });
+}
+
+function configuredBridge(host: VscodeLike): JsonLineCompanionBridge | UnavailableExtensionCompanionBridge {
+  const path = host.workspace.getConfiguration("sxsy-b122").get<string>("companionConfigurationPath");
+  if (!path?.trim()) return new UnavailableExtensionCompanionBridge("Configure sxsy-b122.companionConfigurationPath after starting the local Windows companion.");
+  // Configuration validation/connection failures are mapped by the bridge to
+  // an unavailable result; activation never falls back to a shell or direct API.
+  const transport = { request: async (line: string) => new AuthenticatedLocalPipeTransport(await readLocalCompanionConfiguration(path.trim())).request(line) };
+  return new JsonLineCompanionBridge(transport);
 }
 
 export function deactivate(): void {

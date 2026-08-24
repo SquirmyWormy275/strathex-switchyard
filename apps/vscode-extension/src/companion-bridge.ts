@@ -1,4 +1,6 @@
 import type { B122Control, B122Modifier } from "./commands.ts";
+import { readFile } from "node:fs/promises";
+import { connect } from "node:net";
 
 export type ExtensionCapability = "registered" | "observable" | "controllable" | "mediated";
 export type ExtensionSessionStatus = "running" | "verified_blocked" | "verified_finished" | "unreachable" | "stale" | "unknown";
@@ -57,6 +59,35 @@ export interface ExtensionCompanionBridge {
 /** A line round-trip owned by a deliberately started local companion process. */
 export interface JsonLineTransport {
   request(line: string): Promise<string>;
+}
+
+export interface LocalCompanionConfiguration { readonly ipcPath: string; readonly token: string; }
+
+/** Reads a deliberately configured per-user companion configuration; absence remains fail-closed. */
+export async function readLocalCompanionConfiguration(path: string): Promise<LocalCompanionConfiguration> {
+  const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
+  if (!isRecord(parsed) || typeof parsed.ipcPath !== "string" || !parsed.ipcPath || typeof parsed.token !== "string" || !/^[a-f0-9]{64}$/i.test(parsed.token)) {
+    throw new Error("The configured SXSY-B122 companion configuration is invalid.");
+  }
+  return { ipcPath: parsed.ipcPath, token: parsed.token };
+}
+
+/** Authenticated request/response transport for the companion's local named pipe. */
+export class AuthenticatedLocalPipeTransport implements JsonLineTransport {
+  private readonly configuration: LocalCompanionConfiguration;
+  private readonly timeoutMs: number;
+  constructor(configuration: LocalCompanionConfiguration, timeoutMs = 5_000) { this.configuration = configuration; this.timeoutMs = timeoutMs; }
+
+  request(line: string): Promise<string> {
+    return new Promise((resolveResponse, reject) => {
+      const socket = connect(this.configuration.ipcPath); let pending = ""; let settled = false;
+      const finish = (work: () => void) => { if (settled) return; settled = true; clearTimeout(timer); socket.destroy(); work(); };
+      const timer = setTimeout(() => finish(() => reject(new Error("The local SXSY-B122 companion did not respond before the health timeout."))), this.timeoutMs);
+      socket.once("error", () => finish(() => reject(new Error("The configured local SXSY-B122 companion pipe is unavailable."))));
+      socket.on("data", (chunk) => { pending += chunk.toString("utf8"); const newline = pending.indexOf("\n"); if (newline >= 0) finish(() => resolveResponse(pending.slice(0, newline))); });
+      socket.once("connect", () => socket.write(`${JSON.stringify({ token: this.configuration.token, request: JSON.parse(line) })}\n`));
+    });
+  }
 }
 
 /**

@@ -271,4 +271,3 @@ export class ContainmentController {
   isActive(target: TargetSnapshot): boolean { return this.store.isContained(target.digest); }
   async release(target: TargetSnapshot, reauthenticated: boolean, reason: string): Promise<boolean> { return this.store.release(target.digest, reauthenticated, reason); }
 }
-
