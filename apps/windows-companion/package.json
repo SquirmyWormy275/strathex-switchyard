@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "bin": { "sxsy-b122-companion": "dist/apps/windows-companion/src/service.js" },
+  "bin": { "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js" },
   "files": ["dist/apps", "dist/packages", "README.md", "package.json"],
   "scripts": { "build": "tsc -p tsconfig.build.json" }
 }

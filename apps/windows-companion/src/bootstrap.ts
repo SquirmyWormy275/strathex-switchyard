@@ -1,5 +1,8 @@
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory } from "../../../packages/control-plane/src/dispatch.ts";
+import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
+import { AdapterRegistry } from "../../../packages/control-plane/src/adapters.ts";
+import { InMemoryAutomationBroker, InMemoryExecutionBroker, InMemoryGitBroker, InMemoryTestEnvironmentBroker, UnavailableIsolationRuntime } from "../../../packages/control-plane/src/brokers.ts";
+import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
@@ -8,6 +11,7 @@ import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packag
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
+import { LocalMediatedGitHandler } from "./mediated-git.ts";
 import { CompanionService } from "./service.ts";
 
 export interface DurableWindowsCompanionOptions {
@@ -25,6 +29,12 @@ export interface DurableWindowsCompanionOptions {
   readonly runtime?: Omit<DurableMediatedExecutorOptions, "store" | "sessions" | "policyVersion" | "targetResolver" | "enabledHighConsequenceActions" | "dependencies" | "receiptEvidence">;
   readonly dependencies?: DurableMediatedExecutorOptions["dependencies"];
   readonly receiptEvidence?: DispatchReceiptEvidenceFactory;
+  /**
+   * Enables the concrete local-commit handler. It still needs a reviewed
+   * mutation factory; no chord can invent a commit message or path set.
+   */
+  readonly localGitStateDirectory?: string;
+  readonly localGitMutationFactory?: GitMutationFactory;
 }
 
 /**
@@ -52,6 +62,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     new TargetSnapshotFactory(new GitCliInspector()),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  const containment = new DurableContainmentManager(store);
+  const localGit = options.localGitStateDirectory
+    ? new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory })
+    : undefined;
   const executor = new DurableMediatedExecutor({
     ...options.runtime,
     store,
@@ -59,7 +73,21 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     policyVersion: options.policyVersion,
     targetResolver,
     enabledHighConsequenceActions: options.enabledHighConsequenceActions,
-    dependencies: options.dependencies,
+    dependencies: options.dependencies ?? ((context) => {
+      const adapters = new AdapterRegistry(containment);
+      const git = new InMemoryGitBroker(context.policy, containment);
+      if (localGit) git.register("local_commit", (request) => localGit.execute(request));
+      return {
+        adapters,
+        git,
+        containment,
+        execution: new InMemoryExecutionBroker(context.policy, containment),
+        testEnvironment: new InMemoryTestEnvironmentBroker(context.policy, containment),
+        automation: new InMemoryAutomationBroker(context.policy, containment),
+        isolation: new UnavailableIsolationRuntime(context.policy, containment),
+        ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {})
+      };
+    }),
     receiptEvidence: options.receiptEvidence
   });
   const service = new CompanionService({ executor });

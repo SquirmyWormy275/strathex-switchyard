@@ -35,6 +35,17 @@ async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Pro
   }
 }
 
+async function reviewedLocalCommitToken(runtime: DurableMediatedExecutor, selected: ManagedSession, authorityId: string, selectedTarget: TargetSnapshot): Promise<string> {
+  return (await runtime.confirmations.issue({
+    action: "local_commit",
+    targetSnapshotId: selectedTarget.id,
+    sessionId: selected.id,
+    authorityId,
+    reason: "isolated reviewed local commit",
+    reauthenticated: true
+  })).token;
+}
+
 /**
  * Deadline callbacks intentionally launch a durable cancellation sequence
  * without holding a host timer callback open.  Poll only isolated in-process
@@ -283,8 +294,9 @@ test("durable runtime captures a manual-only checkpoint and settles a running bu
       }
     });
     const assignment = commandForAction("local_commit").assignment!;
+    const confirmationToken = await reviewedLocalCommitToken(runtime, session, authority.id, target);
     const result = await runtime.execute({
-      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id
+      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken
     });
 
     assert.equal(result.status, "completed");
@@ -325,8 +337,9 @@ test("a consequential broker is not called when its required checkpoint capture 
       }
     });
     const assignment = commandForAction("local_commit").assignment!;
+    const confirmationToken = await reviewedLocalCommitToken(runtime, session, authority.id, target);
     const result = await runtime.execute({
-      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id
+      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken
     });
 
     assert.equal(result.status, "unavailable");
@@ -377,8 +390,9 @@ test("consequential work is revalidated after checkpoint capture and does not ru
       }
     });
     const assignment = commandForAction("local_commit").assignment!;
+    const confirmationToken = await reviewedLocalCommitToken(runtime, session, authority.id, target);
     const result = await runtime.execute({
-      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id
+      assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken
     });
 
     assert.equal(result.status, "incomplete");
@@ -422,7 +436,8 @@ test("a checkpoint with an unavailable or mismatched recovery artifact blocks it
       }
     });
     const assignment = commandForAction("local_commit").assignment!;
-    const result = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id });
+    const confirmationToken = await reviewedLocalCommitToken(runtime, session, authority.id, target);
+    const result = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken });
     assert.equal(result.status, "unavailable");
     assert.match(result.summary, /checkpoint artifacts/i);
     assert.equal(brokerCalls, 0);

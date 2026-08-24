@@ -142,7 +142,7 @@ test("durable dispatch gives Git, automation, and Council handlers a scoped chil
     const session: ManagedSession = {
       id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
       status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
-      plannedFiles: [], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+      plannedFiles: ["src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
     };
     const policy = new PolicyEngine({ version: "policy-1", now: () => new Date(now) });
     const authority = (action: AuthorityGrant["allowedActions"][number]): AuthorityGrant => ({
@@ -199,9 +199,13 @@ test("durable dispatch gives Git, automation, and Council handlers a scoped chil
     for (const action of ["local_commit", "compound_capture", "council_report"] as const) {
       const definition = commandForAction(action);
       const assignment = definition.assignment!;
+      const confirmation = action === "local_commit"
+        ? policy.createConfirmation({ action, targetSnapshotId: target.id, sessionId: session.id, authorityId: `authority-${action}`, reason: "isolated reviewed local commit", reauthenticated: true })
+        : undefined;
       const result = await dispatcher.dispatch({
         assignment, control: assignment.control, modifier: assignment.modifier,
-        targetSnapshot: target, sessionId: session.id, authorityId: `authority-${action}`
+        targetSnapshot: target, sessionId: session.id, authorityId: `authority-${action}`,
+        ...(confirmation ? { confirmationToken: confirmation.token } : {})
       });
       assert.equal(result.status, "completed");
     }

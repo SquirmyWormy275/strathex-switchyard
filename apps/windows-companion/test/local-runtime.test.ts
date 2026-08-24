@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import {
-  callCompanion, captureLiveTargetSnapshot, CompanionIpcServer, createCompanionConfiguration, createReviewApproval,
+  captureLiveTargetSnapshot, createReviewApproval,
   FilesystemBroker, LocalControlExecutionBroker, LocalProcessProviderAdapter, LocalRepositoryBroker, LocalSandboxBroker, LocalTestEnvironmentBroker, validateReviewApproval
 } from "../src/local-runtime.ts";
 import type { ManagedSession } from "../src/control-plane.ts";
-import { createCompanionService } from "../src/service.ts";
 
 async function command(directory: string, ...args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => { const child = spawn(args[0], args.slice(1), { cwd: directory, shell: false }); child.once("error", reject); child.once("close", (code) => code === 0 ? resolve() : reject(new Error(`${args.join(" ")} failed`))); });
@@ -20,7 +19,7 @@ async function repository(): Promise<string> {
   await writeFile(join(directory, "README.md"), "safe\n", "utf8"); await command(directory, "git", "add", "README.md"); await command(directory, "git", "commit", "-m", "initial"); await command(directory, "git", "checkout", "-b", "feature/test"); return directory;
 }
 
-test("live Git snapshots, exact-target review, and mutation policy are concrete and fail closed", async () => {
+test("legacy local Git helper retains read-only snapshots and refuses all direct mutations", async () => {
   const directory = await repository();
   try {
     const target = await captureLiveTargetSnapshot(directory); const broker = new LocalRepositoryBroker(directory);
@@ -33,7 +32,7 @@ test("live Git snapshots, exact-target review, and mutation policy are concrete 
     assert.equal((await broker.commit(target, "reviewed", approval)).outcome, "blocked");
     await command(directory, "git", "add", "README.md"); const reviewedTarget = await captureLiveTargetSnapshot(directory);
     assert.equal((await broker.commit(reviewedTarget, "without approval")).outcome, "blocked");
-    assert.equal((await broker.commit(reviewedTarget, "reviewed", createReviewApproval("COMMIT:normal", reviewedTarget, "test"))).outcome, "passed");
+    assert.equal((await broker.commit(reviewedTarget, "reviewed", createReviewApproval("COMMIT:normal", reviewedTarget, "test"))).outcome, "blocked");
     await writeFile(join(directory, "README.md"), "dirty-one\n", "utf8"); const dirtyTarget = await captureLiveTargetSnapshot(directory);
     await writeFile(join(directory, "README.md"), "dirty-two\n", "utf8"); assert.match((await broker.revalidate(dirtyTarget))!, /no longer matches/i);
     await writeFile(join(directory, "untracked.txt"), "one\n", "utf8"); const untrackedTarget = await captureLiveTargetSnapshot(directory);
@@ -59,15 +58,6 @@ test("filesystem, isolated-test, and sandbox brokers contain local state", async
   } finally { await rm(directory, { recursive: true, force: true }); await rm(state, { recursive: true, force: true }); }
 });
 
-test("authenticated local IPC has a local health path", async () => {
-  const state = await mkdtemp(join(tmpdir(), "sxsy-ipc-"));
-  try {
-    const config = await createCompanionConfiguration(state); const server = new CompanionIpcServer(config, async (method) => method === "health" ? { healthy: true } : Promise.reject(new Error("unknown")));
-    await server.start(); const response = await callCompanion(config, "health"); assert.equal(response.ok, true); assert.deepEqual(response.result, { healthy: true });
-    const rejected = await callCompanion({ ...config, token: "not-the-local-token" }, "health"); assert.equal(rejected.ok, false); await server.stop();
-  } finally { await rm(state, { recursive: true, force: true }); }
-});
-
 test("named local controls use concrete broker paths and inspect staged changes", async () => {
   const directory = await repository();
   try {
@@ -81,16 +71,4 @@ test("named local controls use concrete broker paths and inspect staged changes"
     const stagedTarget = await captureLiveTargetSnapshot(directory);
     assert.equal((await execution.execute("SHIELD:normal", stagedTarget, { control: "SHIELD", modifier: "normal", sessionId: session.id })).outcome, "failed");
   } finally { await rm(directory, { recursive: true, force: true }); }
-});
-
-test("companion IPC supplies the complete manifest and records a VS Code Git workspace safely", async () => {
-  const directory = await repository(); const state = await mkdtemp(join(tmpdir(), "sxsy-service-"));
-  try {
-    const config = await createCompanionConfiguration(state); const service = await createCompanionService(state); await service.start();
-    try {
-      const manifest = await callCompanion(config, "assignments"); assert.equal(manifest.ok, true); assert.equal((manifest.result as readonly unknown[]).length, 65);
-      const registered = await callCompanion(config, "register-vscode", { id: "vscode-agent", provider: "generic", terminalName: "managed", workspaceRoot: directory });
-      assert.equal(registered.ok, true); assert.equal((registered.result as { target?: { gitRoot?: string }; capability?: { mediated?: boolean } }).target?.gitRoot, await realpath(directory)); assert.equal((registered.result as { capability?: { mediated?: boolean } }).capability?.mediated, false);
-    } finally { await service.stop(); }
-  } finally { await rm(directory, { recursive: true, force: true }); await rm(state, { recursive: true, force: true }); }
 });

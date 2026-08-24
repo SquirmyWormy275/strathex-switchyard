@@ -25,7 +25,7 @@ const target: TargetSnapshot = {
 const session: ManagedSession = {
   id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
   status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
-  plannedFiles: [], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+  plannedFiles: ["src/a.ts", "src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
 };
 const grant = (action: CommandAction): AuthorityGrant => ({
   id: `authority-${action}`, repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId,
@@ -68,7 +68,40 @@ test("execution broker only invokes an explicitly registered typed recipe with a
   assert.equal(executions, 1);
 });
 
-test("Git broker refuses force semantics and containment fences every outbound Git action", async () => {
+test("containment and a refused final effect check stop execution before a registered handler", async () => {
+  const contained = permitted("run_target");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const containedBroker = new InMemoryExecutionBroker(contained.policy, containment);
+  let containedCalls = 0;
+  containedBroker.register("run_target", () => { containedCalls += 1; return { status: "completed", summary: "must not run" }; });
+  const recipe = { id: "run_target", executable: "node", args: ["app.js"], workingDirectory: target.repositoryRoot, environment: {} };
+
+  const containedResult = await containedBroker.execute({ ...contained.invocation, recipe });
+  assert.equal(containedResult.status, "blocked");
+  assert.equal(containedCalls, 0);
+
+  const guarded = permitted("run_target");
+  const guardedBroker = new InMemoryExecutionBroker(guarded.policy);
+  let guardedCalls = 0;
+  let guardCalls = 0;
+  guardedBroker.register("run_target", () => { guardedCalls += 1; return { status: "completed", summary: "must not run" }; });
+  const guardedResult = await guardedBroker.execute({
+    ...guarded.invocation,
+    recipe,
+    effectGuard: {
+      assertCurrent: () => {
+        guardCalls += 1;
+        return { allowed: false, reason: "Target changed before the execution effect." };
+      }
+    }
+  });
+  assert.equal(guardedResult.status, "incomplete");
+  assert.equal(guardCalls, 1);
+  assert.equal(guardedCalls, 0);
+});
+
+test("Git broker refuses force semantics and containment fences every Git mutation including local commit", async () => {
   const local = permitted("local_commit");
   const broker = new InMemoryGitBroker(local.policy);
   broker.register("local_commit", () => ({ status: "completed", summary: "simulated local commit" }));
@@ -84,6 +117,14 @@ test("Git broker refuses force semantics and containment fences every outbound G
   const result = await outbound.execute({ ...pr.invocation, mutation: { kind: "pr_upsert", headBranch: target.branch!, baseBranch: "main" } });
   assert.equal(result.status, "blocked");
   assert.equal(writes, 0);
+
+  const containedLocal = permitted("local_commit");
+  const localFence = new InMemoryGitBroker(containedLocal.policy, containment);
+  let localWrites = 0;
+  localFence.register("local_commit", () => { localWrites += 1; return { status: "completed", summary: "must not commit" }; });
+  const localResult = await localFence.execute({ ...containedLocal.invocation, mutation: { kind: "local_commit", paths: ["src/a.ts"], message: "blocked by fence" } });
+  assert.equal(localResult.status, "blocked");
+  assert.equal(localWrites, 0);
 });
 
 test("credential, network, and test-environment brokers deny unsafe access without exposing secret material", async () => {
@@ -113,6 +154,24 @@ test("credential, network, and test-environment brokers deny unsafe access witho
   assert.match(safe.environment?.databaseName ?? "", /^sxsy_test_/);
 });
 
+test("active containment prevents a test-environment allocation before any disposable state is created", async () => {
+  const pipeline = permitted("pipeline_local_gate");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const testEnvironment = new InMemoryTestEnvironmentBroker(pipeline.policy, containment);
+  const request = { ...pipeline.invocation, recipe, sourceEnvironment: { SAFE_FLAG: "yes" } };
+
+  const blocked = await testEnvironment.prepare(request);
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.environment, undefined);
+
+  const released = containment.release({ repositoryRoot: target.repositoryRoot, reason: "isolated test release", reauthenticated: true, incidentStatus: "not_required" });
+  assert.equal(released.status, "released");
+  const afterRelease = await testEnvironment.prepare(request);
+  assert.equal(afterRelease.status, "completed");
+  assert.equal(afterRelease.environment?.id, "test-1");
+});
+
 test("unavailable high-risk adapters fail closed instead of pretending to isolate or automate", async () => {
   const highAction = commandForAction("full_sandbox");
   const policy = new PolicyEngine({
@@ -129,6 +188,19 @@ test("unavailable high-risk adapters fail closed instead of pretending to isolat
   const automation = new InMemoryAutomationBroker(policy);
   const lfg = await automation.execute({ action: "lfg", operationId: "op-lfg", target, session, authority: grant("lfg"), permit: undefined });
   assert.equal(lfg.status, "blocked");
+});
+
+test("active containment fences automation before a registered automation handler", async () => {
+  const capture = permitted("compound_capture");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const automation = new InMemoryAutomationBroker(capture.policy, containment);
+  let calls = 0;
+  automation.register("compound_capture", () => { calls += 1; return { status: "completed", summary: "must not run" }; });
+
+  const result = await automation.execute(capture.invocation);
+  assert.equal(result.status, "blocked");
+  assert.equal(calls, 0);
 });
 
 test("a live broker permit cannot be replayed under another durable operation or authority", async () => {

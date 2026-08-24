@@ -2,7 +2,23 @@ import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
 import { redactText } from "./redaction.ts";
 
 /** Durable repository-level fence for brokered outbound effects. */
-export type ContainmentChannel = "git" | "credential" | "network" | "deployment" | "local_remediation";
+/**
+ * Each brokered effect has its own durable fence channel.  Keeping the
+ * channels explicit makes a missing pre-effect check reviewable and prevents
+ * a newly added executor from silently falling through a generic allow path.
+ */
+export type ContainmentChannel =
+  | "git"
+  | "credential"
+  | "network"
+  | "deployment"
+  | "execution"
+  | "test_environment"
+  | "automation"
+  | "isolation"
+  | "council"
+  | "adapter"
+  | "local_remediation";
 export type IncidentStatus = "rotation_pending" | "rotation_complete" | "not_required";
 
 export interface ContainmentRecord {

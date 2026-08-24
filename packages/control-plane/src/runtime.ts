@@ -16,6 +16,7 @@ import {
 } from "./dispatch.ts";
 import { DurableOperationCoordinator, NoReplayOperationRecovery, OperationSagaStore, type OperationReconciler, type ReconciliationResult } from "./operations.ts";
 import { ExecutionControlRegistry, type ExecutionControl, type OperationControlAdapter } from "./execution-control.ts";
+import type { EffectGuard } from "./brokers.ts";
 import { PolicyEngine } from "./policy.ts";
 import { ReceiptLedger } from "./receipts.ts";
 import { SessionRegistry } from "./session-registry.ts";
@@ -560,6 +561,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
   }
 
   async admit(input: DispatchGovernanceRequest): Promise<DispatchGovernanceAdmission> {
+    let effectGuard: EffectGuard | undefined;
     const workflow = checkpointWorkflow(input.definition);
     if (workflow) {
       if (!input.target) return { allowed: false, status: "unavailable", summary: "This risky workflow needs a durably recorded exact TargetSnapshot before a checkpoint can be captured." };
@@ -606,12 +608,34 @@ class DurableRuntimeGovernance implements DispatchGovernance {
         if (!await this.options.revalidator.revalidate({ definition: input.definition, target: input.target, ...(input.session ? { session: input.session } : {}) })) {
           return { allowed: false, status: "incomplete", summary: "The TargetSnapshot changed, became incomplete, or could not be revalidated immediately before broker dispatch." };
         }
+        const expectedDefinition = input.definition;
+        const expectedTarget = input.target;
+        const expectedSessionId = input.session?.id;
+        effectGuard = {
+          assertCurrent: async (effect) => {
+            if (effect.action !== expectedDefinition.action || effect.target.id !== expectedTarget.id || effect.session?.id !== expectedSessionId) {
+              return { allowed: false, reason: "The broker effect does not match its admitted command, target, or selected session." };
+            }
+            try {
+              const current = await this.options.revalidator.revalidate({
+                definition: expectedDefinition,
+                target: expectedTarget,
+                ...(input.session ? { session: input.session } : {})
+              });
+              return current
+                ? { allowed: true, reason: "TargetSnapshot remains current immediately before the broker effect." }
+                : { allowed: false, reason: "The TargetSnapshot changed after admission; the broker effect was not started." };
+            } catch {
+              return { allowed: false, reason: "The TargetSnapshot could not be revalidated immediately before the broker effect." };
+            }
+          }
+        };
       } catch {
         return { allowed: false, status: "unavailable", summary: "The TargetSnapshot could not be revalidated immediately before broker dispatch; no broker was called." };
       }
     }
 
-    if (!budgetRequired(input.definition)) return { allowed: true, summary: "This typed local route does not start a budgeted broker class." };
+    if (!budgetRequired(input.definition)) return { allowed: true, summary: "This typed local route does not start a budgeted broker class.", ...(effectGuard ? { effectGuard } : {}) };
     try {
       await this.ensureBudgetConfiguration();
       const claim = await this.options.budgets.claim({
@@ -628,7 +652,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
       const liveClaim = started.claim!;
       const executionControl = this.options.controls.bind(input.operationId, liveClaim.expiresAt, liveClaim.id);
       this.scheduleDeadline(input.operationId, liveClaim.id, liveClaim.expiresAt);
-      return { allowed: true, summary: "Durable budget claim admitted before broker dispatch.", token: liveClaim.id, executionControl };
+      return { allowed: true, summary: "Durable budget claim admitted before broker dispatch.", token: liveClaim.id, executionControl, ...(effectGuard ? { effectGuard } : {}) };
     } catch {
       return { allowed: false, status: "unavailable", summary: "The budget ledger is unavailable or invalid; no broker was called." };
     }

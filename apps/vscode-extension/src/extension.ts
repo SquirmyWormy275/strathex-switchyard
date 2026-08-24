@@ -1,26 +1,40 @@
 import * as vscode from "vscode";
-import { UnavailableExtensionCompanionBridge } from "./companion-bridge.ts";
+import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { ManagedSessionController, type GitRootRegistration } from "./controller.ts";
+import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
 export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport } from "./companion-bridge.ts";
+export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader, type ExtensionSecretReader, type StoredCompanionPipeConfiguration } from "./named-pipe-transport.ts";
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
 let controller: ManagedSessionController | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Deployment supplies a reviewed local JSON-lines transport before replacing
-  // this fail-closed bridge. Until then the extension records local identity
-  // but presents every command as unavailable rather than executing it.
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
-    new UnavailableExtensionCompanionBridge(),
+    configuredCompanionBridge(),
     { resolveGitRoots: createVscodeGitRootResolver(vscode) }
   );
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
   });
+}
+
+/**
+ * The companion creates the opaque configuration under its host-owned local
+ * state directory. Missing, malformed, or DPAPI-unreadable configuration stays
+ * unavailable; neither workspace settings nor an extension command selects an
+ * endpoint.
+ */
+export function configuredCompanionBridge(): ExtensionCompanionBridge {
+  if (process.platform !== "win32") return new UnavailableExtensionCompanionBridge("The SXSY-B122 companion is available only on Windows.");
+  try {
+    return new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(undefined, new WindowsDpapiSecretReader()));
+  } catch {
+    return new UnavailableExtensionCompanionBridge("The authenticated SXSY-B122 local companion pipe configuration is invalid.");
+  }
 }
 
 export function deactivate(): void {

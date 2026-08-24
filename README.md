@@ -43,13 +43,14 @@ safe and available in the current context.
   one-time confirmations, operation/child-operation sagas, receipts,
   no-replay recovery, containment, budget claims, deadline/cancellation
   control, and typed broker interfaces.
-- `apps/windows-companion/` — a local JSON-lines companion endpoint and
-  bootstrap seam. It hydrates durable state, runs no-replay startup recovery,
-  and requires a host-owned journal authenticator for a non-test durable
-  companion.
-- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It may
-  identify/focus approved local surfaces and route a canonical request; it does
-  not use direct Run/Debug APIs as a bypass around mediation.
+- `apps/windows-companion/` — a local named-pipe companion and bootstrap seam.
+  On Windows it uses a DPAPI CurrentUser-protected journal and endpoint token,
+  hydrates durable state, and runs no-replay startup recovery without opening
+  TCP.
+- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It reads
+  only the companion-created sealed endpoint record, may identify/focus
+  approved local surfaces and route a canonical request, and does not use
+  direct Run/Debug APIs as a bypass around mediation.
 - `docs/` — the accepted specification, reconstructed interview history,
   adversarial review, project charter, attribution records, operational safety
   model, and source-linked software-only completion audit.
@@ -96,10 +97,11 @@ npm run build:vscode
 ```
 
 `npm run start:companion` is intentionally **not** a ready-to-use Windows
-service. The standalone entry point fails closed because no DPAPI/NCrypt/
-service-backed `JournalAuthenticator` is bundled. A reviewed host must embed
-`createDurableWindowsCompanion`, provide that authenticator, and supply any
-real adapters before a durable companion can start.
+service. The standalone Windows entry point uses DPAPI CurrentUser protection
+for the journal and its local named-pipe token, but it does not establish a
+service account, named-pipe ACL policy, OS mediation boundary, or any external
+adapter. Missing mutation factories and real adapters continue to fail closed.
+See [the local companion guide](docs/local-companion.md).
 
 QMK compilation is not part of the default suite because it needs the selected
 physical B122-compatible target and toolchain. See
@@ -128,6 +130,7 @@ particular:
 
 - [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
 - [Software-only completion audit](docs/software-only-completion-audit.md)
+- [Local companion and VS Code guide](docs/local-companion.md)
 - [Operational safety model](docs/operational-safety-model.md)
 - [Acceptance-gate ledger](docs/acceptance-gates.md)
 - [Project charter](docs/01-project-charter.md)

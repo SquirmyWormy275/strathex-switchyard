@@ -15,6 +15,22 @@ export { CompanionService, type CompanionServiceOptions, type LocalHostAction, t
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
 export { createDurableWindowsCompanion, type DurableWindowsCompanionOptions } from "./bootstrap.ts";
 export { handleJsonLine, runCompanionStdio, serveJsonLines, type CompanionRequestHandler } from "./stdio.ts";
+export {
+  AuthenticatedPipeClient,
+  AuthenticatedPipeServer,
+  createPipeConfiguration,
+  defaultPipePath,
+  loadPipeConfiguration,
+  savePipeConfiguration,
+  type AuthenticatedPipeConfiguration
+} from "./authenticated-pipe.ts";
+export {
+  DpapiJournalAuthenticator,
+  FakeUserSecretProtector,
+  WindowsDpapiCurrentUserProtector,
+  type UserSecretProtector
+} from "./windows-secret.ts";
+export { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner, type MediatedGitHandlerOptions } from "./mediated-git.ts";
 export { runStandaloneCompanion } from "./main.ts";
 
 /**

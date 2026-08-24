@@ -13,9 +13,9 @@ ordinary software work and must not be relabeled as hardware or external:
   connect every one of the 65 assignments to a concrete local handler.
 - VS Code registration is not yet synchronized into the companion registry;
   its invoke UI therefore cannot establish a real mediated session by itself.
-- Local Git mediation has snapshot/status/diff and reviewed commit/push, but
-  lacks a complete branch/PR/merge recovery workflow and protected receipt gate
-  activation.
+- Local Git mediation now has a scoped private-index local-commit handler, but
+  has no enabled push, PR, merge, or Direct Main adapter and therefore lacks a
+  complete remote Git recovery workflow and protected acceptance-gate evidence.
 - There is no concrete scoped-credential issuer, network proxy, repository
   test-recipe manifest loader, process/debug supervisor, scanner adapter, or
   Windows Raw HID lifecycle implementation.
@@ -43,7 +43,7 @@ than being presented as implemented.
 | ChatGPT | normal, shift, alt | Managed-session records and unavailable truth | Codex/Desktop authorization |
 | VS Code | normal, shift | Extension session registration/selection/status | Multiple-window live acceptance |
 | Terminal | normal, shift | Managed terminal creation/adoption | External-terminal focus adapter |
-| Commit | normal, shift, alt, shift-alt | Live Git status/diff, reviewed commit/push broker | Merge/direct-main stays gate-disabled |
+| Commit | normal, shift, alt, shift-alt | Scoped private-index local-commit handler with exact confirmation and final target check | Push, PR, merge, and Direct Main stay unavailable/gate-disabled |
 | GitHub | normal, shift, alt, shift-alt | Explicit unavailable path | GitHub authorization/API adapter |
 | Compound | normal, shift, alt, shift-alt | Authority/receipt path | Compound installation/authorization |
 | Run | normal, shift, alt, shift-alt | Isolated recipe broker seam | Repository run/debug recipe |

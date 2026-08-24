@@ -1,43 +1,76 @@
-# Local Windows companion and VS Code setup
+# Local Windows companion and VS Code connection
 
-`@strathex/switchyard-companion` is a local-only Node companion. It owns the
-protected state directory, authenticated named-pipe (Windows) or Unix-socket
-IPC endpoint, receipt store, and broker configuration. It never listens on TCP.
+> **Candidate scope:** this is a local, current-Windows-user companion
+> connection. It is not a Windows service installation, a pipe-ACL review, an
+> OS mediation boundary, or acceptance evidence for any B122 gate.
 
-1. Build it with `npm run build:companion`.
-2. Start `apps/windows-companion/dist/apps/windows-companion/src/service.js`.
-   Its initial state is `%USERPROFILE%/.strathex-switchyard`; the configuration
-   file contains a random local IPC token and must not be committed or shared.
-3. In VS Code run **SXSY-B122: Configure Local Companion** and enter the IPC
-   path/token. Then use **Show Companion Health**, register/select a session,
-   and invoke controls from **Invoke Control**.
+`@strathex/switchyard-companion` is a manually started local Node companion.
+It owns the protected journal, its endpoint record, and its local named pipe.
+It never listens on TCP and the VS Code extension cannot select a host, port,
+workspace path, or cleartext token.
 
-The companion starts manually by default. A login startup registration is a
-user-local installation choice, not a repository action; the code intentionally
-does not create a Scheduled Task or alter startup settings silently. Failed IPC
-connections, unavailable adapters, stale sessions, missing authorities, and
-missing isolated-test recipes are displayed as unavailable/blocked. Reconnects
-require the local token again and do not upgrade a session's capability. The
-configuration and persisted sessions are per-user state files (mode `0600` where
-the OS honors POSIX modes); they are not portable encrypted credential stores.
+## Start a candidate companion
 
-## Concrete local brokers
+Use a current Node.js runtime on Windows. From the repository root:
 
-- `captureLiveTargetSnapshot` gathers branch, HEAD, index tree, dirty tracked
-  state, untracked files, submodules, remote, tool and environment fingerprints
-  from Git immediately before a brokered action.
-- `LocalRepositoryBroker` uses argument-vector Git child processes, canonical
-  workspace allowlists, exact-snapshot revalidation, and target-bound expiring
-  review approvals. Direct-main is denied and push defaults to reviewed.
-- `LocalTestEnvironmentBroker` executes only a declared recipe, injects test
-  mode/network-deny values, and rejects configured production-like endpoints.
-- `LocalSandboxBroker` creates a recoverable copied sandbox/quarantine lease;
-  release needs a target-bound review approval.
-- `LocalProcessProviderAdapter` is the functional local simulator for managed
-  session discovery, focus, pause, and target-bound context acknowledgement.
-  Claude/Codex proprietary adapters remain unavailable until their owners
-  authorize a versioned integration.
+```powershell
+npm run build:companion
+node apps/windows-companion/dist/apps/windows-companion/src/main.js
+```
 
-The local companion does not fabricate a Raw HID connection, provider API,
-GitHub API, cloud credential, scanner advisory feed, browser automation, or
-hardware acceptance result.
+For source-only development, `npm run start:companion` starts the same entry
+point with Node's TypeScript stripping support. The companion is deliberately
+not installed as a Scheduled Task or login item. Starting it is a user-local
+choice; the repository never changes startup settings silently.
+
+At first start, the companion creates these host-owned files under
+`%LOCALAPPDATA%\STRATHEX\switchyard`:
+
+- `protected-audit.jsonl` — append-only protected control-plane records;
+- `authenticated-pipe.json` — a version, a B122-only named-pipe path, and an
+  opaque DPAPI CurrentUser-sealed token.
+
+The endpoint record never contains a clear token. The companion decrypts the
+token only for the local pipe check and clears the buffer after use. Journal
+record tags use the same DPAPI CurrentUser protector; a hash-chain-only store
+is rejected by standalone startup.
+
+## VS Code extension behavior
+
+The extension reads only the companion-created canonical endpoint record from
+the host-owned state location. It opens the sealed token with DPAPI CurrentUser
+and uses one bounded JSON-line request per named-pipe connection. It rejects
+TCP-like paths, endpoint overrides, malformed records, oversized frames,
+trailing response data, mismatched response IDs, and unavailable pipes.
+
+There is intentionally no **Configure Local Companion** command and no
+workspace or VS Code setting for an endpoint or token. If the canonical record
+is missing, malformed, owned by another user, or the companion is stopped, the
+extension reports the companion as unavailable. It does not fall back to a
+stdio server, a TCP listener, a shell command, or another extension.
+
+## What the connection does not authorize
+
+An authenticated named-pipe request is still only input to the durable control
+plane. It cannot self-grant mediation, authority, a confirmation, acceptance
+evidence, a credential, a target, or a successful outcome. Missing mutation
+factories and adapters remain unavailable; high-consequence controls remain
+disabled by policy and gate evidence.
+
+The sealed token provides current-user protection at rest. It is not a claim
+that a malicious process running as the same Windows user cannot invoke DPAPI,
+that a named-pipe ACL has been independently reviewed, or that unmediated
+applications are contained. Those are separate acceptance and deployment
+concerns.
+
+## Local evidence
+
+The isolated tests cover a fake-protector transport round trip, token/frame/
+endpoint rejection, unauthenticated-frame rejection, canonical endpoint
+loading, and Windows CurrentUser DPAPI companion-to-extension interoperability.
+See [authenticated-pipe.test.ts](../apps/windows-companion/test/authenticated-pipe.test.ts)
+and [named-pipe-transport.test.ts](../apps/vscode-extension/test/named-pipe-transport.test.ts).
+
+For the broader policy, Git, and containment boundary, see the
+[software-only completion audit](software-only-completion-audit.md) and
+[operational safety model](operational-safety-model.md).
