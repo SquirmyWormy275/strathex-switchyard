@@ -5,10 +5,11 @@ The Windows deliverable is a per-user bundle containing the compiled companion, 
 ```powershell
 .\deployment\windows\Build-B122Release.ps1 `
   -NodeRuntimeZip C:\reviewed\node-v24-win-x64.zip `
-  -NodeRuntimeSha256 <reviewed-64-character-sha256>
+  -NodeRuntimeSha256 <reviewed-64-character-sha256> `
+  -NodeRuntimeSourceUri https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip
 ```
 
-The release build runs the isolated test suite, TypeScript checks, both builds, the sandbox-helper build, creates the VSIX, and launches the assembled bundle against an isolated temporary state root for an authenticated DPAPI/named-pipe health check. `-SkipVerification` exists only for iterative packaging and is not release evidence; it does not skip the final portable-bundle smoke check.
+The release build runs the isolated test suite, TypeScript checks, both builds, the sandbox-helper build, creates the VSIX, and launches the assembled bundle against an isolated temporary state root for an authenticated DPAPI/named-pipe health check. It records the exact source commit, reviewed runtime URL and archive digest, helper digest, payload checksums, and a structurally validated SPDX inventory. `-SkipVerification` exists only for iterative packaging and is not release evidence; it does not skip the final portable-bundle smoke or artifact-integrity checks.
 
 The installed companion uses `%LOCALAPPDATA%\STRATHEX\switchyard` for the authenticated journal, DPAPI-sealed endpoint record, runtime/network/sandbox pins, receipts, and bounded logs. Product bytes live separately under `%LOCALAPPDATA%\STRATHEX\switchyard-product`. The companion has a strict single-instance record and mutual authenticated named-pipe health probe. Repository files cannot choose either location.
 

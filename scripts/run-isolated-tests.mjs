@@ -40,6 +40,11 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
 export const requiredGroups = [
   { file: "build:companion", args: [npmCli, "run", "build:companion"] },
+  ...(process.platform === "win32" ? [{
+    file: "deployment/windows/Test-B122ManifestGenerators.ps1",
+    executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ManifestGenerators.ps1"]
+  }] : []),
   { file: "packages/protocol/test/b122.test.ts" },
   { file: "packages/protocol/test/raw-hid.test.ts" },
   ...controlPlaneTests,
@@ -108,6 +113,7 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 
 /** A result is recorded only after close proves this owned child has exited. */
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000 } = {}) {
+  const childExecutable = group.executable ?? executable;
   const isTestRun = !group.args;
   const args = group.args ? [...group.args] : ["--experimental-transform-types", "--test", "--test-reporter=tap"]; const pattern = group.args ? undefined : patternArgument(group.pattern); if (pattern) args.push("--test-name-pattern", pattern); if (!group.args) args.push(group.file);
   const startedAt = new Date().toISOString(); const started = Date.now();
@@ -115,7 +121,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const environment = createStrictTestEnvironment(testRoot, process.env, { currentUserProfile: group.currentUserProfile === true });
   await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.SXSY_B122_STATE_DIR].map((directory) => mkdir(directory, { recursive: true })));
   return new Promise((resolveChild) => {
-    const child = spawn(executable, args, { cwd, env: environment, detached: process.platform !== "win32", shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(childExecutable, args, { cwd, env: environment, detached: process.platform !== "win32", shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     const chunks = []; let outputBytes = 0, timedOut = false, spawnError = null, terminationPromise = null;
     const add = (chunk) => { const bytes = Buffer.from(chunk); const remaining = limit - outputBytes; if (remaining > 0) { const captured = bytes.subarray(0, remaining); chunks.push(captured); outputBytes += captured.length; } };
     child.stdout.on("data", add); child.stderr.on("data", add);
@@ -127,7 +133,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         ? await terminationPromise
         : { strategy: "natural-exit", completed: true, supervisorExitCode: null, supervisorError: null };
       const output = Buffer.concat(chunks).toString("utf8");
-      const result = { file: group.file, pattern: group.pattern ?? null, command: [executable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: digest(output), outputBytes, outputLimitBytes: limit, environmentPolicy: "strict-test-v1", processTreeTermination, testCounts: testCounts(output, isTestRun), spawnError, success: !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 };
+      const result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: digest(output), outputBytes, outputLimitBytes: limit, environmentPolicy: "strict-test-v1", processTreeTermination, testCounts: testCounts(output, isTestRun), spawnError, success: !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 };
       await rm(testRoot, { recursive: true, force: true });
       resolveChild(result);
     });

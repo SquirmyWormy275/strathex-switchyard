@@ -10,6 +10,15 @@ async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVe
 test("atomic receipt records current successful child exits", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const result = await verify([await group(directory, "pass", "")], directory); const saved = JSON.parse(await readFile(result.receiptPath, "utf8")); assert.equal(saved.runId, result.receipt.runId); assert.equal(saved.success, true); assert.equal(saved.children[0].exitCode, 0); assert.equal(saved.children[0].timeout, false); assert.deepEqual(saved.children[0].testCounts, { total: 1, passed: 1, failed: 0 }); assert.equal(saved.totals.tests, 1); assert.deepEqual((await readdir(directory)).filter((name) => name.endsWith(".tmp")), []); } finally { await rm(directory, { recursive: true, force: true }); } });
 test("receipt records failure, timeout, bounded output, and exited children", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const failed = await runVerification({ groups: [{ file: "inline-failure", args: ["-e", "process.stderr.write('x'.repeat(100000)); process.exit(7)"] }], outputDirectory: directory, executable }); assert.equal(failed.receipt.success, false); assert.equal(failed.receipt.children[0].exitCode, 7); assert.equal(failed.receipt.children[0].outputBytes <= 65536, true); const timed = await runVerification({ groups: [{ file: "inline-timeout", args: ["-e", "setInterval(() => {}, 1000)"] }], outputDirectory: directory, timeoutMs: 25, executable }); assert.equal(timed.receipt.success, false); assert.equal(timed.receipt.children[0].timeout, true); assert.equal(timed.receipt.children[0].signal !== null || timed.receipt.children[0].exitCode !== null, true); } finally { await rm(directory, { recursive: true, force: true }); } });
 
+test("a verification group can pin its own executable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-executable-"));
+  try {
+    const result = await runVerification({ groups: [{ file: "pinned-executable", executable: process.execPath, args: ["-e", "process.exit(0)"] }], outputDirectory: directory, executable: "C:\\definitely-missing\\unsafe.exe" });
+    assert.equal(result.receipt.success, true);
+    assert.equal(result.receipt.children[0].command[0], process.execPath);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test("strict child environments allowlist operating-system inputs and isolate test state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-environment-"));
   try {
