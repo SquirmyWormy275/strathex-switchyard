@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -33,6 +34,43 @@ class MemoryProtector implements UserSecretProtector {
 class ClearFence implements CredentialContainmentFence, NetworkContainmentFence {
   async check() { return { allowed: true, reason: "clear" }; }
 }
+
+test("provider secret generation validates and Initialize emits its exact ready-to-provision receipt", { skip: process.platform !== "win32" }, async (context) => {
+  const local = process.env.LOCALAPPDATA;
+  if (!local || !isAbsolute(local) || /[\0\r\n]/.test(local)) throw new Error("The isolated LocalApplicationData fixture is unavailable.");
+  const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
+  const secretRoot = join(resolve(local), "STRATHEX", "switchyard", "provider-host", `test-secret-${suffix}`);
+  const initializedRoot = join(resolve(local), "STRATHEX", "switchyard", "provider-host", `test-init-${suffix}`);
+  const envelope = join(secretRoot, "authentication-token.envelope.json");
+  context.after(async () => {
+    await removeWithRetry(secretRoot);
+    await removeWithRetry(initializedRoot);
+  });
+
+  const secretTool = join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1");
+  const generated = parseReceipt(await runPowerShell(secretTool, ["-Action", "GenerateAuthenticationToken", "-ProtectedStateRoot", secretRoot, "-EnvelopePath", envelope, "-ConfirmCurrentUser"]));
+  assert.equal(generated.schema, "sxsy-b122.provider-host-secret-operation");
+  assert.equal(generated.action, "generate-authentication-token");
+  assert.equal(generated.status, "sealed");
+  assert.equal(generated.cleartextOutput, false);
+  const validated = parseReceipt(await runPowerShell(secretTool, ["-Action", "Validate", "-ProtectedStateRoot", secretRoot, "-EnvelopePath", envelope, "-ConfirmCurrentUser"]));
+  assert.equal(validated.schema, "sxsy-b122.provider-host-secret-operation");
+  assert.equal(validated.action, "validate");
+  assert.equal(validated.status, "passed");
+  assert.equal(validated.cleartextRead, false);
+
+  const initialized = parseReceipt(await runPowerShell(join(repository, "deployment/windows/Initialize-B122ProviderHost.ps1"), [
+    "-RepositoryRoot", repository, "-InstanceName", `test-init-${suffix}`, "-ListenPort", String(await freePort())
+  ]));
+  assert.equal(initialized.schema, "sxsy-b122.provider-host-bootstrap");
+  assert.equal(initialized.status, "ready-to-provision");
+  assert.equal(initialized.protectedStateRoot, initializedRoot);
+  assert.equal(initialized.fixtureDiagnosticOnly, true);
+  assert.equal(initialized.providerEffectsEnabled, false);
+  assert.equal(initialized.journalAuthenticationStable, true);
+  assert.equal(initialized.authenticationTokenExposed, false);
+  assert.equal(initialized.proprietaryCredentialsAccessed, false);
+});
 
 test("packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS", { skip: process.platform !== "win32" }, async (context) => {
   // The production PowerShell tools use the Windows Known Folder API rather
