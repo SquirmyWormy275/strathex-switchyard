@@ -85,8 +85,8 @@ export interface RepositoryRuntimeManifest {
 interface ExecutableIdentity {
   readonly canonicalPath: string;
   readonly sha256: string;
-  readonly device: number;
-  readonly inode: number;
+  readonly device: string;
+  readonly inode: string;
   readonly size: number;
   readonly modifiedMs: number;
 }
@@ -458,10 +458,11 @@ function isExactSafeWebUrl(value: string, allowlistedHttpsUrls: readonly string[
 
 async function captureExecutableIdentity(executable: string): Promise<ExecutableIdentity> {
   const canonicalPath = await realpath(executable).catch(() => { throw new Error("Repository runtime executable does not exist."); });
-  const metadata = await stat(canonicalPath);
+  const metadata = await stat(canonicalPath, { bigint: true });
   if (!metadata.isFile()) throw new Error("Repository runtime executable is not a regular file.");
   const sha256 = createHash("sha256").update(await readFile(canonicalPath)).digest("hex");
-  return { canonicalPath, sha256, device: metadata.dev, inode: metadata.ino, size: metadata.size, modifiedMs: metadata.mtimeMs };
+  if (metadata.size > BigInt(Number.MAX_SAFE_INTEGER) || metadata.mtimeMs > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Repository runtime executable metadata exceeds the supported exact range.");
+  return { canonicalPath, sha256, device: metadata.dev.toString(10), inode: metadata.ino.toString(10), size: Number(metadata.size), modifiedMs: Number(metadata.mtimeMs) };
 }
 
 async function assertExecutableUnchanged(expected: ExecutableIdentity): Promise<string> {

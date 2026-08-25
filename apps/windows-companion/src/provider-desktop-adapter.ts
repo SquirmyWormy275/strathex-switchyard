@@ -229,8 +229,8 @@ function safeTerminalProfile(
     || !/^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
     || !Number.isSafeInteger(value.executableSize) || value.executableSize <= 0 || value.executableSize > 2 * 1024 * 1024 * 1024
     || !Number.isFinite(value.executableModifiedMs) || value.executableModifiedMs < 0
-    || !Number.isSafeInteger(value.executableDevice) || value.executableDevice < 0
-    || !Number.isSafeInteger(value.executableInode) || value.executableInode < 0
+    || !decimalIdentity(value.executableDevice)
+    || !decimalIdentity(value.executableInode)
     || !sha256(value.catalogDigest)
     || !boundedReference(value.installationId, 256)
     || !Array.isArray(value.args)
@@ -272,6 +272,11 @@ function safeTerminalProfile(
     validUntil: new Date(validUntil).toISOString(),
     requiresFinalIdentityVerification: true
   };
+}
+
+function decimalIdentity(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?:0|[1-9][0-9]{0,19})$/.test(value)) return false;
+  try { return BigInt(value) <= 0xffff_ffff_ffff_ffffn; } catch { return false; }
 }
 
 function terminalIdentity(provider: ManagedTerminalProviderId): Readonly<{

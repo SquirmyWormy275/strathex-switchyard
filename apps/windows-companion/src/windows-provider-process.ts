@@ -191,6 +191,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       return observations.map((observation) => ({
         processId: observation.processId,
         windowId: observation.surfaceId,
+        isForeground: observation.isForeground,
         identity
       }));
     });
@@ -355,8 +356,8 @@ function nativeIdentity(identity: ProviderExecutableIdentity): Record<string, un
     || !/^[a-f0-9]{40,128}$/.test(identity.signerThumbprint)
     || !Number.isSafeInteger(identity.size) || identity.size <= 0
     || !Number.isFinite(identity.modifiedMs) || identity.modifiedMs < 0
-    || !Number.isSafeInteger(identity.device) || identity.device < 0
-    || !Number.isSafeInteger(identity.inode) || identity.inode < 0) {
+    || !decimalIdentity(identity.device)
+    || !decimalIdentity(identity.inode)) {
     throw new Error("The provider executable identity is malformed.");
   }
   return {
@@ -370,6 +371,11 @@ function nativeIdentity(identity: ProviderExecutableIdentity): Record<string, un
     device: identity.device,
     inode: identity.inode
   };
+}
+
+function decimalIdentity(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?:0|[1-9][0-9]{0,19})$/.test(value)) return false;
+  try { return BigInt(value) <= 0xffff_ffff_ffff_ffffn; } catch { return false; }
 }
 
 function encodeRequest(value: Record<string, unknown>): string {
@@ -397,16 +403,17 @@ function parseResponse(line: string, requestId: string, expectedKind: "ready" | 
   return value;
 }
 
-function parseObservations(value: unknown): readonly { readonly processId: number; readonly surfaceId: string }[] {
+function parseObservations(value: unknown): readonly { readonly processId: number; readonly surfaceId: string; readonly isForeground: boolean }[] {
   if (!Array.isArray(value) || value.length > maximumObservations) throw new Error("The provider helper returned an invalid or ambiguous observation set.");
   const seen = new Set<string>();
   return value.map((observation) => {
     if (!record(observation)) throw new Error("The provider helper returned an invalid observation.");
     const processId = processIdentity(observation.processId);
     const surfaceId = surfaceIdentity(observation.surfaceId);
+    if (typeof observation.isForeground !== "boolean") throw new Error("The provider helper returned an invalid foreground observation.");
     if (seen.has(surfaceId)) throw new Error("The provider helper returned duplicate surface identities.");
     seen.add(surfaceId);
-    return { processId, surfaceId };
+    return { processId, surfaceId, isForeground: observation.isForeground };
   });
 }
 

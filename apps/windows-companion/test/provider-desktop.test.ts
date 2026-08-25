@@ -163,6 +163,7 @@ test("normal desktop action focuses one exact running instance and never launche
   port.observations = [{
     processId: 777,
     windowId: "window:777",
+    isForeground: true,
     identity: installed.identity
   }];
   const guard = new RecordingGuard();
@@ -192,7 +193,7 @@ test("normal launches fixed profile only when no process exists; fresh always us
   assert.deepEqual(port.effects, ["list", "launch-requested:", "launch:", "launch-requested:--new-window", "launch:--new-window"]);
 });
 
-test("ambiguous or identity-mismatched running processes fail unavailable", async (context) => {
+test("normal desktop presses focus the last-used surface and then cycle every exact provider window", async (context) => {
   const setup = await fixture(context);
   const installed = await setup.registry.install("claude_desktop");
   const port = new FakeProcessPort();
@@ -203,9 +204,34 @@ test("ambiguous or identity-mismatched running processes fail unavailable", asyn
     managedTerminalLauncher: { canonicalExecutablePath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe", executableSha256: "c".repeat(64) },
     now: () => new Date(at)
   });
-  const exact = { processId: 1, windowId: "one", identity: installed.identity };
-  port.observations = [exact, { ...exact, processId: 2, windowId: "two" }];
-  assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "ambiguous", control: control() })).status, "unavailable");
+
+  const first = { processId: 1, windowId: "one", isForeground: false, identity: installed.identity };
+  const second = { processId: 2, windowId: "two", isForeground: false, identity: installed.identity };
+  port.observations = [first, second];
+  const focusedLastUsed = await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "focus-last-used", control: control() });
+  assert.equal(focusedLastUsed.status, "completed");
+  assert.equal(focusedLastUsed.processId, 1);
+
+  port.observations = [{ ...first, isForeground: true }, second];
+  const cycled = await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "cycle", control: control() });
+  assert.equal(cycled.status, "completed");
+  assert.equal(cycled.processId, 2);
+
+  port.observations = [{ ...first, isForeground: true }, { ...second, isForeground: true }];
+  assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "ambiguous-foreground", control: control() })).status, "unavailable");
+});
+
+test("identity-mismatched running provider processes fail unavailable", async (context) => {
+  const setup = await fixture(context);
+  const installed = await setup.registry.install("claude_desktop");
+  const port = new FakeProcessPort();
+  const lifecycle = new InstalledProviderDesktopLifecycle({
+    registry: setup.registry,
+    processes: port,
+    effectGuard: new RecordingGuard(),
+    now: () => new Date(at)
+  });
+  const exact = { processId: 1, windowId: "one", isForeground: false, identity: installed.identity };
 
   port.observations = [{ ...exact, identity: { ...installed.identity, executableSha256: "0".repeat(64) } }];
   assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "mismatch", control: control() })).status, "unavailable");

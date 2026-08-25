@@ -44,8 +44,8 @@ class RecordingLifecycle implements InstalledProviderDesktopLifecyclePort {
       signerThumbprint: "d".repeat(40),
       executableSize: 42,
       executableModifiedMs: 1_777_000_000_000,
-      executableDevice: 7,
-      executableInode: 11,
+      executableDevice: "4294967295",
+      executableInode: "59672695062879660",
       productIdentity: {
         productId: "openai.codex",
         displayName: "Codex",

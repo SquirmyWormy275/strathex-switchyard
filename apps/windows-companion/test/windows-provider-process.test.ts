@@ -78,8 +78,8 @@ async function fixture(context: test.TestContext) {
     },
     size: Buffer.byteLength("fixed provider executable"),
     modifiedMs: 1_777_000_000_000,
-    device: 7,
-    inode: 11
+    device: "4294967295",
+    inode: "59672695062879660"
   };
   return { root, helperPath, executablePath, identity };
 }
@@ -102,7 +102,7 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
   const transport = new FakeTransport();
   transport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "result", {
-      observations: [{ processId: 4100, surfaceId: "hwnd:100f" }]
+      observations: [{ processId: 4100, surfaceId: "hwnd:100f", isForeground: true }]
     }));
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
@@ -111,6 +111,7 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
 
   assert.equal(observations.length, 1);
   assert.equal(observations[0]?.windowId, "hwnd:100f");
+  assert.equal(observations[0]?.isForeground, true);
   assert.deepEqual(observations[0]?.identity, setup.identity);
   assert.deepEqual(transport.invocations[0]?.arguments, ["--stdio-v1"]);
   assert.deepEqual(transport.invocations[0]?.environment, { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" });
@@ -138,11 +139,11 @@ test("focus authorizes only after the host barrier while the helper holds the ex
     };
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
-  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly windowId: string; readonly identity: ProviderExecutableIdentity } } = {
+  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly windowId: string; readonly isForeground: boolean; readonly identity: ProviderExecutableIdentity } } = {
     provider: "claude_desktop",
     operationId: "focus-operation",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", identity: setup.identity },
+    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { ordering.push("barrier"); }
@@ -169,7 +170,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "changed-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", identity: setup.identity },
+    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { barrierCalled = true; }
@@ -189,7 +190,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "cancelled-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", identity: setup.identity },
+    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: controller.signal,
     shell: false,
     async beforeEffect() { controller.abort(new Error("cancelled")); }

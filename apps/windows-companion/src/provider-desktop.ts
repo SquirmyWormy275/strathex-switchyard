@@ -122,8 +122,9 @@ export interface ProviderExecutableIdentity {
   readonly productIdentity: ProviderProductIdentity;
   readonly size: number;
   readonly modifiedMs: number;
-  readonly device: number;
-  readonly inode: number;
+  /** Exact unsigned 64-bit file identity; decimal strings avoid JavaScript precision loss on Windows. */
+  readonly device: string;
+  readonly inode: string;
 }
 
 export interface ProviderExecutableIdentityProbe {
@@ -156,25 +157,25 @@ export class NodeProviderExecutableIdentityProbe implements ProviderExecutableId
     if (linkMetadata.isSymbolicLink()) throw new Error("The fixed provider executable cannot be a symbolic link or redirect.");
     const canonicalExecutablePath = await realpath(configured).catch(() => { throw new Error("The fixed provider executable cannot be canonicalized."); });
     if (!localExecutablePath(canonicalExecutablePath)) throw new Error("The fixed provider executable must remain on one bounded local filesystem path.");
-    const metadata = await stat(canonicalExecutablePath);
-    if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maximumExecutableBytes) {
+    const metadata = await stat(canonicalExecutablePath, { bigint: true });
+    if (!metadata.isFile() || metadata.size <= 0n || metadata.size > BigInt(maximumExecutableBytes)) {
       throw new Error("The fixed provider executable is not a bounded regular file.");
     }
     const signature = await this.signatures.inspect(canonicalExecutablePath);
     if (signature.signerSubject !== entry.signerSubject || signature.signerThumbprint !== entry.signerThumbprint) throw new Error("The fixed provider Authenticode signer does not match the reviewed manifest.");
     const executableSha256 = await fileSha256(canonicalExecutablePath);
-    const finalMetadata = await stat(canonicalExecutablePath);
-    if (metadata.size !== finalMetadata.size || metadata.mtimeMs !== finalMetadata.mtimeMs || metadata.dev !== finalMetadata.dev || metadata.ino !== finalMetadata.ino) throw new Error("The fixed provider executable changed during Authenticode validation.");
+    const finalMetadata = await stat(canonicalExecutablePath, { bigint: true });
+    if (metadata.size !== finalMetadata.size || metadata.mtimeNs !== finalMetadata.mtimeNs || metadata.dev !== finalMetadata.dev || metadata.ino !== finalMetadata.ino) throw new Error("The fixed provider executable changed during Authenticode validation.");
     return {
       canonicalExecutablePath,
       executableSha256,
       productIdentity: entry.productIdentity,
       signerSubject: signature.signerSubject,
       signerThumbprint: signature.signerThumbprint,
-      size: metadata.size,
-      modifiedMs: metadata.mtimeMs,
-      device: metadata.dev,
-      inode: metadata.ino
+      size: Number(metadata.size),
+      modifiedMs: Number(metadata.mtimeMs),
+      device: unsignedIdentity(metadata.dev),
+      inode: unsignedIdentity(metadata.ino)
     };
   }
 }
@@ -204,8 +205,8 @@ interface ProviderInstallPayload extends Record<string, JsonValue> {
   readonly signerThumbprint: string;
   readonly size: number;
   readonly modifiedMs: number;
-  readonly device: number;
-  readonly inode: number;
+  readonly device: string;
+  readonly inode: string;
   readonly operator: string;
 }
 
@@ -320,6 +321,8 @@ export class AttestedProviderDesktopRegistry {
 export interface ProviderDesktopProcessObservation {
   readonly processId: number;
   readonly windowId: string;
+  /** True only when the native helper observed this exact top-level surface as the foreground window. */
+  readonly isForeground: boolean;
   readonly identity: ProviderExecutableIdentity;
 }
 
@@ -387,8 +390,8 @@ export interface ManagedTerminalProfile {
   readonly signerThumbprint: string;
   readonly executableSize: number;
   readonly executableModifiedMs: number;
-  readonly executableDevice: number;
-  readonly executableInode: number;
+  readonly executableDevice: string;
+  readonly executableInode: string;
   readonly productIdentity: ProviderProductIdentity;
   readonly args: readonly string[];
   readonly shell: false;
@@ -453,10 +456,13 @@ export class InstalledProviderDesktopLifecycle {
       if (observations.some((observation) => !safeObservation(observation) || !sameIdentity(observation.identity, installation.identity))) {
         return unavailable("The running provider process set did not match the exact approved executable identity.");
       }
-      if (observations.length > 1) return unavailable("More than one exact provider window was observed, so focus selection is ambiguous.");
       if (observations.length === 0) return await this.launch(provider as DesktopProviderId, operationId, installation, entry.normalArgs, false, input.control);
-
-      const process = observations[0]!;
+      const foregroundIndexes = observations.flatMap((observation, index) => observation.isForeground ? [index] : []);
+      if (foregroundIndexes.length > 1) return unavailable("The native provider observation reported more than one foreground surface.");
+      const selectedIndex = foregroundIndexes.length === 1 && observations.length > 1
+        ? (foregroundIndexes[0]! + 1) % observations.length
+        : 0;
+      const process = observations[selectedIndex]!;
       const focused = await runControlled(input.control, this.now, (signal) => this.processes.focusExisting({
         provider: provider as DesktopProviderId,
         operationId,
@@ -466,7 +472,15 @@ export class InstalledProviderDesktopLifecycle {
         shell: false,
         beforeEffect: () => this.finalBarrier(provider, operationId, "focus", installation, input.control)
       }));
-      return { status: "completed", summary: "Focused the exact current-user-approved desktop provider window.", effect: "focused", processId: validProcessId(focused.processId) };
+      return {
+        status: "completed",
+        summary: foregroundIndexes.length === 1 && observations.length > 1
+          ? "Cycled to the next exact current-user-approved desktop provider window."
+          : "Focused the last-used exact current-user-approved desktop provider window.",
+        effect: "focused",
+        processId: validProcessId(focused.processId),
+        surfaceId: process.windowId
+      };
     } catch (error) {
       return lifecycleFailure(error);
     }
@@ -732,8 +746,8 @@ function parseInstall(value: JsonValue): ProviderInstallPayload {
     || typeof value.signerThumbprint !== "string" || !/^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
     || !finiteNonNegative(value.size)
     || !finiteNonNegative(value.modifiedMs)
-    || !finiteNonNegative(value.device)
-    || !finiteNonNegative(value.inode)
+    || !decimalIdentity(value.device)
+    || !decimalIdentity(value.inode)
     || typeof value.operator !== "string") throw new Error("The protected provider installation journal is malformed.");
   return value as ProviderInstallPayload;
 }
@@ -754,7 +768,8 @@ function approvedOperator(value: Awaited<ReturnType<WindowsUserPresenceRunner["v
 
 function safeObservation(value: ProviderDesktopProcessObservation): boolean {
   return Number.isSafeInteger(value.processId) && value.processId > 0
-    && typeof value.windowId === "string" && /^[A-Za-z0-9:._-]{1,160}$/.test(value.windowId);
+    && typeof value.windowId === "string" && /^[A-Za-z0-9:._-]{1,160}$/.test(value.windowId)
+    && typeof value.isForeground === "boolean";
 }
 
 function sameIdentity(left: ProviderExecutableIdentity, right: ProviderExecutableIdentity): boolean {
@@ -860,6 +875,14 @@ function assertProvider(value: ProviderId): ProviderId {
 function isProvider(value: unknown): value is ProviderId { return providerIds.includes(value as ProviderId); }
 function digest(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 function finiteNonNegative(value: unknown): value is number { return typeof value === "number" && Number.isFinite(value) && value >= 0; }
+function decimalIdentity(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?:0|[1-9][0-9]{0,19})$/.test(value)) return false;
+  try { return BigInt(value) <= 0xffff_ffff_ffff_ffffn; } catch { return false; }
+}
+function unsignedIdentity(value: bigint): string {
+  if (value < 0n || value > 0xffff_ffff_ffff_ffffn) throw new Error("The provider executable returned an invalid unsigned file identity.");
+  return value.toString(10);
+}
 function record(value: JsonValue): value is { readonly [key: string]: JsonValue } { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function unknownRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function pathKey(value: string): string { const normalized = value.replaceAll("\\", "/").replace(/\/+$/, ""); return process.platform === "win32" ? normalized.toLowerCase() : normalized; }

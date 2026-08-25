@@ -163,9 +163,9 @@ internal static class Program
     {
         RequireProperties(value, "canonicalPath", "device", "inode");
         string path = Text(value, "canonicalPath");
-        long device = LongInteger(value, "device");
-        long inode = LongInteger(value, "inode");
-        if (!Path.IsPathFullyQualified(path) || path.Length > 4096 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 || device < 0 || inode < 0)
+        ulong device = UnsignedIdentity(value, "device");
+        ulong inode = UnsignedIdentity(value, "inode");
+        if (!Path.IsPathFullyQualified(path) || path.Length > 4096 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)
             throw new ProtocolException("invalid_workspace_identity");
         return new(path, device, inode);
     }
@@ -237,13 +237,14 @@ internal static class Program
     private static int List(Request request)
     {
         using SurfaceSet surfaces = SurfaceSet.Acquire(request);
+        IntPtr foreground = GetForegroundWindow();
         Write(new
         {
             schema = ResponseSchema,
             version = 1,
             requestId = request.RequestId,
             kind = "result",
-            observations = surfaces.Items.Select(surface => new { processId = surface.ProcessId, surfaceId = surface.SurfaceId }).ToArray()
+            observations = surfaces.Items.Select(surface => new { processId = surface.ProcessId, surfaceId = surface.SurfaceId, isForeground = surface.Window == foreground }).ToArray()
         });
         return 0;
     }
@@ -252,10 +253,9 @@ internal static class Program
     {
         if (request.ExpectedProcessId is null || request.ExpectedSurfaceId is null) throw new ProtocolException("invalid_focus_target");
         using SurfaceSet surfaces = SurfaceSet.Acquire(request);
-        if (surfaces.Items.Count != 1) throw new ProtocolException("ambiguous_focus_surface");
-        HeldSurface held = surfaces.Items[0];
-        if (held.ProcessId != request.ExpectedProcessId.Value || held.SurfaceId != request.ExpectedSurfaceId)
-            throw new ProtocolException("changed_focus_surface");
+        List<HeldSurface> matches = surfaces.Items.Where(surface => surface.ProcessId == request.ExpectedProcessId.Value && surface.SurfaceId == request.ExpectedSurfaceId).ToList();
+        if (matches.Count != 1) throw new ProtocolException("changed_focus_surface");
+        HeldSurface held = matches[0];
 
         string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         Write(new
@@ -272,8 +272,10 @@ internal static class Program
 
         held.RevalidateLockedHandles();
         using SurfaceSet final = SurfaceSet.Acquire(request);
-        if (final.Items.Count != 1 || final.Items[0].ProcessId != held.ProcessId || final.Items[0].SurfaceId != held.SurfaceId)
-            throw new ProtocolException("changed_focus_surface");
+        List<HeldSurface> finalMatches = final.Items.Where(surface => surface.ProcessId == held.ProcessId && surface.SurfaceId == held.SurfaceId).ToList();
+        if (finalMatches.Count != 1) throw new ProtocolException("changed_focus_surface");
+        held.RevalidateLockedHandles();
+        finalMatches[0].RevalidateLockedHandles();
         if (!SetForegroundWindow(held.Window)) throw new ProtocolException("focus_denied");
         Write(new { schema = ResponseSchema, version = 1, requestId = request.RequestId, kind = "result", processId = held.ProcessId, surfaceId = held.SurfaceId });
         return 0;
@@ -461,13 +463,13 @@ internal static class Program
         string signerThumbprint = Text(value, "signerThumbprint");
         long size = LongInteger(value, "size");
         double modifiedMs = Double(value, "modifiedMs");
-        long device = LongInteger(value, "device");
-        long inode = LongInteger(value, "inode");
+        ulong device = UnsignedIdentity(value, "device");
+        ulong inode = UnsignedIdentity(value, "inode");
         if (!Path.IsPathFullyQualified(path) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || path.Length > 4096 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)
             throw new ProtocolException("invalid_executable_path");
         if (hash.Length != 64 || !hash.All(IsLowerHex) || signerSubject.Length is < 3 or > 512 || signerSubject.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0
             || signerThumbprint.Length is < 40 or > 128 || !signerThumbprint.All(IsLowerHex) || size <= 0 || size > 2L * 1024 * 1024 * 1024
-            || !double.IsFinite(modifiedMs) || modifiedMs < 0 || device < 0 || inode < 0)
+            || !double.IsFinite(modifiedMs) || modifiedMs < 0)
             throw new ProtocolException("invalid_executable_identity");
         return new(path, hash, product, signerSubject, signerThumbprint, size, modifiedMs, device, inode);
     }
@@ -512,6 +514,15 @@ internal static class Program
         ? number : throw new ProtocolException("invalid_process_id");
     private static long LongInteger(JsonElement value, string name) => Property(value, name).TryGetInt64(out long number)
         ? number : throw new ProtocolException("invalid_integer");
+    private static ulong UnsignedIdentity(JsonElement value, string name)
+    {
+        JsonElement property = Property(value, name);
+        if (property.ValueKind != JsonValueKind.String) throw new ProtocolException("invalid_file_identity");
+        string text = property.GetString() ?? throw new ProtocolException("invalid_file_identity");
+        if ((text.Length > 1 && text[0] == '0') || !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong identity))
+            throw new ProtocolException("invalid_file_identity");
+        return identity;
+    }
     private static double Double(JsonElement value, string name) => Property(value, name).TryGetDouble(out double number)
         ? number : throw new ProtocolException("invalid_number");
     private static bool Boolean(JsonElement value, string name) => Property(value, name).ValueKind switch
@@ -581,8 +592,8 @@ internal static class Program
     private static ProtocolException NativeFailure(string code) => new(code, new Win32Exception(Marshal.GetLastWin32Error()));
 
     private sealed record ProductDefinition(string ProductId, string DisplayName, string Publisher, string NativeProductName, string NativeCompanyName);
-    private sealed record ExecutableIdentity(string CanonicalExecutablePath, string ExecutableSha256, ProductDefinition Product, string SignerSubject, string SignerThumbprint, long Size, double ModifiedMs, long Device, long Inode);
-    private sealed record WorkspaceIdentity(string CanonicalPath, long Device, long Inode);
+    private sealed record ExecutableIdentity(string CanonicalExecutablePath, string ExecutableSha256, ProductDefinition Product, string SignerSubject, string SignerThumbprint, long Size, double ModifiedMs, ulong Device, ulong Inode);
+    private sealed record WorkspaceIdentity(string CanonicalPath, ulong Device, ulong Inode);
     private sealed record ReceiptDescriptor(string PipeName, string Token);
     private sealed record Request(string RequestId, string Action, string Provider, ExecutableIdentity Identity, uint? ExpectedProcessId, string? ExpectedSurfaceId, string[] Arguments, bool RequireDistinctSurface, WorkspaceIdentity? Workspace = null, ReceiptDescriptor? Receipt = null);
 
@@ -650,8 +661,8 @@ internal static class Program
         {
             if (_file.IsInvalid || _file.IsClosed || !SamePath(_canonicalPath, _request.Identity.CanonicalExecutablePath)) throw new ProtocolException("executable_identity_changed");
             if (!GetFileInformationByHandle(_file, out ByHandleFileInformation information)) throw NativeFailure("executable_identity_unavailable");
-            long fileIndex = checked((long)(((ulong)information.FileIndexHigh << 32) | information.FileIndexLow));
-            if (information.FileSize != _request.Identity.Size || information.VolumeSerialNumber != (ulong)_request.Identity.Device || fileIndex != _request.Identity.Inode)
+            ulong fileIndex = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+            if (information.FileSize != _request.Identity.Size || information.VolumeSerialNumber != _request.Identity.Device || fileIndex != _request.Identity.Inode)
                 throw new ProtocolException("executable_identity_changed");
             double modifiedMs = DateTimeOffset.FromFileTime(information.LastWriteTime).ToUnixTimeMilliseconds();
             if (Math.Abs(modifiedMs - _request.Identity.ModifiedMs) > 1.0) throw new ProtocolException("executable_identity_changed");
@@ -691,8 +702,8 @@ internal static class Program
         {
             if (_directory.IsInvalid || _directory.IsClosed || !SamePath(CanonicalPath, _identity.CanonicalPath)) throw new ProtocolException("managed_terminal_workspace_changed");
             if (!GetFileInformationByHandle(_directory, out ByHandleFileInformation information)) throw NativeFailure("workspace_identity_unavailable");
-            long fileIndex = checked((long)(((ulong)information.FileIndexHigh << 32) | information.FileIndexLow));
-            if (information.VolumeSerialNumber != (ulong)_identity.Device || fileIndex != _identity.Inode) throw new ProtocolException("managed_terminal_workspace_changed");
+            ulong fileIndex = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+            if (information.VolumeSerialNumber != _identity.Device || fileIndex != _identity.Inode) throw new ProtocolException("managed_terminal_workspace_changed");
         }
 
         public void Dispose() => _directory.Dispose();
@@ -797,7 +808,6 @@ internal static class Program
                     held.Add(surface);
                     if (held.Count > MaximumSurfaces) throw new ProtocolException("provider_surface_set_oversized");
                 }
-                held.Sort((left, right) => string.CompareOrdinal(left.SurfaceId, right.SurfaceId));
                 return new SurfaceSet(held);
             }
             catch
@@ -988,6 +998,7 @@ internal static class Program
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetWindowRect(IntPtr window, out Rect bounds);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern SafeFileHandle OpenProcess(uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
