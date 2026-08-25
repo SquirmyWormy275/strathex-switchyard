@@ -124,10 +124,35 @@ export interface ConfiguredNetworkResult {
   readonly headers?: Readonly<Record<string, string>>;
 }
 
+function awaitAbortableDnsResolution<T>(resolution: PromiseLike<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => signal.removeEventListener("abort", onAbort);
+    const resolveOnce = (value: T): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+    const rejectOnce = (error: unknown): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onAbort = (): void => rejectOnce(new Error("Network request was cancelled during DNS resolution."));
+    signal.addEventListener("abort", onAbort, { once: true });
+    // Both branches stay attached after cancellation so a resolver that later
+    // settles cannot create an unhandled rejection or restart the request.
+    Promise.resolve(resolution).then(resolveOnce, rejectOnce);
+    if (signal.aborted) onAbort();
+  });
+}
+
 export class SystemNetworkAddressResolver implements NetworkAddressResolver {
   async resolve(hostname: string, signal: AbortSignal): Promise<readonly ResolvedNetworkAddress[]> {
     if (signal.aborted) throw new Error("Network request was cancelled before DNS resolution.");
-    const answers = await lookup(hostname, { all: true, verbatim: true });
+    const answers = await awaitAbortableDnsResolution(lookup(hostname, { all: true, verbatim: true }), signal);
     if (signal.aborted) throw new Error("Network request was cancelled during DNS resolution.");
     return answers.map((answer) => ({ address: answer.address, family: answer.family as 4 | 6 }));
   }
@@ -256,7 +281,7 @@ export class ConfiguredHttpsNetworkBroker {
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
       const url = new URL(dispatchUrl);
       const routeHostname = unbracketedHostname(url.hostname);
-      const addresses = await this.resolver.resolve(routeHostname, controller.signal);
+      const addresses = await awaitAbortableDnsResolution(this.resolver.resolve(routeHostname, controller.signal), controller.signal);
       const resolvedAddress = route.boundary === "provider-host-loopback"
         ? validatedProviderHostLoopbackAddresses(addresses, routeHostname)[0]!
         : validatedPublicAddresses(addresses)[0]!;
@@ -305,7 +330,7 @@ export class ConfiguredHttpsNetworkBroker {
         let redirectUrl: URL;
         try { redirectUrl = validatedSignedDownloadRedirect(response, route.redirectHosts ?? []); }
         catch { return blocked(route.id, "The signed download redirect did not match the exact reviewed host policy."); }
-        const redirectAddresses = await this.resolver.resolve(redirectUrl.hostname, controller.signal);
+        const redirectAddresses = await awaitAbortableDnsResolution(this.resolver.resolve(redirectUrl.hostname, controller.signal), controller.signal);
         const redirectAddress = validatedPublicAddresses(redirectAddresses)[0]!;
         await requireNetworkUncontained(this.containment, input.repositoryRoot);
         response = await this.transport.send({

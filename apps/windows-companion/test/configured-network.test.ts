@@ -149,6 +149,85 @@ test("the final containment recheck and deadline stop effects after DNS resoluti
   assert.match(result.detail, /cancel/i);
 });
 
+test("primary and redirect DNS resolution obey cancellation and deadline even when a resolver never settles", async (context) => {
+  const setup = await fixture(context);
+  let primarySignal: AbortSignal | undefined;
+  let rejectPrimary: ((error: Error) => void) | undefined;
+  const neverPrimary: NetworkAddressResolver = {
+    resolve: async (_hostname, signal) => {
+      primarySignal = signal;
+      return new Promise<readonly { address: string; family: 4 | 6 }[]>((_resolve, reject) => { rejectPrimary = reject; });
+    }
+  };
+  const primaryTransport = new RecordingTransport();
+  const primary = new ConfiguredHttpsNetworkBroker(
+    { version: 1, proxy: "direct", routes: [{ ...route, id: "dns-deadline", timeoutMs: 20 }] },
+    neverPrimary,
+    primaryTransport,
+    setup.fence,
+    setup.vault.createAdapter("configured-network")
+  );
+  const primaryResult = await Promise.race([
+    primary.request({ routeId: "dns-deadline", repositoryRoot }),
+    new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 500))
+  ]);
+  assert.notEqual(primaryResult, "hung", "a never-settling primary DNS lookup outlived the route deadline");
+  assert.equal(typeof primaryResult === "string" ? primaryResult : primaryResult.outcome, "blocked");
+  assert.equal(primarySignal?.aborted, true);
+  assert.equal(primaryTransport.requests.length, 0);
+  rejectPrimary?.(new Error("late primary DNS failure must be consumed"));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const controller = new AbortController();
+  const callerResolver: NetworkAddressResolver = { resolve: async () => new Promise(() => undefined) };
+  const callerBroker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [route] }, callerResolver, new RecordingTransport(), setup.fence, setup.vault.createAdapter("configured-network"));
+  const callerRequest = callerBroker.request({ routeId: route.id, repositoryRoot, signal: controller.signal });
+  controller.abort();
+  const callerResult = await Promise.race([callerRequest, new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 500))]);
+  assert.notEqual(callerResult, "hung", "caller cancellation did not settle a never-resolving primary lookup");
+  assert.equal(typeof callerResult === "string" ? callerResult : callerResult.outcome, "blocked");
+
+  let resolution = 0;
+  let redirectSignal: AbortSignal | undefined;
+  let rejectRedirect: ((error: Error) => void) | undefined;
+  const redirectResolver: NetworkAddressResolver = {
+    resolve: async (_hostname, signal) => {
+      resolution += 1;
+      if (resolution === 1) return [{ address: "93.184.216.34", family: 4 }];
+      redirectSignal = signal;
+      return new Promise<readonly { address: string; family: 4 | 6 }[]>((_resolve, reject) => { rejectRedirect = reject; });
+    }
+  };
+  const redirectRoute = {
+    ...route,
+    id: "dns-redirect-deadline",
+    method: "GET",
+    url: "https://api.github.com/repos/example/repo/actions/jobs/",
+    pathParameter: { name: "jobId", pattern: "unsigned-decimal", suffix: "/logs" },
+    timeoutMs: 20,
+    redirects: "single-use-signed-download",
+    redirectHosts: ["results.example.net"]
+  } as const;
+  const redirectRequests: PinnedNetworkTransportRequest[] = [];
+  const redirectTransport: PinnedNetworkTransport = {
+    async send(request) {
+      redirectRequests.push(request);
+      return { status: 302, headers: { location: "https://results.example.net/log.txt?sig=bounded" }, body: Buffer.alloc(0) };
+    }
+  };
+  const redirectBroker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [redirectRoute] }, redirectResolver, redirectTransport, setup.fence, setup.vault.createAdapter("configured-network"));
+  const redirectResult = await Promise.race([
+    redirectBroker.request({ routeId: redirectRoute.id, repositoryRoot, pathParameters: { jobId: "44" } }),
+    new Promise<"hung">((resolve) => setTimeout(() => resolve("hung"), 500))
+  ]);
+  assert.notEqual(redirectResult, "hung", "a never-settling redirect DNS lookup outlived the route deadline");
+  assert.equal(typeof redirectResult === "string" ? redirectResult : redirectResult.outcome, "blocked");
+  assert.equal(redirectSignal?.aborted, true);
+  assert.equal(redirectRequests.length, 1, "redirect DNS cancellation must happen before a second transport effect");
+  rejectRedirect?.(new Error("late redirect DNS failure must be consumed"));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+});
+
 test("containment rechecks, cancellation, timeout, and response caps fail closed with redacted details", async (context) => {
   const setup = await fixture(context);
   setup.fence.networkBlocked = true;
