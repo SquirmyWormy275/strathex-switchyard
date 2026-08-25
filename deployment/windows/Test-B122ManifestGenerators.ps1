@@ -96,7 +96,11 @@ try {
     $networkRoutes = @{}; foreach ($route in $network.routes) { $networkRoutes[$route.id] = $route }
     Assert-True ($networkRoutes['github.graphql'].url -ceq 'https://api.github.com/graphql') 'public GitHub API host'
     Assert-True ($networkRoutes['github.repository'].url -ceq 'https://github.com/acme/project') 'fork base repository identity'
+    Assert-True ($networkRoutes['github.actions-job-log'].url -ceq 'https://api.github.com/repos/contributor/project/actions/jobs/') 'exact Actions job-log base'
+    Assert-True ($networkRoutes['github.actions-job-log'].pathParameter.name -ceq 'jobId' -and $networkRoutes['github.actions-job-log'].pathParameter.pattern -ceq 'unsigned-decimal' -and $networkRoutes['github.actions-job-log'].pathParameter.suffix -ceq '/logs') 'bounded Actions job ID binding'
+    Assert-True ($networkRoutes['github.actions-job-log'].redirects -ceq 'deny' -and [int]$networkRoutes['github.actions-job-log'].maxResponseBytes -eq 8388608) 'default log redirects denied and response bounded'
     Assert-True ($networkRoutes['git.receive-pack'].url -ceq 'https://github.com/contributor/project.git/git-receive-pack') 'fork head repository push identity'
+    Assert-True ([int]$networkRoutes['git.receive-pack'].maxRequestBytes -eq 67108864) 'bounded configurable Git push cap'
 
     $enterpriseOutput = Join-Path $output 'network-policy-enterprise.json'
     & (Join-Path $PSScriptRoot 'New-B122NetworkPolicy.ps1') -GitHubHost 'ghe.example.test' -GitHubOwner 'contributor' -GitHubRepository 'project' -GitHubBaseOwner 'acme' -GitHubBaseRepository 'project' -OutputPath $enterpriseOutput | Out-Null
@@ -104,7 +108,14 @@ try {
     $enterpriseRoutes = @{}; foreach ($route in $enterprise.routes) { $enterpriseRoutes[$route.id] = $route }
     Assert-True ($enterpriseRoutes['github.graphql'].url -ceq 'https://ghe.example.test/api/graphql') 'Enterprise GraphQL host'
     Assert-True ($enterpriseRoutes['github.repository'].url -ceq 'https://ghe.example.test/acme/project') 'Enterprise base repository identity'
+    Assert-True ($enterpriseRoutes['github.actions-job-log'].url -ceq 'https://ghe.example.test/api/v3/repos/contributor/project/actions/jobs/') 'Enterprise Actions REST base'
     Assert-True ($enterpriseRoutes['git.receive-pack'].url -ceq 'https://ghe.example.test/contributor/project.git/git-receive-pack') 'Enterprise fork head repository push identity'
+
+    $redirectOutput = Join-Path $output 'network-policy-actions-redirect.json'
+    & (Join-Path $PSScriptRoot 'New-B122NetworkPolicy.ps1') -GitHubOwner 'contributor' -GitHubRepository 'project' -GitHubActionsLogRedirectHosts @('results.example.test') -OutputPath $redirectOutput | Out-Null
+    $redirect = Get-Content -LiteralPath $redirectOutput -Raw | ConvertFrom-Json
+    $redirectRoute = @($redirect.routes | Where-Object { $_.id -ceq 'github.actions-job-log' })[0]
+    Assert-True ($redirectRoute.redirects -ceq 'single-use-signed-download' -and @($redirectRoute.redirectHosts).Count -eq 1 -and $redirectRoute.redirectHosts[0] -ceq 'results.example.test') 'exact signed log redirect allowlist'
 
     "B122 manifest generator tests: PASS`nRuntime SHA-256: $($runtimeResult.Sha256)`nSandbox SHA-256: $($sandboxResult.Sha256)"
 } finally {
