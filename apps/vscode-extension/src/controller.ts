@@ -1511,8 +1511,13 @@ export class ManagedSessionController {
       if (!privacy) throw new Error("Voice privacy selection was cancelled.");
       const consent = await this.bridge.grantVoiceConsent({ handoffId: handoff.id, provider, ...privacy, expiresInMinutes: 15 });
       if (!consent.ok) throw new Error(`Current-user voice consent was not granted: ${consent.message}`);
-      const recipient = handoff.recipientSessionId ? this.sessions.get(handoff.recipientSessionId) : undefined;
-      const started = await this.bridge.startVoice({ consentId: consent.value.id, voiceSessionId: `voice-${this.idFactory()}`, ...(recipient?.targetSnapshotId === handoff.targetSnapshotId ? { managedSessionId: recipient.id } : {}) });
+      const recipient = await this.showSessionQueue("all", "Choose the single exact managed session for native voice", (candidate) => candidate.workspaceRoot !== undefined
+        && samePath(candidate.workspaceRoot, handoff.repositoryRoot)
+        && candidate.targetSnapshotId === handoff.targetSnapshotId
+        && (candidate.surface === "vscode_terminal" || candidate.surface === "vscode_window")
+        && (!handoff.recipientSessionId || candidate.id === handoff.recipientSessionId));
+      if (!recipient) throw new Error("Voice managed-session selection was cancelled.");
+      const started = await this.bridge.startVoice({ consentId: consent.value.id, voiceSessionId: `voice-${this.idFactory()}`, managedSessionId: recipient.id });
       if (!started.ok) throw new Error(`Durable voice binding was not started: ${started.message}`);
       binding = started.value;
     }

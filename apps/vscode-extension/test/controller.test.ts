@@ -738,8 +738,9 @@ test("native voice start and provider switch bind an exact managed session witho
   await vscode.invoke("sxsy-b122.chord.voice.shift");
 
   assert.equal(bridge.voiceStarts.length, 1);
+  assert.equal(bridge.voiceStarts[0]?.managedSessionId, exactTarget.id);
   assert.equal(bridge.voiceSwitches.length, 1);
-  assert.deepEqual(bridge.voiceBinds.map((binding) => binding.managedSessionId), [exactTarget.id, exactTarget.id]);
+  assert.deepEqual(bridge.voiceBinds.map((binding) => binding.managedSessionId), [exactTarget.id]);
   assert.deepEqual(opened, []);
   assert.equal(bridge.completedHostActions.every((completion) => completion.succeeded && /native.*runtime/i.test(completion.summary)), true);
 });
