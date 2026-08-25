@@ -80,10 +80,20 @@ export class WindowsHelloConfirmationAttestor implements ConfirmationAttestor {
   }
 
   async attest(input: ConfirmationAttestationRequest): Promise<Readonly<{ reauthenticated: boolean; operator: string }> | undefined> {
-    const prompt = boundedPrompt(`Approve SXSY-B122 ${input.definition.title}. Verify the exact target and scope in VS Code before continuing.`);
+    const prompt = input.reviewedScopeDigest && input.reviewedScopeSummary
+      ? reviewedPrompt(input.definition.title, input.reviewedScopeDigest, input.reviewedScopeSummary)
+      : boundedPrompt(`Approve SXSY-B122 ${input.definition.title}. Verify the exact target and scope in VS Code before continuing.`);
     const result = await this.runner.verify(prompt);
     return result.verified && result.operator ? { reauthenticated: true, operator: result.operator } : undefined;
   }
+}
+
+function reviewedPrompt(title: string, scopeDigest: string, summary: string): string {
+  if (!/^[a-f0-9]{64}$/.test(scopeDigest)) throw new Error("The reviewed Windows user-presence scope digest is invalid.");
+  const trustedSummary = summary.replace(/[\r\n\0]+/g, " ").trim();
+  if (!trustedSummary) throw new Error("The reviewed Windows user-presence summary is invalid.");
+  const prefix = `Approve SXSY-B122 ${title}. Reviewed scope ${scopeDigest}. `;
+  return boundedPrompt(`${prefix}${trustedSummary.slice(0, Math.max(0, 240 - prefix.length))}`.slice(0, 240));
 }
 
 function boundedPrompt(value: string): string {

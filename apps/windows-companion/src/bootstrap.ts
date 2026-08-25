@@ -1,4 +1,5 @@
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { AuthorityLedger } from "../../../packages/control-plane/src/authority.ts";
 import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
@@ -18,6 +19,7 @@ import { hostActionCommandActions } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 import { ConfiguredProviderHostClient } from "./configured-provider-host.ts";
+import { InstalledWorkflowContextPreparationCoordinator } from "./workflow-context-preparation.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableGitMutationReviewQueue } from "./git-review.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
@@ -405,6 +407,17 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         options.runtimePinPresence
       )
     : undefined;
+  const runtimeAuthorities = options.runtime?.authorities ?? new AuthorityLedger(store, {
+    clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
+  });
+  const installedWorkflowContextPreparation = new InstalledWorkflowContextPreparationCoordinator({
+    provider: configuredProviderHost,
+    contexts: workflowContexts,
+    authorities: runtimeAuthorities,
+    sessions,
+    targets: targetResolver,
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
   const providerDesktopEffects = store.hasAuthenticatedProtection ? new DurableProviderDesktopEffectLedger(store) : undefined;
   const installedReconciler = new HostOwnedOperationReconciler(new InstalledReadOnlyObservationPort({
     git: new SpawnCheckpointGitRunner(),
@@ -540,6 +553,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...options.runtime,
     store,
     sessions,
+    authorities: runtimeAuthorities,
+    workflowContextPreparation: options.runtime?.workflowContextPreparation ?? installedWorkflowContextPreparation,
     gateEvidence,
     policyVersion: options.policyVersion,
     targetResolver,

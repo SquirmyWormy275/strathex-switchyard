@@ -24,6 +24,7 @@ import { ReceiptLedger } from "./receipts.ts";
 import { SessionRegistry } from "./session-registry.ts";
 import { TargetSnapshotLedger } from "./snapshot-ledger.ts";
 import { ProtectedJsonStore, sha256 } from "./store.ts";
+import type { ExistingPlanBinding } from "./workflow-artifacts.ts";
 
 export interface TargetResolver {
   /** Resolve a target only from trusted host/session identity; never from command input. */
@@ -74,6 +75,9 @@ export interface ConfirmationAttestationRequest {
   readonly session?: ManagedSession;
   readonly authority?: AuthorityGrant;
   readonly reason: string;
+  /** Host-created review material; never copied from a generic client reason. */
+  readonly reviewedScopeDigest?: string;
+  readonly reviewedScopeSummary?: string;
 }
 
 /**
@@ -89,6 +93,8 @@ export interface RuntimeConfirmationRequest {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly reason: string;
+  /** Host-internal reviewed scope; generic public confirmation IPC cannot select it. */
+  readonly confirmationScopeDigest?: string;
 }
 
 export interface RuntimeConfirmationResult {
@@ -96,6 +102,42 @@ export interface RuntimeConfirmationResult {
   readonly summary: string;
   readonly token?: string;
   readonly expiresAt?: string;
+}
+
+/**
+ * Installed-host workflow preparation observes provider context and binds it
+ * to a protected local authority. Provider output never implements this port
+ * and can never return an unrecorded grant.
+ */
+export interface WorkflowContextPreparationPort {
+  review?(input: Readonly<{
+    definition: CommandDefinition;
+    target: TargetSnapshot;
+    session: ManagedSession;
+  }>): Promise<WorkflowContextReview>;
+  prepare(input: Readonly<{
+    definition: CommandDefinition;
+    target: TargetSnapshot;
+    session: ManagedSession;
+    operator: string;
+    review?: WorkflowContextReview;
+  }>): Promise<AuthorityGrant>;
+}
+
+export interface WorkflowContextReview {
+  readonly action: "plan_approval";
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly provider: Extract<ManagedSession["provider"], "claude" | "codex">;
+  readonly contextId: string;
+  readonly observedAt: string;
+  readonly adapter: Readonly<{ readonly id: string; readonly version: string; readonly moduleSha256: string }>;
+  readonly plan: ExistingPlanBinding;
+  readonly scopeDigest: string;
+  readonly summary: string;
+  readonly providerContextDigest: string;
+  readonly sourceRevision: number;
 }
 
 export interface RuntimeContainmentReleaseRequest {
@@ -114,6 +156,8 @@ export interface RuntimeCommandPreparationRequest {
   readonly reason: string;
   /** Host-internal reviewed scope; public command preparation never accepts this field. */
   readonly confirmationScopeDigest?: string;
+  /** Echo of a host-issued Plan Approval review packet after trusted UI presentation. */
+  readonly reviewScopeDigest?: string;
 }
 
 export interface RuntimeCommandPreparationResult {
@@ -122,7 +166,9 @@ export interface RuntimeCommandPreparationResult {
   readonly session?: ManagedSession;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
   readonly confirmationExpiresAt?: string;
+  readonly workflowReview?: WorkflowContextReview;
 }
 
 export interface ExternalOperationCompletion {
@@ -169,6 +215,8 @@ export interface DurableMediatedExecutorOptions {
   readonly confirmations?: DurableConfirmationLedger;
   /** Omit to fail closed: no confirmation/reauthentication token can be minted. */
   readonly confirmationAttestor?: ConfirmationAttestor;
+  /** Installed provider-host context refresh and local authority binding for agent workflows. */
+  readonly workflowContextPreparation?: WorkflowContextPreparationPort;
   /** Optional host process/provider control. Omission leaves timeout/cancel work visibly unresolved. */
   readonly operationControl?: OperationControlAdapter;
   /** Action-specific observation adapters used only during no-replay startup recovery. */
@@ -289,7 +337,8 @@ export class DurableMediatedExecutor {
         action: definition.action,
         ...(target ? { targetSnapshotId: target.id } : {}),
         ...(session ? { sessionId: session.id } : {}),
-        ...(authority ? { authorityId: authority.id } : {})
+        ...(authority ? { authorityId: authority.id } : {}),
+        ...(request.confirmationScopeDigest ? { scopeDigest: request.confirmationScopeDigest } : {})
       });
       if (!consumed.allowed || !consumed.record) {
         return this.auditWithoutOperation(definition, { status: "blocked", summary: consumed.reason }, target);
@@ -347,13 +396,16 @@ export class DurableMediatedExecutor {
     // An arbitrary optional authority ID must not change a non-authority
     // command's context. For authority-bearing commands, only the ledger's
     // freshly evaluated grant is forwarded to the dispatcher.
-    const { authorityId: _untrustedAuthorityId, confirmationToken: _untrustedConfirmationToken, ...withoutAuthorityReference } = request;
+    const { authorityId: _untrustedAuthorityId, confirmationToken: _untrustedConfirmationToken, confirmationScopeDigest: _untrustedConfirmationScopeDigest, ...withoutAuthorityReference } = request;
     const result = await dispatcher.dispatch({
       ...withoutAuthorityReference,
       ...(target ? { targetSnapshot: target } : {}),
       ...(authority ? { authorityId: authority.id } : {}),
       ...(confirmationToken ? { confirmationToken } : {})
-    }, trustedConfirmationDigest ? { confirmationDigest: trustedConfirmationDigest } : {});
+    }, trustedConfirmationDigest ? {
+      confirmationDigest: trustedConfirmationDigest,
+      ...(request.confirmationScopeDigest ? { confirmationScopeDigest: request.confirmationScopeDigest } : {})
+    } : {});
     return result.operationId ? result : this.auditWithoutOperation(definition, result, target);
   }
 
@@ -508,6 +560,7 @@ export class DurableMediatedExecutor {
         ...(target ? { targetSnapshotId: target.id } : {}),
         ...(session ? { sessionId: session.id } : {}),
         ...(authority ? { authorityId: authority.id } : {}),
+        ...(request.confirmationScopeDigest ? { scopeDigest: request.confirmationScopeDigest } : {}),
         reason: `${request.reason} (attested by ${attestation.operator.trim()})`,
         reauthenticated: true
       });
@@ -526,6 +579,9 @@ export class DurableMediatedExecutor {
    */
   async prepareCommand(request: RuntimeCommandPreparationRequest): Promise<RuntimeCommandPreparationResult> {
     const definition = commandForAction(request.action);
+    if (request.reviewScopeDigest !== undefined && definition.action !== "plan_approval") {
+      return { status: "blocked", summary: "Only Plan Approval may acknowledge a host-issued protected review packet." };
+    }
     let session = request.sessionId ? await this.sessions.get(request.sessionId) : undefined;
     const needsSession = definition.requiresTarget || definition.requiresAuthority || definition.requiresCapabilities.length > 0;
     if (needsSession && !session) return { status: "unavailable", summary: "Command preparation requires one exact protected managed session." };
@@ -551,10 +607,48 @@ export class DurableMediatedExecutor {
       return { status: "unavailable", summary: "No host-owned current-user presence attestor is configured." };
     }
 
+    let workflowReview: WorkflowContextReview | undefined;
+    if (definition.action === "plan_approval") {
+      if (!target || !session || !this.options.workflowContextPreparation?.review) {
+        return { status: "unavailable", summary: "Plan Approval requires one protected exact-plan review before the single current-user confirmation." };
+      }
+      try {
+        workflowReview = await this.options.workflowContextPreparation.review({ definition, target, session });
+        if (!/^[a-f0-9]{64}$/.test(workflowReview.scopeDigest) || !/^[a-f0-9]{64}$/.test(workflowReview.providerContextDigest)
+          || !Number.isSafeInteger(workflowReview.sourceRevision) || workflowReview.sourceRevision < 1
+          || workflowReview.action !== "plan_approval" || workflowReview.sessionId !== session.id || workflowReview.targetSnapshotId !== target.id
+          || workflowReview.repositoryRoot !== target.repositoryRoot || workflowReview.provider !== session.provider
+          || workflowReview.plan.taskId !== session.taskId || workflowReview.plan.revision !== session.planRevision
+          || !/^[a-f0-9]{64}$/.test(workflowReview.plan.digest) || !/^[a-f0-9]{64}$/.test(workflowReview.adapter.moduleSha256)
+          || !workflowReview.summary.trim() || workflowReview.summary.length > 4_096) {
+          throw new Error("Malformed protected plan review.");
+        }
+      } catch {
+        return { status: "unavailable", summary: "The protected exact plan could not be reviewed without changing its provider/session/target binding." };
+      }
+      if (request.reviewScopeDigest === undefined) {
+        return {
+          status: "incomplete",
+          summary: "Plan Approval requires trusted UI presentation of this exact protected review packet before its single current-user confirmation.",
+          session,
+          workflowReview
+        };
+      }
+      if (!/^[a-f0-9]{64}$/.test(request.reviewScopeDigest) || request.reviewScopeDigest !== workflowReview.scopeDigest) {
+        return { status: "blocked", summary: "Plan Approval review acknowledgement does not match the current exact protected plan scope." };
+      }
+    }
+
     let operator: string | undefined;
     if (needsAttestation) {
       try {
-        const attestation = await this.options.confirmationAttestor!.attest({ definition, ...(target ? { target } : {}), ...(session ? { session } : {}), reason: request.reason });
+        const attestation = await this.options.confirmationAttestor!.attest({
+          definition,
+          ...(target ? { target } : {}),
+          ...(session ? { session } : {}),
+          reason: request.reason,
+          ...(workflowReview ? { reviewedScopeDigest: workflowReview.scopeDigest, reviewedScopeSummary: workflowReview.summary } : {})
+        });
         if (!attestation?.reauthenticated || !attestation.operator.trim()) return { status: "blocked", summary: "Current-user presence was not verified; nothing was prepared." };
         operator = attestation.operator.trim();
       } catch {
@@ -581,23 +675,36 @@ export class DurableMediatedExecutor {
     if (definition.requiresAuthority) {
       if (!target || !session || !operator) return { status: "blocked", summary: "Exact target, session, and verified operator are required for scoped authority." };
       try {
-        authority = await this.authorities.issue({
+        authority = definition.executor === "agent" && definition.action !== "bind_voice_session" && this.options.workflowContextPreparation
+          ? await this.options.workflowContextPreparation.prepare({ definition, target, session, operator, ...(workflowReview ? { review: workflowReview } : {}) })
+          : await this.authorities.issue({
+              repositoryRoot: target.repositoryRoot,
+              sessionId: session.id,
+              ...(session.taskId ? { taskId: session.taskId } : {}),
+              ...(session.planRevision ? { planRevision: session.planRevision } : {}),
+              allowedActions: [definition.action],
+              prohibitedActions: [],
+              expiresAt: new Date(this.now().getTime() + 5 * 60_000).toISOString(),
+              issuedBy: operator
+            });
+        const exact = await this.authorities.evaluate({
+          authorityId: authority.id,
           repositoryRoot: target.repositoryRoot,
           sessionId: session.id,
           ...(session.taskId ? { taskId: session.taskId } : {}),
           ...(session.planRevision ? { planRevision: session.planRevision } : {}),
-          allowedActions: [definition.action],
-          prohibitedActions: [],
-          expiresAt: new Date(this.now().getTime() + 5 * 60_000).toISOString(),
-          issuedBy: operator
+          action: definition.action,
+          now: this.now().toISOString()
         });
+        if (!exact.allowed || exact.grant?.id !== authority.id) return { status: "blocked", summary: "Workflow preparation did not produce one exact current protected authority for this action." };
       } catch {
-        return { status: "unavailable", summary: "Exact-action authority could not be durably recorded." };
+        return { status: "unavailable", summary: "Exact-action authority or protected workflow context could not be prepared durably." };
       }
     }
 
     let confirmationToken: string | undefined;
     let confirmationExpiresAt: string | undefined;
+    const confirmationScopeDigest = workflowReview?.scopeDigest ?? request.confirmationScopeDigest;
     if (definition.requiresConfirmation) {
       if (!operator) return { status: "blocked", summary: "Verified current-user presence is required for confirmation." };
       try {
@@ -606,7 +713,7 @@ export class DurableMediatedExecutor {
           ...(target ? { targetSnapshotId: target.id } : {}),
           ...(session ? { sessionId: session.id } : {}),
           ...(authority ? { authorityId: authority.id } : {}),
-          ...(request.confirmationScopeDigest ? { scopeDigest: request.confirmationScopeDigest } : {}),
+          ...(confirmationScopeDigest ? { scopeDigest: confirmationScopeDigest } : {}),
           reason: `${request.reason} (attested by ${operator})`,
           reauthenticated: true
         });
@@ -623,6 +730,7 @@ export class DurableMediatedExecutor {
       ...(session ? { session } : {}),
       ...(authority ? { authorityId: authority.id } : {}),
       ...(confirmationToken ? { confirmationToken } : {}),
+      ...(confirmationScopeDigest ? { confirmationScopeDigest } : {}),
       ...(confirmationExpiresAt ? { confirmationExpiresAt } : {})
     };
   }

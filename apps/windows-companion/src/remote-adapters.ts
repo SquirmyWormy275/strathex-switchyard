@@ -123,7 +123,8 @@ export const providerCommandActions: readonly CommandAction[] = [
 export const remoteAutomationActions: readonly CommandAction[] = ["compound_capture", "compound_refresh", "lfg", "repair_mission"];
 
 export interface WorkflowArtifactDispatchPort {
-  claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string }>): Promise<WorkflowArtifact | undefined>;
+  claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId: string }>): Promise<WorkflowArtifact | undefined>;
+  assertDispatchBinding(input: Readonly<{ artifactId: string; artifactDigest: string; action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId: string }>): Promise<WorkflowArtifact>;
   acknowledge(response: WorkflowProviderResponse): Promise<WorkflowArtifact>;
 }
 
@@ -146,7 +147,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       }
       let artifact: WorkflowArtifact | undefined;
       try {
-        artifact = await this.artifacts.claimForDispatch({ action, targetSnapshotId: request.target.id, sessionId: request.session.id, operationId: request.operationId });
+        artifact = await this.artifacts.claimForDispatch({ action, targetSnapshotId: request.target.id, sessionId: request.session.id, operationId: request.operationId, authorityId: request.authority.id });
       } catch {
         return { status: "blocked", summary: "The prepared provider workflow artifact is missing, ambiguous, corrupt, or bound to another operation.", effectDisposition: "not_started" };
       }
@@ -182,6 +183,19 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         if (!current.allowed) return finish({ status: "blocked", summary: current.reason, effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
       }
       if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider routing was cancelled immediately before network dispatch.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
+      try {
+        await this.artifacts.assertDispatchBinding({
+          artifactId: artifact.id,
+          artifactDigest: artifact.digest,
+          action,
+          targetSnapshotId: request.target.id,
+          sessionId: request.session.id,
+          operationId: request.operationId,
+          authorityId: request.authority.id
+        });
+      } catch {
+        return finish({ status: "blocked", summary: "The protected workflow artifact or coordinator context changed at the final dispatch boundary.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
+      }
       let result: ConfiguredNetworkResult;
       try { result = await this.network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal }); }
       catch { return finish({ status: "failed", summary: "The configured provider transport failed after dispatch may have begun; reconciliation is required.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
@@ -276,6 +290,7 @@ function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
       || request.confirmation.action !== "plan_approval" || request.confirmation.targetSnapshotId !== request.target?.id
       || request.confirmation.sessionId !== session.id || request.confirmation.authorityId !== authority.id
       || request.confirmation.confirmationDigest !== artifact.payload.confirmationDigest
+      || request.confirmation.confirmationScopeDigest !== artifact.payload.confirmationScopeDigest
       || artifact.payload.executorSessionId !== session.id || artifact.payload.authorityId !== authority.id
       || artifact.taskId !== artifact.payload.plan.taskId || artifact.planRevision !== artifact.payload.plan.revision
       || session.taskId !== artifact.payload.plan.taskId || session.planRevision !== artifact.payload.plan.revision) {
@@ -287,6 +302,7 @@ function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
           executeOnce: true as const,
           currentUserConfirmed: true as const,
           confirmationDigest: request.confirmation.confirmationDigest,
+          confirmationScopeDigest: request.confirmation.confirmationScopeDigest,
           operationId: request.operationId!,
           artifactId: artifact.id,
           artifactDigest: artifact.digest,
@@ -313,6 +329,9 @@ function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {
       digest: artifact.digest,
       taskId: artifact.taskId,
       planRevision: artifact.planRevision,
+      authorityId: artifact.authorityId,
+      coordinatorContextDigest: artifact.coordinatorContextDigest,
+      coordinatorContextRevision: artifact.coordinatorContextRevision,
       payload: artifact.payload,
       executionAuthorized: false
     }

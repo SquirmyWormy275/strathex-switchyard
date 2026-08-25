@@ -31,7 +31,12 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
           assert.equal(request.action, "handoff_queue");
           assert.equal(request.authorityId, "authority-1");
           assert.deepEqual(request.intent, { kind: "handoff", recipientSessionId: "coder", route: "queue" });
-          return { kind: "handoff", packageId: "handoff-1", route: "queue", sourceSessionId: "planner", recipientSessionId: "coder", authorityId: "authority-1" };
+          return {
+            payload: { kind: "handoff", packageId: "handoff-1", route: "queue", sourceSessionId: "planner", recipientSessionId: "coder", authorityId: "authority-1" },
+            authorityId: "authority-1",
+            coordinatorContextDigest: "c".repeat(64),
+            coordinatorContextRevision: 1
+          };
         }
       },
       voice: new VoiceCoordinator(store, { clock: () => at, idFactory: () => `voice-${++id}` }),
@@ -69,7 +74,7 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
     const current = await call("voice.current", undefined);
     assert.equal((current.binding as { provider: string }).provider, "chatgpt");
     const voiceWorkflow = await call("workflow.prepare", { action: "bind_voice_session", sessionId: "coder", authorityId: "authority-1", intent: { kind: "none" } });
-    const voiceArtifact = voiceWorkflow.artifact as { action: string; sessionId: string; payload: { kind: string; voiceSessionId: string; consentId: string } };
+    const voiceArtifact = voiceWorkflow.artifact as { id: string; action: string; sessionId: string; payload: { kind: string; voiceSessionId: string; consentId: string } };
     assert.equal(voiceArtifact.action, "bind_voice_session");
     assert.equal(voiceArtifact.sessionId, "coder");
     assert.deepEqual(voiceArtifact.payload, {
@@ -82,6 +87,8 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
     const systemConsent = (await call("voice.consent", { handoffId: handoff.id, provider: "system", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 })).consent as { id: string };
     const systemSwitch = await call("voice.switch", { bindingId: (switched.binding as { id: string }).id, consentId: systemConsent.id, voiceSessionId: "voice-session-3" });
     assert.equal((systemSwitch.binding as { provider: string }).provider, "system");
+    const cancelledVoice = await call("workflow.cancel", { artifactId: voiceArtifact.id, sessionId: "coder", authorityId: "authority-1" });
+    assert.equal((cancelledVoice.artifact as { status: string }).status, "cancelled");
     const systemWorkflow = await call("workflow.prepare", { action: "bind_voice_session", sessionId: "coder", authorityId: "authority-1", intent: { kind: "none" } });
     assert.equal((systemWorkflow.artifact as { payload: { provider: string } }).payload.provider, "system");
   } finally { await rm(directory, { recursive: true, force: true }); }

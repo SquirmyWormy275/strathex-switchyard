@@ -126,6 +126,65 @@ test("hardware signal claims reject background, unknown, and mismatched workspac
   assert.deepEqual(await inbox.status(), { pending: 1, claimed: 0, completed: 0, needsReconciliation: 0 });
 });
 
+test("Plan Approval hardware review keeps the exact signal live for reviewed second preparation", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-hardware-plan-review-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const inbox = new DurableHardwareSignalInbox(new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator }), { claimTokenFactory: () => "claim-token-plan-review" });
+  await inbox.accept("f".repeat(64), { type: "signal", connectionEpoch: 1, bootNonce: 2, counter: 3, control: "PLAN_APPROVAL", modifier: "normal", assigned: true });
+  const scopeDigest = "1".repeat(64);
+  const reviews: Array<string | undefined> = [];
+  const executor: CommandPreparationCapableMediatedCommandExecutor = {
+    async prepareCommand(input) {
+      reviews.push(input.reviewScopeDigest);
+      if (!input.reviewScopeDigest) {
+        return {
+          status: "incomplete",
+          summary: "Review the exact provider-observed plan before confirmation.",
+          workflowReview: {
+            action: "plan_approval",
+            sessionId: "window-1",
+            targetSnapshotId: "2".repeat(64),
+            repositoryRoot: "C:\\repo",
+            provider: "claude",
+            contextId: "context-1",
+            observedAt: "2026-08-24T12:00:00.000Z",
+            adapter: { id: "provider-host", version: "1.0.0", moduleSha256: "3".repeat(64) },
+            plan: {
+              digest: "4".repeat(64), revision: "1", originSessionId: "window-1", taskId: "task-1", objective: "Complete the reviewed plan.",
+              steps: [{ id: "step-1", summary: "Run the exact step.", ownedFiles: ["apps/example.ts"], dependencies: [], status: "approved" }],
+              decisions: ["Use the reviewed provider context."]
+            },
+            scopeDigest,
+            summary: "Complete the reviewed plan. Step step-1: Run the exact step.",
+            providerContextDigest: "5".repeat(64),
+            sourceRevision: 1
+          }
+        };
+      }
+      return { status: "prepared", summary: "prepared", authorityId: "authority-plan", confirmationToken: "confirmation-plan", confirmationScopeDigest: scopeDigest };
+    },
+    async execute() { return { status: "completed", summary: "handled" }; }
+  };
+  const service = new CompanionService({ executor, hardwareSignals: inbox, canonicalizeHostPath: async (value) => value });
+  service.installTrustedSession(windowSession());
+  const claimed = await service.handle(request("claim-plan", "hardware-signal.claim", { windowSessionId: "window-1", workspaceRoots: ["C:\\repo"], focused: true }));
+  const claim = (claimed.result as { claim: { signalId: string; claimToken: string } }).claim;
+  const common = { signalId: claim.signalId, claimToken: claim.claimToken, windowSessionId: "window-1", workspaceRoots: ["C:\\repo"], reason: "Physical Plan Approval chord." };
+
+  const review = await service.handle(request("prepare-plan-review", "hardware-signal.prepare", common));
+  assert.equal(review.ok, true);
+  assert.equal((review.result as { dispositionReceiptId?: string }).dispositionReceiptId, undefined);
+  assert.equal((review.result as { preparation: { workflowReview?: { scopeDigest: string } } }).preparation.workflowReview?.scopeDigest, scopeDigest);
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 1, completed: 0, needsReconciliation: 0 });
+
+  const approved = await service.handle(request("prepare-plan-approved", "hardware-signal.prepare", { ...common, reviewScopeDigest: scopeDigest }));
+  assert.equal(approved.ok, true);
+  assert.equal((approved.result as { preparation: { status: string; confirmationScopeDigest?: string } }).preparation.status, "prepared");
+  assert.equal((approved.result as { preparation: { confirmationScopeDigest?: string } }).preparation.confirmationScopeDigest, scopeDigest);
+  assert.deepEqual(reviews, [undefined, scopeDigest]);
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 1, completed: 0, needsReconciliation: 0 });
+});
+
 test("dispatch intent is durable before executor entry so a concurrent client cannot requeue during an effect", async (context) => {
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-hardware-dispatch-race-"));
   context.after(async () => { await rm(folder, { recursive: true, force: true }); });

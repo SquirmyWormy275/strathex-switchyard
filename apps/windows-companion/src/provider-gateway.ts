@@ -13,11 +13,14 @@ import {
   type JournalEntry,
   type ProtectedJsonStore
 } from "../../../packages/control-plane/src/store.ts";
-import type {
-  WorkflowArtifactAction,
-  WorkflowArtifactPayload,
-  WorkflowProviderResponse,
-  WorkflowProviderResult
+import {
+  canonicalWorkflowArtifact,
+  planApprovalReviewScopeDigest,
+  type WorkflowArtifactImmutable,
+  type WorkflowArtifactAction,
+  type WorkflowArtifactPayload,
+  type WorkflowProviderResponse,
+  type WorkflowProviderResult
 } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { ConfiguredNetworkResult } from "./configured-network.ts";
 
@@ -95,6 +98,9 @@ export interface ProviderGatewayWorkflowCommand {
     digest: string;
     taskId?: string;
     planRevision?: string;
+    authorityId?: string;
+    coordinatorContextDigest?: string;
+    coordinatorContextRevision?: number;
     payload: WorkflowArtifactPayload;
   }>;
   readonly executionAuthorization?: Readonly<{
@@ -102,6 +108,7 @@ export interface ProviderGatewayWorkflowCommand {
     executeOnce: true;
     currentUserConfirmed: true;
     confirmationDigest: string;
+    confirmationScopeDigest: string;
     operationId: string;
     artifactId: string;
     artifactDigest: string;
@@ -457,9 +464,8 @@ export class LocalProviderCommandGateway {
     const backend = this.backends.get(command.provider);
     if (!backend) return unavailable(input.routeId, `No exact local ${command.provider} provider gateway backend is installed.`);
     const session = await this.sessions.get(command.sessionId);
-    if (!session || !hasGatewayProof(session) || session.provider !== command.provider || session.targetSnapshotId !== command.targetSnapshotId
-      || !session.workspaceRoot || rootKey(session.workspaceRoot) !== rootKey(command.repositoryRoot)) {
-      return blocked(input.routeId, "The exact provider session and TargetSnapshot are no longer current.");
+    if (!session || !canExecuteProviderCommand(session, command, this.now(), this.automaticRefreshIntervalMs)) {
+      return blocked(input.routeId, "The exact provider session is not current, fully mediated, running, and bound to this TargetSnapshot.");
     }
     const requestDigest = sha256(stableJson(command));
     const active = this.inFlightCommands.get(command.operationId);
@@ -498,9 +504,19 @@ export class LocalProviderCommandGateway {
       updatedAt: await this.monotonicHostTime()
     };
     await this.saveOperation(submitted);
+    const currentBeforeEffect = await this.sessions.get(command.sessionId);
+    if (!currentBeforeEffect || !canExecuteProviderCommand(currentBeforeEffect, command, this.now(), this.automaticRefreshIntervalMs)) {
+      await this.saveOperation({ ...submitted, state: "failed", updatedAt: await this.monotonicHostTime() });
+      return blocked(input.routeId, "The fully mediated provider session changed before the final execution boundary.");
+    }
     try {
       const response = await backend.execute(command, signalFor(input));
       requireCommandResponse(command, response);
+      const currentAfterEffect = await this.sessions.get(command.sessionId);
+      if (!currentAfterEffect || !canExecuteProviderCommand(currentAfterEffect, command, this.now(), this.automaticRefreshIntervalMs)) {
+        await this.saveOperation({ ...submitted, state: "unresolved", updatedAt: await this.monotonicHostTime() });
+        return unavailable(input.routeId, "The provider session changed while the effect was in flight; the result is ambiguous and requires exact observation.", "ambiguous");
+      }
       const responseBody = JSON.stringify(response);
       if (Buffer.byteLength(responseBody, "utf8") > maximumBodyBytes) throw new Error("The provider result is oversized.");
       await this.saveOperation({
@@ -780,27 +796,68 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
   if (!exact(value, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "artifact", ...(action === "plan_approval" ? ["executionAuthorization"] : [])])) throw new Error("The workflow gateway request contains unknown or missing fields.");
   if (!allowedExact(target, ["id", "repositoryRoot", "policyVersion", "trackedManifest", "untrackedManifest"], ["branch", "head"])) throw new Error("The workflow target binding is malformed.");
   if (!allowedExact(session, ["id", "provider", "surface", "capabilities", "plannedFiles"], ["taskId", "planRevision"])) throw new Error("The workflow session binding is malformed.");
-  if (!allowedExact(artifact, ["id", "digest", "payload", "executionAuthorized"], ["taskId", "planRevision"])) throw new Error("The workflow artifact binding is malformed.");
+  if (!allowedExact(artifact, ["id", "digest", "authorityId", "payload", "executionAuthorized"], ["taskId", "planRevision", "coordinatorContextDigest", "coordinatorContextRevision"])) throw new Error("The workflow artifact binding is malformed.");
   if (artifact.executionAuthorized !== false) throw new Error("Provider workflow artifacts never authorize execution.");
-  const payload = object(artifact.payload, "workflow payload") as unknown as WorkflowArtifactPayload;
   const operationId = safeIdentifier(value.operationId, "operation ID");
   const targetSnapshotId = digest(target.id, "target snapshot");
   const sessionId = safeIdentifier(session.id, "session ID");
   const authorityId = safeIdentifier(value.authorityId, "authority ID");
+  const exactRepositoryRoot = exactRoot(target.repositoryRoot, repositoryRoot);
+  const artifactId = safeIdentifier(artifact.id, "artifact ID");
+  const artifactDigest = digest(artifact.digest, "artifact digest");
+  const artifactAuthorityId = safeIdentifier(artifact.authorityId, "artifact authority ID");
+  if (artifactAuthorityId !== authorityId) throw new Error("The workflow artifact authority differs from the exact mediated dispatch authority.");
+  const hasCoordinatorDigest = artifact.coordinatorContextDigest !== undefined;
+  const hasCoordinatorRevision = artifact.coordinatorContextRevision !== undefined;
+  if (hasCoordinatorDigest !== hasCoordinatorRevision
+    || (hasCoordinatorRevision && (!Number.isSafeInteger(artifact.coordinatorContextRevision) || (artifact.coordinatorContextRevision as number) < 1))) {
+    throw new Error("The workflow artifact coordinator binding is partial or invalid.");
+  }
+  const canonical = canonicalWorkflowArtifact({
+    id: artifactId,
+    action,
+    repositoryRoot: exactRepositoryRoot,
+    targetSnapshotId,
+    sessionId,
+    ...(artifact.taskId === undefined ? {} : { taskId: safeIdentifier(artifact.taskId, "task ID") }),
+    ...(artifact.planRevision === undefined ? {} : { planRevision: safeIdentifier(artifact.planRevision, "plan revision") }),
+    authorityId: artifactAuthorityId,
+    ...(hasCoordinatorDigest ? {
+      coordinatorContextDigest: digest(artifact.coordinatorContextDigest, "coordinator context digest"),
+      coordinatorContextRevision: artifact.coordinatorContextRevision as number
+    } : {}),
+    payload: object(artifact.payload, "workflow payload") as unknown as WorkflowArtifactPayload
+  });
+  if (canonical.digest !== artifactDigest) throw new Error("The workflow artifact digest does not match its exact canonical immutable content.");
+  const immutable: WorkflowArtifactImmutable = canonical.immutable;
+  const payload = immutable.payload;
   let executionAuthorization: ProviderGatewayWorkflowCommand["executionAuthorization"];
   if (action === "plan_approval") {
     const authorization = object(value.executionAuthorization, "plan execution authorization");
-    if (!exact(authorization, ["executionAuthorized", "executeOnce", "currentUserConfirmed", "confirmationDigest", "operationId", "artifactId", "artifactDigest", "targetSnapshotId", "sessionId", "authorityId", "planDigest", "planRevision", "originSessionId"])
+    if (!exact(authorization, ["executionAuthorized", "executeOnce", "currentUserConfirmed", "confirmationDigest", "confirmationScopeDigest", "operationId", "artifactId", "artifactDigest", "targetSnapshotId", "sessionId", "authorityId", "planDigest", "planRevision", "originSessionId"])
       || authorization.executionAuthorized !== true || authorization.executeOnce !== true || authorization.currentUserConfirmed !== true
-      || authorization.operationId !== operationId || authorization.artifactId !== artifact.id || authorization.artifactDigest !== artifact.digest
+      || authorization.operationId !== operationId || authorization.artifactId !== artifactId || authorization.artifactDigest !== artifactDigest
       || authorization.targetSnapshotId !== targetSnapshotId || authorization.sessionId !== sessionId
       || authorization.authorityId !== authorityId) {
       throw new Error("Plan execution authorization does not exactly bind the confirmed immutable plan dispatch.");
     }
     const approval = approvalPayload(payload);
     const plan = approval.plan;
+    if (!immutable.coordinatorContextDigest || !immutable.coordinatorContextRevision) throw new Error("Plan Approval requires one exact protected coordinator-context binding.");
+    const expectedScopeDigest = planApprovalReviewScopeDigest({
+      sessionId,
+      targetSnapshotId,
+      repositoryRoot: exactRepositoryRoot,
+      taskId: plan.taskId,
+      planRevision: plan.revision,
+      planDigest: plan.digest,
+      originSessionId: plan.originSessionId,
+      providerContextDigest: approval.providerContextDigest,
+      sourceRevision: immutable.coordinatorContextRevision
+    });
     if (approval.executorSessionId !== sessionId || approval.authorityId !== authorityId || approval.confirmationDigest !== authorization.confirmationDigest
-      || artifact.taskId !== plan.taskId || artifact.planRevision !== plan.revision || session.taskId !== plan.taskId || session.planRevision !== plan.revision) {
+      || approval.confirmationScopeDigest !== authorization.confirmationScopeDigest || approval.confirmationScopeDigest !== expectedScopeDigest
+      || immutable.taskId !== plan.taskId || immutable.planRevision !== plan.revision || session.taskId !== plan.taskId || session.planRevision !== plan.revision) {
       throw new Error("Plan execution authorization changed the immutable task, plan, executor, authority, or current-user confirmation binding.");
     }
     if (authorization.planDigest !== plan.digest || authorization.planRevision !== plan.revision || authorization.originSessionId !== plan.originSessionId) throw new Error("Plan execution authorization changed the immutable plan binding.");
@@ -809,9 +866,10 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
       executeOnce: true,
       currentUserConfirmed: true,
       confirmationDigest: digest(authorization.confirmationDigest, "confirmation digest"),
+      confirmationScopeDigest: digest(authorization.confirmationScopeDigest, "confirmation scope digest"),
       operationId,
-      artifactId: safeIdentifier(authorization.artifactId, "artifact ID"),
-      artifactDigest: digest(authorization.artifactDigest, "artifact digest"),
+      artifactId,
+      artifactDigest,
       targetSnapshotId,
       sessionId,
       authorityId: safeIdentifier(authorization.authorityId, "authority ID"),
@@ -829,16 +887,19 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
     operationId,
     externalId: operationId,
     action,
-    repositoryRoot: exactRoot(target.repositoryRoot, repositoryRoot),
+    repositoryRoot: exactRepositoryRoot,
     targetSnapshotId,
     sessionId,
     authorityId,
     provider: providerIdentity(session.provider),
     artifact: {
-      id: safeIdentifier(artifact.id, "artifact ID"),
-      digest: digest(artifact.digest, "artifact digest"),
-      ...(artifact.taskId === undefined ? {} : { taskId: safeIdentifier(artifact.taskId, "task ID") }),
-      ...(artifact.planRevision === undefined ? {} : { planRevision: safeIdentifier(artifact.planRevision, "plan revision") }),
+      id: immutable.id,
+      digest: artifactDigest,
+      ...(immutable.taskId === undefined ? {} : { taskId: immutable.taskId }),
+      ...(immutable.planRevision === undefined ? {} : { planRevision: immutable.planRevision }),
+      ...(immutable.authorityId === undefined ? {} : { authorityId: immutable.authorityId }),
+      ...(immutable.coordinatorContextDigest === undefined ? {} : { coordinatorContextDigest: immutable.coordinatorContextDigest }),
+      ...(immutable.coordinatorContextRevision === undefined ? {} : { coordinatorContextRevision: immutable.coordinatorContextRevision }),
       payload
     },
     ...(executionAuthorization ? { executionAuthorization } : {})
@@ -1007,6 +1068,21 @@ function hasGatewayProof(session: ManagedSession): boolean {
     && session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1"
     && session.metadata["sxsy-b122.providerHandshakeTarget"] === session.targetSnapshotId
     && !!session.workspaceRoot;
+}
+
+function canExecuteProviderCommand(session: ManagedSession, command: ProviderGatewayCommand, now: string, refreshIntervalMs: number): boolean {
+  const observedAt = Date.parse(session.lastHeartbeat);
+  const current = Date.parse(now);
+  const freshnessMs = Math.max(60_000, refreshIntervalMs * 2);
+  const requiredCapabilities: readonly Capability[] = ["registered", "observable", "controllable", "mediated"];
+  return hasGatewayProof(session)
+    && session.provider === command.provider
+    && session.status === "running"
+    && requiredCapabilities.every((capabilityValue) => session.capabilities.includes(capabilityValue))
+    && Number.isFinite(observedAt) && Number.isFinite(current) && observedAt <= current + 30_000 && current - observedAt <= freshnessMs
+    && session.targetSnapshotId === command.targetSnapshotId
+    && !!session.workspaceRoot && rootKey(session.workspaceRoot) === rootKey(command.repositoryRoot)
+    && (command.kind !== "workflow" || (session.taskId === command.artifact.taskId && session.planRevision === command.artifact.planRevision));
 }
 
 function providerBackend(backends: ReadonlyMap<ProviderGatewayProvider, ProviderGatewayBackend>, provider: ManagedSession["provider"]): ProviderGatewayBackend | undefined {

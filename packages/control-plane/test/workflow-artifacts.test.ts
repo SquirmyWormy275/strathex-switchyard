@@ -9,6 +9,7 @@ import { HandoffPackageStore } from "../src/context-packages.ts";
 import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
 import {
   DurableWorkflowPreparationCoordinator,
+  planApprovalReviewScopeDigest,
   WorkflowArtifactStore,
   WorkflowCoordinatorContextStore,
   parseWorkflowProviderResponse,
@@ -86,6 +87,54 @@ test("Option Provider sends only one user question and requires exactly five pro
   await assert.rejects(() => artifacts.create(base("option_packet", { ...decisionPayload("one"), mode: "packet" })), /multi-decision/i);
 });
 
+test("prepared workflow artifacts bind exact authority and monotonic coordinator context and remain explicitly cancellable after churn", async (context) => {
+  const journal = await store(context);
+  const contexts = new WorkflowCoordinatorContextStore(journal, { clock: () => "2026-08-24T12:00:00.000Z" });
+  const artifacts = new WorkflowArtifactStore(journal, { clock: () => "2026-08-24T12:00:01.000Z" });
+  const context1 = await contexts.record({
+    sessionId: "session-1", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), authorityId: "authority-1", sourceRevision: 1,
+    evidence: evidence(), pendingDecisions: [{ id: "decision-1", question: "First?", context: "Exact target." }]
+  });
+  const created = await artifacts.create({
+    ...base("option_provider", decisionPayload()), authorityId: "authority-1",
+    coordinatorContextDigest: context1.digest, coordinatorContextRevision: context1.sourceRevision
+  });
+  await assert.rejects(() => artifacts.create({
+    ...base("option_provider", { ...decisionPayload(), decisions: [{ id: "decision-2", question: "Replacement?", context: "Changed." }] }),
+    id: "artifact-replacement", authorityId: "authority-1", coordinatorContextDigest: context1.digest, coordinatorContextRevision: 1
+  }), /cancel it explicitly/i);
+  assert.equal(await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "wrong-authority-op", authorityId: "authority-other" }), undefined);
+
+  await assert.rejects(() => contexts.record({
+    sessionId: "session-1", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), authorityId: "authority-1", sourceRevision: 1,
+    evidence: evidence(), pendingDecisions: [{ id: "decision-changed", question: "Drift?", context: "Same revision." }]
+  }), /without a monotonic (?:provider )?source revision/i);
+  const context2 = await contexts.record({
+    sessionId: "session-1", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), authorityId: "authority-1", sourceRevision: 2,
+    evidence: evidence(), pendingDecisions: [{ id: "decision-2", question: "Replacement?", context: "New provider revision." }]
+  });
+  await assert.rejects(() => contexts.record({
+    sessionId: "session-1", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), authorityId: "authority-1", sourceRevision: 1,
+    evidence: evidence(), pendingDecisions: []
+  }), /cannot roll back/i);
+  await assert.rejects(() => artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "stale-op", authorityId: "authority-1" }), /stale/i);
+  await assert.rejects(() => artifacts.cancelPrepared({ artifactId: created.id, sessionId: created.sessionId, authorityId: "authority-other" }), /exact session and authority/i);
+  assert.equal((await artifacts.cancelPrepared({ artifactId: created.id, sessionId: created.sessionId, authorityId: "authority-1" })).status, "cancelled");
+
+  const replacement = await artifacts.create({
+    ...base("option_provider", { ...decisionPayload(), decisions: [{ id: "decision-2", question: "Replacement?", context: "New provider revision." }] }),
+    id: "artifact-replacement", authorityId: "authority-1", coordinatorContextDigest: context2.digest, coordinatorContextRevision: context2.sourceRevision
+  });
+  const submitted = await artifacts.claimForDispatch({ action: replacement.action, targetSnapshotId: replacement.targetSnapshotId, sessionId: replacement.sessionId, operationId: "current-op", authorityId: "authority-1" });
+  assert.equal(submitted?.id, replacement.id);
+  assert.equal((await artifacts.assertDispatchBinding({ artifactId: replacement.id, artifactDigest: replacement.digest, action: replacement.action, targetSnapshotId: replacement.targetSnapshotId, sessionId: replacement.sessionId, operationId: "current-op", authorityId: "authority-1" })).id, replacement.id);
+  await contexts.record({
+    sessionId: "session-1", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), authorityId: "authority-1", sourceRevision: 3,
+    evidence: evidence(), pendingDecisions: [{ id: "decision-3", question: "Newest?", context: "Final provider revision." }]
+  });
+  await assert.rejects(() => artifacts.assertDispatchBinding({ artifactId: replacement.id, artifactDigest: replacement.digest, action: replacement.action, targetSnapshotId: replacement.targetSnapshotId, sessionId: replacement.sessionId, operationId: "current-op", authorityId: "authority-1" }), /context|changed/i);
+});
+
 test("voice binding artifacts preserve exact ChatGPT and system provider identities", async (context) => {
   const protectedStore = await store(context);
   const artifacts = new WorkflowArtifactStore(protectedStore);
@@ -94,7 +143,7 @@ test("voice binding artifacts preserve exact ChatGPT and system provider identit
   }));
   const system = await artifacts.create({ ...base("bind_voice_session", {
     kind: "voice_binding", voiceSessionId: "voice-system", provider: "system", contextPackageId: "handoff-1", consentId: "consent-system"
-  }), id: "artifact-bind-voice-system" });
+  }), id: "artifact-bind-voice-system", sessionId: "session-2" });
   assert.equal(chatgpt.payload.kind === "voice_binding" ? chatgpt.payload.provider : undefined, "chatgpt");
   assert.equal(system.payload.kind === "voice_binding" ? system.payload.provider : undefined, "system");
   assert.equal((await new WorkflowArtifactStore(protectedStore).get(chatgpt.id))?.payload.kind === "voice_binding"
@@ -119,7 +168,7 @@ test("Plan Expander accepts exactly fifteen unique ordered alternatives for the 
 
 test("Plan Approval binds the immutable originating plan, current session, authority and confirmation and acknowledges execution once", async (context) => {
   const artifacts = new WorkflowArtifactStore(await store(context));
-  const payload = { kind: "plan" as const, mode: "approve" as const, plan: existingPlan(), executorSessionId: "session-1", authorityId: "authority-1", confirmationDigest: "c".repeat(64), executeOnce: true as const };
+  const payload = { kind: "plan" as const, mode: "approve" as const, plan: existingPlan(), executorSessionId: "session-1", authorityId: "authority-1", confirmationDigest: "c".repeat(64), confirmationScopeDigest: "d".repeat(64), providerContextDigest: "e".repeat(64), executeOnce: true as const };
   const created = await artifacts.create(base("plan_approval", payload));
   await assert.rejects(() => artifacts.create({ ...base("plan_approval", { ...payload, executorSessionId: "other-session" }), id: "wrong-executor" }), /selected executor session/i);
   const { digest: _digest, ...planMaterial } = existingPlan();
@@ -157,17 +206,23 @@ test("durable coordinator generates option requests, cycles verified queues, and
   const blocked1 = managedSession("blocked-1", "verified_blocked");
   const blocked2 = managedSession("blocked-2", "verified_blocked");
   const authority = authorityGrant("authority-1", "session-1", ["option_provider", "focus_blocked_agent", "authority_refresh", "plan_approval"]);
-  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: authority.id, evidence: evidence(), pendingDecisions: [{ id: "pending-1", question: "Decision one?", context: "Context one." }, { id: "pending-2", question: "Decision two?", context: "Context two." }], pendingRequest: { requestId: "request-1", targetSnapshotId: source.targetSnapshotId!, planRevision: "plan-7", planDigest: existingPlan().digest, action: "option_provider" } });
+  const provenance = { provider: "codex" as const, contextId: "context-1", observedAt: "2026-08-24T12:00:00.000Z", adapterId: "provider-context", adapterVersion: "1.0.0", moduleSha256: "6".repeat(64), providerContextDigest: "7".repeat(64), envelopeDigest: "8".repeat(64) };
+  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: authority.id, sourceRevision: 1, provenance, evidence: evidence(), pendingDecisions: [{ id: "pending-1", question: "Decision one?", context: "Context one." }, { id: "pending-2", question: "Decision two?", context: "Context two." }], pendingRequest: { requestId: "request-1", targetSnapshotId: source.targetSnapshotId!, planRevision: "plan-7", planDigest: existingPlan().digest, action: "option_provider" } });
   const sessions = new Map([source, blocked1, blocked2].map((session) => [session.id, session]));
   const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => id === authority.id ? authority : undefined });
-  const decision = await coordinator.prepare({ action: "option_provider", session: source, authorityId: authority.id, intent: { kind: "decision", question: "User question?", context: "User context only." } });
+  const decision = (await coordinator.prepare({ action: "option_provider", session: source, authorityId: authority.id, intent: { kind: "decision", question: "User question?", context: "User context only." } })).payload;
   assert.deepEqual(Object.keys((decision as Extract<WorkflowArtifactPayload, { kind: "decision" }>).decisions[0]!).sort(), ["context", "id", "question"]);
-  const first = await coordinator.prepare({ action: "focus_blocked_agent", session: source, authorityId: authority.id, intent: { kind: "none" } }) as Extract<WorkflowArtifactPayload, { kind: "focus" }>;
+  const scope = planApprovalReviewScopeDigest({ sessionId: source.id, targetSnapshotId: source.targetSnapshotId!, repositoryRoot: source.workspaceRoot!, taskId: existingPlan().taskId, planRevision: existingPlan().revision, planDigest: existingPlan().digest, originSessionId: existingPlan().originSessionId, providerContextDigest: provenance.providerContextDigest, sourceRevision: 1 });
+  await assert.rejects(() => coordinator.prepare({ action: "plan_approval", session: source, authorityId: authority.id, intent: { kind: "plan_approval", confirmationToken: "confirmation-1", confirmationScopeDigest: "9".repeat(64) } }), /exact protected plan/i);
+  const approval = (await coordinator.prepare({ action: "plan_approval", session: source, authorityId: authority.id, intent: { kind: "plan_approval", confirmationToken: "confirmation-1", confirmationScopeDigest: scope } })).payload as Extract<WorkflowArtifactPayload, { kind: "plan"; mode: "approve" }>;
+  assert.equal(approval.confirmationScopeDigest, scope);
+  assert.equal(approval.confirmationDigest, sha256("confirmation-1"));
+  const first = (await coordinator.prepare({ action: "focus_blocked_agent", session: source, authorityId: authority.id, intent: { kind: "none" } })).payload as Extract<WorkflowArtifactPayload, { kind: "focus" }>;
   sessions.set(blocked1.id, { ...blocked1, lastHeartbeat: "2026-08-24T12:00:01.000Z" });
   sessions.set(blocked2.id, { ...blocked2, lastHeartbeat: "2026-08-24T12:00:01.000Z" });
-  const second = await coordinator.prepare({ action: "focus_blocked_agent", session: source, authorityId: authority.id, intent: { kind: "none" } }) as Extract<WorkflowArtifactPayload, { kind: "focus" }>;
+  const second = (await coordinator.prepare({ action: "focus_blocked_agent", session: source, authorityId: authority.id, intent: { kind: "none" } })).payload as Extract<WorkflowArtifactPayload, { kind: "focus" }>;
   assert.notEqual(first.selectedSessionId, second.selectedSessionId);
-  const refresh = await coordinator.prepare({ action: "authority_refresh", session: source, authorityId: authority.id, intent: { kind: "none" } }) as Extract<WorkflowArtifactPayload, { kind: "authority" }>;
+  const refresh = (await coordinator.prepare({ action: "authority_refresh", session: source, authorityId: authority.id, intent: { kind: "none" } })).payload as Extract<WorkflowArtifactPayload, { kind: "authority" }>;
   assert.equal(refresh.packets[0]?.pendingRequest.action, "option_provider");
   assert.match(refresh.packets[0]!.matchDigest, /^[a-f0-9]{64}$/);
 });
@@ -179,19 +234,19 @@ test("Authority broadcast uses each recipient's protected pending request and re
   const recipients = [managedSession("recipient-1", "running"), managedSession("recipient-2", "verified_blocked")];
   const sourceAuthority = authorityGrant("authority-broadcast", source.id, ["authority_broadcast"]);
   const recipientAuthorities = recipients.map((recipient, index) => authorityGrant(`authority-recipient-${index + 1}`, recipient.id, ["proof"]));
-  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, evidence: evidence(), pendingDecisions: [] });
+  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, evidence: evidence(), pendingDecisions: [] });
   for (let index = 0; index < recipients.length; index += 1) {
     const recipient = recipients[index]!;
     const authority = recipientAuthorities[index]!;
     await contexts.record({
-      sessionId: recipient.id, repositoryRoot: recipient.workspaceRoot!, targetSnapshotId: recipient.targetSnapshotId!, authorityId: authority.id, evidence: evidence(), pendingDecisions: [],
+      sessionId: recipient.id, repositoryRoot: recipient.workspaceRoot!, targetSnapshotId: recipient.targetSnapshotId!, authorityId: authority.id, sourceRevision: 1, evidence: evidence(), pendingDecisions: [],
       pendingRequest: { requestId: `pending-${index + 1}`, targetSnapshotId: recipient.targetSnapshotId!, planRevision: "plan-7", planDigest: existingPlan().digest, action: "proof" }
     });
   }
   const sessionMap = new Map([source, ...recipients].map((session) => [session.id, session]));
   const authorityMap = new Map([sourceAuthority, ...recipientAuthorities].map((authority) => [authority.id, authority]));
   const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessionMap.values()], get: async (id) => sessionMap.get(id) }, { get: async (id) => authorityMap.get(id) });
-  const payload = await coordinator.prepare({ action: "authority_broadcast", session: source, authorityId: sourceAuthority.id, intent: { kind: "authority_broadcast", recipientSessionIds: recipients.map((recipient) => recipient.id) } }) as Extract<WorkflowArtifactPayload, { kind: "authority" }>;
+  const payload = (await coordinator.prepare({ action: "authority_broadcast", session: source, authorityId: sourceAuthority.id, intent: { kind: "authority_broadcast", recipientSessionIds: recipients.map((recipient) => recipient.id) } })).payload as Extract<WorkflowArtifactPayload, { kind: "authority" }>;
   assert.deepEqual(payload.packets.map((packet) => ({ recipient: packet.recipientSessionId, grant: packet.grantId, action: packet.pendingRequest.action })), [
     { recipient: "recipient-1", grant: "authority-recipient-1", action: "proof" },
     { recipient: "recipient-2", grant: "authority-recipient-2", action: "proof" }
@@ -213,13 +268,13 @@ test("Handoff packages are coordinator-assembled and preserve exact source, reci
   const source = managedSession("session-1", "running");
   const recipient = managedSession("recipient-1", "running");
   const authority = authorityGrant("authority-handoff", source.id, ["handoff", "handoff_queue", "handoff_immediate"]);
-  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: authority.id, evidence: evidence(), pendingDecisions: [{ id: "pending-1", question: "Which migration window?", context: "Exact target only." }] });
+  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: authority.id, sourceRevision: 1, evidence: evidence(), pendingDecisions: [{ id: "pending-1", question: "Which migration window?", context: "Exact target only." }] });
   const sessions = new Map([source, recipient].map((session) => [session.id, session]));
   const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => id === authority.id ? authority : undefined }, handoffs);
 
-  const normal = await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } }) as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
-  const immediate = await coordinator.prepare({ action: "handoff_immediate", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } }) as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
-  const queued = await coordinator.prepare({ action: "handoff_queue", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "queue" } }) as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const normal = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const immediate = (await coordinator.prepare({ action: "handoff_immediate", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const queued = (await coordinator.prepare({ action: "handoff_queue", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "queue" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
 
   assert.deepEqual([normal.route, immediate.route, queued.route], ["immediate", "immediate", "queue"]);
   for (const payload of [normal, immediate, queued]) {

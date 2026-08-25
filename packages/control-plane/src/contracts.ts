@@ -113,6 +113,8 @@ export interface CommandRequest {
   readonly targetSnapshot?: TargetSnapshot;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  /** Echo of a host-computed reviewed scope; it cannot mint or broaden a token. */
+  readonly confirmationScopeDigest?: string;
   readonly input?: Readonly<Record<string, string>>;
 }
 

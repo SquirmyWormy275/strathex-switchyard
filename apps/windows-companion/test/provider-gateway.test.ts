@@ -7,6 +7,7 @@ import test from "node:test";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { ProtectedJsonStore, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { canonicalWorkflowArtifact, planApprovalReviewScopeDigest } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
   DeterministicProviderGatewayBackend,
   LocalProviderCommandGateway,
@@ -16,7 +17,6 @@ import {
 
 const targetId = "a".repeat(64);
 const otherTargetId = "b".repeat(64);
-const artifactDigest = "c".repeat(64);
 
 async function fixture(context: test.TestContext) {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-gateway-"));
@@ -65,10 +65,22 @@ function providerSession(provider: "claude" | "codex" = "codex"): ManagedSession
   };
 }
 
-function workflowBody(operationId = "operation-proof-1", digest = artifactDigest): string {
+function workflowBody(operationId = "operation-proof-1", digestOverride?: string): string {
   const planMaterial = { revision: "plan-1", originSessionId: "codex-session", taskId: "task-1", objective: "Verify gateway", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/index.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
   const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
   const evidenceMaterial = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
+  const payload = {
+    kind: "proof" as const,
+    evidence: { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial },
+    claims: ["claim"],
+    requiredBackends: ["local"],
+    independentBackendRequired: false
+  };
+  const immutable = canonicalWorkflowArtifact({
+    id: "artifact-proof-1", action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: targetId,
+    sessionId: "codex-session", taskId: "task-1", planRevision: "plan-1", authorityId: "authority-proof",
+    coordinatorContextDigest: "f".repeat(64), coordinatorContextRevision: 7, payload
+  });
   return JSON.stringify({
     schema: "sxsy-b122.workflow-command",
     version: 1,
@@ -93,32 +105,42 @@ function workflowBody(operationId = "operation-proof-1", digest = artifactDigest
     },
     artifact: {
       id: "artifact-proof-1",
-      digest,
+      digest: digestOverride ?? immutable.digest,
       taskId: "task-1",
       planRevision: "plan-1",
-      payload: {
-        kind: "proof",
-        evidence: { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial },
-        claims: ["claim"],
-        requiredBackends: ["local"],
-        independentBackendRequired: false
-      },
+      authorityId: "authority-proof",
+      coordinatorContextDigest: "f".repeat(64),
+      coordinatorContextRevision: 7,
+      payload,
       executionAuthorized: false
     }
   });
 }
 
 function planApprovalBody(operationId = "operation-plan-1", includeAuthorization = true): string {
-  const value = JSON.parse(workflowBody(operationId, "8".repeat(64))) as Record<string, unknown>;
+  const value = JSON.parse(workflowBody(operationId)) as Record<string, unknown>;
   const artifact = value.artifact as Record<string, unknown>;
   const proof = artifact.payload as { evidence: { plan: Record<string, unknown> } };
   const plan = proof.evidence.plan;
   value.action = "plan_approval";
   value.authorityId = "authority-plan";
   artifact.id = "artifact-plan-1";
-  artifact.payload = { kind: "plan", mode: "approve", plan, executorSessionId: "codex-session", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), executeOnce: true };
+  artifact.authorityId = "authority-plan";
+  const providerContextDigest = "6".repeat(64);
+  const confirmationScopeDigest = planApprovalReviewScopeDigest({
+    sessionId: "codex-session", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", taskId: String(plan.taskId),
+    planRevision: String(plan.revision), planDigest: String(plan.digest), originSessionId: String(plan.originSessionId),
+    providerContextDigest, sourceRevision: Number(artifact.coordinatorContextRevision)
+  });
+  artifact.payload = { kind: "plan", mode: "approve", plan, executorSessionId: "codex-session", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), confirmationScopeDigest, providerContextDigest, executeOnce: true };
+  artifact.digest = canonicalWorkflowArtifact({
+    id: String(artifact.id), action: "plan_approval", repositoryRoot: "C:\\repo", targetSnapshotId: targetId,
+    sessionId: "codex-session", taskId: "task-1", planRevision: "plan-1", authorityId: "authority-plan",
+    coordinatorContextDigest: String(artifact.coordinatorContextDigest), coordinatorContextRevision: Number(artifact.coordinatorContextRevision),
+    payload: artifact.payload as never
+  }).digest;
   if (includeAuthorization) value.executionAuthorization = {
-    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), operationId, artifactId: artifact.id, artifactDigest: artifact.digest,
+    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest, operationId, artifactId: artifact.id, artifactDigest: artifact.digest,
     targetSnapshotId: targetId, sessionId: "codex-session", authorityId: "authority-plan", planDigest: plan.digest, planRevision: plan.revision, originSessionId: plan.originSessionId
   };
   return JSON.stringify(value);
@@ -181,11 +203,49 @@ test("Plan Approval gateway rejects missing or mismatched execution authorizatio
   assert.equal(changedConfirmationResult.outcome, "blocked");
   assert.equal(setup.codex.commandCalls, 0);
 
+  const changedScope = JSON.parse(planApprovalBody("operation-plan-scope-mismatch")) as Record<string, unknown>;
+  (changedScope.executionAuthorization as Record<string, unknown>).confirmationScopeDigest = "7".repeat(64);
+  const changedScopeResult = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: JSON.stringify(changedScope) });
+  assert.equal(changedScopeResult.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
+  const changedPlan = JSON.parse(planApprovalBody("operation-plan-content-mismatch")) as Record<string, unknown>;
+  const changedPlanArtifact = changedPlan.artifact as Record<string, unknown>;
+  const changedPlanPayload = changedPlanArtifact.payload as { plan: Record<string, unknown> };
+  changedPlanPayload.plan.objective = "Hostile replacement objective with stale immutable digests";
+  const changedPlanResult = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: JSON.stringify(changedPlan) });
+  assert.equal(changedPlanResult.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
+  const changedArtifact = JSON.parse(planApprovalBody("operation-plan-artifact-mismatch")) as Record<string, unknown>;
+  const changedArtifactPayload = (changedArtifact.artifact as Record<string, unknown>).payload as Record<string, unknown>;
+  changedArtifactPayload.providerContextDigest = "5".repeat(64);
+  const changedArtifactResult = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: JSON.stringify(changedArtifact) });
+  assert.equal(changedArtifactResult.outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
+
   const accepted = await setup.client.request({ routeId: "provider.plan_approval", repositoryRoot: "C:\\repo", body: planApprovalBody() });
   assert.equal(accepted.outcome, "passed");
   assert.equal(setup.codex.commandCalls, 1);
   const result = JSON.parse(Buffer.from(accepted.body!).toString("utf8")) as { result: { mode: string; executionStarted: boolean; planDigest: string } };
   assert.deepEqual({ mode: result.result.mode, executionStarted: result.result.executionStarted }, { mode: "execution_ack", executionStarted: true });
+});
+
+test("direct authenticated provider routes still require a fresh running fully mediated host session", async (context) => {
+  const setup = await fixture(context);
+  const original = providerSession();
+  await setup.sessions.upsert({ ...original, capabilities: ["registered", "observable", "controllable"] });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-unmediated") })).outcome, "blocked");
+
+  await setup.sessions.upsert({ ...original, status: "stale" });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale") })).outcome, "blocked");
+
+  await setup.sessions.upsert({ ...original, status: "unreachable" });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-unreachable") })).outcome, "blocked");
+
+  await setup.sessions.upsert({ ...original, lastHeartbeat: "2026-08-24T11:00:00.000Z" });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale-heartbeat") })).outcome, "blocked");
+  assert.equal(setup.codex.commandCalls, 0);
 });
 
 test("host-owned observations renew exact sessions and centrally downgrade churn or outage", async (context) => {

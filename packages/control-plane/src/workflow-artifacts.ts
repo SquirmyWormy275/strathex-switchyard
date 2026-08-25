@@ -73,6 +73,10 @@ export interface PlanApprovalWorkflowPayload {
   readonly executorSessionId: string;
   readonly authorityId: string;
   readonly confirmationDigest: string;
+  /** Exact protected plan/provider review scope consumed by the dispatcher. */
+  readonly confirmationScopeDigest: string;
+  /** Authority-neutral provider observation bound into the protected review. */
+  readonly providerContextDigest: string;
   readonly executeOnce: true;
 }
 export type PlanWorkflowPayload = PlanExpansionWorkflowPayload | PlanApprovalWorkflowPayload;
@@ -115,6 +119,11 @@ export interface WorkflowArtifactInput {
   readonly sessionId: string;
   readonly taskId?: string;
   readonly planRevision?: string;
+  /** Protected local grant selected during host-owned preparation. */
+  readonly authorityId?: string;
+  /** Exact protected coordinator context used to build this immutable artifact. */
+  readonly coordinatorContextDigest?: string;
+  readonly coordinatorContextRevision?: number;
   readonly payload: WorkflowArtifactPayload;
 }
 
@@ -132,6 +141,16 @@ export interface WorkflowArtifact extends Omit<WorkflowArtifactInput, "id"> {
   readonly executionAuthorized: false;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export type WorkflowArtifactImmutable = Omit<WorkflowArtifact,
+  "digest" | "status" | "operationId" | "providerExternalId" | "providerResult" | "providerSummary" |
+  "providerResponseStatus" | "providerEffectDisposition" | "executionAuthorized" | "createdAt" | "updatedAt">;
+
+/** Canonicalize and hash exactly the immutable fields protected by an artifact digest. */
+export function canonicalWorkflowArtifact(input: WorkflowArtifactInput & { readonly id: string }): Readonly<{ immutable: WorkflowArtifactImmutable; digest: string }> {
+  const immutable = normalizeInput(input);
+  return { immutable, digest: artifactDigest(immutable) };
 }
 
 export interface DecisionProviderPacket { readonly decisionId: string; readonly options: readonly DecisionOption[]; readonly recommendationId: string; }
@@ -168,9 +187,56 @@ export interface WorkflowCoordinatorContextInput {
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
   readonly authorityId: string;
+  /** Monotonic provider observation revision for this exact session/target. */
+  readonly sourceRevision: number;
+  /** Authority-neutral provenance retained from the digest-validated provider observation. */
+  readonly provenance?: WorkflowCoordinatorProvenance;
   readonly evidence: CoordinatorEvidenceBundle;
   readonly pendingDecisions: readonly PendingDecision[];
   readonly pendingRequest?: AuthorityPendingRequest;
+}
+
+export interface WorkflowCoordinatorProvenance {
+  readonly provider: "claude" | "codex";
+  readonly contextId: string;
+  readonly observedAt: string;
+  readonly adapterId: string;
+  readonly adapterVersion: string;
+  readonly moduleSha256: string;
+  readonly providerContextDigest: string;
+  readonly envelopeDigest: string;
+}
+
+export interface PlanApprovalReviewScopeInput {
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly taskId: string;
+  readonly planRevision: string;
+  readonly planDigest: string;
+  readonly originSessionId: string;
+  readonly providerContextDigest: string;
+  readonly sourceRevision: number;
+}
+
+/**
+ * One canonical digest binds the current-user ceremony, prepared artifact,
+ * durable confirmation, dispatcher, and provider gateway to the exact plan
+ * the operator reviewed. It deliberately excludes any client-selected data.
+ */
+export function planApprovalReviewScopeDigest(input: PlanApprovalReviewScopeInput): string {
+  return sha256(stableJson({
+    action: "plan_approval",
+    sessionId: identifier(input.sessionId, "plan review session"),
+    targetSnapshotId: digest(input.targetSnapshotId, "plan review target"),
+    repositoryRoot: text(input.repositoryRoot, "plan review repository"),
+    taskId: identifier(input.taskId, "plan review task"),
+    planRevision: identifier(input.planRevision, "plan review revision"),
+    planDigest: digest(input.planDigest, "plan review plan digest"),
+    originSessionId: identifier(input.originSessionId, "plan review origin session"),
+    providerContextDigest: digest(input.providerContextDigest, "plan review provider context"),
+    sourceRevision: positiveRevision(input.sourceRevision, "plan review source revision")
+  }));
 }
 
 export interface WorkflowCoordinatorContext extends WorkflowCoordinatorContextInput {
@@ -183,7 +249,7 @@ export type WorkflowPreparationIntent =
   | { readonly kind: "decision"; readonly question: string; readonly context: string }
   | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "queue" | "immediate" }
   | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
-  | { readonly kind: "plan_approval"; readonly confirmationToken: string };
+  | { readonly kind: "plan_approval"; readonly confirmationToken: string; readonly confirmationScopeDigest: string };
 
 export interface WorkflowPreparationRequest {
   readonly action: WorkflowArtifactAction;
@@ -193,7 +259,14 @@ export interface WorkflowPreparationRequest {
 }
 
 export interface WorkflowPreparationCoordinator {
-  prepare(request: WorkflowPreparationRequest): Promise<WorkflowArtifactPayload>;
+  prepare(request: WorkflowPreparationRequest): Promise<WorkflowPreparationResult>;
+}
+
+export interface WorkflowPreparationResult {
+  readonly payload: WorkflowArtifactPayload;
+  readonly authorityId: string;
+  readonly coordinatorContextDigest: string;
+  readonly coordinatorContextRevision: number;
 }
 
 interface WorkflowContextSavedEvent { readonly context: WorkflowCoordinatorContext; }
@@ -228,6 +301,12 @@ export class WorkflowArtifactStore {
     return this.store.transaction(async (transaction) => {
       const existing = artifactMap(await transaction.readEntries());
       if (existing.has(artifact.id)) throw new WorkflowArtifactError(`Workflow artifact already exists: ${artifact.id}`);
+      const active = [...existing.values()].filter((entry) => entry.status === "prepared" && entry.action === artifact.action
+        && entry.targetSnapshotId === artifact.targetSnapshotId && entry.sessionId === artifact.sessionId);
+      if (active.length > 0) {
+        if (active.length === 1 && active[0]!.digest === artifact.digest) return clone(active[0]!);
+        throw new WorkflowArtifactError("One prepared workflow artifact already exists for this exact action, session, and target; cancel it explicitly before preparing a replacement.");
+      }
       await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact });
       return clone(artifact);
     });
@@ -249,22 +328,81 @@ export class WorkflowArtifactStore {
     return matches[0] ? clone(matches[0]) : undefined;
   }
 
-  async claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string }>): Promise<WorkflowArtifact | undefined> {
+  async claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId?: string }>): Promise<WorkflowArtifact | undefined> {
     return this.store.transaction(async (transaction) => {
-      const entries = artifactMap(await transaction.readEntries());
+      const journal = await transaction.readEntries();
+      const entries = artifactMap(journal);
       const existing = [...entries.values()].find((entry) => entry.operationId === input.operationId);
       if (existing) {
-        if (existing.action !== input.action || existing.targetSnapshotId !== input.targetSnapshotId || existing.sessionId !== input.sessionId) throw new WorkflowArtifactError("The operation is already bound to a different workflow artifact scope.");
+        if (existing.action !== input.action || existing.targetSnapshotId !== input.targetSnapshotId || existing.sessionId !== input.sessionId || existing.authorityId !== input.authorityId) throw new WorkflowArtifactError("The operation is already bound to a different workflow artifact scope.");
+        this.assertCurrentCoordinatorBinding(existing, journal);
         return clone(existing);
       }
-      const candidates = [...entries.values()].filter((entry) => entry.status === "prepared" && entry.action === input.action && entry.targetSnapshotId === input.targetSnapshotId && entry.sessionId === input.sessionId);
+      const candidates = [...entries.values()].filter((entry) => entry.status === "prepared" && entry.action === input.action && entry.targetSnapshotId === input.targetSnapshotId && entry.sessionId === input.sessionId && entry.authorityId === input.authorityId);
       if (candidates.length === 0) return undefined;
       if (candidates.length !== 1) throw new WorkflowArtifactError("Multiple prepared workflow artifacts match this dispatch; explicit operator selection is required.");
       const selected = candidates[0]!;
+      this.assertCurrentCoordinatorBinding(selected, journal);
       const updated: WorkflowArtifact = { ...selected, status: "submitted", operationId: text(input.operationId, "operation id"), updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
       await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: updated });
       return clone(updated);
     });
+  }
+
+  /**
+   * Performs the final protected-artifact check immediately before an
+   * installed adapter crosses its effect boundary. Claiming an artifact is
+   * not sufficient because a trusted coordinator observation may advance
+   * while the adapter is assembling its outbound envelope.
+   */
+  async assertDispatchBinding(input: Readonly<{
+    artifactId: string;
+    artifactDigest: string;
+    action: WorkflowArtifactAction;
+    targetSnapshotId: string;
+    sessionId: string;
+    operationId: string;
+    authorityId: string;
+  }>): Promise<WorkflowArtifact> {
+    return this.store.transaction(async (transaction) => {
+      const journal = await transaction.readEntries();
+      const artifact = artifactMap(journal).get(text(input.artifactId, "artifact id"));
+      if (!artifact || artifact.status !== "submitted" || artifact.digest !== digest(input.artifactDigest, "artifact digest")
+        || artifact.action !== workflowAction(input.action) || artifact.targetSnapshotId !== digest(input.targetSnapshotId, "target snapshot id")
+        || artifact.sessionId !== text(input.sessionId, "workflow dispatch session")
+        || artifact.operationId !== text(input.operationId, "workflow dispatch operation")
+        || artifact.authorityId !== identifier(input.authorityId, "workflow dispatch authority")) {
+        throw new WorkflowArtifactError("The submitted workflow artifact changed or no longer matches the exact final dispatch binding.");
+      }
+      this.assertCurrentCoordinatorBinding(artifact, journal);
+      return clone(artifact);
+    });
+  }
+
+  async cancelPrepared(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<WorkflowArtifact> {
+    return this.store.transaction(async (transaction) => {
+      const journal = await transaction.readEntries();
+      const found = artifactMap(journal).get(text(input.artifactId, "artifact id"));
+      if (!found || found.status !== "prepared") throw new WorkflowArtifactError("Only one exact prepared workflow artifact can be cancelled through this route.");
+      if (found.sessionId !== identifier(input.sessionId, "workflow cancellation session") || found.authorityId !== identifier(input.authorityId, "workflow cancellation authority")) {
+        throw new WorkflowArtifactError("Workflow cancellation does not match the artifact's exact session and authority binding.");
+      }
+      const updated: WorkflowArtifact = { ...found, status: "cancelled", updatedAt: timestamp(this.clock(), "artifact clock"), executionAuthorized: false };
+      await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: updated });
+      return clone(updated);
+    });
+  }
+
+  private assertCurrentCoordinatorBinding(artifact: WorkflowArtifact, journal: readonly JournalEntry<unknown>[]): void {
+    if (artifact.coordinatorContextDigest === undefined && artifact.coordinatorContextRevision === undefined) return;
+    if (!artifact.coordinatorContextDigest || !Number.isSafeInteger(artifact.coordinatorContextRevision) || (artifact.coordinatorContextRevision ?? 0) < 1) {
+      throw new WorkflowArtifactError("The workflow artifact has a partial coordinator-context binding.");
+    }
+    const current = contextMap(journal).get(artifact.sessionId);
+    if (!current || current.targetSnapshotId !== artifact.targetSnapshotId || current.digest !== artifact.coordinatorContextDigest
+      || current.sourceRevision !== artifact.coordinatorContextRevision || current.authorityId !== artifact.authorityId) {
+      throw new WorkflowArtifactError("The prepared workflow artifact is stale relative to the exact current coordinator context and authority.");
+    }
   }
 
   async acknowledge(response: WorkflowProviderResponse): Promise<WorkflowArtifact> {
@@ -377,7 +515,15 @@ export class WorkflowCoordinatorContextStore {
     return this.store.transaction(async (transaction) => {
       const existing = contextMap(await transaction.readEntries());
       const previous = existing.get(context.sessionId);
-      if (previous && previous.targetSnapshotId === context.targetSnapshotId && previous.digest === context.digest) return cloneContext(previous);
+      if (previous && previous.targetSnapshotId === context.targetSnapshotId) {
+        if (context.sourceRevision < previous.sourceRevision) throw new WorkflowArtifactError("Workflow context source revision cannot roll back.");
+        if (context.sourceRevision === previous.sourceRevision) {
+          if (previous.digest === context.digest) return cloneContext(previous);
+          const sameProviderObservation = previous.provenance !== undefined && context.provenance !== undefined
+            && previous.provenance.providerContextDigest === context.provenance.providerContextDigest;
+          if (!sameProviderObservation) throw new WorkflowArtifactError("Workflow context content changed without a monotonic provider source revision.");
+        }
+      }
       await transaction.append<WorkflowContextSavedEvent>("workflow-context.saved", { context });
       return cloneContext(context);
     });
@@ -428,7 +574,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
     this.handoffs = handoffs;
   }
 
-  async prepare(request: WorkflowPreparationRequest): Promise<WorkflowArtifactPayload> {
+  async prepare(request: WorkflowPreparationRequest): Promise<WorkflowPreparationResult> {
     const session = request.session;
     if (!session.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision) throw new WorkflowArtifactError("Workflow preparation requires one exact task-bound managed session.");
     const context = await this.contexts.current(session.id, session.targetSnapshotId);
@@ -438,26 +584,38 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
     switch (request.action) {
       case "reanchor":
         requireIntent(request.intent, "none");
-        return { kind: "anchor", evidence: context.evidence, cooperativeStopRequested: true, resumeAuthorized: false, unresolved: context.pendingDecisions.map((decision) => decision.question) };
+        return this.prepared(context, authority, { kind: "anchor", evidence: context.evidence, cooperativeStopRequested: true, resumeAuthorized: false, unresolved: context.pendingDecisions.map((decision) => decision.question) });
       case "proof":
       case "proof_adversarial":
         requireIntent(request.intent, "none");
-        return { kind: "proof", evidence: context.evidence, claims: proofClaims(context.evidence), requiredBackends: request.action === "proof_adversarial" ? [session.provider, independentProvider(session.provider)] : [session.provider], independentBackendRequired: request.action === "proof_adversarial" };
+        return this.prepared(context, authority, { kind: "proof", evidence: context.evidence, claims: proofClaims(context.evidence), requiredBackends: request.action === "proof_adversarial" ? [session.provider, independentProvider(session.provider)] : [session.provider], independentBackendRequired: request.action === "proof_adversarial" });
       case "option_provider": {
         if (request.intent.kind !== "decision") throw new WorkflowArtifactError("Normal Option Provider requires only the user's question and bounded context; the provider generates the options.");
         const decision = { id: `decision:${sha256(stableJson({ question: request.intent.question, context: request.intent.context })).slice(0, 32)}`, question: text(request.intent.question, "decision question"), context: text(request.intent.context, "decision context") };
-        return { kind: "decision", mode: "one", decisions: [decision], evidence: context.evidence, providerMayChoose: false };
+        return this.prepared(context, authority, { kind: "decision", mode: "one", decisions: [decision], evidence: context.evidence, providerMayChoose: false });
       }
       case "option_packet":
         requireIntent(request.intent, "none");
         if (context.pendingDecisions.length < 2) throw new WorkflowArtifactError("Shift Option Provider requires at least two protected pending decisions.");
-        return { kind: "decision", mode: "packet", decisions: context.pendingDecisions, evidence: context.evidence, providerMayChoose: false };
+        return this.prepared(context, authority, { kind: "decision", mode: "packet", decisions: context.pendingDecisions, evidence: context.evidence, providerMayChoose: false });
       case "plan_expander":
         requireIntent(request.intent, "none");
-        return { kind: "plan", mode: "expand", plan: context.evidence.plan, evidence: context.evidence };
+        return this.prepared(context, authority, { kind: "plan", mode: "expand", plan: context.evidence.plan, evidence: context.evidence });
       case "plan_approval":
-        if (request.intent.kind !== "plan_approval" || !bounded(request.intent.confirmationToken, 512)) throw new WorkflowArtifactError("Plan Approval requires the current-user confirmation issued for this exact command preparation.");
-        return { kind: "plan", mode: "approve", plan: context.evidence.plan, executorSessionId: session.id, authorityId: authority.id, confirmationDigest: sha256(request.intent.confirmationToken), executeOnce: true };
+        if (request.intent.kind !== "plan_approval" || !bounded(request.intent.confirmationToken, 512) || !digestLike(request.intent.confirmationScopeDigest)) throw new WorkflowArtifactError("Plan Approval requires the current-user confirmation and exact protected review scope issued for this command preparation.");
+        if (!context.provenance) throw new WorkflowArtifactError("Plan Approval requires protected provider-context provenance for the exact reviewed plan.");
+        if (request.intent.confirmationScopeDigest !== planApprovalReviewScopeDigest({
+          sessionId: session.id,
+          targetSnapshotId: context.targetSnapshotId,
+          repositoryRoot: context.repositoryRoot,
+          taskId: context.evidence.plan.taskId,
+          planRevision: context.evidence.plan.revision,
+          planDigest: context.evidence.plan.digest,
+          originSessionId: context.evidence.plan.originSessionId,
+          providerContextDigest: context.provenance.providerContextDigest,
+          sourceRevision: context.sourceRevision
+        })) throw new WorkflowArtifactError("Plan Approval confirmation is not bound to the exact protected plan and provider-context revision.");
+        return this.prepared(context, authority, { kind: "plan", mode: "approve", plan: context.evidence.plan, executorSessionId: session.id, authorityId: authority.id, confirmationDigest: sha256(request.intent.confirmationToken), confirmationScopeDigest: request.intent.confirmationScopeDigest, providerContextDigest: context.provenance.providerContextDigest, executeOnce: true });
       case "handoff":
       case "handoff_queue":
       case "handoff_immediate":
@@ -481,14 +639,14 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
           openQuestions: context.pendingDecisions.map((decision) => decision.question),
           nextActions: ["Acknowledge this exact immutable package before using its context."]
         });
-        return { kind: "handoff", packageId: handoff.id, route: request.intent.route, sourceSessionId: session.id, recipientSessionId: request.intent.recipientSessionId, authorityId: authority.id };
+        return this.prepared(context, authority, { kind: "handoff", packageId: handoff.id, route: request.intent.route, sourceSessionId: session.id, recipientSessionId: request.intent.recipientSessionId, authorityId: authority.id });
       case "focus_blocked_agent":
       case "focus_finished_agent":
         requireIntent(request.intent, "none");
-        return this.contexts.nextFocus({ sourceSessionId: session.id, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, expectedStatus: request.action === "focus_blocked_agent" ? "verified_blocked" : "verified_finished", sessions: await this.sessions.list() });
+        return this.prepared(context, authority, await this.contexts.nextFocus({ sourceSessionId: session.id, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, expectedStatus: request.action === "focus_blocked_agent" ? "verified_blocked" : "verified_finished", sessions: await this.sessions.list() }));
       case "authority_refresh":
         requireIntent(request.intent, "none");
-        return { kind: "authority", mode: "refresh", packets: [this.authorityPacket(context, session, authority)], acknowledgementRequired: true };
+        return this.prepared(context, authority, { kind: "authority", mode: "refresh", packets: [this.authorityPacket(context, session, authority)], acknowledgementRequired: true });
       case "authority_broadcast": {
         if (request.intent.kind !== "authority_broadcast" || request.intent.recipientSessionIds.length < 1 || request.intent.recipientSessionIds.length > 64) throw new WorkflowArtifactError("Authority broadcast requires a reviewed bounded recipient set.");
         const recipients = [...new Set(request.intent.recipientSessionIds.map((id) => identifier(id, "authority recipient")))];
@@ -501,11 +659,20 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
           const recipientAuthority = await this.requireAuthorityScope(recipientContext, recipient);
           packets.push(this.authorityPacket(recipientContext, recipient, recipientAuthority));
         }
-        return { kind: "authority", mode: "broadcast", packets, acknowledgementRequired: true };
+        return this.prepared(context, authority, { kind: "authority", mode: "broadcast", packets, acknowledgementRequired: true });
       }
       case "bind_voice_session":
         throw new WorkflowArtifactError("Voice binding uses its dedicated protected consent coordinator.");
     }
+  }
+
+  private prepared(context: WorkflowCoordinatorContext, authority: AuthorityGrant, payload: WorkflowArtifactPayload): WorkflowPreparationResult {
+    return {
+      payload,
+      authorityId: authority.id,
+      coordinatorContextDigest: context.digest,
+      coordinatorContextRevision: context.sourceRevision
+    };
   }
 
   private async requireAuthority(context: WorkflowCoordinatorContext, session: ManagedSession, action: CommandAction): Promise<AuthorityGrant> {
@@ -531,6 +698,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
 
   private authorityPacket(context: WorkflowCoordinatorContext, session: ManagedSession, authority: AuthorityGrant): AuthorityReplayPacket {
     if (!context.pendingRequest || context.pendingRequest.targetSnapshotId !== session.targetSnapshotId || context.pendingRequest.planRevision !== session.planRevision || context.pendingRequest.planDigest !== context.evidence.plan.digest) throw new WorkflowArtifactError("Authority Refresh stopped because the protected pending request does not exactly match target, plan revision, and plan digest.");
+    if (!authority.allowedActions.includes(context.pendingRequest.action) || authority.prohibitedActions.includes(context.pendingRequest.action)) throw new WorkflowArtifactError("Authority Refresh stopped because the existing protected grant cannot replay the exact pending action.");
     const material = { recipientSessionId: session.id, grantId: authority.id, actions: authority.allowedActions.map(commandAction), prohibitions: authority.prohibitedActions.map(commandAction), expiresAt: authority.expiresAt, pendingRequest: context.pendingRequest };
     return { ...material, matchDigest: sha256(stableJson(material)) };
   }
@@ -565,7 +733,7 @@ export function parseWorkflowProviderResponse(value: unknown, artifact: Workflow
   };
 }
 
-function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }): Omit<WorkflowArtifact, "digest" | "status" | "operationId" | "providerExternalId" | "providerResult" | "providerSummary" | "providerResponseStatus" | "providerEffectDisposition" | "executionAuthorized" | "createdAt" | "updatedAt"> {
+function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }): WorkflowArtifactImmutable {
   const action = workflowAction(input.action);
   const payload = normalizePayload(input.payload, action);
   if (payload.kind === "plan" && payload.mode === "approve") {
@@ -573,6 +741,10 @@ function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }):
     if (!input.planRevision || payload.plan.revision !== input.planRevision || !input.taskId || payload.plan.taskId !== input.taskId) throw new WorkflowArtifactError("Plan Approval binding does not match the exact task and plan revision.");
   }
   if (payload.kind === "handoff" && payload.sourceSessionId !== input.sessionId) throw new WorkflowArtifactError("Handoff source does not match the selected managed session.");
+  const hasCoordinatorDigest = input.coordinatorContextDigest !== undefined;
+  const hasCoordinatorRevision = input.coordinatorContextRevision !== undefined;
+  if (hasCoordinatorDigest !== hasCoordinatorRevision) throw new WorkflowArtifactError("Workflow artifact coordinator context digest and revision must be supplied together.");
+  if ((hasCoordinatorDigest || input.authorityId !== undefined) && !input.authorityId) throw new WorkflowArtifactError("A bound workflow artifact requires one exact protected authority.");
   return {
     id: text(input.id, "artifact id"), action,
     repositoryRoot: text(input.repositoryRoot, "repository root"),
@@ -580,6 +752,11 @@ function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }):
     sessionId: text(input.sessionId, "session id"),
     ...(input.taskId ? { taskId: text(input.taskId, "task id") } : {}),
     ...(input.planRevision ? { planRevision: text(input.planRevision, "plan revision") } : {}),
+    ...(input.authorityId ? { authorityId: identifier(input.authorityId, "artifact authority") } : {}),
+    ...(hasCoordinatorDigest ? {
+      coordinatorContextDigest: digest(input.coordinatorContextDigest, "artifact coordinator context digest"),
+      coordinatorContextRevision: positiveRevision(input.coordinatorContextRevision, "artifact coordinator context revision")
+    } : {}),
     payload
   };
 }
@@ -611,10 +788,10 @@ function normalizePayload(payload: WorkflowArtifactPayload, action: WorkflowArti
         if (payload.mode !== "expand") throw new WorkflowArtifactError("Plan Expander requires an immutable existing-plan expansion request.");
         return { kind: "plan", mode: "expand", plan, evidence: normalizeEvidence(payload.evidence) };
       }
-      if (payload.mode !== "approve" || payload.executeOnce !== true) throw new WorkflowArtifactError("Plan Approval requires one immutable existing plan and once-only execution intent.");
+      if (payload.mode !== "approve" || payload.executeOnce !== true || !exact(payload as unknown as Record<string, unknown>, ["kind", "mode", "plan", "executorSessionId", "authorityId", "confirmationDigest", "confirmationScopeDigest", "providerContextDigest", "executeOnce"])) throw new WorkflowArtifactError("Plan Approval requires one exact immutable existing plan and once-only execution intent.");
       if (!plan.steps.some((step) => step.status === "approved") || plan.steps.some((step) => step.status !== "approved" && step.status !== "completed")) throw new WorkflowArtifactError("Plan Approval requires existing approved plan steps and refuses proposed or blocked work.");
       const executorSessionId = identifier(payload.executorSessionId, "plan executor session");
-      return { kind: "plan", mode: "approve", plan, executorSessionId, authorityId: identifier(payload.authorityId, "plan authority"), confirmationDigest: digest(payload.confirmationDigest, "plan confirmation digest"), executeOnce: true };
+      return { kind: "plan", mode: "approve", plan, executorSessionId, authorityId: identifier(payload.authorityId, "plan authority"), confirmationDigest: digest(payload.confirmationDigest, "plan confirmation digest"), confirmationScopeDigest: digest(payload.confirmationScopeDigest, "plan confirmation scope digest"), providerContextDigest: digest(payload.providerContextDigest, "plan provider context digest"), executeOnce: true };
     }
     case "handoff": {
       const route = payload.route === "queue" || payload.route === "immediate" ? payload.route : invalid("handoff route");
@@ -735,9 +912,9 @@ function normalizeEvidenceReference(value: WorkflowEvidenceReference): WorkflowE
 }
 
 function normalizePlan(value: ExistingPlanBinding): ExistingPlanBinding {
-  if (!record(value) || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 256 || !Array.isArray(value.decisions)) throw new WorkflowArtifactError("An immutable existing plan is required.");
+  if (!record(value) || !exact(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions"]) || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 256 || !Array.isArray(value.decisions)) throw new WorkflowArtifactError("An exact immutable existing plan is required.");
   const steps = value.steps.map((step: unknown) => {
-    if (!record(step) || !Array.isArray(step.ownedFiles) || !Array.isArray(step.dependencies)) throw new WorkflowArtifactError("Plan step is invalid.");
+    if (!record(step) || !exact(step, ["id", "summary", "ownedFiles", "dependencies", "status"]) || !Array.isArray(step.ownedFiles) || !Array.isArray(step.dependencies)) throw new WorkflowArtifactError("Plan step is invalid.");
     return { id: identifier(step.id, "plan step id"), summary: text(step.summary, "plan step summary"), ownedFiles: step.ownedFiles.map(safeOwnedFile), dependencies: step.dependencies.map((item: unknown) => identifier(item, "plan dependency")), status: planStepStatus(step.status) };
   });
   if (new Set(steps.map((step) => step.id)).size !== steps.length) throw new WorkflowArtifactError("Plan step IDs must be unique.");
@@ -808,11 +985,14 @@ function normalizeCoordinatorContextInput(input: WorkflowCoordinatorContextInput
     planDigest: digest(input.pendingRequest.planDigest, "pending request plan digest"),
     action: commandAction(input.pendingRequest.action)
   } : undefined;
+  const provenance = input.provenance ? normalizeCoordinatorProvenance(input.provenance) : undefined;
   const normalized = {
     sessionId: identifier(input.sessionId, "workflow context session"),
     repositoryRoot: text(input.repositoryRoot, "workflow context repository"),
     targetSnapshotId: digest(input.targetSnapshotId, "workflow context target"),
     authorityId: identifier(input.authorityId, "workflow context authority"),
+    sourceRevision: positiveRevision(input.sourceRevision, "workflow context source revision"),
+    ...(provenance ? { provenance } : {}),
     evidence,
     pendingDecisions,
     ...(pendingRequest ? { pendingRequest } : {})
@@ -821,14 +1001,31 @@ function normalizeCoordinatorContextInput(input: WorkflowCoordinatorContextInput
   return normalized;
 }
 
+function normalizeCoordinatorProvenance(value: WorkflowCoordinatorProvenance): WorkflowCoordinatorProvenance {
+  if (!record(value) || !exact(value, ["provider", "contextId", "observedAt", "adapterId", "adapterVersion", "moduleSha256", "providerContextDigest", "envelopeDigest"])
+    || (value.provider !== "claude" && value.provider !== "codex")) throw new WorkflowArtifactError("Workflow coordinator provenance is invalid.");
+  return {
+    provider: value.provider,
+    contextId: shortText(value.contextId, "workflow provider context", 256),
+    observedAt: timestamp(value.observedAt, "workflow provider observation time"),
+    adapterId: identifier(value.adapterId, "workflow provider adapter"),
+    adapterVersion: shortText(value.adapterVersion, "workflow provider adapter version", 256),
+    moduleSha256: digest(value.moduleSha256, "workflow provider module digest"),
+    providerContextDigest: digest(value.providerContextDigest, "workflow provider context digest"),
+    envelopeDigest: digest(value.envelopeDigest, "workflow provider envelope digest")
+  };
+}
+
 function contextMap(entries: readonly JournalEntry<unknown>[]): Map<string, WorkflowCoordinatorContext> {
   const contexts = new Map<string, WorkflowCoordinatorContext>();
   for (const entry of entries) {
     if (entry.kind !== "workflow-context.saved") continue;
     const raw = (entry.payload as WorkflowContextSavedEvent | undefined)?.context;
     if (!raw) throw new WorkflowArtifactError("Protected workflow context is malformed.");
-    const normalized = normalizeCoordinatorContextInput(raw);
-    if (sha256(stableJson(normalized)) !== raw.digest) throw new WorkflowArtifactError("Protected workflow context digest is invalid.");
+    const legacy = (raw as WorkflowCoordinatorContext & { readonly sourceRevision?: number }).sourceRevision === undefined;
+    const normalized = normalizeCoordinatorContextInput({ ...raw, sourceRevision: raw.sourceRevision ?? 1 });
+    const digestMaterial = legacy ? Object.fromEntries(Object.entries(normalized).filter(([key]) => key !== "sourceRevision")) : normalized;
+    if (sha256(stableJson(digestMaterial)) !== raw.digest) throw new WorkflowArtifactError("Protected workflow context digest is invalid.");
     timestamp(raw.capturedAt, "workflow context capture time");
     contexts.set(raw.sessionId, cloneContext({ ...raw, ...normalized }));
   }
@@ -869,7 +1066,7 @@ function artifactMap(entries: readonly JournalEntry<unknown>[]): Map<string, Wor
     if (entry.kind !== "workflow-artifact.saved") continue;
     const raw = (entry.payload as ArtifactSavedEvent | undefined)?.artifact;
     if (!raw || raw.executionAuthorized !== false || !workflowStatus(raw.status)) throw new WorkflowArtifactError("Protected workflow artifact is malformed.");
-    const immutable = normalizeInput({ id: raw.id, action: raw.action, repositoryRoot: raw.repositoryRoot, targetSnapshotId: raw.targetSnapshotId, sessionId: raw.sessionId, ...(raw.taskId ? { taskId: raw.taskId } : {}), ...(raw.planRevision ? { planRevision: raw.planRevision } : {}), payload: raw.payload });
+    const immutable = normalizeInput({ id: raw.id, action: raw.action, repositoryRoot: raw.repositoryRoot, targetSnapshotId: raw.targetSnapshotId, sessionId: raw.sessionId, ...(raw.taskId ? { taskId: raw.taskId } : {}), ...(raw.planRevision ? { planRevision: raw.planRevision } : {}), ...(raw.authorityId ? { authorityId: raw.authorityId } : {}), ...(raw.coordinatorContextDigest ? { coordinatorContextDigest: raw.coordinatorContextDigest, coordinatorContextRevision: raw.coordinatorContextRevision } : {}), payload: raw.payload });
     if (artifactDigest(immutable) !== raw.digest || !timestamp(raw.createdAt, "artifact creation time") || !timestamp(raw.updatedAt, "artifact update time")) throw new WorkflowArtifactError("Protected workflow artifact digest is invalid.");
     let providerFields: Pick<WorkflowArtifact, "providerResult" | "providerSummary" | "providerResponseStatus" | "providerEffectDisposition"> = {};
     if (raw.providerResult !== undefined || raw.providerSummary !== undefined || raw.providerResponseStatus !== undefined || raw.providerEffectDisposition !== undefined) {
@@ -908,13 +1105,15 @@ function planStepStatus(value: unknown): PlanStepArtifact["status"] { if (value 
 function workflowStatus(value: unknown): value is WorkflowArtifactStatus { return value === "prepared" || value === "submitted" || value === "cancelling" || value === "acknowledged" || value === "rejected" || value === "cancelled"; }
 function providerStatus(value: unknown): value is WorkflowProviderResponse["status"] { return typeof value === "string" && ["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value); }
 function disposition(value: unknown): value is EffectDisposition { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
-function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function bounded(value: unknown, maximum: number): value is string { return typeof value === "string" && !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value); }
 function digestLike(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value); }
 function digest(value: unknown, field: string): string { if (!digestLike(value)) throw new WorkflowArtifactError(`${field} must be a SHA-256 digest.`); return value.toLowerCase(); }
 function identifier(value: unknown, field: string): string { if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value)) throw new WorkflowArtifactError(`${field} is invalid.`); return value; }
+function positiveRevision(value: unknown, field: string): number { if (!Number.isSafeInteger(value) || Number(value) < 1) throw new WorkflowArtifactError(`${field} must be a positive safe integer.`); return Number(value); }
 function text(value: unknown, field: string): string { if (!bounded(value, 16_384)) throw new WorkflowArtifactError(`${field} must be bounded nonempty text.`); return redactText(value.trim()); }
+function shortText(value: unknown, field: string, maximum: number): string { if (!bounded(value, maximum)) throw new WorkflowArtifactError(`${field} must be bounded nonempty text.`); return redactText(value.trim()); }
 function timestamp(value: unknown, field: string): string { if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw new WorkflowArtifactError(`${field} must be an ISO timestamp.`); return value; }
 function list(values: readonly unknown[], field: string, emptyAllowed = false): readonly string[] { if (!Array.isArray(values) || values.length > 512 || (!emptyAllowed && values.length === 0)) throw new WorkflowArtifactError(`${field} list is invalid.`); return [...new Set(values.map((value) => text(value, field)))]; }
 function safeOwnedFile(value: unknown): string { if (typeof value !== "string" || !value || value.length > 4_096 || /[\r\n\0]/.test(value) || /^(?:[A-Za-z]:[\\/]|[\\/])/.test(value) || value.split(/[\\/]/).some((part) => !part || part === "." || part === "..")) throw new WorkflowArtifactError("Plan owned file is unsafe."); return value.replaceAll("\\", "/"); }

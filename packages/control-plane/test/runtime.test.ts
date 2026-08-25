@@ -15,7 +15,7 @@ import { containmentReleaseScopeDigest, DurableContainmentManager } from "../src
 import { DurableMediatedExecutor } from "../src/runtime.ts";
 import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
-import { ProtectedJsonStore, sha256 } from "../src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
 
 const now = "2026-08-23T12:00:00.000Z";
 const targetMaterial = {
@@ -184,6 +184,117 @@ test("installed preparation attests one Git-root session and binds exact authori
     });
     assert.equal(blocked.status, "blocked", JSON.stringify(blocked));
     assert.match(blocked.summary, /high-consequence|acceptance/i);
+  });
+});
+
+test("installed agent workflow preparation reuses only the protected exact authority returned by its trusted context port", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const session = await sessions.register({
+      id: "session-workflow-context", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-workflow", planRevision: "plan-workflow",
+      plannedFiles: [], adapterVersion: "provider-host", metadata: {}
+    });
+    const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-existing" });
+    const existing = await authorities.issue({
+      repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["option_provider"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "prior-reviewed-user"
+    });
+    let preparedContexts = 0;
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      confirmationAttestor: { attest: async () => ({ reauthenticated: true, operator: "windows-user-presence" }) },
+      workflowContextPreparation: {
+        prepare: async ({ definition, target: selectedTarget, session: selectedSession, operator }) => {
+          preparedContexts += 1;
+          assert.equal(definition.action, "option_provider");
+          assert.equal(selectedTarget.id, target.id);
+          assert.equal(selectedSession.id, session.id);
+          assert.equal(operator, "windows-user-presence");
+          return existing;
+        }
+      }
+    });
+    const prepared = await runtime.prepareCommand({ action: "option_provider", sessionId: session.id, reason: "refresh exact provider context" });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(prepared.authorityId, existing.id);
+    assert.equal(preparedContexts, 1);
+    assert.equal((await authorities.list()).length, 1, "workflow preparation must not mint an incompatible replacement grant");
+  });
+});
+
+test("Plan Approval uses one current-user ceremony bound to the exact reviewed plan scope through final dispatch", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const session = await sessions.register({
+      id: "session-plan-approval", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-plan", planRevision: "plan-7",
+      plannedFiles: ["src/safe.ts"], adapterVersion: "provider-host", metadata: {}
+    });
+    const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-plan-approval" });
+    const authority = await authorities.issue({
+      repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["plan_approval"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "reviewed-user"
+    });
+    const scopeDigest = "e".repeat(64);
+    const reviewSummary = "Review exact plan plan-7 (digest) and its protected provider context before execution.";
+    const planMaterial = { revision: "plan-7", originSessionId: session.id, taskId: "task-plan", objective: "Execute the exact reviewed plan", steps: [{ id: "step-1", summary: "Perform exact work", ownedFiles: ["src/safe.ts"], dependencies: [] as string[], status: "approved" as const }], decisions: ["Use mediated execution."] };
+    const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+    const adapters = new AdapterRegistry();
+    const adapter = new InMemoryCommandAdapter();
+    let calls = 0;
+    let trustedScope: string | undefined;
+    adapter.register("plan_approval", (request) => {
+      calls += 1;
+      trustedScope = request.confirmation?.confirmationScopeDigest;
+      return { status: "completed", summary: "exact plan dispatched", effectDisposition: "committed" };
+    });
+    adapters.register("plan_approval", adapter);
+    const ceremonies: Array<Readonly<{ reason: string; reviewedScopeDigest?: string; reviewedScopeSummary?: string }>> = [];
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      confirmationAttestor: { attest: async (input) => { ceremonies.push(input); return { reauthenticated: true, operator: "windows-user-presence" }; } },
+      workflowContextPreparation: {
+        review: async () => ({
+          action: "plan_approval", sessionId: session.id, targetSnapshotId: target.id, repositoryRoot: target.repositoryRoot,
+          provider: "codex", contextId: "provider-context-7", observedAt: now,
+          adapter: { id: "provider-context", version: "1.0.0", moduleSha256: "b".repeat(64) }, plan,
+          scopeDigest, providerContextDigest: "f".repeat(64), sourceRevision: 7, summary: reviewSummary
+        }),
+        prepare: async (input) => {
+          assert.equal(input.review?.scopeDigest, scopeDigest);
+          return authority;
+        }
+      },
+      checkpointCapture: {
+        capture: async () => ({
+          reason: "Preserve exact reviewed plan context before execution.",
+          artifacts: [{ id: "plan-review", kind: "workspace_manifest", reference: "host://checkpoint/plan-review", sha256: "a".repeat(64) }],
+          recovery: { steps: ["Inspect the exact plan review before manual recovery."], artifactIds: ["plan-review"] }
+        })
+      },
+      checkpointVerifier: { verify: async (artifact) => ({ available: true, sha256: artifact.sha256 }) },
+      dependencies: () => ({ adapters })
+    });
+    const reviewRequired = await runtime.prepareCommand({ action: "plan_approval", sessionId: session.id, reason: "Execute approved plan" });
+    assert.equal(reviewRequired.status, "incomplete");
+    assert.equal(reviewRequired.workflowReview?.scopeDigest, scopeDigest);
+    assert.deepEqual(reviewRequired.workflowReview?.plan.steps, plan.steps);
+    assert.equal(ceremonies.length, 0, "Windows Hello must not run before trusted UI presents the exact review packet");
+    const prepared = await runtime.prepareCommand({ action: "plan_approval", sessionId: session.id, reason: "Execute approved plan", reviewScopeDigest: scopeDigest });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(prepared.confirmationScopeDigest, scopeDigest);
+    assert.equal(ceremonies[0]?.reviewedScopeDigest, scopeDigest);
+    assert.match(ceremonies[0]?.reviewedScopeSummary ?? "", /Review exact plan plan-7/);
+    assert.equal(ceremonies[0]?.reason, "Execute approved plan");
+    const assignment = commandForAction("plan_approval").assignment!;
+    const base = { assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id, confirmationToken: prepared.confirmationToken };
+    assert.equal((await runtime.execute(base)).status, "blocked", "a scoped confirmation cannot be consumed without its protected review digest");
+    assert.equal((await runtime.execute({ ...base, confirmationScopeDigest: "d".repeat(64) })).status, "blocked", "a changed plan-review scope cannot consume the token");
+    const executed = await runtime.execute({ ...base, confirmationScopeDigest: scopeDigest });
+    assert.equal(executed.status, "completed", JSON.stringify(executed));
+    assert.equal(calls, 1);
+    assert.equal(trustedScope, scopeDigest);
   });
 });
 

@@ -23,6 +23,8 @@ export interface AdapterConfirmation {
   readonly currentUserConfirmed: true;
   /** SHA-256 of the exact one-time policy confirmation; the token never leaves the dispatcher. */
   readonly confirmationDigest: string;
+  /** Optional host-reviewed scope that was matched by the durable token. */
+  readonly confirmationScopeDigest?: string;
   readonly action: CommandAction;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;

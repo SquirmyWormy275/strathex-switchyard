@@ -18,6 +18,7 @@ import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalCla
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import type { GateEvidence } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import type { WorkflowContextReview } from "../../../packages/control-plane/src/runtime.ts";
 import type { AcceptanceAdministration, HighConsequenceActivation, InstalledAcceptanceTrust } from "./acceptance-administration.ts";
 import type { InstalledScannerFixture, InstalledScannerFixtureTrust, ScannerFixtureAdministration } from "./scanner-fixtures.ts";
 import { providerIds, type AttestedProviderDesktopRegistry, type ProviderId, type ProviderInstallation } from "./provider-desktop.ts";
@@ -73,6 +74,7 @@ import {
   type HandoffReferencePayload,
   type HandoffRoutingPayload,
   type WorkflowPreparePayload,
+  type WorkflowCancelPayload,
   type VoiceConsentPayload,
   type VoiceStartPayload,
   type VoiceSwitchPayload,
@@ -103,7 +105,7 @@ export interface ConfirmationCapableMediatedCommandExecutor extends MediatedComm
 }
 
 export interface CommandPreparationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
-  prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationExpiresAt?: string }>>;
+  prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>>;
 }
 
 export interface HostActionCompletionRecord {
@@ -356,6 +358,7 @@ export class CompanionService {
         case "handoff.routing.get": return this.success(request.id, { routing: await this.handoffRouting(request.payload) });
         case "handoff.routing.set": return this.success(request.id, { routing: await this.setHandoffRouting(this.requireHandoffRouting(request.payload)) });
         case "workflow.prepare": return this.success(request.id, { artifact: await this.prepareWorkflowArtifact(this.requireWorkflowPrepare(request.payload)) });
+        case "workflow.cancel": return this.success(request.id, { artifact: await this.cancelWorkflowArtifact(this.requireWorkflowCancel(request.payload)) });
         case "workflow.list": return this.success(request.id, { artifacts: await this.listWorkflowArtifacts(request.payload) });
         case "voice.consent": return this.success(request.id, { consent: await this.grantVoiceConsent(this.requireVoiceConsent(request.payload)) });
         case "voice.start": return this.success(request.id, { binding: await this.startVoice(this.requireVoiceStart(request.payload)) });
@@ -515,6 +518,7 @@ export class CompanionService {
       sessionId: payload.sessionId,
       authorityId: payload.authorityId,
       confirmationToken: payload.confirmationToken,
+      confirmationScopeDigest: payload.confirmationScopeDigest,
       input: payload.input
     };
     const result = await this.executor.execute(request);
@@ -540,11 +544,11 @@ export class CompanionService {
     return this.executor.requestConfirmation(payload);
   }
 
-  private async prepareCommand(payload: CommandPreparationPayload): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationExpiresAt?: string }>> {
+  private async prepareCommand(payload: CommandPreparationPayload): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>> {
     if (!isCommandPreparationExecutor(this.executor)) return { status: "unavailable", summary: "No durable command-preparation boundary is attached." };
     const definition = commandFor(payload.control, payload.modifier);
     if (!definition) return { status: "blocked", summary: "The chord is intentionally unassigned and cannot be prepared." };
-    const result = await this.executor.prepareCommand({ action: definition.action, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), reason: payload.reason });
+    const result = await this.executor.prepareCommand({ action: definition.action, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), reason: payload.reason, ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) });
     if (result.session) this.installTrustedSession(result.session);
     this.record("command.prepare", result.status === "prepared" ? "completed" : result.status, result.summary, payload.sessionId);
     return result;
@@ -612,25 +616,34 @@ export class CompanionService {
     const session = this.requireSession(payload.sessionId);
     if (!session.workspaceRoot || !session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "Workflow preparation requires an exact managed-session target.");
     let workflowPayload: WorkflowArtifactPayload;
+    let coordinatorBinding: Readonly<{ authorityId: string; coordinatorContextDigest?: string; coordinatorContextRevision?: number }>;
     if (payload.action === "bind_voice_session") {
       if (payload.intent.kind !== "none") throw new CompanionServiceError("invalid_request", "Voice binding accepts no client-authored workflow fields.");
       const active = this.voice ? await this.voice.active() : undefined;
       const consent = active && this.voice ? await this.voice.getConsent(active.consentId) : undefined;
       if (!consent || !active || active.managedSessionId !== session.id || active.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(active.repositoryRoot) !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active protected consent, context, and managed session.");
       workflowPayload = { kind: "voice_binding", voiceSessionId: active.voiceSessionId, provider: active.provider, contextPackageId: active.contextPackageId, consentId: active.consentId };
+      coordinatorBinding = { authorityId: payload.authorityId };
     } else {
       if (!this.workflowCoordinator) throw new CompanionServiceError("capability_denied", "No protected workflow preparation coordinator is attached; client-authored plans, evidence, options, and authority are rejected.");
-      workflowPayload = await this.workflowCoordinator.prepare({ action: payload.action, session, authorityId: payload.authorityId, intent: payload.intent });
+      const prepared = await this.workflowCoordinator.prepare({ action: payload.action, session, authorityId: payload.authorityId, intent: payload.intent });
+      workflowPayload = prepared.payload;
+      coordinatorBinding = {
+        authorityId: prepared.authorityId,
+        coordinatorContextDigest: prepared.coordinatorContextDigest,
+        coordinatorContextRevision: prepared.coordinatorContextRevision
+      };
     }
     if ((payload.action === "handoff" || payload.action === "handoff_queue" || payload.action === "handoff_immediate") && workflowPayload.kind === "handoff") {
       const handoff = this.handoffs ? await this.handoffs.get(workflowPayload.packageId) : undefined;
       if (!handoff || handoff.repositoryRoot !== session.workspaceRoot || handoff.targetSnapshotId !== session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "The workflow Handoff package is missing or bound to another target.");
       if (handoff.recipientSessionId !== workflowPayload.recipientSessionId || handoff.authorityId !== workflowPayload.authorityId || handoff.planRevision !== session.planRevision || handoff.taskId !== session.taskId) throw new CompanionServiceError("capability_denied", "The coordinator Handoff package changed its exact recipient, authority, task, or plan binding.");
     }
-    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), payload: workflowPayload });
+    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), ...coordinatorBinding, payload: workflowPayload });
   }
 
   private async listWorkflowArtifacts(payload: unknown): Promise<readonly WorkflowArtifact[]> { requireEmptyPayload(payload, "Workflow artifact listing"); if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); return this.workflowArtifacts.list(); }
+  private async cancelWorkflowArtifact(payload: WorkflowCancelPayload): Promise<WorkflowArtifact> { if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); this.requireSession(payload.sessionId); return this.workflowArtifacts.cancelPrepared(payload); }
 
   private async grantVoiceConsent(payload: VoiceConsentPayload): Promise<VoiceConsent> {
     if (!this.voice || !this.voicePresence || !this.handoffs) throw new CompanionServiceError("capability_denied", "Voice requires durable context, privacy state, and current-user presence.");
@@ -936,8 +949,15 @@ export class CompanionService {
     const claim = await this.hardwareSignals.resolveLiveClaim(payload);
     const sessionId = payload.sessionId ?? claim.windowSessionId;
     await this.assertHardwareDispatchSession(claim, sessionId);
-    const preparation = await this.prepareCommand({ control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason });
+    const preparation = await this.prepareCommand({ control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason, ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) });
     if (preparation.status === "prepared") return { preparation };
+    // Plan Approval is deliberately a two-phase host ceremony.  The first
+    // preparation returns the exact provider-observed review packet without
+    // issuing authority or confirmation.  Keep the durable hardware claim
+    // live so the same canonical signal can be prepared again only after the
+    // trusted UI echoes that exact review scope.  Recording a disposition here
+    // would consume the signal before the reviewed second phase could occur.
+    if (preparation.status === "incomplete" && preparation.workflowReview) return { preparation };
     const assignment = assignmentFor(claim.control, claim.modifier);
     if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
     const disposition = await this.hardwareSignals.recordDispatch({
@@ -975,6 +995,7 @@ export class CompanionService {
       sessionId,
       authorityId: payload.authorityId,
       confirmationToken: payload.confirmationToken,
+      confirmationScopeDigest: payload.confirmationScopeDigest,
       input: payload.input
     });
     this.record("hardware-signal.dispatch", command.status, `Dispatched the server-resolved ${assignment.handler} hardware assignment.`, sessionId, command.operationId);
@@ -1010,20 +1031,22 @@ export class CompanionService {
   }
 
   private requireHardwareSignalPreparation(payload: unknown): HardwareSignalPreparationPayload {
-    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId"])
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId", "reviewScopeDigest"])
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
-      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, and bounded reason.");
-    return { ...parseHardwareClaimReference(payload), reason: payload.reason, ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}) };
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, bounded reason, and only a host-issued Plan Approval review digest.");
+    return { ...parseHardwareClaimReference(payload), reason: payload.reason, ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}), ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) };
   }
 
   private requireHardwareSignalDispatch(payload: unknown): HardwareSignalDispatchPayload {
-    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots"], ["sessionId", "authorityId", "confirmationToken", "input"])
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots"], ["sessionId", "authorityId", "confirmationToken", "confirmationScopeDigest", "input"])
       || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) throw new CompanionServiceError("invalid_request", "Hardware signal dispatch accepts only an exact live claim and host-issued mediation references; the chord is server-resolved.");
     return {
       ...parseHardwareClaimReference(payload),
       ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}),
       authorityId: optionalReference(payload.authorityId, "authority ID"),
       confirmationToken: optionalReference(payload.confirmationToken, "confirmation token"),
+      confirmationScopeDigest: optionalDigest(payload.confirmationScopeDigest, "confirmation scope digest"),
       input: parseInput(payload.input)
     };
   }
@@ -1104,7 +1127,8 @@ export class CompanionService {
   }
 
   private requireDispatch(payload: unknown): DispatchPayload {
-    if (!isRecord(payload) || !isControl(payload.control) || !isModifier(payload.modifier)) {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier"], ["sessionId", "authorityId", "confirmationToken", "confirmationScopeDigest", "input"])
+      || !isControl(payload.control) || !isModifier(payload.modifier)) {
       throw new CompanionServiceError("invalid_request", "A command dispatch requires a canonical B122 control and modifier.");
     }
     if (payload.sessionId !== undefined && typeof payload.sessionId !== "string") {
@@ -1116,6 +1140,7 @@ export class CompanionService {
       sessionId: payload.sessionId,
       authorityId: optionalReference(payload.authorityId, "authority ID"),
       confirmationToken: optionalReference(payload.confirmationToken, "confirmation token"),
+      confirmationScopeDigest: optionalDigest(payload.confirmationScopeDigest, "confirmation scope digest"),
       input: parseInput(payload.input)
     };
   }
@@ -1138,12 +1163,13 @@ export class CompanionService {
   }
 
   private requireCommandPreparation(payload: unknown): CommandPreparationPayload {
-    if (!isRecord(payload) || !isControl(payload.control) || !isModifier(payload.modifier)
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier", "reason"], ["sessionId", "reviewScopeDigest"]) || !isControl(payload.control) || !isModifier(payload.modifier)
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
-      || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")) {
+      || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))) {
       throw new CompanionServiceError("invalid_request", "Command preparation requires a canonical chord, bounded host reason, and optional exact session ID.");
     }
-    return { control: payload.control, modifier: payload.modifier, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}) };
+    return { control: payload.control, modifier: payload.modifier, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) };
   }
 
   private requireHostActionCompletion(payload: unknown): HostActionCompletionPayload {
@@ -1209,6 +1235,14 @@ export class CompanionService {
   private requireWorkflowPrepare(payload: unknown): WorkflowPreparePayload {
     if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "authorityId", "intent"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, host-issued authority, and bounded intent.");
     return { action: payload.action, sessionId: payload.sessionId, authorityId: payload.authorityId, intent: workflowPreparationIntent(payload.intent) };
+  }
+
+  private requireWorkflowCancel(payload: unknown): WorkflowCancelPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["artifactId", "sessionId", "authorityId"])
+      || !boundedReferenceValue(payload.artifactId) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) {
+      throw new CompanionServiceError("invalid_request", "Workflow cancellation requires one exact prepared artifact, managed session, and host-issued authority.");
+    }
+    return { artifactId: payload.artifactId, sessionId: payload.sessionId, authorityId: payload.authorityId };
   }
 
   private requireVoiceConsent(payload: unknown): VoiceConsentPayload {
@@ -1329,6 +1363,14 @@ function optionalReference(value: unknown, label: string): string | undefined {
   return value;
 }
 
+function optionalDigest(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new CompanionServiceError("invalid_request", `A command dispatch ${label} must be one exact lowercase SHA-256 digest.`);
+  }
+  return value;
+}
+
 function normalizeCapabilities(values: readonly Capability[]): readonly Capability[] {
   return [...new Set(values.filter(isCapability))];
 }
@@ -1395,13 +1437,13 @@ function exactMutationKeys(value: Record<string, unknown>, expected: readonly st
 
 function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
   const keys = Object.keys(value);
-  return keys.length === expected.length && expected.every((key) => key in value);
+  return keys.length === expected.length && expected.every((key) => Object.hasOwn(value, key));
 }
 
 function allowedExactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean {
   const keys = Object.keys(value);
   const allowed = new Set([...required, ...optional]);
-  return required.every((key) => key in value) && keys.every((key) => allowed.has(key));
+  return required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.has(key));
 }
 
 function requireEmptyPayload(payload: unknown, label: string): void {
@@ -1449,7 +1491,10 @@ function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {
   if (value.kind === "decision" && exactKeys(value, ["kind", "question", "context"]) && boundedWorkflowText(value.question) && boundedWorkflowText(value.context)) return { kind: "decision", question: value.question, context: value.context };
   if (value.kind === "handoff" && exactKeys(value, ["kind", "recipientSessionId", "route"]) && boundedReferenceValue(value.recipientSessionId) && (value.route === "queue" || value.route === "immediate")) return { kind: "handoff", recipientSessionId: value.recipientSessionId, route: value.route };
   if (value.kind === "authority_broadcast" && exactKeys(value, ["kind", "recipientSessionIds"]) && Array.isArray(value.recipientSessionIds) && value.recipientSessionIds.length >= 1 && value.recipientSessionIds.length <= 64 && value.recipientSessionIds.every(boundedReferenceValue)) return { kind: "authority_broadcast", recipientSessionIds: [...new Set(value.recipientSessionIds as string[])] };
-  if (value.kind === "plan_approval" && exactKeys(value, ["kind", "confirmationToken"]) && boundedReferenceValue(value.confirmationToken)) return { kind: "plan_approval", confirmationToken: value.confirmationToken };
+  if (value.kind === "plan_approval" && exactKeys(value, ["kind", "confirmationToken", "confirmationScopeDigest"])
+    && boundedReferenceValue(value.confirmationToken) && typeof value.confirmationScopeDigest === "string" && /^[a-f0-9]{64}$/.test(value.confirmationScopeDigest)) {
+    return { kind: "plan_approval", confirmationToken: value.confirmationToken, confirmationScopeDigest: value.confirmationScopeDigest };
+  }
   throw new CompanionServiceError("invalid_request", "Workflow intent contains unsupported or unbounded client-authored fields.");
 }
 function boundedWorkflowText(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 16_384 && !/\0/.test(value); }

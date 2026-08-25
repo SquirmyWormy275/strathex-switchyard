@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { WorkflowArtifact, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker } from "../src/remote-adapters.ts";
@@ -27,7 +27,7 @@ function planApprovalArtifact(): WorkflowArtifact {
   return {
     id: "artifact-plan-1", action: "plan_approval", repositoryRoot: "C:\\repo", targetSnapshotId: providerTargetId,
     sessionId: "session-1", taskId: plan.taskId, planRevision: plan.revision,
-    payload: { kind: "plan", mode: "approve", plan, executorSessionId: "session-1", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), executeOnce: true },
+    payload: { kind: "plan", mode: "approve", plan, executorSessionId: "session-1", authorityId: "authority-plan", confirmationDigest: "9".repeat(64), confirmationScopeDigest: "7".repeat(64), providerContextDigest: "6".repeat(64), executeOnce: true },
     digest: "8".repeat(64), status: "submitted", operationId: "operation-plan-1", executionAuthorized: false,
     createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
   };
@@ -55,7 +55,8 @@ test("configured provider adapter dispatches and acknowledges only an exact type
       return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId, action: "proof", status: "completed", summary: "Provider returned durable proof.", effectDisposition: "committed", externalId: "provider-proof-1", result: { kind: "proof", verifiedClaims: ["claim"], evidenceReferences: ["receipt:1"], backendResults: [{ backend: "local", status: "passed" }] } })) };
     }
   } as unknown as DynamicConfiguredNetworkClient, {
-    async claimForDispatch(input) { assert.deepEqual(input, { action: "proof", targetSnapshotId: providerTargetId, sessionId: "session-1", operationId: "operation-1" }); return artifact; },
+    async claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId: string }>) { assert.deepEqual(input, { action: "proof", targetSnapshotId: providerTargetId, sessionId: "session-1", operationId: "operation-1", authorityId: "authority-proof" }); return artifact; },
+    async assertDispatchBinding(input) { assert.deepEqual(input, { artifactId: artifact.id, artifactDigest: artifact.digest, action: "proof", targetSnapshotId: providerTargetId, sessionId: "session-1", operationId: "operation-1", authorityId: "authority-proof" }); return artifact; },
     async acknowledge(response) { acknowledged = response; return { ...artifact, status: "acknowledged", providerExternalId: response.externalId }; }
   });
   const childSaga = {
@@ -93,12 +94,31 @@ test("configured provider adapter never acknowledges malformed provider output",
   const artifact = proofArtifact();
   let acknowledgements = 0;
   const adapter = new ConfiguredProviderCommandAdapter({ async request() { return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from("{}") }; } } as unknown as DynamicConfiguredNetworkClient, {
-    async claimForDispatch() { return artifact; }, async acknowledge() { acknowledgements += 1; return artifact; }
+    async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; }, async acknowledge() { acknowledgements += 1; return artifact; }
   });
   const outcome = await adapter.execute(providerRequest());
   assert.equal(outcome.status, "failed");
   assert.equal(outcome.effectDisposition, "ambiguous");
   assert.equal(acknowledgements, 0);
+});
+
+test("configured provider adapter revalidates the exact artifact and protected context at the final network boundary", async () => {
+  const artifact = proofArtifact();
+  let requests = 0;
+  let finalChecks = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({
+    async request() { requests += 1; throw new Error("stale workflow must not reach the network"); }
+  } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { return artifact; },
+    async assertDispatchBinding() { finalChecks += 1; throw new Error("coordinator source revision advanced"); },
+    async acknowledge() { throw new Error("stale workflow must not acknowledge"); }
+  });
+
+  const outcome = await adapter.execute(providerRequest());
+  assert.equal(outcome.status, "blocked");
+  assert.equal(outcome.effectDisposition, "not_started");
+  assert.equal(finalChecks, 1);
+  assert.equal(requests, 0);
 });
 
 test("Plan Approval sends execution authorization only from dispatcher-proven current-user confirmation", async () => {
@@ -114,21 +134,21 @@ test("Plan Approval sends execution authorization only from dispatcher-proven cu
       })) };
     }
   } as unknown as DynamicConfiguredNetworkClient;
-  const artifacts = { async claimForDispatch() { return artifact; }, async acknowledge() { return { ...artifact, status: "acknowledged" as const }; } };
+  const artifacts = { async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; }, async acknowledge() { return { ...artifact, status: "acknowledged" as const }; } };
   const adapter = new ConfiguredProviderCommandAdapter(network, artifacts);
   const base = {
     definition: { action: "plan_approval" }, operationId: "operation-plan-1",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
     authority: { id: "authority-plan" },
-    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), action: "plan_approval", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan" },
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "7".repeat(64), action: "plan_approval", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan" },
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
   } as unknown as AdapterRequest;
 
   assert.equal((await adapter.execute(base)).status, "completed");
   const document = JSON.parse(requests[0]!.body) as { executionAuthorization: unknown };
   assert.deepEqual(document.executionAuthorization, {
-    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), operationId: "operation-plan-1", artifactId: artifact.id, artifactDigest: artifact.digest,
+    executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "7".repeat(64), operationId: "operation-plan-1", artifactId: artifact.id, artifactDigest: artifact.digest,
     targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan", planDigest: proofEvidence().plan.digest, planRevision: "plan-1", originSessionId: "session-1"
   });
 
@@ -136,13 +156,15 @@ test("Plan Approval sends execution authorization only from dispatcher-proven cu
   assert.equal(refused.status, "blocked");
   const mismatchedConfirmation = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: { ...base.confirmation!, confirmationDigest: "7".repeat(64) } } as never);
   assert.equal(mismatchedConfirmation.status, "blocked");
+  const mismatchedScope = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: { ...base.confirmation!, confirmationScopeDigest: "6".repeat(64) } } as never);
+  assert.equal(mismatchedScope.status, "blocked");
   assert.equal(requests.length, 1);
 });
 
 test("configured provider adapter does not call the network without one prepared typed artifact", async () => {
   let requests = 0;
   const adapter = new ConfiguredProviderCommandAdapter({ async request() { requests += 1; throw new Error("must not dispatch"); } } as unknown as DynamicConfiguredNetworkClient, {
-    async claimForDispatch() { return undefined; }, async acknowledge() { throw new Error("must not acknowledge"); }
+    async claimForDispatch() { return undefined; }, async assertDispatchBinding() { throw new Error("must not revalidate"); }, async acknowledge() { throw new Error("must not acknowledge"); }
   });
   const outcome = await adapter.execute(providerRequest());
   assert.equal(outcome.status, "awaiting_input");
@@ -161,6 +183,7 @@ test("configured provider adapter never replays cancelled, cancelling, rejected,
   ] as const) {
     const adapter = new ConfiguredProviderCommandAdapter(network, {
       async claimForDispatch() { return { ...proofArtifact(), status }; },
+      async assertDispatchBinding() { throw new Error("non-dispatchable state must not revalidate"); },
       async acknowledge() { throw new Error("must not acknowledge"); }
     });
     const outcome = await adapter.execute(providerRequest());
@@ -282,6 +305,7 @@ test("configured provider routing aborts when durable cancellation polling fails
       }
     } as unknown as DynamicConfiguredNetworkClient, {
       async claimForDispatch() { return proofArtifact(); },
+      async assertDispatchBinding() { return proofArtifact(); },
       async acknowledge() { throw new Error("an aborted transport must not acknowledge"); }
     });
     const startedAt = Date.now();
@@ -314,6 +338,7 @@ test("configured provider routing bounds a never-settling initial cancellation r
     async request() { requests += 1; throw new Error("transport must not start while cancellation state is unresolved"); }
   } as unknown as DynamicConfiguredNetworkClient, {
     async claimForDispatch() { return proofArtifact(); },
+    async assertDispatchBinding() { return proofArtifact(); },
     async acknowledge() { throw new Error("must not acknowledge"); }
   });
   const startedAt = Date.now();

@@ -27,7 +27,7 @@ import { sha256 } from "./store.ts";
 export interface SessionLookup { get(id: string): ManagedSession | undefined; }
 export interface AuthorityLookup { get(id: string): AuthorityGrant | undefined; }
 /** Host-runtime context that cannot be supplied through the public command payload. */
-export interface TrustedDispatchContext { readonly confirmationDigest?: string; }
+export interface TrustedDispatchContext { readonly confirmationDigest?: string; readonly confirmationScopeDigest?: string; }
 export interface ExecutionRecipeFactory {
   /** Must resolve a companion-approved declarative recipe, never raw request input. */
   create(definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined;
@@ -259,7 +259,7 @@ export class CommandDispatcher {
         };
       } else {
         await lifecycle?.markExecuting(lease);
-        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl, governanceAdmission.effectGuard, trusted.confirmationDigest);
+        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl, governanceAdmission.effectGuard, trusted.confirmationDigest, trusted.confirmationScopeDigest);
       }
     } catch (error) {
       const label = governanceAdmission ? "Command adapter" : "Dispatch governance";
@@ -355,12 +355,13 @@ export class CommandDispatcher {
     return { session, authority };
   }
 
-  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl, effectGuard?: EffectGuard, trustedConfirmationDigest?: string): Promise<CommandResult> {
+  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl, effectGuard?: EffectGuard, trustedConfirmationDigest?: string, trustedConfirmationScopeDigest?: string): Promise<CommandResult> {
     const operationId = lease.operationId;
     const target = request.targetSnapshot;
     const confirmation = definition.requiresConfirmation && request.confirmationToken ? {
       currentUserConfirmed: true as const,
       confirmationDigest: trustedConfirmationDigest ?? sha256(request.confirmationToken),
+      ...(trustedConfirmationScopeDigest ? { confirmationScopeDigest: trustedConfirmationScopeDigest } : {}),
       action: definition.action,
       ...(target ? { targetSnapshotId: target.id } : {}),
       ...(session ? { sessionId: session.id } : {}),
