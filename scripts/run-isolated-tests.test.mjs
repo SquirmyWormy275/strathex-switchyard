@@ -56,6 +56,24 @@ test("a TAP summary remains authoritative after more than the bounded output cap
 });
 test("receipt records failure, timeout, bounded output, and exited children", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const failed = await runVerification({ groups: [{ file: "inline-failure", args: ["-e", "process.stderr.write('x'.repeat(100000)); process.exit(7)"] }], outputDirectory: directory, executable }); assert.equal(failed.receipt.success, false); assert.equal(failed.receipt.children[0].exitCode, 7); assert.equal(failed.receipt.children[0].outputBytes <= 65536, true); const timed = await runVerification({ groups: [{ file: "inline-timeout", args: ["-e", "setInterval(() => {}, 1000)"] }], outputDirectory: directory, timeoutMs: 25, executable }); assert.equal(timed.receipt.success, false); assert.equal(timed.receipt.children[0].timeout, true); assert.equal(timed.receipt.children[0].signal !== null || timed.receipt.children[0].exitCode !== null, true); } finally { await rm(directory, { recursive: true, force: true }); } });
 
+test("only the provider TLS group extends the bounded default timeout and receipts record the effective bound", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-group-timeout-"));
+  try {
+    const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
+    assert.equal(tlsGroup?.timeoutMs, 75_000);
+    assert.equal(requiredGroups.filter((candidate) => candidate !== tlsGroup && candidate.timeoutMs !== undefined).length, 0);
+    const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
+    const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });
+    assert.equal(overridden.receipt.success, true);
+    assert.equal(overridden.receipt.children[0].effectiveTimeoutMs, 1_000);
+    assert.equal(overridden.receipt.children[0].timeout, false);
+    const defaulted = await runVerification({ groups: [{ file: "bounded-default", args: delayed }], outputDirectory: directory, timeoutMs: 50, executable });
+    assert.equal(defaulted.receipt.success, false);
+    assert.equal(defaulted.receipt.children[0].effectiveTimeoutMs, 50);
+    assert.equal(defaulted.receipt.children[0].timeout, true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test("cleanup and receipt-write failures settle with bounded fail-closed evidence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-cleanup-failure-"));
   try {

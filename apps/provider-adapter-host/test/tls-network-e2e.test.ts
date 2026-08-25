@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import test from "node:test";
@@ -22,6 +22,7 @@ import { WindowsDpapiCurrentUserProtector, type UserSecretProtector } from "../.
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const powershell = "pwsh.exe";
+const windowsPowerShell = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
 const trace = (label: string) => { if (process.env.SXSY_PROVIDER_E2E_TRACE === "1") process.stderr.write(`SXSY_PROVIDER_E2E_TRACE=${label}\n`); };
 
 class MemoryProtector implements UserSecretProtector {
@@ -40,11 +41,13 @@ test("provider secret generation validates and Initialize emits its exact ready-
   if (!local || !isAbsolute(local) || /[\0\r\n]/.test(local)) throw new Error("The isolated LocalApplicationData fixture is unavailable.");
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const secretRoot = join(resolve(local), "STRATHEX", "switchyard", "provider-host", `test-secret-${suffix}`);
-  const initializedRoot = join(resolve(local), "STRATHEX", "switchyard", "provider-host", `test-init-${suffix}`);
+  const initializedRoot = join(resolve(local), "STRATHEX", "switchyard", "provider-host", `test-compat-${suffix}`);
+  const initializationBundle = await mkdtemp(join(resolve(process.env.TEMP ?? local), "b122-init-bundle-"));
   const envelope = join(secretRoot, "authentication-token.envelope.json");
   context.after(async () => {
     await removeWithRetry(secretRoot);
     await removeWithRetry(initializedRoot);
+    await removeWithRetry(initializationBundle);
   });
 
   const secretTool = join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1");
@@ -59,17 +62,33 @@ test("provider secret generation validates and Initialize emits its exact ready-
   assert.equal(validated.status, "passed");
   assert.equal(validated.cleartextRead, false);
 
-  const initialized = parseReceipt(await runPowerShell(join(repository, "deployment/windows/Initialize-B122ProviderHost.ps1"), [
-    "-RepositoryRoot", repository, "-InstanceName", `test-init-${suffix}`, "-ListenPort", String(await freePort())
-  ]));
-  assert.equal(initialized.schema, "sxsy-b122.provider-host-bootstrap");
-  assert.equal(initialized.status, "ready-to-provision");
-  assert.equal(initialized.protectedStateRoot, initializedRoot);
-  assert.equal(initialized.fixtureDiagnosticOnly, true);
-  assert.equal(initialized.providerEffectsEnabled, false);
-  assert.equal(initialized.journalAuthenticationStable, true);
-  assert.equal(initialized.authenticationTokenExposed, false);
-  assert.equal(initialized.proprietaryCredentialsAccessed, false);
+  const initializeScript = join(repository, "deployment/windows/Initialize-B122ProviderHost.ps1");
+  const listenPort = String(await freePort());
+  const instanceArguments = ["-RepositoryRoot", repository, "-InstanceName", `test-compat-${suffix}`, "-ListenPort", listenPort] as const;
+  const windowsInitialized = parseReceipt(await runPowerShellExecutable(windowsPowerShell, initializeScript, [
+    ...instanceArguments
+  ], 20_000));
+  const canonicalInitializedRoot = await realpath(initializedRoot);
+  assertInitializeReceipt(windowsInitialized, canonicalInitializedRoot);
+  const expectedPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
+
+  const initialized = parseReceipt(await runPowerShell(initializeScript, [...instanceArguments, "-Replace"]));
+  assertInitializeReceipt(initialized, canonicalInitializedRoot);
+  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "pwsh and Windows PowerShell 5.1 must emit the same parsed source policy");
+
+  await createInitializationBundle(initializationBundle);
+  const packagedInitialize = join(initializationBundle, "scripts", "Initialize-B122ProviderHost.ps1");
+  const packagedInitialized = parseReceipt(await runPowerShellExecutable(windowsPowerShell, packagedInitialize, [
+    ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
+  ], 20_000));
+  assertInitializeReceipt(packagedInitialized, canonicalInitializedRoot);
+  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged Windows PowerShell 5.1 policy must preserve the exact parsed source policy");
+
+  const packagedPwsh = parseReceipt(await runPowerShellExecutable(powershell, packagedInitialize, [
+    ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
+  ], 20_000));
+  assertInitializeReceipt(packagedPwsh, canonicalInitializedRoot);
+  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged pwsh policy must preserve the exact parsed source policy");
 });
 
 test("packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS", { skip: process.platform !== "win32" }, async (context) => {
@@ -140,7 +159,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
 
   await createFixtureBundle(bundle);
   lifecycleReady = true;
-  const started = parseReceipt(await runPowerShell(join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"]));
+  const started = parseReceipt(await runPowerShellExecutable(windowsPowerShell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"]));
   trace("provider-started");
   assert.equal(started.status, "running");
   assert.equal(started.tlsIdentityPinned, true);
@@ -197,6 +216,26 @@ test("packaged provider host lifecycle and the production pinned network broker 
   assert.equal((stopped.processes as Array<Record<string, unknown>>)[0]?.gracefulShutdownAcknowledged, true);
   assert.equal(stopped.survivorCount, 0);
   await assert.rejects(async () => process.kill(processId, 0), /ESRCH|not found|no such process/i);
+
+  const lifecycleArguments = ["-BundleRoot", bundle, "-ConfigurationPath", config] as const;
+  const packagedManage = join(bundle, "scripts", "Manage-B122ProviderHost.ps1");
+  for (const [label, executable, script] of [
+    ["source pwsh", powershell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1")],
+    ["packaged Windows PowerShell 5.1", windowsPowerShell, packagedManage],
+    ["packaged pwsh", powershell, packagedManage]
+  ] as const) {
+    lifecycleReady = true;
+    const restarted = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Start", ...lifecycleArguments, "-WaitForHealth"]));
+    assert.equal(restarted.status, "running", `${label} must complete the bounded authenticated readiness retry`);
+    const restartedProcessId = Number(restarted.processId);
+    assert.ok(Number.isSafeInteger(restartedProcessId) && restartedProcessId > 0);
+    const restopped = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Stop", ...lifecycleArguments]));
+    lifecycleReady = false;
+    assert.equal(restopped.status, "stopped");
+    assert.equal(restopped.survivorCount, 0, `${label} must leave no provider-host process-tree survivor`);
+    assert.equal((restopped.processes as Array<Record<string, unknown>>)[0]?.gracefulShutdownAcknowledged, true);
+    await assert.rejects(async () => process.kill(restartedProcessId, 0), /ESRCH|not found|no such process/i);
+  }
 });
 
 async function createFixtureBundle(bundle: string): Promise<void> {
@@ -213,6 +252,20 @@ async function createFixtureBundle(bundle: string): Promise<void> {
     copyFile(join(repository, "deployment/windows/Get-B122TlsIdentity.mjs"), join(bundle, "scripts/Get-B122TlsIdentity.mjs")),
     copyFile(join(repository, "deployment/windows/Test-B122ProviderHostConfiguration.ps1"), join(bundle, "scripts/provisioning/Test-B122ProviderHostConfiguration.ps1")),
     writeFile(join(bundle, "release.json"), JSON.stringify({ schema: "sxsy-b122.windows-release", version: 1, sourceCommit: "a".repeat(40) }))
+  ]);
+}
+
+async function createInitializationBundle(bundle: string): Promise<void> {
+  await Promise.all([
+    mkdir(join(bundle, "runtime"), { recursive: true }),
+    mkdir(join(bundle, "scripts", "provisioning"), { recursive: true })
+  ]);
+  await Promise.all([
+    copyFile(process.execPath, join(bundle, "runtime", "node.exe")),
+    ...["Initialize-B122ProviderHost.ps1", "Protect-B122ProviderHostSecret.ps1", "New-B122LoopbackTlsIdentity.mjs", "Get-B122TlsIdentity.mjs", "New-B122NetworkPolicy.ps1"]
+      .map((name) => copyFile(join(repository, "deployment", "windows", name), join(bundle, "scripts", name))),
+    ...["New-B122ProviderHostConfiguration.ps1", "Test-B122ProviderHostConfiguration.ps1"]
+      .map((name) => copyFile(join(repository, "deployment", "windows", name), join(bundle, "scripts", "provisioning", name)))
   ]);
 }
 
@@ -239,6 +292,16 @@ async function boundedBrokerRequest(
 }
 function route(policy: ConfiguredNetworkPolicy, routeId: string): ConfiguredNetworkRoute { const value = policy.routes.find((candidate) => candidate.id === routeId); if (!value) throw new Error(`missing ${routeId}`); return value; }
 function parseReceipt(value: string): Record<string, unknown> { const line = value.trim().split(/\r?\n/).filter(Boolean).at(-1); if (!line) throw new Error("missing lifecycle receipt"); return JSON.parse(line); }
+function assertInitializeReceipt(receipt: Record<string, unknown>, expectedRoot: string): void {
+  assert.equal(receipt.schema, "sxsy-b122.provider-host-bootstrap");
+  assert.equal(receipt.status, "ready-to-provision");
+  assert.equal(resolve(String(receipt.protectedStateRoot)).toLowerCase(), resolve(expectedRoot).toLowerCase());
+  assert.equal(receipt.fixtureDiagnosticOnly, true);
+  assert.equal(receipt.providerEffectsEnabled, false);
+  assert.equal(receipt.journalAuthenticationStable, true);
+  assert.equal(receipt.authenticationTokenExposed, false);
+  assert.equal(receipt.proprietaryCredentialsAccessed, false);
+}
 async function windowsKnownLocalAppData(): Promise<string> {
   const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
   if (!systemRoot || !isAbsolute(systemRoot) || /[\0\r\n]/.test(systemRoot)) throw new Error("Windows SystemRoot is unavailable.");
@@ -259,12 +322,39 @@ async function removeWithRetry(path: string): Promise<void> {
 }
 function freePort(): Promise<number> { return new Promise((resolvePort, rejectPort) => { const server = createServer(); server.once("error", rejectPort); server.listen(0, "127.0.0.1", () => { const address = server.address(); if (!address || typeof address === "string") return rejectPort(new Error("missing port")); server.close((error) => error ? rejectPort(error) : resolvePort(address.port)); }); }); }
 function runPowerShell(script: string, arguments_: readonly string[]): Promise<string> {
+  return runPowerShellExecutable(powershell, script, arguments_);
+}
+function runPowerShellExecutable(executable: string, script: string, arguments_: readonly string[], timeoutMs = 45_000): Promise<string> {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(powershell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, ...arguments_], { cwd: repository, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    const childEnvironment: NodeJS.ProcessEnv = { ...process.env, SXSY_PROVIDER_E2E_TRACE: "1" };
+    if (resolve(executable).toLowerCase() === resolve(windowsPowerShell).toLowerCase()) {
+      for (const name of Object.keys(childEnvironment)) if (name.toLowerCase() === "psmodulepath") delete childEnvironment[name];
+    }
+    const child = spawn(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, ...arguments_], {
+      cwd: repository,
+      env: childEnvironment,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
     const stdout: Buffer[] = []; const stderr: Buffer[] = [];
+    let timedOut = false;
     child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk))); child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      if (!child.pid) { child.kill(); return; }
+      const killer = spawn("C:\\Windows\\System32\\taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      killer.once("error", () => child.kill());
+      killer.once("close", (code) => { if (code !== 0) child.kill(); });
+      setTimeout(() => child.kill(), 5_000).unref();
+    }, timeoutMs);
     child.once("error", rejectRun);
-    child.once("close", (code) => code === 0 ? resolveRun(Buffer.concat(stdout).toString("utf8")) : rejectRun(new Error(`PowerShell ${script} failed (${code}): ${Buffer.concat(stderr).toString("utf8")}`)));
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      const errorText = Buffer.concat(stderr).toString("utf8");
+      const safeTrace = [...errorText.matchAll(/SXSY_PROVIDER_E2E_TRACE=([a-z0-9-]{1,64})/g)].map((match) => match[1]).slice(-32);
+      if (timedOut) { rejectRun(new Error(`PowerShell ${script} timed out; safeTrace=${safeTrace.join(",") || "none"}.`)); return; }
+      code === 0 ? resolveRun(Buffer.concat(stdout).toString("utf8")) : rejectRun(new Error(`PowerShell ${script} failed (${code}): ${errorText}`));
+    });
   });
 }
 

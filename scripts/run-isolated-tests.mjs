@@ -55,7 +55,7 @@ const mediatedGitTests = [
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
 const providerHostTests = ["config", "council-resources", "redaction", "release", "server", "service", "tls-network-e2e"]
-  .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e" }));
+  .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 75_000 } : {}) }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
@@ -175,6 +175,8 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 
 /** A result is recorded only after close proves this owned child has exited. */
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000, cleanup = rm, sourceEnvironment = process.env } = {}) {
+  const effectiveTimeoutMs = group.timeoutMs ?? timeoutMs;
+  if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 120_000) throw new Error("An isolated test timeout must be an integer between 1 and 120000 milliseconds.");
   const childExecutable = group.executable ?? executable;
   const isTestRun = !group.args;
   const args = group.args ? [...group.args] : ["--experimental-transform-types", "--test", "--test-reporter=tap"]; const pattern = group.args ? undefined : patternArgument(group.pattern); if (pattern) args.push("--test-name-pattern", pattern); if (!group.args) args.push(group.file);
@@ -198,7 +200,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
       }
     };
     child.stdout.on("data", (chunk) => add(chunk, true)); child.stderr.on("data", (chunk) => add(chunk, false));
-    const timer = setTimeout(() => { timedOut = true; terminationPromise = terminateOwnedProcessTree(child, environment); }, timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; terminationPromise = terminateOwnedProcessTree(child, environment); }, effectiveTimeoutMs);
     child.once("error", (error) => { spawnError = error.message; });
     child.once("close", async (exitCode, signal) => {
       clearTimeout(timer);
@@ -219,9 +221,9 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         const counts = testCounts(tapTail, isTestRun);
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
         const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, spawnError, cleanupCompleted: false, cleanupError: null, success: !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, spawnError, cleanupCompleted: false, cleanupError: null, success: !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess };
       } catch {
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
         try {
           await cleanupIsolatedRoot(cleanup, testRoot);

@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 const artifactPath = argument("--artifact");
 const bundleRoot = resolve(argument("--bundle-root"));
 const replaceExisting = process.argv.includes("--replace-existing");
-const transportModule = resolve(bundleRoot, "extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js");
+const transportModule = resolve(bundleRoot, "extension", "dist", "named-pipe-transport.js");
 const { ProvisionedNamedPipeJsonLineTransport } = await import(pathToFileURL(transportModule).href);
 const artifact = parseArtifact(JSON.parse(await readFile(artifactPath, "utf8")));
 const transport = new ProvisionedNamedPipeJsonLineTransport();

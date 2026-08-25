@@ -82,10 +82,31 @@ function Find-ConfigurationProcesses([string]$Nonce=''){
   }
   return @($foundProcesses)
 }
+function Stop-ExactProbe($Probe){
+  try{if($Probe.HasExited){return}}catch{return}
+  $taskkill=Join-Path $env:SystemRoot 'System32\taskkill.exe';$killInfo=New-Object Diagnostics.ProcessStartInfo;$killInfo.FileName=$taskkill;$killInfo.Arguments=('/PID {0} /T /F' -f [int]$Probe.Id);$killInfo.UseShellExecute=$false;$killInfo.CreateNoWindow=$true
+  $killer=New-Object Diagnostics.Process;$killer.StartInfo=$killInfo
+  try{if($killer.Start()-and-not$killer.WaitForExit(5000)){try{$killer.Kill()}catch{}}}catch{}finally{$killer.Dispose()}
+  try{if(-not$Probe.WaitForExit(5000)){$Probe.Kill();$Probe.WaitForExit(5000)|Out-Null}}catch{}
+}
+function Invoke-HealthProcess([string[]]$ArgumentValues){
+  foreach($value in $ArgumentValues){if($null-eq$value-or[string]$value -match '[\x00\r\n"]'){throw 'Provider-host health arguments contain an unsupported value.'}}
+  $startInfo=New-Object Diagnostics.ProcessStartInfo;$startInfo.FileName=$node;$startInfo.Arguments=(@($ArgumentValues|ForEach-Object{'"'+[string]$_+'"'})-join ' ');$startInfo.UseShellExecute=$false;$startInfo.CreateNoWindow=$true;$startInfo.RedirectStandardOutput=$true;$startInfo.RedirectStandardError=$true
+  $probe=New-Object Diagnostics.Process;$probe.StartInfo=$startInfo
+  try{
+    if(-not$probe.Start()){return $null}
+    $stdoutTask=$probe.StandardOutput.ReadToEndAsync();$stderrTask=$probe.StandardError.ReadToEndAsync()
+    if(-not$probe.WaitForExit(12000)){Stop-ExactProbe $probe;return $null}
+    $probe.WaitForExit()
+    try{$stdout=[string]$stdoutTask.GetAwaiter().GetResult();$stderr=[string]$stderrTask.GetAwaiter().GetResult()}catch{return $null}
+    if($stdout.Length-gt131072-or$stderr.Length-gt131072){return $null}
+    return [pscustomobject]@{exitCode=[int]$probe.ExitCode;stdout=$stdout}
+  }finally{$probe.Dispose()}
+}
 function Invoke-Health($Record,[switch]$Shutdown){
   $arguments=@($health,'--configuration',$config,'--expect-lifecycle-nonce',[string]$Record.lifecycleNonce,'--expect-process-id',[string][int]$Record.processId);if($Shutdown){$arguments+='--shutdown'}
-  $output=& $node @arguments 2>$null;if($LASTEXITCODE-ne0){return $null}
-  try{$receipt=@($output|Where-Object{$_})[-1]|ConvertFrom-Json}catch{return $null}
+  $result=Invoke-HealthProcess $arguments;if($null-eq$result-or$result.exitCode-ne0-or[string]::IsNullOrWhiteSpace([string]$result.stdout)){return $null}
+  try{$receipt=[string]$result.stdout|ConvertFrom-Json}catch{return $null}
   if($Shutdown){if($receipt.schema-cne'sxsy-b122.provider-host-shutdown-check'-or$receipt.status-cne'accepted'){return $null}}
   elseif($receipt.schema-cne'sxsy-b122.provider-host-health-check'-or$receipt.status-cne'passed'){return $null}
   if([int]$receipt.processId-ne[int]$Record.processId-or[string]$receipt.lifecycleNonceSha256-cne[string]$Record.lifecycleNonceSha256-or[string]$receipt.configurationSha256-cne[string]$Record.configurationSha256){return $null}
