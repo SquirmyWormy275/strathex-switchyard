@@ -26,6 +26,7 @@
     "onCommand:sxsy-b122.adoptTerminal",
     "onCommand:sxsy-b122.refreshManagedRegistry",
     "onCommand:sxsy-b122.showManagedSessions",
+    "onCommand:sxsy-b122.showQuickReference",
     "onCommand:sxsy-b122.connectProviderAdapter",
     "onCommand:sxsy-b122.installRepositoryRuntime",
     "onCommand:sxsy-b122.listRepositoryRuntimes",
@@ -43,6 +44,9 @@
     "onCommand:sxsy-b122.installNetworkPolicy",
     "onCommand:sxsy-b122.showNetworkPolicy",
     "onCommand:sxsy-b122.revokeNetworkPolicy",
+    "onCommand:sxsy-b122.manageAcceptanceEvidence",
+    "onCommand:sxsy-b122.manageScannerFixtures",
+    "onCommand:sxsy-b122.manageProviderApplications",
     "onCommand:sxsy-b122.releaseContainment",
     "onCommand:sxsy-b122.dispatch",
     "onCommand:sxsy-b122.showIntent",
@@ -131,6 +135,10 @@
         "title": "SXSY-B122: Show Managed Sessions"
       },
       {
+        "command": "sxsy-b122.showQuickReference",
+        "title": "SXSY-B122: Show 65-Chord Quick Reference"
+      },
+      {
         "command": "sxsy-b122.connectProviderAdapter",
         "title": "SXSY-B122: Connect Attested Provider Adapter"
       },
@@ -201,6 +209,18 @@
       {
         "command": "sxsy-b122.releaseContainment",
         "title": "SXSY-B122: Release Repository Containment"
+      },
+      {
+        "command": "sxsy-b122.manageAcceptanceEvidence",
+        "title": "SXSY-B122: Manage Signed Acceptance Evidence"
+      },
+      {
+        "command": "sxsy-b122.manageScannerFixtures",
+        "title": "SXSY-B122: Manage Signed Scanner Fixtures"
+      },
+      {
+        "command": "sxsy-b122.manageProviderApplications",
+        "title": "SXSY-B122: Manage Fixed Provider Applications"
       },
       {
         "command": "sxsy-b122.dispatch",

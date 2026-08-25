@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  forwardedHostAction,
+  forwardedWorkflowResult,
   JsonLineCompanionBridge,
   type ExtensionManagedSession,
   type JsonLineTransport
@@ -133,6 +135,95 @@ test("GitHub picker authorization binds one exact requested candidate and compan
   assert.equal(rejected.ok, false);
 });
 
+test("acceptance and scanner administration replies are strict and preserve host-owned identities", async () => {
+  const keyId = "a".repeat(64);
+  const trust = { schema: "sxsy-b122.acceptance-trust-policy", version: 1, authorityId: "lab", keyId, publicKeyPem: "PUBLIC KEY", allowedGates: [8], expiresAt: "2027-08-24T00:00:00.000Z", installedAt: "2026-08-24T00:00:00.000Z", installedBy: "reviewer", status: "active" };
+  const fixture = { id: "scanner-feed", kind: "scanner", packageRoot: "C:/state/scanner-feed", manifestSha256: "b".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", installedBy: "reviewer", status: "active" };
+  let corrupt = false;
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string; method: string; payload?: unknown };
+    const result = request.method === "acceptance.trust.install" ? { trust: corrupt ? { ...trust, allowedGates: [0] } : trust }
+      : request.method === "acceptance.trust.list" ? { trust: [trust] }
+        : request.method === "scanner.fixture.install" ? { fixture }
+          : request.method === "scanner.fixture.list" ? { fixtures: [fixture] }
+            : { revoked: true };
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+  } }, "admin-vscode");
+  const installed = await bridge.installAcceptanceTrust("C:/reviewed/trust.json");
+  assert.equal(installed.ok, true);
+  assert.equal((await bridge.listAcceptanceTrust()).ok, true);
+  assert.equal((await bridge.installScannerFixture("C:/reviewed/scanner.json")).ok, true);
+  assert.equal((await bridge.listScannerFixtures()).ok, true);
+  assert.deepEqual(await bridge.revokeScannerFixture("scanner-feed", "retired"), { ok: true, value: true });
+  corrupt = true;
+  assert.equal((await bridge.installAcceptanceTrust("C:/reviewed/trust.json")).ok, false);
+});
+
+test("provider administration and managed-terminal host effects preserve only exact compiled identities", async () => {
+  const seen: Array<{ method: string; payload?: unknown }> = [];
+  const installation = {
+    provider: "codex", installationId: "provider-install:codex", catalogDigest: "a".repeat(64),
+    identity: {
+      canonicalExecutablePath: "C:\\Program Files\\SXSY\\codex.exe", executableSha256: "b".repeat(64),
+      signerSubject: "CN=Isolated Provider Test", signerThumbprint: "a".repeat(40),
+      productIdentity: { productId: "openai.codex", displayName: "Codex", publisher: "OpenAI, L.L.C.", role: "managed_terminal" },
+      size: 42, modifiedMs: 1, device: "3894844051", inode: "59672695062879660"
+    },
+    operator: "Current User", installedAt: "2026-08-24T00:00:00.000Z", statusAt: "2026-08-24T00:00:00.000Z", status: "active"
+  } as const;
+  const profile = {
+    provider: "codex", profileName: "SXSY-B122 Codex", canonicalLauncherPath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe",
+    launcherSha256: "c".repeat(64), launcherProtocolVersion: 1,
+    canonicalExecutablePath: installation.identity.canonicalExecutablePath,
+    executableSha256: installation.identity.executableSha256, signerSubject: installation.identity.signerSubject, signerThumbprint: installation.identity.signerThumbprint, executableSize: installation.identity.size,
+    executableModifiedMs: installation.identity.modifiedMs, executableDevice: installation.identity.device, executableInode: installation.identity.inode,
+    productIdentity: installation.identity.productIdentity,
+    args: [], shell: false, installationId: installation.installationId, catalogDigest: installation.catalogDigest,
+    issuedAt: "2026-08-24T00:00:00.000Z", validUntil: "2026-08-24T00:00:20.000Z", requiresFinalIdentityVerification: true
+  } as const;
+  let corrupt: "none" | "installation" | "wrong_provider" | "duplicates" | "profile" = "none";
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string; method: string; payload?: unknown };
+    seen.push({ method: request.method, ...(request.payload !== undefined ? { payload: request.payload } : {}) });
+    const returnedInstallation = corrupt === "installation"
+      ? { ...installation, identity: { ...installation.identity, productIdentity: { ...installation.identity.productIdentity, productId: "substituted.product" } } }
+      : corrupt === "wrong_provider"
+        ? { ...installation, provider: "claude_desktop", identity: { ...installation.identity, canonicalExecutablePath: "C:\\Program Files\\SXSY\\claude.exe", productIdentity: { productId: "anthropic.claude-desktop", displayName: "Claude Desktop", publisher: "Anthropic, PBC", role: "desktop" } } }
+        : installation;
+    const result = request.method === "provider-desktop.install" || request.method === "provider-desktop.revoke"
+      ? { installation: returnedInstallation }
+      : request.method === "provider-desktop.list"
+        ? { installations: corrupt === "duplicates" ? [installation, installation] : [installation] }
+        : { command: { status: "running", summary: "Exact terminal pending.", data: {
+            hostActionId: `host-action:${"c".repeat(64)}`, hostActionKind: "create_codex_terminal", hostActionExpiresAt: "2026-08-24T00:00:20.000Z",
+            managedTerminalProfile: corrupt === "profile" ? { ...profile, profileName: "Substituted" } : profile
+          } } };
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+  } }, "provider-vscode");
+
+  assert.equal((await bridge.installProviderDesktop("codex")).ok, true);
+  assert.equal((await bridge.listProviderDesktops()).ok, true);
+  assert.equal((await bridge.revokeProviderDesktop("codex")).ok, true);
+  assert.deepEqual(seen.slice(0, 3), [
+    { method: "provider-desktop.install", payload: { provider: "codex" } },
+    { method: "provider-desktop.list" },
+    { method: "provider-desktop.revoke", payload: { provider: "codex" } }
+  ]);
+
+  const dispatched = await bridge.dispatch({ control: "CLAUDE", modifier: "ctrl_shift_alt" });
+  assert.ok(dispatched.ok && forwardedHostAction(dispatched.value)?.managedTerminalProfile?.provider === "codex");
+  corrupt = "installation";
+  assert.equal((await bridge.installProviderDesktop("codex")).ok, false);
+  corrupt = "wrong_provider";
+  assert.equal((await bridge.installProviderDesktop("codex")).ok, false);
+  corrupt = "duplicates";
+  assert.equal((await bridge.listProviderDesktops()).ok, false);
+  corrupt = "profile";
+  const substituted = await bridge.dispatch({ control: "CLAUDE", modifier: "ctrl_shift_alt" });
+  assert.ok(substituted.ok);
+  if (substituted.ok) assert.equal(forwardedHostAction(substituted.value), undefined);
+});
+
 test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
   const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
   const signalId = `hardware-signal:${"a".repeat(64)}`;
@@ -253,4 +344,62 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } });
   assert.equal(forgedAuthority.ok, false);
   if (!forgedAuthority.ok) assert.equal(forgedAuthority.code, "invalid_response");
+});
+
+test("durable workflow results preserve only the exact bounded provider-result envelope", async () => {
+  const anchor = {
+    kind: "anchor",
+    anchorDigest: "c".repeat(64),
+    discrepancies: ["The implementation differs from the accepted plan."],
+    questions: ["Should the reviewed boundary remain unchanged?"],
+    resumed: false
+  } as const;
+  let data: Record<string, unknown> = {
+    artifactId: "artifact-result-1",
+    artifactDigest: "d".repeat(64),
+    resultKind: "anchor",
+    workflowResult: anchor,
+    providerSummary: "The protected Re-anchor result is ready.",
+    externalId: "provider-result-1"
+  };
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string; method: string };
+    assert.equal(request.method, "command.dispatch");
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result: { command: { status: "completed", summary: "Re-anchor completed.", data } } });
+  } }, "workflow-result-vscode");
+
+  const accepted = await bridge.dispatch({ control: "REANCHOR", modifier: "normal" });
+  assert.ok(accepted.ok);
+  if (!accepted.ok) return;
+  assert.deepEqual(forwardedWorkflowResult(accepted.value), anchor);
+
+  const variants = [
+    { kind: "proof", verifiedClaims: [], evidenceReferences: [], backendResults: [{ backend: "local", status: "passed" }] },
+    { kind: "decision", decisionPacketId: "packet-1", decisions: [{ decisionId: "decision-1", options: [
+      { id: "option-1", label: "One", tradeoffs: ["Tradeoff one"], risks: ["Risk one"] },
+      { id: "option-2", label: "Two", tradeoffs: ["Tradeoff two"], risks: ["Risk two"] }
+    ], recommendationId: "option-1" }], userSelectionRequired: true },
+    { kind: "plan", mode: "expanded", planDigest: "e".repeat(64), alternatives: Array.from({ length: 15 }, (_, index) => ({ rank: index + 1, id: `alternative-${index + 1}`, summary: `Alternative ${index + 1}`, rationale: `Rationale ${index + 1}`, risks: [] })) },
+    { kind: "plan", mode: "execution_ack", planDigest: "e".repeat(64), planRevision: "revision-1", originSessionId: "origin-1", executorSessionId: "executor-1", authorityId: "authority-1", acknowledgementId: "ack-1", executionStarted: true },
+    { kind: "handoff", packageId: "handoff-1", recipientSessionId: "recipient-1", acknowledged: true },
+    { kind: "focus", selectedSessionId: "session-1", status: "verified_blocked", queueCycleId: "cycle-1", resultDelivered: true },
+    { kind: "authority", acknowledgements: [{ recipientSessionId: "recipient-1", grantId: "grant-1", matchDigest: "f".repeat(64), acknowledged: true }] },
+    { kind: "voice_binding", bindingId: "binding-1", active: true }
+  ] as const;
+  for (const workflowResult of variants) {
+    data = { ...data, resultKind: workflowResult.kind, workflowResult };
+    const variant = await bridge.dispatch({ control: "REANCHOR", modifier: "normal" });
+    assert.ok(variant.ok && forwardedWorkflowResult(variant.value)?.kind === workflowResult.kind);
+  }
+
+  data = { ...data, resultKind: "proof", workflowResult: anchor };
+  assert.equal((await bridge.dispatch({ control: "REANCHOR", modifier: "normal" })).ok, false);
+  data = { ...data, resultKind: "anchor", workflowResult: anchor, unexpected: "not allowed" };
+  assert.equal((await bridge.dispatch({ control: "REANCHOR", modifier: "normal" })).ok, false);
+  data = { ...data };
+  delete data.unexpected;
+  data.workflowResult = { ...anchor, questions: ["x".repeat(16_385)] };
+  assert.equal((await bridge.dispatch({ control: "REANCHOR", modifier: "normal" })).ok, false);
+  data = { ...data, workflowResult: anchor, providerSummary: "   " };
+  assert.equal((await bridge.dispatch({ control: "REANCHOR", modifier: "normal" })).ok, false);
 });

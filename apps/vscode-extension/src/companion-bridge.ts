@@ -34,6 +34,8 @@ export interface ForwardedCommand {
 export interface ForwardedCommandResult {
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly operationId?: string;
+  readonly effectDisposition?: "not_started" | "committed" | "ambiguous";
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
@@ -54,6 +56,7 @@ export interface ForwardedHostAction {
   readonly debugConfiguration?: string;
   readonly pythonInterpreter?: string;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
+  readonly managedTerminalProfile?: ManagedTerminalProfileSummary;
 }
 
 export interface ForwardedHostActionAuthorization {
@@ -117,6 +120,16 @@ export interface SandboxInstallationPin {
 
 export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string }[]; readonly revokedAt?: string; }
 export interface InstalledNetworkPolicy { readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface AcceptanceTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedGates: readonly number[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface AcceptanceEvidenceSummary { readonly id: string; readonly gate: number; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly targetSnapshotId?: string; readonly operationId?: string; readonly evidenceDigest: string; readonly policyVersion: string; readonly evaluatedBy: string; readonly evaluatedAt: string; readonly expiresAt?: string; readonly rationale: string; readonly invalidatedAt?: string; readonly invalidatedReason?: string; }
+export interface HighConsequenceActivationSummary { readonly id: string; readonly action: string; readonly targetSnapshotId: string; readonly policyVersion: string; readonly gateEvidenceIds: readonly string[]; readonly activatedAt: string; readonly expiresAt: string; readonly activatedBy: string; readonly status: "active" | "revoked"; }
+export interface ScannerTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedKinds: readonly ("scanner" | "advisory")[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface ScannerFixtureSummary { readonly id: string; readonly kind: "scanner" | "advisory"; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export type ProviderDesktopId = "claude_desktop" | "chatgpt_desktop" | "claude_code" | "codex";
+export interface ProviderProductIdentitySummary { readonly productId: string; readonly displayName: string; readonly publisher: string; readonly role: "desktop" | "managed_terminal"; }
+export interface ProviderExecutableIdentitySummary { readonly canonicalExecutablePath: string; readonly executableSha256: string; readonly signerSubject: string; readonly signerThumbprint: string; readonly productIdentity: ProviderProductIdentitySummary; readonly size: number; readonly modifiedMs: number; readonly device: string; readonly inode: string; }
+export interface ProviderInstallationSummary { readonly provider: ProviderDesktopId; readonly installationId: string; readonly catalogDigest: string; readonly identity: ProviderExecutableIdentitySummary; readonly operator: string; readonly installedAt: string; readonly statusAt: string; readonly status: "active" | "stale" | "revoked"; }
+export interface ManagedTerminalProfileSummary { readonly provider: "claude_code" | "codex"; readonly profileName: string; readonly canonicalLauncherPath: string; readonly launcherSha256: string; readonly launcherProtocolVersion: 1; readonly canonicalExecutablePath: string; readonly executableSha256: string; readonly signerSubject: string; readonly signerThumbprint: string; readonly executableSize: number; readonly executableModifiedMs: number; readonly executableDevice: string; readonly executableInode: string; readonly productIdentity: ProviderProductIdentitySummary; readonly args: readonly string[]; readonly shell: false; readonly installationId: string; readonly catalogDigest: string; readonly issuedAt: string; readonly validUntil: string; readonly requiresFinalIdentityVerification: true; }
 export interface RawHidDeviceIdentity { readonly vendorId: number; readonly productId: number; readonly usagePage: number; readonly usage: number; readonly serialNumber?: string; }
 export interface RawHidInstallationPin { readonly identity: RawHidDeviceIdentity; readonly helperPath: string; readonly helperSha256: string; readonly protocolVersion: number; readonly mapFingerprint: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
 export interface RawHidRuntimeStatus { readonly supervisor: { readonly state: "unprovisioned" | "starting" | "running" | "retrying" | "stopped" | "unavailable"; readonly generation: number; readonly detail: string }; readonly inbox: { readonly pending: number; readonly claimed: number; readonly completed: number; readonly needsReconciliation: number }; readonly installations: readonly RawHidInstallationPin[]; }
@@ -133,6 +146,24 @@ export type ExtensionWorkflowPreparationIntent =
   | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
   | { readonly kind: "plan_approval"; readonly confirmationToken: string };
 export interface ExtensionWorkflowArtifact { readonly id: string; readonly digest: string; readonly action: ExtensionWorkflowAction; readonly targetSnapshotId: string; readonly sessionId: string; readonly payload: Readonly<Record<string, unknown>>; readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled"; readonly executionAuthorized: false; }
+export type ExtensionWorkflowProviderResult =
+  | { readonly kind: "anchor"; readonly anchorDigest: string; readonly discrepancies: readonly string[]; readonly questions: readonly string[]; readonly resumed: false }
+  | { readonly kind: "proof"; readonly verifiedClaims: readonly string[]; readonly evidenceReferences: readonly string[]; readonly backendResults: readonly { readonly backend: string; readonly status: "passed" | "failed" | "unavailable" }[] }
+  | { readonly kind: "decision"; readonly decisionPacketId: string; readonly decisions: readonly { readonly decisionId: string; readonly options: readonly { readonly id: string; readonly label: string; readonly tradeoffs: readonly string[]; readonly risks: readonly string[] }[]; readonly recommendationId: string }[]; readonly userSelectionRequired: true }
+  | { readonly kind: "plan"; readonly mode: "expanded"; readonly planDigest: string; readonly alternatives: readonly { readonly rank: number; readonly id: string; readonly summary: string; readonly rationale: string; readonly risks: readonly string[] }[] }
+  | { readonly kind: "plan"; readonly mode: "execution_ack"; readonly planDigest: string; readonly planRevision: string; readonly originSessionId: string; readonly executorSessionId: string; readonly authorityId: string; readonly acknowledgementId: string; readonly executionStarted: true }
+  | { readonly kind: "handoff"; readonly packageId: string; readonly recipientSessionId: string; readonly acknowledged: boolean }
+  | { readonly kind: "focus"; readonly selectedSessionId: string; readonly status: "verified_blocked" | "verified_finished"; readonly queueCycleId: string; readonly resultDelivered: true }
+  | { readonly kind: "authority"; readonly acknowledgements: readonly { readonly recipientSessionId: string; readonly grantId: string; readonly matchDigest: string; readonly acknowledged: true }[] }
+  | { readonly kind: "voice_binding"; readonly bindingId: string; readonly active: boolean };
+export interface ForwardedWorkflowOutcome {
+  readonly artifactId: string;
+  readonly artifactDigest: string;
+  readonly resultKind: ExtensionWorkflowProviderResult["kind"];
+  readonly workflowResult: ExtensionWorkflowProviderResult;
+  readonly providerSummary: string;
+  readonly externalId?: string;
+}
 export type ExtensionVoiceProvider = "claude" | "chatgpt" | "system";
 export interface ExtensionVoiceConsent { readonly id: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly expiresAt: string; }
 export interface ExtensionVoiceBinding { readonly id: string; readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly status: "active" | "muted" | "interrupted" | "ended"; readonly transcriptDeletedAt?: string; }
@@ -163,6 +194,24 @@ export interface ExtensionCompanionBridge {
   installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>>;
+  revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
+  importAcceptanceEvidence(sourcePath: string): Promise<BridgeResult<AcceptanceEvidenceSummary>>;
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>>;
+  invalidateAcceptanceEvidence(evidenceId: string, reason: string): Promise<BridgeResult<boolean>>;
+  activateHighConsequence(action: string, targetSnapshotId: string, expiresAt: string): Promise<BridgeResult<HighConsequenceActivationSummary>>;
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>>;
+  revokeHighConsequenceActivation(activationId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installScannerTrust(sourcePath: string): Promise<BridgeResult<ScannerTrustSummary>>;
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>>;
+  revokeScannerTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installScannerFixture(sourcePath: string): Promise<BridgeResult<ScannerFixtureSummary>>;
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>>;
+  revokeScannerFixture(fixtureId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
+  listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>>;
+  revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
   releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>>;
   installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
@@ -194,7 +243,7 @@ export interface ExtensionCompanionBridge {
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
   authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
-  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>>;
+  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
 /** A line round-trip owned by a deliberately started local companion process. */
@@ -244,8 +293,10 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   }
 
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
-    const result = await this.call<{ command: ForwardedCommandResult }>("command.dispatch", command);
-    return result.ok ? { ok: true, value: result.value.command } : result;
+    const result = await this.call<unknown>("command.dispatch", command);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
   }
 
   async releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>> {
@@ -316,6 +367,35 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
   async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
   async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.install", { sourcePath }, "trust", isAcceptanceTrust); }
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return this.adminList("acceptance.trust.list", "trust", isAcceptanceTrust); }
+  revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.revoke", { authorityId, keyId, reason }, "trust", isAcceptanceTrust); }
+  importAcceptanceEvidence(sourcePath: string): Promise<BridgeResult<AcceptanceEvidenceSummary>> { return this.adminItem("acceptance.evidence.import", { sourcePath }, "evidence", isAcceptanceEvidence); }
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>> { return this.adminList("acceptance.evidence.list", "evidence", isAcceptanceEvidence); }
+  async invalidateAcceptanceEvidence(evidenceId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("acceptance.evidence.invalidate", { evidenceId, reason }, "invalidated"); }
+  activateHighConsequence(action: string, targetSnapshotId: string, expiresAt: string): Promise<BridgeResult<HighConsequenceActivationSummary>> { return this.adminItem("acceptance.activation.activate", { action, targetSnapshotId, expiresAt }, "activation", isHighConsequenceActivation); }
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>> { return this.adminList("acceptance.activation.list", "activations", isHighConsequenceActivation); }
+  async revokeHighConsequenceActivation(activationId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("acceptance.activation.revoke", { activationId, reason }, "revoked"); }
+  installScannerTrust(sourcePath: string): Promise<BridgeResult<ScannerTrustSummary>> { return this.adminItem("scanner.trust.install", { sourcePath }, "trust", isScannerTrust); }
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>> { return this.adminList("scanner.trust.list", "trust", isScannerTrust); }
+  async revokeScannerTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("scanner.trust.revoke", { authorityId, keyId, reason }, "revoked"); }
+  installScannerFixture(sourcePath: string): Promise<BridgeResult<ScannerFixtureSummary>> { return this.adminItem("scanner.fixture.install", { sourcePath }, "fixture", isScannerFixture); }
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>> { return this.adminList("scanner.fixture.list", "fixtures", isScannerFixture); }
+  async revokeScannerFixture(fixtureId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("scanner.fixture.revoke", { fixtureId, reason }, "revoked"); }
+  async installProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> {
+    const result = await this.adminItem("provider-desktop.install", { provider }, "installation", isProviderInstallation);
+    return result.ok && result.value.provider !== provider ? invalidResponse() : result;
+  }
+  async listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> {
+    const result = await this.adminList("provider-desktop.list", "installations", isProviderInstallation);
+    if (!result.ok) return result;
+    if (result.value.length > 4 || new Set(result.value.map((item) => item.provider)).size !== result.value.length) return invalidResponse();
+    return result;
+  }
+  async revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> {
+    const result = await this.adminItem("provider-desktop.revoke", { provider }, "installation", isProviderInstallation);
+    return result.ok && result.value.provider !== provider ? invalidResponse() : result;
+  }
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> { return this.call("provider.handshake", { sessionId, repositoryRoot }); }
 
   async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
@@ -454,9 +534,24 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}) } };
   }
 
-  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
-    const result = await this.call<{ command: ForwardedCommandResult }>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}) });
-    return result.ok ? { ok: true, value: result.value.command } : result;
+  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<unknown>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}), ...(effectDisposition ? { effectDisposition } : {}) });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
+  }
+
+  private async adminItem<T>(method: string, payload: unknown, key: string, validator: (value: unknown) => value is T): Promise<BridgeResult<T>> {
+    const result = await this.call<unknown>(method, payload); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return validator(value) ? { ok: true, value } : invalidResponse();
+  }
+  private async adminList<T>(method: string, key: string, validator: (value: unknown) => value is T): Promise<BridgeResult<readonly T[]>> {
+    const result = await this.call<unknown>(method, undefined); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return Array.isArray(value) && value.length <= 4_096 && value.every(validator) ? { ok: true, value } : invalidResponse();
+  }
+  private async adminBoolean(method: string, payload: unknown, key: string): Promise<BridgeResult<boolean>> {
+    const result = await this.call<unknown>(method, payload); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return value === true ? { ok: true, value: true } : invalidResponse();
   }
 
   private async handoffResult(method: string, payload: unknown): Promise<BridgeResult<ExtensionHandoffPackage>> {
@@ -542,6 +637,24 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   installNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
   currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return this.unavailable(); }
   revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
+  installAcceptanceTrust(): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.unavailable(); }
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return this.unavailable(); }
+  revokeAcceptanceTrust(): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.unavailable(); }
+  importAcceptanceEvidence(): Promise<BridgeResult<AcceptanceEvidenceSummary>> { return this.unavailable(); }
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>> { return this.unavailable(); }
+  invalidateAcceptanceEvidence(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  activateHighConsequence(): Promise<BridgeResult<HighConsequenceActivationSummary>> { return this.unavailable(); }
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>> { return this.unavailable(); }
+  revokeHighConsequenceActivation(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installScannerTrust(): Promise<BridgeResult<ScannerTrustSummary>> { return this.unavailable(); }
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>> { return this.unavailable(); }
+  revokeScannerTrust(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installScannerFixture(): Promise<BridgeResult<ScannerFixtureSummary>> { return this.unavailable(); }
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>> { return this.unavailable(); }
+  revokeScannerFixture(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
+  listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return this.unavailable(); }
+  revokeProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
@@ -584,6 +697,14 @@ export function localHostAction(result: ForwardedCommandResult): LocalHostAction
   return forwardedHostAction(result)?.kind;
 }
 
+export function forwardedWorkflowOutcome(result: ForwardedCommandResult): ForwardedWorkflowOutcome | undefined {
+  return isWorkflowOutcomeData(result.data) ? result.data : undefined;
+}
+
+export function forwardedWorkflowResult(result: ForwardedCommandResult): ExtensionWorkflowProviderResult | undefined {
+  return forwardedWorkflowOutcome(result)?.workflowResult;
+}
+
 export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHostAction | undefined {
   const id = result.data?.hostActionId;
   const kind = result.data?.hostActionKind;
@@ -593,6 +714,7 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
   const debugConfiguration = result.data?.hostActionDebugConfiguration;
   const pythonInterpreter = result.data?.hostActionPythonInterpreter;
   const githubCandidates = result.data?.githubCandidates;
+  const managedTerminalProfile = result.data?.managedTerminalProfile;
   if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
     || typeof kind !== "string" || !isLocalHostAction(kind)
     || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
@@ -600,8 +722,11 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
     || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
     || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
     || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))
-    || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)) return undefined;
-  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}) };
+    || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)
+    || (kind === "create_claude_terminal" || kind === "create_codex_terminal"
+      ? !isManagedTerminalProfile(managedTerminalProfile, kind === "create_claude_terminal" ? "claude_code" : "codex")
+      : managedTerminalProfile !== undefined)) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
 }
 
 function isLocalHostAction(value: string): value is LocalHostAction {
@@ -621,6 +746,96 @@ function isGitHubCandidates(value: unknown): value is readonly GitHubNavigationC
     && typeof candidate.label === "string" && !!candidate.label.trim() && candidate.label.length <= 160 && !/[\r\n\0]/.test(candidate.label)
     && typeof candidate.description === "string" && !!candidate.description.trim() && candidate.description.length <= 512 && !/[\r\n\0]/.test(candidate.description)
     && typeof candidate.url === "string" && trustedHttpsUrl(candidate.url));
+}
+
+function isAcceptanceTrust(value: unknown): value is AcceptanceTrustSummary {
+  return isRecord(value) && exactKeys(value, ["schema", "version", "authorityId", "keyId", "publicKeyPem", "allowedGates", "expiresAt", "installedAt", "installedBy", "status"])
+    && value.schema === "sxsy-b122.acceptance-trust-policy" && value.version === 1 && reference(value.authorityId) && digestText(value.keyId)
+    && contentText(value.publicKeyPem, 16_384) && Array.isArray(value.allowedGates) && value.allowedGates.length > 0 && value.allowedGates.length <= 27
+    && new Set(value.allowedGates).size === value.allowedGates.length && value.allowedGates.every((gate) => Number.isInteger(gate) && gate >= 1 && gate <= 27)
+    && timeText(value.expiresAt) && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isAcceptanceEvidence(value: unknown): value is AcceptanceEvidenceSummary {
+  return isRecord(value) && allowedExactKeys(value, ["id", "gate", "status", "evidenceDigest", "policyVersion", "evaluatedBy", "evaluatedAt", "rationale"], ["targetSnapshotId", "operationId", "evidenceReference", "expiresAt", "invalidatedAt", "invalidatedReason"])
+    && reference(value.id) && Number.isInteger(value.gate) && Number(value.gate) >= 1 && Number(value.gate) <= 27
+    && ["passed", "failed", "unavailable", "incomplete"].includes(value.status as string) && contentText(value.evidenceDigest, 512)
+    && reference(value.policyVersion) && contentText(value.evaluatedBy, 160) && timeText(value.evaluatedAt) && contentText(value.rationale, 4_096)
+    && [value.targetSnapshotId, value.operationId].every((item) => item === undefined || reference(item))
+    && (value.evidenceReference === undefined || pathText(value.evidenceReference))
+    && [value.expiresAt, value.invalidatedAt].every((item) => item === undefined || timeText(item))
+    && (value.invalidatedReason === undefined || contentText(value.invalidatedReason, 2_048));
+}
+
+function isHighConsequenceActivation(value: unknown): value is HighConsequenceActivationSummary {
+  return isRecord(value) && exactKeys(value, ["id", "action", "targetSnapshotId", "policyVersion", "gateEvidenceIds", "activatedAt", "expiresAt", "activatedBy", "status"])
+    && reference(value.id) && reference(value.action) && reference(value.targetSnapshotId) && reference(value.policyVersion)
+    && Array.isArray(value.gateEvidenceIds) && value.gateEvidenceIds.length > 0 && value.gateEvidenceIds.length <= 27 && new Set(value.gateEvidenceIds).size === value.gateEvidenceIds.length && value.gateEvidenceIds.every(reference)
+    && timeText(value.activatedAt) && timeText(value.expiresAt) && contentText(value.activatedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isScannerTrust(value: unknown): value is ScannerTrustSummary {
+  return isRecord(value) && exactKeys(value, ["schema", "version", "authorityId", "keyId", "publicKeyPem", "allowedKinds", "expiresAt", "installedAt", "installedBy", "status"])
+    && value.schema === "sxsy-b122.scanner-fixture-trust" && value.version === 1 && reference(value.authorityId) && digestText(value.keyId) && contentText(value.publicKeyPem, 16_384)
+    && Array.isArray(value.allowedKinds) && value.allowedKinds.length > 0 && value.allowedKinds.length <= 2 && new Set(value.allowedKinds).size === value.allowedKinds.length && value.allowedKinds.every((kind) => kind === "scanner" || kind === "advisory")
+    && timeText(value.expiresAt) && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isScannerFixture(value: unknown): value is ScannerFixtureSummary {
+  return isRecord(value) && exactKeys(value, ["id", "kind", "packageRoot", "manifestSha256", "installedAt", "installedBy", "status"])
+    && reference(value.id) && (value.kind === "scanner" || value.kind === "advisory") && pathText(value.packageRoot) && digestText(value.manifestSha256)
+    && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isProviderInstallation(value: unknown): value is ProviderInstallationSummary {
+  if (!isRecord(value) || !exactKeys(value, ["provider", "installationId", "catalogDigest", "identity", "operator", "installedAt", "statusAt", "status"])
+    || !providerDesktopId(value.provider) || !reference(value.installationId) || !digestText(value.catalogDigest)
+    || !contentText(value.operator, 160) || !timeText(value.installedAt) || !timeText(value.statusAt)
+    || (value.status !== "active" && value.status !== "stale" && value.status !== "revoked") || !isRecord(value.identity)
+    || !exactKeys(value.identity, ["canonicalExecutablePath", "executableSha256", "signerSubject", "signerThumbprint", "productIdentity", "size", "modifiedMs", "device", "inode"])
+    || !absoluteExecutable(value.identity.canonicalExecutablePath) || !digestText(value.identity.executableSha256)
+    || !contentText(value.identity.signerSubject, 512) || typeof value.identity.signerThumbprint !== "string" || !/^[a-f0-9]{40,128}$/.test(value.identity.signerThumbprint)
+    || !Number.isSafeInteger(value.identity.size) || (value.identity.size as number) <= 0
+    || !Number.isFinite(value.identity.modifiedMs) || !uint64Decimal(value.identity.device) || !uint64Decimal(value.identity.inode)
+    || !isProviderProductIdentity(value.identity.productIdentity, value.provider)) return false;
+  return true;
+}
+
+function isManagedTerminalProfile(value: unknown, expectedProvider?: "claude_code" | "codex"): value is ManagedTerminalProfileSummary {
+  return isRecord(value) && exactKeys(value, ["provider", "profileName", "canonicalLauncherPath", "launcherSha256", "launcherProtocolVersion", "canonicalExecutablePath", "executableSha256", "signerSubject", "signerThumbprint", "executableSize", "executableModifiedMs", "executableDevice", "executableInode", "productIdentity", "args", "shell", "installationId", "catalogDigest", "issuedAt", "validUntil", "requiresFinalIdentityVerification"])
+    && (value.provider === "claude_code" || value.provider === "codex") && (expectedProvider === undefined || value.provider === expectedProvider)
+    && value.profileName === (value.provider === "claude_code" ? "SXSY-B122 Claude Code" : "SXSY-B122 Codex")
+    && absoluteExecutable(value.canonicalLauncherPath) && digestText(value.launcherSha256) && value.launcherProtocolVersion === 1
+    && absoluteExecutable(value.canonicalExecutablePath) && digestText(value.executableSha256)
+    && contentText(value.signerSubject, 512) && typeof value.signerThumbprint === "string" && /^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
+    && Number.isSafeInteger(value.executableSize) && (value.executableSize as number) > 0 && (value.executableSize as number) <= 2 * 1024 * 1024 * 1024
+    && Number.isFinite(value.executableModifiedMs) && (value.executableModifiedMs as number) >= 0
+    && uint64Decimal(value.executableDevice) && uint64Decimal(value.executableInode)
+    && isProviderProductIdentity(value.productIdentity, value.provider) && value.productIdentity.role === "managed_terminal"
+    && Array.isArray(value.args) && value.args.length === 0 && value.shell === false && reference(value.installationId) && digestText(value.catalogDigest)
+    && timeText(value.issuedAt) && timeText(value.validUntil) && Date.parse(value.validUntil) > Date.parse(value.issuedAt)
+    && Date.parse(value.validUntil) - Date.parse(value.issuedAt) <= 30_000 && value.requiresFinalIdentityVerification === true;
+}
+
+function isProviderProductIdentity(value: unknown, expectedProvider?: ProviderDesktopId): value is ProviderProductIdentitySummary {
+  if (!isRecord(value) || !exactKeys(value, ["productId", "displayName", "publisher", "role"])) return false;
+  if (expectedProvider === undefined) return reference(value.productId) && contentText(value.displayName, 160) && contentText(value.publisher, 160) && (value.role === "desktop" || value.role === "managed_terminal");
+  const expected = expectedProvider === "claude_desktop"
+    ? ["anthropic.claude-desktop", "Claude Desktop", "Anthropic, PBC", "desktop"]
+    : expectedProvider === "chatgpt_desktop"
+      ? ["openai.chatgpt-desktop", "ChatGPT Desktop", "OpenAI, L.L.C.", "desktop"]
+      : expectedProvider === "claude_code"
+        ? ["anthropic.claude-code", "Claude Code", "Anthropic, PBC", "managed_terminal"]
+        : ["openai.codex", "Codex", "OpenAI, L.L.C.", "managed_terminal"];
+  return value.productId === expected[0] && value.displayName === expected[1] && value.publisher === expected[2] && value.role === expected[3];
+}
+
+function providerDesktopId(value: unknown): value is ProviderDesktopId { return value === "claude_desktop" || value === "chatgpt_desktop" || value === "claude_code" || value === "codex"; }
+function absoluteExecutable(value: unknown): value is string { return typeof value === "string" && value.length <= 160 && /^(?:[A-Za-z]:[\\/]|\/)/.test(value) && !/^(?:\\\\|\/\/|\\\\\?\\|\\\\\.\\)/.test(value) && /\.exe$/i.test(value) && !/[\r\n\0]/.test(value); }
+
+function digestText(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
+function uint64Decimal(value: unknown): value is string {
+  return typeof value === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= 18_446_744_073_709_551_615n;
 }
 
 function trustedHttpsUrl(value: string): boolean {
@@ -788,11 +1003,126 @@ function isPreparedCommand(value: unknown): value is PreparedCommand {
 }
 
 function isForwardedCommandResult(value: unknown): value is ForwardedCommandResult {
-  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["data"])
+  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["operationId", "effectDisposition", "data"])
     && ["queued", "running", "awaiting_input", "awaiting_confirmation", "cancelling", "completed", "failed", "timed_out", "unavailable", "incomplete", "blocked", "cancelled"].includes(value.status as string)
     && typeof value.summary === "string" && boundedText(value.summary, 512)
-    && (value.data === undefined || isRecord(value.data));
+    && (value.operationId === undefined || reference(value.operationId))
+    && (value.effectDisposition === undefined || value.effectDisposition === "not_started" || value.effectDisposition === "committed" || value.effectDisposition === "ambiguous")
+    && (value.data === undefined || (isRecord(value.data) && (!hasWorkflowOutcomeMarker(value.data) || isWorkflowOutcomeData(value.data))));
 }
+
+function hasWorkflowOutcomeMarker(value: Readonly<Record<string, unknown>>): boolean {
+  return value.workflowResult !== undefined || value.resultKind !== undefined;
+}
+
+function isWorkflowOutcomeData(value: unknown): value is ForwardedWorkflowOutcome {
+  if (!isRecord(value) || !allowedExactKeys(value, ["artifactId", "artifactDigest", "resultKind", "workflowResult", "providerSummary"], ["externalId"])
+    || !reference(value.artifactId) || !sha256Text(value.artifactDigest) || !isWorkflowProviderResult(value.workflowResult)
+    || value.resultKind !== value.workflowResult.kind || !workflowBoundedText(value.providerSummary, 1_024)
+    || (value.externalId !== undefined && !workflowBoundedText(value.externalId, 256))) return false;
+  return true;
+}
+
+function isWorkflowProviderResult(value: unknown): value is ExtensionWorkflowProviderResult {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  switch (value.kind) {
+    case "anchor":
+      return exactKeys(value, ["kind", "anchorDigest", "discrepancies", "questions", "resumed"])
+        && sha256Text(value.anchorDigest) && workflowTextList(value.discrepancies, true) && workflowTextList(value.questions, true) && value.resumed === false;
+    case "proof": {
+      if (!exactKeys(value, ["kind", "verifiedClaims", "evidenceReferences", "backendResults"])
+        || !workflowTextList(value.verifiedClaims, true) || !workflowTextList(value.evidenceReferences, true)
+        || !Array.isArray(value.backendResults) || value.backendResults.length < 1 || value.backendResults.length > 512) return false;
+      const backends: string[] = [];
+      for (const item of value.backendResults) {
+        if (!isRecord(item) || !exactKeys(item, ["backend", "status"]) || !workflowBoundedText(item.backend, 128)
+          || (item.status !== "passed" && item.status !== "failed" && item.status !== "unavailable")) return false;
+        backends.push(item.backend);
+      }
+      return new Set(backends).size === backends.length;
+    }
+    case "decision": {
+      if (!exactKeys(value, ["kind", "decisionPacketId", "decisions", "userSelectionRequired"])
+        || !workflowBoundedText(value.decisionPacketId, 256) || value.userSelectionRequired !== true
+        || !Array.isArray(value.decisions) || value.decisions.length < 1 || value.decisions.length > 64) return false;
+      const decisionIds: string[] = [];
+      for (const decision of value.decisions) {
+        if (!isRecord(decision) || !exactKeys(decision, ["decisionId", "options", "recommendationId"])
+          || !workflowIdentifier(decision.decisionId) || !workflowIdentifier(decision.recommendationId)
+          || !Array.isArray(decision.options) || decision.options.length < 2 || decision.options.length > 15) return false;
+        const optionIds: string[] = [];
+        for (const option of decision.options) {
+          if (!isRecord(option) || !exactKeys(option, ["id", "label", "tradeoffs", "risks"]) || !workflowIdentifier(option.id)
+            || !workflowBoundedText(option.label, 16_384)
+            || !workflowTextList(option.tradeoffs, false) || !workflowTextList(option.risks, false)) return false;
+          optionIds.push(option.id);
+        }
+        if (new Set(optionIds).size !== optionIds.length || !optionIds.includes(decision.recommendationId)) return false;
+        decisionIds.push(decision.decisionId);
+      }
+      return new Set(decisionIds).size === decisionIds.length;
+    }
+    case "plan": {
+      if (value.mode === "expanded") {
+        if (!exactKeys(value, ["kind", "mode", "planDigest", "alternatives"]) || !sha256Text(value.planDigest)
+          || !Array.isArray(value.alternatives) || value.alternatives.length !== 15) return false;
+        const ids: string[] = [];
+        for (const [index, alternative] of value.alternatives.entries()) {
+          if (!isRecord(alternative) || !exactKeys(alternative, ["rank", "id", "summary", "rationale", "risks"])
+            || alternative.rank !== index + 1 || !workflowIdentifier(alternative.id)
+            || !workflowBoundedText(alternative.summary, 16_384)
+            || !workflowBoundedText(alternative.rationale, 16_384)
+            || !workflowTextList(alternative.risks, true)) return false;
+          ids.push(alternative.id);
+        }
+        return new Set(ids).size === ids.length;
+      }
+      return value.mode === "execution_ack"
+        && exactKeys(value, ["kind", "mode", "planDigest", "planRevision", "originSessionId", "executorSessionId", "authorityId", "acknowledgementId", "executionStarted"])
+        && sha256Text(value.planDigest) && workflowIdentifier(value.planRevision) && workflowIdentifier(value.originSessionId)
+        && workflowIdentifier(value.executorSessionId) && workflowIdentifier(value.authorityId)
+        && workflowBoundedText(value.acknowledgementId, 256) && value.executionStarted === true;
+    }
+    case "handoff":
+      return exactKeys(value, ["kind", "packageId", "recipientSessionId", "acknowledged"])
+        && workflowIdentifier(value.packageId) && workflowIdentifier(value.recipientSessionId) && typeof value.acknowledged === "boolean";
+    case "focus":
+      return exactKeys(value, ["kind", "selectedSessionId", "status", "queueCycleId", "resultDelivered"])
+        && workflowIdentifier(value.selectedSessionId) && (value.status === "verified_blocked" || value.status === "verified_finished")
+        && workflowIdentifier(value.queueCycleId) && value.resultDelivered === true;
+    case "authority": {
+      if (!exactKeys(value, ["kind", "acknowledgements"]) || !Array.isArray(value.acknowledgements)
+        || value.acknowledgements.length < 1 || value.acknowledgements.length > 64) return false;
+      const recipients: string[] = [];
+      for (const acknowledgement of value.acknowledgements) {
+        if (!isRecord(acknowledgement) || !exactKeys(acknowledgement, ["recipientSessionId", "grantId", "matchDigest", "acknowledged"])
+          || !workflowIdentifier(acknowledgement.recipientSessionId) || !workflowIdentifier(acknowledgement.grantId)
+          || !sha256Text(acknowledgement.matchDigest) || acknowledgement.acknowledged !== true) return false;
+        recipients.push(acknowledgement.recipientSessionId);
+      }
+      return new Set(recipients).size === recipients.length;
+    }
+    case "voice_binding":
+      return exactKeys(value, ["kind", "bindingId", "active"]) && workflowBoundedText(value.bindingId, 256) && typeof value.active === "boolean";
+    default: return false;
+  }
+}
+
+function workflowTextList(value: unknown, emptyAllowed: boolean): value is readonly string[] {
+  if (!Array.isArray(value) || value.length > 512 || (!emptyAllowed && value.length === 0)
+    || !value.every((item) => workflowBoundedText(item, 16_384))) return false;
+  return new Set(value).size === value.length;
+}
+
+function workflowIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
+}
+
+function workflowBoundedText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value);
+}
+
+function sha256Text(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 
 function isHardwareSignalCompletion(value: unknown): value is HardwareSignalCompletionResult {
   return isRecord(value) && exactKeys(value, ["signalId", "outcome"])

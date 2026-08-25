@@ -1,8 +1,12 @@
 import { delimiter, dirname, resolve } from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { lstat, realpath, stat } from "node:fs/promises";
+import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
 import {
   forwardedHostAction,
+  forwardedWorkflowOutcome,
   type ExtensionCompanionBridge,
   type ExtensionManagedSession,
   type ExtensionProvider,
@@ -10,12 +14,17 @@ import {
   type ExtensionWorkflowAction,
   type ExtensionWorkflowArtifact,
   type ExtensionWorkflowPreparationIntent,
+  type ExtensionWorkflowProviderResult,
+  type ExtensionVoiceBinding,
   type ExtensionVoiceProvider,
   type HardwareSignalClaim,
   type ForwardedCommand,
+  type ForwardedCommandResult,
   type ForwardedHostAction,
   type ForwardedHostActionAuthorization,
   type LocalHostAction,
+  type ManagedTerminalProfileSummary,
+  type ProviderDesktopId,
   type ReviewedGitMutation
 } from "./companion-bridge.ts";
 import type {
@@ -29,6 +38,10 @@ import type {
 
 const windowStateKey = "sxsy-b122.managedWindow";
 const selectedTargetStateKey = "sxsy-b122.selectedGitTarget";
+const vscodeRepeatStateKey = "sxsy-b122.vscodeRepeat";
+const pipelineFailureCursorStateKey = "sxsy-b122.pipelineFailureCursor";
+const highConsequenceActions = ["council_automatic", "pr_merge", "direct_main", "lfg", "repair_mission", "emergency_containment", "full_sandbox", "rebuild_full_sandbox", "quarantine", "containment_release"] as const;
+const providerDesktopIds = ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"] as const satisfies readonly ProviderDesktopId[];
 
 interface StoredWindowState {
   readonly id: string;
@@ -58,7 +71,27 @@ export interface ManagedSessionControllerOptions {
   readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
   /** Local Registered-session liveness only; provider proof is host-observed. */
   readonly heartbeatIntervalMs?: number;
+  /** Bounded helper/process health window. Tests may shorten it, never disable it. */
+  readonly managedTerminalHealthMs?: number;
+  /** Exact child-start receipt seam; production uses a one-shot local named pipe. */
+  readonly managedTerminalReceiptFactory?: ManagedTerminalReceiptFactory;
+  /** Consecutive normal-press gesture window; bounded because firmware repeat timing is not yet accepted. */
+  readonly repeatWindowMs?: number;
 }
+
+export interface ManagedTerminalLaunchReceipt {
+  readonly provider: "claude_code" | "codex";
+  readonly processId: number;
+  readonly canonicalExecutablePath: string;
+  readonly canonicalWorkspaceRoot: string;
+}
+export interface ManagedTerminalReceiptReservation {
+  readonly pipeName: string;
+  readonly token: string;
+  wait(): Promise<ManagedTerminalLaunchReceipt>;
+  dispose(): Promise<void>;
+}
+export type ManagedTerminalReceiptFactory = (input: Readonly<{ provider: "claude_code" | "codex"; canonicalExecutablePath: string; canonicalWorkspaceRoot: string }>) => Promise<ManagedTerminalReceiptReservation>;
 
 export interface GitRootRegistration {
   readonly gitRoot: string;
@@ -84,7 +117,11 @@ export class ManagedSessionController {
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
   private readonly heartbeatIntervalMs: number;
+  private readonly managedTerminalHealthMs: number;
+  private readonly managedTerminalReceiptFactory: ManagedTerminalReceiptFactory;
+  private readonly repeatWindowMs: number;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
+  private readonly closedTerminals = new WeakSet<TerminalLike>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
   private readonly debugSessionIds = new WeakMap<DebugSessionLike, string>();
   private readonly sessions = new Map<string, ExtensionManagedSession>();
@@ -97,6 +134,8 @@ export class ManagedSessionController {
   private hardwareSignalInFlight = false;
   private sessionHeartbeatTimer?: ReturnType<typeof setTimeout>;
   private sessionHeartbeatInFlight = false;
+  private readonly observedNotificationStatus = new Map<string, ExtensionManagedSession["status"]>();
+  private readonly deferredHostCommands = new Map<string, string>();
 
   constructor(vscode: VscodeLike, context: ExtensionContextLike, bridge: ExtensionCompanionBridge, options: ManagedSessionControllerOptions = {}) {
     this.vscode = vscode;
@@ -114,6 +153,9 @@ export class ManagedSessionController {
     });
     this.sealSecret = options.sealSecret;
     this.heartbeatIntervalMs = boundedHeartbeatInterval(options.heartbeatIntervalMs ?? 30_000);
+    this.managedTerminalHealthMs = boundedManagedTerminalHealth(options.managedTerminalHealthMs ?? 500);
+    this.managedTerminalReceiptFactory = options.managedTerminalReceiptFactory ?? reserveManagedTerminalReceipt;
+    this.repeatWindowMs = boundedRepeatWindow(options.repeatWindowMs ?? 1_500);
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
@@ -139,7 +181,7 @@ export class ManagedSessionController {
     this.registerCommands();
     this.context.subscriptions.push(
       this.vscode.window.onDidOpenTerminal((terminal) => { void this.registerTerminal(terminal); }),
-      this.vscode.window.onDidCloseTerminal((terminal) => { void this.markTerminalClosed(terminal); }),
+      this.vscode.window.onDidCloseTerminal((terminal) => { this.closedTerminals.add(terminal); void this.markTerminalClosed(terminal); }),
       this.vscode.workspace.onDidChangeWorkspaceFolders(() => { void this.refreshWorkspaceRegistration(); }),
       this.vscode.debug.onDidStartDebugSession((session) => { void this.registerDebugSession(session); }),
       this.vscode.debug.onDidTerminateDebugSession((session) => { void this.markDebugSessionEnded(session); }),
@@ -152,6 +194,7 @@ export class ManagedSessionController {
     await this.refreshWorkspaceRegistration();
     for (const terminal of this.vscode.window.terminals) await this.registerTerminal(terminal);
     await this.registerDebugConfigurations();
+    await this.refreshSessionNotifications();
     this.scheduleSessionHeartbeat();
     this.scheduleHardwareSignalPoll(0);
   }
@@ -184,6 +227,9 @@ export class ManagedSessionController {
         const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
         await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
       }),
+      this.vscode.commands.registerCommand("sxsy-b122.showQuickReference", async () => {
+        await this.showQuickReference();
+      }),
       this.vscode.commands.registerCommand("sxsy-b122.connectProviderAdapter", async () => {
         await this.connectProviderAdapter();
       }),
@@ -211,6 +257,9 @@ export class ManagedSessionController {
       this.vscode.commands.registerCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
       this.vscode.commands.registerCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.manageAcceptanceEvidence", async () => { await this.manageAcceptanceEvidence(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.manageScannerFixtures", async () => { await this.manageScannerFixtures(); }),
+      this.vscode.commands.registerCommand("sxsy-b122.manageProviderApplications", async () => { await this.manageProviderApplications(); }),
       this.vscode.commands.registerCommand("sxsy-b122.releaseContainment", async () => { await this.releaseContainment(); }),
       this.vscode.commands.registerCommand("sxsy-b122.installRawHid", async () => { await this.installRawHid(); }),
       this.vscode.commands.registerCommand("sxsy-b122.listRawHid", async () => { await this.listRawHid(); }),
@@ -238,6 +287,168 @@ export class ManagedSessionController {
       }));
     }
   }
+
+  /**
+   * Refreshes the protected registry and emits only status-transition
+   * notifications. The heartbeat loop calls this in the background; keeping a
+   * public deterministic seam lets the installed command surface and tests
+   * refresh it without inventing terminal-derived state.
+   */
+  async refreshSessionNotifications(): Promise<void> {
+    const listed = await this.bridge.listSessions();
+    if (!listed.ok) return;
+    const currentIds = new Set(listed.value.map((session) => session.id));
+    for (const session of listed.value) {
+      const prior = this.observedNotificationStatus.get(session.id);
+      this.sessions.set(session.id, session);
+      this.observedNotificationStatus.set(session.id, session.status);
+      if (prior === session.status) continue;
+      if (session.status === "verified_blocked") {
+        await this.vscode.window.showWarningMessage(`SXSY-B122: ${session.provider} session ${session.id} is Blocked and ready in the verified blocker queue.`);
+      } else if (session.status === "verified_finished") {
+        await this.vscode.window.showInformationMessage(`SXSY-B122: ${session.provider} session ${session.id} is Finished and ready in the verified done queue.`);
+      }
+    }
+    for (const sessionId of this.observedNotificationStatus.keys()) if (!currentIds.has(sessionId)) this.observedNotificationStatus.delete(sessionId);
+  }
+
+  private async showQuickReference(): Promise<void> {
+    const items = chordCommands.map((command) => ({
+      label: `${controlLabel(command.control)} · ${modifierLabel(command.modifier)} — ${command.title.replace("SXSY-B122: ", "")}`,
+      description: "Read-only settled assignment; this overlay never dispatches the command."
+    }));
+    await this.vscode.window.showQuickPick(items, { placeHolder: `Search the read-only SXSY-B122 quick reference (${items.length} settled chords)` });
+  }
+
+  private async manageAcceptanceEvidence(): Promise<void> {
+    const operation = await this.vscode.window.showQuickPick([
+      "Install acceptance authority", "Show acceptance authorities", "Revoke acceptance authority",
+      "Import signed acceptance evidence", "Show acceptance evidence", "Invalidate acceptance evidence",
+      "Activate high-consequence action", "Show high-consequence activations", "Revoke high-consequence activation"
+    ] as const, { placeHolder: "Manage independently signed B122 acceptance evidence" });
+    if (!operation) return;
+    try {
+      if (operation === "Install acceptance authority" || operation === "Import signed acceptance evidence") {
+        const sourcePath = await this.pickReviewedJson(operation);
+        if (!sourcePath) return;
+        if (operation === "Install acceptance authority") {
+          const result = await this.bridge.installAcceptanceTrust(sourcePath);
+          if (!result.ok) throw new Error(result.message);
+          await this.vscode.window.showInformationMessage(`Installed acceptance authority ${result.value.authorityId}.`);
+        } else {
+          const result = await this.bridge.importAcceptanceEvidence(sourcePath);
+          if (!result.ok) throw new Error(result.message);
+          await this.vscode.window.showInformationMessage(`Imported signed evidence ${result.value.id} for gate ${result.value.gate}.`);
+        }
+        return;
+      }
+      if (operation === "Show acceptance authorities") {
+        const result = await this.bridge.listAcceptanceTrust(); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Acceptance authorities: ${result.value.length ? result.value.map((item) => `${item.authorityId} ${item.status}`).join("; ") : "none installed"}.`); return;
+      }
+      if (operation === "Revoke acceptance authority") {
+        const listed = await this.bridge.listAcceptanceTrust(); if (!listed.ok) throw new Error(listed.message);
+        const active = listed.value.filter((item) => item.status === "active"); const selected = await this.pickRecord(active, (item) => item.authorityId, (item) => item.keyId.slice(0, 16), "Choose the exact authority to revoke"); if (!selected) return;
+        const reason = await this.adminReason("Why must this acceptance authority be revoked?"); if (!reason) return;
+        const result = await this.bridge.revokeAcceptanceTrust(selected.authorityId, selected.keyId, reason); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Revoked acceptance authority ${selected.authorityId}.`); return;
+      }
+      if (operation === "Show acceptance evidence") {
+        const result = await this.bridge.listAcceptanceEvidence(); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Acceptance evidence: ${result.value.length ? result.value.map((item) => `${item.id} gate ${item.gate} ${item.invalidatedAt ? "invalidated" : item.status}`).join("; ") : "none imported"}.`); return;
+      }
+      if (operation === "Invalidate acceptance evidence") {
+        const listed = await this.bridge.listAcceptanceEvidence(); if (!listed.ok) throw new Error(listed.message);
+        const selected = await this.pickRecord(listed.value.filter((item) => !item.invalidatedAt), (item) => item.id, (item) => `gate ${item.gate} ${item.status}`, "Choose the exact evidence record to invalidate"); if (!selected) return;
+        const reason = await this.adminReason("Why must this acceptance evidence be invalidated?"); if (!reason) return;
+        const result = await this.bridge.invalidateAcceptanceEvidence(selected.id, reason); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Invalidated acceptance evidence ${selected.id}.`); return;
+      }
+      if (operation === "Activate high-consequence action") {
+        const action = await this.vscode.window.showQuickPick(highConsequenceActions, { placeHolder: "Choose one exact high-consequence action" }); if (!action) return;
+        const session = await this.showSessionQueue("all", "Choose the exact target for this bounded activation", (item) => !!item.targetSnapshotId); if (!session?.targetSnapshotId) return;
+        const duration = await this.vscode.window.showQuickPick(["10 minutes", "30 minutes", "1 hour"] as const, { placeHolder: "Choose a short activation lifetime" }); if (!duration) return;
+        const milliseconds = duration === "10 minutes" ? 600_000 : duration === "30 minutes" ? 1_800_000 : 3_600_000;
+        const result = await this.bridge.activateHighConsequence(action, session.targetSnapshotId, new Date(Date.parse(this.now()) + milliseconds).toISOString()); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Activated ${action} only for target ${session.targetSnapshotId.slice(0, 12)}… until ${result.value.expiresAt}.`); return;
+      }
+      if (operation === "Show high-consequence activations") {
+        const result = await this.bridge.listHighConsequenceActivations(); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`High-consequence activations: ${result.value.length ? result.value.map((item) => `${item.action} ${item.status} until ${item.expiresAt}`).join("; ") : "none"}.`); return;
+      }
+      const listed = await this.bridge.listHighConsequenceActivations(); if (!listed.ok) throw new Error(listed.message);
+      const selected = await this.pickRecord(listed.value.filter((item) => item.status === "active"), (item) => item.action, (item) => item.id, "Choose the exact activation to revoke"); if (!selected) return;
+      const reason = await this.adminReason("Why must this activation be revoked?"); if (!reason) return;
+      const result = await this.bridge.revokeHighConsequenceActivation(selected.id, reason); if (!result.ok) throw new Error(result.message);
+      await this.vscode.window.showInformationMessage(`Revoked high-consequence activation ${selected.id}.`);
+    } catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 acceptance administration stopped: ${error instanceof Error ? error.message : "trusted host administration unavailable"}`); }
+  }
+
+  private async manageScannerFixtures(): Promise<void> {
+    const operation = await this.vscode.window.showQuickPick(["Install scanner authority", "Show scanner authorities", "Revoke scanner authority", "Install signed scanner/advisory fixture", "Show scanner/advisory fixtures", "Revoke scanner/advisory fixture"] as const, { placeHolder: "Manage signed scanner and advisory fixtures" });
+    if (!operation) return;
+    try {
+      if (operation === "Install scanner authority" || operation === "Install signed scanner/advisory fixture") {
+        const sourcePath = await this.pickReviewedJson(operation); if (!sourcePath) return;
+        if (operation === "Install scanner authority") {
+          const result = await this.bridge.installScannerTrust(sourcePath);
+          if (!result.ok) throw new Error(result.message);
+          await this.vscode.window.showInformationMessage(`Installed scanner authority ${result.value.authorityId}.`);
+        } else {
+          const result = await this.bridge.installScannerFixture(sourcePath);
+          if (!result.ok) throw new Error(result.message);
+          await this.vscode.window.showInformationMessage(`Installed signed ${result.value.kind} fixture ${result.value.id}.`);
+        }
+        return;
+      }
+      if (operation === "Show scanner authorities") {
+        const result = await this.bridge.listScannerTrust(); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Scanner authorities: ${result.value.length ? result.value.map((item) => `${item.authorityId} ${item.status}`).join("; ") : "none installed"}.`); return;
+      }
+      if (operation === "Revoke scanner authority") {
+        const listed = await this.bridge.listScannerTrust(); if (!listed.ok) throw new Error(listed.message);
+        const selected = await this.pickRecord(listed.value.filter((item) => item.status === "active"), (item) => item.authorityId, (item) => item.keyId.slice(0, 16), "Choose the exact scanner authority to revoke"); if (!selected) return;
+        const reason = await this.adminReason("Why must this scanner authority be revoked?"); if (!reason) return;
+        const result = await this.bridge.revokeScannerTrust(selected.authorityId, selected.keyId, reason); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Revoked scanner authority ${selected.authorityId}.`); return;
+      }
+      if (operation === "Show scanner/advisory fixtures") {
+        const result = await this.bridge.listScannerFixtures(); if (!result.ok) throw new Error(result.message);
+        await this.vscode.window.showInformationMessage(`Signed fixtures: ${result.value.length ? result.value.map((item) => `${item.id} ${item.kind} ${item.status}`).join("; ") : "none installed"}.`); return;
+      }
+      const listed = await this.bridge.listScannerFixtures(); if (!listed.ok) throw new Error(listed.message);
+      const selected = await this.pickRecord(listed.value.filter((item) => item.status === "active"), (item) => item.id, (item) => item.kind, "Choose the exact signed fixture to revoke"); if (!selected) return;
+      const reason = await this.adminReason("Why must this signed fixture be revoked?"); if (!reason) return;
+      const result = await this.bridge.revokeScannerFixture(selected.id, reason); if (!result.ok) throw new Error(result.message);
+      await this.vscode.window.showInformationMessage(`Revoked signed fixture ${selected.id}.`);
+    } catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 scanner administration stopped: ${error instanceof Error ? error.message : "trusted host administration unavailable"}`); }
+  }
+
+  private async manageProviderApplications(): Promise<void> {
+    const operation = await this.vscode.window.showQuickPick(["Install provider application", "Show provider applications", "Revoke provider application"] as const, { placeHolder: "Manage fixed-path provider executables" });
+    if (!operation) return;
+    try {
+      const listed = await this.bridge.listProviderDesktops();
+      if (!listed.ok) throw new Error(listed.message);
+      if (operation === "Show provider applications") {
+        await this.vscode.window.showInformationMessage(`Provider applications: ${listed.value.length ? listed.value.map((item) => `${providerLabel(item.provider)} ${item.status} ${item.identity.executableSha256.slice(0, 12)}…`).join("; ") : "none installed"}.`);
+        return;
+      }
+      const candidates = operation === "Install provider application"
+        ? providerDesktopIds.filter((provider) => !listed.value.some((item) => item.provider === provider && item.status === "active"))
+        : listed.value.filter((item) => item.status === "active").map((item) => item.provider);
+      const selectedLabel = await this.vscode.window.showQuickPick(candidates.map(providerLabel), { placeHolder: operation === "Install provider application" ? "Choose one bootstrap-fixed executable to attest" : "Choose one exact installed provider to revoke" });
+      const provider = selectedLabel ? candidates.find((candidate) => providerLabel(candidate) === selectedLabel) : undefined;
+      if (!provider) return;
+      const result = operation === "Install provider application" ? await this.bridge.installProviderDesktop(provider) : await this.bridge.revokeProviderDesktop(provider);
+      if (!result.ok) throw new Error(result.message);
+      await this.vscode.window.showInformationMessage(`${operation === "Install provider application" ? "Installed" : "Revoked"} ${providerLabel(provider)} at its fixed host path.`);
+    } catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 provider administration stopped: ${error instanceof Error ? error.message : "trusted provider registry unavailable"}`); }
+  }
+
+  private async pickReviewedJson(openLabel: string): Promise<string | undefined> { const selected = await this.vscode.window.showOpenDialog?.({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, openLabel, filters: { "Signed JSON document": ["json"] } }); return selected?.length === 1 ? selected[0]?.fsPath : undefined; }
+  private adminReason(prompt: string): Promise<string | undefined> { return Promise.resolve(this.vscode.window.showInputBox?.({ prompt, validateInput: (value) => value.trim() && value.length <= 2_048 && !/\0/.test(value) ? undefined : "Enter a bounded non-empty reason." })); }
+  private async pickRecord<T>(values: readonly T[], label: (value: T) => string, description: (value: T) => string, placeHolder: string): Promise<T | undefined> { if (!values.length) { await this.vscode.window.showInformationMessage("No matching active records are available."); return undefined; } const items = values.map((value) => ({ label: label(value), description: description(value) })); const selected = await this.vscode.window.showQuickPick(items, { placeHolder }); return selected ? values[items.indexOf(selected)] : undefined; }
 
   private async installRepositoryRuntime(): Promise<void> {
     const root = await this.chooseGitRoot("Choose the exact Git root for this verified runtime manifest");
@@ -701,6 +912,22 @@ export class ManagedSessionController {
       return;
     }
 
+    const workflowOutcome = forwardedWorkflowOutcome(result);
+    const attemptedWorkflowOutcome = result.data?.workflowResult !== undefined || result.data?.resultKind !== undefined;
+    if (attemptedWorkflowOutcome && !workflowOutcome) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected malformed protected workflow-result data from the companion.");
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned malformed workflow-result data and the extension rejected it.", dispatchReceiptId, selectedSession);
+      return;
+    }
+    if (workflowOutcome && (preparedWorkflow === true
+      || workflowOutcome.artifactId !== preparedWorkflow.id
+      || workflowOutcome.artifactDigest !== preparedWorkflow.digest
+      || workflowOutcome.workflowResult.kind !== expectedWorkflowResultKind(preparedWorkflow.action))) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected a protected workflow result that did not match the exact prepared artifact and action.");
+      if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical workflow result changed its prepared artifact or action binding and the extension rejected it.", dispatchReceiptId, selectedSession);
+      return;
+    }
+
     const action = forwardedHostAction(result);
     const attemptedHostAction = result.data?.hostActionId !== undefined || result.data?.hostActionKind !== undefined || result.data?.localAction !== undefined;
     if (attemptedHostAction && !action) {
@@ -714,8 +941,16 @@ export class ManagedSessionController {
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", "The canonical dispatch returned an unexpected host action and the extension rejected it.", dispatchReceiptId, selectedSession);
       return;
     }
+    const pipelineStatusPresented = command.control === "PIPELINE" && command.modifier === "normal"
+      ? await this.presentPipelineStatus(result, selectedSession)
+      : false;
+    let workflowResultPresented = false;
     if (result.status === "blocked" || result.status === "unavailable" || result.status === "incomplete" || result.status === "failed") {
-      await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.status}: ${result.summary}`);
+      if (workflowOutcome) {
+        try { await this.presentWorkflowResult(workflowOutcome.workflowResult); workflowResultPresented = true; }
+        catch { await this.vscode.window.showWarningMessage("SXSY-B122 received a protected workflow result, but VS Code could not open its bounded read-only result view."); }
+      }
+      if (!pipelineStatusPresented) await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.status}: ${result.summary}`);
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
       return;
     }
@@ -726,29 +961,44 @@ export class ManagedSessionController {
         return;
       }
       let succeeded = false;
+      let effectDisposition: "not_started" | "committed" | "ambiguous" = "not_started";
       let summary = "The VS Code host action failed before completion.";
       let authorizationToken: string | undefined;
+      let preparedManagedTerminal: PreparedManagedTerminal | undefined;
       try {
         if (Date.parse(action.expiresAt) <= Date.parse(this.now())) throw new Error("The host-action acknowledgement deadline elapsed.");
         const selectionId = action.kind === "select_github_navigation" ? await this.selectGitHubNavigationCandidate(action) : undefined;
         if (action.kind === "select_github_navigation" && !selectionId) throw new Error("GitHub navigation selection was cancelled; no destination was opened.");
+        if (action.kind === "create_claude_terminal" || action.kind === "create_codex_terminal") {
+          preparedManagedTerminal = await this.prepareManagedAgentTerminal(action.managedTerminalProfile, action.kind === "create_claude_terminal" ? "claude_code" : "codex", action.workspaceRoot);
+        }
         const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion, selectionId);
         if (!authorization.ok) throw new Error(`The companion refused the final host-action barrier: ${authorization.message}`);
         if (authorization.value.hostActionId !== action.id || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The final host-action authorization is mismatched or expired.");
         authorizationToken = authorization.value.authorizationToken;
-        summary = await this.executeLocalHostAction(action, command, authorization.value);
+        summary = await this.executeLocalHostAction(action, command, authorization.value, result, preparedManagedTerminal);
         succeeded = true;
+        effectDisposition = "committed";
       } catch (error) {
         summary = error instanceof Error && error.message ? error.message : summary;
+        if (error instanceof HostEffectError) effectDisposition = error.effectDisposition;
+        if (preparedManagedTerminal && effectDisposition === "not_started") await this.bridge.updateStatus(preparedManagedTerminal.sessionId, "unreachable").catch(() => undefined);
       }
-      const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion, authorizationToken);
+      const completion = await this.bridge.completeHostAction(action.id, succeeded, summary.slice(0, 512), this.extensionVersion, authorizationToken, effectDisposition);
       if (!completion.ok) {
+        this.deferredHostCommands.delete(action.id);
         await this.vscode.window.showWarningMessage(`SXSY-B122 host action requires reconciliation: ${completion.message}`);
         if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The local host action may have occurred but durable settlement failed.", dispatchReceiptId, selectedSession);
         return;
       }
       const show = completion.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
       await show(`SXSY-B122 ${completion.value.status}: ${completion.value.summary}`);
+      const deferredCommand = this.deferredHostCommands.get(action.id);
+      this.deferredHostCommands.delete(action.id);
+      if (completion.value.status === "completed" && deferredCommand) {
+        try { await this.executeCommand(deferredCommand); }
+        catch { await this.vscode.window.showWarningMessage("SXSY-B122 completed the Compound palette selection, but VS Code could not start its canonical reviewed command."); }
+      }
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch and host action settled as ${completion.value.status}.`, dispatchReceiptId, selectedSession);
       return;
     }
@@ -760,7 +1010,15 @@ export class ManagedSessionController {
         return;
       }
     }
-    await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.summary}`);
+    if (workflowOutcome && !workflowResultPresented) {
+      try { await this.presentWorkflowResult(workflowOutcome.workflowResult); workflowResultPresented = true; }
+      catch (error) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 received a protected workflow result, but VS Code could not open its bounded read-only result view: ${error instanceof Error ? error.message : "result view unavailable"}`);
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The provider workflow returned a durable result but exact local result delivery failed.", dispatchReceiptId, selectedSession);
+        return;
+      }
+    }
+    if (!pipelineStatusPresented && !workflowResultPresented) await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.summary}`);
     if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
   }
 
@@ -787,6 +1045,7 @@ export class ManagedSessionController {
         const result = await this.bridge.heartbeat(session.id, at);
         if (result.ok) this.sessions.set(result.value.id, result.value);
       }
+      await this.refreshSessionNotifications();
     } finally {
       this.sessionHeartbeatInFlight = false;
       this.scheduleSessionHeartbeat();
@@ -1026,6 +1285,12 @@ export class ManagedSessionController {
     }
   }
 
+  private async presentWorkflowResult(result: ExtensionWorkflowProviderResult): Promise<void> {
+    const presentation = workflowResultPresentation(result);
+    await this.vscode.window.showInformationMessage(`SXSY-B122 ${presentation.summary}`);
+    await this.vscode.window.showQuickPick(presentation.items, { placeHolder: presentation.placeHolder });
+  }
+
   private async reviewedText(prompt: string, value?: string): Promise<string | undefined> {
     const input = this.vscode.window.showInputBox;
     if (!input) return undefined;
@@ -1043,7 +1308,8 @@ export class ManagedSessionController {
     return value === undefined ? undefined : commaList(value);
   }
 
-  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand, authorization: ForwardedHostActionAuthorization): Promise<string> {
+  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand, authorization: ForwardedHostActionAuthorization, result: ForwardedCommandResult, preparedManagedTerminal?: PreparedManagedTerminal): Promise<string> {
+    this.requireLiveHostAuthorization(authorization);
     switch (action.kind) {
       case "show_handoff_queue":
         return this.openHandoffQueue();
@@ -1074,11 +1340,11 @@ export class ManagedSessionController {
         return `Opened the exact selected GitHub destination ${authorization.selectionId}.`;
       }
       case "create_claude_terminal":
-        await this.createManagedAgentTerminal("SXSY-B122 Claude Code");
-        return "Created the tagged Claude terminal and registered its identity; no unverified provider executable was launched.";
+        await this.createManagedAgentTerminal(preparedManagedTerminal, "claude_code", authorization.expiresAt);
+        return "Created the exact current-user-approved Claude Code terminal and registered its identity.";
       case "create_codex_terminal":
-        await this.createManagedAgentTerminal("SXSY-B122 Codex");
-        return "Created the tagged Codex terminal and registered its identity; no unverified provider executable was launched.";
+        await this.createManagedAgentTerminal(preparedManagedTerminal, "codex", authorization.expiresAt);
+        return "Created the exact current-user-approved Codex terminal and registered its identity.";
       case "start_vscode_debug": {
         if (!action.workspaceRoot || !action.debugConfiguration) throw new Error("The companion did not bind debug to an exact workspace and launch configuration.");
         const workspaceRoot = action.workspaceRoot;
@@ -1108,8 +1374,7 @@ export class ManagedSessionController {
         return "Selected the exact repo-local Python interpreter and opened a terminal with that environment activated.";
       }
       case "focus_vscode":
-        await this.executeCommand("workbench.action.focusActiveEditorGroup");
-        return "Focused the active VS Code editor group.";
+        return this.focusOrCycleVscode();
       case "new_vscode_window":
         await this.executeCommand("workbench.action.newWindow");
         return "Opened a new VS Code window.";
@@ -1120,16 +1385,14 @@ export class ManagedSessionController {
         await this.focusIntegratedTerminal();
         return "Focused the integrated VS Code terminal.";
       case "open_compound_palette":
-        await this.executeCommand("workbench.action.showCommands");
-        return "Opened the VS Code command palette for installed Compound commands.";
+        return this.openCompoundPalette(action.id, action.workspaceRoot);
       case "switch_voice_provider": {
         return this.switchDurableVoiceProvider();
       }
       case "show_voice_session_picker":
         return this.bindDurableVoiceSession();
       case "show_pipeline_failure_trace":
-        await this.executeCommand("workbench.action.output.toggleOutput");
-        return "Opened the VS Code output surface for the pipeline failure trace.";
+        return this.presentPipelineFailureTrace(result);
     }
   }
 
@@ -1199,9 +1462,7 @@ export class ManagedSessionController {
       if (!started.ok) throw new Error(`Durable voice binding was not started: ${started.message}`);
       binding = started.value;
     }
-    const url = providerVoiceUrl(binding.provider);
-    if (!url || !await this.openExternal(url)) throw new Error("The selected voice provider has no trusted installed web surface or VS Code did not confirm opening it.");
-    return `Opened ${binding.provider} voice with immutable context ${binding.contextPackageId}; transcript policy is ${binding.transcript}.`;
+    return this.ensureNativeVoiceSession(binding, "started");
   }
 
   private async switchDurableVoiceProvider(): Promise<string> {
@@ -1217,15 +1478,38 @@ export class ManagedSessionController {
     if (!consent.ok) throw new Error(`Fresh current-user voice consent was not granted: ${consent.message}`);
     const switched = await this.bridge.switchVoice({ bindingId: current.value.id, consentId: consent.value.id, voiceSessionId: `voice-${this.idFactory()}` });
     if (!switched.ok) throw new Error(`Voice provider was not switched: ${switched.message}`);
-    const url = providerVoiceUrl(switched.value.provider);
-    if (!url || !await this.openExternal(url)) throw new Error("The selected voice provider has no trusted installed web surface or VS Code did not confirm opening it.");
-    return `Switched voice to ${switched.value.provider} while retaining exact context ${switched.value.contextPackageId}.`;
+    return this.ensureNativeVoiceSession(switched.value, "switched");
+  }
+
+  private async ensureNativeVoiceSession(binding: ExtensionVoiceBinding, verb: "started" | "switched"): Promise<string> {
+    const current = await this.bridge.listSessions();
+    if (!current.ok) throw new Error(`Native voice ${verb}, but the protected managed-session registry is unavailable: ${current.message}`);
+    for (const session of current.value) this.sessions.set(session.id, session);
+    const matchesBinding = (candidate: ExtensionManagedSession): boolean => candidate.workspaceRoot !== undefined
+      && samePath(candidate.workspaceRoot, binding.repositoryRoot)
+      && candidate.targetSnapshotId === binding.targetSnapshotId
+      && (candidate.surface === "vscode_terminal" || candidate.surface === "vscode_window");
+    let session = binding.managedSessionId ? this.sessions.get(binding.managedSessionId) : undefined;
+    if (!session || !matchesBinding(session)) {
+      try {
+        session = await this.pickKnownSessionQueue("all", "Native voice is active — bind its single exact managed session", matchesBinding);
+      } catch (error) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 native ${binding.provider} voice is ${binding.status} but unbound. Use Voice Shift+Alt when an exact VS Code managed session is registered. ${error instanceof Error ? error.message : "Exact session picker unavailable."}`);
+        return `Native ${binding.provider} voice runtime ${verb} with immutable context ${binding.contextPackageId}, but it remains unbound to a VS Code managed session.`;
+      }
+      if (!session) return `Native ${binding.provider} voice runtime ${verb} but remains unbound to a VS Code managed session.`;
+      const bound = await this.bridge.bindVoice(binding.id, session.id);
+      if (!bound.ok) throw new Error(`Native voice ${verb}, but binding the selected exact managed session failed: ${bound.message}`);
+      binding = bound.value;
+    }
+    await this.focusManagedSession(session);
+    return `Native ${binding.provider} voice runtime ${verb} and is ${binding.status}, bound to exact managed session ${session.id} with immutable context ${binding.contextPackageId}; transcript policy is ${binding.transcript}.`;
   }
 
   private async bindDurableVoiceSession(): Promise<string> {
     const current = await this.bridge.currentVoice();
     if (!current.ok || !current.value || current.value.status === "ended") throw new Error("No current durable voice binding is available.");
-    const session = await this.showSessionQueue("all", "Choose the single exact managed session for voice", (candidate) => candidate.workspaceRoot !== undefined && samePath(candidate.workspaceRoot, current.value!.repositoryRoot) && candidate.targetSnapshotId === current.value!.targetSnapshotId);
+    const session = await this.showSessionQueue("all", "Choose the single exact managed session for native voice", (candidate) => candidate.workspaceRoot !== undefined && samePath(candidate.workspaceRoot, current.value!.repositoryRoot) && candidate.targetSnapshotId === current.value!.targetSnapshotId && (candidate.surface === "vscode_terminal" || candidate.surface === "vscode_window"));
     if (!session) throw new Error("Voice session selection was cancelled.");
     const bound = await this.bridge.bindVoice(current.value.id, session.id);
     if (!bound.ok) throw new Error(`Voice was not bound to the selected session: ${bound.message}`);
@@ -1249,6 +1533,10 @@ export class ManagedSessionController {
     const current = await this.bridge.listSessions();
     if (!current.ok) throw new Error(`The protected managed-session registry is unavailable: ${current.message}`);
     for (const session of current.value) this.sessions.set(session.id, session);
+    return this.pickKnownSessionQueue(status, placeHolder, predicate);
+  }
+
+  private async pickKnownSessionQueue(status: ExtensionManagedSession["status"] | "all", placeHolder: string, predicate: (session: ExtensionManagedSession) => boolean): Promise<ExtensionManagedSession | undefined> {
     const candidates = [...this.sessions.values()].filter((session) => (status === "all" || session.status === status) && predicate(session));
     if (!candidates.length) throw new Error(status === "all" ? "No managed sessions are registered." : `No ${status.replace("verified_", "verified ")} sessions are available.`);
     const items = candidates.map((session) => ({ label: `${session.provider}: ${session.id}`, description: `${session.surface} / ${session.status}` }));
@@ -1257,16 +1545,242 @@ export class ManagedSessionController {
     return candidates[items.indexOf(selected)];
   }
 
-  private async createManagedAgentTerminal(name: string): Promise<void> {
-    const terminal = this.vscode.window.createTerminal({ name });
-    terminal.show();
-    // A bare executable name would be resolved through the user's PATH and is
-    // not a trustworthy provider identity.  The extension creates and tags the
-    // surface only; an installed provider must attach through the companion's
-    // attested handshake before gaining Observable/Controllable/Mediated
-    // capabilities.
-    await this.registerTerminal(terminal);
-    await this.vscode.window.showWarningMessage(`SXSY-B122 opened ${name} as Registered only and did not launch an unverified provider executable. Attach an installed provider through the companion handshake before treating it as Observable, Controllable, or Mediated.`);
+  private async focusOrCycleVscode(): Promise<string> {
+    const now = Date.parse(this.now());
+    if (!Number.isFinite(now)) throw new Error("The trusted host clock is unavailable for the VS Code repeat gesture.");
+    const state = this.context.globalState ?? this.context.workspaceState;
+    const prior = state.get<Readonly<{ version: 1; pressedAt: number }>>(vscodeRepeatStateKey);
+    const repeated = prior?.version === 1 && Number.isFinite(prior.pressedAt) && now >= prior.pressedAt && now - prior.pressedAt <= this.repeatWindowMs;
+    if (repeated) {
+      await this.executeCommand("workbench.action.switchWindow");
+      await this.executeCommand("workbench.action.quickOpenNavigateNextInViewPicker");
+      await this.executeCommand("workbench.action.acceptSelectedQuickOpenItem");
+    } else {
+      await this.executeCommand("workbench.action.focusActiveEditorGroup");
+    }
+    await state.update(vscodeRepeatStateKey, { version: 1, pressedAt: now });
+    return repeated ? "Cycled to the next open VS Code window." : "Focused the last-used VS Code window.";
+  }
+
+  private async openCompoundPalette(hostActionId: string, workspaceRoot: string | undefined): Promise<string> {
+    if (!workspaceRoot) throw new Error("The Compound palette is not bound to an exact repository root.");
+    const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
+    if (!folder) throw new Error("The exact Compound repository is no longer open in this VS Code window.");
+    const target = this.gitRoots.find((root) => samePath(root.gitRoot, workspaceRoot));
+    const branch = target?.branch ?? "unknown branch";
+    const choices = [
+      { label: "Capture — ce-compound", description: "Capture one solved, verified problem as durable project learning.", command: "sxsy-b122.chord.compound.normal" },
+      { label: "Refresh — ce-compound-refresh", description: "Mutating learning audit; the canonical route previews scope and requires review.", command: "sxsy-b122.chord.compound.shift" },
+      { label: "Full Loop — lfg", description: "High-consequence plan-to-PR loop; acceptance gates and wrapper confirmation remain mandatory.", command: "sxsy-b122.chord.compound.shift_alt" }
+    ] as const;
+    const items = choices.map(({ label, description }) => ({ label, description }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: `Compound workflows for ${workspaceRoot} on ${branch}` });
+    if (!selected) return `Opened the repository-bound Compound workflow palette for ${branch}; no workflow was selected.`;
+    const choice = choices[items.indexOf(selected)];
+    if (!choice) throw new Error("The Compound workflow selection is no longer valid.");
+    this.deferredHostCommands.set(hostActionId, choice.command);
+    return `Selected ${choice.label} from the repository-bound palette for ${branch}; its canonical B122 command will start only after this host action is durably acknowledged.`;
+  }
+
+  private async presentPipelineStatus(result: ForwardedCommandResult, selectedSessionId: string | undefined): Promise<boolean> {
+    const view = pipelineStatusView(result);
+    const session = selectedSessionId ? this.sessions.get(selectedSessionId) : undefined;
+    const branch = safeOverlayText(session?.metadata["sxsy-b122.branch"] ?? "unknown branch", 160);
+    const targetKey = session?.targetSnapshotId ?? session?.workspaceRoot ?? selectedSessionId ?? "unbound";
+    let selectedFailure: PipelineFailureView | undefined;
+    let selectedIndex = 0;
+    if (view.failures.length) {
+      const seriesDigest = createHash("sha256").update(JSON.stringify(view.failures)).digest("hex");
+      const state = this.context.globalState ?? this.context.workspaceState;
+      const prior = state.get<Readonly<{ version: 1; targetKey: string; seriesDigest: string; index: number }>>(pipelineFailureCursorStateKey);
+      selectedIndex = prior?.version === 1 && prior.targetKey === targetKey && prior.seriesDigest === seriesDigest
+        ? (prior.index + 1) % view.failures.length
+        : 0;
+      await state.update(pipelineFailureCursorStateKey, { version: 1, targetKey, seriesDigest, index: selectedIndex });
+      selectedFailure = view.failures[selectedIndex];
+    }
+    const hosted = `${view.hostedState}${view.head ? ` at ${view.head.slice(0, 12)}…` : ""}`;
+    const localReceipt = view.latestLocalReceipt
+      ? `; local ${view.latestLocalReceipt.action}=${view.latestLocalReceipt.result} (${view.latestLocalReceipt.completeness})`
+      : `; local ${view.localStatus}`;
+    const failure = selectedFailure
+      ? `. Failure ${selectedIndex + 1} of ${view.failures.length}: ${selectedFailure.name}=${selectedFailure.outcome}${selectedFailure.summary ? ` — ${selectedFailure.summary}` : ""}. Press Pipeline again to cycle failures; Alt Pipeline opens the bounded diagnosis.`
+      : ". No failing gate was reported for this exact observation. Shift Pipeline runs the declared isolated local gate; Alt Pipeline opens a bounded diagnosis only when a failure exists.";
+    const message = safeOverlayText(`SXSY-B122 Pipeline ${branch}: hosted ${hosted}${localReceipt}${failure}`, 1_024);
+    if (view.failures.length || ["FAILURE", "ERROR"].includes(view.hostedState) || result.status !== "completed") await this.vscode.window.showWarningMessage(message);
+    else await this.vscode.window.showInformationMessage(message);
+    return true;
+  }
+
+  private async presentPipelineFailureTrace(result: ForwardedCommandResult): Promise<string> {
+    const trace = pipelineFailureTraceView(result);
+    if (!trace) throw new Error("The companion did not return the selected exact-head failure excerpt and bounded diagnosis.");
+    const outcome = trace.selectedFailure.conclusion ?? trace.selectedFailure.state;
+    const items: readonly QuickPickItemLike[] = [
+      workflowResultItem(`${trace.selectedFailure.name}: ${outcome}`, `Failure ${trace.selectedIndex + 1} of ${trace.failureCount} / ${trace.head.slice(0, 12)}…`, trace.logExcerpt),
+      workflowResultItem("Bounded diagnosis", trace.repeatAvailable ? "Press Alt Pipeline again for the next failed context" : "Single failed context", trace.diagnosis),
+      ...(trace.selectedFailure.summary && trace.selectedFailure.summary !== trace.logExcerpt
+        ? [workflowResultItem("Provider summary", trace.selectedFailure.kind, trace.selectedFailure.summary)]
+        : [])
+    ];
+    await this.vscode.window.showQuickPick(items, { placeHolder: `Failure ${trace.selectedIndex + 1} of ${trace.failureCount} for exact head ${trace.head.slice(0, 12)}… — read-only evidence` });
+    return `Presented protected failure ${trace.selectedIndex + 1} of ${trace.failureCount} for exact head ${trace.head.slice(0, 12)}… with its bounded excerpt and diagnosis.`;
+  }
+
+  private async prepareManagedAgentTerminal(profile: ManagedTerminalProfileSummary | undefined, expectedProvider: "claude_code" | "codex", workspaceRoot: string | undefined): Promise<PreparedManagedTerminal> {
+    if (!profile || profile.provider !== expectedProvider || profile.shell !== false || profile.args.length !== 0 || profile.requiresFinalIdentityVerification !== true || Date.parse(profile.validUntil) <= Date.parse(this.now())) throw new Error("The companion did not provide a live exact managed-terminal executable profile.");
+    if (!workspaceRoot) throw new Error("The managed-terminal host action is not bound to an exact workspace root.");
+    const requestedRoot = resolve(workspaceRoot);
+    const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(resolve(candidate.uri.fsPath), requestedRoot));
+    if (!folder) throw new Error("The exact managed-terminal workspace is no longer open in this VS Code host.");
+    const rootLink = await lstat(requestedRoot);
+    if (!rootLink.isDirectory() || rootLink.isSymbolicLink()) throw new Error("The exact managed-terminal workspace is absent or linked.");
+    const canonicalRoot = await realpath(requestedRoot);
+    const canonicalFolder = await realpath(resolve(folder.uri.fsPath));
+    if (!samePath(canonicalRoot, canonicalFolder)) throw new Error("The managed-terminal workspace identity changed before creation.");
+    const rootIdentity = await stat(canonicalRoot);
+    const rootExactIdentity = await exactFilesystemIdentity(canonicalRoot);
+    if (!rootIdentity.isDirectory()) throw new Error("The managed-terminal workspace is not a directory.");
+    const configured = resolve(profile.canonicalExecutablePath);
+    const link = await lstat(configured);
+    if (!link.isFile() || link.isSymbolicLink() || link.size <= 0 || link.size > 2 * 1024 * 1024 * 1024) throw new Error("The managed-terminal provider is absent, linked, or outside its bounded executable size.");
+    const canonical = await realpath(configured);
+    if (!samePath(canonical, configured)) throw new Error("The managed-terminal provider path resolves through an unexpected filesystem alias.");
+    const before = await stat(canonical);
+    const beforeExact = await exactFilesystemIdentity(canonical);
+    const digest = await sha256File(canonical);
+    const after = await stat(canonical);
+    const afterExact = await exactFilesystemIdentity(canonical);
+    if (digest !== profile.executableSha256 || before.size !== after.size || before.mtimeMs !== after.mtimeMs || beforeExact.device !== afterExact.device || beforeExact.inode !== afterExact.inode
+      || after.size !== profile.executableSize || after.mtimeMs !== profile.executableModifiedMs || afterExact.device !== profile.executableDevice || afterExact.inode !== profile.executableInode
+      || Date.parse(profile.validUntil) <= Date.parse(this.now())) throw new Error("The managed-terminal provider identity changed before VS Code creation.");
+    const configuredLauncher = resolve(profile.canonicalLauncherPath);
+    const launcherLink = await lstat(configuredLauncher);
+    if (!launcherLink.isFile() || launcherLink.isSymbolicLink() || launcherLink.size <= 0 || launcherLink.size > 256 * 1024 * 1024) throw new Error("The fixed managed-terminal launcher is absent, linked, or outside its bounded executable size.");
+    const canonicalLauncher = await realpath(configuredLauncher);
+    if (!samePath(canonicalLauncher, configuredLauncher)) throw new Error("The fixed managed-terminal launcher resolves through an unexpected filesystem alias.");
+    const launcherBefore = await stat(canonicalLauncher);
+    const launcherBeforeExact = await exactFilesystemIdentity(canonicalLauncher);
+    const launcherDigest = await sha256File(canonicalLauncher);
+    const launcherAfter = await stat(canonicalLauncher);
+    const launcherAfterExact = await exactFilesystemIdentity(canonicalLauncher);
+    if (launcherDigest !== profile.launcherSha256 || launcherBefore.size !== launcherAfter.size || launcherBefore.mtimeMs !== launcherAfter.mtimeMs
+      || launcherBeforeExact.device !== launcherAfterExact.device || launcherBeforeExact.inode !== launcherAfterExact.inode) throw new Error("The fixed managed-terminal launcher identity changed before VS Code creation.");
+    const sessionId = this.idFactory();
+    const adoptionKey = `terminal:${sessionId}`;
+    const pending = this.makeSession(sessionId, "generic", "vscode_terminal", "unknown", {
+      "sxsy-b122.kind": "terminal",
+      "sxsy-b122.terminalName": profile.profileName,
+      "sxsy-b122.adoptionKey": adoptionKey,
+      "sxsy-b122.providerInstallation": profile.installationId
+    }, canonicalRoot);
+    const registered = await this.bridge.registerSession(pending, "terminal");
+    if (!registered.ok) throw new Error(`The exact managed-terminal identity could not be reserved before creation: ${registered.message}`);
+    return {
+      profile,
+      expectedProvider,
+      canonicalRoot,
+      rootDevice: rootExactIdentity.device,
+      rootInode: rootExactIdentity.inode,
+      canonicalExecutablePath: canonical,
+      executableSize: after.size,
+      executableModifiedMs: after.mtimeMs,
+      executableDevice: afterExact.device,
+      executableInode: afterExact.inode,
+      canonicalLauncherPath: canonicalLauncher,
+      launcherSize: launcherAfter.size,
+      launcherModifiedMs: launcherAfter.mtimeMs,
+      launcherDevice: launcherAfterExact.device,
+      launcherInode: launcherAfterExact.inode,
+      sessionId,
+      adoptionKey,
+      registeredSession: registered.value
+    };
+  }
+
+  private async createManagedAgentTerminal(prepared: PreparedManagedTerminal | undefined, expectedProvider: "claude_code" | "codex", authorizationExpiresAt: string): Promise<void> {
+    if (!prepared || prepared.expectedProvider !== expectedProvider || prepared.profile.provider !== expectedProvider) throw new Error("The managed-terminal provider preflight is missing or bound to another provider.");
+    this.requireLiveHostAuthorization({ expiresAt: authorizationExpiresAt });
+    if (Date.parse(prepared.profile.validUntil) <= Date.parse(this.now())) throw new Error("The managed-terminal executable profile expired before creation.");
+    const rootLink = await lstat(prepared.canonicalRoot);
+    const currentRoot = await realpath(prepared.canonicalRoot);
+    const rootIdentity = await stat(currentRoot);
+    const rootExactIdentity = await exactFilesystemIdentity(currentRoot);
+    if (!rootLink.isDirectory() || rootLink.isSymbolicLink() || !samePath(currentRoot, prepared.canonicalRoot)
+      || !rootIdentity.isDirectory() || rootExactIdentity.device !== prepared.rootDevice || rootExactIdentity.inode !== prepared.rootInode) throw new Error("The managed-terminal workspace identity changed after final authorization.");
+    const executableLink = await lstat(prepared.canonicalExecutablePath);
+    const currentExecutable = await realpath(prepared.canonicalExecutablePath);
+    const executableIdentity = await stat(currentExecutable);
+    const executableExactIdentity = await exactFilesystemIdentity(currentExecutable);
+    if (!executableLink.isFile() || executableLink.isSymbolicLink() || !samePath(currentExecutable, prepared.canonicalExecutablePath)
+      || executableIdentity.size !== prepared.executableSize || executableIdentity.mtimeMs !== prepared.executableModifiedMs
+      || executableExactIdentity.device !== prepared.executableDevice || executableExactIdentity.inode !== prepared.executableInode) throw new Error("The managed-terminal provider identity changed after final authorization.");
+    const launcherLink = await lstat(prepared.canonicalLauncherPath);
+    const currentLauncher = await realpath(prepared.canonicalLauncherPath);
+    const launcherIdentity = await stat(currentLauncher);
+    const launcherExactIdentity = await exactFilesystemIdentity(currentLauncher);
+    if (!launcherLink.isFile() || launcherLink.isSymbolicLink() || !samePath(currentLauncher, prepared.canonicalLauncherPath)
+      || launcherIdentity.size !== prepared.launcherSize || launcherIdentity.mtimeMs !== prepared.launcherModifiedMs
+      || launcherExactIdentity.device !== prepared.launcherDevice || launcherExactIdentity.inode !== prepared.launcherInode) throw new Error("The fixed managed-terminal launcher identity changed after final authorization.");
+    this.requireLiveHostAuthorization({ expiresAt: authorizationExpiresAt });
+    const receiptReservation = await this.managedTerminalReceiptFactory({ provider: expectedProvider, canonicalExecutablePath: prepared.canonicalExecutablePath, canonicalWorkspaceRoot: prepared.canonicalRoot });
+    const descriptor = Buffer.from(JSON.stringify({
+      schema: "sxsy-b122.managed-terminal-launch",
+      version: 1,
+      provider: expectedProvider,
+      identity: {
+        canonicalExecutablePath: prepared.canonicalExecutablePath,
+        executableSha256: prepared.profile.executableSha256,
+        signerSubject: prepared.profile.signerSubject,
+        signerThumbprint: prepared.profile.signerThumbprint,
+        productIdentity: prepared.profile.productIdentity,
+        size: prepared.executableSize,
+        modifiedMs: prepared.executableModifiedMs,
+        device: prepared.executableDevice,
+        inode: prepared.executableInode
+      },
+      workspace: { canonicalPath: prepared.canonicalRoot, device: prepared.rootDevice, inode: prepared.rootInode },
+      receipt: { pipeName: receiptReservation.pipeName, token: receiptReservation.token }
+    }), "utf8").toString("base64url");
+    if (descriptor.length > 16_384) {
+      await receiptReservation.dispose();
+      throw new Error("The exact managed-terminal launch descriptor is oversized.");
+    }
+    let terminal: TerminalLike;
+    try {
+      terminal = this.vscode.window.createTerminal({ name: prepared.profile.profileName, cwd: prepared.canonicalRoot, shellPath: prepared.canonicalLauncherPath, shellArgs: ["--managed-terminal-v1", descriptor] });
+    } catch (error) {
+      await receiptReservation.dispose().catch(() => undefined);
+      throw error;
+    }
+    const { sessionId, adoptionKey } = prepared;
+    const record: TrackedTerminal = { sessionId, adoptionKey, adopted: false, session: prepared.registeredSession };
+    this.terminalRecords.set(terminal, record);
+    this.terminalBySessionId.set(sessionId, record);
+    this.sessions.set(sessionId, prepared.registeredSession);
+    try {
+      terminal.show();
+      const processId = terminal.processId ? await boundedPromise(Promise.resolve(terminal.processId), 5_000, "The managed-terminal launcher did not expose a process identity.") : undefined;
+      if (!Number.isSafeInteger(processId) || (processId ?? 0) <= 0) throw new Error("The managed-terminal launcher did not expose a valid process identity.");
+      const receipt = await boundedPromise(receiptReservation.wait(), 10_000, "The native managed-terminal launcher did not attest a started provider child.");
+      if (receipt.provider !== expectedProvider || !Number.isSafeInteger(receipt.processId) || receipt.processId <= 0
+        || !samePath(receipt.canonicalExecutablePath, prepared.canonicalExecutablePath) || !samePath(receipt.canonicalWorkspaceRoot, prepared.canonicalRoot)) {
+        throw new Error("The native managed-terminal child-start receipt was malformed or substituted.");
+      }
+      await sleep(this.managedTerminalHealthMs);
+      if (this.closedTerminals.has(terminal)) throw new Error("The managed-terminal launcher or provider exited before its bounded health window.");
+      const adopted = await this.bridge.adoptTerminal(sessionId, adoptionKey, expectedProvider === "claude_code" ? "claude" : "codex");
+      if (!adopted.ok) throw new Error(adopted.message);
+      record.adopted = true;
+      record.session = adopted.value;
+      this.sessions.set(sessionId, adopted.value);
+    } catch (error) {
+      throw new HostEffectError(`The exact terminal was created but its durable Registered identity requires reconciliation: ${error instanceof Error ? error.message : "adoption unavailable"}`, "ambiguous");
+    } finally { await receiptReservation.dispose().catch(() => undefined); }
+  }
+
+  private requireLiveHostAuthorization(authorization: Pick<ForwardedHostActionAuthorization, "expiresAt">): void {
+    if (!Number.isFinite(Date.parse(authorization.expiresAt)) || Date.parse(authorization.expiresAt) <= Date.parse(this.now())) throw new Error("The one-time host-action authorization expired before the local effect.");
   }
 
   private async focusIntegratedTerminal(): Promise<void> {
@@ -1329,6 +1843,32 @@ export class ManagedSessionController {
   }
 }
 
+interface PreparedManagedTerminal {
+  readonly profile: ManagedTerminalProfileSummary;
+  readonly expectedProvider: "claude_code" | "codex";
+  readonly canonicalRoot: string;
+  readonly rootDevice: string;
+  readonly rootInode: string;
+  readonly canonicalExecutablePath: string;
+  readonly executableSize: number;
+  readonly executableModifiedMs: number;
+  readonly executableDevice: string;
+  readonly executableInode: string;
+  readonly canonicalLauncherPath: string;
+  readonly launcherSize: number;
+  readonly launcherModifiedMs: number;
+  readonly launcherDevice: string;
+  readonly launcherInode: string;
+  readonly sessionId: string;
+  readonly adoptionKey: string;
+  readonly registeredSession: ExtensionManagedSession;
+}
+
+class HostEffectError extends Error {
+  readonly effectDisposition: "committed" | "ambiguous";
+  constructor(message: string, effectDisposition: "committed" | "ambiguous") { super(message); this.effectDisposition = effectDisposition; }
+}
+
 function workflowActionForCommand(command: ChordCommand): ExtensionWorkflowAction | undefined {
   const value = workflowCommandActions[`${command.control}:${command.modifier}`];
   return value;
@@ -1345,8 +1885,292 @@ function boundedHeartbeatInterval(value: number): number {
   if (!Number.isSafeInteger(value) || value < 10 || value > 5 * 60_000) throw new Error("The local session heartbeat interval is invalid.");
   return value;
 }
-function providerVoiceUrl(provider: ExtensionVoiceProvider): string | undefined { return provider === "claude" ? "https://claude.ai/new" : provider === "chatgpt" ? "https://chatgpt.com/" : undefined; }
+function boundedManagedTerminalHealth(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 10 || value > 5_000) throw new Error("The managed-terminal health interval is invalid.");
+  return value;
+}
+function boundedRepeatWindow(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 250 || value > 5_000) throw new Error("The repeat-gesture interval is invalid.");
+  return value;
+}
+async function boundedPromise<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs); })
+    ]);
+  } finally { if (timer) clearTimeout(timer); }
+}
+async function sleep(milliseconds: number): Promise<void> { await new Promise<void>((resolveSleep) => setTimeout(resolveSleep, milliseconds)); }
+async function reserveManagedTerminalReceipt(input: Readonly<{ provider: "claude_code" | "codex"; canonicalExecutablePath: string; canonicalWorkspaceRoot: string }>): Promise<ManagedTerminalReceiptReservation> {
+  if (process.platform !== "win32") throw new Error("The native managed-terminal receipt boundary requires Windows.");
+  const pipeName = `sxsy-b122-managed-${randomBytes(20).toString("hex")}`;
+  const pipePath = `\\\\.\\pipe\\${pipeName}`;
+  const token = randomBytes(32).toString("hex");
+  let settle!: (value: ManagedTerminalLaunchReceipt) => void;
+  let reject!: (error: Error) => void;
+  let settled = false;
+  let connected = false;
+  const sockets = new Set<import("node:net").Socket>();
+  const receipt = new Promise<ManagedTerminalLaunchReceipt>((resolveReceipt, rejectReceipt) => { settle = resolveReceipt; reject = rejectReceipt; });
+  receipt.catch(() => undefined);
+  const fail = (message: string): void => {
+    if (settled) return;
+    settled = true;
+    reject(new Error(message));
+    for (const socket of sockets) socket.destroy();
+  };
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.once("close", () => sockets.delete(socket));
+    if (connected) { socket.destroy(); return fail("More than one process connected to the one-shot managed-terminal receipt pipe."); }
+    connected = true;
+    socket.setEncoding("utf8");
+    let buffer = "";
+    socket.on("data", (chunk: string) => {
+      if (settled) return;
+      buffer += chunk;
+      if (Buffer.byteLength(buffer, "utf8") > 4_096) return fail("The managed-terminal child-start receipt was oversized.");
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      if (buffer.slice(newline + 1).trim()) return fail("The managed-terminal launcher emitted more than one receipt.");
+      let value: unknown;
+      try { value = JSON.parse(buffer.slice(0, newline).replace(/\r$/, "")); }
+      catch { return fail("The managed-terminal launcher emitted invalid receipt JSON."); }
+      const keys = isRecord(value) ? Object.keys(value).sort() : [];
+      if (!isRecord(value) || keys.join("|") !== "canonicalExecutablePath|canonicalWorkspaceRoot|processId|provider|schema|token|version"
+        || value.schema !== "sxsy-b122.managed-terminal-started" || value.version !== 1 || value.token !== token
+        || value.provider !== input.provider || !Number.isSafeInteger(value.processId) || (value.processId as number) <= 0
+        || typeof value.canonicalExecutablePath !== "string" || !samePath(value.canonicalExecutablePath, input.canonicalExecutablePath)
+        || typeof value.canonicalWorkspaceRoot !== "string" || !samePath(value.canonicalWorkspaceRoot, input.canonicalWorkspaceRoot)) {
+        return fail("The managed-terminal launcher emitted a malformed or substituted child-start receipt.");
+      }
+      settled = true;
+      settle({ provider: input.provider, processId: value.processId as number, canonicalExecutablePath: value.canonicalExecutablePath, canonicalWorkspaceRoot: value.canonicalWorkspaceRoot });
+      socket.end();
+    });
+    socket.once("error", () => fail("The managed-terminal child-start receipt pipe failed."));
+    socket.once("end", () => { if (!settled) fail("The managed-terminal launcher closed before a complete child-start receipt."); });
+  });
+  server.once("error", () => fail("The managed-terminal child-start receipt pipe could not be created."));
+  await new Promise<void>((resolveListen, rejectListen) => {
+    server.once("listening", resolveListen);
+    server.once("error", rejectListen);
+    server.listen(pipePath);
+  });
+  return {
+    pipeName,
+    token,
+    wait: async () => receipt,
+    dispose: async () => {
+      if (!settled) fail("The managed-terminal child-start receipt reservation was closed.");
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose())).catch(() => undefined);
+    }
+  };
+}
+function providerLabel(provider: ProviderDesktopId): string { return ({ claude_desktop: "Claude Desktop", chatgpt_desktop: "ChatGPT Desktop", claude_code: "Claude Code", codex: "Codex" } as const)[provider]; }
 function commaList(value: string): readonly string[] { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }
+
+export interface WorkflowResultPresentation {
+  readonly summary: string;
+  readonly placeHolder: string;
+  readonly items: readonly QuickPickItemLike[];
+}
+
+export function workflowResultPresentation(result: ExtensionWorkflowProviderResult): WorkflowResultPresentation {
+  const readOnly = "Read-only protected result — selecting an item does not approve or execute it";
+  switch (result.kind) {
+    case "anchor": {
+      const items: QuickPickItemLike[] = [{ label: "Anchor digest", description: result.anchorDigest.slice(0, 16), detail: "Automatic resume remained disabled." }];
+      result.discrepancies.forEach((item, index) => items.push(workflowResultItem(`Discrepancy ${index + 1}`, "Review against accepted context", item)));
+      result.questions.forEach((item, index) => items.push(workflowResultItem(`Question ${index + 1}`, "Operator answer required", item)));
+      return { summary: `Re-anchor result: ${result.discrepancies.length} discrepancies and ${result.questions.length} questions; automatic resume remains disabled.`, placeHolder: readOnly, items: boundedWorkflowResultItems(items) };
+    }
+    case "proof": {
+      const items: QuickPickItemLike[] = result.backendResults.map((backend) => workflowResultItem(`Backend: ${backend.backend}`, backend.status, `Protected backend outcome: ${backend.status}.`));
+      result.verifiedClaims.forEach((claim, index) => items.push(workflowResultItem(`Verified claim ${index + 1}`, "Provider-verified", claim)));
+      result.evidenceReferences.forEach((reference, index) => items.push(workflowResultItem(`Evidence ${index + 1}`, "Protected reference", reference)));
+      if (!items.length) items.push(workflowResultItem("No proof evidence returned", "Incomplete protected result", "No verified claims, evidence references, or backend outcomes were present."));
+      const failed = result.backendResults.filter((backend) => backend.status !== "passed").length;
+      return { summary: `Proof result: ${result.verifiedClaims.length} verified claims, ${result.evidenceReferences.length} evidence references, ${failed} non-passing backends.`, placeHolder: readOnly, items: boundedWorkflowResultItems(items) };
+    }
+    case "decision": {
+      const items: QuickPickItemLike[] = [];
+      for (const decision of result.decisions) {
+        for (const option of decision.options) {
+          const recommended = option.id === decision.recommendationId;
+          const tradeoffs = workflowResultList(option.tradeoffs, "None reported");
+          const risks = workflowResultList(option.risks, "None reported");
+          items.push(workflowResultItem(`${recommended ? "Recommended" : "Option"}: ${option.label}`, `${decision.decisionId} / ${option.id} / read-only`, `Tradeoffs: ${tradeoffs}. Risks: ${risks}.`));
+        }
+      }
+      return { summary: `Decision result ${safeOverlayText(result.decisionPacketId, 96)}: ${result.decisions.length} decisions require explicit user selection.`, placeHolder: readOnly, items: boundedWorkflowResultItems(items) };
+    }
+    case "plan": {
+      if (result.mode === "expanded") {
+        const items = result.alternatives.map((alternative) => workflowResultItem(`#${String(alternative.rank).padStart(2, "0")} ${alternative.summary}`, alternative.id, `${alternative.rationale}. Risks: ${workflowResultList(alternative.risks, "None reported")}.`));
+        return { summary: "Plan expansion result: exactly 15 ranked alternatives are available for review.", placeHolder: readOnly, items };
+      }
+      return {
+        summary: `Plan execution acknowledgement ${safeOverlayText(result.acknowledgementId, 96)} is durable; execution started in ${safeOverlayText(result.executorSessionId, 96)}.`,
+        placeHolder: readOnly,
+        items: [workflowResultItem("Execution acknowledgement", `${result.planRevision} / ${result.executorSessionId}`, `Origin: ${result.originSessionId}. Authority: ${result.authorityId}. Plan: ${result.planDigest}.`)]
+      };
+    }
+    case "handoff":
+      return { summary: `Handoff result: package ${safeOverlayText(result.packageId, 96)} is ${result.acknowledged ? "acknowledged" : "queued"}.`, placeHolder: readOnly, items: [workflowResultItem("Handoff package", result.acknowledged ? "Acknowledged" : "Not yet acknowledged", `Recipient: ${result.recipientSessionId}.`)] };
+    case "focus":
+      return { summary: `Focus result delivered for ${safeOverlayText(result.selectedSessionId, 96)} with ${result.status.replace("verified_", "verified ")}.`, placeHolder: readOnly, items: [workflowResultItem("Focused managed session", result.status.replace("verified_", "verified "), `Queue cycle: ${result.queueCycleId}. Result delivered: yes.`)] };
+    case "authority": {
+      const items = result.acknowledgements.map((acknowledgement) => workflowResultItem(`Recipient: ${acknowledgement.recipientSessionId}`, `Grant ${acknowledgement.grantId} acknowledged`, `Exact match digest: ${acknowledgement.matchDigest}.`));
+      return { summary: `Authority result: ${items.length} individualized acknowledgements were durably returned.`, placeHolder: readOnly, items };
+    }
+    case "voice_binding":
+      return { summary: `Native voice binding ${safeOverlayText(result.bindingId, 96)} is ${result.active ? "active" : "inactive"}.`, placeHolder: readOnly, items: [workflowResultItem("Native voice binding", result.active ? "Active" : "Inactive", `Binding ID: ${result.bindingId}.`)] };
+  }
+}
+
+function workflowResultItem(label: string, description?: string, detail?: string): QuickPickItemLike {
+  return {
+    label: safeOverlayText(label, 160),
+    ...(description ? { description: safeOverlayText(description, 240) } : {}),
+    ...(detail ? { detail: safeOverlayText(detail, 640) } : {})
+  };
+}
+
+function workflowResultList(items: readonly string[], fallback: string): string {
+  return items.length ? safeOverlayText(items.map((item) => safeOverlayText(item, 160)).join("; "), 560) : fallback;
+}
+
+function boundedWorkflowResultItems(items: readonly QuickPickItemLike[]): readonly QuickPickItemLike[] {
+  if (items.length <= 512) return items;
+  return [...items.slice(0, 511), workflowResultItem(`${items.length - 511} additional protected items omitted`, "Bounded UI limit", "The durable result remains stored; this read-only VS Code surface displays at most 512 entries at once.")];
+}
+
+function expectedWorkflowResultKind(action: ExtensionWorkflowAction): ExtensionWorkflowProviderResult["kind"] {
+  if (action === "reanchor") return "anchor";
+  if (action === "proof" || action === "proof_adversarial") return "proof";
+  if (action === "option_provider" || action === "option_packet") return "decision";
+  if (action === "plan_expander" || action === "plan_approval") return "plan";
+  if (action === "handoff" || action === "handoff_queue" || action === "handoff_immediate") return "handoff";
+  if (action === "focus_blocked_agent" || action === "focus_finished_agent") return "focus";
+  if (action === "authority_refresh" || action === "authority_broadcast") return "authority";
+  return "voice_binding";
+}
+
+interface PipelineFailureView { readonly name: string; readonly outcome: string; readonly summary?: string; }
+interface PipelineLocalReceiptView { readonly action: string; readonly result: string; readonly completeness: string; }
+interface PipelineFailureTraceView {
+  readonly head: string;
+  readonly selectedIndex: number;
+  readonly failureCount: number;
+  readonly repeatAvailable: boolean;
+  readonly selectedFailure: Readonly<{ kind: "check" | "status"; name: string; state: string; conclusion?: string; summary?: string }>;
+  readonly logExcerpt: string;
+  readonly diagnosis: string;
+}
+interface PipelineStatusView {
+  readonly hostedState: string;
+  readonly head?: string;
+  readonly localStatus: string;
+  readonly failures: readonly PipelineFailureView[];
+  readonly latestLocalReceipt?: PipelineLocalReceiptView;
+}
+
+function pipelineStatusView(result: ForwardedCommandResult): PipelineStatusView {
+  const envelope = isRecord(result.data) ? result.data : {};
+  const localEnvelope = isRecord(envelope.local) ? envelope.local : undefined;
+  const hostedEnvelope = isRecord(envelope.hosted) ? envelope.hosted : undefined;
+  const hosted = hostedEnvelope && isRecord(hostedEnvelope.data) ? hostedEnvelope.data : envelope;
+  const localStatus = safeOverlayText(
+    typeof localEnvelope?.status === "string" ? localEnvelope.status : typeof envelope.clean === "boolean" ? (envelope.clean ? "clean" : "dirty") : result.status,
+    80
+  );
+  const hostedState = safeOverlayText(
+    typeof hosted.hostedState === "string" ? hosted.hostedState : typeof hostedEnvelope?.status === "string" ? hostedEnvelope.status : "not configured",
+    80
+  );
+  const head = typeof hosted.head === "string" && /^[a-f0-9]{40,64}$/i.test(hosted.head) ? hosted.head : undefined;
+  const contexts = Array.isArray(hosted.contexts) && hosted.contexts.length <= 50 ? hosted.contexts : [];
+  const failedOutcomes = new Set(["ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STARTUP_FAILURE", "STALE"]);
+  const failures: PipelineFailureView[] = [];
+  for (const context of contexts) {
+    if (!isRecord(context) || typeof context.name !== "string" || context.name.length > 256) continue;
+    const rawOutcome = typeof context.conclusion === "string" ? context.conclusion : typeof context.state === "string" ? context.state : "UNKNOWN";
+    const outcome = safeOverlayText(rawOutcome.toUpperCase(), 80);
+    if (!failedOutcomes.has(outcome)) continue;
+    const summary = typeof context.summary === "string" ? safeOverlayText(context.summary, 240) : undefined;
+    failures.push({ name: safeOverlayText(context.name, 160), outcome, ...(summary ? { summary } : {}) });
+  }
+  const receipts = Array.isArray(hosted.localReceipts) && hosted.localReceipts.length <= 50 ? hosted.localReceipts : [];
+  const latest = receipts.find((receipt): receipt is Record<string, unknown> => isRecord(receipt)
+    && typeof receipt.action === "string" && typeof receipt.result === "string" && typeof receipt.completeness === "string");
+  const latestLocalReceipt = latest ? {
+    action: safeOverlayText(latest.action as string, 80),
+    result: safeOverlayText(latest.result as string, 80),
+    completeness: safeOverlayText(latest.completeness as string, 80)
+  } : undefined;
+  return { hostedState, ...(head ? { head } : {}), localStatus, failures, ...(latestLocalReceipt ? { latestLocalReceipt } : {}) };
+}
+
+function pipelineFailureTraceView(result: ForwardedCommandResult): PipelineFailureTraceView | undefined {
+  const data = result.data;
+  if (!isRecord(data) || typeof data.head !== "string" || !/^[a-f0-9]{40}$/i.test(data.head)
+    || !Number.isSafeInteger(data.selectedIndex) || (data.selectedIndex as number) < 0
+    || !Number.isSafeInteger(data.failureCount) || (data.failureCount as number) < 1 || (data.failureCount as number) > 50
+    || (data.selectedIndex as number) >= (data.failureCount as number) || typeof data.repeatAvailable !== "boolean"
+    || data.repeatAvailable !== ((data.failureCount as number) > 1) || !isRecord(data.selectedFailure)
+    || (data.selectedFailure.kind !== "check" && data.selectedFailure.kind !== "status")
+    || !pipelineTraceText(data.selectedFailure.name, 256, false) || !pipelineTraceText(data.selectedFailure.state, 64, false)
+    || (data.selectedFailure.conclusion !== undefined && !pipelineTraceText(data.selectedFailure.conclusion, 64, false))
+    || (data.selectedFailure.summary !== undefined && !pipelineTraceText(data.selectedFailure.summary, 4_096, true))
+    || !pipelineTraceText(data.logExcerpt, 4_096, true) || !pipelineTraceText(data.diagnosis, 512, true)) return undefined;
+  return {
+    head: data.head,
+    selectedIndex: data.selectedIndex as number,
+    failureCount: data.failureCount as number,
+    repeatAvailable: data.repeatAvailable,
+    selectedFailure: {
+      kind: data.selectedFailure.kind,
+      name: data.selectedFailure.name,
+      state: data.selectedFailure.state,
+      ...(typeof data.selectedFailure.conclusion === "string" ? { conclusion: data.selectedFailure.conclusion } : {}),
+      ...(typeof data.selectedFailure.summary === "string" ? { summary: data.selectedFailure.summary } : {})
+    },
+    logExcerpt: data.logExcerpt,
+    diagnosis: data.diagnosis
+  };
+}
+
+function pipelineTraceText(value: unknown, maximum: number, allowNewlines: boolean): value is string {
+  return typeof value === "string" && !!value.trim() && value.length <= maximum && !value.includes("\0") && (allowNewlines || !/[\r\n]/.test(value));
+}
+
+function safeOverlayText(value: string, maximum: number): string {
+  return value
+    .replace(/\0/g, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/((?:api[_-]?key|password|secret|token)\s*[:=]\s*)\S+/gi, "$1[REDACTED]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maximum) || "unknown";
+}
+
+function controlLabel(control: B122Control): string {
+  const labels: Readonly<Record<B122Control, string>> = {
+    REANCHOR: "Re-anchor", PROOF: "Proof", OPTION_PROVIDER: "Option Provider", PLAN_EXPANDER: "Plan Expander", PLAN_APPROVAL: "Plan Approval",
+    HANDOFF: "Handoff", FIND_BLOCKED_AGENT: "Find Blocked Agent", FIND_FINISHED_AGENT: "Find Finished Agent", AUTHORITY_REFRESH: "Authority Refresh", COUNCIL: "Council",
+    CLAUDE: "Claude", CHATGPT: "ChatGPT", VSCODE: "VS Code", TERMINAL: "Terminal", COMMIT: "Commit", GITHUB: "GitHub", COMPOUND: "Compound",
+    RUN: "Run", VOICE: "Voice", PIPELINE: "Pipeline", SHIELD: "Shield", SANDBOX: "Sandbox"
+  };
+  return labels[control];
+}
+
+function modifierLabel(modifier: B122Modifier): string {
+  return ({ normal: "Normal", shift: "Shift", alt: "Alt", shift_alt: "Shift+Alt", ctrl: "Ctrl", ctrl_shift: "Ctrl+Shift", ctrl_alt: "Ctrl+Alt", ctrl_shift_alt: "Ctrl+Shift+Alt" } as const)[modifier];
+}
 
 function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined {
   const key = `${command.control}:${command.modifier}`;
@@ -1422,6 +2246,28 @@ function formatUint16(value: number): string { return value.toString(16).padStar
 function samePath(left: string, right: string): boolean {
   const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
   return normalize(left) === normalize(right);
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  await new Promise<void>((resolveHash, rejectHash) => {
+    const stream = createReadStream(path);
+    stream.on("data", (chunk) => { hash.update(chunk); });
+    stream.once("error", rejectHash);
+    stream.once("end", resolveHash);
+  });
+  return hash.digest("hex");
+}
+
+async function exactFilesystemIdentity(path: string): Promise<Readonly<{ device: string; inode: string }>> {
+  const identity = await stat(path, { bigint: true });
+  const device = identity.dev.toString(10);
+  const inode = identity.ino.toString(10);
+  if (!/^(?:0|[1-9][0-9]{0,19})$/.test(device) || !/^(?:0|[1-9][0-9]{0,19})$/.test(inode)
+    || identity.dev > 18_446_744_073_709_551_615n || identity.ino > 18_446_744_073_709_551_615n) {
+    throw new Error("The filesystem returned an invalid exact device/inode identity.");
+  }
+  return { device, inode };
 }
 
 function sameRootList(left: readonly string[], right: readonly string[]): boolean {

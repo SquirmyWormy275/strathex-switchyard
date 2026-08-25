@@ -13,6 +13,8 @@ export interface MementoLike {
 export interface ExtensionContextLike {
   readonly subscriptions: DisposableLike[];
   readonly workspaceState: MementoLike;
+  /** Shared across VS Code windows; repeat gestures use it to remain cross-window. */
+  readonly globalState?: MementoLike;
 }
 
 export interface WorkspaceFolderLike {
@@ -23,11 +25,13 @@ export interface WorkspaceFolderLike {
 export interface TerminalLike {
   readonly name: string;
   readonly creationOptions?: { readonly name?: string };
+  /** VS Code resolves this only after the terminal host process exists. */
+  readonly processId?: PromiseLike<number | undefined>;
   show(preserveFocus?: boolean): void;
   sendText?(text: string, addNewLine?: boolean): void;
 }
 
-export interface TerminalOptionsLike { readonly name: string; readonly cwd?: string; readonly env?: Readonly<Record<string, string | null | undefined>>; }
+export interface TerminalOptionsLike { readonly name: string; readonly cwd?: string; readonly env?: Readonly<Record<string, string | null | undefined>>; readonly shellPath?: string; readonly shellArgs?: readonly string[]; }
 
 export interface DebugConfigurationLike {
   readonly name?: string;
@@ -45,6 +49,7 @@ export interface DebugSessionLike {
 export interface QuickPickItemLike {
   readonly label: string;
   readonly description?: string;
+  readonly detail?: string;
 }
 
 export interface UriLike { readonly fsPath: string; }
