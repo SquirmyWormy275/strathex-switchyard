@@ -1,10 +1,17 @@
 import { createServer } from "node:net";
-import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { canonicalRepositoryPath } from "../../../packages/control-plane/src/brokers.ts";
 import { jsonClone, type JournalEntry, ProtectedJsonStore, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
+import {
+  CouncilResourceHost,
+  CouncilResourceHostError,
+  type CouncilResourceHostBinding,
+  type CouncilResourceHostPort,
+  type CouncilResourceHostRequest
+} from "./council-resource-host.ts";
 
 export type CouncilIsolationStatus = "reserved" | "materializing" | "prepared" | "cleanup_pending" | "cleaned" | "manual_cleanup_required";
 export type CouncilResourceLeaseKind = "branch" | "worktree" | "port" | "cache" | "temp" | "database" | "credential_scope";
@@ -48,6 +55,8 @@ export interface CouncilWorkspaceBinding {
   readonly branch: string;
   readonly head: string;
   readonly leases: readonly CouncilResourceLease[];
+  /** Exact public resource binding; contains paths/ports/opaque handles, never credential values. */
+  readonly resourceHost?: CouncilResourceHostBinding;
   readonly assignmentDigest: string;
 }
 
@@ -95,6 +104,7 @@ export interface CouncilWorkspaceIsolationOptions {
   readonly stateRoot: string;
   readonly git?: LocalGitRunner;
   readonly ports?: CouncilPortAvailabilityProbe;
+  readonly resourceHost?: CouncilResourceHostPort;
   readonly clock?: () => string;
 }
 
@@ -114,6 +124,7 @@ export class CouncilWorkspaceIsolationManager {
   private readonly configuredStateRoot: string;
   private readonly git: LocalGitRunner;
   private readonly ports: CouncilPortAvailabilityProbe;
+  private readonly resourceHost: CouncilResourceHostPort;
   private readonly clock: () => string;
 
   constructor(store: ProtectedJsonStore, options: CouncilWorkspaceIsolationOptions) {
@@ -122,6 +133,7 @@ export class CouncilWorkspaceIsolationManager {
     this.configuredStateRoot = resolve(options.stateRoot);
     this.git = options.git ?? new SpawnLocalGitRunner();
     this.ports = options.ports ?? new LoopbackCouncilPortAvailabilityProbe();
+    this.resourceHost = options.resourceHost ?? new CouncilResourceHost({ stateRoot: this.configuredStateRoot });
     this.clock = options.clock ?? (() => new Date().toISOString());
   }
 
@@ -177,11 +189,12 @@ export class CouncilWorkspaceIsolationManager {
 
   /** Materialization is intentionally private to the single reserve->prepare call path. */
   private async materialize(epochId: string): Promise<CouncilIsolationPlan> {
-    const plan = await this.mutate(epochId, (current) => {
+    let plan = await this.mutate(epochId, (current) => {
       if (current.status === "prepared") return current;
       if (current.status !== "reserved") throw new CouncilIsolationError("Council isolation materialization cannot be replayed; run recovery.");
       return { ...current, status: "materializing" };
     });
+    const externallyMaterialized = new Map<string, CouncilResourceHostBinding>();
     try {
       await this.assertPortsAvailable(plan);
       for (const binding of plan.bindings) {
@@ -190,7 +203,16 @@ export class CouncilWorkspaceIsolationManager {
         const added = await this.runGit(["worktree", "add", "-b", binding.branch, binding.worktreeRoot, plan.targetHead], plan.repositoryRoot);
         if (added.exitCode !== 0) throw new CouncilIsolationError("Git could not create the exact Council worktree on its reserved branch.");
         await this.verifyWorktree(plan, binding, true);
-        await this.createScopeDirectories(plan, binding);
+      }
+      for (const binding of plan.bindings) {
+        const resourceHost = await this.resourceHost.materialize(resourceRequest(plan, binding));
+        externallyMaterialized.set(binding.sessionId, resourceHost);
+        plan = await this.mutate(plan.epochId, (current) => ({
+          ...current,
+          bindings: current.bindings.map((candidate) => candidate.sessionId === binding.sessionId
+            ? withAssignmentDigest({ ...candidate, resourceHost }, current)
+            : candidate)
+        }));
       }
       await this.verifyMaterialized(plan, true);
       return this.mutate(plan.epochId, (current) => {
@@ -200,6 +222,10 @@ export class CouncilWorkspaceIsolationManager {
       });
     } catch (error) {
       const reason = controlledReason(error, "Council isolation could not prove exact independent host resources.");
+      for (const binding of plan.bindings) {
+        const resourceHost = externallyMaterialized.get(binding.sessionId) ?? binding.resourceHost;
+        if (resourceHost) await this.resourceHost.cleanup(resourceRequest(plan, binding), resourceHost).catch(() => undefined);
+      }
       await this.mutate(plan.epochId, (current) => ({ ...current, status: "cleanup_pending", failureReason: reason })).catch(() => undefined);
       await this.cleanup(plan.epochId).catch(() => undefined);
       throw error instanceof CouncilIsolationError ? error : new CouncilIsolationError(reason);
@@ -224,6 +250,10 @@ export class CouncilWorkspaceIsolationManager {
     if (plan.status === "cleaned" || plan.status === "manual_cleanup_required") return plan;
     if (plan.status === "prepared") {
       try {
+        for (const binding of plan.bindings) {
+          if (!binding.resourceHost) throw new CouncilIsolationError("Council recovery found a legacy assignment without a real resource-host binding.");
+          await this.resourceHost.recover(resourceRequest(plan, binding), binding.resourceHost);
+        }
         await this.verifyMaterialized(plan, true);
         return plan;
       } catch (error) {
@@ -234,6 +264,10 @@ export class CouncilWorkspaceIsolationManager {
         }));
         return this.cleanup(plan.epochId);
       }
+    }
+    for (const binding of plan.bindings) {
+      if (!binding.resourceHost) continue;
+      await this.resourceHost.recover(resourceRequest(plan, binding), binding.resourceHost).catch(() => undefined);
     }
     const exact = await this.materializedExactly(plan).catch(() => false);
     if (exact) return this.mutate(plan.epochId, (current) => {
@@ -263,10 +297,23 @@ export class CouncilWorkspaceIsolationManager {
     let plan = await this.requirePlan(epochId);
     if (plan.status === "cleaned" || plan.status === "manual_cleanup_required") return plan;
     plan = await this.mutate(epochId, (current) => ({ ...current, status: "cleanup_pending" }));
+    for (const binding of plan.bindings) {
+      if (!binding.resourceHost) continue;
+      try { await this.resourceHost.preflightCleanup(resourceRequest(plan, binding), binding.resourceHost); }
+      catch {
+        return this.mutate(epochId, (current) => ({ ...current, status: "manual_cleanup_required", failureReason: "Council preserved a hosted resource whose exact ownership or fence could not be proven; manual cleanup is required." }));
+      }
+    }
     const unsafe = await this.cleanupPreflight(plan);
-    if (unsafe) return this.mutate(epochId, (current) => ({ ...current, status: "manual_cleanup_required", failureReason: unsafe }));
+    if (unsafe) {
+      // Disposable non-Git resources are independently owned. Revoke/close
+      // them even when participant Git work must be preserved for inspection.
+      for (const binding of plan.bindings) if (binding.resourceHost) await this.resourceHost.cleanup(resourceRequest(plan, binding), binding.resourceHost).catch(() => undefined);
+      return this.mutate(epochId, (current) => ({ ...current, status: "manual_cleanup_required", failureReason: unsafe }));
+    }
     try {
       for (const binding of [...plan.bindings].reverse()) {
+        if (binding.resourceHost) await this.resourceHost.cleanup(resourceRequest(plan, binding), binding.resourceHost);
         if (await exists(binding.worktreeRoot)) {
           const removed = await this.runGit(["worktree", "remove", binding.worktreeRoot], plan.repositoryRoot);
           if (removed.exitCode !== 0) throw new CouncilIsolationError("Git refused cleanup of an exact clean Council worktree.");
@@ -279,7 +326,9 @@ export class CouncilWorkspaceIsolationManager {
           const deleted = await this.runGit(["update-ref", "-d", ref, plan.targetHead], plan.repositoryRoot);
           if (deleted.exitCode !== 0) throw new CouncilIsolationError("Git refused atomic cleanup of an exact Council branch reference.");
         } else if (present.exitCode !== 1) throw new CouncilIsolationError("Council could not prove whether its cleanup branch still exists.");
-        for (const lease of binding.leases) if (lease.localPath && await exists(lease.localPath)) await rm(lease.localPath, { recursive: true, force: false });
+        // Legacy pre-resource-host plans used marker-only directories. Preserve
+        // their exact cleanup path without treating them as real isolation.
+        if (!binding.resourceHost) for (const lease of binding.leases) if (lease.localPath && lease.kind !== "worktree" && await exists(lease.localPath)) await rm(lease.localPath, { recursive: true, force: false });
       }
       const releasedAt = this.clock();
       return this.mutate(epochId, (current) => {
@@ -370,27 +419,11 @@ export class CouncilWorkspaceIsolationManager {
     if (await exists(binding.worktreeRoot)) throw new CouncilIsolationError("Council worktree lease collides with an existing path.");
   }
 
-  private async createScopeDirectories(plan: CouncilIsolationPlan, binding: CouncilWorkspaceBinding): Promise<void> {
-    for (const lease of binding.leases) {
-      if (!lease.localPath || lease.kind === "worktree") continue;
-      await mkdir(lease.localPath, { recursive: true, mode: 0o700 });
-      const canonical = await canonicalDirectory(lease.localPath, `Council ${lease.kind} scope`);
-      if (!samePath(canonical, lease.localPath) || !inside(plan.stateRoot, canonical)) throw new CouncilIsolationError("Council resource scope left the host-owned state root.");
-      await writeFile(join(canonical, markerName), stableJson({ schema: "sxsy-b122.council-scope", version: 1, epochId: plan.epochId, sessionId: binding.sessionId, leaseId: lease.id, assignmentDigest: binding.assignmentDigest }), { encoding: "utf8", mode: 0o600, flag: "wx" });
-    }
-  }
-
   private async verifyMaterialized(plan: CouncilIsolationPlan, requireClean: boolean): Promise<void> {
-    await this.assertPortsAvailable(plan);
     for (const binding of plan.bindings) {
       await this.verifyWorktree(plan, binding, requireClean);
-      for (const lease of binding.leases) {
-        if (!lease.localPath || lease.kind === "worktree") continue;
-        const canonical = await canonicalDirectory(lease.localPath, `Council ${lease.kind} scope`);
-        if (!samePath(canonical, lease.localPath) || !inside(plan.stateRoot, canonical)) throw new CouncilIsolationError("Council resource scope is no longer exact and host-owned.");
-        const marker = await readMarker(canonical);
-        if (marker.epochId !== plan.epochId || marker.sessionId !== binding.sessionId || marker.leaseId !== lease.id || marker.assignmentDigest !== binding.assignmentDigest) throw new CouncilIsolationError("Council resource scope marker does not match its durable lease.");
-      }
+      if (!binding.resourceHost) throw new CouncilIsolationError("Council assignment has no exact durable resource-host binding.");
+      await this.resourceHost.assertCurrent(resourceRequest(plan, binding), binding.resourceHost);
     }
   }
 
@@ -423,16 +456,18 @@ export class CouncilWorkspaceIsolationManager {
           if ((await this.gitText(["rev-parse", ref], plan.repositoryRoot, "Council cleanup branch identity")).toLowerCase() !== plan.targetHead) return `Council preserved advanced branch state for ${binding.sessionId}; manual cleanup is required.`;
         } catch { return `Council could not prove the cleanup branch identity for ${binding.sessionId}; manual cleanup is required.`; }
       } else if (present.exitCode !== 1) return `Council could not prove whether the cleanup branch exists for ${binding.sessionId}; manual cleanup is required.`;
-      for (const lease of binding.leases) {
-        if (!lease.localPath || lease.kind === "worktree" || !await exists(lease.localPath)) continue;
-        try {
-          const canonical = await canonicalDirectory(lease.localPath, `Council ${lease.kind} cleanup scope`);
-          if (!samePath(canonical, lease.localPath) || !inside(plan.stateRoot, canonical)) return "Council preserved a resource scope whose canonical path changed; manual cleanup is required.";
-          const entries = await readdir(canonical);
-          if (entries.length !== 1 || entries[0] !== markerName) return "Council preserved a resource scope containing participant data; manual cleanup is required.";
-          const marker = await readMarker(canonical);
-          if (marker.epochId !== plan.epochId || marker.sessionId !== binding.sessionId || marker.leaseId !== lease.id || marker.assignmentDigest !== binding.assignmentDigest) return "Council preserved a resource scope with a mismatched ownership marker; manual cleanup is required.";
-        } catch { return "Council could not prove ownership of a resource scope; manual cleanup is required."; }
+      if (!binding.resourceHost) {
+        for (const lease of binding.leases) {
+          if (!lease.localPath || lease.kind === "worktree" || !await exists(lease.localPath)) continue;
+          try {
+            const canonical = await canonicalDirectory(lease.localPath, `Council ${lease.kind} cleanup scope`);
+            if (!samePath(canonical, lease.localPath) || !inside(plan.stateRoot, canonical)) return "Council preserved a resource scope whose canonical path changed; manual cleanup is required.";
+            const entries = await readdir(canonical);
+            if (entries.length !== 1 || entries[0] !== markerName) return "Council preserved a legacy resource scope containing participant data; manual cleanup is required.";
+            const marker = await readMarker(canonical);
+            if (marker.epochId !== plan.epochId || marker.sessionId !== binding.sessionId || marker.leaseId !== lease.id || marker.assignmentDigest !== binding.assignmentDigest) return "Council preserved a resource scope with a mismatched ownership marker; manual cleanup is required.";
+          } catch { return "Council could not prove ownership of a resource scope; manual cleanup is required."; }
+        }
       }
     }
     return undefined;
@@ -502,6 +537,27 @@ function assignmentDigest(binding: Omit<CouncilWorkspaceBinding, "assignmentDige
 
 function withAssignmentDigest(binding: CouncilWorkspaceBinding, plan: Pick<CouncilIsolationPlan, "epochId" | "targetSnapshotId" | "repositoryRoot"> | Pick<CouncilIsolationPrepareRequest, "epochId" | "targetSnapshotId" | "repositoryRoot">): CouncilWorkspaceBinding {
   return { ...binding, assignmentDigest: assignmentDigest(binding, plan) };
+}
+
+function resourceRequest(plan: CouncilIsolationPlan, binding: CouncilWorkspaceBinding): CouncilResourceHostRequest {
+  return {
+    epochId: plan.epochId,
+    targetSnapshotId: plan.targetSnapshotId,
+    repositoryRoot: plan.repositoryRoot,
+    stateRoot: plan.stateRoot,
+    sessionId: binding.sessionId,
+    worktreeRoot: binding.worktreeRoot,
+    branch: binding.branch,
+    head: binding.head,
+    leases: binding.leases.map((lease) => ({
+      id: lease.id,
+      kind: lease.kind,
+      ...(lease.declaration ? { declaration: lease.declaration } : {}),
+      ...(lease.localPath ? { localPath: lease.localPath } : {}),
+      fence: lease.fence,
+      status: lease.status
+    }))
+  };
 }
 
 function clonePlan(plan: CouncilIsolationPlan): CouncilIsolationPlan { return jsonClone(plan); }
@@ -586,4 +642,4 @@ async function readMarker(directory: string): Promise<Readonly<{ epochId: string
 }
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function controlledReason(error: unknown, fallback: string): string { return error instanceof CouncilIsolationError ? error.message.slice(0, 512) : fallback; }
+function controlledReason(error: unknown, fallback: string): string { return error instanceof CouncilIsolationError || error instanceof CouncilResourceHostError ? error.message.slice(0, 512) : fallback; }

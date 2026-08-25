@@ -27,7 +27,14 @@ function fakeIsolation(): CouncilWorkspaceIsolator & { readonly prepared: Counci
       sessionId: assignment.sessionId, paths: assignment.paths, declarations: assignment.resources,
       worktreeRoot: `C:\\host-state\\${input.epochId}\\${assignment.sessionId}`,
       branch: `sxsy-b122/council/${input.epochId}/${assignment.sessionId}`,
-      head: input.targetHead, leases: [], assignmentDigest: (index === 0 ? "3" : "4").repeat(64)
+      head: input.targetHead,
+      leases: [],
+      resourceHost: {
+        schema: "sxsy-b122.council-resource-host", version: 1, epochId: input.epochId, sessionId: assignment.sessionId,
+        fenceDigest: (index === 0 ? "6" : "7").repeat(64), capabilities: ["held-loopback-port"], resources: [],
+        environment: { SXSY_COUNCIL_SESSION_ID: assignment.sessionId }, digest: (index === 0 ? "8" : "9").repeat(64)
+      },
+      assignmentDigest: (index === 0 ? "3" : "4").repeat(64)
     }));
     return { epochId: input.epochId, targetSnapshotId: input.targetSnapshotId, repositoryRoot: input.repositoryRoot, targetHead: input.targetHead, defaultBranch: input.defaultBranch, stateRoot: "C:\\host-state", bindings, status: "prepared", executionAuthorized: false, createdAt: at, updatedAt: at, digest: "5".repeat(64) };
   };
@@ -62,7 +69,8 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
     await sessions.upsert(session("one", "codex", ["src/one.ts"]));
     await sessions.upsert(session("two", "claude", ["src/two.ts"]));
     const phases: string[] = [];
-    const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; phases.push(`${input.routeId}:${document.phase}:${document.sessionId}`); return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
+    const documents: Record<string, unknown>[] = [];
+    const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; documents.push(document); phases.push(`${input.routeId}:${document.phase}:${document.sessionId}`); const resourceHost = document.resourceHost as Record<string, unknown> | undefined; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: resourceHost?.digest } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
     const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-1" });
     const isolation = fakeIsolation();
     const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), { isolation, automaticGate: acceptedGate });
@@ -77,18 +85,24 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
     assert.deepEqual((await council.get("epoch-1"))?.resumeAcknowledgedSessionIds, ["one", "two"]);
     assert.equal(isolation.prepared.length, 1);
     assert.deepEqual(isolation.prepared[0]?.assignments.map((assignment) => assignment.sessionId), ["one", "two"]);
-    assert.equal(isolation.asserted.length, 5);
+    assert.equal(isolation.asserted.length, 15);
+    for (const document of documents.filter((candidate) => candidate.phase !== "pause")) {
+      const resourceHost = document.resourceHost as Record<string, unknown>;
+      assert.match(String(resourceHost.digest), /^[a-f0-9]{64}$/);
+      assert.deepEqual(Object.keys(resourceHost.environment as Record<string, unknown>), ["SXSY_COUNCIL_SESSION_ID"]);
+      assert.equal(JSON.stringify(document).includes("secret-value"), false);
+    }
     assert.equal((await council.get("epoch-1"))?.assignments.one?.isolationDigest, "3".repeat(64));
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test("automatic Council aborts durably on a malformed provider acknowledgement", async () => {
+test("automatic Council aborts durably when provider acknowledges a stale resource-host digest", async () => {
   const directory = await mkdtemp(join(tmpdir(), "b122-council-abort-"));
   try {
     const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
     const sessions = new SessionRegistry(store, { clock: () => at });
     await sessions.upsert(session("one", "codex", ["src/one.ts"])); await sessions.upsert(session("two", "claude", ["src/two.ts"]));
-    const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(document.phase === "pause" ? JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true }) : "{}") }; } } as unknown as DynamicConfiguredNetworkClient;
+    const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: "0".repeat(64) } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
     const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-2" });
     const isolation = fakeIsolation();
     const result = await new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), { isolation, automaticGate: acceptedGate }).execute({ action: "council_automatic", operationId: "operation-auto", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });

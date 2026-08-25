@@ -79,7 +79,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       for (const participant of participants) { await this.phase(request, epoch.id, participant, "pause"); await this.council.acknowledgePause(epoch.id, participant.id); }
       isolationPlan = await this.prepareIsolation(request, epoch.id, participants, defaultBranch);
       for (const participant of participants) {
-        const binding = requiredBinding(isolationPlan, participant.id);
+        const binding = await this.currentBinding(epoch.id, participant.id, requiredBinding(isolationPlan, participant.id));
         await this.council.assign(epoch.id, participant.id, participant.plannedFiles, participant.resources, binding.assignmentDigest);
         await this.phase(request, epoch.id, participant, "assignment", binding);
         await this.council.acknowledgeAssignment(epoch.id, participant.id, binding.assignmentDigest);
@@ -90,6 +90,8 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
         await this.phase(request, epoch.id, participant, "resume", binding);
         await this.council.acknowledgeResume(epoch.id, participant.id, binding.assignmentDigest);
       }
+      const final = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final activation guard." };
+      if (!final.allowed) throw new Error(final.reason);
       isolationPlan = await this.isolation.assertCurrent(epoch.id);
       const active = await this.council.activate(epoch.id);
       return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint host-isolated assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, isolationDigest: isolationPlan.digest, participants: participants.length, status: active.status } };
@@ -126,8 +128,6 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   private async phase(request: CouncilRequest, epochId: string, participant: CouncilParticipant, phase: CouncilPhase, binding?: CouncilWorkspaceBinding): Promise<void> {
     const session = await this.sessions.get(participant.id);
     if (!session || session.metadata["sxsy-b122.providerHandshake"] !== "exact-route-v1") throw new Error(`Council participant ${participant.id} lacks an exact-route provider handshake.`);
-    const current = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final effect guard." };
-    if (!current.allowed) throw new Error(current.reason);
     if (request.executionControl && (Date.parse(request.executionControl.deadline) <= this.now() || await request.executionControl.isCancellationRequested())) throw new Error("Automatic Council was cancelled or exceeded its durable deadline.");
     const child = request.childSaga ? await request.childSaga.begin({ action: `council.${phase}`, idempotencyScope: `${epochId}:${participant.id}:${phase}`, details: { epochId, phase, sessionId: participant.id, target: request.target.id } }) : undefined;
     if (child && !child.mayExecute) throw new Error(`Council ${phase} for ${participant.id} requires reconciliation and was not replayed.`);
@@ -135,19 +135,31 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     const control = operationSignal(request);
     try {
       if (phase !== "pause" && !binding) throw new Error(`Council ${phase} has no exact durable isolation binding for ${participant.id}.`);
-      if (binding) {
-        const refreshed = requiredBinding(await this.isolation!.assertCurrent(epochId), participant.id);
-        if (refreshed.assignmentDigest !== binding.assignmentDigest) throw new Error(`Council ${phase} isolation binding changed before the provider effect.`);
-        binding = refreshed;
-      }
-      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })) } : {}) }), signal: control.signal });
-      const acknowledgement = parseAcknowledgement(response.body, response.outcome, { epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(binding ? { assignmentDigest: binding.assignmentDigest } : {}) });
+      if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
+      const current = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final effect guard." };
+      if (!current.allowed) throw new Error(current.reason);
+      if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
+      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal });
+      if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
+      const acknowledgement = parseAcknowledgement(response.body, response.outcome, { epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(binding ? { assignmentDigest: binding.assignmentDigest, resourceHostDigest: binding.resourceHost!.digest } : {}) });
       if (!acknowledgement) throw new Error(`Council ${phase} was not acknowledged by ${participant.id}.`);
-      if (child) { await request.childSaga!.markExternalCommitted(child, { acknowledged: "true" }); await request.childSaga!.settle(child, "completed", { acknowledged: "true" }); }
+      if (child) {
+        const evidence = { acknowledged: "true", ...(binding ? { assignmentDigest: binding.assignmentDigest, resourceHostDigest: binding.resourceHost!.digest } : {}) };
+        await request.childSaga!.markExternalCommitted(child, evidence);
+        await request.childSaga!.settle(child, "completed", evidence);
+      }
     } catch (error) {
       if (child) await request.childSaga!.settle(child, "ambiguous", { acknowledged: "unknown" }).catch(() => undefined);
       throw error;
     } finally { control.dispose(); }
+  }
+
+  private async currentBinding(epochId: string, sessionId: string, expected: CouncilWorkspaceBinding): Promise<CouncilWorkspaceBinding> {
+    const refreshed = requiredBinding(await this.isolation!.assertCurrent(epochId), sessionId);
+    if (!expected.resourceHost || !refreshed.resourceHost || refreshed.assignmentDigest !== expected.assignmentDigest || refreshed.resourceHost.digest !== expected.resourceHost.digest) {
+      throw new Error(`Council isolation binding changed before the provider effect for ${sessionId}.`);
+    }
+    return refreshed;
   }
 
   private async exactDefaultBranch(observed: string | undefined, participants: readonly CouncilParticipant[]): Promise<string | undefined> {
@@ -182,7 +194,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
 function reportOutcome(report: Awaited<ReturnType<CouncilCoordinator["report"]>>, summary: string): BrokerOutcome { return { status: "completed", summary, effectDisposition: "committed", data: { participants: report.participants.length, atomic: report.atomic, pathConflicts: report.pathConflicts.length, resourceConflicts: report.resourceConflicts.length, dependencyConflicts: report.dependencyConflicts.length } }; }
 function declarations(session: ManagedSession, key: string): readonly string[] { const raw = session.metadata[key]; if (!raw) return []; try { const value: unknown = JSON.parse(raw); return Array.isArray(value) && value.length <= 128 && value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 256 && !/[\r\n\0]/.test(item)) ? [...new Set(value)] : []; } catch { return []; } }
 function trustedDiff(session: ManagedSession): string | undefined { const value = session.metadata["sxsy-b122.diffDigest"]; return value && /^[a-f0-9]{64}$/i.test(value) ? value : undefined; }
-function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string; assignmentDigest?: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } const expectedKeys = expected.assignmentDigest ? 8 : 7; if (!record(value) || Object.keys(value).length !== expectedKeys || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true || (expected.assignmentDigest !== undefined && value.assignmentDigest !== expected.assignmentDigest)) return false; return true; }
+function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string; assignmentDigest?: string; resourceHostDigest?: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } const expectedKeys = expected.assignmentDigest ? 9 : 7; if (!record(value) || Object.keys(value).length !== expectedKeys || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true || (expected.assignmentDigest !== undefined && value.assignmentDigest !== expected.assignmentDigest) || (expected.resourceHostDigest !== undefined && value.resourceHostDigest !== expected.resourceHostDigest)) return false; return true; }
 function operationSignal(request: CouncilRequest): { readonly signal: AbortSignal; dispose(): void } { const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined; let poll: ReturnType<typeof setInterval> | undefined; if (request.executionControl) { timer = setTimeout(() => controller.abort(), Math.max(0, Date.parse(request.executionControl.deadline) - Date.now())); poll = setInterval(() => { void request.executionControl!.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }); }, 100); timer.unref?.(); poll.unref?.(); } return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } }; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function requiredBinding(plan: CouncilIsolationPlan, sessionId: string): CouncilWorkspaceBinding { const binding = plan.bindings.find((candidate) => candidate.sessionId === sessionId); if (!binding) throw new Error(`Council isolation plan omitted participant ${sessionId}.`); return binding; }
+function requiredBinding(plan: CouncilIsolationPlan, sessionId: string): CouncilWorkspaceBinding { const binding = plan.bindings.find((candidate) => candidate.sessionId === sessionId); if (!binding) throw new Error(`Council isolation plan omitted participant ${sessionId}.`); if (!binding.resourceHost || !/^[a-f0-9]{64}$/.test(binding.resourceHost.digest)) throw new Error(`Council isolation plan omitted the exact resource-host binding for ${sessionId}.`); return binding; }
