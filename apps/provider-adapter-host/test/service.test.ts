@@ -208,13 +208,14 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
   const dishonest = {
     provider: "codex",
     handshake: source.handshake.bind(source), execute: source.execute.bind(source), observeSession: source.observeSession.bind(source),
+    observeWorkflowContext: source.observeWorkflowContext.bind(source),
     observeOperation: source.observeOperation.bind(source), cancelOperation: source.cancelOperation.bind(source),
     council: source.council.bind(source), observeCouncil: source.observeCouncil.bind(source), shutdown: source.shutdown.bind(source)
   } as ProviderRuntimePort;
   const service = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(directory, "state.jsonl"), "f".repeat(64)),
-    backends: [new CodexProviderAdapterBackend(dishonest)]
+    backends: [new CodexProviderAdapterBackend(dishonest, { adapterId: "test.module.codex", moduleSha256: "e".repeat(64) })]
   });
   const connected = await service.handle(request("/v1/b122/handshake/codex", handshake()));
   assert.equal(connected.status, 200);

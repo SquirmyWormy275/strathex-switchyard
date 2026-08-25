@@ -8,7 +8,11 @@ import {
   type AuthenticatedProviderGatewayClient,
   type ProviderGatewayProvider
 } from "../../windows-companion/src/provider-gateway.ts";
-import type { ProviderAdapterBackend } from "./backends.ts";
+import type {
+  ProviderAdapterBackend,
+  ProviderRuntimeWorkflowContextRequest,
+  ProviderWorkflowContextObservation
+} from "./backends.ts";
 import {
   councilEventKind,
   councilKey,
@@ -25,8 +29,10 @@ import {
 } from "./state.ts";
 
 const maximumRequestBytes = 64 * 1024;
+const maximumResponseBytes = 64 * 1024;
 const providerOperationKind = "provider-gateway.operation";
 const councilCleanupKind = "provider-host.council-cleanup";
+const workflowContextObservationKind = "provider-host.workflow-context-observation";
 
 export interface ProviderHostRequest {
   readonly method: string;
@@ -119,6 +125,8 @@ export class ProviderAdapterHostService {
       if (councilCleanupMatch) return await this.cleanupCouncil(councilCleanupMatch[1] as ProviderGatewayProvider, input.body);
       const sessionMatch = /^\/v1\/b122\/observe\/session\/(claude|codex)$/.exec(input.path);
       if (sessionMatch) return await this.observeSession(sessionMatch[1] as ProviderGatewayProvider, input.body);
+      const workflowContextMatch = /^\/v1\/b122\/observe\/workflow-context\/(claude|codex)$/.exec(input.path);
+      if (workflowContextMatch) return await this.observeWorkflowContext(workflowContextMatch[1] as ProviderGatewayProvider, input.body, input.signal);
       const operationMatch = /^\/v1\/b122\/observe\/operation\/(claude|codex)$/.exec(input.path);
       if (operationMatch) return await this.observeOperation(operationMatch[1] as ProviderGatewayProvider, input.body);
       const cancelMatch = /^\/v1\/b122\/cancel\/(claude|codex)$/.exec(input.path);
@@ -128,6 +136,7 @@ export class ProviderAdapterHostService {
     } catch (error) {
       if (error instanceof CouncilConflictError) return errorResponse(409, safeError(error));
       if (error instanceof CouncilUnresolvedError) return errorResponse(503, safeError(error), "ambiguous");
+      if (error instanceof WorkflowContextConflictError) return errorResponse(409, safeError(error));
       return errorResponse(400, safeError(error));
     }
   }
@@ -240,6 +249,31 @@ export class ProviderAdapterHostService {
       repositoryRoot: observed.workspaceRoot, status: observed.status, capabilities: observed.capabilities,
       adapterVersion: observed.adapterVersion
     });
+  }
+
+  private async observeWorkflowContext(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, signal?: AbortSignal): Promise<ProviderHostResponse> {
+    const request = parseWorkflowContextRequest(parseBody(body), provider);
+    const current = await this.exactSession(request.sessionId, provider, request.targetSnapshotId, request.repositoryRoot);
+    if (!current || current.taskId !== request.taskId || current.planRevision !== request.planRevision) {
+      return errorResponse(409, "The requested workflow context no longer matches the exact managed session, target, task, and plan.");
+    }
+    const backend = this.backends.get(provider);
+    if (!backend) return errorResponse(503, `No ${provider} provider backend is installed.`);
+    const observation = await backend.observeWorkflowContext(request, signal ?? new AbortController().signal);
+    const after = await this.exactSession(request.sessionId, provider, request.targetSnapshotId, request.repositoryRoot);
+    if (!after || after.taskId !== request.taskId || after.planRevision !== request.planRevision) {
+      return errorResponse(409, "The exact managed workflow context changed during provider observation.");
+    }
+    await this.recordWorkflowContextObservation(observation);
+    const unsigned = Object.freeze({
+      schema: "sxsy-b122.provider-workflow-context-observation" as const,
+      version: 1 as const,
+      ...observation,
+      observedAt: this.timestamp()
+    });
+    const envelope = Object.freeze({ ...unsigned, envelopeDigest: sha256(stableJson(unsigned)) });
+    if (Buffer.byteLength(stableJson(envelope), "utf8") > maximumResponseBytes) throw new Error("The provider workflow-context observation response is oversized.");
+    return response(200, envelope);
   }
 
   private async observeOperation(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined): Promise<ProviderHostResponse> {
@@ -388,6 +422,41 @@ export class ProviderAdapterHostService {
       && rootKey(latest.repositoryRoot) === rootKey(document.repositoryRoot);
   }
 
+  private async recordWorkflowContextObservation(observation: ProviderWorkflowContextObservation): Promise<void> {
+    const key = workflowContextKey(observation);
+    await this.store.transaction(async (transaction) => {
+      let latest: Readonly<{ sourceRevision: number; contextDigest: string }> | undefined;
+      for (const entry of await transaction.readEntries()) {
+        if (entry.kind !== workflowContextObservationKind) continue;
+        if (!record(entry.payload) || entry.payload.key !== key || !Number.isSafeInteger(entry.payload.sourceRevision)
+          || (entry.payload.sourceRevision as number) < 1 || !digest(entry.payload.contextDigest)) {
+          if (record(entry.payload) && entry.payload.key !== key) continue;
+          throw new Error("The protected provider workflow-context journal is malformed.");
+        }
+        latest = { sourceRevision: entry.payload.sourceRevision as number, contextDigest: entry.payload.contextDigest };
+      }
+      if (latest && observation.sourceRevision < latest.sourceRevision) {
+        throw new WorkflowContextConflictError("The provider workflow-context source revision moved backward.");
+      }
+      if (latest && observation.sourceRevision === latest.sourceRevision) {
+        if (observation.contextDigest !== latest.contextDigest) throw new WorkflowContextConflictError("One provider workflow-context source revision changed content.");
+        return;
+      }
+      await transaction.append(workflowContextObservationKind, {
+        key,
+        sessionId: observation.sessionId,
+        provider: observation.provider,
+        targetSnapshotId: observation.targetSnapshotId,
+        repositoryRoot: observation.repositoryRoot,
+        taskId: observation.taskId,
+        planRevision: observation.planRevision,
+        sourceRevision: observation.sourceRevision,
+        contextDigest: observation.contextDigest,
+        recordedAt: this.timestamp()
+      });
+    });
+  }
+
   private async saveCouncil(saved: SavedCouncilPhase): Promise<void> { await this.store.append(councilEventKind, { ...saved }); }
   private timestamp(): string { const value = this.now(); if (!Number.isFinite(Date.parse(value))) throw new Error("The provider host clock is invalid."); return value; }
   private authenticated(value: string | undefined): boolean {
@@ -399,6 +468,25 @@ export class ProviderAdapterHostService {
 }
 
 interface ExactOperationDocument { readonly sessionId: string; readonly targetSnapshotId: string; readonly repositoryRoot: string; readonly operationId?: string; readonly externalId?: string; readonly routeId?: string; }
+
+function parseWorkflowContextRequest(value: Record<string, unknown>, provider: ProviderGatewayProvider): ProviderRuntimeWorkflowContextRequest {
+  if (!exactKeys(value, ["schema", "version", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "branch", "head", "taskId", "planRevision", "requestNonce"])
+    || value.schema !== "sxsy-b122.provider-workflow-context-observe" || value.version !== 1 || value.provider !== provider
+    || !safeIdentifier(value.sessionId) || !digest(value.targetSnapshotId) || !absoluteRoot(value.repositoryRoot)
+    || !safeBranch(value.branch) || !sha40(value.head) || !boundedIdentity(value.taskId) || !boundedIdentity(value.planRevision)
+    || !digest(value.requestNonce)) throw new Error("The provider workflow-context observation envelope is invalid.");
+  return {
+    sessionId: value.sessionId,
+    provider,
+    targetSnapshotId: value.targetSnapshotId,
+    repositoryRoot: value.repositoryRoot,
+    branch: value.branch,
+    head: value.head,
+    taskId: value.taskId,
+    planRevision: value.planRevision,
+    requestNonce: value.requestNonce
+  };
+}
 
 function exactOperationDocument(value: Record<string, unknown>, schema: string, kind: "session" | "operation" | "cancel"): ExactOperationDocument {
   if (value.schema !== schema || value.version !== 1 || !safeIdentifier(value.sessionId) || !digest(value.targetSnapshotId) || !absoluteRoot(value.repositoryRoot)) throw new Error("The provider observation envelope is invalid.");
@@ -507,6 +595,7 @@ function bindingTypeForResource(kind: ProviderCouncilHostedResource["kind"]): Pr
 
 class CouncilConflictError extends Error {}
 class CouncilUnresolvedError extends Error {}
+class WorkflowContextConflictError extends Error {}
 
 function mapGatewayResult(result: Awaited<ReturnType<AuthenticatedProviderGatewayClient["request"]>>): ProviderHostResponse {
   if (result.outcome === "passed" && result.body) {
@@ -534,11 +623,16 @@ function safeError(error: unknown): string {
   // Never reflect an arbitrary Error.message into an HTTP response or journal.
   if (error instanceof CouncilConflictError) return "The Council phase conflicts with the exact durable phase binding.";
   if (error instanceof CouncilUnresolvedError) return "The Council phase is unresolved and requires exact observation before retry.";
+  if (error instanceof WorkflowContextConflictError) return "The provider workflow context conflicts with its durable monotonic source binding.";
   return "The provider runtime or request boundary failed closed.";
 }
 function bodyLength(value: string | Uint8Array | undefined): number { return value === undefined ? 0 : typeof value === "string" ? Buffer.byteLength(value, "utf8") : value.byteLength; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  const allowed = new Set(keys);
+  return actual.length === keys.length && actual.every((key) => allowed.has(key)) && keys.every((key) => Object.hasOwn(value, key));
+}
 function allowedKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean { const allowed = new Set([...required, ...optional]); return required.every((key) => key in value) && Object.keys(value).every((key) => allowed.has(key)); }
 function safeIdentifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value); }
 function safeRoute(value: unknown): value is string { return typeof value === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(value); }
@@ -548,6 +642,7 @@ function absoluteRoot(value: unknown): value is string { return typeof value ===
 function safeBranch(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 240 && !/[\0\r\n~^:?*\\\[]/.test(value); }
 function safeSummary(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
 function safeBoundedText(value: unknown, maximum: number): value is string { return typeof value === "string" && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
+function boundedIdentity(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 256 && !/[\0\r\n]/.test(value); }
 function opaqueCouncilCapability(value: unknown): value is string { return typeof value === "string" && /^council-capability:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value); }
 function boundedList(value: unknown, maximumItems: number, maximumLength: number): readonly string[] { if (!Array.isArray(value) || value.length > maximumItems || !value.every((entry) => typeof entry === "string" && entry.length > 0 && entry.length <= maximumLength && !/[\0\r\n]/.test(entry))) throw new Error("A Council bounded declaration list is invalid."); return [...new Set(value)]; }
 function leaseList(value: unknown): value is readonly ProviderCouncilLease[] { return Array.isArray(value) && value.length <= 128 && value.every((entry) => record(entry) && exactKeys(entry, ["kind", "resource", "fence"]) && safeIdentifier(entry.kind) && safeBoundedText(entry.resource, 4_096) && Number.isSafeInteger(entry.fence) && (entry.fence as number) >= 1); }
@@ -556,3 +651,6 @@ function capabilities(value: unknown): readonly Capability[] { const list = stri
 function sessionStatus(value: unknown): SessionStatus { if (value !== "running" && value !== "verified_blocked" && value !== "verified_finished" && value !== "unreachable" && value !== "stale" && value !== "unknown") throw new Error("The provider status is invalid."); return value; }
 function safeAdapterVersion(value: unknown): string { if (typeof value !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The provider adapter version is invalid."); return value; }
 function rootKey(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
+function workflowContextKey(value: Pick<ProviderWorkflowContextObservation, "provider" | "sessionId" | "targetSnapshotId" | "repositoryRoot" | "taskId" | "planRevision">): string {
+  return sha256(stableJson({ provider: value.provider, sessionId: value.sessionId, targetSnapshotId: value.targetSnapshotId, repositoryRoot: rootKey(value.repositoryRoot), taskId: value.taskId, planRevision: value.planRevision }));
+}

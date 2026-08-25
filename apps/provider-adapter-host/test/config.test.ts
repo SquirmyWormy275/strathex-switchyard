@@ -133,7 +133,7 @@ test("digest-pinned modules receive only an opened protected credential and sour
   const certPath = join(root, "cert.pem");
   const keyPath = join(root, "key.pem");
   const modulePath = join(root, "backend.mjs");
-  const moduleSource = `export async function createB122ProviderRuntimePort(input) { if (new TextDecoder().decode(input.credential) !== "provider-secret") throw new Error("credential missing"); return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(signal){ globalThis.__b122ProviderShutdown = signal.aborted ? "aborted" : "clean"; } }; }`;
+  const moduleSource = `export async function createB122ProviderRuntimePort(input) { if (new TextDecoder().decode(input.credential) !== "provider-secret") throw new Error("credential missing"); return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(signal){ globalThis.__b122ProviderShutdown = signal.aborted ? "aborted" : "clean"; } }; }`;
   await Promise.all([
     envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(credentialPath, "provider-secret"),
     writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem), writeFile(modulePath, moduleSource)
@@ -159,7 +159,7 @@ test("module providers must expose the typed shutdown contract", async (context)
   const root = await mkdtemp(join(tmpdir(), "b122-provider-module-shutdown-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
   const paths = { config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"), credential: join(root, "credential.json"), cert: join(root, "cert.pem"), key: join(root, "key.pem"), module: join(root, "backend.mjs") };
-  const source = `export function createB122ProviderRuntimePort(input){ return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){} }; }`;
+  const source = `export function createB122ProviderRuntimePort(input){ return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){} }; }`;
   await Promise.all([envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.credential, "provider-secret"), writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem), writeFile(paths.module, source)]);
   await writeFile(paths.config, JSON.stringify({ schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root, listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key), authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal, stateFile: join(root, "state.jsonl"), providers: [{ provider: "codex", kind: "module", modulePath: paths.module, moduleSha256: createHash("sha256").update(source).digest("hex"), credentialEnvelopeFile: paths.credential }] }));
   const loaded = await loadProviderHostConfiguration(paths.config, options(root));

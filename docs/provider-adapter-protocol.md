@@ -96,6 +96,7 @@ The installed provider host also owns these exact authenticated endpoints:
 | --- | --- | --- |
 | `provider.health` | `GET /v1/b122/health` | Authenticated listener/package readiness; it does not claim live-provider acceptance. |
 | `provider.observe-session.<provider>` | `POST /v1/b122/observe/session/<provider>` | Refresh one exact session/TargetSnapshot binding. |
+| `provider.observe-workflow-context.<provider>` | `POST /v1/b122/observe/workflow-context/<provider>` | Read one bounded, authority-neutral coordinator context for the exact session/target/task/plan. |
 | `provider.observe-operation.<provider>` | `POST /v1/b122/observe/operation/<provider>` | Reconcile one durable external operation without replay. |
 | `provider.cancel.<provider>` | `POST /v1/b122/cancel/<provider>` | Cancel one exact nonterminal external operation and observe its result. |
 | `provider.reconcile` | `POST /v1/b122/reconcile` | Observe every unresolved host-owned operation and Council phase after restart. |
@@ -105,6 +106,50 @@ Operation observation and cancellation bind the operation ID, external ID,
 original route ID, session ID, repository root, and TargetSnapshot ID. Council
 phase recovery binds the epoch, participant, phase, target, and assignment
 digest. Submitted work is observed, never automatically replayed.
+
+### Authority-neutral workflow-context observation
+
+Workflow preparation does not infer coordinator evidence from the handshake.
+The companion calls `provider.observe-workflow-context.<provider>` with exact
+schema `sxsy-b122.provider-workflow-context-observe` version 1. The request
+binds `sessionId`, provider, complete TargetSnapshot ID, canonical repository
+root, branch, 40-hex head, task ID, plan revision, and a fresh 64-hex request
+nonce. Both the host and companion reject unknown fields.
+
+The response is exact
+`sxsy-b122.provider-workflow-context-observation` version 1. It repeats every
+request binding and adds:
+
+- a provider `contextId` and monotonic positive `sourceRevision`;
+- bounded planned-file, resource, and dependency lists plus the exact diff
+  digest;
+- the complete `CoordinatorEvidenceBundle`: protected instructions, immutable
+  digest-bound plan (objective, steps, owned files, dependencies, statuses,
+  decisions), documentation, diff, file, and classified test evidence;
+- complete bounded pending decisions (`id`, `question`, and `context`) and an
+  optional pending-request material binding (`requestId`, TargetSnapshot,
+  plan revision, plan digest, and audited action);
+- the host-owned adapter ID, observed module version, and configuration-pinned
+  module SHA-256; and
+- a context digest, host observation timestamp, echoed request nonce, and
+  whole-envelope digest.
+
+This is a read-only evidence contract. There is deliberately no authority ID,
+grant, permission, credential, bearer token, command line, executable path, or
+provider-selected route. The pending-request material describes work waiting
+for host-owned authority selection; it does not confer that authority. Every
+nested record has an exact field set, item/text/byte bounds, secret-redaction
+checks, and recomputed digests. Planned files must equal the immutable plan's
+owned-file union, and the top-level diff digest must equal the evidence diff.
+
+The provider runtime is observed before and after the read under one bounded
+cancellation signal. Late module or transport settlement is consumed. The host
+durably rejects source-revision rollback and same-revision content drift across
+restart; the companion repeats those checks for concurrent calls in the live
+process. A changed session, target, task, plan, adapter version, or response
+nonce fails closed. Credential-bearing in-process modules remain non-Mediated:
+this observation can supply coordinator evidence, but cannot authorize or
+execute any effect.
 
 ## Windows configuration and lifecycle contracts
 

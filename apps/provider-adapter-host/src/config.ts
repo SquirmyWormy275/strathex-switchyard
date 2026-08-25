@@ -226,7 +226,10 @@ export async function loadProviderBackendRuntime(configuration: LoadedProviderHo
         port = wrapProviderRuntimeCouncilLifecycle(port, councilResources);
       }
       ports.push(port);
-      result.push(provider.provider === "claude" ? new ClaudeProviderAdapterBackend(port) : new CodexProviderAdapterBackend(port));
+      const identity = provider.kind === "module"
+        ? { adapterId: `sxsy-b122.module.${provider.provider}`, moduleSha256: provider.moduleSha256 }
+        : undefined;
+      result.push(provider.provider === "claude" ? new ClaudeProviderAdapterBackend(port, identity) : new CodexProviderAdapterBackend(port, identity));
     }
   } catch (error) {
     await closeProviderRuntime(ports, councilResources).catch(() => undefined);
@@ -247,7 +250,7 @@ export async function loadProviderBackends(configuration: LoadedProviderHostConf
 }
 
 function validateRuntimePort(value: unknown, provider: "claude" | "codex"): asserts value is ProviderRuntimePort {
-  if (!record(value) || value.provider !== provider || !["handshake", "execute", "observeSession", "observeOperation", "cancelOperation", "council", "observeCouncil", "shutdown"].every((name) => typeof value[name] === "function")) {
+  if (!record(value) || value.provider !== provider || !["handshake", "execute", "observeSession", "observeWorkflowContext", "observeOperation", "cancelOperation", "council", "observeCouncil", "shutdown"].every((name) => typeof value[name] === "function")) {
     throw new Error(`The ${provider} provider module did not return the exact runtime port contract.`);
   }
 }
