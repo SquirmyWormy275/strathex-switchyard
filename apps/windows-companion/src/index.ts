@@ -15,6 +15,18 @@ export { CompanionService, type CompanionServiceOptions, type MediatedCommandExe
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
 export { WindowsDpapiJournalAuthenticator } from "./windows-authenticator.ts";
 export { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
+export {
+  InstalledCouncilParticipantClient,
+  loadInstalledCouncilParticipantClient,
+  type CouncilParticipantEnvironment,
+  type CouncilParticipantPortProxyHandle
+} from "./council-participant-client.ts";
+export {
+  InstalledCouncilResourceBroker,
+  type CouncilCredentialNetworkRequest,
+  type CouncilPortProxyRequest,
+  type CouncilResourceBrokerPort
+} from "./council-resource-broker.ts";
 export { createDurableWindowsCompanion, type DurableWindowsCompanionOptions } from "./bootstrap.ts";
 export { handleJsonLine, runCompanionStdio, serveJsonLines, type CompanionRequestHandler } from "./stdio.ts";
 export {
@@ -76,6 +88,7 @@ export * from "./hardware-signal-queue.ts";
 export * from "./local-checkpoints.ts";
 export * from "./operation-control.ts";
 export * from "./operation-recovery.ts";
+export * from "./council-epoch-lifecycle.ts";
 export * from "./receipt-evidence.ts";
 export * from "./raw-hid-installation.ts";
 export * from "./raw-hid-protocol.ts";

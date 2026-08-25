@@ -115,7 +115,66 @@ test("Council cannot become active before every durable resume acknowledgement a
     await assert.rejects(council.activate(epoch.id), /resume/i);
     await council.acknowledgeResume(epoch.id, "agent-b");
     await council.activate(epoch.id);
+    await council.validate(epoch.id, [
+      { ...session("agent-a", ["src/a.ts"], ["port:4100"]), status: "verified_finished" },
+      { ...session("agent-b", ["src/b.ts"], ["port:4200"]), status: "verified_finished" }
+    ]);
+    assert.equal((await council.beginCompletion(epoch.id)).status, "completion_pending");
     assert.equal((await council.complete(epoch.id)).status, "completed");
+  });
+});
+
+test("Council accepts and persists a newer healthy heartbeat but aborts on regression or staleness", async () => {
+  await withStore(async (store) => {
+    let now = "2026-08-23T10:02:00.000Z";
+    const council = new CouncilCoordinator(store, {
+      clock: () => now,
+      idFactory: () => "epoch-heartbeat",
+      heartbeatMaxAgeMs: 5 * 60_000
+    });
+    const initial = session("agent-a", ["src/a.ts"], ["port:4100"]);
+    const epoch = await council.beginAutomatic({
+      repositoryRoot: "C:/repos/safe",
+      targetSnapshotId: "snapshot-1",
+      participants: [initial]
+    });
+    await council.acknowledgePause(epoch.id, initial.id);
+    await council.assign(epoch.id, initial.id, initial.plannedFiles, initial.resources);
+    await council.acknowledgeAssignment(epoch.id, initial.id);
+    await council.beginResume(epoch.id);
+    await council.acknowledgeResume(epoch.id, initial.id);
+    await council.activate(epoch.id);
+
+    const advancedAt = "2026-08-23T10:01:30.000Z";
+    const healthy = await council.validate(epoch.id, [{ ...initial, lastHeartbeat: advancedAt }]);
+    assert.equal(healthy.status, "active");
+    assert.equal(healthy.participants[0]?.lastHeartbeat, advancedAt);
+
+    const regressed = await council.validate(epoch.id, [{ ...initial, lastHeartbeat: "2026-08-23T10:01:00.000Z" }]);
+    assert.equal(regressed.status, "aborted");
+    assert.match(regressed.abortReason ?? "", /heartbeat.*regressed/i);
+
+    now = "2026-08-23T10:10:00.000Z";
+    const staleCouncil = new CouncilCoordinator(store, {
+      clock: () => now,
+      idFactory: () => "epoch-stale",
+      heartbeatMaxAgeMs: 5 * 60_000
+    });
+    const staleEpoch = await staleCouncil.beginAutomatic({
+      repositoryRoot: "C:/repos/safe",
+      targetSnapshotId: "snapshot-1",
+      participants: [{ ...initial, lastHeartbeat: "2026-08-23T10:09:00.000Z" }]
+    });
+    await staleCouncil.acknowledgePause(staleEpoch.id, initial.id);
+    await staleCouncil.assign(staleEpoch.id, initial.id, initial.plannedFiles, initial.resources);
+    await staleCouncil.acknowledgeAssignment(staleEpoch.id, initial.id);
+    await staleCouncil.beginResume(staleEpoch.id);
+    await staleCouncil.acknowledgeResume(staleEpoch.id, initial.id);
+    await staleCouncil.activate(staleEpoch.id);
+    now = "2026-08-23T10:15:00.001Z";
+    const stale = await staleCouncil.validate(staleEpoch.id, [{ ...initial, lastHeartbeat: "2026-08-23T10:10:00.000Z" }]);
+    assert.equal(stale.status, "aborted");
+    assert.match(stale.abortReason ?? "", /heartbeat.*stale/i);
   });
 });
 

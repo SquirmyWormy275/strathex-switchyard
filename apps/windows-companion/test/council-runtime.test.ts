@@ -73,7 +73,12 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
     const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; documents.push(document); phases.push(`${input.routeId}:${document.phase}:${document.sessionId}`); const resourceHost = document.resourceHost as Record<string, unknown> | undefined; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: resourceHost?.digest } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
     const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-1" });
     const isolation = fakeIsolation();
-    const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), { isolation, automaticGate: acceptedGate });
+    let resourceProofs = 0;
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), {
+      isolation,
+      automaticGate: acceptedGate,
+      resources: { async assertPlanOperational() { resourceProofs += 1; } }
+    });
     const result = await executor.execute({ action: "council_automatic", operationId: "operation-auto", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "completed");
     assert.equal(result.data?.status, "active");
@@ -85,7 +90,8 @@ test("automatic Council durably pauses, assigns, and resumes every provider thro
     assert.deepEqual((await council.get("epoch-1"))?.resumeAcknowledgedSessionIds, ["one", "two"]);
     assert.equal(isolation.prepared.length, 1);
     assert.deepEqual(isolation.prepared[0]?.assignments.map((assignment) => assignment.sessionId), ["one", "two"]);
-    assert.equal(isolation.asserted.length, 15);
+    assert.equal(isolation.asserted.length, 16);
+    assert.equal(resourceProofs, 2);
     for (const document of documents.filter((candidate) => candidate.phase !== "pause")) {
       const resourceHost = document.resourceHost as Record<string, unknown>;
       assert.match(String(resourceHost.digest), /^[a-f0-9]{64}$/);
@@ -109,6 +115,61 @@ test("automatic Council aborts durably when provider acknowledges a stale resour
     assert.equal(result.status, "incomplete");
     assert.equal((await council.get("epoch-2"))?.status, "aborted");
     assert.deepEqual(isolation.cleaned, ["epoch-2"]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council proves every assigned resource is operational before any participant resumes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-resource-proof-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const isolation = fakeIsolation();
+    const phases: string[] = [];
+    const network = {
+      async request(input: { body?: string }) {
+        const document = JSON.parse(input.body!) as Record<string, unknown>;
+        phases.push(String(document.phase));
+        const resourceHost = document.resourceHost as Record<string, unknown> | undefined;
+        return {
+          outcome: "passed",
+          detail: "ok",
+          body: Buffer.from(JSON.stringify({
+            schema: "sxsy-b122.council-ack",
+            version: 1,
+            epochId: document.epochId,
+            phase: document.phase,
+            sessionId: document.sessionId,
+            targetSnapshotId: document.targetSnapshotId,
+            accepted: true,
+            ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: resourceHost?.digest } : {})
+          }))
+        };
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    let resourceProofs = 0;
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-resource-proof" }),
+      sessions,
+      network,
+      () => Date.parse(at),
+      {
+        isolation,
+        automaticGate: acceptedGate,
+        resources: {
+          async assertPlanOperational() {
+            resourceProofs += 1;
+            assert.equal(phases.includes("resume"), false);
+            throw new Error("one assigned port proxy was never activated");
+          }
+        }
+      }
+    ).execute({ action: "council_automatic", operationId: "operation-resource-proof", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "incomplete");
+    assert.equal(resourceProofs, 1);
+    assert.equal(phases.includes("resume"), false);
+    assert.deepEqual(isolation.cleaned, ["epoch-resource-proof"]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

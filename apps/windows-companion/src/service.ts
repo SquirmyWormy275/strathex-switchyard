@@ -12,6 +12,7 @@ import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
 import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
 import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import type { CouncilResourceBrokerPort } from "./council-resource-broker.ts";
 import type { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
@@ -48,6 +49,8 @@ import {
   type CredentialProvisionPayload,
   type CredentialRevokePayload,
   type NetworkPolicyInstallPayload,
+  type CouncilPortProxyPayload,
+  type CouncilCredentialNetworkPayload,
   type AdministrationSourcePayload,
   type AcceptanceTrustRevokePayload,
   type AcceptanceEvidenceInvalidatePayload,
@@ -149,6 +152,7 @@ export interface CompanionServiceOptions {
   readonly sandboxInstallations?: SandboxInstallationCoordinator;
   readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  readonly councilResources?: CouncilResourceBrokerPort;
   readonly acceptanceAdministration?: Pick<AcceptanceAdministration, "installTrustPolicy" | "listTrust" | "revokeTrust" | "importEvidence" | "listEvidence" | "invalidateEvidence" | "activate" | "listActivations" | "revokeActivation">;
   readonly scannerAdministration?: ScannerFixtureAdministration;
   readonly providerDesktopRegistry?: Pick<AttestedProviderDesktopRegistry, "install" | "list" | "revoke">;
@@ -190,6 +194,7 @@ export class CompanionService {
   private readonly sandboxInstallations?: SandboxInstallationCoordinator;
   private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  private readonly councilResources?: CouncilResourceBrokerPort;
   private readonly acceptanceAdministration?: CompanionServiceOptions["acceptanceAdministration"];
   private readonly scannerAdministration?: ScannerFixtureAdministration;
   private readonly providerDesktopRegistry?: CompanionServiceOptions["providerDesktopRegistry"];
@@ -217,6 +222,7 @@ export class CompanionService {
     this.sandboxInstallations = options.sandboxInstallations;
     this.credentialProvisioning = options.credentialProvisioning;
     this.networkPolicyProvisioning = options.networkPolicyProvisioning;
+    this.councilResources = options.councilResources;
     this.acceptanceAdministration = options.acceptanceAdministration;
     this.scannerAdministration = options.scannerAdministration;
     this.providerDesktopRegistry = options.providerDesktopRegistry;
@@ -293,6 +299,10 @@ export class CompanionService {
           return this.success(request.id, { policy: await this.currentNetworkPolicy(request.payload) });
         case "network-policy.revoke":
           return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
+        case "council.port-proxy.activate":
+          return this.success(request.id, { receipt: await this.activateCouncilPortProxy(this.requireCouncilPortProxy(request.payload)) });
+        case "council.credential-network.execute":
+          return this.success(request.id, { receipt: await this.executeCouncilCredentialNetwork(this.requireCouncilCredentialNetwork(request.payload)) });
         case "acceptance.trust.install": return this.success(request.id, { trust: await this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation")) });
         case "acceptance.trust.list": return this.success(request.id, { trust: await this.listAcceptanceTrust(request.payload) });
         case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload)) });
@@ -800,6 +810,29 @@ export class CompanionService {
 
   private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
   private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
+  private requireCouncilPortProxy(payload: unknown): CouncilPortProxyPayload {
+    const keys = ["epochId", "sessionId", "targetSnapshotId", "leaseId", "operationId", "fenceDigest", "resourceHostDigest", "expectedPort", "backendPipePath", "backendProof"];
+    if (!isRecord(payload) || !exactKeys(payload, keys) || !keys.every((key) => typeof payload[key] === "string" && (payload[key] as string).length > 0 && (payload[key] as string).length <= 512 && !/[\r\n\0]/.test(payload[key] as string))) {
+      throw new CompanionServiceError("invalid_request", "Council port-proxy activation requires only exact epoch, session, target, lease, operation, and local backend-pipe fields.");
+    }
+    return payload as unknown as CouncilPortProxyPayload;
+  }
+  private requireCouncilCredentialNetwork(payload: unknown): CouncilCredentialNetworkPayload {
+    const required = ["epochId", "sessionId", "targetSnapshotId", "leaseId", "operationId", "fenceDigest", "resourceHostDigest", "capabilityId", "routeId"];
+    if (!isRecord(payload) || !exactKeys(payload, required)
+      || !required.every((key) => typeof payload[key] === "string" && (payload[key] as string).length > 0 && (payload[key] as string).length <= 256 && !/[\r\n\0]/.test(payload[key] as string))) {
+      throw new CompanionServiceError("invalid_request", "Council credentialed network execution requires only exact bounded broker fields.");
+    }
+    return payload as unknown as CouncilCredentialNetworkPayload;
+  }
+  private async activateCouncilPortProxy(payload: CouncilPortProxyPayload) {
+    if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
+    return this.councilResources.activatePortProxy(payload);
+  }
+  private async executeCouncilCredentialNetwork(payload: CouncilCredentialNetworkPayload) {
+    if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
+    return this.councilResources.credentialNetwork(payload);
+  }
   private requireAdministrationSource(payload: unknown, label: string): AdministrationSourcePayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", `${label} requires one bounded absolute source path.`); return { sourcePath: payload.sourcePath }; }
   private requireAcceptanceTrustRevoke(payload: unknown): AcceptanceTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
   private requireAcceptanceEvidenceInvalidate(payload: unknown): AcceptanceEvidenceInvalidatePayload { if (!isRecord(payload) || !exactKeys(payload, ["evidenceId", "reason"]) || !boundedIdentifier(payload.evidenceId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance evidence invalidation requires one exact evidence ID and bounded reason."); return { evidenceId: payload.evidenceId, reason: payload.reason }; }

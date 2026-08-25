@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { chmod, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:net";
+import { createServer, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -38,6 +38,45 @@ export interface CouncilCredentialVaultCapabilityPort {
   issue(request: CouncilCredentialVaultIssueRequest): Promise<CouncilCredentialCapabilityBinding>;
   assertCurrent(binding: CouncilCredentialCapabilityBinding, request: CouncilCredentialVaultIssueRequest): Promise<boolean>;
   revoke(binding: CouncilCredentialCapabilityBinding, request: CouncilCredentialVaultIssueRequest): Promise<void>;
+  /** Optional host-only use path. Public capability IDs never redeem directly. */
+  withCredential?<T>(binding: CouncilCredentialCapabilityBinding, request: CouncilCredentialVaultIssueRequest, consume: (cleartext: Uint8Array) => Promise<T>): Promise<T>;
+}
+
+export interface CouncilPortProxyActivation {
+  readonly leaseId: string;
+  readonly activationId: string;
+  /** Host-owned connector; neither a prompt nor a resource binding can replace it. */
+  readonly connectBackend: () => Promise<Socket>;
+}
+
+export interface CouncilCredentialOperationInput {
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly leaseId: string;
+  readonly fence: number;
+  readonly fenceDigest: string;
+  readonly credentialReference: string;
+  readonly operationId: string;
+}
+
+export interface CouncilCredentialOperationPort {
+  perform(input: CouncilCredentialOperationInput, cleartext: Uint8Array): Promise<Readonly<{ outcome: "passed" | "failed"; summary: string }>>;
+}
+
+export interface CouncilCredentialOperationReceipt {
+  readonly schema: "sxsy-b122.council-credential-operation";
+  readonly version: 1;
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly leaseId: string;
+  readonly fence: number;
+  readonly operationId: string;
+  readonly outcome: "passed" | "failed";
+  readonly summary: string;
+  readonly digest: string;
 }
 
 export interface CouncilResourceHostLease {
@@ -118,9 +157,10 @@ export class CouncilResourceHostError extends Error {
 export class CouncilResourceHost implements CouncilResourceHostPort {
   private readonly stateRoot: string;
   private readonly credentials?: CouncilCredentialVaultCapabilityPort;
-  private readonly ports = new Map<string, Server>();
+  private readonly ports = new Map<string, HostedPort>();
   private readonly databases = new Map<string, DatabaseSync>();
   private readonly liveBindings = new Map<string, CouncilResourceHostBinding>();
+  private readonly credentialOperations = new Map<string, Readonly<{ requestDigest: string; bindingDigest: string; receipt: CouncilCredentialOperationReceipt }>>();
 
   constructor(options: CouncilResourceHostOptions) {
     if (!isAbsolute(options.stateRoot)) throw new CouncilResourceHostError("Council resource host state root must be absolute.");
@@ -190,15 +230,20 @@ export class CouncilResourceHost implements CouncilResourceHostPort {
         throw new CouncilResourceHostError("Council resource host binding changed its exact lease, order, type, environment, or fence.");
       }
       if (resource.kind === "port") {
-        const server = this.ports.get(resource.leaseId);
-        const address = server?.address();
-        if (!server?.listening || !address || typeof address === "string" || address.address !== "127.0.0.1" || address.port !== Number(resource.value)) {
+        const hosted = this.ports.get(resource.leaseId);
+        const address = hosted?.server.address();
+        if (!hosted?.server.listening || !address || typeof address === "string" || address.address !== "127.0.0.1" || address.port !== Number(resource.value)) {
           throw new CouncilResourceHostError("Council loopback port is no longer held by its exact fenced resource host.");
         }
       } else if (resource.kind === "credential_scope") {
         if (!this.credentials || resource.credentialExpiresAt === undefined) throw new CouncilResourceHostError("Council credential capability is unavailable after its exact assignment.");
         const capability = { id: resource.value, expiresAt: resource.credentialExpiresAt };
-        if (!await this.credentials.assertCurrent(capability, credentialIssue(request, lease))) throw new CouncilResourceHostError("Council credential capability is not current for its exact session fence.");
+        const current = await this.credentials.assertCurrent(capability, credentialIssue(request, lease));
+        const consumed = [...this.credentialOperations.values()].some((operation) => operation.bindingDigest === binding.digest
+          && operation.receipt.epochId === request.epochId && operation.receipt.sessionId === request.sessionId
+          && operation.receipt.targetSnapshotId === request.targetSnapshotId && operation.receipt.leaseId === lease.id
+          && operation.receipt.fence === lease.fence && operation.receipt.outcome === "passed");
+        if (!current && !consumed) throw new CouncilResourceHostError("Council credential capability is not current for its exact session fence.");
       } else {
         await this.assertDirectory(request, lease, resource.value);
         if (resource.kind === "database") this.assertDatabase(request, lease, resource.value);
@@ -245,10 +290,136 @@ export class CouncilResourceHost implements CouncilResourceHostPort {
       this.liveBindings.set(bindingKey(request), cloneBinding(binding));
       await this.assertCurrent(request, binding);
     } catch (error) {
-      for (const id of acquiredPorts) await closeServer(this.ports.get(id)).catch(() => undefined).finally(() => this.ports.delete(id));
+      for (const id of acquiredPorts) await closeHostedPort(this.ports.get(id)).catch(() => undefined).finally(() => this.ports.delete(id));
       for (const id of openedDatabases) { this.databases.get(id)?.close(); this.databases.delete(id); }
       throw error instanceof CouncilResourceHostError ? error : new CouncilResourceHostError("Council restart resource reconciliation failed closed.");
     }
+  }
+
+  /**
+   * Turns an exclusively held numeric lease into a usable host-retained proxy.
+   * The listening socket is never released, and only the exact first
+   * activation may install the host-owned backend connector.
+   */
+  async activatePortProxy(requestInput: CouncilResourceHostRequest, bindingInput: CouncilResourceHostBinding, activation: CouncilPortProxyActivation): Promise<void> {
+    const request = await this.normalizedRequest(requestInput);
+    const binding = validatedBinding(bindingInput, request);
+    await this.assertCurrent(request, binding);
+    const operationId = boundedIdentity(activation.activationId, "Council port-proxy activation ID");
+    const resource = binding.resources.find((candidate) => candidate.leaseId === activation.leaseId && candidate.kind === "port");
+    if (!resource) throw new CouncilResourceHostError("Council port proxy refers to an unknown exact port lease.");
+    const lease = requiredLease(request, resource);
+    if (lease.fence !== resource.fence || resource.value !== String(exactPort(lease))) throw new CouncilResourceHostError("Council port proxy lease or fence changed before activation.");
+    const hosted = this.ports.get(lease.id);
+    if (!hosted?.server.listening) throw new CouncilResourceHostError("Council port proxy lost its host-retained listener.");
+    if (hosted.activationId) {
+      if (hosted.activationId === operationId && hosted.bindingDigest === binding.digest) return;
+      throw new CouncilResourceHostError("Council port proxy is already activated by a different operation; replay was refused.");
+    }
+    let probe: Socket | undefined;
+    try {
+      probe = await activation.connectBackend();
+      if (probe.destroyed) throw new Error("backend closed");
+    } catch {
+      throw new CouncilResourceHostError("Council port proxy backend could not be proven at activation time.");
+    } finally {
+      probe?.destroy();
+    }
+    hosted.activationId = operationId;
+    hosted.bindingDigest = binding.digest;
+    hosted.connectBackend = activation.connectBackend;
+  }
+
+  /** Stronger active-epoch check: every numeric lease has a live exact proxy. */
+  async assertOperational(requestInput: CouncilResourceHostRequest, bindingInput: CouncilResourceHostBinding): Promise<void> {
+    const request = await this.normalizedRequest(requestInput);
+    const binding = validatedBinding(bindingInput, request);
+    await this.assertCurrent(request, binding);
+    for (const resource of binding.resources.filter((candidate) => candidate.kind === "port")) {
+      const hosted = this.ports.get(resource.leaseId);
+      if (!hosted?.server.listening || !hosted.activationId || hosted.bindingDigest !== binding.digest || !hosted.connectBackend) {
+        throw new CouncilResourceHostError("Council active port lease lacks its exact installed host-retained proxy.");
+      }
+      let probe: Socket | undefined;
+      try {
+        probe = await hosted.connectBackend();
+        if (probe.destroyed) throw new Error("backend closed");
+      } catch {
+        throw new CouncilResourceHostError("Council active port proxy backend is unavailable.");
+      } finally {
+        probe?.destroy();
+      }
+    }
+  }
+
+  /**
+   * Executes one scoped host-owned operation with credential bytes confined to
+   * the trusted consumer callback. Replays return the protected public receipt
+   * and never redeem the credential twice.
+   */
+  async performCredentialOperation(
+    requestInput: CouncilResourceHostRequest,
+    bindingInput: CouncilResourceHostBinding,
+    operationInput: Readonly<{ leaseId: string; operationId: string }>,
+    operation: CouncilCredentialOperationPort
+  ): Promise<CouncilCredentialOperationReceipt> {
+    const request = await this.normalizedRequest(requestInput);
+    const binding = validatedBinding(bindingInput, request);
+    const operationId = boundedIdentity(operationInput.operationId, "Council credential operation ID");
+    const resource = binding.resources.find((candidate) => candidate.leaseId === operationInput.leaseId && candidate.kind === "credential_scope");
+    if (!resource || resource.credentialExpiresAt === undefined) throw new CouncilResourceHostError("Council credential operation refers to an unknown exact credential lease.");
+    const lease = requiredLease(request, resource);
+    const input: CouncilCredentialOperationInput = {
+      epochId: request.epochId,
+      sessionId: request.sessionId,
+      targetSnapshotId: request.targetSnapshotId,
+      repositoryRoot: request.repositoryRoot,
+      leaseId: lease.id,
+      fence: lease.fence,
+      fenceDigest: binding.fenceDigest,
+      credentialReference: credentialReference(lease),
+      operationId
+    };
+    const requestDigest = sha256(stableJson(input));
+    const prior = this.credentialOperations.get(operationId);
+    if (prior) {
+      if (prior.requestDigest !== requestDigest) throw new CouncilResourceHostError("Council credential operation ID was replayed against a different session, target, lease, or fence.");
+      return cloneCredentialReceipt(prior.receipt);
+    }
+    await this.assertCurrent(request, binding);
+    if (!this.credentials?.withCredential) throw new CouncilResourceHostError("Council credential capability has no installed host-only operation broker.");
+    const capability = { id: resource.value, expiresAt: resource.credentialExpiresAt };
+    let result: Awaited<ReturnType<CouncilCredentialOperationPort["perform"]>>;
+    try {
+      result = await this.credentials.withCredential(capability, credentialIssue(request, lease), async (cleartext) => {
+        const scoped = new Uint8Array(cleartext);
+        try {
+          return await operation.perform(input, scoped);
+        } finally {
+          scoped.fill(0);
+        }
+      });
+    } catch {
+      throw new CouncilResourceHostError("Council credential operation failed inside the host-only broker.");
+    }
+    if ((result.outcome !== "passed" && result.outcome !== "failed") || !result.summary.trim() || result.summary.length > 512 || /[\r\n\0]/.test(result.summary)) {
+      throw new CouncilResourceHostError("Council credential operation returned an invalid scoped result.");
+    }
+    const unsigned = {
+      schema: "sxsy-b122.council-credential-operation" as const,
+      version: 1 as const,
+      epochId: input.epochId,
+      sessionId: input.sessionId,
+      targetSnapshotId: input.targetSnapshotId,
+      leaseId: input.leaseId,
+      fence: input.fence,
+      operationId,
+      outcome: result.outcome,
+      summary: result.summary.trim()
+    };
+    const receipt: CouncilCredentialOperationReceipt = { ...unsigned, digest: sha256(stableJson(unsigned)) };
+    this.credentialOperations.set(operationId, { requestDigest, bindingDigest: binding.digest, receipt });
+    return cloneCredentialReceipt(receipt);
   }
 
   async preflightCleanup(requestInput: CouncilResourceHostRequest, binding?: CouncilResourceHostBinding): Promise<void> {
@@ -257,14 +428,14 @@ export class CouncilResourceHost implements CouncilResourceHostPort {
     for (const lease of request.leases.filter(isHostedLease)) {
       if (lease.kind === "port") {
         const held = this.ports.get(lease.id);
-        if (held?.listening) {
-          const address = held.address();
+        if (held?.server.listening) {
+          const address = held.server.address();
           if (!address || typeof address === "string" || address.address !== "127.0.0.1" || address.port !== exactPort(lease)) throw new CouncilResourceHostError("Council cleanup port handle changed identity.");
         } else {
           // A restarted host may have no prior handle. One exclusive bind proves
           // no other process stole the assignment before it is released.
           const probe = await holdPort(exactPort(lease));
-          await closeServer(probe);
+          await closeHostedPort(probe);
         }
         continue;
       }
@@ -291,16 +462,20 @@ export class CouncilResourceHost implements CouncilResourceHostPort {
     for (const lease of request.leases.filter(isHostedLease)) {
       if (lease.localPath && await exists(lease.localPath)) await rm(lease.localPath, { recursive: true, force: false });
     }
+    for (const [operationId, operation] of this.credentialOperations) {
+      if (operation.receipt.epochId === request.epochId && operation.receipt.sessionId === request.sessionId) this.credentialOperations.delete(operationId);
+    }
     this.liveBindings.delete(bindingKey(request));
   }
 
   /** Test/restart hook: imitates process handle loss without durable cleanup. */
   async shutdownForRestart(): Promise<void> {
-    for (const server of this.ports.values()) await closeServer(server).catch(() => undefined);
+    for (const hosted of this.ports.values()) await closeHostedPort(hosted).catch(() => undefined);
     for (const database of this.databases.values()) database.close();
     this.ports.clear();
     this.databases.clear();
     this.liveBindings.clear();
+    this.credentialOperations.clear();
   }
 
   private async normalizedRequest(input: CouncilResourceHostRequest): Promise<CouncilResourceHostRequest> {
@@ -356,7 +531,7 @@ export class CouncilResourceHost implements CouncilResourceHostPort {
 
   private async closeHandles(request: CouncilResourceHostRequest): Promise<void> {
     for (const lease of request.leases.filter(isHostedLease)) {
-      if (lease.kind === "port") await closeServer(this.ports.get(lease.id)).catch(() => undefined).finally(() => this.ports.delete(lease.id));
+      if (lease.kind === "port") await closeHostedPort(this.ports.get(lease.id)).catch(() => undefined).finally(() => this.ports.delete(lease.id));
       if (lease.kind === "database") { this.databases.get(lease.id)?.close(); this.databases.delete(lease.id); }
     }
   }
@@ -478,7 +653,7 @@ function resourceMarker(request: CouncilResourceHostRequest, lease: CouncilResou
 
 function credentialIssue(request: CouncilResourceHostRequest, lease: CouncilResourceHostLease): CouncilCredentialVaultIssueRequest {
   return {
-    reference: lease.declaration!.slice(lease.declaration!.indexOf(":") + 1),
+    reference: credentialReference(lease),
     repositoryRoot: request.repositoryRoot,
     epochId: request.epochId,
     sessionId: request.sessionId,
@@ -486,6 +661,15 @@ function credentialIssue(request: CouncilResourceHostRequest, lease: CouncilReso
     fence: lease.fence,
     fenceDigest: fenceDigest(request)
   };
+}
+
+function credentialReference(lease: CouncilResourceHostLease): string {
+  if (lease.kind !== "credential_scope" || !lease.declaration) throw new CouncilResourceHostError("Council credential lease lacks an exact scoped reference.");
+  const value = lease.declaration.slice(lease.declaration.indexOf(":") + 1);
+  const separator = value.indexOf("@");
+  const reference = separator < 0 ? value : value.slice(0, separator);
+  if (!capabilityIdPattern.test(reference)) throw new CouncilResourceHostError("Council credential lease has an invalid exact reference.");
+  return reference;
 }
 
 function fenceDigest(request: CouncilResourceHostRequest): string {
@@ -539,15 +723,41 @@ function requiredLease(request: CouncilResourceHostRequest, resource: CouncilHos
   return lease;
 }
 
-async function holdPort(port: number): Promise<Server> {
+interface HostedPort {
+  readonly server: Server;
+  readonly sockets: Set<Socket>;
+  activationId?: string;
+  bindingDigest?: string;
+  connectBackend?: () => Promise<Socket>;
+}
+
+async function holdPort(port: number): Promise<HostedPort> {
   return new Promise((resolveServer, reject) => {
-    const server = createServer((socket) => socket.destroy());
+    const sockets = new Set<Socket>();
+    const hosted: HostedPort = {
+      sockets,
+      server: createServer((socket) => {
+        sockets.add(socket);
+        socket.once("close", () => sockets.delete(socket));
+        const connector = hosted.connectBackend;
+        if (!connector) { socket.destroy(); return; }
+        void connector().then((backend) => {
+          sockets.add(backend);
+          backend.once("close", () => sockets.delete(backend));
+          socket.once("error", () => backend.destroy());
+          backend.once("error", () => socket.destroy());
+          socket.pipe(backend);
+          backend.pipe(socket);
+        }).catch(() => socket.destroy());
+      })
+    };
+    const { server } = hosted;
     server.unref();
     server.once("error", (error) => { server.close(); reject(new CouncilResourceHostError(`Council could not exclusively hold loopback port ${port}: ${error.message}`)); });
     server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
       server.removeAllListeners("error");
       server.on("error", () => { /* assertCurrent observes a lost listener */ });
-      resolveServer(server);
+      resolveServer(hosted);
     });
   });
 }
@@ -555,6 +765,13 @@ async function holdPort(port: number): Promise<Server> {
 async function closeServer(server: Server | undefined): Promise<void> {
   if (!server?.listening) return;
   await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+}
+
+async function closeHostedPort(hosted: HostedPort | undefined): Promise<void> {
+  if (!hosted) return;
+  for (const socket of hosted.sockets) socket.destroy();
+  hosted.sockets.clear();
+  await closeServer(hosted.server);
 }
 
 function validateCapability(value: CouncilCredentialCapabilityBinding): CouncilCredentialCapabilityBinding {
@@ -574,3 +791,9 @@ function samePath(left: string, right: string): boolean { return resolve(left).r
 function inside(parent: string, candidate: string): boolean { const rel = relative(resolve(parent), resolve(candidate)); return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel)); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function cloneBinding(binding: CouncilResourceHostBinding): CouncilResourceHostBinding { return JSON.parse(JSON.stringify(binding)) as CouncilResourceHostBinding; }
+function cloneCredentialReceipt(receipt: CouncilCredentialOperationReceipt): CouncilCredentialOperationReceipt { return { ...receipt }; }
+function boundedIdentity(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,255}$/.test(normalized)) throw new CouncilResourceHostError(`${field} is invalid.`);
+  return normalized;
+}

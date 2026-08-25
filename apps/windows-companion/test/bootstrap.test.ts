@@ -82,6 +82,25 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   assert.ok(companion.checkpointCapture instanceof LocalCheckpointCapture);
   assert.ok(companion.checkpointVerifier instanceof LocalRecoveryArtifactVerifier);
   assert.ok(companion.operationControl instanceof InstalledOperationControl);
+  const councilIngress = await companion.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "council-resource-ingress",
+    method: "council.port-proxy.activate",
+    payload: {
+      epochId: "missing-epoch",
+      sessionId: "trusted",
+      targetSnapshotId: target.id,
+      leaseId: "missing-port-lease",
+      operationId: "missing-port-operation",
+      fenceDigest: "1".repeat(64),
+      resourceHostDigest: "2".repeat(64),
+      expectedPort: "45123",
+      backendPipePath: "\\\\.\\pipe\\sxsy-b122-council-backend-missing",
+      backendProof: "3".repeat(64)
+    }
+  });
+  assert.equal(councilIngress.ok, false);
+  assert.equal(councilIngress.error?.code, "invalid_request");
   const workflowArtifacts = new WorkflowArtifactStore(companion.store, { idFactory: () => "provider-artifact" });
   await workflowArtifacts.create({
     action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: "trusted",

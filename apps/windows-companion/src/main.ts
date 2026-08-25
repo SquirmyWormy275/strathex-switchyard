@@ -32,6 +32,8 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   let pipe: AuthenticatedPipeServer | undefined;
   let rawHidSupervisor: InstalledRawHidSupervisor | undefined;
   let voiceRuntime: { shutdown(): Promise<void> } | undefined;
+  let councilLifecycle: { dispose(): Promise<void> } | undefined;
+  let councilResources: { shutdownForRestart(): Promise<void> } | undefined;
   let transcriptVault: { startRetentionEnforcement(options?: Readonly<{ onFailure?: (error: Error) => void }>): Promise<void>; stopRetentionEnforcement(): void } | undefined;
   let stopped = false;
   try {
@@ -107,6 +109,8 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   });
   rawHidSupervisor = companion.rawHidSupervisor;
   voiceRuntime = companion.voiceRuntime;
+  councilLifecycle = companion.councilLifecycle;
+  councilResources = companion.councilResources;
   transcriptVault = companion.transcriptVault;
   await companion.endpoint.ready();
   await transcriptVault.startRetentionEnforcement({
@@ -125,9 +129,11 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   }
   pipe = new AuthenticatedPipeServer(configuration, protector, companion.endpoint);
   await pipe.start();
-  return { async stop() { if (stopped) return; stopped = true; transcriptVault?.stopRetentionEnforcement(); await companion.voiceRuntime.shutdown(); await rawHidSupervisor?.stop(); await pipe?.stop().finally(() => instance.release()); } };
+  return { async stop() { if (stopped) return; stopped = true; transcriptVault?.stopRetentionEnforcement(); try { await pipe?.stop(); await companion.councilLifecycle.dispose(); await companion.councilResources.shutdownForRestart(); await companion.voiceRuntime.shutdown(); await rawHidSupervisor?.stop(); } finally { instance.release(); } } };
   } catch (error) {
     transcriptVault?.stopRetentionEnforcement();
+    await councilLifecycle?.dispose().catch(() => undefined);
+    await councilResources?.shutdownForRestart().catch(() => undefined);
     await voiceRuntime?.shutdown().catch(() => undefined);
     await rawHidSupervisor?.stop().catch(() => undefined);
     await pipe?.stop().catch(() => undefined);

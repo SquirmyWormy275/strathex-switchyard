@@ -56,6 +56,8 @@ import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-ev
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { CouncilResourceHost, VaultBackedCouncilCredentialCapabilityPort } from "./council-resource-host.ts";
+import { InstalledCouncilResourceBroker } from "./council-resource-broker.ts";
+import { CouncilEpochLifecycleManager } from "./council-epoch-lifecycle.ts";
 import { SessionFreshnessCoordinator } from "./session-freshness.ts";
 import { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 import {
@@ -184,6 +186,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly voiceGateway: HybridVoiceGateway;
   readonly voiceRuntime: InstalledVoiceConversationRuntime;
   readonly councilIsolation: CouncilWorkspaceIsolationManager;
+  readonly councilResources: InstalledCouncilResourceBroker;
+  readonly councilLifecycle: CouncilEpochLifecycleManager;
   readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
@@ -315,14 +319,18 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
   });
   credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
+  const councilResourceHost = new CouncilResourceHost({
+    stateRoot: councilStateRoot,
+    credentials: new VaultBackedCouncilCredentialCapabilityPort(credentialVault.createAdapter("council-resource-host"))
+  });
   const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
     stateRoot: councilStateRoot,
-    resourceHost: new CouncilResourceHost({
-      stateRoot: councilStateRoot,
-      credentials: new VaultBackedCouncilCredentialCapabilityPort(credentialVault.createAdapter("council-resource-host"))
-    })
+    resourceHost: councilResourceHost
   });
+  const council = new CouncilCoordinator(store);
   const networkPolicyRegistry = new DurableNetworkPolicyRegistry(store, resolve(options.localStateDirectory ?? dirname(store.filePath), "network-policy.json"));
+  const councilResources = new InstalledCouncilResourceBroker(councilIsolation, councilResourceHost, networkPolicyRegistry, containmentManager);
+  const councilLifecycle = new CouncilEpochLifecycleManager(council, sessions, councilIsolation, { resources: councilResources });
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
   const configuredNetwork = new DynamicConfiguredNetworkClient({
@@ -391,7 +399,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     network: configuredNetwork,
     providerOperations: providerGateway,
     networkPolicy: networkPolicyRegistry,
-    council: new CouncilCoordinator(store),
+    council,
     hostActions,
     ...(providerDesktopEffects ? { providerDesktopEffects } : {})
   }));
@@ -503,6 +511,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           networkPolicyRegistry,
           providerTransport,
           councilIsolation,
+          councilResources,
           councilAutomaticGate,
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
           ...(repositorySandbox ? { repositorySandbox } : {}),
@@ -533,7 +542,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   });
   const containmentRelease = new AttestedContainmentReleaseCoordinator(executor);
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
@@ -543,6 +552,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       for (const completion of await hostActions.listSettled()) await executor.completeExternalOperation(completion);
       await repositoryRuntimes.recoverManagedProcesses();
       await councilIsolation.recoverPending();
+      await councilLifecycle.start();
       await executor.recoverAfterRestart();
       await hardwareSignals.recoverAfterRestart();
     }
@@ -570,6 +580,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     voiceGateway,
     voiceRuntime,
     councilIsolation,
+    councilResources,
+    councilLifecycle,
     scannerFixtures,
     ...(acceptanceAdministration ? { acceptanceAdministration } : {}),
     ...(scannerAdministration ? { scannerAdministration } : {}),

@@ -32,7 +32,7 @@ export interface CouncilReport {
   readonly collectedAt: string;
 }
 
-export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "awaiting_resume_acknowledgements" | "active" | "aborted" | "completed";
+export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "awaiting_resume_acknowledgements" | "active" | "completion_pending" | "aborted" | "completed";
 
 export interface CouncilAssignment {
   readonly sessionId: string;
@@ -213,11 +213,14 @@ export class CouncilCoordinator {
   private readonly store: ProtectedJsonStore;
   private readonly clock: () => string;
   private readonly idFactory: () => string;
+  private readonly heartbeatMaxAgeMs: number;
 
-  constructor(store: ProtectedJsonStore, options: { readonly clock?: () => string; readonly idFactory?: () => string } = {}) {
+  constructor(store: ProtectedJsonStore, options: { readonly clock?: () => string; readonly idFactory?: () => string; readonly heartbeatMaxAgeMs?: number } = {}) {
     this.store = store;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? randomUUID;
+    this.heartbeatMaxAgeMs = options.heartbeatMaxAgeMs ?? 5 * 60_000;
+    if (!Number.isSafeInteger(this.heartbeatMaxAgeMs) || this.heartbeatMaxAgeMs < 1) throw new CouncilError("Council heartbeat maximum age must be a positive integer.");
   }
 
   async report(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReport> {
@@ -334,6 +337,14 @@ export class CouncilCoordinator {
     });
   }
 
+  /** Returns durable nonterminal epochs that require the installed lifecycle verifier. */
+  async listOngoing(): Promise<readonly CouncilEpoch[]> {
+    return [...epochs(await this.store.readEntries()).values()]
+      .filter((epoch) => epoch.status === "active" || epoch.status === "completion_pending")
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map(cloneEpoch);
+  }
+
   async prepareRecommendation(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilRecommendation> {
     const report = await this.report(input);
     const ready = report.atomic && report.pathConflicts.length === 0 && report.resourceConflicts.length === 0 && report.dependencyConflicts.length === 0;
@@ -392,9 +403,21 @@ export class CouncilCoordinator {
     });
   }
 
+  async beginCompletion(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status === "completion_pending") return epoch;
+      if (epoch.status !== "active") throw new CouncilError("Only an active Council epoch can begin completion.");
+      if (!epoch.participants.length || !epoch.participants.every((participant) => participant.status === "verified_finished")) {
+        throw new CouncilError("Council completion requires every exact participant to be freshly verified finished.");
+      }
+      return { ...epoch, status: "completion_pending" };
+    });
+  }
+
   async complete(id: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
-      if (epoch.status !== "active") throw new CouncilError("Only an active Council epoch can be completed.");
+      if (epoch.status === "completed") return epoch;
+      if (epoch.status !== "completion_pending") throw new CouncilError("Council completion requires a durable pending-completion transition and resource cleanup.");
       return { ...epoch, status: "completed" };
     });
   }
@@ -408,17 +431,28 @@ export class CouncilCoordinator {
     try {
       const normalized = observations.map((observation) => {
         const participant = normalizedParticipant(observation);
-        assertAutomaticParticipant(participant);
+        if (!necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))) {
+          throw new CouncilError(`Participant ${participant.id} lost a proven automatic-coordination capability.`);
+        }
+        if (participant.status !== "running" && participant.status !== "verified_finished") {
+          throw new CouncilError(`Participant ${participant.id} is ${participant.status}; the active Council epoch stopped.`);
+        }
         return participant;
       });
-      if (normalized.length !== epoch.participants.length) reason = "Council participant set changed during the epoch.";
+      if (normalized.length !== epoch.participants.length || new Set(normalized.map((participant) => participant.id)).size !== normalized.length) reason = "Council participant set changed during the epoch.";
+      const statuses = new Set(normalized.map((participant) => participant.status));
+      if (!reason && statuses.has("verified_finished") && statuses.size !== 1) reason = "Council participant completion was not verified for the complete exact session set.";
       const currentById = new Map(normalized.map((participant) => [participant.id, participant]));
+      const now = Date.parse(this.clock());
       for (const expected of epoch.participants) {
         const current = currentById.get(expected.id);
         if (!current) { reason = `Council participant ${expected.id} is missing.`; break; }
         if (current.targetSnapshotId !== epoch.targetSnapshotId) { reason = `Council participant ${expected.id} changed TargetSnapshot.`; break; }
         if (current.diffDigest !== expected.diffDigest) { reason = `Council participant ${expected.id} changed its diff during coordination.`; break; }
-        if (current.lastHeartbeat !== expected.lastHeartbeat) { reason = `Council participant ${expected.id} heartbeat changed; the epoch is no longer atomic.`; break; }
+        const heartbeat = Date.parse(current.lastHeartbeat);
+        if (heartbeat < Date.parse(expected.lastHeartbeat)) { reason = `Council participant ${expected.id} heartbeat regressed during coordination.`; break; }
+        if (heartbeat > now + 30_000) { reason = `Council participant ${expected.id} heartbeat is in the future.`; break; }
+        if (now - heartbeat > this.heartbeatMaxAgeMs) { reason = `Council participant ${expected.id} heartbeat is stale.`; break; }
         if (!equalStrings(current.plannedFiles, expected.plannedFiles) || !equalStrings(current.resources, expected.resources) || !equalStrings(current.dependencies, expected.dependencies)) {
           reason = `Council participant ${expected.id} changed its declared plan or resource lease.`;
           break;
@@ -427,7 +461,11 @@ export class CouncilCoordinator {
     } catch (error) {
       reason = error instanceof Error ? error.message : "Council observation could not be verified.";
     }
-    return reason ? this.abort(id, reason) : epoch;
+    if (reason) return this.abort(id, reason);
+    return this.mutate(id, (current) => current.status !== "active" ? current : {
+      ...current,
+      participants: observations.map(normalizedParticipant).sort((left, right) => left.id.localeCompare(right.id))
+    });
   }
 
   async abort(id: string, reason: string): Promise<CouncilEpoch> {

@@ -23,6 +23,11 @@ export interface CouncilAutomaticAcceptanceGate {
   accepted(request: CouncilRequest): Promise<boolean>;
 }
 
+export interface CouncilAssignmentResourceVerifier {
+  /** Proves every assigned host resource is usable without changing the plan. */
+  assertPlanOperational(plan: CouncilIsolationPlan): Promise<void>;
+}
+
 /** Reads only independently attested, current-target evidence from the protected gate ledger. */
 export class LedgerCouncilAutomaticAcceptanceGate implements CouncilAutomaticAcceptanceGate {
   constructor(private readonly evidence: GateEvidenceLedger) {}
@@ -37,6 +42,7 @@ export class LedgerCouncilAutomaticAcceptanceGate implements CouncilAutomaticAcc
 export interface DurableConfiguredCouncilOptions {
   readonly isolation?: CouncilWorkspaceIsolator;
   readonly automaticGate?: CouncilAutomaticAcceptanceGate;
+  readonly resources?: CouncilAssignmentResourceVerifier;
 }
 
 /** Durable multi-session Council with exact-route provider acknowledgements for every automatic phase. */
@@ -47,7 +53,8 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   private readonly now: () => number;
   private readonly isolation?: CouncilWorkspaceIsolator;
   private readonly automaticGate?: CouncilAutomaticAcceptanceGate;
-  constructor(council: CouncilCoordinator, sessions: SessionRegistry, network?: DynamicConfiguredNetworkClient, now: () => number = Date.now, options: DurableConfiguredCouncilOptions = {}) { this.council = council; this.sessions = sessions; this.network = network; this.now = now; this.isolation = options.isolation; this.automaticGate = options.automaticGate; }
+  private readonly resources?: CouncilAssignmentResourceVerifier;
+  constructor(council: CouncilCoordinator, sessions: SessionRegistry, network?: DynamicConfiguredNetworkClient, now: () => number = Date.now, options: DurableConfiguredCouncilOptions = {}) { this.council = council; this.sessions = sessions; this.network = network; this.now = now; this.isolation = options.isolation; this.automaticGate = options.automaticGate; this.resources = options.resources; }
 
   async execute(request: CouncilRequest): Promise<BrokerOutcome> {
     const participants = await this.participants(request);
@@ -84,6 +91,9 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
         await this.phase(request, epoch.id, participant, "assignment", binding);
         await this.council.acknowledgeAssignment(epoch.id, participant.id, binding.assignmentDigest);
       }
+      if (!this.resources) throw new Error("Automatic Council requires the installed host resource broker before any participant may resume.");
+      isolationPlan = await this.isolation.assertCurrent(epoch.id);
+      await this.resources.assertPlanOperational(isolationPlan);
       await this.council.beginResume(epoch.id);
       for (const participant of participants) {
         const binding = requiredBinding(isolationPlan, participant.id);
@@ -93,6 +103,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       const final = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final activation guard." };
       if (!final.allowed) throw new Error(final.reason);
       isolationPlan = await this.isolation.assertCurrent(epoch.id);
+      await this.resources.assertPlanOperational(isolationPlan);
       const active = await this.council.activate(epoch.id);
       return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint host-isolated assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, isolationDigest: isolationPlan.digest, participants: participants.length, status: active.status } };
     } catch (error) {

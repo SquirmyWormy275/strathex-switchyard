@@ -44,6 +44,8 @@ export type CompanionMethod =
   | "network-policy.install"
   | "network-policy.current"
   | "network-policy.revoke"
+  | "council.port-proxy.activate"
+  | "council.credential-network.execute"
   | "acceptance.trust.install"
   | "acceptance.trust.list"
   | "acceptance.trust.revoke"
@@ -172,6 +174,32 @@ export interface ConfirmationRequestPayload {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly reason: string;
+}
+
+export interface CouncilPortProxyPayload {
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly leaseId: string;
+  readonly operationId: string;
+  readonly fenceDigest: string;
+  readonly resourceHostDigest: string;
+  readonly expectedPort: string;
+  readonly backendPipePath: string;
+  /** One activation-scoped proof sent only over the mutually authenticated companion pipe. */
+  readonly backendProof: string;
+}
+
+export interface CouncilCredentialNetworkPayload {
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly leaseId: string;
+  readonly operationId: string;
+  readonly fenceDigest: string;
+  readonly resourceHostDigest: string;
+  readonly capabilityId: string;
+  readonly routeId: string;
 }
 
 export interface CommandPreparationPayload {
@@ -306,6 +334,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke",
+    "council.port-proxy.activate", "council.credential-network.execute",
     "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
     "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
     "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
