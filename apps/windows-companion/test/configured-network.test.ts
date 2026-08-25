@@ -11,7 +11,8 @@ import {
   type NetworkAddressResolver,
   type NetworkContainmentFence,
   type PinnedNetworkTransport,
-  type PinnedNetworkTransportRequest
+  type PinnedNetworkTransportRequest,
+  type PinnedNetworkTransportResponse
 } from "../src/configured-network.ts";
 import { DurableCredentialReferenceVault, type CredentialContainmentFence } from "../src/durable-credentials.ts";
 import type { UserSecretProtector } from "../src/windows-secret.ts";
@@ -213,7 +214,7 @@ test("Actions log downloads follow at most one credentialless redirect to one ex
     redirectHosts: ["results.example.net"]
   } as const;
   const requests: PinnedNetworkTransportRequest[] = [];
-  const transport: PinnedNetworkTransport = { async send(request) {
+  const transport: PinnedNetworkTransport = { async send(request): Promise<PinnedNetworkTransportResponse> {
     requests.push({ ...request, headers: { ...request.headers } });
     return requests.length === 1
       ? { status: 302, headers: { location: "https://results.example.net/logs/job-44.txt?sig=ephemeral" }, body: Buffer.alloc(0) }
