@@ -9,6 +9,7 @@
  * port's final-effect callback.
  */
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -47,17 +48,15 @@ export interface ProviderCatalogEntry {
   readonly normalArgs: readonly string[];
   readonly freshArgs?: readonly string[];
   readonly terminalProfileName?: string;
+  readonly signerSubject: string;
+  readonly signerThumbprint: string;
   readonly catalogDigest: string;
 }
 
-export interface FixedProviderDesktopPaths {
-  readonly claude_desktop: string;
-  readonly chatgpt_desktop: string;
-  readonly claude_code: string;
-  readonly codex: string;
-}
+export interface FixedProviderExecutableConfiguration { readonly path: string; readonly signerSubject: string; readonly signerThumbprint: string; }
+export type FixedProviderDesktopPaths = Readonly<Partial<Record<ProviderId, FixedProviderExecutableConfiguration>>>;
 
-const products: Readonly<Record<ProviderId, Omit<ProviderCatalogEntry, "provider" | "executablePath" | "catalogDigest">>> = {
+const products: Readonly<Record<ProviderId, Omit<ProviderCatalogEntry, "provider" | "executablePath" | "signerSubject" | "signerThumbprint" | "catalogDigest">>> = {
   claude_desktop: {
     productIdentity: { productId: "anthropic.claude-desktop", displayName: "Claude Desktop", publisher: "Anthropic, PBC", role: "desktop" },
     normalArgs: [],
@@ -88,11 +87,16 @@ export class FixedProviderDesktopCatalog {
   private readonly entries: ReadonlyMap<ProviderId, ProviderCatalogEntry>;
 
   constructor(paths: FixedProviderDesktopPaths) {
-    const entries = providerIds.map((provider): readonly [ProviderId, ProviderCatalogEntry] => {
-      const executablePath = fixedExecutablePath(paths[provider], provider);
-      const unsigned = { provider, executablePath, ...products[provider] };
-      return [provider, { ...unsigned, catalogDigest: sha256(stableJson(unsigned)) }];
+    const entries = providerIds.flatMap((provider): readonly (readonly [ProviderId, ProviderCatalogEntry])[] => {
+      const configured = paths[provider];
+      if (configured === undefined) return [];
+      const executablePath = fixedExecutablePath(configured.path, provider);
+      const signerSubject = fixedSignerSubject(configured.signerSubject, provider);
+      const signerThumbprint = fixedSignerThumbprint(configured.signerThumbprint, provider);
+      const unsigned = { provider, executablePath, signerSubject, signerThumbprint, ...products[provider] };
+      return [[provider, { ...unsigned, catalogDigest: sha256(stableJson(unsigned)) }]];
     });
+    if (entries.length === 0) throw new Error("The fixed provider catalog must configure at least one compiled provider identity.");
     this.entries = new Map(entries);
   }
 
@@ -103,7 +107,7 @@ export class FixedProviderDesktopCatalog {
     return entry;
   }
 
-  list(): readonly ProviderCatalogEntry[] { return providerIds.map((provider) => this.get(provider)); }
+  list(): readonly ProviderCatalogEntry[] { return providerIds.flatMap((provider) => { const entry = this.entries.get(provider); return entry ? [entry] : []; }); }
 }
 
 export function createFixedProviderDesktopCatalog(paths: FixedProviderDesktopPaths): FixedProviderDesktopCatalog {
@@ -113,6 +117,8 @@ export function createFixedProviderDesktopCatalog(paths: FixedProviderDesktopPat
 export interface ProviderExecutableIdentity {
   readonly canonicalExecutablePath: string;
   readonly executableSha256: string;
+  readonly signerSubject: string;
+  readonly signerThumbprint: string;
   readonly productIdentity: ProviderProductIdentity;
   readonly size: number;
   readonly modifiedMs: number;
@@ -124,22 +130,47 @@ export interface ProviderExecutableIdentityProbe {
   inspect(entry: ProviderCatalogEntry): Promise<ProviderExecutableIdentity>;
 }
 
+export interface ProviderExecutableSignatureProbe { inspect(path: string): Promise<Readonly<{ signerSubject: string; signerThumbprint: string }>>; }
+
+/** Fixed inbox PowerShell probe uses Windows' timestamp-aware Authenticode validation. */
+export class WindowsAuthenticodeSignatureProbe implements ProviderExecutableSignatureProbe {
+  async inspect(path: string): Promise<Readonly<{ signerSubject: string; signerThumbprint: string }>> {
+    if (process.platform !== "win32") throw new Error("Authenticode provider validation requires Windows.");
+    const shell = `${process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows"}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`;
+    const script = "$p=[Environment]::GetEnvironmentVariable('SXSY_B122_PROVIDER_PATH','Process');if([string]::IsNullOrWhiteSpace($p)){throw 'missing_path'};$s=Get-AuthenticodeSignature -LiteralPath $p;if($s.Status -cne 'Valid' -or $null -eq $s.SignerCertificate){throw 'invalid_signature'};[ordered]@{subject=$s.SignerCertificate.Subject;thumbprint=$s.SignerCertificate.Thumbprint}|ConvertTo-Json -Compress";
+    const output = await boundedProcess(shell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], { SXSY_B122_PROVIDER_PATH: path });
+    let value: unknown;
+    try { value = JSON.parse(output); } catch { throw new Error("The provider Authenticode result was malformed."); }
+    if (!unknownRecord(value) || typeof value.subject !== "string" || typeof value.thumbprint !== "string") throw new Error("The provider Authenticode result was incomplete.");
+    return { signerSubject: fixedSignerSubject(value.subject, "provider"), signerThumbprint: fixedSignerThumbprint(value.thumbprint, "provider") };
+  }
+}
+
 /** Exact byte and file identity probe; product identity is bound by the compiled catalog and the approved digest. */
 export class NodeProviderExecutableIdentityProbe implements ProviderExecutableIdentityProbe {
+  private readonly signatures: ProviderExecutableSignatureProbe;
+  constructor(signatures: ProviderExecutableSignatureProbe = new WindowsAuthenticodeSignatureProbe()) { this.signatures = signatures; }
   async inspect(entry: ProviderCatalogEntry): Promise<ProviderExecutableIdentity> {
     const configured = resolve(entry.executablePath);
     const linkMetadata = await lstat(configured).catch(() => { throw new Error("The fixed provider executable is unavailable."); });
     if (linkMetadata.isSymbolicLink()) throw new Error("The fixed provider executable cannot be a symbolic link or redirect.");
     const canonicalExecutablePath = await realpath(configured).catch(() => { throw new Error("The fixed provider executable cannot be canonicalized."); });
+    if (!localExecutablePath(canonicalExecutablePath)) throw new Error("The fixed provider executable must remain on one bounded local filesystem path.");
     const metadata = await stat(canonicalExecutablePath);
     if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maximumExecutableBytes) {
       throw new Error("The fixed provider executable is not a bounded regular file.");
     }
+    const signature = await this.signatures.inspect(canonicalExecutablePath);
+    if (signature.signerSubject !== entry.signerSubject || signature.signerThumbprint !== entry.signerThumbprint) throw new Error("The fixed provider Authenticode signer does not match the reviewed manifest.");
     const executableSha256 = await fileSha256(canonicalExecutablePath);
+    const finalMetadata = await stat(canonicalExecutablePath);
+    if (metadata.size !== finalMetadata.size || metadata.mtimeMs !== finalMetadata.mtimeMs || metadata.dev !== finalMetadata.dev || metadata.ino !== finalMetadata.ino) throw new Error("The fixed provider executable changed during Authenticode validation.");
     return {
       canonicalExecutablePath,
       executableSha256,
       productIdentity: entry.productIdentity,
+      signerSubject: signature.signerSubject,
+      signerThumbprint: signature.signerThumbprint,
       size: metadata.size,
       modifiedMs: metadata.mtimeMs,
       device: metadata.dev,
@@ -156,7 +187,8 @@ export interface ProviderInstallation {
   readonly operator: string;
   readonly installedAt: string;
   readonly statusAt: string;
-  readonly status: "active" | "revoked";
+  /** `stale` is a live fail-closed observation; durable journal state remains active until revoke/reinstall. */
+  readonly status: "active" | "stale" | "revoked";
 }
 
 interface ProviderInstallPayload extends Record<string, JsonValue> {
@@ -168,6 +200,8 @@ interface ProviderInstallPayload extends Record<string, JsonValue> {
   readonly displayName: string;
   readonly publisher: string;
   readonly role: "desktop" | "managed_terminal";
+  readonly signerSubject: string;
+  readonly signerThumbprint: string;
   readonly size: number;
   readonly modifiedMs: number;
   readonly device: number;
@@ -212,7 +246,7 @@ export class AttestedProviderDesktopRegistry {
     const provider = assertProvider(providerInput);
     const entry = this.catalog.get(provider);
     const inspected = await this.identityProbe.inspect(entry);
-    const approval = await this.presence.verify(`Approve ${entry.productIdentity.displayName} at its fixed host path with SHA-256 ${inspected.executableSha256}.`);
+    const approval = await this.presence.verify(`Approve ${entry.productIdentity.displayName} at ${inspected.canonicalExecutablePath} (SHA-256 ${inspected.executableSha256.slice(0, 16)}...).`);
     const operator = approvedOperator(approval);
     const finalIdentity = await this.identityProbe.inspect(entry);
     if (!sameIdentity(inspected, finalIdentity)) throw new Error("The provider executable identity changed during current-user approval.");
@@ -257,10 +291,25 @@ export class AttestedProviderDesktopRegistry {
 
   async list(): Promise<readonly ProviderInstallation[]> {
     const state = await this.state();
-    return providerIds.flatMap((provider) => {
+    const installations: ProviderInstallation[] = [];
+    for (const provider of providerIds) {
       const installation = state.get(provider);
-      return installation ? [installation] : [];
-    });
+      if (!installation) continue;
+      if (installation.status !== "active") {
+        installations.push(installation);
+        continue;
+      }
+      try {
+        const entry = this.catalog.get(provider);
+        const current = await this.identityProbe.inspect(entry);
+        installations.push(installation.catalogDigest === entry.catalogDigest && sameIdentity(installation.identity, current)
+          ? installation
+          : { ...installation, status: "stale" });
+      } catch {
+        installations.push({ ...installation, status: "stale" });
+      }
+    }
+    return installations;
   }
 
   private async state(): Promise<Map<ProviderId, ProviderInstallation>> {
@@ -328,8 +377,18 @@ export interface ProviderLifecycleOutcome {
 export interface ManagedTerminalProfile {
   readonly provider: ManagedTerminalProviderId;
   readonly profileName: string;
+  /** Fixed native launcher from the installed B122 bundle. It holds and revalidates the provider image at CreateProcess. */
+  readonly canonicalLauncherPath: string;
+  readonly launcherSha256: string;
+  readonly launcherProtocolVersion: 1;
   readonly canonicalExecutablePath: string;
   readonly executableSha256: string;
+  readonly signerSubject: string;
+  readonly signerThumbprint: string;
+  readonly executableSize: number;
+  readonly executableModifiedMs: number;
+  readonly executableDevice: number;
+  readonly executableInode: number;
   readonly productIdentity: ProviderProductIdentity;
   readonly args: readonly string[];
   readonly shell: false;
@@ -350,6 +409,7 @@ export interface InstalledProviderDesktopLifecycleOptions {
   readonly registry: AttestedProviderDesktopRegistry;
   readonly processes: ProviderDesktopProcessPort;
   readonly effectGuard: ProviderDesktopEffectGuard;
+  readonly managedTerminalLauncher?: Readonly<{ canonicalExecutablePath: string; executableSha256: string }>;
   readonly now?: () => Date;
 }
 
@@ -358,12 +418,14 @@ export class InstalledProviderDesktopLifecycle {
   private readonly registry: AttestedProviderDesktopRegistry;
   private readonly processes: ProviderDesktopProcessPort;
   private readonly effectGuard: ProviderDesktopEffectGuard;
+  private readonly managedTerminalLauncher?: Readonly<{ canonicalExecutablePath: string; executableSha256: string }>;
   private readonly now: () => Date;
 
   constructor(options: InstalledProviderDesktopLifecycleOptions) {
     this.registry = options.registry;
     this.processes = options.processes;
     this.effectGuard = options.effectGuard;
+    this.managedTerminalLauncher = options.managedTerminalLauncher;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -425,6 +487,7 @@ export class InstalledProviderDesktopLifecycle {
       if (entry.productIdentity.role !== "managed_terminal" || !entry.terminalProfileName) {
         return unavailable("The requested provider is not an installed managed-terminal provider.");
       }
+      if (!this.managedTerminalLauncher) return unavailable("The fixed native managed-terminal launcher is unavailable.");
       await this.finalBarrier(provider, operationId, "terminal_metadata", installation, input.control);
       const issuedAt = this.now();
       const deadline = Date.parse(input.control.deadline);
@@ -435,8 +498,17 @@ export class InstalledProviderDesktopLifecycle {
         profile: {
           provider: provider as ManagedTerminalProviderId,
           profileName: entry.terminalProfileName,
+          canonicalLauncherPath: this.managedTerminalLauncher.canonicalExecutablePath,
+          launcherSha256: this.managedTerminalLauncher.executableSha256,
+          launcherProtocolVersion: 1,
           canonicalExecutablePath: installation.identity.canonicalExecutablePath,
           executableSha256: installation.identity.executableSha256,
+          signerSubject: installation.identity.signerSubject,
+          signerThumbprint: installation.identity.signerThumbprint,
+          executableSize: installation.identity.size,
+          executableModifiedMs: installation.identity.modifiedMs,
+          executableDevice: installation.identity.device,
+          executableInode: installation.identity.inode,
           productIdentity: installation.identity.productIdentity,
           args: entry.normalArgs,
           shell: false,
@@ -612,6 +684,8 @@ function installationFromInstall(entry: JournalEntry<ProviderInstallPayload>, pa
       canonicalExecutablePath: payload.canonicalExecutablePath,
       executableSha256: payload.executableSha256,
       productIdentity: { productId: payload.productId, displayName: payload.displayName, publisher: payload.publisher, role: payload.role },
+      signerSubject: payload.signerSubject,
+      signerThumbprint: payload.signerThumbprint,
       size: payload.size,
       modifiedMs: payload.modifiedMs,
       device: payload.device,
@@ -634,6 +708,8 @@ function installPayload(provider: ProviderId, entry: ProviderCatalogEntry, ident
     displayName: identity.productIdentity.displayName,
     publisher: identity.productIdentity.publisher,
     role: identity.productIdentity.role,
+    signerSubject: identity.signerSubject,
+    signerThumbprint: identity.signerThumbprint,
     size: identity.size,
     modifiedMs: identity.modifiedMs,
     device: identity.device,
@@ -652,6 +728,8 @@ function parseInstall(value: JsonValue): ProviderInstallPayload {
     || typeof value.displayName !== "string"
     || typeof value.publisher !== "string"
     || (value.role !== "desktop" && value.role !== "managed_terminal")
+    || typeof value.signerSubject !== "string" || !safeSignerSubject(value.signerSubject)
+    || typeof value.signerThumbprint !== "string" || !/^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
     || !finiteNonNegative(value.size)
     || !finiteNonNegative(value.modifiedMs)
     || !finiteNonNegative(value.device)
@@ -683,6 +761,8 @@ function sameIdentity(left: ProviderExecutableIdentity, right: ProviderExecutabl
   return samePath(left.canonicalExecutablePath, right.canonicalExecutablePath)
     && left.executableSha256 === right.executableSha256
     && stableJson(left.productIdentity) === stableJson(right.productIdentity)
+    && left.signerSubject === right.signerSubject
+    && left.signerThumbprint === right.signerThumbprint
     && left.size === right.size
     && left.modifiedMs === right.modifiedMs
     && left.device === right.device
@@ -690,12 +770,50 @@ function sameIdentity(left: ProviderExecutableIdentity, right: ProviderExecutabl
 }
 
 function fixedExecutablePath(value: string, provider: ProviderId): string {
-  if (typeof value !== "string" || value.length > 4_096 || /[\0\r\n]/.test(value) || !isAbsolute(value)) {
-    throw new Error(`The fixed ${provider} executable must be a bounded absolute host path.`);
+  if (typeof value !== "string" || !localExecutablePath(value)) {
+    throw new Error(`The fixed ${provider} executable must be a bounded local absolute host path.`);
   }
   const path = resolve(value);
   if (!/\.exe$/i.test(path)) throw new Error(`The fixed ${provider} provider executable must be an .exe file.`);
   return path;
+}
+
+function fixedSignerSubject(value: string, provider: ProviderId | "provider"): string {
+  const subject = typeof value === "string" ? value.trim() : "";
+  if (!safeSignerSubject(subject)) throw new Error(`The fixed ${provider} signer subject is invalid.`);
+  return subject;
+}
+
+function fixedSignerThumbprint(value: string, provider: ProviderId | "provider"): string {
+  const thumbprint = typeof value === "string" ? value.replaceAll(" ", "").toLowerCase() : "";
+  if (!/^[a-f0-9]{40,128}$/.test(thumbprint)) throw new Error(`The fixed ${provider} signer thumbprint is invalid.`);
+  return thumbprint;
+}
+
+function safeSignerSubject(value: string): boolean { return value.length >= 3 && value.length <= 512 && !/[\0\r\n]/.test(value); }
+
+async function boundedProcess(executable: string, args: readonly string[], extraEnvironment: Readonly<Record<string, string>> = {}): Promise<string> {
+  return new Promise<string>((resolveProcess, rejectProcess) => {
+    const child = spawn(executable, [...args], { shell: false, windowsHide: true, env: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? process.env.SystemRoot ?? "C:\\Windows", ...extraEnvironment }, stdio: ["ignore", "pipe", "pipe"] });
+    let output = ""; let diagnostic = ""; let closed = false; let settled = false; let timedOut = false;
+    const timer = setTimeout(() => { if (!closed) { timedOut = true; child.kill(); } }, 15_000);
+    child.stdout?.setEncoding("utf8"); child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => { if (output.length <= 16_384) output += chunk.slice(0, 16_385 - output.length); });
+    child.stderr?.on("data", (chunk: string) => { if (diagnostic.length <= 4_096) diagnostic += chunk.slice(0, 4_097 - diagnostic.length); });
+    child.once("error", () => { if (settled) return; settled = true; clearTimeout(timer); rejectProcess(new Error("The fixed Authenticode verifier could not start.")); });
+    child.once("close", (code) => {
+      closed = true; clearTimeout(timer);
+      if (settled) return; settled = true;
+      if (timedOut || code !== 0 || output.length > 16_384 || diagnostic.length > 4_096) rejectProcess(new Error("The fixed provider executable does not have the reviewed valid Authenticode identity."));
+      else resolveProcess(output.trim());
+    });
+  });
+}
+
+function localExecutablePath(value: string): boolean {
+  if (value.length < 4 || value.length > 160 || /[\0\r\n]/.test(value) || !isAbsolute(value) || !/\.exe$/i.test(value)) return false;
+  if (/^(?:\\\\|\/\/|\\\\\?\\|\\\\\.\\)/.test(value)) return false;
+  return process.platform === "win32" ? /^[A-Za-z]:[\\/]/.test(value) : value.startsWith("/");
 }
 
 function boundedReference(value: string, label: string): string {
@@ -743,6 +861,7 @@ function isProvider(value: unknown): value is ProviderId { return providerIds.in
 function digest(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 function finiteNonNegative(value: unknown): value is number { return typeof value === "number" && Number.isFinite(value) && value >= 0; }
 function record(value: JsonValue): value is { readonly [key: string]: JsonValue } { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function unknownRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function pathKey(value: string): string { const normalized = value.replaceAll("\\", "/").replace(/\/+$/, ""); return process.platform === "win32" ? normalized.toLowerCase() : normalized; }
 function samePath(left: string, right: string): boolean { return pathKey(left) === pathKey(right); }
 function sha256(value: string): string { return createHash("sha256").update(value).digest("hex"); }

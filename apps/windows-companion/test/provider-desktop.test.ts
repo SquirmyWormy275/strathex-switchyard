@@ -69,20 +69,23 @@ class RecordingGuard implements ProviderDesktopEffectGuard {
 async function fixture(context: test.TestContext, presenceApproved = true) {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-desktop-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
-  const paths = {
+  const executablePaths = {
     claude_desktop: join(root, "Claude.exe"),
     chatgpt_desktop: join(root, "ChatGPT.exe"),
     claude_code: join(root, "claude-code.exe"),
     codex: join(root, "codex.exe")
   } as const;
-  for (const [provider, path] of Object.entries(paths)) await writeFile(path, `${provider}-v1`, "utf8");
+  for (const [provider, path] of Object.entries(executablePaths)) await writeFile(path, `${provider}-v1`, "utf8");
+  const paths = Object.fromEntries(Object.entries(executablePaths).map(([provider, path]) => [provider, { path, signerSubject: "CN=Isolated Provider Test", signerThumbprint: "a".repeat(40) }])) as {
+    readonly [K in keyof typeof executablePaths]: { readonly path: string; readonly signerSubject: string; readonly signerThumbprint: string };
+  };
   const catalog = createFixedProviderDesktopCatalog(paths);
   const store = new ProtectedJsonStore({ filePath: join(root, "protected.jsonl"), authenticator: new TestAuthenticator() });
   const prompts: string[] = [];
   const registry = new AttestedProviderDesktopRegistry({
     store,
     catalog,
-    identityProbe: new NodeProviderExecutableIdentityProbe(),
+    identityProbe: new NodeProviderExecutableIdentityProbe({ async inspect() { return { signerSubject: "CN=Isolated Provider Test", signerThumbprint: "a".repeat(40) }; } }),
     presence: {
       async verify(prompt) {
         prompts.push(prompt);
@@ -91,7 +94,7 @@ async function fixture(context: test.TestContext, presenceApproved = true) {
     },
     now: () => new Date(at)
   });
-  return { root, paths, catalog, store, prompts, registry };
+  return { root, paths: executablePaths, catalog, store, prompts, registry };
 }
 
 function control(overrides: Partial<ProviderLifecycleControl> = {}): ProviderLifecycleControl {
@@ -116,7 +119,7 @@ test("installs only the host catalog path after current-user approval and surviv
   const restarted = new AttestedProviderDesktopRegistry({
     store: setup.store,
     catalog: setup.catalog,
-    identityProbe: new NodeProviderExecutableIdentityProbe(),
+    identityProbe: new NodeProviderExecutableIdentityProbe({ async inspect() { return { signerSubject: "CN=Isolated Provider Test", signerThumbprint: "a".repeat(40) }; } }),
     presence: { async verify() { throw new Error("resolve must not reprompt"); } },
     now: () => new Date(at)
   });
@@ -141,13 +144,16 @@ test("registry requires authenticated durable storage and rejects executable dri
   assert.throws(() => new AttestedProviderDesktopRegistry({
     store: new ProtectedJsonStore({ filePath: join(setup.root, "unprotected.jsonl") }),
     catalog: setup.catalog,
-    identityProbe: new NodeProviderExecutableIdentityProbe(),
+    identityProbe: new NodeProviderExecutableIdentityProbe({ async inspect() { return { signerSubject: "CN=Isolated Provider Test", signerThumbprint: "a".repeat(40) }; } }),
     presence: { async verify() { return { verified: true, operator: "operator" }; } }
   }), /authenticated/i);
 
   await setup.registry.install("claude_desktop");
   await writeFile(setup.paths.claude_desktop, "tampered", "utf8");
   await assert.rejects(() => setup.registry.resolve("claude_desktop"), /identity changed/i);
+  const listed = await setup.registry.list();
+  assert.equal(listed.find((item) => item.provider === "claude_desktop")?.status, "stale");
+  assert.equal(listed.find((item) => item.provider === "chatgpt_desktop"), undefined);
 });
 
 test("normal desktop action focuses one exact running instance and never launches", async (context) => {
@@ -190,7 +196,13 @@ test("ambiguous or identity-mismatched running processes fail unavailable", asyn
   const setup = await fixture(context);
   const installed = await setup.registry.install("claude_desktop");
   const port = new FakeProcessPort();
-  const lifecycle = new InstalledProviderDesktopLifecycle({ registry: setup.registry, processes: port, effectGuard: new RecordingGuard(), now: () => new Date(at) });
+  const lifecycle = new InstalledProviderDesktopLifecycle({
+    registry: setup.registry,
+    processes: port,
+    effectGuard: new RecordingGuard(),
+    managedTerminalLauncher: { canonicalExecutablePath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe", executableSha256: "c".repeat(64) },
+    now: () => new Date(at)
+  });
   const exact = { processId: 1, windowId: "one", identity: installed.identity };
   port.observations = [exact, { ...exact, processId: 2, windowId: "two" }];
   assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "ambiguous", control: control() })).status, "unavailable");
@@ -251,11 +263,18 @@ test("managed terminal returns exact attested metadata without spawning from the
   const setup = await fixture(context);
   const installed = await setup.registry.install("codex");
   const port = new FakeProcessPort();
-  const lifecycle = new InstalledProviderDesktopLifecycle({ registry: setup.registry, processes: port, effectGuard: new RecordingGuard(), now: () => new Date(at) });
+  const lifecycle = new InstalledProviderDesktopLifecycle({
+    registry: setup.registry,
+    processes: port,
+    effectGuard: new RecordingGuard(),
+    managedTerminalLauncher: { canonicalExecutablePath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe", executableSha256: "c".repeat(64) },
+    now: () => new Date(at)
+  });
 
   const metadata = await lifecycle.managedTerminal({ provider: "codex", operationId: "terminal", control: control() });
   assert.equal(metadata.status, "completed");
   assert.equal(metadata.profile?.profileName, "SXSY-B122 Codex");
+  assert.equal(metadata.profile?.launcherProtocolVersion, 1);
   assert.equal(metadata.profile?.canonicalExecutablePath, installed.identity.canonicalExecutablePath);
   assert.equal(metadata.profile?.executableSha256, installed.identity.executableSha256);
   assert.deepEqual(metadata.profile?.args, []);
@@ -267,9 +286,9 @@ test("managed terminal returns exact attested metadata without spawning from the
 
 test("catalog rejects relative executables and keeps product identity and launch arguments host fixed", async () => {
   assert.throws(() => createFixedProviderDesktopCatalog({
-    claude_desktop: "Claude.exe",
-    chatgpt_desktop: "C:\\Apps\\ChatGPT.exe",
-    claude_code: "C:\\Apps\\claude-code.exe",
-    codex: "C:\\Apps\\codex.exe"
+    claude_desktop: { path: "Claude.exe", signerSubject: "CN=Test", signerThumbprint: "a".repeat(40) },
+    chatgpt_desktop: { path: "C:\\Apps\\ChatGPT.exe", signerSubject: "CN=Test", signerThumbprint: "a".repeat(40) },
+    claude_code: { path: "C:\\Apps\\claude-code.exe", signerSubject: "CN=Test", signerThumbprint: "a".repeat(40) },
+    codex: { path: "C:\\Apps\\codex.exe", signerSubject: "CN=Test", signerThumbprint: "a".repeat(40) }
   }), /absolute/i);
 });

@@ -92,6 +92,8 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
     const readers: Array<{ readonly resolve: (line: string) => void; readonly reject: (error: Error) => void }> = [];
     let buffer = "";
     let stderrBytes = 0;
+    let responseBytes = 0;
+    let responseLines = 0;
     let terminalError: Error | undefined;
     let exited = false;
     let settleExit!: (value: { readonly code: number; readonly signal: NodeJS.Signals | null }) => void;
@@ -102,7 +104,10 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
       if (!exited) child.kill();
     };
     const emit = (line: string): void => {
-      if (Buffer.byteLength(line, "utf8") > maximumProtocolBytes) return fail(new Error("The provider helper emitted an oversized response."));
+      const bytes = Buffer.byteLength(line, "utf8");
+      responseBytes += bytes;
+      responseLines += 1;
+      if (bytes > maximumProtocolBytes || responseBytes > maximumProtocolBytes || responseLines > 4) return fail(new Error("The provider helper exceeded its bounded response budget."));
       const reader = readers.shift();
       if (reader) reader.resolve(line);
       else queued.push(line);
@@ -346,6 +351,8 @@ function nativeIdentity(identity: ProviderExecutableIdentity): Record<string, un
     throw new Error("The provider executable identity must use one bounded absolute .exe path.");
   }
   if (!digestPattern.test(identity.executableSha256)
+    || typeof identity.signerSubject !== "string" || identity.signerSubject.length < 3 || identity.signerSubject.length > 512 || /[\0\r\n]/.test(identity.signerSubject)
+    || !/^[a-f0-9]{40,128}$/.test(identity.signerThumbprint)
     || !Number.isSafeInteger(identity.size) || identity.size <= 0
     || !Number.isFinite(identity.modifiedMs) || identity.modifiedMs < 0
     || !Number.isSafeInteger(identity.device) || identity.device < 0
@@ -355,6 +362,8 @@ function nativeIdentity(identity: ProviderExecutableIdentity): Record<string, un
   return {
     canonicalExecutablePath: resolve(identity.canonicalExecutablePath),
     executableSha256: identity.executableSha256,
+    signerSubject: identity.signerSubject,
+    signerThumbprint: identity.signerThumbprint,
     productIdentity: { ...identity.productIdentity },
     size: identity.size,
     modifiedMs: identity.modifiedMs,
@@ -430,6 +439,8 @@ function assertNotAborted(signal: AbortSignal): void {
 function sameNativeIdentity(left: ProviderExecutableIdentity, right: ProviderExecutableIdentity): boolean {
   return samePath(left.canonicalExecutablePath, right.canonicalExecutablePath)
     && left.executableSha256 === right.executableSha256
+    && left.signerSubject === right.signerSubject
+    && left.signerThumbprint === right.signerThumbprint
     && sameProduct(left.productIdentity, right.productIdentity)
     && left.size === right.size
     && left.modifiedMs === right.modifiedMs

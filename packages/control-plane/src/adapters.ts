@@ -6,7 +6,7 @@ import type { ContainmentGuard, EffectGuard } from "./brokers.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 
 /** Adapter lifecycle mirrors only truthful command dispositions; long-running provider work stays reconcilable. */
-export type AdapterStatus = "completed" | "unavailable" | "blocked" | "failed" | "awaiting_input" | "awaiting_confirmation" | "running" | "cancelled" | "timed_out";
+export type AdapterStatus = "completed" | "unavailable" | "blocked" | "failed" | "incomplete" | "awaiting_input" | "awaiting_confirmation" | "running" | "cancelled" | "timed_out";
 export interface AdapterOutcome {
   readonly status: AdapterStatus;
   readonly summary: string;

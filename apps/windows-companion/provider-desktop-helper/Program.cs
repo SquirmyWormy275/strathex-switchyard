@@ -4,9 +4,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Pipes;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -24,27 +26,52 @@ internal static class Program
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint Synchronize = 0x00100000;
     private const uint GenericRead = 0x80000000;
+    private const uint FileReadAttributes = 0x00000080;
     private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000;
     private const uint CreateSuspended = 0x00000004;
     private const uint CreateUnicodeEnvironment = 0x00000400;
     private const uint CreateNewProcessGroup = 0x00000200;
     private const uint JobObjectExtendedLimitInformationClass = 9;
     private const uint JobObjectLimitKillOnJobClose = 0x00002000;
     private const uint WaitTimeout = 0x00000102;
+    private const uint WaitFailed = 0xffffffff;
+    private const uint Infinite = 0xffffffff;
     private const uint GwOwner = 4;
     private const uint DwmwaCloaked = 14;
 
     private static readonly IReadOnlyDictionary<string, ProductDefinition> Products =
         new Dictionary<string, ProductDefinition>(StringComparer.Ordinal)
         {
-            ["claude_desktop"] = new("anthropic.claude-desktop", "Claude Desktop", "Anthropic, PBC"),
-            ["chatgpt_desktop"] = new("openai.chatgpt-desktop", "ChatGPT Desktop", "OpenAI, L.L.C.")
+            ["claude_desktop"] = new("anthropic.claude-desktop", "Claude Desktop", "Anthropic, PBC", "Claude Desktop", "Anthropic, PBC"),
+            ["chatgpt_desktop"] = new("openai.chatgpt-desktop", "ChatGPT Desktop", "OpenAI, L.L.C.", "ChatGPT Desktop", "OpenAI, L.L.C."),
+            ["claude_code"] = new("anthropic.claude-code", "Claude Code", "Anthropic, PBC", "Claude Code", "Anthropic PBC"),
+            ["codex"] = new("openai.codex", "Codex", "OpenAI, L.L.C.", "codex-windows-sandbox", "")
         };
 
     public static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
+        if (args.Length == 2 && args[0] == "--managed-terminal-v1")
+        {
+            try
+            {
+                if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+                return RunManagedTerminal(ParseManagedTerminalDescriptor(args[1]));
+            }
+            catch (ProtocolException exception)
+            {
+                Console.Error.WriteLine($"SXSY-B122 managed-terminal launch refused ({exception.Code}).");
+                return 65;
+            }
+            catch
+            {
+                Console.Error.WriteLine("SXSY-B122 managed-terminal launch failed closed (native_failure).");
+                return 70;
+            }
+        }
         if (args.Length != 1 || args[0] != "--stdio-v1") return 64;
         string requestId = "unknown";
         try
@@ -75,15 +102,136 @@ internal static class Program
 
     private static int SelfTest()
     {
-        bool products = Products.Count == 2
+        bool products = Products.Count == 4
             && Products["claude_desktop"].ProductId == "anthropic.claude-desktop"
-            && Products["chatgpt_desktop"].ProductId == "openai.chatgpt-desktop";
+            && Products["chatgpt_desktop"].ProductId == "openai.chatgpt-desktop"
+            && Products["claude_code"].ProductId == "anthropic.claude-code"
+            && Products["codex"].ProductId == "openai.codex";
         bool quoting = QuoteArgument("--new-window") == "--new-window"
             && QuoteArgument("C:\\Program Files\\Provider\\Provider.exe") == "\"C:\\Program Files\\Provider\\Provider.exe\"";
         bool surfaces = TryParseSurfaceId("hwnd:1a", out IntPtr handle) && handle == new IntPtr(0x1a)
             && !TryParseSurfaceId("pid:42", out _);
         Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = products && quoting && surfaces ? "ok" : "failed" });
         return products && quoting && surfaces ? 0 : 1;
+    }
+
+    private static Request ParseManagedTerminalDescriptor(string encoded)
+    {
+        if (encoded.Length is < 32 or > MaximumRequestChars || encoded.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_')))
+            throw new ProtocolException("invalid_managed_terminal_descriptor");
+        string padded = encoded.Replace('-', '+').Replace('_', '/');
+        padded += (padded.Length % 4) switch { 0 => "", 2 => "==", 3 => "=", _ => throw new ProtocolException("invalid_managed_terminal_descriptor") };
+        string json;
+        try { json = new UTF8Encoding(false, true).GetString(Convert.FromBase64String(padded)); }
+        catch (Exception exception) when (exception is FormatException or DecoderFallbackException)
+        { throw new ProtocolException("invalid_managed_terminal_descriptor", exception); }
+        if (Encoding.UTF8.GetByteCount(json) > MaximumRequestChars) throw new ProtocolException("invalid_managed_terminal_descriptor");
+        using JsonDocument document = ParseJson(json);
+        JsonElement root = document.RootElement;
+        RequireProperties(root, "schema", "version", "provider", "identity", "workspace", "receipt");
+        if (Text(root, "schema") != "sxsy-b122.managed-terminal-launch" || Integer(root, "version") != 1)
+            throw new ProtocolException("invalid_managed_terminal_schema");
+        string provider = Text(root, "provider");
+        if (provider is not ("claude_code" or "codex") || !Products.TryGetValue(provider, out ProductDefinition? product) || product is null)
+            throw new ProtocolException("invalid_provider");
+        ExecutableIdentity identity = ParseIdentity(Property(root, "identity"), product, "managed_terminal");
+        WorkspaceIdentity workspace = ParseWorkspace(Property(root, "workspace"));
+        ReceiptDescriptor receipt = ParseReceipt(Property(root, "receipt"));
+        return new Request(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant(), "managed_terminal", provider, identity, null, null, Array.Empty<string>(), false, workspace, receipt);
+    }
+
+    private static int RunManagedTerminal(Request request)
+    {
+        if (request.Action != "managed_terminal" || request.Provider is not ("claude_code" or "codex") || request.Arguments.Length != 0)
+            throw new ProtocolException("invalid_managed_terminal_request");
+        if (request.Workspace is null || request.Receipt is null) throw new ProtocolException("invalid_managed_terminal_request");
+        using HeldExecutable executable = HeldExecutable.Acquire(request);
+        using HeldDirectory workspace = HeldDirectory.Acquire(request.Workspace);
+        if (!SamePath(Environment.CurrentDirectory, workspace.CanonicalPath)) throw new ProtocolException("managed_terminal_workspace_changed");
+        executable.RevalidateLockedHandle();
+        workspace.Revalidate();
+        using JobGuard job = JobGuard.Create();
+        using LaunchedProcess launched = CreateManagedTerminalProcess(request, job);
+        WriteManagedTerminalReceipt(request, workspace, launched.ProcessId);
+        uint waited = WaitForSingleObject(launched.Process, Infinite);
+        if (waited == WaitFailed) throw NativeFailure("managed_terminal_wait_failed");
+        if (!GetExitCodeProcess(launched.Process, out uint exitCode)) throw NativeFailure("managed_terminal_exit_unavailable");
+        return exitCode > int.MaxValue ? 70 : (int)exitCode;
+    }
+
+    private static WorkspaceIdentity ParseWorkspace(JsonElement value)
+    {
+        RequireProperties(value, "canonicalPath", "device", "inode");
+        string path = Text(value, "canonicalPath");
+        long device = LongInteger(value, "device");
+        long inode = LongInteger(value, "inode");
+        if (!Path.IsPathFullyQualified(path) || path.Length > 4096 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 || device < 0 || inode < 0)
+            throw new ProtocolException("invalid_workspace_identity");
+        return new(path, device, inode);
+    }
+
+    private static ReceiptDescriptor ParseReceipt(JsonElement value)
+    {
+        RequireProperties(value, "pipeName", "token");
+        string pipeName = Text(value, "pipeName");
+        string token = Text(value, "token");
+        if (pipeName.Length is < 24 or > 96 || !pipeName.StartsWith("sxsy-b122-managed-", StringComparison.Ordinal)
+            || !pipeName.All(character => char.IsAsciiLetterOrDigit(character) || character == '-')
+            || token.Length != 64 || !token.All(IsLowerHex)) throw new ProtocolException("invalid_receipt_boundary");
+        return new(pipeName, token);
+    }
+
+    private static void WriteManagedTerminalReceipt(Request request, HeldDirectory workspace, uint processId)
+    {
+        ReceiptDescriptor receipt = request.Receipt ?? throw new ProtocolException("invalid_receipt_boundary");
+        using var pipe = new NamedPipeClientStream(".", receipt.PipeName, PipeDirection.Out, PipeOptions.WriteThrough);
+        try { pipe.Connect(5_000); }
+        catch (TimeoutException exception) { throw new ProtocolException("receipt_pipe_unavailable", exception); }
+        string line = JsonSerializer.Serialize(new
+        {
+            schema = "sxsy-b122.managed-terminal-started",
+            version = 1,
+            token = receipt.Token,
+            provider = request.Provider,
+            processId,
+            canonicalExecutablePath = request.Identity.CanonicalExecutablePath,
+            canonicalWorkspaceRoot = workspace.CanonicalPath
+        });
+        if (Encoding.UTF8.GetByteCount(line) > 4_096) throw new ProtocolException("receipt_oversized");
+        byte[] bytes = Encoding.UTF8.GetBytes(line + "\n");
+        pipe.Write(bytes, 0, bytes.Length);
+        pipe.Flush();
+    }
+
+    private static LaunchedProcess CreateManagedTerminalProcess(Request request, JobGuard job)
+    {
+        string executablePath = request.Identity.CanonicalExecutablePath;
+        var startup = new StartupInfo { Cb = Marshal.SizeOf<StartupInfo>() };
+        if (!CreateProcessW(
+            executablePath,
+            new StringBuilder(QuoteArgument(executablePath)),
+            IntPtr.Zero,
+            IntPtr.Zero,
+            false,
+            CreateSuspended | CreateNewProcessGroup,
+            IntPtr.Zero,
+            Environment.CurrentDirectory,
+            ref startup,
+            out ProcessInformation information)) throw NativeFailure("managed_terminal_create_process_failed");
+        var process = new SafeFileHandle(information.Process, ownsHandle: true);
+        var thread = new SafeFileHandle(information.Thread, ownsHandle: true);
+        try
+        {
+            job.Assign(process);
+            if (ResumeThread(thread) == uint.MaxValue) throw NativeFailure("managed_terminal_resume_failed");
+            return new LaunchedProcess(process, thread, information.ProcessId);
+        }
+        catch
+        {
+            process.Dispose();
+            thread.Dispose();
+            throw;
+        }
     }
 
     private static int List(Request request)
@@ -287,7 +435,8 @@ internal static class Program
         if (requestId.Length != 48 || !requestId.All(IsLowerHex)) throw new ProtocolException("invalid_request_id");
         string provider = Text(root, "provider");
         if (!Products.TryGetValue(provider, out ProductDefinition? product) || product is null) throw new ProtocolException("invalid_provider");
-        ExecutableIdentity identity = ParseIdentity(Property(root, "identity"), product);
+        if (provider is not ("claude_desktop" or "chatgpt_desktop")) throw new ProtocolException("invalid_provider");
+        ExecutableIdentity identity = ParseIdentity(Property(root, "identity"), product, "desktop");
         uint? processId = action == "focus" ? UnsignedInteger(root, "expectedProcessId") : null;
         string? surfaceId = action == "focus" ? Text(root, "expectedSurfaceId") : null;
         if (surfaceId is not null && !TryParseSurfaceId(surfaceId, out _)) throw new ProtocolException("invalid_surface_id");
@@ -298,26 +447,29 @@ internal static class Program
         return request;
     }
 
-    private static ExecutableIdentity ParseIdentity(JsonElement value, ProductDefinition product)
+    private static ExecutableIdentity ParseIdentity(JsonElement value, ProductDefinition product, string expectedRole)
     {
-        RequireProperties(value, "canonicalExecutablePath", "executableSha256", "productIdentity", "size", "modifiedMs", "device", "inode");
+        RequireProperties(value, "canonicalExecutablePath", "executableSha256", "signerSubject", "signerThumbprint", "productIdentity", "size", "modifiedMs", "device", "inode");
         JsonElement productValue = Property(value, "productIdentity");
         RequireProperties(productValue, "productId", "displayName", "publisher", "role");
         if (Text(productValue, "productId") != product.ProductId || Text(productValue, "displayName") != product.DisplayName
-            || Text(productValue, "publisher") != product.Publisher || Text(productValue, "role") != "desktop")
+            || Text(productValue, "publisher") != product.Publisher || Text(productValue, "role") != expectedRole)
             throw new ProtocolException("product_identity_mismatch");
         string path = Text(value, "canonicalExecutablePath");
         string hash = Text(value, "executableSha256");
+        string signerSubject = Text(value, "signerSubject");
+        string signerThumbprint = Text(value, "signerThumbprint");
         long size = LongInteger(value, "size");
         double modifiedMs = Double(value, "modifiedMs");
         long device = LongInteger(value, "device");
         long inode = LongInteger(value, "inode");
         if (!Path.IsPathFullyQualified(path) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || path.Length > 4096 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)
             throw new ProtocolException("invalid_executable_path");
-        if (hash.Length != 64 || !hash.All(IsLowerHex) || size <= 0 || size > 2L * 1024 * 1024 * 1024
+        if (hash.Length != 64 || !hash.All(IsLowerHex) || signerSubject.Length is < 3 or > 512 || signerSubject.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0
+            || signerThumbprint.Length is < 40 or > 128 || !signerThumbprint.All(IsLowerHex) || size <= 0 || size > 2L * 1024 * 1024 * 1024
             || !double.IsFinite(modifiedMs) || modifiedMs < 0 || device < 0 || inode < 0)
             throw new ProtocolException("invalid_executable_identity");
-        return new(path, hash, product, size, modifiedMs, device, inode);
+        return new(path, hash, product, signerSubject, signerThumbprint, size, modifiedMs, device, inode);
     }
 
     private static void ValidateFixedArguments(Request request)
@@ -428,9 +580,11 @@ internal static class Program
     }
     private static ProtocolException NativeFailure(string code) => new(code, new Win32Exception(Marshal.GetLastWin32Error()));
 
-    private sealed record ProductDefinition(string ProductId, string DisplayName, string Publisher);
-    private sealed record ExecutableIdentity(string CanonicalExecutablePath, string ExecutableSha256, ProductDefinition Product, long Size, double ModifiedMs, long Device, long Inode);
-    private sealed record Request(string RequestId, string Action, string Provider, ExecutableIdentity Identity, uint? ExpectedProcessId, string? ExpectedSurfaceId, string[] Arguments, bool RequireDistinctSurface);
+    private sealed record ProductDefinition(string ProductId, string DisplayName, string Publisher, string NativeProductName, string NativeCompanyName);
+    private sealed record ExecutableIdentity(string CanonicalExecutablePath, string ExecutableSha256, ProductDefinition Product, string SignerSubject, string SignerThumbprint, long Size, double ModifiedMs, long Device, long Inode);
+    private sealed record WorkspaceIdentity(string CanonicalPath, long Device, long Inode);
+    private sealed record ReceiptDescriptor(string PipeName, string Token);
+    private sealed record Request(string RequestId, string Action, string Provider, ExecutableIdentity Identity, uint? ExpectedProcessId, string? ExpectedSurfaceId, string[] Arguments, bool RequireDistinctSurface, WorkspaceIdentity? Workspace = null, ReceiptDescriptor? Receipt = null);
 
     private sealed class ProtocolException : Exception
     {
@@ -477,9 +631,19 @@ internal static class Program
             if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(hash), Encoding.ASCII.GetBytes(_request.Identity.ExecutableSha256)))
                 throw new ProtocolException("executable_digest_changed");
             FileVersionInfo version = FileVersionInfo.GetVersionInfo(_canonicalPath);
-            if (!string.Equals(version.ProductName, _request.Identity.Product.DisplayName, StringComparison.Ordinal)
-                || !string.Equals(version.CompanyName, _request.Identity.Product.Publisher, StringComparison.Ordinal))
+            if (!string.Equals(version.ProductName ?? "", _request.Identity.Product.NativeProductName, StringComparison.Ordinal)
+                || !string.Equals(version.CompanyName ?? "", _request.Identity.Product.NativeCompanyName, StringComparison.Ordinal))
                 throw new ProtocolException("product_identity_mismatch");
+            X509Certificate2 signer;
+            try { signer = new X509Certificate2(X509Certificate.CreateFromSignedFile(_canonicalPath)); }
+            catch (CryptographicException exception) { throw new ProtocolException("authenticode_signer_unavailable", exception); }
+            using (signer)
+            {
+                string thumbprint = (signer.Thumbprint ?? "").Replace(" ", "", StringComparison.Ordinal).ToLowerInvariant();
+                if (!string.Equals(signer.Subject, _request.Identity.SignerSubject, StringComparison.Ordinal)
+                    || !string.Equals(thumbprint, _request.Identity.SignerThumbprint, StringComparison.Ordinal))
+                    throw new ProtocolException("authenticode_signer_mismatch");
+            }
         }
 
         public void RevalidateLockedHandle()
@@ -494,6 +658,44 @@ internal static class Program
         }
 
         public void Dispose() => _file.Dispose();
+    }
+
+    private sealed class HeldDirectory : IDisposable
+    {
+        private readonly WorkspaceIdentity _identity;
+        private readonly SafeFileHandle _directory;
+        public string CanonicalPath { get; }
+
+        private HeldDirectory(WorkspaceIdentity identity, SafeFileHandle directory, string canonicalPath)
+        { _identity = identity; _directory = directory; CanonicalPath = canonicalPath; }
+
+        public static HeldDirectory Acquire(WorkspaceIdentity identity)
+        {
+            SafeFileHandle directory = CreateFileW(identity.CanonicalPath, FileReadAttributes, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
+            if (directory.IsInvalid) throw NativeFailure("workspace_lock_failed");
+            try
+            {
+                string canonical = FinalPath(directory);
+                var held = new HeldDirectory(identity, directory, canonical);
+                held.Revalidate();
+                return held;
+            }
+            catch
+            {
+                directory.Dispose();
+                throw;
+            }
+        }
+
+        public void Revalidate()
+        {
+            if (_directory.IsInvalid || _directory.IsClosed || !SamePath(CanonicalPath, _identity.CanonicalPath)) throw new ProtocolException("managed_terminal_workspace_changed");
+            if (!GetFileInformationByHandle(_directory, out ByHandleFileInformation information)) throw NativeFailure("workspace_identity_unavailable");
+            long fileIndex = checked((long)(((ulong)information.FileIndexHigh << 32) | information.FileIndexLow));
+            if (information.VolumeSerialNumber != (ulong)_identity.Device || fileIndex != _identity.Inode) throw new ProtocolException("managed_terminal_workspace_changed");
+        }
+
+        public void Dispose() => _directory.Dispose();
     }
 
     private sealed class HeldSurface : IDisposable
@@ -794,6 +996,7 @@ internal static class Program
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path, uint size, uint flags);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetFileInformationByHandle(SafeFileHandle file, out ByHandleFileInformation information);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(SafeFileHandle handle, uint milliseconds);
+    [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetExitCodeProcess(SafeFileHandle process, out uint exitCode);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint ResumeThread(SafeFileHandle thread);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateProcessW(string applicationName, StringBuilder commandLine, IntPtr processAttributes, IntPtr threadAttributes, [MarshalAs(UnmanagedType.Bool)] bool inheritHandles, uint creationFlags, IntPtr environment, string? currentDirectory, ref StartupInfo startupInfo, out ProcessInformation processInformation);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeFileHandle CreateJobObjectW(IntPtr attributes, string? name);

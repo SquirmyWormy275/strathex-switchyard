@@ -35,8 +35,17 @@ class RecordingLifecycle implements InstalledProviderDesktopLifecyclePort {
     profile: {
       provider: "codex",
       profileName: "SXSY-B122 Codex",
+      canonicalLauncherPath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe",
+      launcherSha256: "c".repeat(64),
+      launcherProtocolVersion: 1,
       canonicalExecutablePath: "C:\\Program Files\\SXSY\\codex.exe",
       executableSha256: "a".repeat(64),
+      signerSubject: "CN=Isolated Provider Test",
+      signerThumbprint: "d".repeat(40),
+      executableSize: 42,
+      executableModifiedMs: 1_777_000_000_000,
+      executableDevice: 7,
+      executableInode: 11,
       productIdentity: {
         productId: "openai.codex",
         displayName: "Codex",
@@ -190,6 +199,43 @@ test("managed-terminal result exposes only a bounded typed profile and rejects p
   assert.equal(substituted.status, "failed");
   assert.equal(substituted.effectDisposition, "not_started");
   assert.equal(substituted.data, undefined);
+});
+
+test("managed terminals cross the durable authenticated host-action queue with the exact attested profile", async () => {
+  const lifecycle = new RecordingLifecycle();
+  const queued: unknown[] = [];
+  const adapter = new InstalledProviderDesktopCommandAdapter(lifecycle, {
+    async enqueue(invocation, plan) {
+      queued.push({ invocation, plan });
+      return {
+        id: `host-action:${"f".repeat(64)}`,
+        hostAction: plan.hostAction,
+        expiresAt: "2099-08-24T12:00:20.000Z",
+        workspaceRoot: "C:\\repo",
+        managedTerminalProfile: plan.managedTerminalProfile
+      };
+    }
+  });
+
+  const invocation = request("open_managed_codex_terminal");
+  const result = await adapter.execute(invocation);
+  assert.equal(result.status, "running");
+  assert.equal(result.effectDisposition, "not_started");
+  assert.deepEqual(queued, [{ invocation, plan: { hostAction: "create_codex_terminal", managedTerminalProfile: lifecycle.terminalOutcome.profile } }]);
+  assert.deepEqual(result.data, {
+    hostActionId: `host-action:${"f".repeat(64)}`,
+    hostActionKind: "create_codex_terminal",
+    hostActionExpiresAt: "2099-08-24T12:00:20.000Z",
+    hostActionWorkspaceRoot: "C:\\repo",
+    managedTerminalProfile: lifecycle.terminalOutcome.profile
+  });
+
+  const stripped = new InstalledProviderDesktopCommandAdapter(lifecycle, {
+    async enqueue(_invocation, plan) {
+      return { id: "host-action:stripped", hostAction: plan.hostAction, expiresAt: "2099-08-24T12:00:20.000Z" };
+    }
+  });
+  assert.equal((await stripped.execute(invocation)).status, "unavailable");
 });
 
 test("desktop uncertainty remains ambiguous while pre-effect refusals remain replay-safe", async () => {

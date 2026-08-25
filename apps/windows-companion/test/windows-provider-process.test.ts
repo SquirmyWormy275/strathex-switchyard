@@ -68,6 +68,8 @@ async function fixture(context: test.TestContext) {
   const identity: ProviderExecutableIdentity = {
     canonicalExecutablePath: executablePath,
     executableSha256: digest("fixed provider executable"),
+    signerSubject: "CN=Isolated Provider Test",
+    signerThumbprint: "a".repeat(40),
     productIdentity: {
       productId: "anthropic.claude-desktop",
       displayName: "Claude Desktop",

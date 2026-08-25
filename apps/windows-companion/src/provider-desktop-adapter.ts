@@ -13,11 +13,27 @@ import type {
   ManagedTerminalProviderId,
   ProviderLifecycleOutcome
 } from "./provider-desktop.ts";
+import type { DurableProviderDesktopEffectLedger } from "./provider-desktop-effects.ts";
 
 export type InstalledProviderDesktopLifecyclePort = Pick<
   InstalledProviderDesktopLifecycle,
   "open" | "managedTerminal"
 >;
+
+export type InstalledProviderDesktopLifecycleFactory = (request: AdapterRequest) => InstalledProviderDesktopLifecyclePort;
+
+export interface ProviderDesktopHostActionQueue {
+  enqueue(request: AdapterRequest, plan: Readonly<{
+    hostAction: "create_claude_terminal" | "create_codex_terminal";
+    managedTerminalProfile: ManagedTerminalProfile;
+  }>): Promise<Readonly<{
+    id: string;
+    hostAction: string;
+    expiresAt: string;
+    workspaceRoot?: string;
+    managedTerminalProfile?: ManagedTerminalProfile;
+  }>>;
+}
 
 type DesktopBinding = Readonly<{
   kind: "desktop";
@@ -60,10 +76,14 @@ const commandBindings: Readonly<Partial<Record<CommandAction, ProviderCommandBin
 export class InstalledProviderDesktopCommandAdapter implements CommandAdapter {
   readonly id = "installed-provider-desktop-v1";
   readonly kind = "desktop" as const;
-  private readonly lifecycle: InstalledProviderDesktopLifecyclePort;
+  private readonly lifecycle: InstalledProviderDesktopLifecyclePort | InstalledProviderDesktopLifecycleFactory;
+  private readonly hostActions?: ProviderDesktopHostActionQueue;
+  private readonly effects?: DurableProviderDesktopEffectLedger;
 
-  constructor(lifecycle: InstalledProviderDesktopLifecyclePort) {
+  constructor(lifecycle: InstalledProviderDesktopLifecyclePort | InstalledProviderDesktopLifecycleFactory, hostActions?: ProviderDesktopHostActionQueue, effects?: DurableProviderDesktopEffectLedger) {
     this.lifecycle = lifecycle;
+    this.hostActions = hostActions;
+    this.effects = effects;
   }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
@@ -79,6 +99,7 @@ export class InstalledProviderDesktopCommandAdapter implements CommandAdapter {
     if (request.executionControl.operationId !== operationId) {
       return blocked("The provider execution control is bound to another durable operation.");
     }
+    const lifecycle = typeof this.lifecycle === "function" ? this.lifecycle(request) : this.lifecycle;
 
     if (binding.kind === "desktop" && binding.mode === "fresh") {
       const confirmation = request.confirmation;
@@ -97,16 +118,31 @@ export class InstalledProviderDesktopCommandAdapter implements CommandAdapter {
     }
 
     if (binding.kind === "desktop") {
-      const outcome = await this.lifecycle.open({
+      const effectBinding = { operationId, action: request.definition.action, provider: binding.provider, mode: binding.mode } as const;
+      if (this.effects) {
+        try { await this.effects.begin(effectBinding); }
+        catch { return unavailable("The durable provider desktop effect boundary could not record an exact start; no effect was requested."); }
+      }
+      const outcome = await lifecycle.open({
         provider: binding.provider,
         mode: binding.mode,
         operationId,
         control: request.executionControl
       });
+      if (this.effects) {
+        try { await this.effects.settle(effectBinding, outcome); }
+        catch {
+          return {
+            status: "incomplete",
+            summary: "The provider desktop effect returned without a durable final record; manual reconciliation is required before any retry.",
+            effectDisposition: "ambiguous"
+          };
+        }
+      }
       return desktopOutcome(outcome);
     }
 
-    const outcome = await this.lifecycle.managedTerminal({
+    const outcome = await lifecycle.managedTerminal({
       provider: binding.provider,
       operationId,
       control: request.executionControl
@@ -126,17 +162,27 @@ export class InstalledProviderDesktopCommandAdapter implements CommandAdapter {
         effectDisposition: "not_started"
       };
     }
+    if (!this.hostActions) {
+      return {
+        status: "completed",
+        summary: boundedSummary(outcome.summary),
+        effectDisposition: "not_started",
+        data: { kind: "managed_terminal_profile", version: 1, operationId, commandAction: request.definition.action, deadline: request.executionControl.deadline, profile }
+      };
+    }
+    const hostAction = binding.provider === "claude_code" ? "create_claude_terminal" : "create_codex_terminal";
+    const intent = await this.hostActions.enqueue(request, { hostAction, managedTerminalProfile: profile });
+    if (intent.hostAction !== hostAction || !intent.managedTerminalProfile) return unavailable("The durable host action did not retain the exact managed-terminal profile.");
     return {
-      status: "completed",
-      summary: boundedSummary(outcome.summary),
+      status: "running",
+      summary: "The exact provider executable is awaiting a one-time authenticated VS Code host effect.",
       effectDisposition: "not_started",
       data: {
-        kind: "managed_terminal_profile",
-        version: 1,
-        operationId,
-        commandAction: request.definition.action,
-        deadline: request.executionControl.deadline,
-        profile
+        hostActionId: intent.id,
+        hostActionKind: intent.hostAction,
+        hostActionExpiresAt: intent.expiresAt,
+        ...(intent.workspaceRoot ? { hostActionWorkspaceRoot: intent.workspaceRoot } : {}),
+        managedTerminalProfile: intent.managedTerminalProfile
       }
     };
   }
@@ -168,11 +214,23 @@ function safeTerminalProfile(
 ): ManagedTerminalProfile | undefined {
   if (!value || value.provider !== provider || value.shell !== false
     || value.requiresFinalIdentityVerification !== true
+    || !isAbsolute(value.canonicalLauncherPath)
+    || value.canonicalLauncherPath.length > 4_096
+    || !/\.exe$/i.test(value.canonicalLauncherPath)
+    || /[\0\r\n]/.test(value.canonicalLauncherPath)
+    || !sha256(value.launcherSha256)
+    || value.launcherProtocolVersion !== 1
     || !isAbsolute(value.canonicalExecutablePath)
     || value.canonicalExecutablePath.length > 4_096
     || !/\.exe$/i.test(value.canonicalExecutablePath)
     || /[\0\r\n]/.test(value.canonicalExecutablePath)
     || !sha256(value.executableSha256)
+    || value.signerSubject.length < 3 || value.signerSubject.length > 512 || /[\0\r\n]/.test(value.signerSubject)
+    || !/^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
+    || !Number.isSafeInteger(value.executableSize) || value.executableSize <= 0 || value.executableSize > 2 * 1024 * 1024 * 1024
+    || !Number.isFinite(value.executableModifiedMs) || value.executableModifiedMs < 0
+    || !Number.isSafeInteger(value.executableDevice) || value.executableDevice < 0
+    || !Number.isSafeInteger(value.executableInode) || value.executableInode < 0
     || !sha256(value.catalogDigest)
     || !boundedReference(value.installationId, 256)
     || !Array.isArray(value.args)
@@ -194,8 +252,17 @@ function safeTerminalProfile(
   return {
     provider: value.provider,
     profileName: value.profileName,
+    canonicalLauncherPath: value.canonicalLauncherPath,
+    launcherSha256: value.launcherSha256,
+    launcherProtocolVersion: 1,
     canonicalExecutablePath: value.canonicalExecutablePath,
     executableSha256: value.executableSha256,
+    signerSubject: value.signerSubject,
+    signerThumbprint: value.signerThumbprint,
+    executableSize: value.executableSize,
+    executableModifiedMs: value.executableModifiedMs,
+    executableDevice: value.executableDevice,
+    executableInode: value.executableInode,
     productIdentity: { ...value.productIdentity },
     args: [...value.args],
     shell: false,
