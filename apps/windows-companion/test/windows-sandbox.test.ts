@@ -25,6 +25,8 @@ import {
   type WindowsSandboxEffectGuard,
   type WindowsSandboxFeatureProbe,
   type WindowsSandboxFileSystem,
+  type WindowsSandboxLifecycleController,
+  type WindowsSandboxProcessIdentity,
   type WindowsSandboxProcessRunner,
   type WindowsSandboxRunSpec
 } from "../src/windows-sandbox.ts";
@@ -494,4 +496,209 @@ test("the control-plane wrapper claims enforcement only for a completed concrete
   assert.equal(outcome.status, "completed");
   assert.equal(outcome.data?.enforced, true);
   assert.equal(outcome.data?.backend, "windows-sandbox");
+});
+
+function processIdentity(pid: number, creationFileTimeUtc = "133801632000000000"): WindowsSandboxProcessIdentity {
+  return {
+    pid,
+    creationFileTimeUtc,
+    executablePath: WINDOWS_SANDBOX_EXECUTABLE,
+    executableVolumeSerialNumber: "123456789",
+    executableFileIndex: "987654321",
+    sessionId: 1
+  };
+}
+
+test("full sandbox creates once then enters the exact durable process after companion restart", async (context) => {
+  const setup = await fixture(context);
+  const identities = new Map<number, "same" | "absent" | "mismatch">();
+  const effects: string[] = [];
+  let launches = 0;
+  let focuses = 0;
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch(spec, configurationSha256, signal) {
+      assert.equal(signal.aborted, false);
+      assert.equal(spec.executable, WINDOWS_SANDBOX_EXECUTABLE);
+      assert.match(configurationSha256, /^[a-f0-9]{64}$/);
+      const configuration = await readFile(spec.args[0], "utf8");
+      assert.doesNotMatch(configuration, /<LogonCommand>/);
+      assert.match(configuration, /<Networking>Disable<\/Networking>/);
+      launches += 1;
+      const identity = processIdentity(8101);
+      identities.set(identity.pid, "same");
+      return identity;
+    },
+    async inspect(identity) { return identities.get(identity.pid) ?? "absent"; },
+    async focus(identity) {
+      assert.equal(identities.get(identity.pid), "same");
+      focuses += 1;
+      return { focused: true };
+    },
+    async terminate() { throw new Error("enter must not terminate"); }
+  };
+  const first = createBackend(setup, successfulRunner(), effects, { lifecycleController: lifecycle });
+  const created = await first.run(await sandboxRequest(setup));
+  assert.equal(created.status, "running", created.summary);
+  assert.equal(created.lifecycleEffect, "created");
+  assert.equal(launches, 1);
+
+  const restarted = createBackend(setup, successfulRunner(), effects, { lifecycleController: lifecycle });
+  const entered = await restarted.run(await sandboxRequest(setup));
+  assert.equal(entered.status, "running", entered.summary);
+  assert.equal(entered.lifecycleEffect, "entered");
+  assert.equal(entered.leaseId, created.leaseId);
+  assert.equal(launches, 1);
+  assert.equal(focuses, 1);
+  assert.deepEqual(effects, ["launch", "focus"]);
+
+  const receipt = JSON.parse(await readFile(created.receiptPath!, "utf8")) as Record<string, unknown>;
+  assert.equal(receipt.state, "running");
+  assert.deepEqual(receipt.hostProcessIdentity, processIdentity(8101));
+  assert.equal(receipt.cleanupVerified, false);
+});
+
+test("full sandbox refuses a reused PID identity and never focuses or launches around it", async (context) => {
+  const setup = await fixture(context);
+  let identityState: "same" | "mismatch" = "same";
+  let launches = 0;
+  let focuses = 0;
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch() {
+      launches += 1;
+      return processIdentity(8201, "133801632000000001");
+    },
+    async inspect() { return identityState; },
+    async focus() { focuses += 1; return { focused: true }; },
+    async terminate() { throw new Error("must not terminate reused identity"); }
+  };
+  const backend = createBackend(setup, successfulRunner(), [], { lifecycleController: lifecycle });
+  assert.equal((await backend.run(await sandboxRequest(setup))).status, "running");
+  identityState = "mismatch";
+  const refused = await backend.run(await sandboxRequest(setup));
+  assert.equal(refused.status, "blocked");
+  assert.match(refused.summary, /identity|reused/i);
+  assert.equal(launches, 1);
+  assert.equal(focuses, 0);
+});
+
+test("fresh full sandbox terminates only the exact old instance and preserves approved volumes", async (context) => {
+  const setup = await fixture(context);
+  const persistent = join(setup.base, "approved-build-cache");
+  await mkdir(persistent);
+  await writeFile(join(persistent, "keep.txt"), "preserve exactly", "utf8");
+  const identities = new Map<number, "same" | "absent">();
+  const launched: WindowsSandboxProcessIdentity[] = [];
+  const terminated: WindowsSandboxProcessIdentity[] = [];
+  const effects: string[] = [];
+  const ids = [
+    "11111111-2222-4333-8444-555555555555",
+    "22222222-2222-4333-8444-555555555555"
+  ];
+  let lease = 0;
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch() {
+      const identity = processIdentity(8301 + launched.length, String(133801632000000010n + BigInt(launched.length)));
+      identities.set(identity.pid, "same");
+      launched.push(identity);
+      return identity;
+    },
+    async inspect(identity) { return identities.get(identity.pid) ?? "absent"; },
+    async focus() { throw new Error("rebuild must not focus the old instance"); },
+    async terminate(identity) {
+      assert.equal(identities.get(identity.pid), "same");
+      identities.set(identity.pid, "absent");
+      terminated.push(identity);
+      return { terminated: true };
+    }
+  };
+  const backend = createBackend(setup, successfulRunner(), effects, {
+    lifecycleController: lifecycle,
+    idFactory: () => ids[lease++]!,
+    approvedPersistentVolumes: [{ id: "build-cache", hostRoot: persistent }]
+  });
+  const original = await backend.run(await sandboxRequest(setup));
+  assert.equal(original.status, "running");
+
+  const rebuilt = await backend.run(await sandboxRequest(setup, { profile: "fresh_full_sandbox", recipeId: "rebuild_full_sandbox" }));
+  assert.equal(rebuilt.status, "running", rebuilt.summary);
+  assert.equal(rebuilt.lifecycleEffect, "rebuilt");
+  assert.notEqual(rebuilt.leaseId, original.leaseId);
+  assert.deepEqual(terminated, [launched[0]]);
+  assert.equal(await readFile(join(persistent, "keep.txt"), "utf8"), "preserve exactly");
+  assert.deepEqual(effects, ["launch", "terminate", "launch"]);
+
+  const oldReceipt = JSON.parse(await readFile(original.receiptPath!, "utf8")) as Record<string, unknown>;
+  assert.equal(oldReceipt.state, "completed");
+  assert.equal(oldReceipt.cleanupVerified, true);
+  await assert.rejects(access(join(dirname(original.receiptPath!), "sandbox.wsb")));
+});
+
+test("restart reconciliation cleans an ended exact full sandbox without treating a PID reuse as absent", async (context) => {
+  const setup = await fixture(context);
+  let state: "same" | "absent" | "mismatch" = "same";
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch() { return processIdentity(8401); },
+    async inspect() { return state; },
+    async focus() { return { focused: true }; },
+    async terminate() { return { terminated: true }; }
+  };
+  const backend = createBackend(setup, successfulRunner(), [], { lifecycleController: lifecycle });
+  const started = await backend.run(await sandboxRequest(setup));
+  assert.equal(started.status, "running");
+
+  state = "mismatch";
+  await assert.rejects(() => backend.reconcile(), /identity|reused/i);
+  assert.equal((await readdir(dirname(started.receiptPath!))).includes("exchange"), true);
+
+  state = "absent";
+  const reconciled = await backend.reconcile();
+  assert.equal(reconciled[0]?.state, "completed");
+  assert.equal(reconciled[0]?.cleanupVerified, true);
+  assert.equal((await readdir(dirname(started.receiptPath!))).includes("exchange"), false);
+});
+
+test("quarantine remains a one-shot bounded execution and never enters the interactive lifecycle", async (context) => {
+  const setup = await fixture(context);
+  let lifecycleCalls = 0;
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch() { lifecycleCalls += 1; return processIdentity(8501); },
+    async inspect() { lifecycleCalls += 1; return "absent"; },
+    async focus() { lifecycleCalls += 1; return { focused: true }; },
+    async terminate() { lifecycleCalls += 1; return { terminated: true }; }
+  };
+  const result = await createBackend(setup, successfulRunner(async (spec) => {
+    assert.match(await readFile(spec.args[0], "utf8"), /<LogonCommand>/);
+  }), [], { lifecycleController: lifecycle })
+    .run(await sandboxRequest(setup, { profile: "quarantine", recipeId: "quarantine" }));
+  assert.equal(result.status, "completed", result.summary);
+  assert.equal(lifecycleCalls, 0);
+});
+
+test("target and effect guards run again immediately before exact focus and termination", async (context) => {
+  const setup = await fixture(context);
+  const identity = processIdentity(8601);
+  const lifecycleCalls: string[] = [];
+  const lifecycle: WindowsSandboxLifecycleController = {
+    async launch() { lifecycleCalls.push("launch"); return identity; },
+    async inspect() { lifecycleCalls.push("inspect"); return "same"; },
+    async focus() { lifecycleCalls.push("focus"); return { focused: true }; },
+    async terminate() { lifecycleCalls.push("terminate"); return { terminated: true }; }
+  };
+  const backend = createBackend(setup, successfulRunner(), [], { lifecycleController: lifecycle });
+  assert.equal((await backend.run(await sandboxRequest(setup))).status, "running");
+  const deniedFocus = await backend.run(await sandboxRequest(setup, {
+    effectGuard: { async check(input: { phase: string }) { return { allowed: false, reason: `${input.phase} target changed` }; } }
+  }));
+  assert.equal(deniedFocus.status, "blocked");
+  assert.match(deniedFocus.summary, /focus target changed/i);
+  assert.equal(lifecycleCalls.includes("focus"), false);
+
+  const deniedTerminate = await backend.run(await sandboxRequest(setup, {
+    profile: "fresh_full_sandbox",
+    recipeId: "rebuild_full_sandbox",
+    effectGuard: { async check(input: { phase: string }) { return { allowed: false, reason: `${input.phase} authority changed` }; } }
+  }));
+  assert.equal(deniedTerminate.status, "blocked");
+  assert.match(deniedTerminate.summary, /terminate authority changed/i);
+  assert.equal(lifecycleCalls.includes("terminate"), false);
 });

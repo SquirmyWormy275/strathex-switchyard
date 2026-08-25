@@ -118,11 +118,35 @@ export interface WindowsSandboxProcessRunner {
   isProcessActive?(pid: number): Promise<boolean>;
 }
 
+/** Exact native identity for one non-reusable WindowsSandbox.exe process. */
+export interface WindowsSandboxProcessIdentity {
+  readonly pid: number;
+  /** Unsigned Windows FILETIME encoded as decimal to avoid JavaScript precision loss. */
+  readonly creationFileTimeUtc: string;
+  readonly executablePath: typeof WINDOWS_SANDBOX_EXECUTABLE;
+  readonly executableVolumeSerialNumber: string;
+  readonly executableFileIndex: string;
+  readonly sessionId: number;
+}
+
+export type WindowsSandboxIdentityStatus = "same" | "absent" | "mismatch";
+
+/**
+ * Fixed native lifecycle boundary. Implementations must atomically compare the
+ * complete identity before focus or termination; a PID alone is insufficient.
+ */
+export interface WindowsSandboxLifecycleController {
+  launch(spec: WindowsSandboxRunSpec, configurationSha256: string, signal: AbortSignal): Promise<WindowsSandboxProcessIdentity>;
+  inspect(identity: WindowsSandboxProcessIdentity): Promise<WindowsSandboxIdentityStatus>;
+  focus(identity: WindowsSandboxProcessIdentity): Promise<Readonly<{ focused: true }>>;
+  terminate(identity: WindowsSandboxProcessIdentity): Promise<Readonly<{ terminated: true }>>;
+}
+
 export interface WindowsSandboxFeatureProbe {
   check(): Promise<{ readonly available: boolean; readonly reason: string }>;
 }
 
-export type WindowsSandboxEffectPhase = "launch" | "extract";
+export type WindowsSandboxEffectPhase = "launch" | "focus" | "terminate" | "extract";
 export interface WindowsSandboxEffectGuard {
   check(input: Readonly<{
     phase: WindowsSandboxEffectPhase;
@@ -157,6 +181,7 @@ export interface WindowsSandboxReceipt {
   readonly updatedAt: string;
   readonly deadline: string;
   readonly hostPid?: number;
+  readonly hostProcessIdentity?: WindowsSandboxProcessIdentity;
   readonly exitCode?: number | null;
   readonly timedOut: boolean;
   readonly cancelled: boolean;
@@ -175,7 +200,7 @@ export interface WindowsSandboxReceipt {
   readonly summary: string;
 }
 
-export type WindowsSandboxStatus = "completed" | "failed" | "unavailable" | "blocked" | "timed_out" | "cancelled";
+export type WindowsSandboxStatus = "running" | "completed" | "failed" | "unavailable" | "blocked" | "timed_out" | "cancelled";
 export interface WindowsSandboxExecutionResult {
   readonly status: WindowsSandboxStatus;
   readonly summary: string;
@@ -188,6 +213,7 @@ export interface WindowsSandboxExecutionResult {
   readonly recipeCatalogSha256?: string;
   readonly sandboxHelperSha256?: string;
   readonly validatedOutputs?: readonly Readonly<{ path: string; size: number; sha256: string }>[];
+  readonly lifecycleEffect?: "created" | "entered" | "rebuilt";
 }
 
 export interface WindowsSandboxExecutionRequest {
@@ -213,6 +239,7 @@ export interface WindowsSandboxBackendOptions {
   readonly effectGuard: WindowsSandboxEffectGuard;
   readonly featureProbe?: WindowsSandboxFeatureProbe;
   readonly runner?: WindowsSandboxProcessRunner;
+  readonly lifecycleController?: WindowsSandboxLifecycleController;
   readonly filesystem?: WindowsSandboxFileSystem;
   readonly timeoutMs?: number;
   readonly maxProcessOutputBytes?: number;
@@ -353,6 +380,142 @@ export class SpawnWindowsSandboxRunner implements WindowsSandboxProcessRunner {
   }
 }
 
+interface LifecycleHelperResponse {
+  readonly schema: "sxsy-b122.sandbox-lifecycle-response";
+  readonly version: 1;
+  readonly requestId: string;
+  readonly kind: "result" | "error";
+  readonly status?: WindowsSandboxIdentityStatus;
+  readonly effect?: "launched" | "focused" | "terminated";
+  readonly identity?: WindowsSandboxProcessIdentity;
+  readonly code?: string;
+}
+
+/**
+ * Invokes only the installed digest-pinned native helper. The helper is
+ * started with no request, its exact bytes/file identity are rechecked after
+ * process creation, and only then is one bounded structured request written.
+ */
+export class FixedWindowsSandboxLifecycleController implements WindowsSandboxLifecycleController {
+  private readonly helperPath: string;
+  private readonly helperSha256: string;
+
+  constructor(helperPath: string, helperSha256: string) {
+    if (!isAbsolute(helperPath) || basename(helperPath).toLowerCase() !== "b122-sandbox-lifecycle.exe" || !validDigest(helperSha256)) {
+      throw new Error("Windows Sandbox lifecycle requires one fixed digest-pinned native helper.");
+    }
+    this.helperPath = resolve(helperPath);
+    this.helperSha256 = helperSha256.toLowerCase();
+  }
+
+  async launch(spec: WindowsSandboxRunSpec, configurationSha256: string, signal: AbortSignal): Promise<WindowsSandboxProcessIdentity> {
+    if (spec.executable !== WINDOWS_SANDBOX_EXECUTABLE || spec.args.length !== 1 || !isAbsolute(spec.args[0]) || !validDigest(configurationSha256)) {
+      throw new SandboxBlockedError("Windows Sandbox lifecycle rejected a non-exact launch request.");
+    }
+    if (signal.aborted) throw new SandboxCancelledError("Windows Sandbox lifecycle launch was cancelled.");
+    const response = await this.call({
+      schema: "sxsy-b122.sandbox-lifecycle-request",
+      version: 1,
+      requestId: `sandbox-lifecycle:${randomUUID()}`,
+      action: "launch",
+      configurationPath: spec.args[0],
+      configurationSha256: configurationSha256.toLowerCase()
+    }, signal);
+    if (response.effect !== "launched" || !response.identity) throw new SandboxBlockedError("Windows Sandbox native lifecycle helper did not prove an exact launch identity.");
+    return assertProcessIdentity(response.identity);
+  }
+
+  async inspect(identity: WindowsSandboxProcessIdentity): Promise<WindowsSandboxIdentityStatus> {
+    const response = await this.call(this.identityRequest("inspect", identity));
+    if (response.status !== "same" && response.status !== "absent" && response.status !== "mismatch") throw new SandboxBlockedError("Windows Sandbox native lifecycle inspection was ambiguous.");
+    return response.status;
+  }
+
+  async focus(identity: WindowsSandboxProcessIdentity): Promise<Readonly<{ focused: true }>> {
+    const response = await this.call(this.identityRequest("focus", identity));
+    if (response.effect !== "focused" || !response.identity || !sameProcessIdentity(assertProcessIdentity(response.identity), identity)) {
+      throw new SandboxBlockedError("Windows Sandbox native lifecycle focus did not remain bound to the exact process identity.");
+    }
+    return { focused: true };
+  }
+
+  async terminate(identity: WindowsSandboxProcessIdentity): Promise<Readonly<{ terminated: true }>> {
+    const response = await this.call(this.identityRequest("terminate", identity));
+    if (response.effect !== "terminated" || !response.identity || !sameProcessIdentity(assertProcessIdentity(response.identity), identity)) {
+      throw new SandboxBlockedError("Windows Sandbox native lifecycle termination did not remain bound to the exact process identity.");
+    }
+    return { terminated: true };
+  }
+
+  private identityRequest(action: "inspect" | "focus" | "terminate", identity: WindowsSandboxProcessIdentity): Readonly<Record<string, unknown>> {
+    return {
+      schema: "sxsy-b122.sandbox-lifecycle-request",
+      version: 1,
+      requestId: `sandbox-lifecycle:${randomUUID()}`,
+      action,
+      identity: assertProcessIdentity(identity)
+    };
+  }
+
+  private async call(request: Readonly<Record<string, unknown>>, signal?: AbortSignal): Promise<LifecycleHelperResponse> {
+    if (process.platform !== "win32") throw new SandboxBlockedError("Windows Sandbox native lifecycle is available only on Windows.");
+    const requestId = typeof request.requestId === "string" ? request.requestId : "";
+    if (requestId.length < 24 || requestId.length > 128) throw new SandboxBlockedError("Windows Sandbox native lifecycle request identity is invalid.");
+    const before = await attestLifecycleHelper(this.helperPath, this.helperSha256);
+    return new Promise((resolveCall, rejectCall) => {
+      const child = spawn(before.path, ["--stdio-v1"], {
+        cwd: dirname(before.path),
+        env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" },
+        shell: false,
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+      let settled = false;
+      let output: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      let errorOutput: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      const finish = (callback: () => void): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+        callback();
+      };
+      const fail = (error: unknown): void => finish(() => rejectCall(error));
+      const append = (current: Buffer, chunk: Buffer): Buffer => {
+        if (current.byteLength + chunk.byteLength > 64 * 1024) {
+          child.kill();
+          fail(new SandboxBlockedError("Windows Sandbox native lifecycle helper emitted oversized output."));
+          return current;
+        }
+        return Buffer.concat([current, chunk]);
+      };
+      child.stdout.on("data", (chunk: Buffer) => { output = append(output, chunk); });
+      child.stderr.on("data", (chunk: Buffer) => { errorOutput = append(errorOutput, chunk); });
+      const abort = (): void => { child.kill(); fail(new SandboxCancelledError("Windows Sandbox native lifecycle request was cancelled.")); };
+      const timer = setTimeout(() => { child.kill(); fail(new SandboxBlockedError("Windows Sandbox native lifecycle helper exceeded its deadline.")); }, 15_000);
+      signal?.addEventListener("abort", abort, { once: true });
+      child.once("error", fail);
+      child.once("spawn", () => {
+        void (async () => {
+          const after = await attestLifecycleHelper(this.helperPath, this.helperSha256);
+          if (!sameAttestedHelper(before, after)) throw new SandboxBlockedError("Windows Sandbox lifecycle helper changed during process creation.");
+          child.stdin.end(`${JSON.stringify(request)}\n`);
+        })().catch((error: unknown) => { child.kill(); fail(error); });
+      });
+      child.once("close", (exitCode) => finish(() => {
+        let value: unknown;
+        try { value = JSON.parse(output.toString("utf8")); }
+        catch { rejectCall(new SandboxBlockedError("Windows Sandbox native lifecycle helper returned malformed JSON.")); return; }
+        if (!lifecycleResponse(value) || value.requestId !== requestId || value.kind !== "result" || exitCode !== 0) {
+          rejectCall(new SandboxBlockedError(`Windows Sandbox native lifecycle helper failed closed (${untrustedSummary(lifecycleErrorCode(value, errorOutput))}).`));
+          return;
+        }
+        resolveCall(value);
+      }));
+    });
+  }
+}
+
 /** Verifies both the inbox executable and the optional Windows feature. */
 export class DefaultWindowsSandboxFeatureProbe implements WindowsSandboxFeatureProbe {
   private readonly filesystem: WindowsSandboxFileSystem;
@@ -401,6 +564,7 @@ export class WindowsSandboxBackend {
   private readonly options: WindowsSandboxBackendOptions;
   private readonly filesystem: WindowsSandboxFileSystem;
   private readonly runner: WindowsSandboxProcessRunner;
+  private readonly lifecycle?: WindowsSandboxLifecycleController;
   private readonly featureProbe: WindowsSandboxFeatureProbe;
   private readonly timeoutMs: number;
   private readonly maxProcessOutputBytes: number;
@@ -422,6 +586,7 @@ export class WindowsSandboxBackend {
     this.options = options;
     this.filesystem = options.filesystem ?? nodeFileSystem;
     this.runner = options.runner ?? new SpawnWindowsSandboxRunner();
+    this.lifecycle = options.lifecycleController;
     this.featureProbe = options.featureProbe ?? new DefaultWindowsSandboxFeatureProbe(this.filesystem);
     this.timeoutMs = boundedInteger(options.timeoutMs ?? 30 * 60_000, 1_000, maximumTimeoutMs, "timeout");
     this.maxProcessOutputBytes = boundedInteger(options.maxProcessOutputBytes ?? 64 * 1024, 1, 1024 * 1024, "process output limit");
@@ -447,9 +612,36 @@ export class WindowsSandboxBackend {
     if (request.signal?.aborted) return { status: "cancelled", summary: "Windows Sandbox was cancelled before preparation." };
     let reconciled: readonly WindowsSandboxReceipt[];
     try { reconciled = await this.reconcile(); }
-    catch { return { status: "unavailable", summary: "Windows Sandbox could not reconcile its durable lease state." }; }
-    if (reconciled.some((entry) => entry.state === "prepared" || entry.state === "running")) {
-      return { status: "unavailable", summary: "Windows Sandbox has an unreconciled live lease; no concurrent launch was attempted." };
+    catch (error) {
+      const summary = untrustedSummary((error as Error).message || "Windows Sandbox could not reconcile its durable lease state.");
+      return { status: error instanceof SandboxBlockedError ? "blocked" : "unavailable", summary };
+    }
+    const live = reconciled.filter((entry) => entry.state === "prepared" || entry.state === "running");
+    const interactiveLifecycle = recipeId === "full_sandbox" || recipeId === "rebuild_full_sandbox" ? this.lifecycle : undefined;
+    let lifecycleEffect: "created" | "rebuilt" = recipeId === "rebuild_full_sandbox" ? "rebuilt" : "created";
+    if (live.length) {
+      if (!interactiveLifecycle || live.length !== 1) {
+        return { status: "unavailable", summary: "Windows Sandbox has an unreconciled live lease; no concurrent launch was attempted." };
+      }
+      try {
+        const allowedRoots = await Promise.all(this.options.allowedTaskRoots.map((path) => this.filesystem.realpath(path)));
+        const targetRoot = await this.canonicalOwnedDirectory(request.targetRoot, allowedRoots, "target");
+        const destinationRoot = await this.canonicalOwnedDirectory(destinationAddress, allowedRoots, "destination");
+        const stateRoot = await this.ensureOwnedDirectory(this.options.stateRoot, allowedRoots, "state");
+        const current = live[0]!;
+        if (current.state !== "running" || !samePath(current.targetRoot, targetRoot) || !samePath(current.destinationRoot, destinationRoot)
+          || (current.profile !== "full_sandbox" && current.profile !== "fresh_full_sandbox") || !current.hostProcessIdentity) {
+          return { status: "unavailable", summary: "Windows Sandbox live state is not one exact enterable Full Sandbox for this target." };
+        }
+        const guard = request.effectGuard ?? this.options.effectGuard;
+        if (recipeId === "full_sandbox") return await this.enterLive(current, targetRoot, destinationRoot, guard, request.signal);
+        await this.terminateForRebuild(current, stateRoot, targetRoot, destinationRoot, guard, request.signal);
+      } catch (error) {
+        return {
+          status: error instanceof SandboxCancelledError ? "cancelled" : error instanceof SandboxBlockedError ? "blocked" : "failed",
+          summary: untrustedSummary((error as Error).message || "Windows Sandbox lifecycle effect failed closed.")
+        };
+      }
     }
     const feature = await this.featureProbe.check().catch(() => ({ available: false, reason: "Windows Sandbox feature verification failed." }));
     if (!feature.available) return { status: "unavailable", summary: untrustedSummary(feature.reason) };
@@ -509,7 +701,8 @@ export class WindowsSandboxBackend {
         manifestRelativePath: this.options.jobManifestRelativePath,
         profile,
         resourcePolicy,
-        persistentVolumes
+        persistentVolumes,
+        interactive: Boolean(interactiveLifecycle)
       });
       await this.filesystem.writeText(configurationPath, configurationDocument);
       const requestDigest = sha256(requestDocument);
@@ -563,7 +756,7 @@ export class WindowsSandboxBackend {
 
       const controller = request.signal ? undefined : new AbortController();
       const signal = request.signal ?? controller!.signal;
-      const processResult = await this.runner.run({
+      const runSpec: WindowsSandboxRunSpec = {
         executable: WINDOWS_SANDBOX_EXECUTABLE,
         args: [configurationPath],
         cwd: canonicalLeaseRoot,
@@ -571,7 +764,30 @@ export class WindowsSandboxBackend {
         shell: false,
         timeoutMs: this.timeoutMs,
         maxOutputBytes: this.maxProcessOutputBytes
-      }, signal, async (pid) => {
+      };
+      if (interactiveLifecycle) {
+        const identity = assertProcessIdentity(await interactiveLifecycle.launch(runSpec, configurationDigest, signal));
+        receipt = this.updateReceipt(receipt, {
+          state: "running",
+          hostPid: identity.pid,
+          hostProcessIdentity: identity,
+          summary: "Windows Sandbox exact interactive process is running."
+        });
+        await this.writeReceipt(receiptPath, receipt);
+        return {
+          status: "running",
+          summary: recipeId === "rebuild_full_sandbox"
+            ? "Rebuilt and entered a fresh exact Full Sandbox while preserving only approved persistent volumes."
+            : "Created and entered the exact target-owned Full Sandbox.",
+          leaseId,
+          processId,
+          receiptPath,
+          recipeCatalogSha256: recipeCatalogDigest,
+          sandboxHelperSha256: helperDigest,
+          lifecycleEffect
+        };
+      }
+      const processResult = await this.runner.run(runSpec, signal, async (pid) => {
         if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Windows Sandbox did not expose a valid owned child process identity.");
         receipt = this.updateReceipt(receipt!, { state: "running", hostPid: pid, summary: "Windows Sandbox owned process is running." });
         await this.writeReceipt(receiptPath!, receipt);
@@ -619,6 +835,74 @@ export class WindowsSandboxBackend {
     }
   }
 
+  private async enterLive(
+    receipt: WindowsSandboxReceipt,
+    targetRoot: string,
+    destinationRoot: string,
+    guard: WindowsSandboxEffectGuard,
+    signal?: AbortSignal
+  ): Promise<WindowsSandboxExecutionResult> {
+    if (!this.lifecycle || !receipt.hostProcessIdentity) throw new SandboxBlockedError("Windows Sandbox cannot enter a live lease without its exact native process identity.");
+    if (signal?.aborted) throw new SandboxCancelledError("Windows Sandbox entry was cancelled.");
+    const approvedVolumeIds = (this.options.approvedPersistentVolumes ?? []).map((volume) => volume.id).sort();
+    if (JSON.stringify([...receipt.persistentVolumeIds].sort()) !== JSON.stringify(approvedVolumeIds)) {
+      throw new SandboxBlockedError("Windows Sandbox persistent-volume approval changed while the interactive instance was running.");
+    }
+    await this.assertCanonicalUnchanged(targetRoot, "target");
+    await this.assertCanonicalUnchanged(destinationRoot, "destination");
+    const observation = await this.lifecycle.inspect(receipt.hostProcessIdentity);
+    if (observation === "mismatch") throw new SandboxBlockedError("Windows Sandbox refused to focus a reused process identity.");
+    if (observation !== "same") throw new SandboxBlockedError("Windows Sandbox exact process ended before focus.");
+    await this.assertCanonicalUnchanged(targetRoot, "target");
+    await this.assertCanonicalUnchanged(destinationRoot, "destination");
+    await this.assertEffect(guard, { phase: "focus", leaseId: receipt.leaseId, recipeId: receipt.recipeId, targetRoot, destinationRoot });
+    if (signal?.aborted) throw new SandboxCancelledError("Windows Sandbox entry was cancelled before focus.");
+    await this.lifecycle.focus(receipt.hostProcessIdentity);
+    if (await this.lifecycle.inspect(receipt.hostProcessIdentity) !== "same") throw new SandboxBlockedError("Windows Sandbox exact process changed during focus.");
+    return {
+      status: "running",
+      summary: "Entered and focused the existing exact target-owned Full Sandbox.",
+      leaseId: receipt.leaseId,
+      processId: receipt.processId,
+      receiptPath: this.receiptPath(receipt),
+      recipeCatalogSha256: receipt.recipeCatalogDigest,
+      sandboxHelperSha256: receipt.helperDigest,
+      lifecycleEffect: "entered"
+    };
+  }
+
+  private async terminateForRebuild(
+    receipt: WindowsSandboxReceipt,
+    stateRoot: string,
+    targetRoot: string,
+    destinationRoot: string,
+    guard: WindowsSandboxEffectGuard,
+    signal?: AbortSignal
+  ): Promise<void> {
+    if (!this.lifecycle || !receipt.hostProcessIdentity) throw new SandboxBlockedError("Windows Sandbox cannot rebuild without the exact prior process identity.");
+    if (signal?.aborted) throw new SandboxCancelledError("Windows Sandbox rebuild was cancelled.");
+    await this.assertCanonicalUnchanged(targetRoot, "target");
+    await this.assertCanonicalUnchanged(destinationRoot, "destination");
+    const observation = await this.lifecycle.inspect(receipt.hostProcessIdentity);
+    if (observation === "mismatch") throw new SandboxBlockedError("Windows Sandbox refused to terminate a reused process identity.");
+    if (observation !== "same") throw new SandboxBlockedError("Windows Sandbox prior process ended before the guarded rebuild.");
+    await this.assertCanonicalUnchanged(targetRoot, "target");
+    await this.assertCanonicalUnchanged(destinationRoot, "destination");
+    await this.assertEffect(guard, { phase: "terminate", leaseId: receipt.leaseId, recipeId: "rebuild_full_sandbox", targetRoot, destinationRoot });
+    if (signal?.aborted) throw new SandboxCancelledError("Windows Sandbox rebuild was cancelled before termination.");
+    await this.lifecycle.terminate(receipt.hostProcessIdentity);
+    if (await this.lifecycle.inspect(receipt.hostProcessIdentity) !== "absent") throw new SandboxBlockedError("Windows Sandbox could not prove the exact prior process terminated.");
+    const receiptPath = this.receiptPath(receipt, stateRoot);
+    const finished = await this.finish(receiptPath, receipt, "completed", "Windows Sandbox exact prior instance was terminated for a guarded rebuild.");
+    if (finished.status !== "completed") throw new SandboxBlockedError("Windows Sandbox prior instance terminated but its owned cleanup could not be verified; no replacement was launched.");
+  }
+
+  private receiptPath(receipt: WindowsSandboxReceipt, stateRoot = this.options.stateRoot): string {
+    const rawId = receipt.leaseId.slice("sandbox:".length);
+    if (!safeUuid.test(rawId)) throw new SandboxBlockedError("Windows Sandbox durable lease identity is invalid.");
+    return join(stateRoot, "leases", rawId, "receipt.json");
+  }
+
   /**
    * Reconciles durable leases without ever terminating an unverified PID.  A
    * stale PID that still exists remains live/blocked; a missing PID can be
@@ -649,7 +933,22 @@ export class WindowsSandboxBackend {
         continue;
       }
       if (receipt.state === "prepared" || receipt.state === "running") {
-        if (receipt.hostPid) {
+        if (receipt.hostProcessIdentity) {
+          if (!this.lifecycle) throw new SandboxBlockedError("Windows Sandbox found an exact interactive lease but no native identity controller is available.");
+          const identity = await this.lifecycle.inspect(receipt.hostProcessIdentity).catch(() => "mismatch" as const);
+          if (identity === "same") {
+            receipts.push(receipt);
+            continue;
+          }
+          if (identity === "mismatch") throw new SandboxBlockedError("Windows Sandbox found a reused or changed durable process identity.");
+          receipt = this.updateReceipt(receipt, {
+            state: "completed",
+            timedOut: false,
+            reconciledAt: this.now().toISOString(),
+            summary: "Windows Sandbox reconciled a normally ended exact interactive instance."
+          });
+          await this.writeReceipt(receiptPath, receipt);
+        } else if (receipt.hostPid) {
           const active = this.runner.isProcessActive ? await this.runner.isProcessActive(receipt.hostPid).catch(() => true) : true;
           if (active) {
             receipts.push(receipt);
@@ -659,13 +958,15 @@ export class WindowsSandboxBackend {
           receipts.push(receipt);
           continue;
         }
-        receipt = this.updateReceipt(receipt, {
-          state: "failed",
-          timedOut: true,
-          reconciledAt: this.now().toISOString(),
-          summary: "Windows Sandbox recovered an expired crash lease after proving its recorded host process was absent."
-        });
-        await this.writeReceipt(receiptPath, receipt);
+        if (receipt.state === "prepared" || receipt.state === "running") {
+          receipt = this.updateReceipt(receipt, {
+            state: "failed",
+            timedOut: true,
+            reconciledAt: this.now().toISOString(),
+            summary: "Windows Sandbox recovered an expired crash lease after proving its recorded host process was absent."
+          });
+          await this.writeReceipt(receiptPath, receipt);
+        }
       }
       try {
         await this.cleanupLease(receiptPath, receipt);
@@ -952,7 +1253,7 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
         summary: result.summary,
         data: {
           backend: "windows-sandbox",
-          enforced: result.status === "completed",
+          enforced: result.status === "completed" || result.status === "running",
           ...(result.leaseId ? { leaseId: result.leaseId } : {}),
           ...(result.processId ? { processId: result.processId } : {}),
           ...(result.receiptPath ? { receiptPath: result.receiptPath } : {}),
@@ -960,7 +1261,8 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
           ...(result.resultManifestSha256 ? { resultManifestSha256: result.resultManifestSha256 } : {}),
           ...(result.recipeCatalogSha256 ? { recipeCatalogSha256: result.recipeCatalogSha256 } : {}),
           ...(result.sandboxHelperSha256 ? { sandboxHelperSha256: result.sandboxHelperSha256 } : {}),
-          ...(result.validatedOutputs ? { validatedOutputs: result.validatedOutputs } : {})
+          ...(result.validatedOutputs ? { validatedOutputs: result.validatedOutputs } : {}),
+          ...(result.lifecycleEffect ? { lifecycleEffect: result.lifecycleEffect } : {})
         }
       };
     } finally {
@@ -979,6 +1281,7 @@ function createConfiguration(input: Readonly<{
   profile: WindowsSandboxProfile;
   resourcePolicy: WindowsSandboxResourcePolicy;
   persistentVolumes: readonly PersistentVolumeMapping[];
+  interactive: boolean;
 }>): string {
   const command = `&quot;C:\\B122\\tools\\${input.helperFilename}&quot; --catalog &quot;C:\\B122\\input\\${input.manifestRelativePath.replace(/\//g, "\\")}&quot; --request &quot;C:\\B122\\exchange\\request.json&quot; --output &quot;C:\\B122\\exchange&quot;`;
   return [
@@ -997,7 +1300,7 @@ function createConfiguration(input: Readonly<{
     mappedFolder(input.exchangeRoot, "C:\\B122\\exchange", false),
     ...input.persistentVolumes.map((volume) => mappedFolder(volume.hostRoot, volume.sandboxRoot, volume.readOnly)),
     "  </MappedFolders>",
-    `  <LogonCommand><Command>${command}</Command></LogonCommand>`,
+    ...(input.interactive ? [] : [`  <LogonCommand><Command>${command}</Command></LogonCommand>`]),
     "</Configuration>",
     ""
   ].join("\n");
@@ -1069,7 +1372,9 @@ function parseReceipt(contents: string, rawId: string): WindowsSandboxReceipt {
     || typeof value.configurationDigest !== "string" || !validDigest(value.configurationDigest)
     || !Array.isArray(value.persistentVolumeIds) || value.persistentVolumeIds.length > 32 || value.persistentVolumeIds.some((id) => typeof id !== "string" || !safeIdentifier.test(id))
     || typeof value.cleanupVerified !== "boolean" || typeof value.summary !== "string"
-    || (value.hostPid !== undefined && (!Number.isSafeInteger(value.hostPid) || (value.hostPid as number) <= 0))) {
+    || (value.hostPid !== undefined && (!Number.isSafeInteger(value.hostPid) || (value.hostPid as number) <= 0))
+    || (value.hostProcessIdentity !== undefined && !validProcessIdentity(value.hostProcessIdentity))
+    || (value.hostProcessIdentity !== undefined && value.hostPid !== (value.hostProcessIdentity as WindowsSandboxProcessIdentity).pid)) {
     throw new Error("Windows Sandbox receipt is malformed or not bound to its lease path.");
   }
   return value as unknown as WindowsSandboxReceipt;
@@ -1118,4 +1423,94 @@ function boundedRedactedOutput(value: string, maximumBytes: number): { output: s
   return bytes.byteLength <= maximumBytes
     ? { output: redacted, truncated: false }
     : { output: bytes.subarray(0, maximumBytes).toString("utf8"), truncated: true };
+}
+
+interface AttestedLifecycleHelper {
+  readonly path: string;
+  readonly sha256: string;
+  readonly size: string;
+  readonly modifiedNanoseconds: string;
+  readonly device: string;
+  readonly inode: string;
+}
+
+async function attestLifecycleHelper(configuredPath: string, expectedSha256: string): Promise<AttestedLifecycleHelper> {
+  const link = await lstat(configuredPath).catch(() => { throw new SandboxBlockedError("Windows Sandbox lifecycle helper is unavailable."); });
+  if (!link.isFile() || link.isSymbolicLink()) throw new SandboxBlockedError("Windows Sandbox lifecycle helper is not one concrete regular file.");
+  const canonical = await realpath(configuredPath).catch(() => { throw new SandboxBlockedError("Windows Sandbox lifecycle helper cannot be canonicalized."); });
+  if (!samePath(canonical, configuredPath) || basename(canonical).toLowerCase() !== "b122-sandbox-lifecycle.exe") {
+    throw new SandboxBlockedError("Windows Sandbox lifecycle helper path changed after installation.");
+  }
+  const before = await stat(canonical, { bigint: true });
+  if (!before.isFile() || before.size <= 0n || before.size > 256n * 1024n * 1024n) throw new SandboxBlockedError("Windows Sandbox lifecycle helper is outside its size bound.");
+  const bytes = await readFile(canonical);
+  if (!sameDigest(sha256(bytes), expectedSha256)) throw new SandboxBlockedError("Windows Sandbox lifecycle helper changed after current-user attestation.");
+  const after = await stat(canonical, { bigint: true });
+  if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.dev !== after.dev || before.ino !== after.ino) {
+    throw new SandboxBlockedError("Windows Sandbox lifecycle helper changed during verification.");
+  }
+  return {
+    path: canonical,
+    sha256: expectedSha256.toLowerCase(),
+    size: before.size.toString(10),
+    modifiedNanoseconds: before.mtimeNs.toString(10),
+    device: unsignedDecimal(before.dev),
+    inode: unsignedDecimal(before.ino)
+  };
+}
+
+function sameAttestedHelper(left: AttestedLifecycleHelper, right: AttestedLifecycleHelper): boolean {
+  return samePath(left.path, right.path) && left.sha256 === right.sha256 && left.size === right.size
+    && left.modifiedNanoseconds === right.modifiedNanoseconds && left.device === right.device && left.inode === right.inode;
+}
+
+function unsignedDecimal(value: bigint): string {
+  return BigInt.asUintN(64, value).toString(10);
+}
+
+function assertProcessIdentity(value: unknown): WindowsSandboxProcessIdentity {
+  if (!validProcessIdentity(value)) throw new SandboxBlockedError("Windows Sandbox native process identity is malformed.");
+  return value;
+}
+
+function validProcessIdentity(value: unknown): value is WindowsSandboxProcessIdentity {
+  return isRecord(value)
+    && exactKeys(value, ["pid", "creationFileTimeUtc", "executablePath", "executableVolumeSerialNumber", "executableFileIndex", "sessionId"])
+    && Number.isSafeInteger(value.pid) && (value.pid as number) > 0 && (value.pid as number) <= 0xffff_ffff
+    && typeof value.creationFileTimeUtc === "string" && unsigned64(value.creationFileTimeUtc)
+    && typeof value.executablePath === "string" && samePath(value.executablePath, WINDOWS_SANDBOX_EXECUTABLE)
+    && typeof value.executableVolumeSerialNumber === "string" && unsigned64(value.executableVolumeSerialNumber)
+    && typeof value.executableFileIndex === "string" && unsigned64(value.executableFileIndex)
+    && Number.isSafeInteger(value.sessionId) && (value.sessionId as number) >= 0 && (value.sessionId as number) <= 0xffff_ffff;
+}
+
+function unsigned64(value: string): boolean {
+  if (!/^(0|[1-9][0-9]{0,19})$/.test(value)) return false;
+  try { return BigInt(value) <= 18_446_744_073_709_551_615n; }
+  catch { return false; }
+}
+
+function sameProcessIdentity(left: WindowsSandboxProcessIdentity, right: WindowsSandboxProcessIdentity): boolean {
+  return left.pid === right.pid && left.creationFileTimeUtc === right.creationFileTimeUtc
+    && samePath(left.executablePath, right.executablePath)
+    && left.executableVolumeSerialNumber === right.executableVolumeSerialNumber
+    && left.executableFileIndex === right.executableFileIndex && left.sessionId === right.sessionId;
+}
+
+function lifecycleResponse(value: unknown): value is LifecycleHelperResponse {
+  return isRecord(value)
+    && value.schema === "sxsy-b122.sandbox-lifecycle-response"
+    && value.version === 1
+    && typeof value.requestId === "string" && value.requestId.length >= 24 && value.requestId.length <= 128
+    && (value.kind === "result" || value.kind === "error")
+    && (value.status === undefined || value.status === "same" || value.status === "absent" || value.status === "mismatch")
+    && (value.effect === undefined || value.effect === "launched" || value.effect === "focused" || value.effect === "terminated")
+    && (value.identity === undefined || validProcessIdentity(value.identity))
+    && (value.code === undefined || typeof value.code === "string" && safeIdentifier.test(value.code));
+}
+
+function lifecycleErrorCode(value: unknown, stderr: Uint8Array): string {
+  if (isRecord(value) && typeof value.code === "string" && safeIdentifier.test(value.code)) return value.code;
+  const message = Buffer.from(stderr).toString("utf8").trim();
+  return message ? boundedRedactedOutput(message, 256).output : "native_failure";
 }
