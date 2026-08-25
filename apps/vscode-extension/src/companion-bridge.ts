@@ -43,7 +43,7 @@ export type LocalHostAction =
   | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
   | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
   | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
-  | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv" | "select_github_navigation";
+  | "show_voice_center" | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv" | "select_github_navigation";
 
 export interface GitHubNavigationCandidate { readonly id: string; readonly label: string; readonly description: string; readonly url: string; }
 
@@ -734,7 +734,7 @@ function isLocalHostAction(value: string): value is LocalHostAction {
     "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
     "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
     "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-    "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv", "select_github_navigation"
+    "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv", "select_github_navigation"
   ].includes(value);
 }
 

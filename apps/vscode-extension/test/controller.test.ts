@@ -231,6 +231,9 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly voiceBinds: Array<{ bindingId: string; managedSessionId: string }> = [];
   readonly voiceStarts: Array<{ consentId: string; voiceSessionId: string; managedSessionId?: string }> = [];
   readonly voiceSwitches: Array<{ bindingId: string; consentId: string; voiceSessionId: string }> = [];
+  readonly voiceMutes: string[] = [];
+  readonly voiceResumes: string[] = [];
+  readonly voiceEnds: string[] = [];
   nextWorkflowArtifact?: ExtensionWorkflowArtifact;
   listedWorkflows?: readonly ExtensionWorkflowArtifact[];
   listedHandoffs?: readonly ExtensionHandoffPackage[];
@@ -362,10 +365,10 @@ class FakeBridge implements ExtensionCompanionBridge {
   async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return { ok: true, value: this.currentVoiceValue }; }
   async switchVoice(input: { bindingId: string; consentId: string; voiceSessionId: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceSwitches.push(input); this.currentVoiceValue = { id: input.bindingId, consentId: input.consentId, voiceSessionId: input.voiceSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
   async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceBinds.push({ bindingId, managedSessionId }); this.currentVoiceValue = { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
-  async muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "muted"); }
-  async resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "active"); }
+  async muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceMutes.push(bindingId); return this.voiceState(bindingId, "muted"); }
+  async resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceResumes.push(bindingId); return this.voiceState(bindingId, "active"); }
   async interruptVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "interrupted"); }
-  async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
+  async endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceEnds.push(bindingId); return this.voiceState(bindingId, "ended"); }
   async deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "ended"); }
   async installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>> { this.acceptanceTrustInstallRequests.push(sourcePath); return { ok: true, value: { authorityId: "independent-lab", keyId: "a".repeat(64), allowedGates: [8], expiresAt: "2099-01-01T00:00:00.000Z", installedAt: "2026-08-24T00:00:00.000Z", installedBy: "reviewer", status: "active" } }; }
   async listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return { ok: true, value: [] }; }
@@ -385,7 +388,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   async installProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> { this.providerInstallRequests.push(provider); return { ok: true, value: fakeProviderInstallation(provider, "active") }; }
   async listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return { ok: true, value: this.listedProviderDesktops ?? [] }; }
   async revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> { this.providerRevokeRequests.push(provider); return { ok: true, value: fakeProviderInstallation(provider, "revoked") }; }
-  private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { return { ok: true, value: { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status } }; }
+  private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { this.currentVoiceValue = { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status }; return { ok: true, value: this.currentVoiceValue }; }
   async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string) {
     this.authorizedHostActions.push({ id, adapterVersion, ...(selectionId ? { selectionId } : {}) });
     return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", ...(selectionId ? { selectionId, url: `https://github.com/acme/project/pull/${selectionId.split(":")[1]}` } : {}) } } as const;
@@ -719,7 +722,7 @@ test("native voice start and provider switch bind an exact managed session witho
   const exactTarget: ExtensionManagedSession = { ...target, targetSnapshotId: "snapshot-test", taskId: "task-voice", planRevision: "revision-voice", status: "running" };
   bridge.listedSessions = [exactTarget];
   bridge.listedHandoffs = [{ id: "handoff-test", digest: "c".repeat(64), repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", taskId: "task-voice", planRevision: "revision-voice", status: "queued", executionAuthorized: false }];
-  bridge.nextDispatch = { status: "running", summary: "Native voice start awaits host acknowledgement.", data: { hostActionId: `host-action:${"1".repeat(64)}`, hostActionKind: "open_external_url", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  bridge.nextDispatch = { status: "running", summary: "Native voice start awaits host acknowledgement.", data: { hostActionId: `host-action:${"1".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
 
   vscode.choose("task-voice: handoff-test");
   vscode.choose("claude");
@@ -739,6 +742,45 @@ test("native voice start and provider switch bind an exact managed session witho
   assert.deepEqual(bridge.voiceBinds.map((binding) => binding.managedSessionId), [exactTarget.id, exactTarget.id]);
   assert.deepEqual(opened, []);
   assert.equal(bridge.completedHostActions.every((completion) => completion.succeeded && /native.*runtime/i.test(completion.summary)), true);
+});
+
+test("repeated Voice Center presses toggle mute and resume while a reviewed center action can end", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const context = new FakeContext();
+  let now = Date.parse("2026-08-24T12:00:00.000Z");
+  const controller = new ManagedSessionController(vscode.api, context, bridge, {
+    now: () => new Date(now).toISOString(),
+    idFactory: sequenceFactory(),
+    repeatWindowMs: 1_500,
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-center" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const exactTarget: ExtensionManagedSession = { ...target, targetSnapshotId: "snapshot-test", taskId: "task-voice", planRevision: "revision-voice", status: "running" };
+  bridge.listedSessions = [exactTarget];
+  bridge.currentVoiceValue = { id: "voice-binding-test", consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId: exactTarget.id, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active" };
+
+  bridge.nextDispatch = { status: "running", summary: "Voice Center awaits host acknowledgement.", data: { hostActionId: `host-action:${"3".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  vscode.choose("Focus current managed voice session");
+  await vscode.invoke("sxsy-b122.chord.voice.normal");
+
+  now += 500;
+  bridge.nextDispatch = { status: "running", summary: "Voice Center awaits host acknowledgement.", data: { hostActionId: `host-action:${"4".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  await vscode.invoke("sxsy-b122.chord.voice.normal");
+  now += 500;
+  bridge.nextDispatch = { status: "running", summary: "Voice Center awaits host acknowledgement.", data: { hostActionId: `host-action:${"5".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  await vscode.invoke("sxsy-b122.chord.voice.normal");
+
+  now += 2_000;
+  bridge.nextDispatch = { status: "running", summary: "Voice Center awaits host acknowledgement.", data: { hostActionId: `host-action:${"6".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  vscode.choose("End voice conversation");
+  await vscode.invoke("sxsy-b122.chord.voice.normal");
+
+  assert.deepEqual(bridge.voiceMutes, ["voice-binding-test"]);
+  assert.deepEqual(bridge.voiceResumes, ["voice-binding-test"]);
+  assert.deepEqual(bridge.voiceEnds, ["voice-binding-test"]);
+  assert.equal(vscode.quickPickSurfaces.some((surface) => surface.placeHolder?.includes("Native Voice Center")), true);
 });
 
 test("local commit collects an exact structured Git review before dispatch", async () => {

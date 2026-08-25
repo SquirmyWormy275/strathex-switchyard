@@ -106,10 +106,10 @@ export const specialGestures: Readonly<Record<Control, readonly string[]>> = {
   REANCHOR: [], PROOF: [], OPTION_PROVIDER: [], PLAN_EXPANDER: [], PLAN_APPROVAL: [], HANDOFF: [],
   FIND_BLOCKED_AGENT: ["Repeated normal presses cycle verified blocked agents."],
   FIND_FINISHED_AGENT: ["Repeated normal presses cycle verified finished agents."],
-  AUTHORITY_REFRESH: [], COUNCIL: [], CLAUDE: ["Window cycling remains unresolved."],
-  CHATGPT: ["Window cycling remains unresolved."], VSCODE: ["Repeated normal presses cycle VS Code windows."],
+  AUTHORITY_REFRESH: [], COUNCIL: [], CLAUDE: ["Repeated normal presses cycle exact current-user-approved Claude Desktop windows."],
+  CHATGPT: ["Repeated normal presses cycle exact current-user-approved ChatGPT Desktop windows."], VSCODE: ["Repeated normal presses cycle VS Code windows."],
   TERMINAL: [], COMMIT: [], GITHUB: [], COMPOUND: [], RUN: [],
-  VOICE: ["Repeat or long press handles mute/end; exact split is unresolved."],
+  VOICE: ["Repeated normal presses toggle mute/resume; end remains an explicit reviewed Voice Center choice until physical long-press timing is accepted."],
   PIPELINE: ["Repeated normal presses cycle failing gates."],
   SHIELD: ["Status lighting is hardware-dependent."], SANDBOX: []
 };
@@ -128,7 +128,7 @@ export const manifest = {
 
 export const canonicalManifestJson = JSON.stringify(manifest);
 /** Updated only by `packages/protocol/scripts/generate-manifest.mjs`. */
-export const manifestSha256 = "5d2c8804edf2890f45dda030f871c0738785fc8b4976517fecfd40b549a7036b";
+export const manifestSha256 = "7b8a6eb7e043665c04751a0fee15ee54d9793f9df288f9278bc8dc955f4174fc";
 
 export function assignmentFor(control: Control, modifier: Modifier): Assignment | undefined {
   return assignments.find((assignment) => assignment.control === control && assignment.modifier === modifier);

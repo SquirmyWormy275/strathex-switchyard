@@ -63,6 +63,16 @@ test("GitHub host actions preserve the exact canonical GitHub Enterprise host", 
   assert.equal(result.data?.hostActionUrl, "https://ghe.example.test/acme/switchyard/actions/runs/9");
 });
 
+test("Voice Center queues only the native host action and never a browser fallback", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-voice-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
+  const result = await new DurableHostActionAdapter(queue).execute({ definition: commandForAction("open_voice"), operationId: "operation-voice-center", target });
+  assert.equal(result.status, "running");
+  assert.equal(result.data?.hostActionKind, "show_voice_center");
+  assert.equal(result.data?.hostActionUrl, undefined);
+});
+
 test("ambiguous GitHub identities queue a bounded picker and authorize only the selected exact candidate", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-picker-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
@@ -90,7 +100,7 @@ test("ambiguous GitHub identities queue a bounded picker and authorize only the 
   assert.equal((await queue.listPending()).length, 1);
 });
 
-test("installed dispatch stays running until the authenticated host acknowledgement durably settles it", async (context) => {
+test("installed dispatch keeps provider desktop commands unavailable without the exact installed adapter", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-integration-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
@@ -102,32 +112,10 @@ test("installed dispatch stays running until the authenticated host acknowledgem
   });
   const dispatch = await companion.endpoint.handle({ version: companionBridgeVersion, id: "open-claude", method: "command.dispatch", payload: { control: "CLAUDE", modifier: "normal" } });
   assert.equal(dispatch.ok, true);
-  const command = (dispatch.result as { command: { status: string; operationId?: string; data?: Record<string, unknown> } }).command;
-  assert.equal(command.status, "running");
-  assert.match(String(command.data?.hostActionId), /^host-action:[a-f0-9]{64}$/);
-  assert.equal((await companion.hostActions.listPending()).length, 1);
-
-  const authorized = await companion.endpoint.handle({
-    version: companionBridgeVersion,
-    id: "authorize-claude",
-    method: "host-action.authorize",
-    payload: { hostActionId: command.data!.hostActionId, adapterVersion: "test-extension-1" }
-  });
-  assert.equal(authorized.ok, true);
-  const authorizationToken = (authorized.result as { authorization: { authorizationToken: string } }).authorization.authorizationToken;
-
-  const completed = await companion.endpoint.handle({
-    version: companionBridgeVersion,
-    id: "ack-claude",
-    method: "host-action.complete",
-    payload: { hostActionId: command.data!.hostActionId, succeeded: true, summary: "VS Code opened the trusted Claude destination.", adapterVersion: "test-extension-1", authorizationToken }
-  });
-  assert.equal(completed.ok, true);
-  const result = (completed.result as { command: { status: string; operationId?: string } }).command;
-  assert.equal(result.status, "completed");
-  assert.equal(result.operationId, command.operationId);
+  const command = (dispatch.result as { command: { status: string; summary: string } }).command;
+  assert.equal(command.status, "unavailable");
+  assert.match(command.summary, /adapter|unavailable|configured/i);
   assert.equal((await companion.hostActions.listPending()).length, 0);
-  assert.equal((await companion.executor.operations.get(command.operationId!))?.state, "recorded");
 });
 
 test("host actions fail closed on target churn, missing authorization, and authorization replay", async (context) => {
@@ -148,6 +136,32 @@ test("host actions fail closed on target churn, missing authorization, and autho
   await assert.rejects(queue.settle({ hostActionId: intent.id, succeeded: true, summary: "wrong token", adapterVersion: "extension-1", authorizationToken: `host-action-auth:${"0".repeat(64)}` }), /authorization/i);
   const settled = await queue.settle({ hostActionId: intent.id, succeeded: true, summary: "exact effect completed", adapterVersion: "extension-1", authorizationToken: authorization.authorizationToken });
   assert.equal(settled.status, "completed");
+});
+
+test("expired authorization and post-effect uncertainty remain incomplete and non-replayable", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-uncertain-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let now = new Date("2026-08-24T12:00:00.000Z");
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }), {
+    now: () => now,
+    lifetimeMs: 10_000,
+    authorizationLifetimeMs: 500,
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact target remains current" }; } }
+  });
+  const late = await queue.enqueue({ definition: commandForAction("github_home"), operationId: "operation-late", target }, { hostAction: "open_external_url", url: "https://github.com/acme/switchyard" });
+  const lateAuthorization = await queue.authorize({ hostActionId: late.id, adapterVersion: "extension-1" });
+  now = new Date("2026-08-24T12:00:00.600Z");
+  const lateCompletion = await queue.settle({ hostActionId: late.id, succeeded: true, effectDisposition: "committed", summary: "host reported a late effect", adapterVersion: "extension-1", authorizationToken: lateAuthorization.authorizationToken });
+  assert.equal(lateCompletion.status, "incomplete");
+  assert.match(lateCompletion.summary, /authorization expired|reconciliation/i);
+  assert.equal((await queue.observeOperation("operation-late", "github_home")).outcome, "unresolved");
+
+  const uncertain = await queue.enqueue({ definition: commandForAction("open_managed_codex_terminal"), operationId: "operation-uncertain", target }, { hostAction: "create_codex_terminal" });
+  const uncertainAuthorization = await queue.authorize({ hostActionId: uncertain.id, adapterVersion: "extension-1" });
+  const uncertainCompletion = await queue.settle({ hostActionId: uncertain.id, succeeded: false, effectDisposition: "ambiguous", summary: "terminal exists but adoption requires reconciliation", adapterVersion: "extension-1", authorizationToken: uncertainAuthorization.authorizationToken });
+  assert.equal(uncertainCompletion.status, "incomplete");
+  assert.equal((await queue.observeOperation("operation-uncertain", "open_managed_codex_terminal")).outcome, "unresolved");
+  await assert.rejects(queue.authorize({ hostActionId: uncertain.id, adapterVersion: "extension-1" }), /already authorized|settled|reconciliation/i);
 });
 
 test("an unknown or conflicting host acknowledgement cannot finalize an operation", async (context) => {
@@ -175,8 +189,8 @@ test("host-owned cancellation settles only exact queued operation intents and is
   const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
   const queue = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:00.000Z") });
   const adapter = new DurableHostActionAdapter(queue);
-  await adapter.execute({ definition: commandForAction("open_claude"), operationId: "operation-cancel", target });
-  await adapter.execute({ definition: commandForAction("open_chatgpt"), operationId: "operation-keep", target });
+  await adapter.execute({ definition: commandForAction("focus_vscode"), operationId: "operation-cancel", target });
+  await adapter.execute({ definition: commandForAction("focus_terminal"), operationId: "operation-keep", target });
 
   assert.equal(await queue.cancelPendingByOperation("operation-cancel", "Operator cancelled exact durable work."), 1);
   assert.equal(await queue.cancelPendingByOperation("operation-cancel", "Operator cancelled exact durable work."), 0);
@@ -186,8 +200,8 @@ test("host-owned cancellation settles only exact queued operation intents and is
   assert.equal(await queue.cancelQueuedForRepository(target.repositoryRoot, "containment"), 1);
 
   const restarted = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:01.000Z") });
-  assert.deepEqual(await restarted.observeOperation("operation-cancel", "open_claude"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
-  assert.deepEqual(await restarted.observeOperation("operation-keep", "open_chatgpt"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
+  assert.deepEqual(await restarted.observeOperation("operation-cancel", "focus_vscode"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
+  assert.deepEqual(await restarted.observeOperation("operation-keep", "focus_terminal"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
   assert.deepEqual(await restarted.listSettled(), []);
 });
 

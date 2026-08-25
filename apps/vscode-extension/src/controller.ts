@@ -39,6 +39,7 @@ import type {
 const windowStateKey = "sxsy-b122.managedWindow";
 const selectedTargetStateKey = "sxsy-b122.selectedGitTarget";
 const vscodeRepeatStateKey = "sxsy-b122.vscodeRepeat";
+const voiceRepeatStateKey = "sxsy-b122.voiceRepeat";
 const pipelineFailureCursorStateKey = "sxsy-b122.pipelineFailureCursor";
 const highConsequenceActions = ["council_automatic", "pr_merge", "direct_main", "lfg", "repair_mission", "emergency_containment", "full_sandbox", "rebuild_full_sandbox", "quarantine", "containment_release"] as const;
 const providerDesktopIds = ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"] as const satisfies readonly ProviderDesktopId[];
@@ -1328,7 +1329,6 @@ export class ManagedSessionController {
         await this.showSessionQueue("verified_finished", "Verified finished sessions");
         return "Opened the verified finished queue.";
       case "open_external_url": {
-        if (command.control === "VOICE") return this.openOrStartVoice();
         if (!action.url || !trustedExternalUrl(action.url)) throw new Error("The companion supplied an untrusted external URL.");
         if (!await this.openExternal(action.url)) throw new Error("VS Code did not confirm opening the trusted external URL.");
         return "Opened the verified external destination.";
@@ -1386,6 +1386,8 @@ export class ManagedSessionController {
         return "Focused the integrated VS Code terminal.";
       case "open_compound_palette":
         return this.openCompoundPalette(action.id, action.workspaceRoot);
+      case "show_voice_center":
+        return this.openVoiceCenter();
       case "switch_voice_provider": {
         return this.switchDurableVoiceProvider();
       }
@@ -1438,6 +1440,58 @@ export class ManagedSessionController {
     throw new Error("This installed VS Code host cannot safely focus that non-VS-Code provider surface.");
   }
 
+  private async openVoiceCenter(): Promise<string> {
+    const now = Date.parse(this.now());
+    if (!Number.isFinite(now)) throw new Error("The trusted host clock is unavailable for the Voice Center gesture.");
+    const state = this.context.globalState ?? this.context.workspaceState;
+    const prior = state.get<Readonly<{ version: 1; pressedAt: number }>>(voiceRepeatStateKey);
+    const repeated = prior?.version === 1 && Number.isFinite(prior.pressedAt) && now >= prior.pressedAt && now - prior.pressedAt <= this.repeatWindowMs;
+    await state.update(voiceRepeatStateKey, { version: 1, pressedAt: now });
+
+    const current = await this.bridge.currentVoice();
+    if (!current.ok) throw new Error(`Durable voice state unavailable: ${current.message}`);
+    const binding = current.value;
+    if (!binding || binding.status === "ended") return this.openOrStartVoice();
+
+    if (repeated) {
+      const changed = binding.status === "active" ? await this.bridge.muteVoice(binding.id) : await this.bridge.resumeVoice(binding.id);
+      if (!changed.ok) throw new Error(`Voice could not ${binding.status === "active" ? "mute" : "resume"}: ${changed.message}`);
+      return `Native ${changed.value.provider} voice runtime is ${changed.value.status}; immutable context ${changed.value.contextPackageId} remains bound.`;
+    }
+
+    const choices = [
+      "Focus current managed voice session",
+      ...(binding.status === "active" ? ["Mute voice conversation"] : ["Resume voice conversation"]),
+      "Switch voice provider",
+      "Bind exact managed session",
+      "End voice conversation",
+      ...(binding.transcript === "redacted" ? ["Delete retained transcript"] : [])
+    ] as const;
+    const selected = await this.vscode.window.showQuickPick(choices, { placeHolder: `Native Voice Center — ${binding.provider} / ${binding.status} / ${binding.contextPackageId}` });
+    if (!selected) throw new Error("Voice Center selection was cancelled.");
+    if (selected === "Focus current managed voice session") return this.ensureNativeVoiceSession(binding, "focused");
+    if (selected === "Mute voice conversation") {
+      const muted = await this.bridge.muteVoice(binding.id);
+      if (!muted.ok) throw new Error(`Voice could not mute: ${muted.message}`);
+      return `Native ${muted.value.provider} voice runtime is muted; immutable context ${muted.value.contextPackageId} remains bound.`;
+    }
+    if (selected === "Resume voice conversation") {
+      const resumed = await this.bridge.resumeVoice(binding.id);
+      if (!resumed.ok) throw new Error(`Voice could not resume: ${resumed.message}`);
+      return this.ensureNativeVoiceSession(resumed.value, "focused");
+    }
+    if (selected === "Switch voice provider") return this.switchDurableVoiceProvider();
+    if (selected === "Bind exact managed session") return this.bindDurableVoiceSession();
+    if (selected === "End voice conversation") {
+      const ended = await this.bridge.endVoice(binding.id);
+      if (!ended.ok) throw new Error(`Voice could not end: ${ended.message}`);
+      return `Native ${ended.value.provider} voice conversation ended for immutable context ${ended.value.contextPackageId}.`;
+    }
+    const deleted = await this.bridge.deleteVoiceTranscript(binding.id);
+    if (!deleted.ok) throw new Error(`Retained voice transcript could not be deleted: ${deleted.message}`);
+    return `Native ${deleted.value.provider} voice transcript was deleted for immutable context ${deleted.value.contextPackageId}.`;
+  }
+
   private async openOrStartVoice(): Promise<string> {
     const current = await this.bridge.currentVoice();
     if (!current.ok) throw new Error(`Durable voice state unavailable: ${current.message}`);
@@ -1481,7 +1535,7 @@ export class ManagedSessionController {
     return this.ensureNativeVoiceSession(switched.value, "switched");
   }
 
-  private async ensureNativeVoiceSession(binding: ExtensionVoiceBinding, verb: "started" | "switched"): Promise<string> {
+  private async ensureNativeVoiceSession(binding: ExtensionVoiceBinding, verb: "started" | "switched" | "focused"): Promise<string> {
     const current = await this.bridge.listSessions();
     if (!current.ok) throw new Error(`Native voice ${verb}, but the protected managed-session registry is unavailable: ${current.message}`);
     for (const session of current.value) this.sessions.set(session.id, session);
@@ -2183,7 +2237,7 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
     "TERMINAL:normal": "focus_external_terminal", "TERMINAL:shift": "focus_integrated_terminal",
     "COMMIT:shift": "open_external_url",
     "GITHUB:normal": "open_external_url", "GITHUB:shift": "open_external_url", "GITHUB:alt": "open_external_url", "GITHUB:shift_alt": "open_external_url",
-    "RUN:shift": "start_vscode_debug", "RUN:shift_alt": "open_external_url", "SANDBOX:normal": "configure_python_venv", "SANDBOX:shift": "configure_python_venv", "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "open_external_url", "VOICE:shift": "switch_voice_provider",
+    "RUN:shift": "start_vscode_debug", "RUN:shift_alt": "open_external_url", "SANDBOX:normal": "configure_python_venv", "SANDBOX:shift": "configure_python_venv", "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "show_voice_center", "VOICE:shift": "switch_voice_provider",
     "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];

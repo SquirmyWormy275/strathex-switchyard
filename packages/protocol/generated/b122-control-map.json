@@ -498,10 +498,10 @@
     "AUTHORITY_REFRESH": [],
     "COUNCIL": [],
     "CLAUDE": [
-      "Window cycling remains unresolved."
+      "Repeated normal presses cycle exact current-user-approved Claude Desktop windows."
     ],
     "CHATGPT": [
-      "Window cycling remains unresolved."
+      "Repeated normal presses cycle exact current-user-approved ChatGPT Desktop windows."
     ],
     "VSCODE": [
       "Repeated normal presses cycle VS Code windows."
@@ -512,7 +512,7 @@
     "COMPOUND": [],
     "RUN": [],
     "VOICE": [
-      "Repeat or long press handles mute/end; exact split is unresolved."
+      "Repeated normal presses toggle mute/resume; end remains an explicit reviewed Voice Center choice until physical long-press timing is accepted."
     ],
     "PIPELINE": [
       "Repeated normal presses cycle failing gates."

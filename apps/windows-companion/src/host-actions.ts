@@ -6,12 +6,13 @@ import type { ProtectedJsonStore } from "../../../packages/control-plane/src/sto
 import type { HostActionAuthorizationPayload, HostActionCompletionPayload } from "./bridge.ts";
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
 import type { GitHubNavigationCandidate, GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
+import type { ManagedTerminalProfile } from "./provider-desktop.ts";
 
 export const localHostActionKinds = [
   "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
   "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
   "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-  "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv",
+  "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv",
   "select_github_navigation"
 ] as const;
 
@@ -30,6 +31,7 @@ export interface HostActionIntent {
   readonly debugConfiguration?: string;
   readonly pythonInterpreter?: string;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
+  readonly managedTerminalProfile?: ManagedTerminalProfile;
   readonly createdAt: string;
   readonly expiresAt: string;
 }
@@ -89,7 +91,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     }
   }
 
-  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[] }>): Promise<HostActionIntent> {
+  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[]; managedTerminalProfile?: ManagedTerminalProfile }>): Promise<HostActionIntent> {
     if (!request.operationId) throw new Error("A durable operation ID is required before a host action can be queued.");
     const now = this.now();
     const intent: HostActionIntent = {
@@ -105,6 +107,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       ...(plan.debugConfiguration ? { debugConfiguration: plan.debugConfiguration } : {}),
       ...(plan.pythonInterpreter ? { pythonInterpreter: plan.pythonInterpreter } : {}),
       ...(plan.githubCandidates ? { githubCandidates: validateGitHubCandidates(plan.githubCandidates) } : {}),
+      ...(plan.managedTerminalProfile ? { managedTerminalProfile: validateManagedTerminalProfile(plan.managedTerminalProfile, plan.hostAction) } : {}),
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + this.lifetimeMs).toISOString()
     };
@@ -116,7 +119,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
           || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
           || existing.sessionId !== intent.sessionId
           || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter
-          || JSON.stringify(existing.githubCandidates) !== JSON.stringify(intent.githubCandidates)) {
+          || JSON.stringify(existing.githubCandidates) !== JSON.stringify(intent.githubCandidates)
+          || JSON.stringify(existing.managedTerminalProfile) !== JSON.stringify(intent.managedTerminalProfile)) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
         }
         return existing;
@@ -184,16 +188,23 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       const priorEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === payload.hostActionId)?.record;
       const prior = priorEvent ? safeCompletion(priorEvent, queued) : undefined;
       if (priorEvent && !prior) throw new Error("The protected host-action completion does not match its exact durable intent.");
-      const expired = Date.parse(queued.expiresAt) <= this.now().getTime();
+      const now = this.now();
+      const intentExpired = Date.parse(queued.expiresAt) <= now.getTime();
+      const authorizationExpired = authorization !== undefined && Date.parse(authorization.expiresAt) <= now.getTime();
+      const ambiguous = payload.effectDisposition === "ambiguous" || (payload.succeeded && authorizationExpired);
       const record: HostActionCompletionRecord = {
         hostActionId: queued.id,
         operationId: queued.operationId,
         action: queued.commandAction,
         ...(queued.targetSnapshotId ? { targetSnapshotId: queued.targetSnapshotId } : {}),
-        status: expired ? "failed" : payload.succeeded ? "completed" : "failed",
-        summary: expired ? "The authenticated host acknowledgement arrived after the bounded action deadline." : boundedSummary(payload.summary),
-        completionDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !expired && payload.succeeded, adapterVersion: boundedVersion(payload.adapterVersion), authorization: authorization ? digest(authorization.authorizationToken) : "none" })),
-        completedAt: this.now().toISOString()
+        status: ambiguous ? "incomplete" : intentExpired ? "failed" : payload.succeeded ? "completed" : "failed",
+        summary: authorizationExpired && payload.succeeded
+          ? "The host reported an effect after its one-time authorization expired; reconciliation is required and completion was not accepted."
+          : intentExpired
+            ? "The authenticated host acknowledgement arrived after the bounded action deadline."
+            : boundedSummary(payload.summary),
+        completionDigest: digest(JSON.stringify({ id: queued.id, action: queued.commandAction, succeeded: !intentExpired && !ambiguous && payload.succeeded, effectDisposition: payload.effectDisposition ?? (payload.succeeded ? "committed" : "not_started"), adapterVersion: boundedVersion(payload.adapterVersion), authorization: authorization ? digest(authorization.authorizationToken) : "none" })),
+        completedAt: now.toISOString()
       };
       if (prior) {
         if (prior.status !== record.status || prior.summary !== record.summary
@@ -280,7 +291,9 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     const completed = completedEvent ? safeCompletion(completedEvent, queued) : undefined;
     if (completed) return completed.status === "completed"
       ? { outcome: "committed", note: "The authenticated host completion is durable for the exact operation." }
-      : { outcome: "failed", note: "The authenticated host reported failure for the exact operation." };
+      : completed.status === "incomplete"
+        ? { outcome: "unresolved", note: "The authenticated host reported a possibly committed effect that requires reconciliation and must not be replayed." }
+        : { outcome: "failed", note: "The authenticated host reported failure for the exact operation." };
     if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === queued.id)) {
       return { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." };
     }
@@ -303,7 +316,7 @@ export class DurableHostActionAdapter implements CommandAdapter {
   constructor(queue: DurableHostActionQueue, github?: GitHubNavigationResolver) { this.queue = queue; this.github = github; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[] }> | undefined;
+    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[]; managedTerminalProfile?: ManagedTerminalProfile }> | undefined;
     const githubPage = navigationPage(request.definition.action);
     if (githubPage) {
       if (!this.github) return { status: "unavailable", summary: "Exact GitHub navigation requires an installed authenticated GitHub route; no search URL was guessed.", effectDisposition: "not_started" };
@@ -325,7 +338,8 @@ export class DurableHostActionAdapter implements CommandAdapter {
         ...(intent.url ? { hostActionUrl: intent.url } : {}),
         ...(intent.debugConfiguration ? { hostActionDebugConfiguration: intent.debugConfiguration } : {}),
         ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {}),
-        ...(intent.githubCandidates ? { githubCandidates: intent.githubCandidates } : {})
+        ...(intent.githubCandidates ? { githubCandidates: intent.githubCandidates } : {}),
+        ...(intent.managedTerminalProfile ? { managedTerminalProfile: intent.managedTerminalProfile } : {})
       }
     };
   }
@@ -333,8 +347,7 @@ export class DurableHostActionAdapter implements CommandAdapter {
 
 export const hostActionCommandActions: readonly CommandAction[] = [
   "handoff_immediate", "handoff_routing_default", "blocker_queue", "done_queue",
-  "open_claude", "fresh_claude", "open_managed_claude_terminal", "open_chatgpt", "fresh_chatgpt",
-  "open_managed_codex_terminal", "focus_vscode", "new_vscode", "focus_terminal", "focus_vscode_terminal",
+  "focus_vscode", "new_vscode", "focus_terminal", "focus_vscode_terminal",
   "github_home", "github_pr", "github_issues", "github_actions", "compound_palette", "open_voice",
   "switch_voice_provider", "voice_session_picker", "pipeline_failure_trace"
 ];
@@ -345,12 +358,6 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
     case "handoff_routing_default": return { hostAction: "toggle_handoff_routing" };
     case "blocker_queue": return { hostAction: "show_blocker_queue" };
     case "done_queue": return { hostAction: "show_done_queue" };
-    case "open_claude":
-    case "fresh_claude": return { hostAction: "open_external_url", url: "https://claude.ai/new" };
-    case "open_managed_claude_terminal": return { hostAction: "create_claude_terminal" };
-    case "open_chatgpt":
-    case "fresh_chatgpt": return { hostAction: "open_external_url", url: "https://chatgpt.com/" };
-    case "open_managed_codex_terminal": return { hostAction: "create_codex_terminal" };
     case "focus_vscode": return { hostAction: "focus_vscode" };
     case "new_vscode": return { hostAction: "new_vscode_window" };
     case "focus_terminal": return { hostAction: "focus_external_terminal" };
@@ -360,7 +367,7 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
     case "github_issues": return undefined;
     case "github_actions": return undefined;
     case "compound_palette": return { hostAction: "open_compound_palette" };
-    case "open_voice": return { hostAction: "open_external_url", url: "https://chatgpt.com/" };
+    case "open_voice": return { hostAction: "show_voice_center" };
     case "switch_voice_provider": return { hostAction: "switch_voice_provider" };
     case "voice_session_picker": return { hostAction: "show_voice_session_picker" };
     case "pipeline_failure_trace": return { hostAction: "show_pipeline_failure_trace" };
@@ -392,6 +399,43 @@ function validateGitHubCandidates(value: readonly GitHubNavigationCandidate[]): 
     ids.add(candidate.id);
     return { id: candidate.id, label: candidate.label, description: candidate.description, url: candidate.url };
   });
+}
+
+function validateManagedTerminalProfile(value: ManagedTerminalProfile, hostAction: LocalHostActionKind): ManagedTerminalProfile {
+  const expectedProvider = hostAction === "create_claude_terminal" ? "claude_code" : hostAction === "create_codex_terminal" ? "codex" : undefined;
+  const expectedIdentity = expectedProvider === "claude_code"
+    ? { productId: "anthropic.claude-code", displayName: "Claude Code", publisher: "Anthropic, PBC", profileName: "SXSY-B122 Claude Code" }
+    : expectedProvider === "codex"
+      ? { productId: "openai.codex", displayName: "Codex", publisher: "OpenAI, L.L.C.", profileName: "SXSY-B122 Codex" }
+      : undefined;
+  if (!expectedProvider || !value || value.provider !== expectedProvider || value.shell !== false || value.requiresFinalIdentityVerification !== true
+    || !/^(?:[A-Za-z]:[\\/]|\/)/.test(value.canonicalLauncherPath) || !/\.exe$/i.test(value.canonicalLauncherPath)
+    || value.canonicalLauncherPath.length > 4_096 || /[\0\r\n]/.test(value.canonicalLauncherPath)
+    || !/^[a-f0-9]{64}$/.test(value.launcherSha256) || value.launcherProtocolVersion !== 1
+    || !/^(?:[A-Za-z]:[\\/]|\/)/.test(value.canonicalExecutablePath) || !/\.exe$/i.test(value.canonicalExecutablePath)
+    || value.canonicalExecutablePath.length > 4_096 || /[\0\r\n]/.test(value.canonicalExecutablePath)
+    || !/^[a-f0-9]{64}$/.test(value.executableSha256) || !/^[a-f0-9]{64}$/.test(value.catalogDigest)
+    || value.signerSubject.length < 3 || value.signerSubject.length > 512 || /[\0\r\n]/.test(value.signerSubject)
+    || !/^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
+    || !Number.isSafeInteger(value.executableSize) || value.executableSize <= 0 || value.executableSize > 2 * 1024 * 1024 * 1024
+    || !Number.isFinite(value.executableModifiedMs) || value.executableModifiedMs < 0
+    || !decimalIdentity(value.executableDevice)
+    || !decimalIdentity(value.executableInode)
+    || !value.installationId || value.installationId.length > 256 || /[\0\r\n]/.test(value.installationId)
+    || !Array.isArray(value.args) || value.args.length !== 0 || !expectedIdentity
+    || value.profileName !== expectedIdentity.profileName || value.productIdentity.role !== "managed_terminal"
+    || value.productIdentity.productId !== expectedIdentity.productId || value.productIdentity.displayName !== expectedIdentity.displayName
+    || value.productIdentity.publisher !== expectedIdentity.publisher
+    || !Number.isFinite(Date.parse(value.issuedAt)) || !Number.isFinite(Date.parse(value.validUntil))
+    || Date.parse(value.validUntil) <= Date.parse(value.issuedAt) || Date.parse(value.validUntil) - Date.parse(value.issuedAt) > 30_000) {
+    throw new Error("The managed-terminal host action profile is malformed or substituted.");
+  }
+  return { ...value, args: [...value.args], productIdentity: { ...value.productIdentity } };
+}
+
+function decimalIdentity(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?:0|[1-9][0-9]{0,19})$/.test(value)) return false;
+  try { return BigInt(value) <= 0xffff_ffff_ffff_ffffn; } catch { return false; }
 }
 
 function selectGitHubCandidate(intent: HostActionIntent, selectionId: string | undefined): GitHubNavigationCandidate | undefined {
@@ -435,7 +479,7 @@ function boundedReference(value: string, field: string): string {
 
 function safeCompletion(value: HostActionCompletionRecord, intent: HostActionIntent): HostActionCompletionRecord | undefined {
   if (!value || value.hostActionId !== intent.id || value.operationId !== intent.operationId || value.action !== intent.commandAction
-    || value.targetSnapshotId !== intent.targetSnapshotId || (value.status !== "completed" && value.status !== "failed")
+    || value.targetSnapshotId !== intent.targetSnapshotId || (value.status !== "completed" && value.status !== "failed" && value.status !== "incomplete")
     || typeof value.summary !== "string" || boundedSummary(value.summary) !== value.summary
     || typeof value.completedAt !== "string" || !Number.isFinite(Date.parse(value.completedAt))
     || (value.completionDigest !== undefined && !/^[a-f0-9]{64}$/.test(value.completionDigest))) return undefined;
