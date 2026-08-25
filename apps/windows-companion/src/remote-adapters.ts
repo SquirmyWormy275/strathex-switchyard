@@ -9,6 +9,7 @@ import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
 export interface DynamicConfiguredNetworkOptions {
   readonly registry: DurableNetworkPolicyRegistry;
@@ -415,22 +416,6 @@ function sessionStatus(value: unknown): value is SessionStatus { return value ==
 function safePlannedFile(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value) && !/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value) && !value.split(/[\\/]/).includes(".."); }
 function safeDeclaration(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\r\n\0]/.test(value); }
 
-async function operationAbort(control: AutomationRequest["executionControl"] | AdapterRequest["executionControl"]): Promise<{ signal: AbortSignal; dispose(): void }> {
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let poll: ReturnType<typeof setInterval> | undefined;
-  if (control) {
-    const remaining = Date.parse(control.deadline) - Date.now();
-    if (remaining <= 0 || await control.isCancellationRequested()) controller.abort();
-    else {
-      timer = setTimeout(() => controller.abort(), remaining);
-      poll = setInterval(() => {
-        void control.isCancellationRequested().then(
-          (cancelled) => { if (cancelled) controller.abort(); },
-          () => controller.abort()
-        );
-      }, 100);
-    }
-  }
-  return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } };
+async function operationAbort(control: AutomationRequest["executionControl"] | AdapterRequest["executionControl"]): Promise<DurableAbortControl> {
+  return createDurableAbortControl(control);
 }

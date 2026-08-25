@@ -214,3 +214,60 @@ test("a live broker permit cannot be replayed under another durable operation or
   assert.equal((await broker.execute({ ...request, authority: { ...grant("run_target"), id: "other-authority" } })).status, "blocked");
   assert.equal(executions, 1);
 });
+
+test("composed Git and automation brokers bound unavailable durable cancellation before handlers", async () => {
+  const local = permitted("local_commit");
+  const git = new InMemoryGitBroker(local.policy);
+  let gitHandlers = 0;
+  let gitReads = 0;
+  git.register("local_commit", () => { gitHandlers += 1; return { status: "completed", summary: "must not run" }; });
+  const gitStarted = Date.now();
+  const gitOutcome = await git.execute({
+    ...local.invocation,
+    executionControl: {
+      operationId: local.invocation.operationId,
+      deadline: new Date(Date.now() + 40).toISOString(),
+      async isCancellationRequested() { gitReads += 1; return new Promise<boolean>(() => undefined); }
+    },
+    mutation: { kind: "local_commit", paths: ["src/a.ts"], message: "must not commit" }
+  });
+  assert.equal(gitOutcome.status, "timed_out");
+  assert.equal(gitHandlers, 0);
+  assert.equal(gitReads, 1);
+  assert.ok(Date.now() - gitStarted < 1_000);
+
+  const capture = permitted("compound_capture");
+  const automation = new InMemoryAutomationBroker(capture.policy);
+  let automationHandlers = 0;
+  automation.register("compound_capture", () => { automationHandlers += 1; return { status: "completed", summary: "must not run" }; });
+  const automationOutcome = await automation.execute({
+    ...capture.invocation,
+    executionControl: {
+      operationId: capture.invocation.operationId,
+      deadline: new Date(Date.now() + 1_000).toISOString(),
+      async isCancellationRequested() { throw new Error("protected cancellation store unavailable"); }
+    }
+  });
+  assert.equal(automationOutcome.status, "unavailable");
+  assert.equal(automationHandlers, 0);
+});
+
+test("a delayed false cancellation read cannot admit an effect after its deadline", async () => {
+  const capture = permitted("compound_capture");
+  const automation = new InMemoryAutomationBroker(capture.policy);
+  let handlers = 0;
+  automation.register("compound_capture", () => { handlers += 1; return { status: "completed", summary: "must not run" }; });
+  const outcomePromise = automation.execute({
+    ...capture.invocation,
+    executionControl: {
+      operationId: capture.invocation.operationId,
+      deadline: new Date(Date.now() + 20).toISOString(),
+      async isCancellationRequested() { return false; }
+    }
+  });
+  const blockedUntil = Date.now() + 50;
+  while (Date.now() < blockedUntil) { /* deterministically delay the fulfilled-read microtask past the deadline */ }
+  const outcome = await outcomePromise;
+  assert.equal(outcome.status, "timed_out");
+  assert.equal(handlers, 0);
+});

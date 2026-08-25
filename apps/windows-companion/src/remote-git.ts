@@ -8,6 +8,7 @@ import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import { SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
+import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
 const zeroOid = "0".repeat(40);
 const defaultMaximumPushBytes = 64 * 1024 * 1024;
@@ -307,8 +308,17 @@ function boundedPushCap(value: number): number { if (!Number.isSafeInteger(value
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") && !value.startsWith("-"); }
 async function fixedExecutable(candidates: readonly string[]): Promise<string> { for (const candidate of candidates) try { if ((await stat(candidate)).isFile()) return realpath(candidate); } catch { /* continue */ } throw new Error("A trusted absolute Git executable is unavailable."); }
 async function finalEffect(request: GitRequest): Promise<BrokerOutcome | undefined> { const cancellation = await cancelled(request); if (cancellation) return cancellation; const result = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); return result.allowed ? undefined : { status: "incomplete", summary: result.reason }; }
-async function cancelled(request: GitRequest): Promise<BrokerOutcome | undefined> { if (!request.executionControl) return undefined; if (Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "Remote Git operation exceeded its durable deadline." }; if (await request.executionControl.isCancellationRequested()) return { status: "cancelled", summary: "Remote Git operation was cancelled before the next external effect." }; return undefined; }
-async function operationSignal(request: GitRequest): Promise<{ readonly signal: AbortSignal; dispose(): void }> { const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined; let poll: ReturnType<typeof setInterval> | undefined; const cancelledBefore = await cancelled(request); if (cancelledBefore) controller.abort(); else if (request.executionControl) { const remaining = Date.parse(request.executionControl.deadline) - Date.now(); timer = setTimeout(() => controller.abort(), Math.max(0, remaining)); poll = setInterval(() => { void request.executionControl!.isCancellationRequested().then((value) => { if (value) controller.abort(); }, () => controller.abort()); }, 100); poll.unref?.(); timer.unref?.(); } return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } }; }
+async function cancelled(request: GitRequest): Promise<BrokerOutcome | undefined> {
+  if (!request.executionControl) return undefined;
+  const control = await createDurableAbortControl(request.executionControl);
+  try {
+    if (!control.signal.aborted) return undefined;
+    if (control.reason() === "deadline") return { status: "timed_out", summary: "Remote Git operation exceeded its durable deadline." };
+    if (control.reason() === "cancelled") return { status: "cancelled", summary: "Remote Git operation was cancelled before the next external effect." };
+    return { status: "unavailable", summary: "Remote Git could not verify durable cancellation state before the next external effect." };
+  } finally { control.dispose(); }
+}
+async function operationSignal(request: GitRequest): Promise<DurableAbortControl> { return createDurableAbortControl(request.executionControl); }
 function failed(error: unknown, fallback: string): BrokerOutcome { return { status: "failed", summary: redactText(error instanceof Error ? error.message : fallback).slice(0, 512) }; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function exactRoot(value: Record<string, unknown>): boolean { const keys = Object.keys(value); return keys.length === 1 && keys[0] === "data"; }

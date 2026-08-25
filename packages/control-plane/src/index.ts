@@ -14,6 +14,7 @@ export * from "./contracts.ts";
 export * from "./council.ts";
 export * from "./dispatch.ts";
 export * from "./execution-control.ts";
+export * from "./execution-cancellation.ts";
 export * from "./git-inspector.ts";
 export * from "./operations.ts";
 export * from "./policy.ts";

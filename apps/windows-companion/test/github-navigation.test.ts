@@ -36,6 +36,45 @@ test("repository home and issues navigation require the installed exact host ide
   assert.deepEqual(await navigation.resolve(request("github_issues"), "issues"), { kind: "open", url: "https://github.com/contributor/project/issues", summary: "Resolved the exact installed workspace repository issues list." });
 });
 
+test("GitHub navigation bounds unavailable initial and in-flight cancellation reads", async () => {
+  let initialReads = 0;
+  const initialStarted = Date.now();
+  const initial = await resolver([]).resolve({
+    ...request("github_home"),
+    executionControl: {
+      operationId: "operation-github_home",
+      deadline: new Date(Date.now() + 40).toISOString(),
+      async isCancellationRequested() { initialReads += 1; return new Promise<boolean>(() => undefined); }
+    }
+  }, "home");
+  assert.equal(initial.kind, "blocked");
+  assert.equal(initialReads, 1);
+  assert.ok(Date.now() - initialStarted < 1_000);
+
+  let reads = 0;
+  let networkCalls = 0;
+  const navigation = new ConfiguredGitHubNavigationResolver({ async request(input: { signal: AbortSignal }) {
+    networkCalls += 1;
+    if (!input.signal.aborted) await new Promise<void>((resolve) => input.signal.addEventListener("abort", () => resolve(), { once: true }));
+    return { outcome: "failed", routeId: "github.graphql", detail: "aborted", effectDisposition: "ambiguous" };
+  } } as unknown as DynamicConfiguredNetworkClient, { async resolve() { return configuredGitHostFromPolicy(policy); } });
+  const interrupted = await navigation.resolve({
+    ...request("github_pr"),
+    executionControl: {
+      operationId: "operation-github_pr",
+      deadline: new Date(Date.now() + 180).toISOString(),
+      async isCancellationRequested() {
+        reads += 1;
+        if (reads <= 2) return false;
+        return new Promise<boolean>(() => undefined);
+      }
+    }
+  }, "pr");
+  assert.equal(interrupted.kind, "blocked");
+  assert.equal(reads, 3);
+  assert.equal(networkCalls, 1);
+});
+
 function resolver(responses: unknown[], calls: Array<{ query: string; variables: Record<string, unknown> }> = []) {
   const network = { async request(input: { routeId: string; body?: Uint8Array }) {
     assert.equal(input.routeId, "github.graphql");

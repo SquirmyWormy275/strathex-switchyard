@@ -5,6 +5,7 @@ import type { AdapterRequest } from "../../../packages/control-plane/src/adapter
 import type { BrokerOutcome, ContainmentGuard, ExecutionBroker, ExecutionRecipe, ExecutionRequest, IsolationRequest } from "../../../packages/control-plane/src/brokers.ts";
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import { createDurableAbortControl } from "../../../packages/control-plane/src/execution-cancellation.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import {
   repositoryProcessActions,
@@ -232,36 +233,40 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
     if (!request.permit || Date.parse(request.permit.expiresAt) <= Date.now()) {
       return { status: "blocked", summary: "The repository runtime rejected an absent or expired durable policy permit." };
     }
-    if (request.executionControl) {
-      if (Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "The repository runtime deadline expired before execution." };
-      if (await request.executionControl.isCancellationRequested()) return { status: "cancelled", summary: "The repository runtime observed cancellation before execution." };
+    const operationControl = await createDurableAbortControl(request.executionControl, { fallbackDeadline: request.permit.expiresAt });
+    const initialAbort = operationControl.reason();
+    if (initialAbort) {
+      operationControl.dispose();
+      return initialAbort === "deadline"
+        ? { status: "timed_out", summary: "The repository runtime deadline expired while checking durable cancellation.", effectDisposition: "not_started" }
+        : initialAbort === "cancelled"
+          ? { status: "cancelled", summary: "The repository runtime observed cancellation before execution.", effectDisposition: "not_started" }
+          : { status: "unavailable", summary: "The repository runtime could not verify durable cancellation state before execution.", effectDisposition: "not_started" };
     }
-    if (!request.effectGuard) return { status: "blocked", summary: "The repository runtime requires an exact dispatch-bound final effect guard." };
-    const admissionFence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
-    if (admissionFence && !admissionFence.allowed) return { status: "blocked", summary: admissionFence.reason };
-
-    let runtime: RepositoryRuntime;
-    try { runtime = await this.runtimes.resolve(request.target.repositoryRoot); }
-    catch (error) { return { status: "unavailable", summary: untrustedSummary((error as Error).message) }; }
-
-    const controller = new AbortController();
-    const cleanup = this.bindCancellation(request, controller);
-    const effectGuard: RuntimeEffectGuard = {
-      check: async (_runtimeAction, repositoryRoot) => {
-        if (!samePath(repositoryRoot, request.target.repositoryRoot)) return { allowed: false, reason: "The pinned runtime repository no longer matches the protected target." };
-        const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
-        if (fence && !fence.allowed) return { allowed: false, reason: fence.reason };
-        return request.effectGuard!.assertCurrent({
-          action: request.action,
-          operationId: request.operationId,
-          target: request.target,
-          ...(request.session ? { session: request.session } : {}),
-          ...(request.authority ? { authority: request.authority } : {})
-        });
-      }
-    };
     try {
-      const result = await runtime.execute(action as RepositoryRuntimeAction, { operationId: request.operationId, signal: controller.signal, effectGuard });
+      if (!request.effectGuard) return { status: "blocked", summary: "The repository runtime requires an exact dispatch-bound final effect guard." };
+      const admissionFence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
+      if (admissionFence && !admissionFence.allowed) return { status: "blocked", summary: admissionFence.reason };
+
+      let runtime: RepositoryRuntime;
+      try { runtime = await this.runtimes.resolve(request.target.repositoryRoot); }
+      catch (error) { return { status: "unavailable", summary: untrustedSummary((error as Error).message) }; }
+
+      const effectGuard: RuntimeEffectGuard = {
+        check: async (_runtimeAction, repositoryRoot) => {
+          if (!samePath(repositoryRoot, request.target.repositoryRoot)) return { allowed: false, reason: "The pinned runtime repository no longer matches the protected target." };
+          const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
+          if (fence && !fence.allowed) return { allowed: false, reason: fence.reason };
+          return request.effectGuard!.assertCurrent({
+            action: request.action,
+            operationId: request.operationId,
+            target: request.target,
+            ...(request.session ? { session: request.session } : {}),
+            ...(request.authority ? { authority: request.authority } : {})
+          });
+        }
+      };
+      const result = await runtime.execute(action as RepositoryRuntimeAction, { operationId: request.operationId, signal: operationControl.signal, effectGuard });
       if (action === "debug_target" && result.status === "running" && result.debugConfiguration && this.hostActions) {
         return this.queueVerifiedDebug(request, result.debugConfiguration);
       }
@@ -274,7 +279,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       return mapResult(result);
     } catch (error) {
       return { status: "failed", summary: `The verified repository runtime failed safely: ${untrustedSummary((error as Error).message)}` };
-    } finally { cleanup(); }
+    } finally { operationControl.dispose(); }
   }
 
   private async queueVerifiedPythonEnvironment(request: ExecutionRequest, interpreter: string, result: RepositoryRuntimeResult): Promise<BrokerOutcome> {
@@ -377,16 +382,6 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
     }
   }
 
-  private bindCancellation(request: ExecutionRequest, controller: AbortController): () => void {
-    const deadline = request.executionControl ? Date.parse(request.executionControl.deadline) : Date.parse(request.permit!.expiresAt);
-    const deadlineTimer = setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now()));
-    const cancellationTimer = request.executionControl ? setInterval(() => {
-      void request.executionControl!.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }).catch(() => controller.abort());
-    }, 100) : undefined;
-    deadlineTimer.unref?.();
-    cancellationTimer?.unref?.();
-    return () => { clearTimeout(deadlineTimer); if (cancellationTimer) clearInterval(cancellationTimer); };
-  }
 }
 
 /** Sends every pipeline/security recipe through the installed OS sandbox; ordinary run/debug recipes retain the host-pinned runtime. */

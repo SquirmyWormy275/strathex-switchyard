@@ -44,6 +44,55 @@ const host = configuredGitHostFromPolicy({ version: 1, proxy: "direct", routes: 
 ] });
 const hostResolver = { async resolve() { return host; } };
 
+test("pipeline adapter bounds initial and in-flight durable cancellation reads", async () => {
+  let networkCalls = 0;
+  let initialReads = 0;
+  const neverStarts = new ConfiguredGitHubPipelineAdapter({ async request() {
+    networkCalls += 1;
+    throw new Error("must not run");
+  } } as unknown as DynamicConfiguredNetworkClient, { async list() { return []; } }, hostResolver);
+  const started = Date.now();
+  const initial = await neverStarts.execute({
+    ...request("pipeline_status"),
+    executionControl: {
+      operationId: "operation-pipeline_status",
+      deadline: new Date(Date.now() + 40).toISOString(),
+      async isCancellationRequested() { initialReads += 1; return new Promise<boolean>(() => undefined); }
+    }
+  });
+  assert.equal(initial.status, "timed_out");
+  assert.equal(networkCalls, 0);
+  assert.equal(initialReads, 1);
+  assert.ok(Date.now() - started < 1_000);
+
+  let reads = 0;
+  let activeReads = 0;
+  let maximumActiveReads = 0;
+  const inFlight = new ConfiguredGitHubPipelineAdapter({ async request(input: { signal: AbortSignal }) {
+    networkCalls += 1;
+    if (!input.signal.aborted) await new Promise<void>((resolve) => input.signal.addEventListener("abort", () => resolve(), { once: true }));
+    return { outcome: "failed", routeId: "github.graphql", detail: "aborted", effectDisposition: "ambiguous" };
+  } } as unknown as DynamicConfiguredNetworkClient, { async list() { return []; } }, hostResolver);
+  const interrupted = await inFlight.execute({
+    ...request("pipeline_status"),
+    executionControl: {
+      operationId: "operation-pipeline_status",
+      deadline: new Date(Date.now() + 180).toISOString(),
+      async isCancellationRequested() {
+        reads += 1;
+        activeReads += 1;
+        maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+        if (reads === 1) { activeReads -= 1; return false; }
+        return new Promise<boolean>(() => undefined);
+      }
+    }
+  });
+  assert.equal(interrupted.status, "timed_out");
+  assert.equal(reads, 2);
+  assert.equal(maximumActiveReads, 1);
+  assert.equal(networkCalls, 1);
+});
+
 test("pipeline adapter binds GitHub status to the exact target head and protected local receipts", async () => {
   const calls: unknown[] = [];
   const adapter = new ConfiguredGitHubPipelineAdapter({

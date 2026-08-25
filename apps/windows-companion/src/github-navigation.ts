@@ -1,4 +1,5 @@
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
+import { createDurableAbortControl, type DurableAbortControl } from "../../../packages/control-plane/src/execution-cancellation.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import { configuredGitRepository, type ConfiguredGitHostIdentity } from "./remote-git.ts";
@@ -61,7 +62,9 @@ export class ConfiguredGitHubNavigationResolver implements GitHubNavigationResol
     if (!headRepository || headRepository.owner.toLowerCase() !== host.headOwner.toLowerCase() || headRepository.name.toLowerCase() !== host.headName.toLowerCase()) {
       return { kind: "blocked", summary: "The canonical remote does not match the exact installed GitHub head repository." };
     }
-    const cancelled = await cancelledBeforeRead(request);
+    const admissionControl = await createDurableAbortControl(request.executionControl, { fallbackDeadline: new Date(Date.now() + 30_000).toISOString() });
+    const cancelled = navigationCancellation(admissionControl, "GitHub navigation stopped while checking durable cancellation.");
+    admissionControl.dispose();
     if (cancelled) return cancelled;
     const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
     if (!current.allowed) return { kind: "blocked", summary: current.reason };
@@ -107,10 +110,14 @@ export class ConfiguredGitHubNavigationResolver implements GitHubNavigationResol
   }
 
   private async graphql(request: AdapterRequest, payload: Readonly<{ query: string; variables: Readonly<Record<string, unknown>> }>): Promise<Readonly<{ data: Record<string, unknown> }> | Extract<GitHubNavigationResolution, { kind: "blocked" | "failed" | "unavailable" }>> {
-    const control = abortControl(request);
+    const control = await createDurableAbortControl(request.executionControl, { fallbackDeadline: new Date(Date.now() + 30_000).toISOString() });
+    const preflight = navigationCancellation(control, "GitHub navigation stopped before its provider read.");
+    if (preflight) { control.dispose(); return preflight; }
     let response;
     try { response = await this.network.request({ routeId: "github.graphql", repositoryRoot: request.target!.repositoryRoot, body: JSON.stringify(payload), signal: control.signal }); }
     finally { control.dispose(); }
+    const interrupted = navigationCancellation(control, "GitHub navigation stopped while its provider read was in flight.");
+    if (interrupted) return interrupted;
     if (response.outcome !== "passed" || !response.body) {
       const kind = response.outcome === "blocked" ? "blocked" : response.outcome === "unavailable" ? "unavailable" : "failed";
       return { kind, summary: untrustedSummary(response.detail) };
@@ -180,5 +187,8 @@ function bounded(value: unknown, maximum: number): value is string { return type
 function branchName(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/"); }
 function oid(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{40}$/i.test(value); }
 function timestamp(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
-function abortControl(request: AdapterRequest): { readonly signal: AbortSignal; dispose(): void } { const controller = new AbortController(); const deadline = request.executionControl ? Date.parse(request.executionControl.deadline) : Date.now() + 30_000; const timer = setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now())); timer.unref?.(); return { signal: controller.signal, dispose() { clearTimeout(timer); } }; }
-async function cancelledBeforeRead(request: AdapterRequest): Promise<Readonly<{ kind: "blocked"; summary: string }> | undefined> { if (!request.executionControl) return undefined; if (Date.parse(request.executionControl.deadline) <= Date.now()) return { kind: "blocked", summary: "GitHub navigation exceeded its durable deadline before the provider read." }; return await request.executionControl.isCancellationRequested() ? { kind: "blocked", summary: "GitHub navigation was cancelled before the provider read." } : undefined; }
+function navigationCancellation(control: DurableAbortControl, summary: string): Readonly<{ kind: "blocked" | "unavailable"; summary: string }> | undefined {
+  const reason = control.reason();
+  if (!reason) return undefined;
+  return { kind: reason === "unavailable" ? "unavailable" : "blocked", summary };
+}

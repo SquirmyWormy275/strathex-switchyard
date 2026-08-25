@@ -246,6 +246,44 @@ test("automatic Council aborts when durable cancellation polling fails", async (
   }
 });
 
+test("automatic Council bounds a never-settling initial cancellation read", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-cancellation-hang-"));
+  try {
+    const now = Date.now();
+    const heartbeat = new Date(now).toISOString();
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => heartbeat });
+    await sessions.upsert({ ...session("one", "codex", ["src/one.ts"]), lastHeartbeat: heartbeat });
+    await sessions.upsert({ ...session("two", "claude", ["src/two.ts"]), lastHeartbeat: heartbeat });
+    let checks = 0;
+    let requests = 0;
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => heartbeat, idFactory: () => "epoch-cancellation-hang" }),
+      sessions,
+      { async request() { requests += 1; throw new Error("provider must not start"); } } as unknown as DynamicConfiguredNetworkClient,
+      () => now,
+      { isolation: fakeIsolation(), automaticGate: acceptedGate }
+    ).execute({
+      action: "council_automatic",
+      operationId: "operation-cancellation-hang",
+      target,
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+      executionControl: {
+        operationId: "operation-cancellation-hang",
+        deadline: new Date(now + 180).toISOString(),
+        async isCancellationRequested() { checks += 1; return new Promise<boolean>(() => undefined); }
+      }
+    });
+    assert.equal(result.status, "incomplete");
+    assert.equal(checks, 1);
+    assert.equal(requests, 0);
+    assert.equal((await new CouncilCoordinator(store).get("epoch-cancellation-hang"))?.status, "aborted");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("automatic Council gate requires every exact-target acceptance record and rejects stale target evidence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "b122-council-evidence-"));
   try {

@@ -548,6 +548,47 @@ test("the control-plane sandbox wrapper aborts when durable cancellation polling
   }
 });
 
+test("the control-plane sandbox wrapper serializes a never-settling cancellation poll", async () => {
+  let checks = 0;
+  let backendAborted = false;
+  const runtime = new WindowsSandboxIsolationRuntime({
+    async execute(input: { signal: AbortSignal }) {
+      return new Promise<{ status: "cancelled"; summary: string }>((resolve) => {
+        const finish = (): void => { backendAborted = true; resolve({ status: "cancelled", summary: "Sandbox operation cancelled." }); };
+        if (input.signal.aborted) finish();
+        else input.signal.addEventListener("abort", finish, { once: true });
+      });
+    }
+  } as never, {
+    destinationRoot: "C:\\validated-results",
+    permitVerifier: { verifyPermit: () => true },
+    recipeCatalogDigest: "a".repeat(64),
+    helperDigest: "b".repeat(64)
+  });
+  const startedAt = Date.now();
+  const outcome = await runtime.start({
+    action: "full_sandbox",
+    operationId: "operation-cancellation-hang",
+    target: { id: "target-1", repositoryRoot: "C:\\repo" } as never,
+    profile: "full_sandbox",
+    permit: {} as never,
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+    executionControl: {
+      operationId: "operation-cancellation-hang",
+      deadline: new Date(Date.now() + 360).toISOString(),
+      async isCancellationRequested() {
+        checks += 1;
+        if (checks === 1) return false;
+        return new Promise<boolean>(() => undefined);
+      }
+    }
+  });
+  assert.equal(outcome.status, "cancelled");
+  assert.equal(backendAborted, true);
+  assert.equal(checks, 2, "a never-settling poll must not permit overlapping cancellation reads");
+  assert.ok(Date.now() - startedAt < 800, "Windows Sandbox outlived its exact durable deadline");
+});
+
 function processIdentity(pid: number, creationFileTimeUtc = "133801632000000000"): WindowsSandboxProcessIdentity {
   return {
     pid,

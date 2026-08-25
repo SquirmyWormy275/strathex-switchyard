@@ -3,6 +3,7 @@ import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot 
 import type { CommandAction } from "./command-catalog.ts";
 import type { ContainmentChannel } from "./containment.ts";
 import type { ExecutionControl } from "./execution-control.ts";
+import { readDurableCancellation } from "./execution-cancellation.ts";
 import type { ChildOperationSaga } from "./operations.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 import type { PermitBinding, PolicyPermit } from "./policy.ts";
@@ -57,12 +58,10 @@ export interface EffectGuard {
 type MaybePromise<T> = T | Promise<T>;
 
 async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): Promise<BrokerOutcome | undefined> {
-  if (invocation.executionControl && Date.parse(invocation.executionControl.deadline) <= Date.now()) {
-    return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline has already elapsed.", effectDisposition: "not_started" };
-  }
-  if (invocation.executionControl && await invocation.executionControl.isCancellationRequested()) {
-    return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested.", effectDisposition: "not_started" };
-  }
+  const cancellation = await readDurableCancellation(invocation.executionControl);
+  if (cancellation === "deadline") return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline elapsed while checking cancellation.", effectDisposition: "not_started" };
+  if (cancellation === "cancelled") return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested.", effectDisposition: "not_started" };
+  if (cancellation === "unavailable") return { status: "unavailable", summary: "Broker refused an invocation because its durable cancellation state was unavailable.", effectDisposition: "not_started" };
   if (!policy.verifyPermit(invocation.permit, {
     action: invocation.action,
     operationId: invocation.operationId,

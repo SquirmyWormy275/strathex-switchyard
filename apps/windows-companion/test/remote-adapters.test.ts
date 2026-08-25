@@ -306,3 +306,27 @@ test("configured provider routing aborts when durable cancellation polling fails
     process.off("unhandledRejection", onUnhandled);
   }
 });
+
+test("configured provider routing bounds a never-settling initial cancellation read", async () => {
+  let checks = 0;
+  let requests = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({
+    async request() { requests += 1; throw new Error("transport must not start while cancellation state is unresolved"); }
+  } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { return proofArtifact(); },
+    async acknowledge() { throw new Error("must not acknowledge"); }
+  });
+  const startedAt = Date.now();
+  const outcome = await adapter.execute({
+    ...(providerRequest() as unknown as Record<string, unknown>),
+    executionControl: {
+      operationId: "operation-1",
+      deadline: new Date(Date.now() + 180).toISOString(),
+      async isCancellationRequested() { checks += 1; return new Promise<boolean>(() => undefined); }
+    }
+  } as unknown as AdapterRequest);
+  assert.equal(outcome.status, "cancelled");
+  assert.equal(checks, 1);
+  assert.equal(requests, 0);
+  assert.ok(Date.now() - startedAt < 700, "initial cancellation state outlived the durable deadline");
+});

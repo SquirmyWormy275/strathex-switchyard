@@ -218,6 +218,41 @@ test("remote Git aborts when durable cancellation polling fails", async () => {
   }
 });
 
+test("remote Git serializes a never-settling cancellation poll until the exact deadline", async () => {
+  let checks = 0;
+  let transportAborted = false;
+  const network = {
+    async request(input: { routeId: string; signal?: AbortSignal }) {
+      assert.ok(input.signal);
+      return new Promise<{ outcome: "blocked"; routeId: string; detail: string }>((resolve) => {
+        const finish = (): void => { transportAborted = true; resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled" }); };
+        if (input.signal!.aborted) finish();
+        else input.signal!.addEventListener("abort", finish, { once: true });
+      });
+    }
+  } as unknown as DynamicConfiguredNetworkClient;
+  const request = {
+    ...requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed", body: "Reviewed" }),
+    executionControl: {
+      operationId: "operation-1",
+      deadline: new Date(Date.now() + 360).toISOString(),
+      async isCancellationRequested() {
+        checks += 1;
+        if (checks <= 2) return false;
+        return new Promise<boolean>(() => undefined);
+      }
+    }
+  } as GitRequest;
+  const startedAt = Date.now();
+  await assert.rejects(
+    new ConfiguredGitHubGraphqlPort(network, gitHost).defaultBranch({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", request }),
+    /configured GitHub GraphQL route did not complete/i
+  );
+  assert.equal(transportAborted, true);
+  assert.equal(checks, 3, "a never-settling poll must not permit overlapping cancellation reads");
+  assert.ok(Date.now() - startedAt < 800, "remote Git outlived its exact durable deadline");
+});
+
 test("fork PR upsert pushes the exact head repository while creating into the separately configured base", async () => {
   const forkPolicy: ConfiguredNetworkPolicy = { version: 1, proxy: "direct", routes: [
     { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },

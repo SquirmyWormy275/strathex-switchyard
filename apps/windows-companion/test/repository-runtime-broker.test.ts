@@ -71,6 +71,53 @@ test("repository runtime broker refuses recipe/action confusion and pre-cancelle
   assert.equal(calls, 0);
 });
 
+test("repository runtime bounds never-settling cancellation reads and propagates one serialized abort", async () => {
+  let runtimeCalls = 0;
+  let initialReads = 0;
+  const neverStarts = new RepositoryRuntimeExecutionBroker({ async resolve() {
+    return { async execute(): Promise<RepositoryRuntimeResult> { runtimeCalls += 1; return { status: "completed", summary: "must not run" }; } } as unknown as RepositoryRuntime;
+  } });
+  const started = Date.now();
+  const timedOut = await neverStarts.execute(request({ executionControl: {
+    operationId: "operation-runtime",
+    deadline: new Date(Date.now() + 40).toISOString(),
+    async isCancellationRequested() { initialReads += 1; return new Promise<boolean>(() => undefined); }
+  } }));
+  assert.equal(timedOut.status, "timed_out");
+  assert.equal(runtimeCalls, 0);
+  assert.equal(initialReads, 1);
+  assert.ok(Date.now() - started < 1_000);
+
+  let reads = 0;
+  let activeReads = 0;
+  let maximumActiveReads = 0;
+  const polling = new RepositoryRuntimeExecutionBroker({ async resolve() {
+    return {
+      async execute(_action: string, options: RepositoryRuntimeExecuteOptions): Promise<RepositoryRuntimeResult> {
+        runtimeCalls += 1;
+        const signal = options.signal;
+        assert.ok(signal);
+        if (!signal.aborted) await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+        return { status: "cancelled", summary: "bounded durable abort observed" };
+      }
+    } as unknown as RepositoryRuntime;
+  } });
+  const bounded = await polling.execute(request({ executionControl: {
+    operationId: "operation-runtime",
+    deadline: new Date(Date.now() + 180).toISOString(),
+    async isCancellationRequested() {
+      reads += 1;
+      activeReads += 1;
+      maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+      if (reads === 1) { activeReads -= 1; return false; }
+      return new Promise<boolean>(() => undefined);
+    }
+  } }));
+  assert.equal(bounded.status, "cancelled");
+  assert.equal(reads, 2);
+  assert.equal(maximumActiveReads, 1);
+});
+
 test("missing host pin remains unavailable and never falls back to recipe command text", async () => {
   const broker = new RepositoryRuntimeExecutionBroker({ async resolve() { throw new Error("No active host-attested repository runtime pin exists."); } });
   const outcome = await broker.execute(request({ recipe: { ...repositoryRuntimeExecutionRecipe("run_target", target), executable: "evil.exe", args: ["untrusted"] } }));

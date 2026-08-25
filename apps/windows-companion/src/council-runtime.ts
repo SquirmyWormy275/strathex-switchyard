@@ -8,6 +8,7 @@ import type { SessionRegistry } from "../../../packages/control-plane/src/sessio
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import type { CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "./council-workspace-isolation.ts";
+import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
 type CouncilRequest = Parameters<CouncilExecutor["execute"]>[0];
 type CouncilPhase = "pause" | "assignment" | "resume";
@@ -140,11 +141,14 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   private async phase(request: CouncilRequest, epochId: string, participant: CouncilParticipant, phase: CouncilPhase, binding?: CouncilWorkspaceBinding): Promise<void> {
     const session = await this.sessions.get(participant.id);
     if (!session || session.metadata["sxsy-b122.providerHandshake"] !== "exact-route-v1") throw new Error(`Council participant ${participant.id} lacks an exact-route provider handshake.`);
-    if (request.executionControl && (Date.parse(request.executionControl.deadline) <= this.now() || await request.executionControl.isCancellationRequested())) throw new Error("Automatic Council was cancelled or exceeded its durable deadline.");
+    const control = await operationSignal(request);
+    if (control.signal.aborted) {
+      control.dispose();
+      throw new Error(control.reason() === "unavailable" ? "Automatic Council could not verify durable cancellation state." : "Automatic Council was cancelled or exceeded its durable deadline.");
+    }
     const child = request.childSaga ? await request.childSaga.begin({ action: `council.${phase}`, idempotencyScope: `${epochId}:${participant.id}:${phase}`, details: { epochId, phase, sessionId: participant.id, target: request.target.id } }) : undefined;
     if (child && !child.mayExecute) throw new Error(`Council ${phase} for ${participant.id} requires reconciliation and was not replayed.`);
     if (child) await request.childSaga!.markExecuting(child);
-    const control = operationSignal(request);
     try {
       if (phase !== "pause" && !binding) throw new Error(`Council ${phase} has no exact durable isolation binding for ${participant.id}.`);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
@@ -207,6 +211,6 @@ function reportOutcome(report: Awaited<ReturnType<CouncilCoordinator["report"]>>
 function declarations(session: ManagedSession, key: string): readonly string[] { const raw = session.metadata[key]; if (!raw) return []; try { const value: unknown = JSON.parse(raw); return Array.isArray(value) && value.length <= 128 && value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 256 && !/[\r\n\0]/.test(item)) ? [...new Set(value)] : []; } catch { return []; } }
 function trustedDiff(session: ManagedSession): string | undefined { const value = session.metadata["sxsy-b122.diffDigest"]; return value && /^[a-f0-9]{64}$/i.test(value) ? value : undefined; }
 function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string; assignmentDigest?: string; resourceHostDigest?: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } const expectedKeys = expected.assignmentDigest ? 9 : 7; if (!record(value) || Object.keys(value).length !== expectedKeys || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true || (expected.assignmentDigest !== undefined && value.assignmentDigest !== expected.assignmentDigest) || (expected.resourceHostDigest !== undefined && value.resourceHostDigest !== expected.resourceHostDigest)) return false; return true; }
-function operationSignal(request: CouncilRequest): { readonly signal: AbortSignal; dispose(): void } { const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined; let poll: ReturnType<typeof setInterval> | undefined; if (request.executionControl) { timer = setTimeout(() => controller.abort(), Math.max(0, Date.parse(request.executionControl.deadline) - Date.now())); poll = setInterval(() => { void request.executionControl!.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }, () => controller.abort()); }, 100); timer.unref?.(); poll.unref?.(); } return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } }; }
+async function operationSignal(request: CouncilRequest): Promise<DurableAbortControl> { return createDurableAbortControl(request.executionControl); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function requiredBinding(plan: CouncilIsolationPlan, sessionId: string): CouncilWorkspaceBinding { const binding = plan.bindings.find((candidate) => candidate.sessionId === sessionId); if (!binding) throw new Error(`Council isolation plan omitted participant ${sessionId}.`); if (!binding.resourceHost || !/^[a-f0-9]{64}$/.test(binding.resourceHost.digest)) throw new Error(`Council isolation plan omitted the exact resource-host binding for ${sessionId}.`); return binding; }

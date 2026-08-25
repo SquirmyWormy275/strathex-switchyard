@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
 import type { ProtectedReceipt } from "../../../packages/control-plane/src/contracts.ts";
+import { createDurableAbortControl, type DurableAbortControl } from "../../../packages/control-plane/src/execution-cancellation.ts";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
@@ -99,13 +100,12 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
     const repository = configuredGitRepository(request.target.canonicalRemote, host);
     if (!repository || repository.owner.toLowerCase() !== host.headOwner.toLowerCase() || repository.name.toLowerCase() !== host.headName.toLowerCase()) return { status: "blocked", summary: "Hosted pipeline inspection requires the canonical remote to match the exact configured GitHub head repository.", effectDisposition: "not_started" };
     if (!request.effectGuard) return { status: "blocked", summary: "Hosted pipeline inspection requires a final target guard.", effectDisposition: "not_started" };
-    if (request.executionControl && (Date.parse(request.executionControl.deadline) <= Date.now() || await request.executionControl.isCancellationRequested())) {
-      return { status: Date.parse(request.executionControl.deadline) <= Date.now() ? "timed_out" : "cancelled", summary: "Hosted pipeline inspection stopped before its network effect.", effectDisposition: "not_started" };
-    }
     const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
     if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
 
-    const control = abortControl(request);
+    const control = await createDurableAbortControl(request.executionControl, { fallbackDeadline: new Date(Date.now() + 30_000).toISOString() });
+    const preflight = cancellationOutcome(control, "Hosted pipeline inspection stopped before its network effect.", "not_started");
+    if (preflight) { control.dispose(); return preflight; }
     let response;
     try {
       response = await this.network.request({
@@ -118,6 +118,8 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
         })
       });
     } finally { control.dispose(); }
+    const interrupted = cancellationOutcome(control, "Hosted pipeline inspection stopped while its network effect was in flight.", response?.effectDisposition ?? "ambiguous");
+    if (interrupted) return interrupted;
     if (response.outcome !== "passed" || !response.body) return { status: response.outcome === "blocked" ? "blocked" : response.outcome === "unavailable" ? "unavailable" : "failed", summary: untrustedSummary(response.detail), effectDisposition: response.effectDisposition };
     let observation: PipelineObservation;
     try { observation = parseObservation(response.body, request.target.head, host.host, repository.owner, repository.name); }
@@ -148,16 +150,17 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
     let logExcerpt = selected.summary ?? "The provider supplied no bounded check output for this failed context.";
     let logSource: "actions-job-log" | "check-output" = "check-output";
     if (selected.kind === "check" && selected.jobId) {
-      if (request.executionControl && (Date.parse(request.executionControl.deadline) <= Date.now() || await request.executionControl.isCancellationRequested())) {
-        return { status: Date.parse(request.executionControl.deadline) <= Date.now() ? "timed_out" : "cancelled", summary: "Hosted failure-log retrieval stopped before its network effect.", effectDisposition: "not_started" };
-      }
       const logGuard = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
       if (!logGuard.allowed) return { status: "blocked", summary: logGuard.reason, effectDisposition: "not_started" };
-      const logControl = abortControl(request);
+      const logControl = await createDurableAbortControl(request.executionControl, { fallbackDeadline: new Date(Date.now() + 30_000).toISOString() });
+      const logPreflight = cancellationOutcome(logControl, "Hosted failure-log retrieval stopped before its network effect.", "not_started");
+      if (logPreflight) { logControl.dispose(); return logPreflight; }
       let logResponse;
       try {
         logResponse = await this.network.request({ routeId: "github.actions-job-log", repositoryRoot: request.target.repositoryRoot, pathParameters: { jobId: selected.jobId }, signal: logControl.signal });
       } finally { logControl.dispose(); }
+      const logInterrupted = cancellationOutcome(logControl, "Hosted failure-log retrieval stopped while its network effect was in flight.", logResponse?.effectDisposition ?? "ambiguous");
+      if (logInterrupted) return logInterrupted;
       if (logResponse.outcome !== "passed" || !logResponse.body) {
         return { status: logResponse.outcome === "blocked" ? "blocked" : "unavailable", summary: `Selected exact-head Actions job ${selected.jobId} log is unavailable: ${untrustedSummary(logResponse.detail)}`, effectDisposition: logResponse.effectDisposition, data: { head: observation.oid, selectedIndex, failureCount: failures.length, repeatAvailable: failures.length > 1, selectedFailure: selected } };
       }
@@ -242,7 +245,15 @@ function diagnoseFailure(value: PipelineContext, excerpt: string): string {
 function validCursorEvent(value: PipelineFailureCursorEvent): boolean { return value?.version === 1 && typeof value.targetSnapshotId === "string" && value.targetSnapshotId.length <= 512 && /^[a-f0-9]{64}$/.test(value.seriesDigest) && Number.isSafeInteger(value.index) && value.index >= 0 && validTimestamp(value.selectedAt); }
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 function exactHost(value: string): string { const host = value.toLowerCase(); if (host.startsWith(".") || host.endsWith(".") || !host.includes(".") || host.split(".").some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) throw new Error("invalid GitHub host"); return host; }
-function abortControl(request: AdapterRequest): { readonly signal: AbortSignal; dispose(): void } { const controller = new AbortController(); const deadline = request.executionControl ? Date.parse(request.executionControl.deadline) : Date.now() + 30_000; const timer = setTimeout(() => controller.abort(), Math.max(1, deadline - Date.now())); timer.unref?.(); return { signal: controller.signal, dispose() { clearTimeout(timer); } }; }
+function cancellationOutcome(control: DurableAbortControl, summary: string, effectDisposition: NonNullable<AdapterOutcome["effectDisposition"]>): AdapterOutcome | undefined {
+  const reason = control.reason();
+  if (!reason) return undefined;
+  return {
+    status: reason === "deadline" ? "timed_out" : reason === "cancelled" ? "cancelled" : "unavailable",
+    summary,
+    effectDisposition
+  };
+}
 function observationData(outcome: AdapterOutcome): Readonly<Record<string, unknown>> { return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition ?? "ambiguous", data: outcome.data ?? {} }; }
 function combineDisposition(left: AdapterOutcome, right: AdapterOutcome): NonNullable<AdapterOutcome["effectDisposition"]> {
   const values = [left.effectDisposition, right.effectDisposition];

@@ -31,6 +31,7 @@ import type {
   PermitVerifier
 } from "../../../packages/control-plane/src/brokers.ts";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import { createDurableAbortControl } from "./execution-cancellation.ts";
 
 export const WINDOWS_SANDBOX_EXECUTABLE = "C:\\Windows\\System32\\WindowsSandbox.exe" as const;
 export const WINDOWS_SANDBOX_FEATURE_TOOL = "C:\\Windows\\System32\\dism.exe" as const;
@@ -1214,24 +1215,16 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
       ...(request.authority ? { authorityId: request.authority.id } : {})
     })) return { status: "blocked", summary: "Windows Sandbox denied an absent, expired, forged, or mismatched policy permit." };
     if (!request.effectGuard) return { status: "blocked", summary: "Windows Sandbox requires a host-owned final effect guard." };
-    if (request.executionControl && Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "Windows Sandbox refused an expired durable deadline." };
-    if (request.executionControl && await request.executionControl.isCancellationRequested()) return { status: "cancelled", summary: "Windows Sandbox refused a cancelled durable operation." };
-    const controller = new AbortController();
-    let poll: ReturnType<typeof setInterval> | undefined;
-    let deadline: ReturnType<typeof setTimeout> | undefined;
-    if (request.executionControl) {
-      const remaining = Math.max(1, Date.parse(request.executionControl.deadline) - Date.now());
-      deadline = setTimeout(() => controller.abort(), remaining);
-      poll = setInterval(() => {
-        void request.executionControl!.isCancellationRequested().then(
-          (cancelled) => { if (cancelled) controller.abort(); },
-          () => controller.abort()
-        );
-      }, 100);
+    const control = await createDurableAbortControl(request.executionControl);
+    if (control.signal.aborted) {
+      control.dispose();
+      if (control.reason() === "deadline") return { status: "timed_out", summary: "Windows Sandbox refused an expired durable deadline." };
+      if (control.reason() === "unavailable") return { status: "unavailable", summary: "Windows Sandbox could not verify durable cancellation state." };
+      return { status: "cancelled", summary: "Windows Sandbox refused a cancelled durable operation." };
     }
     const controlPlaneGuard: WindowsSandboxEffectGuard = {
       check: async (input) => {
-        if (controller.signal.aborted) return { allowed: false, reason: "Windows Sandbox durable operation was cancelled or expired." };
+        if (control.signal.aborted) return { allowed: false, reason: "Windows Sandbox durable operation was cancelled, expired, or became unverifiable." };
         const checked = await (request.effectGuard as EffectGuard).assertCurrent({
           action: request.action,
           operationId: request.operationId,
@@ -1250,7 +1243,7 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
         profile: request.profile === "rebuild_full_sandbox" ? "fresh_full_sandbox" : request.profile,
         expectedRecipeCatalogSha256: this.options.recipeCatalogDigest,
         expectedHelperSha256: this.options.helperDigest,
-        signal: controller.signal,
+        signal: control.signal,
         effectGuard: controlPlaneGuard
       });
       return {
@@ -1271,8 +1264,7 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
         }
       };
     } finally {
-      if (poll) clearInterval(poll);
-      if (deadline) clearTimeout(deadline);
+      control.dispose();
     }
   }
 }
