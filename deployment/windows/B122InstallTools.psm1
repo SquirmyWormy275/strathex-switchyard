@@ -108,6 +108,42 @@ function Restore-B122InstallStateSnapshot {
   return Write-B122InstallStateAtomic -InstallRoot $root -Current ([string]$Snapshot.current) -Previous $(if($null -eq $Snapshot.previous){$null}else{[string]$Snapshot.previous})
 }
 
+function Get-B122FileSnapshot {
+  param([Parameter(Mandatory=$true)][string]$Path)
+  $full = [IO.Path]::GetFullPath($Path)
+  if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+    return [pscustomobject]@{ exists=$false; bytes=$null }
+  }
+  return [pscustomobject]@{ exists=$true; bytes=[Convert]::ToBase64String([IO.File]::ReadAllBytes($full)) }
+}
+
+function Copy-B122FileAtomic {
+  param([Parameter(Mandatory=$true)][string]$Source,[Parameter(Mandatory=$true)][string]$Destination)
+  $sourceFull = [IO.Path]::GetFullPath($Source); $destinationFull = [IO.Path]::GetFullPath($Destination)
+  if (-not (Test-Path -LiteralPath $sourceFull -PathType Leaf)) { throw "The B122 source file is missing: $sourceFull" }
+  $parent = Split-Path -Parent $destinationFull; New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  $temporary = Join-Path $parent ('.b122-file-' + [guid]::NewGuid().ToString('N') + '.tmp')
+  try {
+    [IO.File]::WriteAllBytes($temporary,[IO.File]::ReadAllBytes($sourceFull))
+    Move-Item -LiteralPath $temporary -Destination $destinationFull -Force
+  } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force } }
+}
+
+function Restore-B122FileSnapshot {
+  param([Parameter(Mandatory=$true)][string]$Path,[Parameter(Mandatory=$true)]$Snapshot)
+  $full = [IO.Path]::GetFullPath($Path)
+  if (-not [bool]$Snapshot.exists) {
+    if (Test-Path -LiteralPath $full) { Remove-Item -LiteralPath $full -Force }
+    return
+  }
+  $parent = Split-Path -Parent $full; New-Item -ItemType Directory -Force -Path $parent | Out-Null
+  $temporary = Join-Path $parent ('.b122-restore-' + [guid]::NewGuid().ToString('N') + '.tmp')
+  try {
+    [IO.File]::WriteAllBytes($temporary,[Convert]::FromBase64String([string]$Snapshot.bytes))
+    Move-Item -LiteralPath $temporary -Destination $full -Force
+  } finally { if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force } }
+}
+
 function Invoke-B122AtomicActivation {
   param(
     [Parameter(Mandatory=$true)][string]$InstallRoot,
@@ -118,6 +154,7 @@ function Invoke-B122AtomicActivation {
     [Parameter(Mandatory=$true)][scriptblock]$ConfigureAutostart,
     [Parameter(Mandatory=$true)][scriptblock]$RestoreExtension,
     [Parameter(Mandatory=$true)][scriptblock]$RestoreAutostart,
+    [scriptblock]$RestoreRootTools = {},
     [Parameter(Mandatory=$true)][scriptblock]$RecoverPrior
   )
   $extensionAttempted = $false; $autostartAttempted = $false; $primary = $null; $rollbackErrors = New-Object Collections.Generic.List[string]
@@ -130,9 +167,14 @@ function Invoke-B122AtomicActivation {
   } catch {
     $primary = $_
     try { Restore-B122InstallStateSnapshot -InstallRoot $InstallRoot -Snapshot $PriorState | Out-Null } catch { $rollbackErrors.Add("install pointer: $($_.Exception.Message)") }
+    $rootToolsRestored = $true
+    try { & $RestoreRootTools } catch { $rootToolsRestored = $false; $rollbackErrors.Add("root launcher tooling: $($_.Exception.Message)") }
     if ($extensionAttempted) { try { & $RestoreExtension } catch { $rollbackErrors.Add("VS Code extension: $($_.Exception.Message)") } }
     if ($autostartAttempted) { try { & $RestoreAutostart } catch { $rollbackErrors.Add("autostart: $($_.Exception.Message)") } }
-    if ($null -ne $PriorState) { try { & $RecoverPrior } catch { $rollbackErrors.Add("prior companion: $($_.Exception.Message)") } }
+    if ($null -ne $PriorState) {
+      if ($rootToolsRestored) { try { & $RecoverPrior } catch { $rollbackErrors.Add("prior companion: $($_.Exception.Message)") } }
+      else { $rollbackErrors.Add('prior companion: recovery skipped because root launcher tooling could not be restored') }
+    }
     $suffix = if($rollbackErrors.Count){' Rollback errors: '+($rollbackErrors -join '; ')}else{''}
     throw "B122 activation failed: $($primary.Exception.Message).$suffix"
   }
@@ -164,4 +206,4 @@ function Stop-B122InstalledCompanion {
   }
 }
 
-Export-ModuleMember -Function Assert-B122ChildPath,Test-B122VersionId,Get-B122InstallState,Write-B122InstallStateAtomic,Repair-B122InterruptedInstall,Import-B122ValidatedBundle,Set-B122CurrentVersion,Restore-B122PreviousVersion,Restore-B122InstallStateSnapshot,Invoke-B122AtomicActivation,Remove-B122UnreferencedVersion,Get-B122CurrentBundle,Stop-B122InstalledCompanion
+Export-ModuleMember -Function Assert-B122ChildPath,Test-B122VersionId,Get-B122InstallState,Write-B122InstallStateAtomic,Repair-B122InterruptedInstall,Import-B122ValidatedBundle,Set-B122CurrentVersion,Restore-B122PreviousVersion,Restore-B122InstallStateSnapshot,Get-B122FileSnapshot,Copy-B122FileAtomic,Restore-B122FileSnapshot,Invoke-B122AtomicActivation,Remove-B122UnreferencedVersion,Get-B122CurrentBundle,Stop-B122InstalledCompanion

@@ -13,8 +13,6 @@ $versionId = Test-B122VersionId ([string]$release.sourceCommit)
 $candidatePath = Join-Path (Join-Path $root 'versions') $versionId
 $candidateExisted = Test-Path -LiteralPath $candidatePath -PathType Container
 $versionRoot = Import-B122ValidatedBundle -BundleRoot $bundle -InstallRoot $root
-Copy-Item -LiteralPath (Join-Path $bundle 'scripts\B122InstallTools.psm1') -Destination (Join-Path $root 'B122InstallTools.psm1') -Force
-Copy-Item -LiteralPath (Join-Path $bundle 'scripts\Invoke-B122Current.ps1') -Destination (Join-Path $root 'Invoke-B122Current.ps1') -Force
 $stagedValidator = Join-Path $versionRoot 'scripts\Test-B122ReleaseArtifact.ps1'
 if (-not (Test-Path -LiteralPath $stagedValidator -PathType Leaf)) { throw 'The staged B122 release validator is missing.' }
 $stagedReceipt = & $stagedValidator -BundleRoot $versionRoot | ConvertFrom-Json
@@ -29,8 +27,19 @@ if ($null -eq $prior -and $null -ne $code) {
 $runPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'; $runName = 'STRATHEX-SXSY-B122'
 $priorRunExists = $false; $priorRunValue = $null
 if(Test-Path -LiteralPath $runPath){$runProperties=Get-ItemProperty -LiteralPath $runPath; $runProperty=$runProperties.PSObject.Properties[$runName]; if($null -ne $runProperty){$priorRunValue=[string]$runProperty.Value;$priorRunExists=$true}}
+$rootModule = Join-Path $root 'B122InstallTools.psm1'; $rootLauncher = Join-Path $root 'Invoke-B122Current.ps1'
+$rootModuleSnapshot = Get-B122FileSnapshot -Path $rootModule; $rootLauncherSnapshot = Get-B122FileSnapshot -Path $rootLauncher
+$rootToolState = @{ installed=$false }
+$restoreRootTools = {
+  Restore-B122FileSnapshot -Path $rootModule -Snapshot $rootModuleSnapshot
+  Restore-B122FileSnapshot -Path $rootLauncher -Snapshot $rootLauncherSnapshot
+  $rootToolState.installed = $false
+}
 Stop-B122InstalledCompanion -InstallRoot $root
 try {
+  $rootToolState.installed = $true
+  Copy-B122FileAtomic -Source (Join-Path $bundle 'scripts\B122InstallTools.psm1') -Destination $rootModule
+  Copy-B122FileAtomic -Source (Join-Path $bundle 'scripts\Invoke-B122Current.ps1') -Destination $rootLauncher
   $installExtension = { if($null -ne $code){ & $code --install-extension (Join-Path $versionRoot 'extension\sxsy-b122-switchyard.vsix') --force; if($LASTEXITCODE -ne 0){throw 'VS Code refused the reviewed B122 extension package.'} } }
   $waitForHealth = { & (Join-Path $root 'Invoke-B122Current.ps1') -InstallRoot $root -WaitForHealth }
   $configureAutostart = {
@@ -49,10 +58,10 @@ try {
   }
   $restoreAutostart = { if($SkipAutostart){return}; if($priorRunExists){New-Item -Path $runPath -Force|Out-Null;Set-ItemProperty -Path $runPath -Name $runName -Value $priorRunValue}else{Remove-ItemProperty -Path $runPath -Name $runName -ErrorAction SilentlyContinue} }
   $recoverPrior = { & (Join-Path $root 'Invoke-B122Current.ps1') -InstallRoot $root }
-  Invoke-B122AtomicActivation -InstallRoot $root -VersionId $versionId -PriorState $prior -InstallExtension $installExtension -WaitForHealth $waitForHealth -ConfigureAutostart $configureAutostart -RestoreExtension $restoreExtension -RestoreAutostart $restoreAutostart -RecoverPrior $recoverPrior | Out-Null
+  Invoke-B122AtomicActivation -InstallRoot $root -VersionId $versionId -PriorState $prior -InstallExtension $installExtension -WaitForHealth $waitForHealth -ConfigureAutostart $configureAutostart -RestoreExtension $restoreExtension -RestoreAutostart $restoreAutostart -RestoreRootTools $restoreRootTools -RecoverPrior $recoverPrior | Out-Null
 } catch {
+  if($rootToolState.installed){ try{& $restoreRootTools}catch{} }
   if(-not $candidateExisted){ try{Remove-B122UnreferencedVersion -InstallRoot $root -VersionId $versionId}catch{} }
-  if($null -eq $prior){ Remove-Item -LiteralPath (Join-Path $root 'B122InstallTools.psm1') -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath (Join-Path $root 'Invoke-B122Current.ps1') -Force -ErrorAction SilentlyContinue }
   throw
 }
 [ordered]@{ schema='sxsy-b122.install-result'; version=1; status='installed'; sourceCommit=[string]$release.sourceCommit; installRoot=$root; previous=if($null -eq $prior){$null}else{[string]$prior.current} } | ConvertTo-Json -Compress

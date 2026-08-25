@@ -1,11 +1,19 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const firmwareRoot = dirname(fileURLToPath(import.meta.url));
 const root = resolve(firmwareRoot, "..");
+const requiredCompiler = process.argv.includes("--require-c-compiler");
+const receiptArgument = process.argv.indexOf("--receipt");
+const receiptPath = receiptArgument >= 0 ? process.argv[receiptArgument + 1] : undefined;
+const compilerArgument = process.argv.indexOf("--c-compiler");
+const explicitCompiler = compilerArgument >= 0 ? process.argv[compilerArgument + 1] : undefined;
+if (receiptArgument >= 0 && (!receiptPath || receiptPath.startsWith("--"))) throw new Error("--receipt requires one output path.");
+if (compilerArgument >= 0 && (!explicitCompiler || explicitCompiler.startsWith("--"))) throw new Error("--c-compiler requires one exact executable path.");
 const checks = [
   ["manifest generation", process.execPath, ["packages/protocol/scripts/generate-manifest.mjs"]],
   ["TypeScript protocol simulator", process.execPath, ["--experimental-transform-types", "--test", "packages/protocol/test/b122.test.ts", "packages/protocol/test/raw-hid.test.ts", "apps/windows-companion/test/raw-hid-protocol.test.ts"]],
@@ -60,13 +68,17 @@ if (dotnet?.status === 0 && dotnet.stdout.trim()) {
   } else process.stdout.write(".NET SDK/PowerShell compiler unavailable; Windows helper source/static boundary checks passed.\n");
 }
 
-const compilerCandidates = process.platform === "win32"
+const ambientCompilerCandidates = process.platform === "win32"
   ? [["clang", ["-std=c11", "-Wall", "-Wextra", "-Werror"]], ["gcc", ["-std=c11", "-Wall", "-Wextra", "-Werror"]]]
   : [["cc", ["-std=c11", "-Wall", "-Wextra", "-Werror"]], ["clang", ["-std=c11", "-Wall", "-Wextra", "-Werror"]], ["gcc", ["-std=c11", "-Wall", "-Wextra", "-Werror"]]];
+const compilerCandidates = explicitCompiler
+  ? [[resolve(explicitCompiler), ["-std=c11", "-Wall", "-Wextra", "-Werror"]]]
+  : ambientCompilerCandidates;
 let compiled = false;
+let compilerEvidence;
 const temporary = mkdtempSync(join(tmpdir(), "b122-firmware-"));
 try {
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && !explicitCompiler) {
     const vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
     if (existsSync(vswhere)) {
       const found = spawnSync(vswhere, ["-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath"], { encoding: "utf8" });
@@ -75,13 +87,16 @@ try {
       if (vcvars && existsSync(vcvars)) {
         const executable = join(temporary, "b122-selftest.exe");
         const commandFile = join(temporary, "compile-b122.cmd");
-        writeFileSync(commandFile, `@call "${vcvars}" >nul\r\n@if errorlevel 1 exit /b %errorlevel%\r\n@cl /nologo /std:c11 /W4 /WX /Fe:"${executable}" "${join(root, "firmware/protocol/b122_protocol.c")}" "${join(root, "firmware/simulator/protocol_selftest.c")}"\r\n`);
+        const versionFile = join(temporary, "compiler-version.txt");
+        writeFileSync(commandFile, `@call "${vcvars}" >nul\r\n@if errorlevel 1 exit /b %errorlevel%\r\n@cl /nologo /Bv > "${versionFile}" 2>&1\r\n@cl /nologo /std:c11 /W4 /WX /Fe:"${executable}" "${join(root, "firmware/protocol/b122_protocol.c")}" "${join(root, "firmware/simulator/protocol_selftest.c")}"\r\n`);
         const build = spawnSync(join(process.env.SystemRoot ?? "C:\\Windows", "System32", "cmd.exe"), ["/d", "/c", commandFile], { cwd: temporary, encoding: "utf8" });
         if (build.status !== 0) throw new Error(`C protocol build failed with MSVC\n${build.stdout}\n${build.stderr}`);
         const run = spawnSync(executable, [], { encoding: "utf8" });
         if (run.status !== 0) throw new Error(`C protocol self-test failed\n${run.stdout}\n${run.stderr}`);
         process.stdout.write("C11 protocol compile/self-test (MSVC Build Tools): passed\n");
         compiled = true;
+        const versionOutput = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "MSVC Build Tools";
+        compilerEvidence = compilerFingerprint("msvc", ["/std:c11", "/W4", "/WX"], versionOutput);
       }
     }
   }
@@ -95,9 +110,44 @@ try {
     if (run.status !== 0) throw new Error(`C protocol self-test failed\n${run.stdout}\n${run.stderr}`);
     process.stdout.write(`C11 protocol compile/self-test (${compiler}): passed\n`);
     compiled = true;
+    compilerEvidence = compilerFingerprint(basename(compiler), flags, `${probe.stdout ?? ""}\n${probe.stderr ?? ""}`.trim());
     break;
   }
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
-if (!compiled) process.stdout.write("C compiler unavailable; deterministic manifest, TypeScript framing, and QMK/Vial static checks passed.\n");
+const verificationReceipt = {
+  schema: "sxsy-b122.firmware-verification",
+  version: 1,
+  status: compiled ? "passed" : "static-only",
+  compilerRequired: requiredCompiler,
+  compiled,
+  protocolSelfTest: compiled,
+  compiler: compilerEvidence ?? null,
+  hardwareAccessed: false,
+};
+if (receiptPath) writeJsonAtomic(resolve(receiptPath), verificationReceipt);
+if (!compiled) {
+  if (requiredCompiler) throw new Error("Evidence-eligible firmware verification requires a working C11 compiler and portable protocol self-test.");
+  process.stdout.write("C compiler unavailable; deterministic manifest, TypeScript framing, and QMK/Vial static checks passed.\n");
+}
+
+function compilerFingerprint(kind, flags, versionOutput) {
+  const normalized = versionOutput.replaceAll("\r\n", "\n").trim();
+  return {
+    kind,
+    flags,
+    versionOutputSha256: createHash("sha256").update(normalized, "utf8").digest("hex"),
+    fingerprintSha256: createHash("sha256").update(JSON.stringify({ kind, flags, normalized }), "utf8").digest("hex"),
+  };
+}
+
+function writeJsonAtomic(path, value) {
+  const temporaryPath = `${path}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporaryPath, `${JSON.stringify(value)}\n`, { encoding: "utf8", flag: "wx" });
+    renameSync(temporaryPath, path);
+  } finally {
+    rmSync(temporaryPath, { force: true });
+  }
+}
