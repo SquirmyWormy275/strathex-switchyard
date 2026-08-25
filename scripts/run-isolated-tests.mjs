@@ -30,7 +30,7 @@ const controlPlaneTests = [
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
+  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "containment-release", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "durable-credentials", "main-shutdown",
   "durable-endpoint", "git-review", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
@@ -44,8 +44,8 @@ const companionTests = [
   "repository-runtime-release-package", "router", "runtime-provisioning",
   "runtime-registry", "sandbox-installation", "sandbox-lifecycle-helper", "service", "session-freshness", "stdio",
   "voice-gateway", "voice-helper-source", "voice-runtime", "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
-  "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-voice-service"
-].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime" }));
+  "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-context-preparation", "workflow-voice-service"
+].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime", ...(name === "companion-lifecycle-helper" ? { timeoutMs: 240_000 } : {}) }));
 const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
   "default-branch review creates a hook-disabled feature branch and requires a fresh target before committing",
@@ -54,7 +54,7 @@ const mediatedGitTests = [
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
-const providerHostTests = ["config", "council-resources", "redaction", "release", "server", "service", "tls-network-e2e"]
+const providerHostTests = ["config", "council-resources", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
   .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 75_000 } : {}) }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
@@ -71,6 +71,16 @@ export const requiredGroups = [
     file: "deployment/windows/Test-B122InstallLifecycle.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122InstallLifecycle.ps1"]
+  }, {
+    file: "deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5",
+    executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122TrustedBootstrap.ps1"],
+    timeoutMs: 240_000
+  }, {
+    file: "deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh",
+    executable: "pwsh.exe",
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", "deployment/windows/Test-B122TrustedBootstrap.ps1"],
+    timeoutMs: 240_000
   }, {
     file: "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -176,7 +186,7 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 /** A result is recorded only after close proves this owned child has exited. */
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000, cleanup = rm, sourceEnvironment = process.env } = {}) {
   const effectiveTimeoutMs = group.timeoutMs ?? timeoutMs;
-  if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 120_000) throw new Error("An isolated test timeout must be an integer between 1 and 120000 milliseconds.");
+  if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 300_000) throw new Error("An isolated test timeout must be an integer between 1 and 300000 milliseconds.");
   const childExecutable = group.executable ?? executable;
   const isTestRun = !group.args;
   const args = group.args ? [...group.args] : ["--experimental-transform-types", "--test", "--test-reporter=tap"]; const pattern = group.args ? undefined : patternArgument(group.pattern); if (pattern) args.push("--test-name-pattern", pattern); if (!group.args) args.push(group.file);

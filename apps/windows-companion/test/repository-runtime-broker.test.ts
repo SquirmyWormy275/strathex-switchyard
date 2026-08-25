@@ -182,6 +182,65 @@ test("debug routes one exact attested launch configuration through the authentic
   assert.equal(queued.length, 1);
 });
 
+test("Alt Run queues stop for the exact durable VS Code debug origin instead of an unrelated process supervisor", async () => {
+  const queued: unknown[] = [];
+  let runtimeStopCalls = 0;
+  const runtime = {
+    allowsManagedStop(action: string): boolean { return action === "debug_target"; },
+    async execute(): Promise<RepositoryRuntimeResult> { runtimeStopCalls += 1; return { status: "failed", summary: "must not use the process supervisor for VS Code debug" }; }
+  };
+  const debugSession = {
+    id: "vscode-window:debug-session:debug-1",
+    provider: "generic" as const,
+    surface: "vscode_window" as const,
+    capabilities: ["registered" as const],
+    status: "running" as const,
+    workspaceRoot: target.repositoryRoot,
+    targetSnapshotId: target.id,
+    plannedFiles: [],
+    lastHeartbeat: "2026-08-25T00:00:00.000Z",
+    adapterVersion: "1.0.0",
+    metadata: {
+      "sxsy-b122.kind": "debug-session",
+      "sxsy-b122.debugSessionId": "debug-1",
+      "sxsy-b122.debugOriginOperationId": "operation-debug-origin",
+      "sxsy-b122.debugOriginSessionId": "git-session-1",
+      "sxsy-b122.debugWorkspaceRoot": target.repositoryRoot,
+      "sxsy-b122.debugConfiguration": "Launch test"
+    }
+  };
+  const broker = new RepositoryRuntimeExecutionBroker(
+    { async resolve() { return runtime as unknown as RepositoryRuntime; } },
+    { hostActions: { async enqueue(input, plan) {
+      queued.push({ input, plan });
+      return {
+        version: 1, id: `host-action:${"2".repeat(64)}`, operationId: input.operationId!, commandAction: input.definition.action,
+        hostAction: plan.hostAction, workspaceRoot: input.target?.repositoryRoot, debugConfiguration: plan.debugConfiguration,
+        debugSessionId: plan.debugSessionId, debugOriginOperationId: plan.debugOriginOperationId,
+        createdAt: "2026-08-25T00:00:00.000Z", expiresAt: "2026-08-25T00:01:00.000Z"
+      };
+    } } }
+  );
+  const outcome = await broker.execute(request({
+    action: "stop_managed_run",
+    operationId: "operation-debug-stop",
+    recipe: repositoryRuntimeExecutionRecipe("stop_managed_run", target),
+    session: debugSession
+  }));
+  assert.equal(outcome.status, "running");
+  assert.equal(outcome.data?.hostActionKind, "stop_vscode_debug");
+  assert.equal(outcome.data?.hostActionDebugSessionId, "debug-1");
+  assert.equal(outcome.data?.hostActionDebugOriginOperationId, "operation-debug-origin");
+  assert.equal(outcome.data?.hostActionWorkspaceRoot, target.repositoryRoot);
+  assert.equal(runtimeStopCalls, 0);
+  assert.equal(queued.length, 1);
+
+  const changedOrigin = { ...debugSession, metadata: { ...debugSession.metadata, "sxsy-b122.debugOriginOperationId": "" } };
+  const blocked = await broker.execute(request({ action: "stop_managed_run", recipe: repositoryRuntimeExecutionRecipe("stop_managed_run", target), session: changedOrigin }));
+  assert.notEqual(blocked.status, "running");
+  assert.equal(queued.length, 1);
+});
+
 test("venv completion selects only the exact repo-local interpreter through the authenticated VS Code host", async () => {
   const interpreter = `${target.repositoryRoot}\\.venv\\Scripts\\python.exe`;
   const runtime = { async execute(): Promise<RepositoryRuntimeResult> { return { status: "completed", summary: "venv ready", pythonInterpreter: interpreter }; } };

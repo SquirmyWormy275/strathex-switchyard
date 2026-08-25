@@ -222,7 +222,7 @@ const forbiddenEnvironmentName = /(?:^|_)(?:PASSWORD|PASSWD|SECRET|TOKEN|CREDENT
 const filesystemTraversal = /(?:^|[\\/])\.\.(?:[\\/]|$)/;
 const supportedActionSet = new Set<string>([...repositoryProcessActions, "stop_managed_run"]);
 const processActionSet = new Set<string>(repositoryProcessActions);
-const managedActionSet = new Set<string>(["run_target", "launch_web_app"]);
+const managedActionSet = new Set<string>(["run_target", "debug_target", "launch_web_app"]);
 const disposableRequired = new Set<RepositoryProcessAction>(["pipeline_local_gate", "pipeline_clean_reproduction", "release_shield"]);
 
 class RuntimeUnavailableError extends Error {}
@@ -712,6 +712,11 @@ export class RepositoryRuntime {
     }
     if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type." };
     return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`);
+  }
+
+  allowsManagedStop(action: "run_target" | "debug_target" | "launch_web_app"): boolean {
+    const recipe = this.verified.manifest.recipes.stop_managed_run;
+    return recipe?.kind === "stop" && recipe.managedActions.includes(action);
   }
 
   private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string): Promise<RepositoryRuntimeResult> {

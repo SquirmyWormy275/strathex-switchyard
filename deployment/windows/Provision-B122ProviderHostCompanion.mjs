@@ -4,13 +4,14 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const artifactPath = argument("--artifact");
-const bundleRoot = resolve(argument("--bundle-root"));
-const replaceExisting = process.argv.includes("--replace-existing");
+const parsedArguments = parseArguments(process.argv.slice(2));
+const artifactPath = parsedArguments.artifactPath;
+const bundleRoot = parsedArguments.bundleRoot;
+const replaceExisting = parsedArguments.replaceExisting;
 const transportModule = resolve(bundleRoot, "extension", "dist", "named-pipe-transport.js");
 const { ProvisionedNamedPipeJsonLineTransport } = await import(pathToFileURL(transportModule).href);
 const artifact = parseArtifact(JSON.parse(await readFile(artifactPath, "utf8")));
-const transport = new ProvisionedNamedPipeJsonLineTransport();
+const transport = new ProvisionedNamedPipeJsonLineTransport(parsedArguments.configurationPath);
 const credential = await request(transport, "credential.provision", {
   reference: artifact.reference,
   repositoryRoot: artifact.repositoryRoot,
@@ -37,7 +38,26 @@ function parseArtifact(value) {
     || !absolute(value.networkPolicyPath) || !absolute(value.providerConfigurationPath) || typeof value.tlsSpkiSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.tlsSpkiSha256)) fail();
   return value;
 }
-function argument(name) { const index = process.argv.indexOf(name); const value = index >= 0 ? process.argv[index + 1] : undefined; if (!value || !isAbsolute(value) || /[\0\r\n]/.test(value)) throw new Error(`${name} requires one absolute path.`); return resolve(value); }
+function parseArguments(values) {
+  const parsed = { artifactPath: undefined, bundleRoot: undefined, configurationPath: undefined, replaceExisting: false };
+  for (let index = 0; index < values.length; index += 1) {
+    const name = values[index];
+    if (name === "--replace-existing") {
+      if (parsed.replaceExisting) throw new Error("--replace-existing may be supplied at most once.");
+      parsed.replaceExisting = true;
+      continue;
+    }
+    if (name !== "--artifact" && name !== "--bundle-root" && name !== "--configuration") throw new Error(`Unsupported provider provisioning argument: ${name ?? "<missing>"}.`);
+    const value = values[++index];
+    if (!value || !isAbsolute(value) || /[\0\r\n"]/u.test(value)) throw new Error(`${name} requires one absolute path.`);
+    const property = name === "--artifact" ? "artifactPath" : name === "--bundle-root" ? "bundleRoot" : "configurationPath";
+    if (parsed[property] !== undefined) throw new Error(`${name} may be supplied at most once.`);
+    parsed[property] = resolve(value);
+  }
+  if (!parsed.artifactPath) throw new Error("--artifact requires one absolute path.");
+  if (!parsed.bundleRoot) throw new Error("--bundle-root requires one absolute path.");
+  return parsed;
+}
 function absolute(value) { return typeof value === "string" && isAbsolute(value) && !/[\0\r\n]/.test(value); }
 function exact(value, keys) { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
 function record(value) { return typeof value === "object" && value !== null && !Array.isArray(value); }

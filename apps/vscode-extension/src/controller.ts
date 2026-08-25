@@ -1,6 +1,7 @@
-import { delimiter, dirname, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
@@ -25,23 +26,55 @@ import {
   type ForwardedHostActionAuthorization,
   type LocalHostAction,
   type ManagedTerminalProfileSummary,
+  type PlanApprovalWorkflowReview,
   type ProviderDesktopId,
   type ReviewedGitMutation
 } from "./companion-bridge.ts";
 import type {
   DebugConfigurationLike,
   DebugSessionLike,
+  DisposableLike,
   ExtensionContextLike,
   QuickPickItemLike,
   TerminalLike,
   VscodeLike
 } from "./vscode-like.ts";
 
+const acceptedExtensionPackageNames = new Set([
+  "@strathex/switchyard-vscode",
+  "strathex-switchyard-b122"
+]);
+
+/** Validate the reviewed source identity or the release builder's VSIX name. */
+export function exactExtensionPackageVersion(extensionPath: string): string {
+  if (typeof extensionPath !== "string" || !isAbsolute(extensionPath)) {
+    throw new Error("The installed SXSY-B122 VS Code package root is invalid.");
+  }
+  let packageJson: { readonly name?: unknown; readonly publisher?: unknown; readonly main?: unknown; readonly version?: unknown };
+  try {
+    packageJson = JSON.parse(readFileSync(join(extensionPath, "package.json"), "utf8")) as typeof packageJson;
+  } catch {
+    throw new Error("The installed SXSY-B122 VS Code package identity is unreadable.");
+  }
+  if (
+    typeof packageJson.name !== "string"
+    || !acceptedExtensionPackageNames.has(packageJson.name)
+    || packageJson.publisher !== "SquirmyWormy275"
+    || packageJson.main !== "./dist/extension.js"
+    || typeof packageJson.version !== "string"
+    || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(packageJson.version)
+  ) {
+    throw new Error("The installed SXSY-B122 VS Code package identity is invalid.");
+  }
+  return packageJson.version;
+}
+
 const windowStateKey = "sxsy-b122.managedWindow";
 const selectedTargetStateKey = "sxsy-b122.selectedGitTarget";
 const vscodeRepeatStateKey = "sxsy-b122.vscodeRepeat";
 const voiceRepeatStateKey = "sxsy-b122.voiceRepeat";
 const pipelineFailureCursorStateKey = "sxsy-b122.pipelineFailureCursor";
+const debugBindingStateKey = "sxsy-b122.debugBindings.v1";
 const highConsequenceActions = ["council_automatic", "pr_merge", "direct_main", "lfg", "repair_mission", "emergency_containment", "full_sandbox", "rebuild_full_sandbox", "quarantine", "containment_release"] as const;
 const providerDesktopIds = ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"] as const satisfies readonly ProviderDesktopId[];
 
@@ -57,6 +90,34 @@ interface TrackedTerminal {
   readonly adoptionKey: string;
   adopted: boolean;
   session: ExtensionManagedSession;
+}
+
+interface StoredDebugBinding {
+  readonly version: 1;
+  readonly bindingId: string;
+  readonly originOperationId: string;
+  readonly originSessionId: string;
+  readonly workspaceRoot: string;
+  readonly configuration: string;
+  readonly targetSnapshotId?: string;
+  readonly startedAt: string;
+  readonly status: "starting" | "running" | "stopping";
+  readonly debugSessionId?: string;
+  readonly managedSessionId?: string;
+}
+
+interface PendingDebugStart {
+  readonly bindingId: string;
+  readonly promise: Promise<StoredDebugBinding>;
+  resolve(binding: StoredDebugBinding): void;
+  reject(error: Error): void;
+}
+
+interface PendingDebugStop {
+  readonly debugSessionId: string;
+  readonly promise: Promise<void>;
+  resolve(): void;
+  reject(error: Error): void;
 }
 
 export interface ManagedSessionControllerOptions {
@@ -79,6 +140,8 @@ export interface ManagedSessionControllerOptions {
   readonly managedTerminalReceiptFactory?: ManagedTerminalReceiptFactory;
   /** Consecutive normal-press gesture window; bounded because firmware repeat timing is not yet accepted. */
   readonly repeatWindowMs?: number;
+  /** Bound for observing the exact VS Code debug start/termination event. */
+  readonly debugLifecycleTimeoutMs?: number;
 }
 
 export interface ManagedTerminalLaunchReceipt {
@@ -122,83 +185,177 @@ export class ManagedSessionController {
   private readonly managedTerminalHealthMs: number;
   private readonly managedTerminalReceiptFactory: ManagedTerminalReceiptFactory;
   private readonly repeatWindowMs: number;
+  private readonly debugLifecycleTimeoutMs: number;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
   private readonly closedTerminals = new WeakSet<TerminalLike>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
   private readonly debugSessionIds = new WeakMap<DebugSessionLike, string>();
+  private readonly debugSessionObjects = new Map<string, DebugSessionLike>();
+  private readonly debugBindings = new Map<string, StoredDebugBinding>();
+  private readonly pendingDebugStarts = new Map<string, PendingDebugStart>();
+  private readonly pendingDebugStops = new Map<string, PendingDebugStop>();
   private readonly sessions = new Map<string, ExtensionManagedSession>();
   private started = false;
   private windowSessionId?: string;
   private gitRoots: readonly GitRootRegistration[] = [];
+  private rawBridge: ExtensionCompanionBridge;
   private bridge: ExtensionCompanionBridge;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
   private hardwareSignalTimer?: ReturnType<typeof setTimeout>;
   private hardwareSignalInFlight = false;
+  private hardwareSignalTask?: Promise<void>;
   private sessionHeartbeatTimer?: ReturnType<typeof setTimeout>;
   private sessionHeartbeatInFlight = false;
+  private sessionHeartbeatTask?: Promise<void>;
+  private startTask?: Promise<void>;
+  private reconnectTask?: Promise<boolean>;
+  private lifecycleGeneration = 0;
+  private acceptingAdmissions = false;
+  private readonly admissionContext = new AsyncLocalStorage<number>();
+  private readonly admittedTasks = new Set<Promise<unknown>>();
+  private readonly lifecycleDisposables: DisposableLike[] = [];
   private readonly observedNotificationStatus = new Map<string, ExtensionManagedSession["status"]>();
   private readonly deferredHostCommands = new Map<string, string>();
 
   constructor(vscode: VscodeLike, context: ExtensionContextLike, bridge: ExtensionCompanionBridge, options: ManagedSessionControllerOptions = {}) {
     this.vscode = vscode;
     this.context = context;
-    this.bridge = bridge;
+    this.rawBridge = bridge;
+    this.bridge = this.guardBridge(bridge);
     this.now = options.now ?? (() => new Date().toISOString());
     let counter = 0;
     this.idFactory = options.idFactory ?? (() => `vscode-${Date.now().toString(36)}-${++counter}`);
-    this.extensionVersion = options.extensionVersion ?? "0.2.0";
+    this.extensionVersion = boundedAdapterVersion(options.extensionVersion ?? "unpackaged-test");
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
-    this.openExternal = options.openExternal ?? (async () => false);
-    this.executeCommand = options.executeCommand ?? (async (command) => {
+    const openExternal = options.openExternal ?? (async () => false);
+    this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
+    const executeCommand = options.executeCommand ?? (async (command: string) => {
       if (!this.vscode.commands.executeCommand) throw new Error("The VS Code host command boundary is unavailable.");
       await this.vscode.commands.executeCommand(command);
     });
-    this.sealSecret = options.sealSecret;
+    this.executeCommand = async (command) => { this.assertAdmissionActive(); await executeCommand(command); };
+    this.sealSecret = options.sealSecret ? async (cleartext) => { this.assertAdmissionActive(); return options.sealSecret!(cleartext); } : undefined;
     this.heartbeatIntervalMs = boundedHeartbeatInterval(options.heartbeatIntervalMs ?? 30_000);
     this.managedTerminalHealthMs = boundedManagedTerminalHealth(options.managedTerminalHealthMs ?? 500);
     this.managedTerminalReceiptFactory = options.managedTerminalReceiptFactory ?? reserveManagedTerminalReceipt;
     this.repeatWindowMs = boundedRepeatWindow(options.repeatWindowMs ?? 1_500);
+    this.debugLifecycleTimeoutMs = boundedDebugLifecycleTimeout(options.debugLifecycleTimeoutMs ?? 5_000);
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
   attachBridge(bridge: ExtensionCompanionBridge): void {
-    this.bridge = bridge;
+    this.rawBridge = bridge;
+    this.bridge = this.guardBridge(bridge);
     this.scheduleReconnect(0);
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
+    this.acceptingAdmissions = false;
+    this.started = false;
+    this.lifecycleGeneration += 1;
+    for (const disposable of this.lifecycleDisposables.splice(0)) {
+      try { disposable.dispose(); } catch { /* disposal is best effort; the generation fence is authoritative */ }
+    }
     this.stopReconnect();
     if (this.sessionHeartbeatTimer) clearTimeout(this.sessionHeartbeatTimer);
     this.sessionHeartbeatTimer = undefined;
-    this.sessionHeartbeatInFlight = false;
     if (this.hardwareSignalTimer) clearTimeout(this.hardwareSignalTimer);
     this.hardwareSignalTimer = undefined;
-    this.hardwareSignalInFlight = false;
-    this.started = false;
+    for (const pending of this.pendingDebugStarts.values()) pending.reject(new Error("VS Code deactivated before the exact debug start event settled."));
+    for (const pending of this.pendingDebugStops.values()) pending.reject(new Error("VS Code deactivated before the exact debug termination event settled."));
+    const tasks: Promise<unknown>[] = [];
+    for (const task of [this.startTask, this.reconnectTask, this.sessionHeartbeatTask, this.hardwareSignalTask, ...this.admittedTasks]) if (task) tasks.push(task);
+    await Promise.allSettled(tasks);
   }
 
-  async start(): Promise<void> {
-    if (this.started) return;
+  start(): Promise<void> {
+    if (this.started) return this.startTask ?? Promise.resolve();
     this.started = true;
+    this.acceptingAdmissions = true;
+    this.lifecycleGeneration += 1;
+    const generation = this.lifecycleGeneration;
     this.registerCommands();
-    this.context.subscriptions.push(
-      this.vscode.window.onDidOpenTerminal((terminal) => { void this.registerTerminal(terminal); }),
-      this.vscode.window.onDidCloseTerminal((terminal) => { this.closedTerminals.add(terminal); void this.markTerminalClosed(terminal); }),
-      this.vscode.workspace.onDidChangeWorkspaceFolders(() => { void this.refreshWorkspaceRegistration(); }),
-      this.vscode.debug.onDidStartDebugSession((session) => { void this.registerDebugSession(session); }),
-      this.vscode.debug.onDidTerminateDebugSession((session) => { void this.markDebugSessionEnded(session); }),
+    this.ownLifecycleDisposables(
+      this.vscode.window.onDidOpenTerminal((terminal) => this.scheduleLifecycleEvent((admittedGeneration) => this.registerTerminal(terminal, admittedGeneration))),
+      this.vscode.window.onDidCloseTerminal((terminal) => this.scheduleLifecycleEvent((admittedGeneration) => { this.closedTerminals.add(terminal); return this.markTerminalClosed(terminal, admittedGeneration); })),
+      this.vscode.workspace.onDidChangeWorkspaceFolders(() => this.scheduleLifecycleEvent((admittedGeneration) => this.refreshWorkspaceRegistration(admittedGeneration).then(() => undefined))),
+      this.vscode.debug.onDidStartDebugSession((session) => this.scheduleLifecycleEvent((admittedGeneration) => this.registerDebugSession(session, admittedGeneration))),
+      this.vscode.debug.onDidTerminateDebugSession((session) => this.scheduleLifecycleEvent((admittedGeneration) => this.markDebugSessionEnded(session, admittedGeneration))),
       this.vscode.window.onDidChangeWindowState((state) => {
+        if (!this.started || !this.acceptingAdmissions) return;
         if (state.focused) this.scheduleHardwareSignalPoll(0);
         else if (this.hardwareSignalTimer) { clearTimeout(this.hardwareSignalTimer); this.hardwareSignalTimer = undefined; }
       })
     );
 
-    await this.refreshWorkspaceRegistration();
-    for (const terminal of this.vscode.window.terminals) await this.registerTerminal(terminal);
-    await this.registerDebugConfigurations();
-    await this.refreshSessionNotifications();
+    const task = this.runInGeneration(generation, () => this.initializeStartedGeneration(generation));
+    this.startTask = task;
+    const clear = () => { if (this.startTask === task) this.startTask = undefined; };
+    void task.then(clear, clear);
+    return task;
+  }
+
+  private async initializeStartedGeneration(generation: number): Promise<void> {
+    await this.refreshWorkspaceRegistration(generation);
+    if (!this.isActiveGeneration(generation)) return;
+    for (const terminal of this.vscode.window.terminals) {
+      await this.registerTerminal(terminal, generation);
+      if (!this.isActiveGeneration(generation)) return;
+    }
+    await this.registerDebugConfigurations(generation);
+    if (!this.isActiveGeneration(generation)) return;
+    await this.recoverDebugBindings(generation);
+    if (!this.isActiveGeneration(generation)) return;
+    await this.refreshSessionNotifications(generation);
+    if (!this.isActiveGeneration(generation)) return;
     this.scheduleSessionHeartbeat();
     this.scheduleHardwareSignalPoll(0);
+  }
+
+  private isActiveGeneration(generation: number): boolean {
+    return this.started && this.acceptingAdmissions && this.lifecycleGeneration === generation;
+  }
+
+  private assertAdmissionActive(): void {
+    const generation = this.admissionContext.getStore();
+    if (generation !== undefined && !this.isActiveGeneration(generation)) throw new Error("The SXSY-B122 extension lifecycle stopped before this effect boundary.");
+  }
+
+  private runInGeneration<T>(generation: number, work: () => Promise<T>): Promise<T> {
+    return this.admissionContext.run(generation, async () => { this.assertAdmissionActive(); return work(); });
+  }
+
+  private admitLifecycleTask<T>(work: (generation: number) => Promise<T>): Promise<T> {
+    const generation = this.lifecycleGeneration;
+    if (!this.isActiveGeneration(generation)) return Promise.reject(new Error("The SXSY-B122 extension is stopping and cannot admit another operation."));
+    const task = Promise.resolve().then(() => this.runInGeneration(generation, () => work(generation)));
+    this.admittedTasks.add(task);
+    const clear = () => { this.admittedTasks.delete(task); };
+    void task.then(clear, clear);
+    return task;
+  }
+
+  private ownLifecycleDisposables(...disposables: DisposableLike[]): void {
+    this.lifecycleDisposables.push(...disposables);
+    this.context.subscriptions.push(...disposables);
+  }
+
+  private scheduleLifecycleEvent(work: (generation: number) => Promise<unknown>): Promise<void> {
+    return this.admitLifecycleTask(work).then(() => undefined, () => undefined);
+  }
+
+  private registerAdmittedCommand(command: string, callback: (argument: unknown, generation: number) => Promise<void>): DisposableLike {
+    return this.vscode.commands.registerCommand(command, (argument: unknown) => this.admitLifecycleTask((generation) => callback(argument, generation)));
+  }
+
+  private guardBridge(bridge: ExtensionCompanionBridge): ExtensionCompanionBridge {
+    return new Proxy(bridge, {
+      get: (target, property, receiver) => {
+        const value = Reflect.get(target, property, receiver) as unknown;
+        if (typeof value !== "function") return value;
+        return (...args: readonly unknown[]) => { this.assertAdmissionActive(); return Reflect.apply(value, target, args); };
+      }
+    }) as ExtensionCompanionBridge;
   }
 
   /** Test and operator-visible snapshot; it never claims mediation on its own. */
@@ -212,62 +369,62 @@ export class ManagedSessionController {
   }
 
   private registerCommands(): void {
-    this.context.subscriptions.push(
-      this.vscode.commands.registerCommand("sxsy-b122.registerManagedSession", async () => {
+    this.ownLifecycleDisposables(
+      this.registerAdmittedCommand("sxsy-b122.registerManagedSession", async () => {
         await this.refreshWorkspaceRegistration();
         await this.vscode.window.showInformationMessage("SXSY-B122 refreshed this VS Code window's Registered session record. Registered is not Mediated.");
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.adoptTerminal", async (argument: unknown) => {
+      this.registerAdmittedCommand("sxsy-b122.adoptTerminal", async (argument: unknown) => {
         await this.adoptTerminal(argument);
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.refreshManagedRegistry", async () => {
+      this.registerAdmittedCommand("sxsy-b122.refreshManagedRegistry", async () => {
         await this.refreshWorkspaceRegistration();
         for (const terminal of this.vscode.window.terminals) await this.registerTerminal(terminal);
         await this.registerDebugConfigurations();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.showManagedSessions", async () => {
+      this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
         const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
         await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.showQuickReference", async () => {
+      this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.connectProviderAdapter", async () => {
+      this.registerAdmittedCommand("sxsy-b122.connectProviderAdapter", async () => {
         await this.connectProviderAdapter();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.installRepositoryRuntime", async () => {
+      this.registerAdmittedCommand("sxsy-b122.installRepositoryRuntime", async () => {
         await this.installRepositoryRuntime();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.listRepositoryRuntimes", async () => {
+      this.registerAdmittedCommand("sxsy-b122.listRepositoryRuntimes", async () => {
         await this.listRepositoryRuntimes();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.revokeRepositoryRuntime", async () => {
+      this.registerAdmittedCommand("sxsy-b122.revokeRepositoryRuntime", async () => {
         await this.revokeRepositoryRuntime();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.installWindowsSandbox", async () => {
+      this.registerAdmittedCommand("sxsy-b122.installWindowsSandbox", async () => {
         await this.installWindowsSandbox();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.listWindowsSandboxes", async () => {
+      this.registerAdmittedCommand("sxsy-b122.listWindowsSandboxes", async () => {
         await this.listWindowsSandboxes();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.revokeWindowsSandbox", async () => {
+      this.registerAdmittedCommand("sxsy-b122.revokeWindowsSandbox", async () => {
         await this.revokeWindowsSandbox();
       }),
-      this.vscode.commands.registerCommand("sxsy-b122.provisionCredential", async () => { await this.provisionCredential(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.listCredentials", async () => { await this.listCredentials(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.revokeCredential", async () => { await this.revokeCredential(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.manageAcceptanceEvidence", async () => { await this.manageAcceptanceEvidence(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.manageScannerFixtures", async () => { await this.manageScannerFixtures(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.manageProviderApplications", async () => { await this.manageProviderApplications(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.releaseContainment", async () => { await this.releaseContainment(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.installRawHid", async () => { await this.installRawHid(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.listRawHid", async () => { await this.listRawHid(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.showRawHidStatus", async () => { await this.showRawHidStatus(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.revokeRawHid", async () => { await this.revokeRawHid(); }),
-      this.vscode.commands.registerCommand("sxsy-b122.dispatch", async (argument: unknown) => {
+      this.registerAdmittedCommand("sxsy-b122.provisionCredential", async () => { await this.provisionCredential(); }),
+      this.registerAdmittedCommand("sxsy-b122.listCredentials", async () => { await this.listCredentials(); }),
+      this.registerAdmittedCommand("sxsy-b122.revokeCredential", async () => { await this.revokeCredential(); }),
+      this.registerAdmittedCommand("sxsy-b122.installNetworkPolicy", async () => { await this.installNetworkPolicy(); }),
+      this.registerAdmittedCommand("sxsy-b122.showNetworkPolicy", async () => { await this.showNetworkPolicy(); }),
+      this.registerAdmittedCommand("sxsy-b122.revokeNetworkPolicy", async () => { await this.revokeNetworkPolicy(); }),
+      this.registerAdmittedCommand("sxsy-b122.manageAcceptanceEvidence", async () => { await this.manageAcceptanceEvidence(); }),
+      this.registerAdmittedCommand("sxsy-b122.manageScannerFixtures", async () => { await this.manageScannerFixtures(); }),
+      this.registerAdmittedCommand("sxsy-b122.manageProviderApplications", async () => { await this.manageProviderApplications(); }),
+      this.registerAdmittedCommand("sxsy-b122.releaseContainment", async () => { await this.releaseContainment(); }),
+      this.registerAdmittedCommand("sxsy-b122.installRawHid", async () => { await this.installRawHid(); }),
+      this.registerAdmittedCommand("sxsy-b122.listRawHid", async () => { await this.listRawHid(); }),
+      this.registerAdmittedCommand("sxsy-b122.showRawHidStatus", async () => { await this.showRawHidStatus(); }),
+      this.registerAdmittedCommand("sxsy-b122.revokeRawHid", async () => { await this.revokeRawHid(); }),
+      this.registerAdmittedCommand("sxsy-b122.dispatch", async (argument: unknown) => {
         const command = parseChordArgument(argument);
         if (!command) {
           await this.vscode.window.showWarningMessage("SXSY-B122 cannot route that command because its control or modifier is not a settled assignment.");
@@ -277,14 +434,14 @@ export class ManagedSessionController {
       }),
       // Retained for compatibility with the baseline command. It cannot turn
       // arbitrary UI text into a companion action.
-      this.vscode.commands.registerCommand("sxsy-b122.showIntent", async (intent: unknown) => {
+      this.registerAdmittedCommand("sxsy-b122.showIntent", async (intent: unknown) => {
         const detail = typeof intent === "string" ? intent : "No canonical B122 intent was supplied.";
         await this.vscode.window.showWarningMessage(`SXSY-B122 preview: ${detail}`);
       })
     );
 
     for (const command of chordCommands) {
-      this.context.subscriptions.push(this.vscode.commands.registerCommand(command.command, async (argument: unknown) => {
+      this.ownLifecycleDisposables(this.registerAdmittedCommand(command.command, async (argument: unknown) => {
         await this.dispatchChord(command, parseInputArgument(argument));
       }));
     }
@@ -296,8 +453,9 @@ export class ManagedSessionController {
    * public deterministic seam lets the installed command surface and tests
    * refresh it without inventing terminal-derived state.
    */
-  async refreshSessionNotifications(): Promise<void> {
+  async refreshSessionNotifications(generation?: number): Promise<void> {
     const listed = await this.bridge.listSessions();
+    if (generation !== undefined && !this.isActiveGeneration(generation)) return;
     if (!listed.ok) return;
     const currentIds = new Set(listed.value.map((session) => session.id));
     for (const session of listed.value) {
@@ -310,6 +468,7 @@ export class ManagedSessionController {
       } else if (session.status === "verified_finished") {
         await this.vscode.window.showInformationMessage(`SXSY-B122: ${session.provider} session ${session.id} is Finished and ready in the verified done queue.`);
       }
+      if (generation !== undefined && !this.isActiveGeneration(generation)) return;
     }
     for (const sessionId of this.observedNotificationStatus.keys()) if (!currentIds.has(sessionId)) this.observedNotificationStatus.delete(sessionId);
   }
@@ -682,18 +841,48 @@ export class ManagedSessionController {
     try { session = await this.showSessionQueue("all", "Choose the exact contained repository session"); }
     catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release stopped: ${error instanceof Error ? error.message : "session selection unavailable"}`); return; }
     if (!session?.workspaceRoot) { await this.vscode.window.showWarningMessage("SXSY-B122 containment release requires an exact repository-bound managed session."); return; }
+    const inspected = await this.bridge.inspectContainment(session.id);
+    if (!inspected.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment inspection unavailable: ${inspected.message}`); return; }
+    const containment = inspected.value;
+    if (containment.sessionId !== session.id || !samePath(containment.repositoryRoot, session.workspaceRoot)) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 refused a containment inspection bound to a different session or repository.");
+      return;
+    }
+    const hookSummary = containment.hookStates.map((hook) => `${hook.name}=${hook.status} (attempts ${hook.attempts})`).join("; ");
+    const exposureSummary = containment.uncontrolledPaths.length ? containment.uncontrolledPaths.join(", ") : "none declared";
+    const failureSummary = containment.hookFailures.length ? containment.hookFailures.join("; ") : "none";
+    await this.vscode.window.showInformationMessage(`SXSY-B122 containment inspection: active fence ${containment.fenceEpoch}, activation ${containment.activatedByOperationId}; hooks ${hookSummary}; hook failures ${failureSummary}; uncontrolled exposure ${exposureSummary}.`);
+    if (containment.hookStates.some((hook) => hook.status !== "completed") || containment.hookFailures.length) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 containment release is unavailable until every exact revocation/cancellation hook is complete without a retained failure.");
+      return;
+    }
     const reason = await this.vscode.window.showInputBox?.({ prompt: "Record the incident review and why containment may be released", validateInput: (value) => value.trim() && value.length <= 2_048 && !/\0/.test(value) ? undefined : "Enter a bounded non-empty incident-review reason." });
     if (!reason) return;
     const rotation = await this.vscode.window.showQuickPick(["Credential rotation complete", "Credential rotation not required"] as const, { placeHolder: "Confirm credential-rotation disposition before Windows reauthentication" });
     if (!rotation) return;
-    const result = await this.bridge.releaseContainment({ sessionId: session.id, reason, incidentStatus: rotation === "Credential rotation complete" ? "rotation_complete" : "not_required" });
+    const finalLabel = `Release exact containment fence ${containment.fenceEpoch}`;
+    const finalConfirmation = await this.vscode.window.showQuickPick([{
+      label: finalLabel,
+      description: `Activation ${containment.activatedByOperationId}`,
+      detail: `Hooks: ${hookSummary}. Rotation: ${rotation}. Uncontrolled exposure: ${exposureSummary}.`
+    }], { placeHolder: "Final review before the one-time current-user containment-release confirmation" });
+    if (!finalConfirmation || finalConfirmation.label !== finalLabel) return;
+    const result = await this.bridge.releaseContainment({
+      sessionId: session.id,
+      reason,
+      incidentStatus: rotation === "Credential rotation complete" ? "rotation_complete" : "not_required",
+      expectedFenceEpoch: containment.fenceEpoch,
+      expectedActivationOperationId: containment.activatedByOperationId
+    });
     if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release unavailable: ${result.message}`); return; }
     const show = result.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
     await show(`SXSY-B122 containment release ${result.value.status}: ${result.value.summary}`);
   }
 
-  private async refreshWorkspaceRegistration(): Promise<void> {
-    this.gitRoots = await this.resolveGitRoots();
+  private async refreshWorkspaceRegistration(generation = this.lifecycleGeneration): Promise<boolean> {
+    const gitRoots = await this.resolveGitRoots();
+    if (!this.isActiveGeneration(generation)) return false;
+    this.gitRoots = gitRoots;
     const stored = this.context.workspaceState.get<StoredWindowState>(windowStateKey);
     const sessionId = this.windowSessionId ?? stored?.id ?? this.idFactory();
     this.windowSessionId = sessionId;
@@ -704,6 +893,7 @@ export class ManagedSessionController {
       "sxsy-b122.gitRoots": this.gitRoots.length ? "registered separately" : "unavailable"
     });
     const result = await this.bridge.registerSession(session);
+    if (!this.isActiveGeneration(generation)) return false;
     const registered = result.ok ? result.value : session;
     this.sessions.set(sessionId, registered);
     await this.context.workspaceState.update(windowStateKey, {
@@ -712,25 +902,45 @@ export class ManagedSessionController {
       workspaceRoots: this.workspaceRoots(),
       updatedAt: this.now()
     } satisfies StoredWindowState);
+    if (!this.isActiveGeneration(generation)) return false;
     if (result.ok) this.stopReconnect(); else this.scheduleReconnect();
-    await this.registerGitRootSessions();
+    await this.registerGitRootSessions(generation);
+    return result.ok && this.isActiveGeneration(generation);
   }
 
   private scheduleReconnect(delayMs = 1_000): void {
-    if (this.reconnectTimer) return;
+    if (!this.started || this.reconnectTimer || this.reconnectTask) return;
+    const generation = this.lifecycleGeneration;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
-      void this.bridge.health().then((health) => health.ok ? this.refreshWorkspaceRegistration() : undefined).catch(() => undefined).finally(() => {
-        if (!this.reconnectTimer) this.scheduleReconnect();
-      });
+      if (!this.isActiveGeneration(generation)) return;
+      const task = this.reconnectGeneration(generation);
+      this.reconnectTask = task;
+      const clear = () => { if (this.reconnectTask === task) this.reconnectTask = undefined; };
+      void task.then(
+        (connected) => { clear(); if (this.isActiveGeneration(generation) && !connected) this.scheduleReconnect(); },
+        () => { clear(); if (this.isActiveGeneration(generation)) this.scheduleReconnect(); }
+      );
     }, delayMs);
     this.reconnectTimer.unref?.();
   }
 
-  private async registerGitRootSessions(): Promise<void> {
+  private async reconnectGeneration(generation: number): Promise<boolean> {
+    try {
+      const health = await this.bridge.health();
+      if (!this.isActiveGeneration(generation)) return false;
+      return health.ok ? this.refreshWorkspaceRegistration(generation) : false;
+    } catch {
+      // The reviewed reconnect loop treats transport failures as unavailable.
+      return false;
+    }
+  }
+
+  private async registerGitRootSessions(generation?: number): Promise<void> {
     const windowId = this.windowSessionId;
     if (!windowId) return;
     for (const [index, root] of this.gitRoots.entries()) {
+      if (generation !== undefined && !this.isActiveGeneration(generation)) return;
       const id = `${windowId}:git-root:${index}`;
       const session = this.makeSession(id, "generic", "vscode_window", "unknown", {
         "sxsy-b122.kind": "git-root",
@@ -740,11 +950,12 @@ export class ManagedSessionController {
         "sxsy-b122.canonicalRemote": root.canonicalRemote ?? "unknown"
       }, root.gitRoot);
       const result = await this.bridge.registerSession(session);
+      if (generation !== undefined && !this.isActiveGeneration(generation)) return;
       this.sessions.set(id, result.ok ? result.value : session);
     }
   }
 
-  private async registerTerminal(terminal: TerminalLike): Promise<TrackedTerminal> {
+  private async registerTerminal(terminal: TerminalLike, generation?: number): Promise<TrackedTerminal> {
     const known = this.terminalRecords.get(terminal);
     if (known) return known;
     const sessionId = this.idFactory();
@@ -761,19 +972,21 @@ export class ManagedSessionController {
       adopted: false,
       session: result.ok ? result.value : session
     };
+    if (generation !== undefined && !this.isActiveGeneration(generation)) return record;
     this.terminalRecords.set(terminal, record);
     this.terminalBySessionId.set(sessionId, record);
     this.sessions.set(sessionId, record.session);
     return record;
   }
 
-  private async markTerminalClosed(terminal: TerminalLike): Promise<void> {
+  private async markTerminalClosed(terminal: TerminalLike, generation?: number): Promise<void> {
     const record = this.terminalRecords.get(terminal);
     if (!record) return;
     const closed: ExtensionManagedSession = { ...record.session, status: "unreachable", lastHeartbeat: this.now() };
+    await this.bridge.updateStatus(record.sessionId, "unreachable");
+    if (generation !== undefined && !this.isActiveGeneration(generation)) return;
     record.session = closed;
     this.sessions.set(record.sessionId, closed);
-    await this.bridge.updateStatus(record.sessionId, "unreachable");
   }
 
   private async adoptTerminal(argument: unknown): Promise<void> {
@@ -819,9 +1032,10 @@ export class ManagedSessionController {
     return selected;
   }
 
-  private async registerDebugConfigurations(): Promise<void> {
+  private async registerDebugConfigurations(generation?: number): Promise<void> {
     const configurations = this.debugConfigurations();
     for (const [index, configuration] of configurations.entries()) {
+      if (generation !== undefined && !this.isActiveGeneration(generation)) return;
       const name = configuration.name ?? `configuration-${index + 1}`;
       const sessionId = `${this.windowSessionId ?? "vscode"}:debug-configuration:${index}`;
       if (this.sessions.has(sessionId)) continue;
@@ -830,30 +1044,105 @@ export class ManagedSessionController {
         "sxsy-b122.debugConfiguration": name
       });
       const result = await this.bridge.registerSession(session, "debug");
+      if (generation !== undefined && !this.isActiveGeneration(generation)) return;
       this.sessions.set(sessionId, result.ok ? result.value : session);
     }
   }
 
-  private async registerDebugSession(debugSession: DebugSessionLike): Promise<void> {
-    const sessionId = this.debugSessionIds.get(debugSession) ?? `${this.windowSessionId ?? "vscode"}:debug-session:${debugSession.id ?? this.idFactory()}`;
-    this.debugSessionIds.set(debugSession, sessionId);
-    const session = this.makeSession(sessionId, "generic", "vscode_window", "running", {
+  private async registerDebugSession(debugSession: DebugSessionLike, generation?: number): Promise<void> {
+    const binding = this.bindingForDebugSession(debugSession);
+    const sessionId = binding?.managedSessionId ?? this.debugSessionIds.get(debugSession) ?? `${this.windowSessionId ?? "vscode"}:debug-session:${debugSession.id ?? this.idFactory()}`;
+    let session = this.makeSession(sessionId, "generic", "vscode_window", "running", {
       "sxsy-b122.kind": "debug-session",
       "sxsy-b122.debugName": debugSession.name,
-      "sxsy-b122.debugConfiguration": debugSession.configuration?.name ?? "unnamed"
-    });
+      "sxsy-b122.debugConfiguration": debugSession.configuration?.name ?? "unnamed",
+      ...(binding ? {
+        "sxsy-b122.debugSessionId": exactDebugReference(debugSession.id, "VS Code debug session ID"),
+        "sxsy-b122.debugOriginOperationId": binding.originOperationId,
+        "sxsy-b122.debugOriginSessionId": binding.originSessionId,
+        "sxsy-b122.debugWorkspaceRoot": binding.workspaceRoot,
+        "sxsy-b122.debugBindingId": binding.bindingId
+      } : {})
+    }, binding?.workspaceRoot ?? debugSession.workspaceFolder?.uri.fsPath);
+    if (binding?.targetSnapshotId) session = { ...session, targetSnapshotId: binding.targetSnapshotId };
     const result = await this.bridge.registerSession(session, "debug");
+    if (generation !== undefined && !this.isActiveGeneration(generation)) return;
+    if (!result.ok && binding) {
+      this.pendingDebugStarts.get(binding.bindingId)?.reject(new Error(`The exact started debug session could not be registered: ${result.message}`));
+      return;
+    }
+    this.debugSessionIds.set(debugSession, sessionId);
+    if (debugSession.id) this.debugSessionObjects.set(debugSession.id, debugSession);
     this.sessions.set(sessionId, result.ok ? result.value : session);
+    if (binding && debugSession.id) {
+      const running: StoredDebugBinding = { ...binding, status: "running", debugSessionId: debugSession.id, managedSessionId: sessionId };
+      this.debugBindings.set(binding.bindingId, running);
+      await this.persistDebugBindings();
+      this.pendingDebugStarts.get(binding.bindingId)?.resolve(running);
+    }
   }
 
-  private async markDebugSessionEnded(debugSession: DebugSessionLike): Promise<void> {
+  private async markDebugSessionEnded(debugSession: DebugSessionLike, generation?: number): Promise<void> {
     const sessionId = this.debugSessionIds.get(debugSession);
-    if (!sessionId) return;
+    const debugSessionId = debugSession.id;
+    const binding = debugSessionId ? [...this.debugBindings.values()].find((candidate) => candidate.debugSessionId === debugSessionId) : undefined;
+    if (binding) {
+      this.debugBindings.delete(binding.bindingId);
+      await this.persistDebugBindings();
+    }
+    if (debugSessionId) this.debugSessionObjects.delete(debugSessionId);
+    if (!sessionId) {
+      if (debugSessionId) this.pendingDebugStops.get(debugSessionId)?.resolve();
+      return;
+    }
     const current = this.sessions.get(sessionId);
-    if (!current) return;
+    if (!current) {
+      if (debugSessionId) this.pendingDebugStops.get(debugSessionId)?.resolve();
+      return;
+    }
     const ended: ExtensionManagedSession = { ...current, status: "unreachable", lastHeartbeat: this.now() };
+    const updated = await this.bridge.updateStatus(sessionId, "unreachable");
+    if (generation !== undefined && !this.isActiveGeneration(generation)) return;
     this.sessions.set(sessionId, ended);
-    await this.bridge.updateStatus(sessionId, "unreachable");
+    if (debugSessionId) {
+      if (updated.ok) this.pendingDebugStops.get(debugSessionId)?.resolve();
+      else this.pendingDebugStops.get(debugSessionId)?.reject(new Error(`The exact debug session ended, but its durable managed-session status was not reconciled: ${updated.message}`));
+    }
+  }
+
+  private bindingForDebugSession(debugSession: DebugSessionLike): StoredDebugBinding | undefined {
+    const debugSessionId = debugSession.id;
+    if (debugSessionId) {
+      const exact = [...this.debugBindings.values()].find((candidate) => candidate.debugSessionId === debugSessionId);
+      if (exact) return exact;
+    }
+    const configuration = debugSession.configuration?.name;
+    const workspaceRoot = debugSession.workspaceFolder?.uri.fsPath;
+    if (!configuration || !workspaceRoot) return undefined;
+    const candidates = [...this.debugBindings.values()].filter((candidate) => candidate.status === "starting"
+      && candidate.configuration === configuration && samePath(candidate.workspaceRoot, workspaceRoot));
+    return candidates.length === 1 ? candidates[0] : undefined;
+  }
+
+  private async persistDebugBindings(): Promise<void> {
+    const records = [...this.debugBindings.values()];
+    if (records.length > 64 || records.some((record) => !isStoredDebugBinding(record))) throw new Error("The durable VS Code debug-binding registry is malformed or unbounded.");
+    await (this.context.globalState ?? this.context.workspaceState).update(debugBindingStateKey, records);
+  }
+
+  private async recoverDebugBindings(generation: number): Promise<void> {
+    const raw = (this.context.globalState ?? this.context.workspaceState).get<unknown>(debugBindingStateKey);
+    if (raw === undefined) return;
+    if (!Array.isArray(raw) || raw.length > 64 || !raw.every(isStoredDebugBinding)) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 ignored a malformed durable debug-binding registry; no debug session was stopped or adopted.");
+      return;
+    }
+    for (const binding of raw) this.debugBindings.set(binding.bindingId, binding);
+    const active = this.vscode.debug.activeDebugSession;
+    if (!active || !this.isActiveGeneration(generation)) return;
+    const binding = this.bindingForDebugSession(active);
+    if (!binding) return;
+    await this.registerDebugSession(active, generation);
   }
 
   /** Physical claims use this exact UI/policy path; only the bridge call differs. */
@@ -865,20 +1154,59 @@ export class ManagedSessionController {
       return;
     }
     const reason = `Operator requested ${command.title} through the installed SXSY-B122 extension.`;
-    const hardwarePreparation = hardwareClaim ? await this.bridge.prepareHardwareSignal(hardwareClaim, selectedSession, reason) : undefined;
-    const regularPreparation = hardwareClaim ? undefined : await this.bridge.prepareCommand({ control: command.control, modifier: command.modifier, ...(selectedSession ? { sessionId: selectedSession } : {}), reason });
-    const preparationFailure = hardwarePreparation && !hardwarePreparation.ok ? hardwarePreparation : regularPreparation && !regularPreparation.ok ? regularPreparation : undefined;
+    let hardwarePreparation = hardwareClaim ? await this.bridge.prepareHardwareSignal(hardwareClaim, selectedSession, reason) : undefined;
+    let regularPreparation = hardwareClaim ? undefined : await this.bridge.prepareCommand({ control: command.control, modifier: command.modifier, ...(selectedSession ? { sessionId: selectedSession } : {}), reason });
+    let preparationFailure = hardwarePreparation && !hardwarePreparation.ok ? hardwarePreparation : regularPreparation && !regularPreparation.ok ? regularPreparation : undefined;
     if (preparationFailure) {
       await this.vscode.window.showWarningMessage(`SXSY-B122 preparation unavailable: ${preparationFailure.message}`);
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Command preparation failed before any dispatch request was sent.", undefined, selectedSession);
       return;
     }
-    const preparation = hardwarePreparation?.ok ? hardwarePreparation.value.preparation : regularPreparation?.ok ? regularPreparation.value : undefined;
+    let preparation = hardwarePreparation?.ok ? hardwarePreparation.value.preparation : regularPreparation?.ok ? regularPreparation.value : undefined;
     if (!preparation) {
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "needs_reconciliation", "The extension could not prove a canonical preparation result.", undefined, selectedSession);
       return;
     }
-    if (preparation.status !== "prepared") {
+    const workflowAction = workflowActionForCommand(command);
+    if (workflowAction === "plan_approval") {
+      if (preparation.status !== "incomplete" || !preparation.workflowReview || !preparation.session) {
+        await this.vscode.window.showWarningMessage("Plan Approval stopped because command preparation did not return the required unconfirmed protected plan-review packet.");
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Plan Approval preparation did not return a reviewable exact protected plan before dispatch.", undefined, selectedSession);
+        return;
+      }
+      const reviewScopeDigest = await this.presentPlanApprovalReview(preparation.workflowReview, preparation.session);
+      if (!reviewScopeDigest) {
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "The operator cancelled or rejected the exact protected Plan Approval review before dispatch.", undefined, selectedSession);
+        return;
+      }
+      hardwarePreparation = hardwareClaim ? await this.bridge.prepareHardwareSignal(hardwareClaim, selectedSession, reason, reviewScopeDigest) : undefined;
+      regularPreparation = hardwareClaim ? undefined : await this.bridge.prepareCommand({ control: command.control, modifier: command.modifier, ...(selectedSession ? { sessionId: selectedSession } : {}), reason, reviewScopeDigest });
+      preparationFailure = hardwarePreparation && !hardwarePreparation.ok ? hardwarePreparation : regularPreparation && !regularPreparation.ok ? regularPreparation : undefined;
+      if (preparationFailure) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 reviewed Plan Approval unavailable: ${preparationFailure.message}`);
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Reviewed Plan Approval preparation failed before dispatch.", undefined, selectedSession);
+        return;
+      }
+      preparation = hardwarePreparation?.ok ? hardwarePreparation.value.preparation : regularPreparation?.ok ? regularPreparation.value : undefined;
+      if (!preparation) {
+        await this.vscode.window.showWarningMessage("SXSY-B122 rejected an absent reviewed Plan Approval preparation result.");
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Reviewed Plan Approval returned no canonical preparation result.", undefined, selectedSession);
+        return;
+      }
+      if (preparation.status !== "prepared") {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 ${preparation.status}: ${preparation.summary}`);
+        if (hardwareClaim) {
+          const dispositionReceiptId = hardwarePreparation?.ok ? hardwarePreparation.value.dispositionReceiptId : undefined;
+          await this.finishHardwareSignal(hardwareClaim, dispositionReceiptId ? "handled" : "failed_before_dispatch", `Reviewed Plan Approval preparation returned ${preparation.status}: ${preparation.summary}`.slice(0, 512), dispositionReceiptId, selectedSession);
+        }
+        return;
+      }
+      if (preparation.workflowReview || preparation.confirmationScopeDigest !== reviewScopeDigest || !preparation.confirmationToken) {
+        await this.vscode.window.showWarningMessage("Plan Approval stopped because final preparation did not bind one confirmation token to the exact reviewed plan scope.");
+        if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "Final Plan Approval preparation changed or omitted the reviewed scope binding.", undefined, selectedSession);
+        return;
+      }
+    } else if (preparation.status !== "prepared") {
       await this.vscode.window.showWarningMessage(`SXSY-B122 ${preparation.status}: ${preparation.summary}`);
       if (hardwareClaim) {
         const dispositionReceiptId = hardwarePreparation?.ok ? hardwarePreparation.value.dispositionReceiptId : undefined;
@@ -891,7 +1219,7 @@ export class ManagedSessionController {
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "The exact Git mutation review did not approve dispatch.", undefined, selectedSession);
       return;
     }
-    const preparedWorkflow = await this.prepareWorkflowForCommand(command, selectedSession, preparation.authorityId, preparation.confirmationToken);
+    const preparedWorkflow = await this.prepareWorkflowForCommand(command, selectedSession, preparation.authorityId, preparation.confirmationToken, preparation.confirmationScopeDigest);
     if (!preparedWorkflow) {
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "failed_before_dispatch", "The typed provider workflow artifact was not prepared for dispatch.", undefined, selectedSession);
       return;
@@ -902,9 +1230,10 @@ export class ManagedSessionController {
       ...(selectedSession ? { sessionId: selectedSession } : {}),
       ...(preparation.authorityId ? { authorityId: preparation.authorityId } : {}),
       ...(preparation.confirmationToken ? { confirmationToken: preparation.confirmationToken } : {}),
+      ...(preparation.confirmationScopeDigest ? { confirmationScopeDigest: preparation.confirmationScopeDigest } : {}),
       input
     };
-    const hardwareDispatch = hardwareClaim ? await this.bridge.dispatchHardwareSignal(hardwareClaim, { ...(forwarded.sessionId ? { sessionId: forwarded.sessionId } : {}), ...(forwarded.authorityId ? { authorityId: forwarded.authorityId } : {}), ...(forwarded.confirmationToken ? { confirmationToken: forwarded.confirmationToken } : {}), ...(forwarded.input ? { input: forwarded.input } : {}) }) : undefined;
+    const hardwareDispatch = hardwareClaim ? await this.bridge.dispatchHardwareSignal(hardwareClaim, { ...(forwarded.sessionId ? { sessionId: forwarded.sessionId } : {}), ...(forwarded.authorityId ? { authorityId: forwarded.authorityId } : {}), ...(forwarded.confirmationToken ? { confirmationToken: forwarded.confirmationToken } : {}), ...(forwarded.confirmationScopeDigest ? { confirmationScopeDigest: forwarded.confirmationScopeDigest } : {}), ...(forwarded.input ? { input: forwarded.input } : {}) }) : undefined;
     const regularDispatch = hardwareClaim ? undefined : await this.bridge.dispatch(forwarded);
     const dispatchFailure = hardwareDispatch && !hardwareDispatch.ok ? hardwareDispatch : regularDispatch && !regularDispatch.ok ? regularDispatch : undefined;
     if (dispatchFailure) {
@@ -983,8 +1312,9 @@ export class ManagedSessionController {
         const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion, selectionId, expectedUrl);
         if (!authorization.ok) throw new Error(`The companion refused the final host-action barrier: ${authorization.message}`);
         if (authorization.value.hostActionId !== action.id || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The final host-action authorization is mismatched or expired.");
+        this.assertAdmissionActive();
         authorizationToken = authorization.value.authorizationToken;
-        summary = await this.executeLocalHostAction(action, command, authorization.value, result, preparedManagedTerminal);
+        summary = await this.executeLocalHostAction(action, command, authorization.value, result, preparedManagedTerminal, selectedSession);
         succeeded = true;
         effectDisposition = "committed";
       } catch (error) {
@@ -1036,13 +1366,17 @@ export class ManagedSessionController {
     if (!this.started || this.sessionHeartbeatTimer || this.sessionHeartbeatInFlight) return;
     this.sessionHeartbeatTimer = setTimeout(() => {
       this.sessionHeartbeatTimer = undefined;
-      void this.heartbeatLocalSessions();
+      const task = this.heartbeatLocalSessions();
+      this.sessionHeartbeatTask = task;
+      const clear = () => { if (this.sessionHeartbeatTask === task) this.sessionHeartbeatTask = undefined; };
+      void task.then(clear, clear);
     }, delayMs);
     this.sessionHeartbeatTimer.unref?.();
   }
 
   private async heartbeatLocalSessions(): Promise<void> {
     if (!this.started || this.sessionHeartbeatInFlight) return;
+    const generation = this.lifecycleGeneration;
     this.sessionHeartbeatInFlight = true;
     try {
       const at = this.now();
@@ -1051,12 +1385,14 @@ export class ManagedSessionController {
         && session.status !== "unreachable" && session.status !== "stale");
       for (const session of localSessions) {
         const result = await this.bridge.heartbeat(session.id, at);
+        if (!this.started || generation !== this.lifecycleGeneration) return;
         if (result.ok) this.sessions.set(result.value.id, result.value);
       }
+      if (!this.started || generation !== this.lifecycleGeneration) return;
       await this.refreshSessionNotifications();
     } finally {
       this.sessionHeartbeatInFlight = false;
-      this.scheduleSessionHeartbeat();
+      if (this.started && generation === this.lifecycleGeneration) this.scheduleSessionHeartbeat();
     }
   }
 
@@ -1064,13 +1400,17 @@ export class ManagedSessionController {
     if (!this.started || !this.vscode.window.state.focused || this.hardwareSignalTimer || this.hardwareSignalInFlight || !this.windowSessionId || this.workspaceRoots().length < 1) return;
     this.hardwareSignalTimer = setTimeout(() => {
       this.hardwareSignalTimer = undefined;
-      void this.pollHardwareSignal();
+      const task = this.pollHardwareSignal();
+      this.hardwareSignalTask = task;
+      const clear = () => { if (this.hardwareSignalTask === task) this.hardwareSignalTask = undefined; };
+      void task.then(clear, clear);
     }, delayMs);
     this.hardwareSignalTimer.unref?.();
   }
 
   private async pollHardwareSignal(): Promise<void> {
     if (!this.started || !this.vscode.window.state.focused || this.hardwareSignalInFlight || !this.windowSessionId) return;
+    const generation = this.lifecycleGeneration;
     const workspaceRoots = this.workspaceRoots();
     if (!workspaceRoots.length) return;
     this.hardwareSignalInFlight = true;
@@ -1078,6 +1418,10 @@ export class ManagedSessionController {
       const claimResult = await this.bridge.claimHardwareSignal({ windowSessionId: this.windowSessionId, workspaceRoots, focused: true });
       if (!claimResult.ok || !claimResult.value) return;
       const claim = claimResult.value;
+      if (!this.started || generation !== this.lifecycleGeneration) {
+        await this.finishHardwareSignal(claim, "failed_before_dispatch", "The VS Code extension stopped after claiming this hardware signal and before dispatch.");
+        return;
+      }
       if (!this.vscode.window.state.focused || !sameRootList(this.workspaceRoots(), workspaceRoots)) {
         await this.finishHardwareSignal(claim, "failed_before_dispatch", "The VS Code window lost focus or changed workspace binding before hardware preparation began.");
         return;
@@ -1090,13 +1434,14 @@ export class ManagedSessionController {
       await this.dispatchChord(command, undefined, claim);
     } finally {
       this.hardwareSignalInFlight = false;
-      this.scheduleHardwareSignalPoll();
+      if (this.started && generation === this.lifecycleGeneration) this.scheduleHardwareSignalPoll();
     }
   }
 
   private async finishHardwareSignal(claim: HardwareSignalClaim, outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation", summary: string, dispatchReceiptId?: string, dispatchSessionId?: string): Promise<void> {
     const session = dispatchSessionId ? this.sessions.get(dispatchSessionId) : undefined;
-    const completion = await this.bridge.completeHardwareSignal(claim, {
+    const completionBridge = outcome === "failed_before_dispatch" && !this.started ? this.rawBridge : this.bridge;
+    const completion = await completionBridge.completeHardwareSignal(claim, {
       outcome,
       summary,
       ...(dispatchReceiptId ? { dispatchReceiptId } : {}),
@@ -1193,7 +1538,69 @@ export class ManagedSessionController {
     return true;
   }
 
-  private async prepareWorkflowForCommand(command: ChordCommand, sessionId: string | undefined, authorityId: string | undefined, confirmationToken: string | undefined): Promise<true | ExtensionWorkflowArtifact | false> {
+  private async presentPlanApprovalReview(review: PlanApprovalWorkflowReview, session: ExtensionManagedSession): Promise<string | undefined> {
+    if (review.sessionId !== session.id || review.targetSnapshotId !== session.targetSnapshotId || !session.workspaceRoot
+      || !samePath(review.repositoryRoot, session.workspaceRoot) || review.provider !== session.provider
+      || review.plan.taskId !== session.taskId || review.plan.revision !== session.planRevision) {
+      await this.vscode.window.showWarningMessage("Plan Approval stopped because the protected review packet changed its exact session, target, repository, provider, task, or plan binding.");
+      return undefined;
+    }
+    const approveLabel = `Approve exact protected scope ${review.scopeDigest}`;
+    const cancelLabel = "Cancel Plan Approval";
+    const items: QuickPickItemLike[] = [
+      {
+        label: `Objective • plan ${review.plan.revision}`,
+        description: review.plan.objective,
+        detail: `Plan digest ${review.plan.digest}; task ${review.plan.taskId}; origin session ${review.plan.originSessionId}`
+      },
+      ...review.plan.steps.map((step, index) => ({
+        label: `Step ${index + 1} • ${step.id} • ${step.status}`,
+        description: step.summary,
+        detail: `Owned files: ${step.ownedFiles.length ? step.ownedFiles.join(" | ") : "(none)"}; dependencies: ${step.dependencies.length ? step.dependencies.join(" | ") : "(none)"}`
+      })),
+      ...(review.plan.decisions.length
+        ? review.plan.decisions.map((decision, index) => ({ label: `Decision ${index + 1}`, description: decision, detail: `Bound to plan ${review.plan.digest}` }))
+        : [{ label: "Decisions", description: "(none)", detail: `Bound to plan ${review.plan.digest}` }]),
+      {
+        label: `Provider provenance • ${review.provider}`,
+        description: `${review.contextId} observed ${review.observedAt}; source revision ${review.sourceRevision}`,
+        detail: `Provider-context digest ${review.providerContextDigest}; ${review.summary}`
+      },
+      {
+        label: `Adapter provenance • ${review.adapter.id}@${review.adapter.version}`,
+        description: review.adapter.moduleSha256,
+        detail: "Exact installed adapter module SHA-256 returned by the protected companion."
+      },
+      {
+        label: `Target • ${review.targetSnapshotId}`,
+        description: review.repositoryRoot,
+        detail: `Session ${review.sessionId}; provider ${review.provider}`
+      },
+      {
+        label: `Protected review scope • ${review.scopeDigest}`,
+        description: review.scopeDigest,
+        detail: "The full digest below must remain unchanged through confirmation, workflow preparation, and dispatch."
+      },
+      {
+        label: approveLabel,
+        description: `Plan ${review.plan.digest}`,
+        detail: `Approve only this exact immutable plan and protected scope ${review.scopeDigest}. The companion will reobserve it before issuing one confirmation.`
+      },
+      {
+        label: cancelLabel,
+        description: "No authority, confirmation token, workflow artifact, or dispatch",
+        detail: `Keep protected scope ${review.scopeDigest} unapproved.`
+      }
+    ];
+    const selected = await this.vscode.window.showQuickPick(items, {
+      placeHolder: `Review the entire immutable plan and provenance. Select only Approve exact scope or Cancel. Scope ${review.scopeDigest}`
+    });
+    if (selected?.label === approveLabel) return review.scopeDigest;
+    await this.vscode.window.showInformationMessage(`SXSY-B122 did not approve protected plan scope ${review.scopeDigest}; no confirmation or dispatch was requested.`);
+    return undefined;
+  }
+
+  private async prepareWorkflowForCommand(command: ChordCommand, sessionId: string | undefined, authorityId: string | undefined, confirmationToken: string | undefined, confirmationScopeDigest: string | undefined): Promise<true | ExtensionWorkflowArtifact | false> {
     const action = workflowActionForCommand(command);
     if (!action) return true;
     if (!sessionId || !authorityId) {
@@ -1211,27 +1618,34 @@ export class ManagedSessionController {
       await this.vscode.window.showWarningMessage(`SXSY-B122 workflow registry unavailable: ${listed.message}`);
       return false;
     }
-    const pending = listed.value.filter((artifact) => artifact.action === action && artifact.sessionId === session.id && artifact.targetSnapshotId === session.targetSnapshotId && artifact.status === "prepared");
+    const pending = listed.value.filter((artifact) => artifact.action === action && artifact.sessionId === session.id
+      && artifact.targetSnapshotId === session.targetSnapshotId && samePath(artifact.repositoryRoot, session.workspaceRoot!) && artifact.status === "prepared");
     if (pending.length > 1) {
-      await this.vscode.window.showWarningMessage("SXSY-B122 found multiple prepared artifacts for this exact workflow. Cancel the queued operation before trying again; nothing was dispatched.");
+      await this.cancelPreparedWorkflowSelection(pending, "Multiple legacy prepared artifacts block this exact workflow");
       return false;
     }
     if (pending.length === 1) {
+      const existing = pending[0]!;
+      if (existing.authorityId !== authorityId) {
+        await this.cancelPreparedWorkflowSelection([existing], "The existing prepared artifact is bound to a different exact authority and must be explicitly cancelled before replacement");
+        return false;
+      }
       if (action === "plan_approval") {
-        const payload = pending[0]!.payload;
-        const confirmationMatches = !!confirmationToken && payload.kind === "plan" && payload.mode === "approve"
-          && payload.confirmationDigest === createHash("sha256").update(confirmationToken, "utf8").digest("hex");
+        const payload = existing.payload;
+        const confirmationMatches = !!confirmationToken && !!confirmationScopeDigest && payload.kind === "plan" && payload.mode === "approve"
+          && payload.confirmationDigest === createHash("sha256").update(confirmationToken, "utf8").digest("hex")
+          && payload.confirmationScopeDigest === confirmationScopeDigest;
         if (!confirmationMatches) {
-          await this.vscode.window.showWarningMessage("SXSY-B122 stopped because the existing prepared Plan Approval is bound to a different one-time current-user confirmation. Cancel or reconcile that artifact before trying again.");
+          await this.cancelPreparedWorkflowSelection([existing], "The existing Plan Approval is bound to a different one-time confirmation or protected plan review scope and must be explicitly cancelled before replacement");
           return false;
         }
       }
-      await this.vscode.window.showInformationMessage(`SXSY-B122 reused the exact prepared ${action} artifact ${pending[0]!.id}; it still grants no execution authority.`);
-      return pending[0]!;
+      await this.vscode.window.showInformationMessage(`SXSY-B122 reused the exact prepared ${action} artifact ${existing.id}; it still grants no execution authority.`);
+      return existing;
     }
 
     let intent: ExtensionWorkflowPreparationIntent | undefined;
-    try { intent = await this.collectWorkflowIntent(action, session, confirmationToken); }
+    try { intent = await this.collectWorkflowIntent(action, session, confirmationToken, confirmationScopeDigest); }
     catch (error) { await this.vscode.window.showWarningMessage(`SXSY-B122 workflow preparation stopped: ${error instanceof Error ? error.message : "reviewed input was unavailable"}`); return false; }
     if (!intent) return false;
     const prepared = await this.bridge.prepareWorkflow({ action, sessionId: session.id, authorityId, intent });
@@ -1243,7 +1657,46 @@ export class ManagedSessionController {
     return prepared.value;
   }
 
-  private async collectWorkflowIntent(action: ExtensionWorkflowAction, session: ExtensionManagedSession, confirmationToken: string | undefined): Promise<ExtensionWorkflowPreparationIntent | undefined> {
+  private async cancelPreparedWorkflowSelection(artifacts: readonly ExtensionWorkflowArtifact[], reason: string): Promise<void> {
+    const candidates = artifacts.filter((artifact) => artifact.status === "prepared" && !!artifact.authorityId);
+    if (!candidates.length) {
+      await this.vscode.window.showWarningMessage(`${reason}. No exact cancellable prepared artifact was returned; nothing was changed.`);
+      return;
+    }
+    const items = candidates.map((artifact) => ({
+      label: `${artifact.action}: ${artifact.id}`,
+      description: `${artifact.digest} / authority ${artifact.authorityId}`,
+      detail: `Session ${artifact.sessionId}; target ${artifact.targetSnapshotId}; repository ${artifact.repositoryRoot}; prepared ${artifact.createdAt}`
+    }));
+    const selected = await this.vscode.window.showQuickPick(items, { placeHolder: `${reason}. Choose one exact prepared artifact to review for cancellation.` });
+    const artifact = selected ? candidates[items.indexOf(selected)] : undefined;
+    if (!artifact) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 kept every prepared workflow artifact; no replacement was prepared or dispatched.");
+      return;
+    }
+    const confirmation = await this.vscode.window.showQuickPick([
+      { label: `Cancel exact artifact ${artifact.id}`, description: `${artifact.action} / ${artifact.digest}`, detail: `Session ${artifact.sessionId}; authority ${artifact.authorityId}; target ${artifact.targetSnapshotId}` },
+      { label: "Keep this prepared artifact", description: "No workflow state changes", detail: "Return without cancellation, preparation, or dispatch." }
+    ], { placeHolder: "Final confirmation: cancel only the exact selected prepared artifact?" });
+    if (!confirmation || confirmation.label !== `Cancel exact artifact ${artifact.id}`) {
+      await this.vscode.window.showInformationMessage(`SXSY-B122 kept prepared artifact ${artifact.id}; no replacement was prepared or dispatched.`);
+      return;
+    }
+    const cancelled = await this.bridge.cancelWorkflow({ artifactId: artifact.id, sessionId: artifact.sessionId, authorityId: artifact.authorityId });
+    if (!cancelled.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 could not cancel exact prepared artifact ${artifact.id}: ${cancelled.message}`);
+      return;
+    }
+    const value = cancelled.value;
+    if (value.digest !== artifact.digest || value.action !== artifact.action || value.targetSnapshotId !== artifact.targetSnapshotId
+      || !samePath(value.repositoryRoot, artifact.repositoryRoot) || value.status !== "cancelled") {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected a workflow-cancellation receipt that changed the selected immutable artifact binding.");
+      return;
+    }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 cancelled exact prepared ${artifact.action} artifact ${artifact.id}. Press the chord again to prepare a replacement.`);
+  }
+
+  private async collectWorkflowIntent(action: ExtensionWorkflowAction, session: ExtensionManagedSession, confirmationToken: string | undefined, confirmationScopeDigest: string | undefined): Promise<ExtensionWorkflowPreparationIntent | undefined> {
     const input = this.vscode.window.showInputBox;
     if (action === "option_provider") {
       if (!input) { await this.vscode.window.showWarningMessage("SXSY-B122 cannot collect the one bounded decision question in this VS Code host."); return undefined; }
@@ -1253,7 +1706,8 @@ export class ManagedSessionController {
     }
     if (action === "plan_approval") {
       if (!confirmationToken) { await this.vscode.window.showWarningMessage("Plan Approval stopped because the companion did not issue exact current-user confirmation for this plan execution."); return undefined; }
-      return { kind: "plan_approval", confirmationToken };
+      if (!confirmationScopeDigest) { await this.vscode.window.showWarningMessage("Plan Approval stopped because the companion did not bind confirmation to the exact protected plan review scope."); return undefined; }
+      return { kind: "plan_approval", confirmationToken, confirmationScopeDigest };
     }
     if (action === "handoff" || action === "handoff_queue" || action === "handoff_immediate") {
       if (!session.taskId || !session.planRevision) { await this.vscode.window.showWarningMessage("Handoff requires the selected session to carry an exact task and plan revision."); return undefined; }
@@ -1317,7 +1771,7 @@ export class ManagedSessionController {
     return value === undefined ? undefined : commaList(value);
   }
 
-  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand, authorization: ForwardedHostActionAuthorization, result: ForwardedCommandResult, preparedManagedTerminal?: PreparedManagedTerminal): Promise<string> {
+  private async executeLocalHostAction(action: ForwardedHostAction, command: ChordCommand, authorization: ForwardedHostActionAuthorization, result: ForwardedCommandResult, preparedManagedTerminal?: PreparedManagedTerminal, originSessionId?: string): Promise<string> {
     this.requireLiveHostAuthorization(authorization);
     switch (action.kind) {
       case "show_handoff_queue":
@@ -1355,15 +1809,10 @@ export class ManagedSessionController {
         await this.createManagedAgentTerminal(preparedManagedTerminal, "codex", authorization.expiresAt);
         return "Created the exact current-user-approved Codex terminal and registered its identity.";
       case "start_vscode_debug": {
-        if (!action.workspaceRoot || !action.debugConfiguration) throw new Error("The companion did not bind debug to an exact workspace and launch configuration.");
-        const workspaceRoot = action.workspaceRoot;
-        const debugConfiguration = action.debugConfiguration;
-        const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
-        if (!folder) throw new Error("The exact debug workspace is not open in this VS Code host.");
-        const matches = this.debugConfigurations().filter((configuration) => configuration.name === debugConfiguration);
-        if (matches.length !== 1) throw new Error("The exact verified debug configuration is missing or ambiguous in this VS Code host.");
-        if (!await this.vscode.debug.startDebugging(folder, debugConfiguration, { noDebug: false })) throw new Error("VS Code refused to start the exact verified debug configuration.");
-        return `Started VS Code debug configuration ${debugConfiguration}.`;
+        return this.startBoundDebugSession(action, result, originSessionId);
+      }
+      case "stop_vscode_debug": {
+        return this.stopBoundDebugSession(action, originSessionId);
       }
       case "configure_python_venv": {
         if (!action.workspaceRoot || !action.pythonInterpreter) throw new Error("The companion did not bind the Python environment to an exact workspace and interpreter.");
@@ -1375,6 +1824,7 @@ export class ManagedSessionController {
         const python = this.vscode.workspace.getConfiguration("python", folder.uri);
         if (!python.update) throw new Error("This VS Code host cannot persist an exact workspace-folder interpreter selection.");
         await python.update("defaultInterpreterPath", interpreter, 3);
+        this.assertAdmissionActive();
         const scripts = dirname(interpreter);
         const inheritedPath = process.env.Path ?? process.env.PATH ?? "";
         const terminal = this.vscode.window.createTerminal({ name: "SXSY-B122 .venv", cwd: workspaceRoot, env: { VIRTUAL_ENV: dirname(scripts), PATH: inheritedPath ? `${scripts}${delimiter}${inheritedPath}` : scripts } });
@@ -1404,6 +1854,93 @@ export class ManagedSessionController {
         return this.bindDurableVoiceSession();
       case "show_pipeline_failure_trace":
         return this.presentPipelineFailureTrace(result);
+    }
+  }
+
+  private async startBoundDebugSession(action: ForwardedHostAction, result: ForwardedCommandResult, originSessionId: string | undefined): Promise<string> {
+    if (!action.workspaceRoot || !action.debugConfiguration || !result.operationId || !originSessionId) throw new Error("The companion did not bind debug to an exact operation, session, workspace, and launch configuration.");
+    const workspaceRoot = action.workspaceRoot;
+    const debugConfiguration = action.debugConfiguration;
+    const operationId = exactDebugReference(result.operationId, "debug origin operation ID");
+    const originSession = this.sessions.get(originSessionId);
+    if (!originSession?.workspaceRoot || !samePath(originSession.workspaceRoot, workspaceRoot)) throw new Error("The debug host action changed its exact originating managed session or workspace.");
+    const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
+    if (!folder) throw new Error("The exact debug workspace is not open in this VS Code host.");
+    const matches = this.debugConfigurations().filter((configuration) => configuration.name === debugConfiguration);
+    if (matches.length !== 1) throw new Error("The exact verified debug configuration is missing or ambiguous in this VS Code host.");
+    const prior = [...this.debugBindings.values()].find((candidate) => candidate.originOperationId === operationId);
+    if (prior) {
+      if (prior.originSessionId !== originSessionId || !samePath(prior.workspaceRoot, workspaceRoot) || prior.configuration !== debugConfiguration) throw new Error("The debug origin operation is already bound to a different exact host effect.");
+      if (prior.status === "running" && prior.debugSessionId && this.debugSessionObjects.has(prior.debugSessionId)) return `VS Code debug configuration ${prior.configuration} is already bound to operation ${operationId}.`;
+      throw new HostEffectError("The exact debug origin operation has an unresolved durable start; no second debug session was launched.", "ambiguous");
+    }
+    if ([...this.debugBindings.values()].some((candidate) => candidate.status !== "stopping" && candidate.configuration === debugConfiguration && samePath(candidate.workspaceRoot, workspaceRoot))) {
+      throw new Error("An exact debug session with the same workspace and configuration is already active or unresolved.");
+    }
+    const binding: StoredDebugBinding = {
+      version: 1,
+      bindingId: action.id,
+      originOperationId: operationId,
+      originSessionId,
+      workspaceRoot,
+      configuration: debugConfiguration,
+      ...(originSession.targetSnapshotId ? { targetSnapshotId: originSession.targetSnapshotId } : {}),
+      startedAt: this.now(),
+      status: "starting"
+    };
+    this.debugBindings.set(binding.bindingId, binding);
+    await this.persistDebugBindings();
+    const pending = createPendingDebugStart(binding.bindingId);
+    this.pendingDebugStarts.set(binding.bindingId, pending);
+    let started = false;
+    try {
+      this.assertAdmissionActive();
+      started = await this.vscode.debug.startDebugging(folder, action.debugConfiguration, { noDebug: false });
+      if (!started) {
+        this.debugBindings.delete(binding.bindingId);
+        await this.persistDebugBindings();
+        throw new Error("VS Code refused to start the exact verified debug configuration.");
+      }
+      const running = await boundedPromise(pending.promise, this.debugLifecycleTimeoutMs, "VS Code did not publish the exact started debug-session identity within the bounded window.");
+      return `Started and durably bound VS Code debug configuration ${running.configuration} to operation ${running.originOperationId}.`;
+    } catch (error) {
+      if (started && this.debugBindings.has(binding.bindingId) && !(error instanceof HostEffectError)) throw new HostEffectError(error instanceof Error ? error.message : "The started debug session requires reconciliation.", "ambiguous");
+      throw error;
+    } finally {
+      this.pendingDebugStarts.delete(binding.bindingId);
+    }
+  }
+
+  private async stopBoundDebugSession(action: ForwardedHostAction, selectedSessionId: string | undefined): Promise<string> {
+    if (!action.workspaceRoot || !action.debugConfiguration || !action.debugSessionId || !action.debugOriginOperationId || !selectedSessionId) throw new Error("The companion did not bind debug stop to an exact session, origin operation, workspace, and configuration.");
+    const binding = [...this.debugBindings.values()].find((candidate) => candidate.debugSessionId === action.debugSessionId);
+    if (!binding || binding.status !== "running" || binding.managedSessionId !== selectedSessionId
+      || binding.originOperationId !== action.debugOriginOperationId || binding.configuration !== action.debugConfiguration
+      || !samePath(binding.workspaceRoot, action.workspaceRoot)) throw new Error("The requested VS Code debug session is absent, stale, ambiguous, or bound to a different origin.");
+    const debugSession = this.debugSessionObjects.get(action.debugSessionId)
+      ?? (this.vscode.debug.activeDebugSession?.id === action.debugSessionId ? this.vscode.debug.activeDebugSession : undefined);
+    if (!debugSession) throw new Error("The exact durable debug identity is not active in this VS Code host.");
+    const stopping: StoredDebugBinding = { ...binding, status: "stopping" };
+    this.debugBindings.set(binding.bindingId, stopping);
+    await this.persistDebugBindings();
+    const pending = createPendingDebugStop(action.debugSessionId);
+    this.pendingDebugStops.set(action.debugSessionId, pending);
+    let accepted = false;
+    try {
+      this.assertAdmissionActive();
+      accepted = await this.vscode.debug.stopDebugging(debugSession);
+      if (!accepted) {
+        this.debugBindings.set(binding.bindingId, binding);
+        await this.persistDebugBindings();
+        throw new Error("VS Code refused to stop the exact bound debug session.");
+      }
+      await boundedPromise(pending.promise, this.debugLifecycleTimeoutMs, "VS Code accepted debug stop but did not publish exact termination within the bounded window.");
+      return `Stopped exact VS Code debug session ${action.debugSessionId} from operation ${action.debugOriginOperationId}.`;
+    } catch (error) {
+      if (accepted && this.debugBindings.has(binding.bindingId)) throw new HostEffectError(error instanceof Error ? error.message : "The debug stop requires reconciliation.", "ambiguous");
+      throw error;
+    } finally {
+      this.pendingDebugStops.delete(action.debugSessionId);
     }
   }
 
@@ -1830,6 +2367,7 @@ export class ManagedSessionController {
       || launcherIdentity.size !== prepared.launcherSize || launcherIdentity.mtimeMs !== prepared.launcherModifiedMs
       || launcherExactIdentity.device !== prepared.launcherDevice || launcherExactIdentity.inode !== prepared.launcherInode) throw new Error("The fixed managed-terminal launcher identity changed after final authorization.");
     this.requireLiveHostAuthorization({ expiresAt: authorizationExpiresAt });
+    this.assertAdmissionActive();
     const receiptReservation = await this.managedTerminalReceiptFactory({ provider: expectedProvider, canonicalExecutablePath: prepared.canonicalExecutablePath, canonicalWorkspaceRoot: prepared.canonicalRoot });
     const descriptor = Buffer.from(JSON.stringify({
       schema: "sxsy-b122.managed-terminal-launch",
@@ -1855,6 +2393,7 @@ export class ManagedSessionController {
     }
     let terminal: TerminalLike;
     try {
+      this.assertAdmissionActive();
       terminal = this.vscode.window.createTerminal({ name: prepared.profile.profileName, cwd: prepared.canonicalRoot, shellPath: prepared.canonicalLauncherPath, shellArgs: ["--managed-terminal-v1", descriptor] });
     } catch (error) {
       await receiptReservation.dispose().catch(() => undefined);
@@ -1930,6 +2469,17 @@ export class ManagedSessionController {
   }
 
   private async resolveDispatchSession(command: ChordCommand): Promise<string | null | undefined> {
+    if (command.control === "RUN" && command.modifier === "alt") {
+      const bindings = [...this.debugBindings.values()].filter((binding) => binding.status === "running" && !!binding.debugSessionId && !!binding.managedSessionId
+        && this.debugSessionObjects.has(binding.debugSessionId!) && this.sessions.get(binding.managedSessionId!)?.status === "running");
+      if (bindings.length === 1) return bindings[0]!.managedSessionId;
+      if (bindings.length > 1) {
+        const items = bindings.map((binding) => ({ label: `${binding.configuration} — ${binding.workspaceRoot}`, description: `Origin ${binding.originOperationId}`, detail: binding.managedSessionId }));
+        const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose one exact durable VS Code debug session to stop" });
+        if (!selected) return null;
+        return bindings[items.indexOf(selected)]?.managedSessionId ?? null;
+      }
+    }
     if (command.control === "VOICE" && command.modifier === "alt") {
       const active = this.activeSessionId();
       const session = active ? this.sessions.get(active) : undefined;
@@ -1957,6 +2507,11 @@ export class ManagedSessionController {
   private workspaceRoots(): readonly string[] {
     return (this.vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath);
   }
+}
+
+function boundedAdapterVersion(value: string): string {
+  if (!/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The VS Code adapter package version is invalid.");
+  return value;
 }
 
 interface PreparedManagedTerminal {
@@ -2008,6 +2563,40 @@ function boundedManagedTerminalHealth(value: number): number {
 function boundedRepeatWindow(value: number): number {
   if (!Number.isSafeInteger(value) || value < 250 || value > 5_000) throw new Error("The repeat-gesture interval is invalid.");
   return value;
+}
+function boundedDebugLifecycleTimeout(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 50 || value > 30_000) throw new Error("The VS Code debug lifecycle timeout is invalid.");
+  return value;
+}
+function exactDebugReference(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 256 || /[\r\n\0]/.test(value)) throw new Error(`The ${label} is invalid.`);
+  return value;
+}
+function createPendingDebugStart(bindingId: string): PendingDebugStart {
+  let resolvePromise!: (binding: StoredDebugBinding) => void;
+  let rejectPromise!: (error: Error) => void;
+  let settled = false;
+  const promise = new Promise<StoredDebugBinding>((resolvePending, rejectPending) => { resolvePromise = resolvePending; rejectPromise = rejectPending; });
+  promise.catch(() => undefined);
+  return {
+    bindingId,
+    promise,
+    resolve(binding) { if (!settled) { settled = true; resolvePromise(binding); } },
+    reject(error) { if (!settled) { settled = true; rejectPromise(error); } }
+  };
+}
+function createPendingDebugStop(debugSessionId: string): PendingDebugStop {
+  let resolvePromise!: () => void;
+  let rejectPromise!: (error: Error) => void;
+  let settled = false;
+  const promise = new Promise<void>((resolvePending, rejectPending) => { resolvePromise = resolvePending; rejectPromise = rejectPending; });
+  promise.catch(() => undefined);
+  return {
+    debugSessionId,
+    promise,
+    resolve() { if (!settled) { settled = true; resolvePromise(); } },
+    reject(error) { if (!settled) { settled = true; rejectPromise(error); } }
+  };
 }
 async function boundedPromise<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -2088,6 +2677,18 @@ async function reserveManagedTerminalReceipt(input: Readonly<{ provider: "claude
 }
 function providerLabel(provider: ProviderDesktopId): string { return ({ claude_desktop: "Claude Desktop", chatgpt_desktop: "ChatGPT Desktop", claude_code: "Claude Code", codex: "Codex" } as const)[provider]; }
 function commaList(value: string): readonly string[] { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }
+
+/**
+ * Drain controller work before zeroizing the DPAPI reader. Reader disposal is
+ * a finally action so an exceptional drain cannot strand opened token bytes.
+ */
+export async function deactivateManagedExtension(
+  activeController: Pick<ManagedSessionController, "stop"> | undefined,
+  activeSecretReader: Readonly<{ dispose(): Promise<void> }> | undefined
+): Promise<void> {
+  try { await activeController?.stop(); }
+  finally { await activeSecretReader?.dispose(); }
+}
 
 export interface WorkflowResultPresentation {
   readonly summary: string;
@@ -2298,7 +2899,7 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
     "TERMINAL:normal": "focus_external_terminal", "TERMINAL:shift": "focus_integrated_terminal",
     "COMMIT:shift": "open_external_url",
     "GITHUB:normal": "open_external_url", "GITHUB:shift": "open_external_url", "GITHUB:alt": "open_external_url", "GITHUB:shift_alt": "open_external_url",
-    "RUN:shift": "start_vscode_debug", "RUN:shift_alt": "open_external_url", "SANDBOX:normal": "configure_python_venv", "SANDBOX:shift": "configure_python_venv", "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "show_voice_center", "VOICE:shift": "switch_voice_provider",
+    "RUN:shift": "start_vscode_debug", "RUN:alt": "stop_vscode_debug", "RUN:shift_alt": "open_external_url", "SANDBOX:normal": "configure_python_venv", "SANDBOX:shift": "configure_python_venv", "COMPOUND:alt": "open_compound_palette", "VOICE:normal": "show_voice_center", "VOICE:shift": "switch_voice_provider",
     "VOICE:shift_alt": "show_voice_session_picker", "PIPELINE:alt": "show_pipeline_failure_trace"
   };
   return actions[key];
@@ -2434,6 +3035,24 @@ function isModifier(value: unknown): value is B122Modifier {
 
 function isDebugConfiguration(value: unknown): value is DebugConfigurationLike {
   return isRecord(value) && (value.name === undefined || typeof value.name === "string");
+}
+
+function isStoredDebugBinding(value: unknown): value is StoredDebugBinding {
+  if (!isRecord(value)) return false;
+  const required = ["version", "bindingId", "originOperationId", "originSessionId", "workspaceRoot", "configuration", "startedAt", "status"];
+  const optional = ["targetSnapshotId", "debugSessionId", "managedSessionId"];
+  const keys = Object.keys(value);
+  return keys.every((key) => required.includes(key) || optional.includes(key)) && required.every((key) => key in value)
+    && value.version === 1
+    && [value.bindingId, value.originOperationId, value.originSessionId].every((item) => typeof item === "string" && !!item.trim() && item.length <= 256 && !/[\r\n\0]/.test(item))
+    && typeof value.workspaceRoot === "string" && !!value.workspaceRoot.trim() && value.workspaceRoot.length <= 4_096 && !/[\r\n\0]/.test(value.workspaceRoot)
+    && typeof value.configuration === "string" && !!value.configuration.trim() && value.configuration.length <= 256 && !/[\r\n\0]/.test(value.configuration)
+    && typeof value.startedAt === "string" && Number.isFinite(Date.parse(value.startedAt))
+    && (value.status === "starting" || value.status === "running" || value.status === "stopping")
+    && (value.targetSnapshotId === undefined || typeof value.targetSnapshotId === "string" && !!value.targetSnapshotId.trim() && value.targetSnapshotId.length <= 256 && !/[\r\n\0]/.test(value.targetSnapshotId))
+    && (value.debugSessionId === undefined || typeof value.debugSessionId === "string" && !!value.debugSessionId.trim() && value.debugSessionId.length <= 256 && !/[\r\n\0]/.test(value.debugSessionId))
+    && (value.managedSessionId === undefined || typeof value.managedSessionId === "string" && !!value.managedSessionId.trim() && value.managedSessionId.length <= 256 && !/[\r\n\0]/.test(value.managedSessionId))
+    && (value.status === "starting" ? value.debugSessionId === undefined && value.managedSessionId === undefined : typeof value.debugSessionId === "string" && typeof value.managedSessionId === "string");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

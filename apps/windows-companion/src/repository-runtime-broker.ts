@@ -266,6 +266,10 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
           });
         }
       };
+      if (action === "stop_managed_run" && request.session?.metadata["sxsy-b122.kind"] === "debug-session") {
+        if (!this.hostActions) return { status: "unavailable", summary: "The authenticated VS Code host-action queue is unavailable for the exact debug session." };
+        return this.queueVerifiedDebugStop(request, runtime);
+      }
       const result = await runtime.execute(action as RepositoryRuntimeAction, { operationId: request.operationId, signal: operationControl.signal, effectGuard });
       if (action === "debug_target" && result.status === "running" && result.debugConfiguration && this.hostActions) {
         return this.queueVerifiedDebug(request, result.debugConfiguration);
@@ -326,6 +330,52 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       };
     } catch {
       return { status: "failed", summary: "The verified debug configuration could not be durably queued for the authenticated VS Code host." };
+    }
+  }
+
+  private async queueVerifiedDebugStop(request: ExecutionRequest, runtime: RepositoryRuntime): Promise<BrokerOutcome> {
+    const session = request.session;
+    if (!session || session.status !== "running" || session.metadata["sxsy-b122.kind"] !== "debug-session"
+      || !session.workspaceRoot || !samePath(session.workspaceRoot, request.target.repositoryRoot)
+      || !runtime.allowsManagedStop("debug_target")) return { status: "blocked", summary: "The selected debug session is not an active exact target allowed by the verified stop recipe." };
+    let debugSessionId: string;
+    let originOperationId: string;
+    let originSessionId: string;
+    let configuration: string;
+    try {
+      debugSessionId = boundedDebugIdentity(session.metadata["sxsy-b122.debugSessionId"], "VS Code debug session ID");
+      originOperationId = boundedDebugIdentity(session.metadata["sxsy-b122.debugOriginOperationId"], "VS Code debug origin operation ID");
+      originSessionId = boundedDebugIdentity(session.metadata["sxsy-b122.debugOriginSessionId"], "VS Code debug origin session ID");
+      configuration = boundedDebugIdentity(session.metadata["sxsy-b122.debugConfiguration"], "VS Code debug configuration");
+    } catch {
+      return { status: "blocked", summary: "The selected debug session has invalid or incomplete durable identity metadata." };
+    }
+    const workspaceRoot = session.metadata["sxsy-b122.debugWorkspaceRoot"];
+    if (!workspaceRoot || !samePath(workspaceRoot, request.target.repositoryRoot) || originSessionId === session.id) return { status: "blocked", summary: "The selected debug session changed its exact durable origin or workspace binding." };
+    const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;
+    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason };
+    const current = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) });
+    if (!current.allowed) return { status: "incomplete", summary: current.reason };
+    try {
+      const intent = await this.hostActions!.enqueue({
+        definition: commandForAction(request.action), operationId: request.operationId, target: request.target, session,
+        ...(request.authority ? { authority: request.authority } : {}), ...(request.executionControl ? { executionControl: request.executionControl } : {}), effectGuard: request.effectGuard
+      }, { hostAction: "stop_vscode_debug", debugConfiguration: configuration, debugSessionId, debugOriginOperationId: originOperationId });
+      return {
+        status: "running",
+        summary: "Stopping the exact durable VS Code debug session awaits authenticated host acknowledgement.",
+        data: {
+          hostActionId: intent.id,
+          hostActionKind: intent.hostAction,
+          hostActionExpiresAt: intent.expiresAt,
+          hostActionWorkspaceRoot: intent.workspaceRoot,
+          hostActionDebugConfiguration: intent.debugConfiguration,
+          hostActionDebugSessionId: intent.debugSessionId,
+          hostActionDebugOriginOperationId: intent.debugOriginOperationId
+        }
+      };
+    } catch {
+      return { status: "failed", summary: "The exact VS Code debug stop could not be durably queued for authenticated host execution." };
     }
   }
 
@@ -471,6 +521,11 @@ function samePath(left: string, right: string): boolean {
   const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "");
   const [a, b] = [normalize(left), normalize(right)];
   return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+function boundedDebugIdentity(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 256 || /[\r\n\0]/.test(value)) throw new Error(`The ${label} is invalid.`);
+  return value;
 }
 
 function trustedRuntimeUrl(value: string): boolean {

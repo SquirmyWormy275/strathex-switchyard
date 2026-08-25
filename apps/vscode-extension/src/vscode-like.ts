@@ -44,6 +44,7 @@ export interface DebugSessionLike {
   readonly id?: string;
   readonly name: string;
   readonly configuration?: DebugConfigurationLike;
+  readonly workspaceFolder?: WorkspaceFolderLike;
 }
 
 export interface QuickPickItemLike {
@@ -79,7 +80,9 @@ export interface VscodeLike {
     onDidChangeWorkspaceFolders(listener: () => unknown): DisposableLike;
   };
   readonly debug: {
+    readonly activeDebugSession?: DebugSessionLike;
     startDebugging(folder: WorkspaceFolderLike | undefined, configuration: string | DebugConfigurationLike, options?: { readonly noDebug?: boolean }): PromiseLike<boolean>;
+    stopDebugging(session?: DebugSessionLike): PromiseLike<boolean>;
     onDidStartDebugSession(listener: (session: DebugSessionLike) => unknown): DisposableLike;
     onDidTerminateDebugSession(listener: (session: DebugSessionLike) => unknown): DisposableLike;
   };

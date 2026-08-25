@@ -120,6 +120,7 @@ if ($ProviderBaseUri) {
   Trace-Stage 'provider-council-ready'
   foreach ($provider in @('claude','codex')) {
     $routes += Provider-Route ("provider.observe-session.$provider") 'POST' ("$base/v1/b122/observe/session/$provider") @{'content-type'='application/json'} $providerCredential
+    $routes += Provider-Route ("provider.observe-workflow-context.$provider") 'POST' ("$base/v1/b122/observe/workflow-context/$provider") @{'content-type'='application/json'} $providerCredential
     $routes += Provider-Route ("provider.observe-operation.$provider") 'POST' ("$base/v1/b122/observe/operation/$provider") @{'content-type'='application/json'} $providerCredential
     $routes += Provider-Route ("provider.cancel.$provider") 'POST' ("$base/v1/b122/cancel/$provider") @{'content-type'='application/json'} $providerCredential
   }

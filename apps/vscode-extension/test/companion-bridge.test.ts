@@ -61,6 +61,129 @@ test("the VS Code JSON-lines client sends bounded companion methods and preserve
   assert.equal(seen.every((entry) => entry.id.startsWith("isolated-vscode-")), true);
 });
 
+test("Plan Approval preparation exact-parses the protected review packet and echoes only its reviewed scope", async () => {
+  const boundSession = { ...session, provider: "codex" as const, targetSnapshotId: "1".repeat(64), taskId: "task-plan", planRevision: "revision-plan" };
+  const workflowReview = {
+    action: "plan_approval",
+    sessionId: boundSession.id,
+    targetSnapshotId: boundSession.targetSnapshotId,
+    repositoryRoot: boundSession.workspaceRoot,
+    provider: "codex",
+    contextId: "provider-context-1",
+    observedAt: "2026-08-25T00:00:00.000Z",
+    adapter: { id: "configured-provider-host", version: "1.2.3", moduleSha256: "2".repeat(64) },
+    plan: {
+      digest: "3".repeat(64), revision: boundSession.planRevision, originSessionId: "origin-session", taskId: boundSession.taskId,
+      objective: "Execute only the immutable reviewed plan.",
+      steps: [{ id: "step-1", summary: "Review and execute.", ownedFiles: ["src/plan.ts"], dependencies: [], status: "approved" }],
+      decisions: ["Keep the protected target unchanged."]
+    },
+    scopeDigest: "4".repeat(64),
+    summary: "Exact provider-observed plan scope.",
+    providerContextDigest: "5".repeat(64),
+    sourceRevision: 3
+  } as const;
+  let final = false;
+  let corrupt = false;
+  const seen: unknown[] = [];
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; payload: unknown };
+      seen.push(request.payload);
+      const preparation = final
+        ? { status: "prepared", summary: "Confirmed unchanged review.", session: boundSession, authorityId: "authority-plan", confirmationToken: "confirmation-plan", confirmationScopeDigest: workflowReview.scopeDigest }
+        : { status: "incomplete", summary: "Review required.", session: boundSession, workflowReview: corrupt ? { ...workflowReview, extra: true } : workflowReview };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { preparation } });
+    }
+  }, "plan-review-vscode");
+
+  const first = await bridge.prepareCommand({ control: "PLAN_APPROVAL", modifier: "normal", sessionId: boundSession.id, reason: "Review exact plan" });
+  assert.ok(first.ok && first.value.workflowReview?.scopeDigest === workflowReview.scopeDigest);
+  final = true;
+  const second = await bridge.prepareCommand({ control: "PLAN_APPROVAL", modifier: "normal", sessionId: boundSession.id, reason: "Review exact plan", reviewScopeDigest: workflowReview.scopeDigest });
+  assert.ok(second.ok && second.value.confirmationScopeDigest === workflowReview.scopeDigest);
+  assert.equal((seen[1] as { reviewScopeDigest?: string }).reviewScopeDigest, workflowReview.scopeDigest);
+  final = false;
+  corrupt = true;
+  assert.equal((await bridge.prepareCommand({ control: "PLAN_APPROVAL", modifier: "normal", sessionId: boundSession.id, reason: "Review exact plan" })).ok, false);
+});
+
+test("containment IPC exact-parses the active fence inspection and carries both expected release bindings", async () => {
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  const containment = {
+    sessionId: session.id,
+    repositoryRoot: session.workspaceRoot!,
+    active: true,
+    fenceEpoch: 9,
+    activatedByOperationId: "operation-containment-9",
+    hookStates: [
+      { name: "credential_lease_revocation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:00.000Z" },
+      { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
+    ],
+    hookFailures: [],
+    uncontrolledPaths: ["unmediated-local-user-processes"]
+  } as const;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      seen.push({ method: request.method, payload: request.payload });
+      const result = request.method === "containment.inspect"
+        ? { containment }
+        : { command: { status: "completed", summary: "Exact containment generation released." } };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+    }
+  }, "containment-vscode");
+
+  const inspected = await bridge.inspectContainment(session.id);
+  assert.equal(inspected.ok, true);
+  if (inspected.ok) assert.equal(inspected.value.fenceEpoch, 9);
+  const request = {
+    sessionId: session.id,
+    reason: "Reviewed exact active containment generation.",
+    incidentStatus: "rotation_complete" as const,
+    expectedFenceEpoch: 9,
+    expectedActivationOperationId: "operation-containment-9"
+  };
+  const released = await bridge.releaseContainment(request);
+  assert.equal(released.ok, true);
+  assert.deepEqual(seen, [
+    { method: "containment.inspect", payload: { sessionId: session.id } },
+    { method: "containment.release", payload: request }
+  ]);
+});
+
+test("containment IPC rejects a mismatched session, incomplete hook inventory, or response extras", async () => {
+  const valid = {
+    sessionId: session.id,
+    repositoryRoot: session.workspaceRoot!,
+    active: true,
+    fenceEpoch: 3,
+    activatedByOperationId: "operation-containment-3",
+    hookStates: [
+      { name: "credential_lease_revocation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:00.000Z" },
+      { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
+    ],
+    hookFailures: [],
+    uncontrolledPaths: []
+  };
+  const invalid = [
+    { ...valid, sessionId: "different-session" },
+    { ...valid, hookStates: valid.hookStates.slice(0, 1) },
+    { ...valid, unreviewedExtra: true }
+  ];
+  for (const containment of invalid) {
+    const bridge = new JsonLineCompanionBridge({
+      async request(line) {
+        const request = JSON.parse(line) as { id: string };
+        return JSON.stringify({ version: 1, id: request.id, ok: true, result: { containment } });
+      }
+    }, "invalid-containment");
+    const result = await bridge.inspectContainment(session.id);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.code, "invalid_response");
+  }
+});
+
 test("credential IPC carries exact scope triples and rejects a broadened durable receipt", async () => {
   const scopes = [
     { repositoryRoot: "C:/isolated/repo", adapterId: "configured-network", purpose: "provider-api" },
@@ -119,7 +242,7 @@ test("managed-session listing accepts only the strict protected-registry shape",
   let malformed = false;
   const bridge = new JsonLineCompanionBridge({
     async request(line) {
-      const request = JSON.parse(line) as { id: string; method: string };
+      const request = JSON.parse(line) as { id: string; method: string; payload?: Record<string, unknown> };
       assert.equal(request.method, "session.list");
       return JSON.stringify({ version: 1, id: request.id, ok: true, result: malformed ? [{ ...session, capabilities: ["registered", "fabricated"] }] : [session] });
     }
@@ -286,16 +409,19 @@ test("hardware bridge never sends a client-selected chord and carries the server
   assert.equal(claim.ok, true);
   assert.ok(claim.ok && claim.value);
   if (!claim.ok || !claim.value) return;
-  const prepared = await bridge.prepareHardwareSignal(claim.value, session.id, "Focused physical chord");
+  const prepared = await bridge.prepareHardwareSignal(claim.value, session.id, "Focused physical chord", "d".repeat(64));
   assert.equal(prepared.ok, true);
-  const dispatched = await bridge.dispatchHardwareSignal(claim.value, { sessionId: session.id, authorityId: "authority" });
+  const dispatched = await bridge.dispatchHardwareSignal(claim.value, { sessionId: session.id, authorityId: "authority", confirmationToken: "confirmation", confirmationScopeDigest: "d".repeat(64) });
   assert.equal(dispatched.ok, true);
   if (!dispatched.ok) return;
   await bridge.completeHardwareSignal(claim.value, { outcome: "handled", summary: "Mediated dispatch returned.", dispatchReceiptId: dispatched.value.dispatchReceiptId, dispatchSessionId: session.id, repositoryRoot: "C:/isolated/repo" });
 
   const dispatchPayload = seen.find((entry) => entry.method === "hardware-signal.dispatch")?.payload;
+  const preparationPayload = seen.find((entry) => entry.method === "hardware-signal.prepare")?.payload;
+  assert.equal(preparationPayload?.reviewScopeDigest, "d".repeat(64));
   assert.equal("control" in (dispatchPayload ?? {}), false);
   assert.equal("modifier" in (dispatchPayload ?? {}), false);
+  assert.equal(dispatchPayload?.confirmationScopeDigest, "d".repeat(64));
   assert.equal(seen.find((entry) => entry.method === "hardware-signal.complete")?.payload?.dispatchReceiptId, dispatchReceiptId);
 });
 
@@ -342,6 +468,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   } as const;
   const artifact = {
     action: "handoff", repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, sessionId: session.id,
+    authorityId: "authority-1",
     payload: { kind: "handoff", packageId: handoff.id, route: "queue", recipientSessionId: handoff.recipientSessionId }, id: "artifact-1", digest: "b".repeat(64),
     status: "prepared", executionAuthorized: false, createdAt: "2026-08-24T00:00:01.000Z", updatedAt: "2026-08-24T00:00:01.000Z"
   } as const;
@@ -364,6 +491,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
           : request.method === "handoff.routing.get" ? { routing: "queue" }
             : request.method === "workflow.prepare" ? { artifact: corrupt ? { ...artifact, executionAuthorized: true } : artifact }
               : request.method === "workflow.list" ? { artifacts: [artifact] }
+                : request.method === "workflow.cancel" ? { artifact: corrupt ? { ...artifact, status: "cancelled", sessionId: "substituted-session" } : { ...artifact, status: "cancelled" } }
                 : request.method === "voice.consent" ? { consent }
                   : request.method === "voice.current" ? { binding }
                     : { binding };
@@ -376,6 +504,9 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   assert.deepEqual(await bridge.handoffRouting(), { ok: true, value: "queue" });
   assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } })).ok, true);
   assert.equal((await bridge.listWorkflows()).ok, true);
+  const cancelled = await bridge.cancelWorkflow({ artifactId: artifact.id, sessionId: session.id, authorityId: "authority-1" });
+  assert.equal(cancelled.ok, true);
+  assert.equal(methods.includes("workflow.cancel"), true);
   assert.equal((await bridge.grantVoiceConsent({ handoffId: handoff.id, provider: "claude", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 })).ok, true);
   assert.equal((await bridge.startVoice({ consentId: consent.id, voiceSessionId: binding.voiceSessionId, managedSessionId: session.id })).ok, true);
   assert.equal((await bridge.currentVoice()).ok, true);
@@ -386,6 +517,9 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } });
   assert.equal(forgedAuthority.ok, false);
   if (!forgedAuthority.ok) assert.equal(forgedAuthority.code, "invalid_response");
+  const substitutedCancellation = await bridge.cancelWorkflow({ artifactId: artifact.id, sessionId: session.id, authorityId: "authority-1" });
+  assert.equal(substitutedCancellation.ok, false);
+  if (!substitutedCancellation.ok) assert.equal(substitutedCancellation.code, "invalid_response");
 });
 
 test("durable workflow results preserve only the exact bounded provider-result envelope", async () => {

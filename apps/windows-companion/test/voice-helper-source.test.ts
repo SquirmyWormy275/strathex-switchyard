@@ -48,10 +48,14 @@ test("native route administration keeps secrets off argv and persists only curre
   assert.doesNotMatch(source, /args\[[0-9]+\].*(?:secret|token|credential)/i);
 });
 
-test("standalone startup always stops retention and voice after a later startup failure", async () => {
+test("standalone startup uses bounded ordered teardown for retention and voice after a later startup failure", async () => {
   const source = await readFile(join(companionRoot, "src", "main.ts"), "utf8");
   assert.match(source, /await transcriptVault\.startRetentionEnforcement/);
+  assert.match(source, /closeStandaloneResources\(/);
+  assert.match(source, /for \(let index = 0; index < input\.resources\.length; index \+= 1\)/);
+  assert.match(source, /closeResourceWithinBound\(resource, closeTimeoutMs\)/);
+  assert.doesNotMatch(source, /Promise\.allSettled/);
   assert.match(source, /transcriptVault\?\.stopRetentionEnforcement\(\)/);
-  assert.match(source, /await voiceRuntime\?\.shutdown\(\)\.catch/);
-  assert.match(source, /await companion\.voiceRuntime\.shutdown\(\)/);
+  assert.match(source, /name: "voice-runtime", close: \(\) => voiceRuntime\?\.shutdown\(\)/);
+  assert.match(source, /await stopAll\(\)\.catch/);
 });

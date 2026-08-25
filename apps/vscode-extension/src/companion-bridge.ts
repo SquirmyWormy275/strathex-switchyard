@@ -28,6 +28,7 @@ export interface ForwardedCommand {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
   readonly input?: Readonly<Record<string, string>>;
 }
 
@@ -43,7 +44,7 @@ export type LocalHostAction =
   | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
   | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
   | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
-  | "show_voice_center" | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "configure_python_venv" | "select_github_navigation";
+  | "show_voice_center" | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "stop_vscode_debug" | "configure_python_venv" | "select_github_navigation";
 
 export interface GitHubNavigationCandidate { readonly id: string; readonly label: string; readonly description: string; readonly url: string; }
 
@@ -54,6 +55,8 @@ export interface ForwardedHostAction {
   readonly url?: string;
   readonly workspaceRoot?: string;
   readonly debugConfiguration?: string;
+  readonly debugSessionId?: string;
+  readonly debugOriginOperationId?: string;
   readonly pythonInterpreter?: string;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly managedTerminalProfile?: ManagedTerminalProfileSummary;
@@ -73,7 +76,33 @@ export interface PreparedCommand {
   readonly session?: ExtensionManagedSession;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
   readonly confirmationExpiresAt?: string;
+  readonly workflowReview?: PlanApprovalWorkflowReview;
+}
+
+export interface PlanApprovalWorkflowReview {
+  readonly action: "plan_approval";
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly provider: "claude" | "codex";
+  readonly contextId: string;
+  readonly observedAt: string;
+  readonly adapter: Readonly<{ readonly id: string; readonly version: string; readonly moduleSha256: string }>;
+  readonly plan: Readonly<{
+    readonly digest: string;
+    readonly revision: string;
+    readonly originSessionId: string;
+    readonly taskId: string;
+    readonly objective: string;
+    readonly steps: readonly Readonly<{ readonly id: string; readonly summary: string; readonly ownedFiles: readonly string[]; readonly dependencies: readonly string[]; readonly status: "proposed" | "approved" | "completed" | "blocked" }>[];
+    readonly decisions: readonly string[];
+  }>;
+  readonly scopeDigest: string;
+  readonly summary: string;
+  readonly providerContextDigest: string;
+  readonly sourceRevision: number;
 }
 
 export type ReviewedGitMutation =
@@ -134,6 +163,19 @@ export interface ManagedTerminalProfileSummary { readonly provider: "claude_code
 export interface RawHidDeviceIdentity { readonly vendorId: number; readonly productId: number; readonly usagePage: number; readonly usage: number; readonly serialNumber?: string; }
 export interface RawHidInstallationPin { readonly identity: RawHidDeviceIdentity; readonly helperPath: string; readonly helperSha256: string; readonly protocolVersion: number; readonly mapFingerprint: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
 export interface RawHidRuntimeStatus { readonly supervisor: { readonly state: "unprovisioned" | "starting" | "running" | "retrying" | "stopped" | "unavailable"; readonly generation: number; readonly detail: string }; readonly inbox: { readonly pending: number; readonly claimed: number; readonly completed: number; readonly needsReconciliation: number }; readonly installations: readonly RawHidInstallationPin[]; }
+export type ContainmentHookName = "credential_lease_revocation" | "queued_operation_cancellation";
+export type ContainmentHookStatus = "pending" | "running" | "completed" | "failed" | "unavailable";
+export interface ContainmentHookInspection { readonly name: ContainmentHookName; readonly status: ContainmentHookStatus; readonly attempts: number; readonly updatedAt: string; readonly failure?: string; }
+export interface ContainmentInspectionSummary {
+  readonly sessionId: string;
+  readonly repositoryRoot: string;
+  readonly active: true;
+  readonly fenceEpoch: number;
+  readonly activatedByOperationId: string;
+  readonly hookStates: readonly ContainmentHookInspection[];
+  readonly hookFailures: readonly string[];
+  readonly uncontrolledPaths: readonly string[];
+}
 export interface HardwareSignalClaim { readonly signalId: string; readonly claimToken: string; readonly deviceId: string; readonly connectionEpoch: number; readonly bootNonce: number; readonly counter: number; readonly control: B122Control; readonly modifier: B122Modifier; readonly acceptedAt: string; readonly claimedAt: string; readonly attempt: number; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
 export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
 export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
@@ -145,8 +187,31 @@ export type ExtensionWorkflowPreparationIntent =
   | { readonly kind: "decision"; readonly question: string; readonly context: string }
   | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "queue" | "immediate" }
   | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
-  | { readonly kind: "plan_approval"; readonly confirmationToken: string };
-export interface ExtensionWorkflowArtifact { readonly id: string; readonly digest: string; readonly action: ExtensionWorkflowAction; readonly targetSnapshotId: string; readonly sessionId: string; readonly payload: Readonly<Record<string, unknown>>; readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled"; readonly executionAuthorized: false; }
+  | { readonly kind: "plan_approval"; readonly confirmationToken: string; readonly confirmationScopeDigest: string };
+export interface ExtensionWorkflowArtifact {
+  readonly id: string;
+  readonly digest: string;
+  readonly action: ExtensionWorkflowAction;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId: string;
+  readonly taskId?: string;
+  readonly planRevision?: string;
+  readonly authorityId: string;
+  readonly coordinatorContextDigest?: string;
+  readonly coordinatorContextRevision?: number;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled";
+  readonly operationId?: string;
+  readonly providerExternalId?: string;
+  readonly providerResult?: ExtensionWorkflowProviderResult;
+  readonly providerSummary?: string;
+  readonly providerResponseStatus?: "completed" | "failed" | "blocked" | "unavailable" | "running" | "awaiting_input" | "awaiting_confirmation";
+  readonly providerEffectDisposition?: "not_started" | "committed" | "ambiguous";
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
 export type ExtensionWorkflowProviderResult =
   | { readonly kind: "anchor"; readonly anchorDigest: string; readonly discrepancies: readonly string[]; readonly questions: readonly string[]; readonly resumed: false }
   | { readonly kind: "proof"; readonly verifiedClaims: readonly string[]; readonly evidenceReferences: readonly string[]; readonly backendResults: readonly { readonly backend: string; readonly status: "passed" | "failed" | "unavailable" }[] }
@@ -180,7 +245,7 @@ export interface ExtensionCompanionBridge {
   adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>>;
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
-  prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>>;
+  prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<BridgeResult<PreparedCommand>>;
   inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>>;
   reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
   installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
@@ -214,13 +279,14 @@ export interface ExtensionCompanionBridge {
   listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>>;
   revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
-  releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>>;
+  inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
   installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
   rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>>;
   claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>>;
-  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
+  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
   dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
   completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
   createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>>;
@@ -231,6 +297,7 @@ export interface ExtensionCompanionBridge {
   handoffRouting(): Promise<BridgeResult<"queue" | "immediate">>;
   setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">>;
   prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
+  cancelWorkflow(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
   listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>>;
   grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>>;
   startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
@@ -300,16 +367,25 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.command };
   }
 
-  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required" }>): Promise<BridgeResult<ForwardedCommandResult>> {
+  async inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.inspect", { sessionId });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, sessionId)) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }>): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<unknown>("containment.release", input);
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
     return { ok: true, value: result.value.command };
   }
 
-  async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string }>): Promise<BridgeResult<PreparedCommand>> {
-    const result = await this.call<{ preparation: PreparedCommand }>("command.prepare", command);
-    return result.ok ? { ok: true, value: result.value.preparation } : result;
+  async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<BridgeResult<PreparedCommand>> {
+    const result = await this.call<unknown>("command.prepare", command);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["preparation"]) || !isPreparedCommand(result.value.preparation)) return invalidResponse();
+    return { ok: true, value: result.value.preparation };
   }
 
   async reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>> {
@@ -448,12 +524,14 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.claim };
   }
 
-  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
-    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, { ...(sessionId ? { sessionId } : {}), reason }));
+  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, { ...(sessionId ? { sessionId } : {}), reason, ...(reviewScopeDigest ? { reviewScopeDigest } : {}) }));
     if (!result.ok) return result;
     if (!isRecord(result.value) || !allowedExactKeys(result.value, ["preparation"], ["dispositionReceiptId"]) || !isPreparedCommand(result.value.preparation)
       || (result.value.dispositionReceiptId !== undefined && !isHardwareDispatchReceipt(result.value.dispositionReceiptId))
-      || (result.value.preparation.status === "prepared" ? result.value.dispositionReceiptId !== undefined : result.value.dispositionReceiptId === undefined)) return invalidResponse();
+      || (result.value.preparation.status === "prepared" || result.value.preparation.workflowReview !== undefined
+        ? result.value.dispositionReceiptId !== undefined
+        : result.value.dispositionReceiptId === undefined)) return invalidResponse();
     return { ok: true, value: { preparation: result.value.preparation, ...(typeof result.value.dispositionReceiptId === "string" ? { dispositionReceiptId: result.value.dispositionReceiptId } : {}) } };
   }
 
@@ -500,6 +578,15 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
     return { ok: true, value: result.value.artifact };
+  }
+
+  async cancelWorkflow(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
+    const result = await this.call<unknown>("workflow.cancel", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
+    const artifact = result.value.artifact;
+    if (artifact.id !== input.artifactId || artifact.sessionId !== input.sessionId || artifact.authorityId !== input.authorityId || artifact.status !== "cancelled") return invalidResponse();
+    return { ok: true, value: artifact };
   }
 
   async listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> {
@@ -671,6 +758,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return this.unavailable(); }
   revokeProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  inspectContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
@@ -688,6 +776,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
   setHandoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
   prepareWorkflow(): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return this.unavailable(); }
+  cancelWorkflow(): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return this.unavailable(); }
   listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> { return this.unavailable(); }
   grantVoiceConsent(): Promise<BridgeResult<ExtensionVoiceConsent>> { return this.unavailable(); }
   startVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
@@ -727,6 +816,8 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
   const url = result.data?.hostActionUrl;
   const workspaceRoot = result.data?.hostActionWorkspaceRoot;
   const debugConfiguration = result.data?.hostActionDebugConfiguration;
+  const debugSessionId = result.data?.hostActionDebugSessionId;
+  const debugOriginOperationId = result.data?.hostActionDebugOriginOperationId;
   const pythonInterpreter = result.data?.hostActionPythonInterpreter;
   const githubCandidates = result.data?.githubCandidates;
   const managedTerminalProfile = result.data?.managedTerminalProfile;
@@ -736,12 +827,19 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
     || (url !== undefined && typeof url !== "string")
     || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
     || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
+    || (debugSessionId !== undefined && (typeof debugSessionId !== "string" || !debugSessionId.trim() || debugSessionId.length > 256 || /[\r\n\0]/.test(debugSessionId)))
+    || (debugOriginOperationId !== undefined && (typeof debugOriginOperationId !== "string" || !debugOriginOperationId.trim() || debugOriginOperationId.length > 256 || /[\r\n\0]/.test(debugOriginOperationId)))
     || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))
     || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)
     || (kind === "create_claude_terminal" || kind === "create_codex_terminal"
       ? !isManagedTerminalProfile(managedTerminalProfile, kind === "create_claude_terminal" ? "claude_code" : "codex")
-      : managedTerminalProfile !== undefined)) return undefined;
-  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
+      : managedTerminalProfile !== undefined)
+    || (kind === "start_vscode_debug"
+      ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || debugSessionId !== undefined || debugOriginOperationId !== undefined
+      : kind === "stop_vscode_debug"
+        ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || typeof debugSessionId !== "string" || typeof debugOriginOperationId !== "string"
+        : debugSessionId !== undefined || debugOriginOperationId !== undefined)) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof debugSessionId === "string" ? { debugSessionId } : {}), ...(typeof debugOriginOperationId === "string" ? { debugOriginOperationId } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
 }
 
 function isLocalHostAction(value: string): value is LocalHostAction {
@@ -749,7 +847,7 @@ function isLocalHostAction(value: string): value is LocalHostAction {
     "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
     "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
     "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
-    "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv", "select_github_navigation"
+    "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "stop_vscode_debug", "configure_python_venv", "select_github_navigation"
   ].includes(value);
 }
 
@@ -761,6 +859,26 @@ function isGitHubCandidates(value: unknown): value is readonly GitHubNavigationC
     && typeof candidate.label === "string" && !!candidate.label.trim() && candidate.label.length <= 160 && !/[\r\n\0]/.test(candidate.label)
     && typeof candidate.description === "string" && !!candidate.description.trim() && candidate.description.length <= 512 && !/[\r\n\0]/.test(candidate.description)
     && typeof candidate.url === "string" && trustedHttpsUrl(candidate.url));
+}
+
+function isContainmentInspection(value: unknown, expectedSessionId: string): value is ContainmentInspectionSummary {
+  if (!isRecord(value) || !exactKeys(value, ["sessionId", "repositoryRoot", "active", "fenceEpoch", "activatedByOperationId", "hookStates", "hookFailures", "uncontrolledPaths"])
+    || value.sessionId !== expectedSessionId || !reference(value.sessionId) || !pathText(value.repositoryRoot) || value.active !== true
+    || !Number.isSafeInteger(value.fenceEpoch) || Number(value.fenceEpoch) < 1 || !reference(value.activatedByOperationId)
+    || !Array.isArray(value.hookStates) || value.hookStates.length !== 2
+    || !Array.isArray(value.hookFailures) || value.hookFailures.length > 16 || !value.hookFailures.every((failure) => contentText(failure, 2_048))
+    || !Array.isArray(value.uncontrolledPaths) || value.uncontrolledPaths.length > 256 || !value.uncontrolledPaths.every(pathText)
+    || new Set(value.uncontrolledPaths).size !== value.uncontrolledPaths.length) return false;
+  const hookNames = new Set<string>();
+  for (const hook of value.hookStates) {
+    if (!isRecord(hook) || !allowedExactKeys(hook, ["name", "status", "attempts", "updatedAt"], ["failure"])
+      || (hook.name !== "credential_lease_revocation" && hook.name !== "queued_operation_cancellation") || hookNames.has(hook.name)
+      || !["pending", "running", "completed", "failed", "unavailable"].includes(String(hook.status))
+      || !Number.isSafeInteger(hook.attempts) || Number(hook.attempts) < 0 || !timeText(hook.updatedAt)
+      || (hook.failure !== undefined && !contentText(hook.failure, 2_048))) return false;
+    hookNames.add(hook.name);
+  }
+  return hookNames.has("credential_lease_revocation") && hookNames.has("queued_operation_cancellation");
 }
 
 function isAcceptanceTrust(value: unknown): value is AcceptanceTrustSummary {
@@ -952,13 +1070,24 @@ function isExtensionHandoffPackage(value: unknown): value is ExtensionHandoffPac
 }
 
 function isExtensionWorkflowArtifact(value: unknown): value is ExtensionWorkflowArtifact {
-  const required = ["action", "repositoryRoot", "targetSnapshotId", "sessionId", "payload", "id", "digest", "status", "executionAuthorized", "createdAt", "updatedAt"];
-  if (!isRecord(value) || !allowedExactKeys(value, required, ["taskId", "planRevision", "operationId", "providerExternalId"])
-    || !workflowAction(value.action) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.sessionId)
+  const required = ["action", "repositoryRoot", "targetSnapshotId", "sessionId", "authorityId", "payload", "id", "digest", "status", "executionAuthorized", "createdAt", "updatedAt"];
+  const providerKeys = ["providerResult", "providerSummary", "providerResponseStatus", "providerEffectDisposition"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["taskId", "planRevision", "coordinatorContextDigest", "coordinatorContextRevision", "operationId", "providerExternalId", ...providerKeys])
+    || !workflowAction(value.action) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.sessionId) || !reference(value.authorityId)
     || !isRecord(value.payload) || !reference(value.id) || typeof value.digest !== "string" || !/^[a-f0-9]{64}$/.test(value.digest)
     || !["prepared", "submitted", "cancelling", "acknowledged", "rejected", "cancelled"].includes(value.status as string)
     || value.executionAuthorized !== false || !timeText(value.createdAt) || !timeText(value.updatedAt)
     || ![value.taskId, value.planRevision, value.operationId, value.providerExternalId].every((item) => item === undefined || reference(item))) return false;
+  const hasCoordinatorDigest = value.coordinatorContextDigest !== undefined;
+  const hasCoordinatorRevision = value.coordinatorContextRevision !== undefined;
+  if (hasCoordinatorDigest !== hasCoordinatorRevision || (hasCoordinatorDigest && (!sha256Text(value.coordinatorContextDigest)
+    || !Number.isSafeInteger(value.coordinatorContextRevision) || (value.coordinatorContextRevision as number) < 1))) return false;
+  const presentProviderKeys = providerKeys.filter((key) => value[key] !== undefined);
+  if (presentProviderKeys.length !== 0 && presentProviderKeys.length !== providerKeys.length) return false;
+  if (presentProviderKeys.length && (!isWorkflowProviderResult(value.providerResult)
+    || !workflowBoundedText(value.providerSummary, 1_024)
+    || !["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value.providerResponseStatus as string)
+    || !["not_started", "committed", "ambiguous"].includes(value.providerEffectDisposition as string))) return false;
   return true;
 }
 
@@ -1048,12 +1177,46 @@ function isHardwareSignalClaim(value: unknown): value is HardwareSignalClaim {
 }
 
 function isPreparedCommand(value: unknown): value is PreparedCommand {
-  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationExpiresAt"])
-    && ["prepared", "blocked", "unavailable", "incomplete"].includes(value.status as string)
-    && typeof value.summary === "string" && boundedText(value.summary, 512)
-    && (value.session === undefined || isRecord(value.session))
-    && [value.authorityId, value.confirmationToken].every((item) => item === undefined || (typeof item === "string" && boundedText(item, 512)))
-    && (value.confirmationExpiresAt === undefined || (typeof value.confirmationExpiresAt === "string" && Number.isFinite(Date.parse(value.confirmationExpiresAt))));
+  if (!isRecord(value)) return false;
+  if (!allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationScopeDigest", "confirmationExpiresAt", "workflowReview"])
+    || !["prepared", "blocked", "unavailable", "incomplete"].includes(value.status as string)
+    || typeof value.summary !== "string" || !boundedText(value.summary, 512)
+    || (value.session !== undefined && !isRecord(value.session))
+    || ![value.authorityId, value.confirmationToken].every((item) => item === undefined || (typeof item === "string" && boundedText(item, 512)))
+    || (value.confirmationScopeDigest !== undefined && !sha256Text(value.confirmationScopeDigest))
+    || (value.confirmationExpiresAt !== undefined && (typeof value.confirmationExpiresAt !== "string" || !Number.isFinite(Date.parse(value.confirmationExpiresAt))))) return false;
+  if (value.confirmationScopeDigest !== undefined && value.confirmationToken === undefined) return false;
+  if (value.workflowReview !== undefined) {
+    if (value.status !== "incomplete" || value.session === undefined || value.authorityId !== undefined || value.confirmationToken !== undefined
+      || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined || !isPlanApprovalWorkflowReview(value.workflowReview)) return false;
+  }
+  return true;
+}
+
+function isPlanApprovalWorkflowReview(value: unknown): value is PlanApprovalWorkflowReview {
+  if (!isRecord(value) || !exactKeys(value, ["action", "sessionId", "targetSnapshotId", "repositoryRoot", "provider", "contextId", "observedAt", "adapter", "plan", "scopeDigest", "summary", "providerContextDigest", "sourceRevision"])
+    || value.action !== "plan_approval" || !reference(value.sessionId) || !reference(value.targetSnapshotId) || !pathText(value.repositoryRoot)
+    || (value.provider !== "claude" && value.provider !== "codex") || !reference(value.contextId) || !timeText(value.observedAt)
+    || !isRecord(value.adapter) || !exactKeys(value.adapter, ["id", "version", "moduleSha256"]) || !reference(value.adapter.id) || !reference(value.adapter.version) || !sha256Text(value.adapter.moduleSha256)
+    || !isPlanApprovalBinding(value.plan) || !sha256Text(value.scopeDigest) || !contentText(value.summary, 4_096)
+    || !sha256Text(value.providerContextDigest) || !Number.isSafeInteger(value.sourceRevision) || (value.sourceRevision as number) < 1) return false;
+  return true;
+}
+
+function isPlanApprovalBinding(value: unknown): value is PlanApprovalWorkflowReview["plan"] {
+  if (!isRecord(value) || !exactKeys(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions"])
+    || !sha256Text(value.digest) || !reference(value.revision) || !reference(value.originSessionId) || !reference(value.taskId) || !contentText(value.objective, 16_384)
+    || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 512 || !value.steps.every(isPlanApprovalStep)
+    || !Array.isArray(value.decisions) || value.decisions.length > 512 || !value.decisions.every((item) => contentText(item, 16_384))) return false;
+  return true;
+}
+
+function isPlanApprovalStep(value: unknown): value is PlanApprovalWorkflowReview["plan"]["steps"][number] {
+  return isRecord(value) && exactKeys(value, ["id", "summary", "ownedFiles", "dependencies", "status"])
+    && reference(value.id) && contentText(value.summary, 16_384)
+    && Array.isArray(value.ownedFiles) && value.ownedFiles.length <= 512 && value.ownedFiles.every(pathText)
+    && Array.isArray(value.dependencies) && value.dependencies.length <= 512 && value.dependencies.every(reference)
+    && ["proposed", "approved", "completed", "blocked"].includes(value.status as string);
 }
 
 function isForwardedCommandResult(value: unknown): value is ForwardedCommandResult {

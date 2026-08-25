@@ -9,7 +9,7 @@ $script:RuntimeActions = @(
     'pipeline_local_gate', 'pipeline_clean_reproduction', 'shield_change_scan',
     'shield_codebase_audit', 'shield_supply_chain', 'release_shield', 'stop_managed_run'
 )
-$script:ManagedActions = @('run_target', 'launch_web_app')
+$script:ManagedActions = @('run_target', 'debug_target', 'launch_web_app')
 $script:DisposableActions = @('pipeline_local_gate', 'pipeline_clean_reproduction', 'release_shield')
 
 function Test-B122InsidePath {
@@ -342,7 +342,7 @@ function ConvertTo-B122RuntimeDocument {
         }
         if ($action -eq 'stop_managed_run') {
             Assert-B122ExactKeys -Value $recipe -Allowed @('managedActions', 'gracefulTimeoutMs', 'forceTimeoutMs') -Required @('managedActions', 'gracefulTimeoutMs', 'forceTimeoutMs') -Label $action
-            if (-not ($recipe.managedActions -is [Collections.IList]) -or $recipe.managedActions.Count -lt 1 -or $recipe.managedActions.Count -gt 2) { throw 'stop_managed_run requires one or two managed process actions.' }
+            if (-not ($recipe.managedActions -is [Collections.IList]) -or $recipe.managedActions.Count -lt 1 -or $recipe.managedActions.Count -gt 3) { throw 'stop_managed_run requires one to three managed process actions.' }
             $managed = @()
             foreach ($name in $recipe.managedActions) { if ($script:ManagedActions -cnotcontains $name -or $managed -ccontains $name) { throw 'stop_managed_run contains an invalid or duplicate action.' }; $managed += [string]$name }
             foreach ($name in @('gracefulTimeoutMs', 'forceTimeoutMs')) { if (-not (Test-B122BoundedInteger -Value $recipe[$name] -Minimum 10 -Maximum 60000)) { throw "$action.$name is outside its bound." } }

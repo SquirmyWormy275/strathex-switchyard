@@ -13,7 +13,7 @@ export const localHostActionKinds = [
   "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
   "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
   "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "configure_python_venv",
-  "select_github_navigation"
+  "stop_vscode_debug", "select_github_navigation"
 ] as const;
 
 export type LocalHostActionKind = (typeof localHostActionKinds)[number];
@@ -29,6 +29,8 @@ export interface HostActionIntent {
   readonly workspaceRoot?: string;
   readonly url?: string;
   readonly debugConfiguration?: string;
+  readonly debugSessionId?: string;
+  readonly debugOriginOperationId?: string;
   readonly pythonInterpreter?: string;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly managedTerminalProfile?: ManagedTerminalProfile;
@@ -46,6 +48,17 @@ export interface HostActionAuthorization {
   readonly expiresAt: string;
   readonly selectionId?: string;
   readonly url?: string;
+}
+
+export interface HostActionPlan {
+  readonly hostAction: LocalHostActionKind;
+  readonly url?: string;
+  readonly debugConfiguration?: string;
+  readonly debugSessionId?: string;
+  readonly debugOriginOperationId?: string;
+  readonly pythonInterpreter?: string;
+  readonly githubCandidates?: readonly GitHubNavigationCandidate[];
+  readonly managedTerminalProfile?: ManagedTerminalProfile;
 }
 
 export interface HostActionFinalAuthorizer {
@@ -91,8 +104,15 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     }
   }
 
-  async enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[]; managedTerminalProfile?: ManagedTerminalProfile }>): Promise<HostActionIntent> {
+  async enqueue(request: AdapterRequest, plan: Readonly<HostActionPlan>): Promise<HostActionIntent> {
     if (!request.operationId) throw new Error("A durable operation ID is required before a host action can be queued.");
+    if (plan.hostAction === "start_vscode_debug") {
+      if (!plan.debugConfiguration || plan.debugSessionId !== undefined || plan.debugOriginOperationId !== undefined) throw new Error("VS Code debug start requires one exact configuration and no preselected session identity.");
+    } else if (plan.hostAction === "stop_vscode_debug") {
+      if (!plan.debugConfiguration || !plan.debugSessionId || !plan.debugOriginOperationId) throw new Error("VS Code debug stop requires one exact configuration, session identity, and origin operation.");
+    } else if (plan.debugConfiguration !== undefined || plan.debugSessionId !== undefined || plan.debugOriginOperationId !== undefined) {
+      throw new Error("Only the exact VS Code debug host actions may carry debug identity fields.");
+    }
     const now = this.now();
     const intent: HostActionIntent = {
       version: 1,
@@ -104,7 +124,9 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       ...(request.session ? { sessionId: request.session.id } : {}),
       ...(request.target ? { workspaceRoot: request.target.repositoryRoot } : {}),
       ...(plan.url ? { url: plan.url } : {}),
-      ...(plan.debugConfiguration ? { debugConfiguration: plan.debugConfiguration } : {}),
+      ...(plan.debugConfiguration ? { debugConfiguration: boundedDebugReference(plan.debugConfiguration, "VS Code debug configuration") } : {}),
+      ...(plan.debugSessionId ? { debugSessionId: boundedDebugReference(plan.debugSessionId, "VS Code debug session ID") } : {}),
+      ...(plan.debugOriginOperationId ? { debugOriginOperationId: boundedDebugReference(plan.debugOriginOperationId, "VS Code debug origin operation ID") } : {}),
       ...(plan.pythonInterpreter ? { pythonInterpreter: plan.pythonInterpreter } : {}),
       ...(plan.githubCandidates ? { githubCandidates: validateGitHubCandidates(plan.githubCandidates) } : {}),
       ...(plan.managedTerminalProfile ? { managedTerminalProfile: validateManagedTerminalProfile(plan.managedTerminalProfile, plan.hostAction) } : {}),
@@ -118,7 +140,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         if (existing.operationId !== intent.operationId || existing.commandAction !== intent.commandAction || existing.hostAction !== intent.hostAction
           || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
           || existing.sessionId !== intent.sessionId
-          || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.pythonInterpreter !== intent.pythonInterpreter
+          || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.debugSessionId !== intent.debugSessionId
+          || existing.debugOriginOperationId !== intent.debugOriginOperationId || existing.pythonInterpreter !== intent.pythonInterpreter
           || JSON.stringify(existing.githubCandidates) !== JSON.stringify(intent.githubCandidates)
           || JSON.stringify(existing.managedTerminalProfile) !== JSON.stringify(intent.managedTerminalProfile)) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
@@ -320,7 +343,7 @@ export class DurableHostActionAdapter implements CommandAdapter {
   constructor(queue: DurableHostActionQueue, github?: GitHubNavigationResolver) { this.queue = queue; this.github = github; }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    let plan: Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string; githubCandidates?: readonly GitHubNavigationCandidate[]; managedTerminalProfile?: ManagedTerminalProfile }> | undefined;
+    let plan: Readonly<HostActionPlan> | undefined;
     const githubPage = navigationPage(request.definition.action);
     if (githubPage) {
       if (!this.github) return { status: "unavailable", summary: "Exact GitHub navigation requires an installed authenticated GitHub route; no search URL was guessed.", effectDisposition: "not_started" };
@@ -341,6 +364,8 @@ export class DurableHostActionAdapter implements CommandAdapter {
         ...(intent.workspaceRoot ? { hostActionWorkspaceRoot: intent.workspaceRoot } : {}),
         ...(intent.url ? { hostActionUrl: intent.url } : {}),
         ...(intent.debugConfiguration ? { hostActionDebugConfiguration: intent.debugConfiguration } : {}),
+        ...(intent.debugSessionId ? { hostActionDebugSessionId: intent.debugSessionId } : {}),
+        ...(intent.debugOriginOperationId ? { hostActionDebugOriginOperationId: intent.debugOriginOperationId } : {}),
         ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {}),
         ...(intent.githubCandidates ? { githubCandidates: intent.githubCandidates } : {}),
         ...(intent.managedTerminalProfile ? { managedTerminalProfile: intent.managedTerminalProfile } : {})
@@ -489,6 +514,11 @@ function sameIntent(left: HostActionIntent, right: HostActionIntent): boolean {
 
 function boundedReference(value: string, field: string): string {
   if (typeof value !== "string" || !value.trim() || value.length > 512 || /[\r\n\0]/.test(value)) throw new Error(`The ${field} is invalid.`);
+  return value;
+}
+
+function boundedDebugReference(value: string, field: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 256 || /[\r\n\0]/.test(value)) throw new Error(`The ${field} is invalid.`);
   return value;
 }
 

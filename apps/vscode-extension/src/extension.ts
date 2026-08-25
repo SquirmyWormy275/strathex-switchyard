@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { isAbsolute, relative } from "node:path";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
-import { ManagedSessionController, type GitRootRegistration } from "./controller.ts";
+import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
@@ -10,9 +10,11 @@ export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, Wind
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
 let controller: ManagedSessionController | undefined;
+let secretReader: WindowsDpapiSecretReader | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const secretProtector = new WindowsDpapiSecretReader();
+  secretReader = secretProtector;
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
     context as unknown as ExtensionContextLike,
@@ -21,7 +23,8 @@ export function activate(context: vscode.ExtensionContext): void {
       resolveGitRoots: createVscodeGitRootResolver(vscode),
       openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
       executeCommand: async (command) => { await vscode.commands.executeCommand(command); },
-      sealSecret: (cleartext) => secretProtector.seal(cleartext)
+      sealSecret: (cleartext) => secretProtector.seal(cleartext),
+      extensionVersion: exactExtensionVersion(context)
     }
   );
   void controller.start().catch(async () => {
@@ -44,10 +47,18 @@ export function configuredCompanionBridge(secretReader: WindowsDpapiSecretReader
   }
 }
 
-export function deactivate(): void {
-  controller?.stop();
-  // The extension owns no process, broker, terminal hook, or external action.
+export async function deactivate(): Promise<void> {
+  const activeController = controller;
   controller = undefined;
+  const activeSecretReader = secretReader;
+  secretReader = undefined;
+  await deactivateManagedExtension(activeController, activeSecretReader);
+  // The extension owns no process, broker, terminal hook, or external action.
+}
+
+export function exactExtensionVersion(context: vscode.ExtensionContext): string {
+  const extensionPath = (context as unknown as { readonly extensionPath?: unknown }).extensionPath;
+  return exactExtensionPackageVersion(extensionPath as string);
 }
 
 /**
