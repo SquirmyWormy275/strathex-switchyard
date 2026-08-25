@@ -15,6 +15,7 @@ import { loadOrCreateHostReceiptEvidenceFactory } from "./receipt-evidence.ts";
 import { WindowsJobObjectProcessSupervisor } from "./windows-job-supervisor.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
+import { loadProviderDesktopPaths } from "./provider-desktop-configuration.ts";
 
 /**
  * Deliberately launched local named-pipe entry point. It does not spawn from
@@ -30,6 +31,8 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   const instance = await acquireCompanionInstance(stateDirectory, mainPath);
   let pipe: AuthenticatedPipeServer | undefined;
   let rawHidSupervisor: InstalledRawHidSupervisor | undefined;
+  let voiceRuntime: { shutdown(): Promise<void> } | undefined;
+  let transcriptVault: { startRetentionEnforcement(options?: Readonly<{ onFailure?: (error: Error) => void }>): Promise<void>; stopRetentionEnforcement(): void } | undefined;
   let stopped = false;
   try {
   const store = new ProtectedJsonStore({
@@ -42,17 +45,25 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   const sandboxHelperPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "sandbox-helper", "b122-sandbox-worker.exe");
   const rawHidHelperPath = packagedRawHidHelperPath(mainPath);
   const repositoryRuntimeHelperPath = packagedRepositoryRuntimeHelperPath(mainPath);
-  const [sandboxHelperIdentity, rawHidHelperIdentity, repositoryRuntimeHelperIdentity] = await Promise.all([
+  const providerDesktopHelperPath = packagedProviderDesktopHelperPath(mainPath);
+  const voiceHelperPath = packagedVoiceHelperPath(mainPath);
+  const [sandboxHelperIdentity, rawHidHelperIdentity, repositoryRuntimeHelperIdentity, providerDesktopHelperIdentity, voiceHelperIdentity] = await Promise.all([
     installedHelperIdentity(sandboxHelperPath),
     installedHelperIdentity(rawHidHelperPath),
-    installedHelperIdentity(repositoryRuntimeHelperPath)
+    installedHelperIdentity(repositoryRuntimeHelperPath),
+    installedHelperIdentity(providerDesktopHelperPath),
+    installedHelperIdentity(voiceHelperPath)
   ]);
+  const providerDesktopPaths = await loadProviderDesktopPaths(join(stateDirectory, "provider-desktop-paths.json"));
+  if (providerDesktopPaths && !providerDesktopHelperIdentity.startsWith("sha256:")) throw new Error("Configured provider applications require the fixed packaged provider-desktop helper.");
   const exactVersions = {
     companion: "@strathex/switchyard-companion@0.2.0",
     node: process.version,
     sandboxHelper: sandboxHelperIdentity,
     rawHidHelper: rawHidHelperIdentity,
     repositoryRuntimeHelper: repositoryRuntimeHelperIdentity,
+    providerDesktopHelper: providerDesktopHelperIdentity,
+    voiceHelper: voiceHelperIdentity,
     repositoryRuntimeHelperVersion: "sxsy-b122-repository-runner-v1",
     rawHidProtocol: String(protocolVersion),
     rawHidMap: Buffer.from(mapFingerprint).toString("hex")
@@ -82,11 +93,26 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
     runtimePinPresence: userPresence,
     sandboxHelperPath,
     rawHidHelperPath,
+    ...(voiceHelperIdentity.startsWith("sha256:") ? {
+      voiceHelperPath,
+      voiceHelperSha256: voiceHelperIdentity.slice("sha256:".length)
+    } : {}),
+    ...(providerDesktopPaths ? {
+      providerDesktopPaths,
+      providerDesktopHelperPath,
+      providerDesktopHelperSha256: providerDesktopHelperIdentity.slice("sha256:".length)
+    } : {}),
     ...(repositoryProcessSupervisor ? { repositoryProcessSupervisor } : {}),
     snapshotEnvironmentFor: () => ({ toolVersions: exactVersions })
   });
   rawHidSupervisor = companion.rawHidSupervisor;
+  voiceRuntime = companion.voiceRuntime;
+  transcriptVault = companion.transcriptVault;
   await companion.endpoint.ready();
+  await transcriptVault.startRetentionEnforcement({
+    onFailure: () => { void voiceRuntime?.shutdown(); }
+  });
+  await companion.voiceRuntime.reconcile();
   await rawHidSupervisor?.startConfigured();
   const configurationPath = join(stateDirectory, "authenticated-pipe.json");
   let configuration;
@@ -99,8 +125,10 @@ export async function runStandaloneCompanion(options: Readonly<{ stateDirectory?
   }
   pipe = new AuthenticatedPipeServer(configuration, protector, companion.endpoint);
   await pipe.start();
-  return { async stop() { if (stopped) return; stopped = true; await rawHidSupervisor?.stop(); await pipe?.stop().finally(() => instance.release()); } };
+  return { async stop() { if (stopped) return; stopped = true; transcriptVault?.stopRetentionEnforcement(); await companion.voiceRuntime.shutdown(); await rawHidSupervisor?.stop(); await pipe?.stop().finally(() => instance.release()); } };
   } catch (error) {
+    transcriptVault?.stopRetentionEnforcement();
+    await voiceRuntime?.shutdown().catch(() => undefined);
     await rawHidSupervisor?.stop().catch(() => undefined);
     await pipe?.stop().catch(() => undefined);
     await instance.release();
@@ -116,6 +144,16 @@ export function packagedRawHidHelperPath(mainModulePath: string): string {
 /** Fixed Windows release-bundle location; no workspace or environment input participates. */
 export function packagedRepositoryRuntimeHelperPath(mainModulePath: string): string {
   return resolve(dirname(mainModulePath), "..", "repository-runtime", "b122-repository-runner.exe");
+}
+
+/** Fixed Windows release-bundle location; no workspace or bridge input participates. */
+export function packagedProviderDesktopHelperPath(mainModulePath: string): string {
+  return resolve(dirname(mainModulePath), "..", "provider-desktop", "sxsy-b122-provider-desktop-helper.exe");
+}
+
+/** Fixed Windows release-bundle location; no command, workspace, or environment input participates. */
+export function packagedVoiceHelperPath(mainModulePath: string): string {
+  return resolve(dirname(mainModulePath), "..", "voice", "sxsy-b122-voice-helper.exe");
 }
 
 async function installedHelperIdentity(path: string): Promise<string> {

@@ -8,7 +8,7 @@ import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packag
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import { randomBytes } from "node:crypto";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
 import { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import { LedgerCouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
@@ -43,12 +43,19 @@ import { HostOwnedOperationReconciler, InstalledReadOnlyObservationPort } from "
 import { SpawnCheckpointGitRunner } from "./local-checkpoints.ts";
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
 import type { RepositoryProcessSupervisor } from "./repository-runtime.ts";
-import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import {
+  DurableWorkflowPreparationCoordinator,
+  WorkflowArtifactStore,
+  WorkflowCoordinatorContextStore,
+  type WorkflowCoordinatorContext,
+  type WorkflowCoordinatorContextInput
+} from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
 import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-evidence.ts";
 import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
+import { CouncilResourceHost, VaultBackedCouncilCredentialCapabilityPort } from "./council-resource-host.ts";
 import { SessionFreshnessCoordinator } from "./session-freshness.ts";
 import { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 import {
@@ -58,6 +65,32 @@ import {
   type ProviderGatewayBackend,
   type ProviderGatewayProvider
 } from "./provider-gateway.ts";
+import { createAcceptanceAdministration, type AcceptanceAdministration } from "./acceptance-administration.ts";
+import {
+  DurableScannerFixtureRegistry,
+  createScannerFixtureAdministration,
+  type ScannerFixtureAdministration
+} from "./scanner-fixtures.ts";
+import {
+  AttestedProviderDesktopRegistry,
+  InstalledProviderDesktopLifecycle,
+  NodeProviderExecutableIdentityProbe,
+  createFixedProviderDesktopCatalog,
+  type FixedProviderDesktopPaths,
+  type ProviderDesktopProcessPort
+} from "./provider-desktop.ts";
+import { InstalledProviderDesktopCommandAdapter, installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
+import { DurableProviderDesktopEffectLedger } from "./provider-desktop-effects.ts";
+import { WindowsProviderDesktopProcessPort } from "./windows-provider-process.ts";
+import { HybridVoiceGateway, type VoiceAudioPort, type VoiceProviderPort } from "./voice-gateway.ts";
+import {
+  SafeUnavailableVoiceAudioPort,
+  SafeUnavailableVoiceProviderPort,
+  WindowsVoiceAudioPort,
+  WindowsVoiceProviderPort
+} from "./windows-voice-port.ts";
+import { InstalledVoiceConversationRuntime } from "./voice-runtime.ts";
+import { WindowsErasableVoiceTranscriptVault } from "./windows-voice-transcript-vault.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -100,6 +133,19 @@ export interface DurableWindowsCompanionOptions {
   readonly providerGatewayBackends?: readonly ProviderGatewayBackend[];
   /** Explicit opt-in required for any backend that is not local to this host. */
   readonly authorizedExternalProviderGatewayProviders?: readonly ProviderGatewayProvider[];
+  /** Host-owned fixed executable catalog; no IPC payload can add or replace a path. */
+  readonly providerDesktopPaths?: FixedProviderDesktopPaths;
+  /** Fixed packaged native helper identity used for desktop focus/launch. */
+  readonly providerDesktopHelperPath?: string;
+  readonly providerDesktopHelperSha256?: string;
+  /** Isolated tests may replace only the native process boundary. */
+  readonly providerDesktopProcessPort?: ProviderDesktopProcessPort;
+  /** Fixed packaged native microphone/provider helper; never supplied over IPC. */
+  readonly voiceHelperPath?: string;
+  readonly voiceHelperSha256?: string;
+  /** Isolated tests may replace the voice ports, never production IPC callers. */
+  readonly voiceAudioPort?: VoiceAudioPort;
+  readonly voiceProviderPorts?: readonly VoiceProviderPort[];
 }
 
 /**
@@ -132,12 +178,21 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly operationControl: InstalledOperationControl;
   readonly handoffs: HandoffPackageStore;
   readonly workflowArtifacts: WorkflowArtifactStore;
+  readonly workflowContexts: WorkflowCoordinatorContextStore;
   readonly voice: VoiceCoordinator;
+  readonly transcriptVault: WindowsErasableVoiceTranscriptVault;
+  readonly voiceGateway: HybridVoiceGateway;
+  readonly voiceRuntime: InstalledVoiceConversationRuntime;
   readonly councilIsolation: CouncilWorkspaceIsolationManager;
   readonly rawHidInstallationRegistry?: DurableRawHidInstallationRegistry;
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
+  readonly acceptanceAdministration?: AcceptanceAdministration;
+  readonly scannerFixtures: DurableScannerFixtureRegistry;
+  readonly scannerAdministration?: ScannerFixtureAdministration;
+  readonly providerDesktopRegistry?: AttestedProviderDesktopRegistry;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
+  registerTrustedWorkflowContext(input: WorkflowCoordinatorContextInput): Promise<WorkflowCoordinatorContext>;
 } {
   const store = options.store ?? new ProtectedJsonStore({
     ...(options.journalAuthenticator ? { authenticator: options.journalAuthenticator } : {}),
@@ -159,9 +214,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       : {})
   }).connect(providerGatewayToken);
   const localStateDirectory = resolve(options.localStateDirectory ?? dirname(store.filePath));
-  const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
-    stateRoot: resolve(localStateDirectory, "council-isolation")
-  });
+  const councilStateRoot = resolve(localStateDirectory, "council-isolation");
   const checkpointCapture = options.runtime?.checkpointCapture ?? new LocalCheckpointCapture({ stateDirectory: localStateDirectory });
   const checkpointVerifier = options.runtime?.checkpointVerifier ?? new LocalRecoveryArtifactVerifier(localStateDirectory);
   const credentialProtector = options.credentialProtector ?? unavailableCredentialProtector;
@@ -171,6 +224,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const hardwareSignals = new DurableHardwareSignalInbox(store);
   let targetResolver!: TargetResolver;
   let containmentManager!: DurableContainmentManager;
+  let providerDesktopRegistry: AttestedProviderDesktopRegistry | undefined;
   const hostActions = new DurableHostActionQueue(store, {
     finalAuthorizer: {
       async authorize(intent) {
@@ -178,6 +232,20 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           if (intent.workspaceRoot) {
             const containment = await containmentManager.check(intent.workspaceRoot, "adapter");
             if (!containment.allowed) return { allowed: false, reason: containment.reason };
+          }
+          if (intent.managedTerminalProfile) {
+            if (!providerDesktopRegistry) return { allowed: false, reason: "The fixed provider installation registry is unavailable." };
+            if (Date.parse(intent.managedTerminalProfile.validUntil) <= Date.now()) return { allowed: false, reason: "The managed-terminal executable authorization expired before the host effect." };
+            const installed = await providerDesktopRegistry.resolve(intent.managedTerminalProfile.provider);
+            const profile = intent.managedTerminalProfile;
+            if (installed.installationId !== profile.installationId || installed.catalogDigest !== profile.catalogDigest
+              || resolve(installed.identity.canonicalExecutablePath).toLowerCase() !== resolve(profile.canonicalExecutablePath).toLowerCase()
+              || installed.identity.executableSha256 !== profile.executableSha256
+              || installed.identity.productIdentity.productId !== profile.productIdentity.productId
+              || installed.identity.productIdentity.publisher !== profile.productIdentity.publisher
+              || installed.identity.productIdentity.role !== "managed_terminal") {
+              return { allowed: false, reason: "The managed-terminal provider identity changed before final host authorization." };
+            }
           }
           if (!intent.targetSnapshotId) return { allowed: true, reason: "The queued UI action has no repository effect target." };
           if (!intent.sessionId || !intent.workspaceRoot) return { allowed: false, reason: "The queued target-bound host action has no exact managed session and workspace." };
@@ -195,8 +263,48 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     }
   });
   const workflowArtifacts = new WorkflowArtifactStore(store);
+  const workflowContexts = new WorkflowCoordinatorContextStore(store);
   const handoffs = new HandoffPackageStore(store);
-  const voice = new VoiceCoordinator(store);
+  const transcriptVault = new WindowsErasableVoiceTranscriptVault(join(localStateDirectory, "voice-transcripts"), credentialProtector);
+  const voice = new VoiceCoordinator(store, { transcripts: transcriptVault });
+  if ((options.voiceHelperPath && !options.voiceHelperSha256) || (!options.voiceHelperPath && options.voiceHelperSha256)) {
+    throw new Error("The installed voice helper requires both an exact path and SHA-256 digest.");
+  }
+  const voiceAudio = options.voiceAudioPort ?? (options.voiceHelperPath && options.voiceHelperSha256
+    ? new WindowsVoiceAudioPort({
+        helperPath: options.voiceHelperPath,
+        helperSha256: options.voiceHelperSha256,
+        routeId: "audio.winmm.current-user"
+      })
+    : new SafeUnavailableVoiceAudioPort("The fixed packaged Windows microphone helper is unavailable."));
+  const voiceProviders = options.voiceProviderPorts ?? (options.voiceHelperPath && options.voiceHelperSha256
+    ? [
+        new WindowsVoiceProviderPort({ helperPath: options.voiceHelperPath, helperSha256: options.voiceHelperSha256, routeId: "provider.claude.voice", provider: "claude", authorizationReference: "credential-ref:claude-current-user" }),
+        new WindowsVoiceProviderPort({ helperPath: options.voiceHelperPath, helperSha256: options.voiceHelperSha256, routeId: "provider.chatgpt.voice", provider: "chatgpt", authorizationReference: "credential-ref:chatgpt-current-user" }),
+        new SafeUnavailableVoiceProviderPort("system", "No system voice-provider route is installed.")
+      ]
+    : [
+        new SafeUnavailableVoiceProviderPort("claude", "The fixed packaged Claude voice route is unavailable."),
+        new SafeUnavailableVoiceProviderPort("chatgpt", "The fixed packaged ChatGPT voice route is unavailable."),
+        new SafeUnavailableVoiceProviderPort("system", "No system voice-provider route is installed.")
+      ]);
+  const voiceGateway = new HybridVoiceGateway({
+    voice,
+    contexts: handoffs,
+    audio: voiceAudio,
+    providers: voiceProviders,
+    sessionScopeVerifier: {
+      async assertCurrent(scope, context) {
+        const session = await sessions.get(scope.managedSessionId);
+        if (!session || !session.capabilities.includes("registered") || ["unknown", "stale", "unreachable"].includes(session.status)
+          || !session.workspaceRoot || resolve(session.workspaceRoot).toLowerCase() !== resolve(scope.repositoryRoot).toLowerCase()
+          || session.targetSnapshotId !== scope.targetSnapshotId || session.taskId !== context.taskId || session.planRevision !== context.planRevision) {
+          throw new Error("The managed voice session is absent, stale, or changed from its exact context binding.");
+        }
+      }
+    }
+  });
+  const voiceRuntime = new InstalledVoiceConversationRuntime({ gateway: voiceGateway });
   const operationControl = new InstalledOperationControl({
     queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals, providerGateway],
     processes: repositoryRuntimes
@@ -207,6 +315,13 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
   });
   credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
+  const councilIsolation = new CouncilWorkspaceIsolationManager(store, {
+    stateRoot: councilStateRoot,
+    resourceHost: new CouncilResourceHost({
+      stateRoot: councilStateRoot,
+      credentials: new VaultBackedCouncilCredentialCapabilityPort(credentialVault.createAdapter("council-resource-host"))
+    })
+  });
   const networkPolicyRegistry = new DurableNetworkPolicyRegistry(store, resolve(options.localStateDirectory ?? dirname(store.filePath), "network-policy.json"));
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
@@ -270,19 +385,22 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         options.runtimePinPresence
       )
     : undefined;
+  const providerDesktopEffects = store.hasAuthenticatedProtection ? new DurableProviderDesktopEffectLedger(store) : undefined;
   const installedReconciler = new HostOwnedOperationReconciler(new InstalledReadOnlyObservationPort({
     git: new SpawnCheckpointGitRunner(),
     network: configuredNetwork,
     providerOperations: providerGateway,
     networkPolicy: networkPolicyRegistry,
     council: new CouncilCoordinator(store),
-    hostActions
+    hostActions,
+    ...(providerDesktopEffects ? { providerDesktopEffects } : {})
   }));
   const installedReconciliationActions = [
     "git.local-commit", "git.push-reviewed-head", "git.direct-main", "github.pr-upsert", "github.pr-merge",
     "council.pause", "council.assignment", "council.resume",
     ...providerCommandActions.map((action) => `provider.${action}`),
     ...remoteAutomationActions.map((action) => `automation.${action}`),
+    ...installedProviderDesktopActions,
     ...hostActionCommandActions
   ];
   const operationReconcilers = {
@@ -295,7 +413,66 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     targetResolver,
     attestor: options.runtime.confirmationAttestor
   }) : undefined;
-  const gateEvidence = options.runtime?.gateEvidence ?? new GateEvidenceLedger(store);
+  const acceptanceAdministration = options.runtimePinPresence
+    ? createAcceptanceAdministration({
+        store,
+        stateDirectory: localStateDirectory,
+        presence: options.runtimePinPresence,
+        policyVersion: options.policyVersion
+      })
+    : undefined;
+  const scannerFixtures = new DurableScannerFixtureRegistry(store, localStateDirectory);
+  const scannerAdministration = options.runtimePinPresence
+    ? createScannerFixtureAdministration({
+        registry: scannerFixtures,
+        presence: options.runtimePinPresence
+      })
+    : undefined;
+  const providerDesktopCatalog = options.providerDesktopPaths ? createFixedProviderDesktopCatalog(options.providerDesktopPaths) : undefined;
+  providerDesktopRegistry = providerDesktopCatalog && options.runtimePinPresence
+    ? new AttestedProviderDesktopRegistry({
+        store,
+        catalog: providerDesktopCatalog,
+        identityProbe: new NodeProviderExecutableIdentityProbe(),
+        presence: options.runtimePinPresence
+      })
+    : undefined;
+  const providerDesktopProcesses = options.providerDesktopProcessPort
+    ?? (options.providerDesktopHelperPath && options.providerDesktopHelperSha256
+      ? new WindowsProviderDesktopProcessPort({ helperPath: options.providerDesktopHelperPath, helperSha256: options.providerDesktopHelperSha256 })
+      : undefined);
+  let executor!: DurableMediatedExecutor;
+  const providerDesktopAdapter = providerDesktopRegistry && providerDesktopProcesses
+      ? new InstalledProviderDesktopCommandAdapter((request) => new InstalledProviderDesktopLifecycle({
+        registry: providerDesktopRegistry!,
+        processes: providerDesktopProcesses,
+        ...(options.providerDesktopHelperPath && options.providerDesktopHelperSha256 ? { managedTerminalLauncher: {
+          canonicalExecutablePath: options.providerDesktopHelperPath,
+          executableSha256: options.providerDesktopHelperSha256
+        } } : {}),
+        effectGuard: {
+          async check(input) {
+            if (!request.operationId || request.operationId !== input.operationId) return { allowed: false, reason: "The provider effect is not bound to the exact durable operation." };
+            const operation = await executor.operations.get(input.operationId);
+            if (!operation || operation.action !== request.definition.action || operation.state !== "executing") return { allowed: false, reason: "The durable provider operation is absent, changed, or no longer executing." };
+            if (!request.target) return operation.targetSnapshotId.startsWith("<no-target:")
+              ? { allowed: true, reason: "The targetless desktop action remains bound to its exact durable operation." }
+              : { allowed: false, reason: "The provider operation unexpectedly retained a repository target." };
+            if (!request.effectGuard || operation.targetSnapshotId !== request.target.id) return { allowed: false, reason: "The provider effect lacks its exact final target guard." };
+            const current = await request.effectGuard.assertCurrent({
+              action: request.definition.action,
+              operationId: input.operationId,
+              target: request.target,
+              ...(request.session ? { session: request.session } : {}),
+              ...(request.authority ? { authority: request.authority } : {})
+            });
+            if (!current.allowed) return current;
+            return containmentManager.check(request.target.repositoryRoot, "adapter");
+          }
+        }
+      }), hostActions, providerDesktopEffects)
+    : undefined;
+  const gateEvidence = options.runtime?.gateEvidence ?? acceptanceAdministration?.ledger ?? new GateEvidenceLedger(store);
   const councilAutomaticGate = new LedgerCouncilAutomaticAcceptanceGate(gateEvidence);
   let localComponents: DefaultLocalComposition | undefined;
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
@@ -307,7 +484,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       const receiptIssuer = hostReceiptEvidenceIssuer(options.receiptEvidence);
       const repositorySandbox = installedSandbox && receiptIssuer && sandboxInstallationRegistry
         ? new HostValidatedRepositoryRecipeRunner(installedSandbox, sandboxInstallationRegistry, receiptIssuer, {
-            stateDirectory: options.localStateDirectory ?? dirname(store.filePath)
+            stateDirectory: options.localStateDirectory ?? dirname(store.filePath),
+            scannerFixtures
           })
         : installedSandbox;
       const composed = createDefaultLocalComposition(
@@ -328,6 +506,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           councilAutomaticGate,
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
           ...(repositorySandbox ? { repositorySandbox } : {}),
+          ...(providerDesktopAdapter ? { providerDesktopAdapter } : {}),
           hostActions
         }
       );
@@ -336,7 +515,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     }
     return defaultDependencies;
   });
-  const executor = new DurableMediatedExecutor({
+  executor = new DurableMediatedExecutor({
     ...options.runtime,
     store,
     sessions,
@@ -344,6 +523,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     policyVersion: options.policyVersion,
     targetResolver,
     enabledHighConsequenceActions: options.enabledHighConsequenceActions,
+    highConsequenceActivations: options.runtime?.highConsequenceActivations ?? acceptanceAdministration?.activations,
     checkpointCapture,
     checkpointVerifier,
     operationControl: options.runtime?.operationControl ?? operationControl,
@@ -352,7 +532,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     receiptEvidence: options.receiptEvidence
   });
   const containmentRelease = new AttestedContainmentReleaseCoordinator(executor);
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, voice, containmentRelease, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}) });
+  const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
@@ -383,8 +564,16 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     operationControl,
     handoffs,
     workflowArtifacts,
+    workflowContexts,
     voice,
+    transcriptVault,
+    voiceGateway,
+    voiceRuntime,
     councilIsolation,
+    scannerFixtures,
+    ...(acceptanceAdministration ? { acceptanceAdministration } : {}),
+    ...(scannerAdministration ? { scannerAdministration } : {}),
+    ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}),
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),
@@ -401,6 +590,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       const persisted = await sessions.upsert(session);
       service.installTrustedSession(persisted);
       return persisted;
+    },
+    async registerTrustedWorkflowContext(input: WorkflowCoordinatorContextInput): Promise<WorkflowCoordinatorContext> {
+      await endpoint.ready();
+      return workflowContexts.record(input);
     }
   };
 }

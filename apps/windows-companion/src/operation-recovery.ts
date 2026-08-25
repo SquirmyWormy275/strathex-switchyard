@@ -1,6 +1,8 @@
 import type { OperationRecord } from "../../../packages/control-plane/src/contracts.ts";
 import type { OperationReconciler, ReconciliationDecision } from "../../../packages/control-plane/src/operations.ts";
 import { hostActionCommandActions } from "./host-actions.ts";
+import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
+import type { DurableProviderDesktopEffectLedger } from "./provider-desktop-effects.ts";
 import type { CheckpointGitRunner } from "./local-checkpoints.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import { configuredGitHostFromPolicy, configuredGitRemoteMatchesPolicy, parseAdvertisement } from "./remote-git.ts";
@@ -22,9 +24,12 @@ export interface InstalledOperationObservationPort {
   provider(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation>;
   council(input: Readonly<{ epochId: string; phase: "pause" | "assignment" | "resume"; sessionId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation>;
   hostAction(input: Readonly<{ operationId: string; action: string }>): Promise<InstalledOperationObservation>;
+  providerDesktop?(input: Readonly<{ operationId: string; action: string }>): Promise<InstalledOperationObservation>;
 }
 
 const hostActions = new Set<string>(hostActionCommandActions);
+const providerDesktopActions = new Set<string>(["open_claude", "fresh_claude", "open_chatgpt", "fresh_chatgpt"]);
+const providerManagedTerminalActions = new Set<string>(["open_managed_claude_terminal", "open_managed_codex_terminal"]);
 
 /**
  * Routes only read-only observations for the already durable operation. It
@@ -72,6 +77,10 @@ export class HostOwnedOperationReconciler implements OperationReconciler {
       const epochId = detail(details, "epochId"); const phase = councilPhase(details.phase); const sessionId = detail(details, "sessionId"); const targetSnapshotId = detail(details, "target");
       return epochId && phase && sessionId && targetSnapshotId ? this.observations.council({ epochId, phase, sessionId, targetSnapshotId }) : undefined;
     }
+    if (providerDesktopActions.has(operation.action) && !operation.parentId) {
+      return this.observations.providerDesktop?.({ operationId: operation.id, action: operation.action });
+    }
+    if (providerManagedTerminalActions.has(operation.action) && !operation.parentId) return this.observations.hostAction({ operationId: operation.id, action: operation.action });
     if (hostActions.has(operation.action) && !operation.parentId) return this.observations.hostAction({ operationId: operation.id, action: operation.action });
     return undefined;
   }
@@ -86,6 +95,7 @@ export interface InstalledReadOnlyObservationOptions {
   readonly networkPolicy?: Readonly<{ resolve(): Promise<ConfiguredNetworkPolicy> }>;
   readonly council?: Readonly<{ get(id: string): Promise<Readonly<{ status: string; targetSnapshotId: string; pauseAcknowledgedSessionIds: readonly string[]; assignmentAcknowledgedSessionIds: readonly string[] }> | undefined> }>;
   readonly hostActions?: Readonly<{ observeOperation(operationId: string, action?: string): Promise<Readonly<{ outcome: "committed" | "failed" | "cancelled" | "unresolved"; note: string }>> }>;
+  readonly providerDesktopEffects?: Pick<DurableProviderDesktopEffectLedger, "observeOperation">;
   readonly canonicalRepositoryRoot?: (repositoryRoot: string) => Promise<string>;
 }
 
@@ -186,6 +196,11 @@ export class InstalledReadOnlyObservationPort implements InstalledOperationObser
     return this.options.hostActions?.observeOperation(input.operationId, input.action) ?? unresolved("No durable host-action observer is installed.");
   }
 
+  async providerDesktop(input: Readonly<{ operationId: string; action: string }>): Promise<InstalledOperationObservation> {
+    return this.options.providerDesktopEffects?.observeOperation(input.operationId, input.action)
+      ?? unresolved("No authenticated provider desktop effect observer is installed.");
+  }
+
   private async exactRepositoryRoot(repositoryRoot: string): Promise<string | undefined> {
     const observed = await (this.options.canonicalRepositoryRoot ?? realpath)(resolve(repositoryRoot));
     return pathKey(observed) === pathKey(repositoryRoot) ? observed : undefined;
@@ -206,7 +221,7 @@ function decision(observed: InstalledOperationObservation): ReconciliationDecisi
 function recognized(action: string): boolean {
   return action === "git.local-commit" || action === "git.push-reviewed-head" || action === "git.direct-main"
     || action === "github.pr-upsert" || action === "github.pr-merge" || action.startsWith("provider.") || action.startsWith("automation.")
-    || action === "council.pause" || action === "council.assignment" || action === "council.resume" || hostActions.has(action);
+    || action === "council.pause" || action === "council.assignment" || action === "council.resume" || providerDesktopActions.has(action) || providerManagedTerminalActions.has(action) || hostActions.has(action);
 }
 function detail(details: Readonly<Record<string, string>>, name: string): string | undefined { const value = details[name]; return value && value.length <= 2_048 && !/[\0\r\n]/.test(value) ? value : undefined; }
 function oid(value: string | undefined): string | undefined { return value && /^[a-f0-9]{40}$/i.test(value) ? value.toLowerCase() : undefined; }

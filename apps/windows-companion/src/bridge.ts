@@ -44,6 +44,24 @@ export type CompanionMethod =
   | "network-policy.install"
   | "network-policy.current"
   | "network-policy.revoke"
+  | "acceptance.trust.install"
+  | "acceptance.trust.list"
+  | "acceptance.trust.revoke"
+  | "acceptance.evidence.import"
+  | "acceptance.evidence.list"
+  | "acceptance.evidence.invalidate"
+  | "acceptance.activation.activate"
+  | "acceptance.activation.list"
+  | "acceptance.activation.revoke"
+  | "scanner.trust.install"
+  | "scanner.trust.list"
+  | "scanner.trust.revoke"
+  | "scanner.fixture.install"
+  | "scanner.fixture.list"
+  | "scanner.fixture.revoke"
+  | "provider-desktop.install"
+  | "provider-desktop.list"
+  | "provider-desktop.revoke"
   | "provider.handshake"
   | "containment.release"
   | "raw-hid.install"
@@ -167,6 +185,8 @@ export interface CommandPreparationPayload {
 export interface HostActionCompletionPayload {
   readonly hostActionId: string;
   readonly succeeded: boolean;
+  /** Distinguishes a proven pre-effect refusal from an effect that may already exist. */
+  readonly effectDisposition?: "not_started" | "committed" | "ambiguous";
   readonly summary: string;
   readonly adapterVersion: string;
   readonly authorizationToken?: string;
@@ -205,6 +225,14 @@ export interface SandboxRevokePayload { readonly repositoryRoot: string; }
 export interface CredentialProvisionPayload { readonly reference: string; readonly repositoryRoot: string; readonly purposes: readonly string[]; readonly sealedSecret: string; readonly replaceExisting?: boolean; }
 export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
 export interface NetworkPolicyInstallPayload { readonly sourcePath: string; }
+export interface AdministrationSourcePayload { readonly sourcePath: string; }
+export interface AcceptanceTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
+export interface AcceptanceEvidenceInvalidatePayload { readonly evidenceId: string; readonly reason: string; }
+export interface AcceptanceActivationPayload { readonly action: CommandAction; readonly targetSnapshotId: string; readonly expiresAt: string; }
+export interface AcceptanceActivationRevokePayload { readonly activationId: string; readonly reason: string; }
+export interface ScannerTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
+export interface ScannerFixtureRevokePayload { readonly fixtureId: string; readonly reason: string; }
+export interface ProviderDesktopReferencePayload { readonly provider: "claude_desktop" | "chatgpt_desktop" | "claude_code" | "codex"; }
 export interface ProviderHandshakePayload { readonly sessionId: string; readonly repositoryRoot: string; }
 export interface ContainmentReleasePayload { readonly sessionId: string; readonly reason: string; readonly incidentStatus: "rotation_complete" | "not_required"; }
 export type RawHidInstallPayload = RawHidDeviceIdentity;
@@ -277,7 +305,11 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
-    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke", "provider.handshake", "containment.release",
+    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke",
+    "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
+    "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
+    "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
+    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider.handshake", "containment.release",
     "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"

@@ -20,6 +20,7 @@ class Observations implements InstalledOperationObservationPort {
   async provider(input: Parameters<InstalledOperationObservationPort["provider"]>[0]) { this.calls.push(`provider:${input.repositoryRoot}:${input.routeId}:${input.externalId}`); return { outcome: this.result, note: "read-only provider observation" } as const; }
   async council(input: Parameters<InstalledOperationObservationPort["council"]>[0]) { this.calls.push(`council:${input.epochId}:${input.phase}:${input.sessionId}`); return { outcome: this.result, note: "read-only Council observation" } as const; }
   async hostAction(input: Parameters<InstalledOperationObservationPort["hostAction"]>[0]) { this.calls.push(`host:${input.operationId}:${input.action}`); return { outcome: this.result, note: "read-only host observation" } as const; }
+  async providerDesktop(input: Readonly<{ operationId: string; action: string }>) { this.calls.push(`provider-desktop:${input.operationId}:${input.action}`); return { outcome: this.result, note: "read-only provider desktop effect observation" } as const; }
 }
 
 test("read-only recovery routes exact immutable bindings and records a verified child without invoking effects", async () => {
@@ -33,11 +34,13 @@ test("read-only recovery routes exact immutable bindings and records a verified 
   await reconciler.reconcile(operation("provider.artifact", { repositoryRoot: "C:\\repo", routeId: "provider.repair", externalId: "external-1", targetSnapshotId: "snapshot-1" }));
   await reconciler.reconcile(operation("council.pause", { epochId: "epoch-1", phase: "pause", sessionId: "session-1", target: "snapshot-1" }));
   await reconciler.reconcile(operation("open_claude", {}, null));
+  await reconciler.reconcile(operation("open_managed_codex_terminal", {}, null));
   assert.deepEqual(observations.calls, [
     `local:C:\\repo:${"a".repeat(40)}:${"c".repeat(40)}`,
     `ref:https://github.com/acme/repo.git:refs/heads/feat/a:${"d".repeat(40)}`,
     "pr:acme/repo:feat/a:OPEN", "pr:acme/repo:17:MERGED", "provider:C:\\repo:provider.repair:external-1",
-    "council:epoch-1:pause:session-1", "host:operation-open_claude:open_claude"
+    "council:epoch-1:pause:session-1", "provider-desktop:operation-open_claude:open_claude",
+    "host:operation-open_managed_codex_terminal:open_managed_codex_terminal"
   ]);
 });
 

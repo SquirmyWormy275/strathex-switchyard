@@ -16,6 +16,10 @@ import type { AttestedContainmentReleaseCoordinator } from "./containment-releas
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import type { GateEvidence } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import type { AcceptanceAdministration, HighConsequenceActivation, InstalledAcceptanceTrust } from "./acceptance-administration.ts";
+import type { InstalledScannerFixture, InstalledScannerFixtureTrust, ScannerFixtureAdministration } from "./scanner-fixtures.ts";
+import { providerIds, type AttestedProviderDesktopRegistry, type ProviderId, type ProviderInstallation } from "./provider-desktop.ts";
 import type {
   AuditEvent,
   Capability,
@@ -44,6 +48,14 @@ import {
   type CredentialProvisionPayload,
   type CredentialRevokePayload,
   type NetworkPolicyInstallPayload,
+  type AdministrationSourcePayload,
+  type AcceptanceTrustRevokePayload,
+  type AcceptanceEvidenceInvalidatePayload,
+  type AcceptanceActivationPayload,
+  type AcceptanceActivationRevokePayload,
+  type ScannerTrustRevokePayload,
+  type ScannerFixtureRevokePayload,
+  type ProviderDesktopReferencePayload,
   type ProviderHandshakePayload,
   type ContainmentReleasePayload,
   type RawHidInstallPayload,
@@ -95,11 +107,22 @@ export interface HostActionCompletionRecord {
   readonly operationId: string;
   readonly action: CommandAction;
   readonly targetSnapshotId?: string;
-  readonly status: "completed" | "failed";
+  readonly status: "completed" | "failed" | "incomplete";
   readonly summary: string;
   /** Host-action idempotency evidence; deliberately not eligible for gate receipts. */
   readonly completionDigest?: string;
   readonly completedAt: string;
+}
+
+export interface VoiceRuntimeCoordinator {
+  open(bindingId: string): Promise<void>;
+  switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>): Promise<VoiceBinding>;
+  bindManagedSession(bindingId: string, managedSessionId: string): Promise<VoiceBinding>;
+  mute(bindingId: string): Promise<VoiceBinding>;
+  resume(bindingId: string): Promise<VoiceBinding>;
+  interrupt(bindingId: string, reason: string): Promise<VoiceBinding>;
+  end(bindingId: string): Promise<VoiceBinding>;
+  deleteTranscript(bindingId: string): Promise<VoiceBinding>;
 }
 
 export interface HostActionCoordinator {
@@ -126,6 +149,9 @@ export interface CompanionServiceOptions {
   readonly sandboxInstallations?: SandboxInstallationCoordinator;
   readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  readonly acceptanceAdministration?: Pick<AcceptanceAdministration, "installTrustPolicy" | "listTrust" | "revokeTrust" | "importEvidence" | "listEvidence" | "invalidateEvidence" | "activate" | "listActivations" | "revokeActivation">;
+  readonly scannerAdministration?: ScannerFixtureAdministration;
+  readonly providerDesktopRegistry?: Pick<AttestedProviderDesktopRegistry, "install" | "list" | "revoke">;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
@@ -135,6 +161,7 @@ export interface CompanionServiceOptions {
   readonly workflowArtifacts?: WorkflowArtifactStore;
   readonly workflowCoordinator?: WorkflowPreparationCoordinator;
   readonly voice?: VoiceCoordinator;
+  readonly voiceRuntime?: VoiceRuntimeCoordinator;
   readonly voicePresence?: WindowsUserPresenceRunner;
   readonly canonicalizeHostPath?: (value: string) => Promise<string>;
   /**
@@ -163,6 +190,9 @@ export class CompanionService {
   private readonly sandboxInstallations?: SandboxInstallationCoordinator;
   private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
   private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  private readonly acceptanceAdministration?: CompanionServiceOptions["acceptanceAdministration"];
+  private readonly scannerAdministration?: ScannerFixtureAdministration;
+  private readonly providerDesktopRegistry?: CompanionServiceOptions["providerDesktopRegistry"];
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
   private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
@@ -172,6 +202,7 @@ export class CompanionService {
   private readonly workflowArtifacts?: WorkflowArtifactStore;
   private readonly workflowCoordinator?: WorkflowPreparationCoordinator;
   private readonly voice?: VoiceCoordinator;
+  private readonly voiceRuntime?: VoiceRuntimeCoordinator;
   private readonly voicePresence?: WindowsUserPresenceRunner;
   private readonly canonicalizeHostPath: (value: string) => Promise<string>;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
@@ -186,6 +217,9 @@ export class CompanionService {
     this.sandboxInstallations = options.sandboxInstallations;
     this.credentialProvisioning = options.credentialProvisioning;
     this.networkPolicyProvisioning = options.networkPolicyProvisioning;
+    this.acceptanceAdministration = options.acceptanceAdministration;
+    this.scannerAdministration = options.scannerAdministration;
+    this.providerDesktopRegistry = options.providerDesktopRegistry;
     this.providerHandshakes = options.providerHandshakes;
     this.containmentRelease = options.containmentRelease;
     this.rawHidInstallations = options.rawHidInstallations;
@@ -195,6 +229,7 @@ export class CompanionService {
     this.workflowArtifacts = options.workflowArtifacts;
     this.workflowCoordinator = options.workflowCoordinator;
     this.voice = options.voice;
+    this.voiceRuntime = options.voiceRuntime;
     this.voicePresence = options.voicePresence;
     this.canonicalizeHostPath = options.canonicalizeHostPath ?? realpath;
     this.verifyCapabilities = options.verifyCapabilities;
@@ -258,6 +293,24 @@ export class CompanionService {
           return this.success(request.id, { policy: await this.currentNetworkPolicy(request.payload) });
         case "network-policy.revoke":
           return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
+        case "acceptance.trust.install": return this.success(request.id, { trust: await this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation")) });
+        case "acceptance.trust.list": return this.success(request.id, { trust: await this.listAcceptanceTrust(request.payload) });
+        case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload)) });
+        case "acceptance.evidence.import": return this.success(request.id, { evidence: await this.importAcceptanceEvidence(this.requireAdministrationSource(request.payload, "Acceptance evidence import")) });
+        case "acceptance.evidence.list": return this.success(request.id, { evidence: await this.listAcceptanceEvidence(request.payload) });
+        case "acceptance.evidence.invalidate": return this.success(request.id, { invalidated: await this.invalidateAcceptanceEvidence(this.requireAcceptanceEvidenceInvalidate(request.payload)) });
+        case "acceptance.activation.activate": return this.success(request.id, { activation: await this.activateHighConsequence(this.requireAcceptanceActivation(request.payload)) });
+        case "acceptance.activation.list": return this.success(request.id, { activations: await this.listHighConsequenceActivations(request.payload) });
+        case "acceptance.activation.revoke": return this.success(request.id, { revoked: await this.revokeHighConsequenceActivation(this.requireAcceptanceActivationRevoke(request.payload)) });
+        case "scanner.trust.install": return this.success(request.id, { trust: await this.installScannerTrust(this.requireAdministrationSource(request.payload, "Scanner trust installation")) });
+        case "scanner.trust.list": return this.success(request.id, { trust: await this.listScannerTrust(request.payload) });
+        case "scanner.trust.revoke": return this.success(request.id, { revoked: await this.revokeScannerTrust(this.requireScannerTrustRevoke(request.payload)) });
+        case "scanner.fixture.install": return this.success(request.id, { fixture: await this.installScannerFixture(this.requireAdministrationSource(request.payload, "Scanner fixture installation")) });
+        case "scanner.fixture.list": return this.success(request.id, { fixtures: await this.listScannerFixtures(request.payload) });
+        case "scanner.fixture.revoke": return this.success(request.id, { revoked: await this.revokeScannerFixture(this.requireScannerFixtureRevoke(request.payload)) });
+        case "provider-desktop.install": return this.success(request.id, { installation: await this.installProviderDesktop(this.requireProviderDesktopReference(request.payload)) });
+        case "provider-desktop.list": return this.success(request.id, { installations: await this.listProviderDesktops(request.payload) });
+        case "provider-desktop.revoke": return this.success(request.id, { installation: await this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload)) });
         case "provider.handshake":
           return this.success(request.id, await this.providerHandshake(this.requireProviderHandshake(request.payload)));
         case "containment.release":
@@ -368,7 +421,10 @@ export class CompanionService {
   private adopt(payload: SessionAdoptionPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
     const existingAdoption = this.adoptionKeys.get(payload.adoptionKey);
-    if (existingAdoption || session.metadata["sxsy-b122.adoptionKey"]) {
+    const reservedKey = session.metadata["sxsy-b122.adoptionKey"];
+    if ((existingAdoption && existingAdoption !== session.id)
+      || session.metadata["sxsy-b122.adoptedAt"]
+      || (reservedKey && reservedKey !== payload.adoptionKey)) {
       throw new CompanionServiceError("already_adopted", "This terminal has already been adopted; its capabilities were not changed.");
     }
     const next: ManagedSession = {
@@ -577,17 +633,23 @@ export class CompanionService {
     if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached.");
     const consent = await this.voice.getConsent(payload.consentId);
     if (!consent) throw new CompanionServiceError("not_found", "Voice consent was not found.");
+    if (this.voiceRuntime && !payload.managedSessionId) throw new CompanionServiceError("capability_denied", "The installed two-way voice runtime requires one explicitly selected exact managed session.");
     if (payload.managedSessionId) this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), consent.repositoryRoot, consent.targetSnapshotId);
-    return this.voice.start(payload);
+    const binding = await this.voice.start(payload);
+    if (payload.managedSessionId && this.voiceRuntime) {
+      try { await this.voiceRuntime.open(binding.id); }
+      catch (error) { await this.voice.end(binding.id).catch(() => undefined); throw voiceServiceFailure(error); }
+    }
+    return (await this.voice.getBinding(binding.id)) ?? binding;
   }
   private async currentVoice(payload: unknown): Promise<VoiceBinding | undefined> { requireEmptyPayload(payload, "Voice current binding"); if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.active(); }
-  private async switchVoice(payload: VoiceSwitchPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }); }
-  private async bindVoice(payload: VoiceBindingPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await this.voice.getBinding(payload.bindingId); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); return this.voice.bindManagedSession(payload.bindingId, payload.managedSessionId); }
-  private async muteVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.mute(payload.bindingId); }
-  private async resumeVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.resume(payload.bindingId); }
-  private async interruptVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); return this.voice.interrupt(payload.bindingId, payload.reason); }
-  private async endVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.end(payload.bindingId); }
-  private async deleteVoiceTranscript(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.deleteTranscript(payload.bindingId); }
+  private async switchVoice(payload: VoiceSwitchPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }) : await this.voice.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }); } catch (error) { throw voiceServiceFailure(error); } }
+  private async bindVoice(payload: VoiceBindingPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await this.voice.getBinding(payload.bindingId); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); try { return this.voiceRuntime ? await this.voiceRuntime.bindManagedSession(payload.bindingId, payload.managedSessionId) : await this.voice.bindManagedSession(payload.bindingId, payload.managedSessionId); } catch (error) { throw voiceServiceFailure(error); } }
+  private async muteVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.mute(payload.bindingId) : await this.voice.mute(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
+  private async resumeVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.resume(payload.bindingId) : await this.voice.resume(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
+  private async interruptVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); try { return this.voiceRuntime ? await this.voiceRuntime.interrupt(payload.bindingId, payload.reason) : await this.voice.interrupt(payload.bindingId, payload.reason); } catch (error) { throw voiceServiceFailure(error); } }
+  private async endVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.end(payload.bindingId) : await this.voice.end(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
+  private async deleteVoiceTranscript(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.deleteTranscript(payload.bindingId) : await this.voice.deleteTranscript(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
 
   private assertVoiceSessionScope(session: ManagedSession, repositoryRoot: string, targetSnapshotId: string): void {
     if (session.targetSnapshotId !== targetSnapshotId || normalizeHostPath(session.workspaceRoot ?? "") !== normalizeHostPath(repositoryRoot)) throw new CompanionServiceError("capability_denied", "Voice can bind only to a managed session on the exact consent target.");
@@ -690,6 +752,29 @@ export class CompanionService {
   private async currentNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy inspection"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return this.networkPolicyProvisioning.current(); }
   private async revokeNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy revocation"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await this.networkPolicyProvisioning.revoke(); this.record("network-policy.revoke", "completed", "Revoked the active exact-route HTTPS policy."); return policy; }
 
+  private acceptanceAdmin() { if (!this.acceptanceAdministration) throw new CompanionServiceError("capability_denied", "No current-user acceptance-evidence administration boundary is installed."); return this.acceptanceAdministration; }
+  private scannerAdmin() { if (!this.scannerAdministration) throw new CompanionServiceError("capability_denied", "No current-user signed scanner-fixture administration boundary is installed."); return this.scannerAdministration; }
+  private async installAcceptanceTrust(payload: AdministrationSourcePayload): Promise<InstalledAcceptanceTrust> { const value = await this.acceptanceAdmin().installTrustPolicy(payload.sourcePath); this.record("acceptance.trust.install", "completed", "Installed one current-user-approved acceptance authority."); return value; }
+  private async listAcceptanceTrust(payload: unknown): Promise<readonly InstalledAcceptanceTrust[]> { requireEmptyPayload(payload, "Acceptance trust listing"); return this.acceptanceAdmin().listTrust(); }
+  private async revokeAcceptanceTrust(payload: AcceptanceTrustRevokePayload): Promise<InstalledAcceptanceTrust> { const value = await this.acceptanceAdmin().revokeTrust(payload.authorityId, payload.keyId, payload.reason); this.record("acceptance.trust.revoke", "completed", "Revoked one current-user-approved acceptance authority."); return value; }
+  private async importAcceptanceEvidence(payload: AdministrationSourcePayload): Promise<GateEvidence> { const value = await this.acceptanceAdmin().importEvidence(payload.sourcePath); this.record("acceptance.evidence.import", "completed", "Imported one independently signed acceptance-evidence package."); return value; }
+  private async listAcceptanceEvidence(payload: unknown): Promise<readonly GateEvidence[]> { requireEmptyPayload(payload, "Acceptance evidence listing"); return this.acceptanceAdmin().listEvidence(); }
+  private async invalidateAcceptanceEvidence(payload: AcceptanceEvidenceInvalidatePayload): Promise<true> { await this.acceptanceAdmin().invalidateEvidence(payload.evidenceId, payload.reason); this.record("acceptance.evidence.invalidate", "completed", "Invalidated one selected acceptance-evidence record."); return true; }
+  private async activateHighConsequence(payload: AcceptanceActivationPayload): Promise<HighConsequenceActivation> { const value = await this.acceptanceAdmin().activate(payload.action, payload.targetSnapshotId, payload.expiresAt); this.record("acceptance.activation.activate", "completed", "Activated one high-consequence action for one exact target and expiry."); return value; }
+  private async listHighConsequenceActivations(payload: unknown): Promise<readonly HighConsequenceActivation[]> { requireEmptyPayload(payload, "High-consequence activation listing"); return this.acceptanceAdmin().listActivations(); }
+  private async revokeHighConsequenceActivation(payload: AcceptanceActivationRevokePayload): Promise<true> { await this.acceptanceAdmin().revokeActivation(payload.activationId, payload.reason); this.record("acceptance.activation.revoke", "completed", "Revoked one selected high-consequence activation."); return true; }
+  private async installScannerTrust(payload: AdministrationSourcePayload): Promise<InstalledScannerFixtureTrust> { const value = await this.scannerAdmin().installTrust(payload.sourcePath); this.record("scanner.trust.install", "completed", "Installed one current-user-approved scanner-fixture authority."); return value; }
+  private async listScannerTrust(payload: unknown): Promise<readonly InstalledScannerFixtureTrust[]> { requireEmptyPayload(payload, "Scanner trust listing"); return this.scannerAdmin().listTrust(); }
+  private async revokeScannerTrust(payload: ScannerTrustRevokePayload): Promise<true> { await this.scannerAdmin().revokeTrust(payload.authorityId, payload.keyId, payload.reason); this.record("scanner.trust.revoke", "completed", "Revoked one selected scanner-fixture authority."); return true; }
+  private async installScannerFixture(payload: AdministrationSourcePayload): Promise<InstalledScannerFixture> { const value = await this.scannerAdmin().installFixture(payload.sourcePath); this.record("scanner.fixture.install", "completed", "Installed one current-user-approved signed scanner/advisory fixture."); return value; }
+  private async listScannerFixtures(payload: unknown): Promise<readonly InstalledScannerFixture[]> { requireEmptyPayload(payload, "Scanner fixture listing"); return this.scannerAdmin().listFixtures(); }
+  private async revokeScannerFixture(payload: ScannerFixtureRevokePayload): Promise<true> { await this.scannerAdmin().revokeFixture(payload.fixtureId, payload.reason); this.record("scanner.fixture.revoke", "completed", "Revoked one selected scanner/advisory fixture."); return true; }
+
+  private providerDesktopAdmin() { if (!this.providerDesktopRegistry) throw new CompanionServiceError("capability_denied", "No fixed-path current-user provider installation registry is attached."); return this.providerDesktopRegistry; }
+  private async installProviderDesktop(payload: ProviderDesktopReferencePayload): Promise<ProviderInstallation> { const value = await this.providerDesktopAdmin().install(payload.provider); this.record("provider-desktop.install", "completed", "Installed one current-user-approved fixed provider executable identity."); return value; }
+  private async listProviderDesktops(payload: unknown): Promise<readonly ProviderInstallation[]> { requireEmptyPayload(payload, "Provider desktop listing"); return this.providerDesktopAdmin().list(); }
+  private async revokeProviderDesktop(payload: ProviderDesktopReferencePayload): Promise<ProviderInstallation> { const value = await this.providerDesktopAdmin().revoke(payload.provider); this.record("provider-desktop.revoke", "completed", "Revoked one fixed provider executable identity."); return value; }
+
   private async providerHandshake(payload: ProviderHandshakePayload): Promise<ManagedSession> {
     if (!this.providerHandshakes) throw new CompanionServiceError("capability_denied", "No configured provider handshake boundary is attached.");
     const session = this.requireSession(payload.sessionId);
@@ -715,6 +800,14 @@ export class CompanionService {
 
   private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
   private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
+  private requireAdministrationSource(payload: unknown, label: string): AdministrationSourcePayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", `${label} requires one bounded absolute source path.`); return { sourcePath: payload.sourcePath }; }
+  private requireAcceptanceTrustRevoke(payload: unknown): AcceptanceTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
+  private requireAcceptanceEvidenceInvalidate(payload: unknown): AcceptanceEvidenceInvalidatePayload { if (!isRecord(payload) || !exactKeys(payload, ["evidenceId", "reason"]) || !boundedIdentifier(payload.evidenceId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance evidence invalidation requires one exact evidence ID and bounded reason."); return { evidenceId: payload.evidenceId, reason: payload.reason }; }
+  private requireAcceptanceActivation(payload: unknown): AcceptanceActivationPayload { if (!isRecord(payload) || !exactKeys(payload, ["action", "targetSnapshotId", "expiresAt"]) || typeof payload.action !== "string" || !commandActionIds.includes(payload.action as CommandAction) || !boundedIdentifier(payload.targetSnapshotId) || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt))) throw new CompanionServiceError("invalid_request", "High-consequence activation requires one catalog action, exact target snapshot, and ISO expiry."); return { action: payload.action as CommandAction, targetSnapshotId: payload.targetSnapshotId, expiresAt: payload.expiresAt }; }
+  private requireAcceptanceActivationRevoke(payload: unknown): AcceptanceActivationRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["activationId", "reason"]) || !boundedIdentifier(payload.activationId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "High-consequence activation revocation requires one exact activation ID and bounded reason."); return { activationId: payload.activationId, reason: payload.reason }; }
+  private requireScannerTrustRevoke(payload: unknown): ScannerTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
+  private requireScannerFixtureRevoke(payload: unknown): ScannerFixtureRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["fixtureId", "reason"]) || !boundedIdentifier(payload.fixtureId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner fixture revocation requires one exact fixture ID and bounded reason."); return { fixtureId: payload.fixtureId, reason: payload.reason }; }
+  private requireProviderDesktopReference(payload: unknown): ProviderDesktopReferencePayload { if (!isRecord(payload) || !exactKeys(payload, ["provider"]) || typeof payload.provider !== "string" || !(providerIds as readonly string[]).includes(payload.provider)) throw new CompanionServiceError("invalid_request", "Provider installation administration accepts only one compiled provider identity."); return { provider: payload.provider as ProviderId }; }
   private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
   private requireContainmentRelease(payload: unknown): ContainmentReleasePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "incidentStatus"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /\0/.test(payload.reason) || (payload.incidentStatus !== "rotation_complete" && payload.incidentStatus !== "not_required")) throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, bounded incident-review reason, and completed-or-not-required credential rotation status."); return { sessionId: payload.sessionId, reason: payload.reason.trim(), incidentStatus: payload.incidentStatus }; }
 
@@ -975,15 +1068,19 @@ export class CompanionService {
     if (!isRecord(payload)
       || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
       || typeof payload.succeeded !== "boolean"
+      || (payload.effectDisposition !== undefined && !["not_started", "committed", "ambiguous"].includes(payload.effectDisposition as string))
+      || (payload.succeeded === true && payload.effectDisposition !== undefined && payload.effectDisposition !== "committed")
+      || (payload.succeeded === false && payload.effectDisposition === "committed")
       || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
       || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
-      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "summary", "adapterVersion", "authorizationToken"].includes(key))) {
+      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "effectDisposition", "summary", "adapterVersion", "authorizationToken"].includes(key))) {
       throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
     }
     if (payload.authorizationToken !== undefined && (typeof payload.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(payload.authorizationToken))) {
       throw new CompanionServiceError("invalid_request", "The host-action completion authorization token is malformed.");
     }
-    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}) };
+    const effectDisposition = (payload.effectDisposition ?? (payload.succeeded ? "committed" : "not_started")) as "not_started" | "committed" | "ambiguous";
+    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, effectDisposition, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}) };
   }
 
   private requireHostActionAuthorization(payload: unknown): HostActionAuthorizationPayload {
@@ -1171,6 +1268,14 @@ function isConfirmationCapableExecutor(value: MediatedCommandExecutor | undefine
   return !!value && typeof (value as Partial<ConfirmationCapableMediatedCommandExecutor>).requestConfirmation === "function";
 }
 
+function voiceServiceFailure(error: unknown): CompanionServiceError {
+  if (error instanceof CompanionServiceError) return error;
+  const code = typeof error === "object" && error !== null && "code" in error ? (error as { code?: unknown }).code : undefined;
+  if (code === "deletion_incomplete") return new CompanionServiceError("companion_unavailable", "Local voice transcript keys were destroyed, but external provider deletion could not be confirmed.");
+  if (code === "provider_unavailable" || code === "deadline" || code === "cancelled") return new CompanionServiceError("companion_unavailable", "The exact configured voice runtime is unavailable or did not complete within its bounded lifecycle.");
+  return new CompanionServiceError("capability_denied", "The voice request no longer matches its exact consent, provider, target, and managed-session binding.");
+}
+
 function parseGitMutation(value: unknown): GitMutation {
   if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Git review requires a typed mutation record.");
   switch (value.kind) {
@@ -1248,6 +1353,8 @@ function sameHostRoots(left: readonly string[], right: readonly string[]): boole
 }
 
 function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function boundedIdentifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
+function boundedReason(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 2_048 && !/\0/.test(value); }
 function boundedStringList(value: unknown, label: string): readonly string[] { if (!Array.isArray(value) || value.length > 512 || !value.every((item) => typeof item === "string" && item.trim() && item.length <= 16_384 && !/\0/.test(item))) throw new CompanionServiceError("invalid_request", `${label} must be a bounded string list.`); return [...new Set(value.map((item) => (item as string).trim()))]; }
 function workflowArtifactAction(value: unknown): value is WorkflowArtifactAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
 function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {

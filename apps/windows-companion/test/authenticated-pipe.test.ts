@@ -36,6 +36,30 @@ test("authenticated local pipe carries the candidate bridge protocol without a c
   assert.deepEqual(seen, [request]);
 });
 
+test("authenticated local pipe admits the installed acceptance, scanner, and provider administration methods", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-admin-pipe-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `admin-${Date.now()}`);
+  const seen: string[] = [];
+  const server = new AuthenticatedPipeServer(configuration, protector, {
+    async handle(candidate): Promise<CompanionResponse> {
+      seen.push(candidate.method);
+      return { version: companionBridgeVersion, id: candidate.id, ok: true, result: { admitted: candidate.method } };
+    }
+  });
+  await server.start();
+  context.after(async () => { await server.stop(); });
+  const client = new AuthenticatedPipeClient(configuration, protector);
+  const requests: CompanionRequest[] = [
+    { version: 1, id: "acceptance-admin", method: "acceptance.trust.list" },
+    { version: 1, id: "scanner-admin", method: "scanner.fixture.list" },
+    { version: 1, id: "provider-admin", method: "provider-desktop.list" }
+  ];
+  for (const candidate of requests) assert.equal((await client.request(candidate)).ok, true);
+  assert.deepEqual(seen, requests.map((candidate) => candidate.method));
+});
+
 test("local pipe client rejects oversized requests before any connection", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });

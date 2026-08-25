@@ -29,6 +29,7 @@ import { DurableConfiguredCouncilExecutor, type CouncilAutomaticAcceptanceGate }
 import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor } from "./pipeline-adapters.ts";
 import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
+import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
@@ -90,6 +91,8 @@ export interface DefaultLocalCompositionOptions {
   readonly councilAutomaticGate?: CouncilAutomaticAcceptanceGate;
   /** Authenticated local gateway with an explicitly configured-network fallback. */
   readonly providerTransport?: ProviderCommandTransport;
+  /** Installed fixed-path desktop/managed-terminal adapter; omitted means those exact desktop commands remain unavailable. */
+  readonly providerDesktopAdapter?: CommandAdapter;
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   let credentials: DurableCredentialReferenceVault | undefined = options.credentialVault;
@@ -119,6 +122,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   const configuredGitHost = options.networkPolicyRegistry ? { resolve: async () => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve()) } : undefined;
   const hostActionAdapter = new DurableHostActionAdapter(hostActions, dynamicNetwork && configuredGitHost ? new ConfiguredGitHubNavigationResolver(dynamicNetwork, configuredGitHost) : undefined);
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
+  if (options.providerDesktopAdapter) for (const action of installedProviderDesktopActions) adapters.register(action, options.providerDesktopAdapter);
   if (dynamicNetwork) {
     const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), configuredGitHost!, new DurablePipelineFailureCursor(store));
     adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));

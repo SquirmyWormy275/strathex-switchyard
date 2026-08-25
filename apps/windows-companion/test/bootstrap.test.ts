@@ -7,7 +7,7 @@ import test from "node:test";
 
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
-import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import { JsonLineCompanionBridge } from "../../vscode-extension/src/companion-bridge.ts";
 import { NamedPipeJsonLineTransport } from "../../vscode-extension/src/named-pipe-transport.ts";
 import { companionBridgeVersion } from "../src/bridge.ts";
@@ -54,6 +54,13 @@ const isolatedAuthenticator: JournalAuthenticator = {
   async verify(hash, tag) { return tag === `test:${hash}`; }
 };
 
+function proofPayload(sessionId: string, taskId: string, planRevision: string, backend: string) {
+  const planMaterial = { revision: planRevision, originSessionId: sessionId, taskId, objective: "Verify the exact workflow.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
+  const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+  const material = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
+  return { kind: "proof" as const, evidence: { contextDigest: sha256(stableJson(material)), ...material }, claims: ["claim"], requiredBackends: [backend], independentBackendRequired: false };
+}
+
 test("bootstrap wires a protected registry and durable executor while a missing authority remains fail-closed", async (context) => {
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-bootstrap-"));
   context.after(async () => { await rm(folder, { recursive: true, force: true }); });
@@ -78,7 +85,7 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   const workflowArtifacts = new WorkflowArtifactStore(companion.store, { idFactory: () => "provider-artifact" });
   await workflowArtifacts.create({
     action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: "trusted",
-    payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["evidence"], requiredBackends: ["provider"] }
+    payload: proofPayload("trusted", "task", "plan", "provider")
   });
   await workflowArtifacts.claimForDispatch({ action: "proof", targetSnapshotId: target.id, sessionId: "trusted", operationId: "provider-operation" });
   assert.equal((await companion.operationControl.cancel({ operationId: "provider-operation", reason: "operator cancelled" })).accepted, true);
@@ -105,7 +112,7 @@ test("installed bootstrap routes an authorized workflow through the authenticate
   });
   await companion.workflowArtifacts.create({
     id: "gateway-proof-artifact", action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: session.id,
-    taskId: "task", planRevision: "plan", payload: { kind: "proof", claims: ["claim"], evidenceReferences: ["evidence"], requiredBackends: ["local"] }
+    taskId: "task", planRevision: "plan", payload: proofPayload("gateway-session", "task", "plan", "local")
   });
   const authority = await companion.executor.authorities.issue({
     repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["proof"], prohibitedActions: [],
@@ -137,7 +144,7 @@ test("packaged restart finalizes a durable authenticated host effect without rep
     version: companionBridgeVersion,
     id: "crash-after-host-effect",
     method: "command.dispatch",
-    payload: { control: "CLAUDE", modifier: "normal" }
+    payload: { control: "VSCODE", modifier: "normal" }
   });
   assert.equal(dispatched.ok, true);
   const command = (dispatched.result as { command: { operationId: string; data: { hostActionId: string } } }).command;
@@ -207,7 +214,7 @@ test("packaged restart reconciles an exact crash-after-local-commit child by rea
   });
   await restarted.endpoint.ready();
   assert.equal((await restarted.executor.operations.get(child.id))?.state, "recorded");
-  assert.equal((await restarted.executor.operations.get(parent.id))?.state, "executing");
+  assert.equal((await restarted.executor.operations.get(parent.id))?.state, "recorded");
   assert.equal(await gitText(folder, ["rev-parse", "HEAD"]), postHead);
   assert.equal((await gitText(folder, ["rev-list", "--count", "HEAD"])), "2");
 });
@@ -277,6 +284,20 @@ test("installed composition synchronizes an authenticated extension session and 
   await server.start();
   context.after(async () => { await server.stop(); });
   const bridge = new JsonLineCompanionBridge(new NamedPipeJsonLineTransport(configuration, protector));
+  const reservedAdoptionKey = "terminal:managed-reservation-1";
+  await companion.registerTrustedSession({ id: "managed-reserved", provider: "generic", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-host-reservation", metadata: { "sxsy-b122.adoptionKey": reservedAdoptionKey } });
+  const reservedRegistration = await bridge.registerSession({ id: "managed-reserved", provider: "generic", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-extension", metadata: {} });
+  assert.equal(reservedRegistration.ok, true);
+  const adopted = await bridge.adoptTerminal("managed-reserved", reservedAdoptionKey, "codex");
+  assert.equal(adopted.ok, true, JSON.stringify(adopted));
+  assert.equal(adopted.ok && adopted.value.provider, "codex");
+  assert.deepEqual(adopted.ok && adopted.value.capabilities, ["registered"]);
+  const replayedAdoption = await bridge.adoptTerminal("managed-reserved", reservedAdoptionKey, "claude");
+  assert.equal(replayedAdoption.ok, false);
+  const secondRegistration = await bridge.registerSession({ id: "managed-reserved-2", provider: "generic", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-extension", metadata: {} });
+  assert.equal(secondRegistration.ok, true);
+  const crossSessionAdoption = await bridge.adoptTerminal("managed-reserved-2", reservedAdoptionKey, "codex");
+  assert.equal(crossSessionAdoption.ok, false);
   const registered = await bridge.registerSession({ id: "installed-extension", provider: "generic", surface: "vscode_window", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-smoke", metadata: {} });
   assert.equal(registered.ok, true);
   assert.equal((await companion.sessions.get("installed-extension"))?.targetSnapshotId, currentTarget.value.id);
@@ -285,7 +306,7 @@ test("installed composition synchronizes an authenticated extension session and 
   await companion.registerTrustedSession({ id: "installed-extension", provider: "generic", surface: "vscode_window", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: folder, targetSnapshotId: currentTarget.value.id, taskId: "task", planRevision: "plan", plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "installed-host-attestation", metadata: { "sxsy-b122.registration": "registered" } });
   const authority = await companion.executor.authorities.issue({ repositoryRoot: folder, sessionId: "installed-extension", taskId: "task", planRevision: "plan", allowedActions: ["shield_change_scan"], prohibitedActions: [], expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user" });
   const safe = await bridge.dispatch({ control: "SHIELD", modifier: "normal", sessionId: "installed-extension", authorityId: authority.id });
-  assert.equal(safe.ok, true);
+  assert.equal(safe.ok, true, JSON.stringify(safe));
   assert.equal(safe.ok && safe.value.status, "unavailable", JSON.stringify(safe));
   assert.match(safe.ok ? safe.value.summary : "", /host-attested.*runtime pin/i);
   const unauthorized = await bridge.dispatch({ control: "SHIELD", modifier: "normal", sessionId: "installed-extension", authorityId: "not-issued" });
@@ -340,4 +361,35 @@ test("bootstrap owns a durable Raw-HID inbox and fixed-helper supervisor without
   assert.equal(events.length, 1);
   await companion.rawHidSupervisor!.stop();
   assert.equal(stops, 1);
+});
+
+test("installed bootstrap exposes protected acceptance and scanner administration while retaining empty fail-closed registries", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-bootstrap-administration-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const companion = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    localStateDirectory: folder,
+    targetResolver: { resolve: async () => target },
+    runtimePinPresence: { async verify() { return { verified: true, operator: "Current User", method: "windows-user-presence" }; } }
+  });
+  assert.ok(companion.acceptanceAdministration);
+  assert.ok(companion.scannerAdministration);
+  assert.ok(companion.scannerFixtures);
+  const acceptance = await companion.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "acceptance-list",
+    method: "acceptance.trust.list",
+    payload: {}
+  });
+  const scanner = await companion.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "scanner-list",
+    method: "scanner.fixture.list",
+    payload: {}
+  });
+  assert.equal(acceptance.ok, true, JSON.stringify(acceptance));
+  assert.deepEqual((acceptance.result as { trust: readonly unknown[] }).trust, []);
+  assert.equal(scanner.ok, true, JSON.stringify(scanner));
+  assert.deepEqual((scanner.result as { fixtures: readonly unknown[] }).fixtures, []);
 });
