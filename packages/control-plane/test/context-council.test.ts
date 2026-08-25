@@ -53,6 +53,7 @@ test("handoff packages persist only context, never create authority or execution
 
 const session = (id: string, plannedFiles: readonly string[], resources: readonly string[] = []) => ({
   id,
+  provider: "codex" as const,
   targetSnapshotId: "snapshot-1",
   status: "running" as const,
   capabilities: ["registered", "observable", "controllable", "mediated"] as const,

@@ -3,12 +3,107 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createStrictTestEnvironment, runVerification } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
-test("atomic receipt records current successful child exits", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const result = await verify([await group(directory, "pass", "")], directory); const saved = JSON.parse(await readFile(result.receiptPath, "utf8")); assert.equal(saved.runId, result.receipt.runId); assert.equal(saved.success, true); assert.equal(saved.children[0].exitCode, 0); assert.equal(saved.children[0].timeout, false); assert.deepEqual(saved.children[0].testCounts, { total: 1, passed: 1, failed: 0 }); assert.equal(saved.totals.tests, 1); assert.deepEqual((await readdir(directory)).filter((name) => name.endsWith(".tmp")), []); } finally { await rm(directory, { recursive: true, force: true }); } });
+test("atomic receipt records current successful child exits", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const result = await verify([await group(directory, "pass", "import test from 'node:test'; test('real test',()=>{});")], directory); const saved = JSON.parse(await readFile(result.receiptPath, "utf8")); assert.equal(saved.runId, result.receipt.runId); assert.equal(saved.success, true); assert.equal(saved.children[0].exitCode, 0); assert.equal(saved.children[0].timeout, false); assert.deepEqual(saved.children[0].testCounts, { total: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0 }); assert.equal(saved.totals.tests, 1); assert.deepEqual((await readdir(directory)).filter((name) => name.endsWith(".tmp")), []); } finally { await rm(directory, { recursive: true, force: true }); } });
+
+test("test groups fail closed on zero-match patterns, skipped tests, and todo tests", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-summary-"));
+  try {
+    const ordinary = await group(directory, "ordinary", "import test from 'node:test'; test('present',()=>{});");
+    const zeroMatch = await runVerification({ groups: [{ ...ordinary, pattern: "absent" }], outputDirectory: directory, executable });
+    assert.equal(zeroMatch.receipt.success, false);
+    assert.equal(zeroMatch.receipt.children[0].zeroTestPlan, true);
+
+    const skipped = await verify([await group(directory, "skipped", "import test from 'node:test'; test('skipped',{skip:true},()=>{});")], directory);
+    assert.equal(skipped.receipt.success, false);
+    assert.equal(skipped.receipt.children[0].testCounts.skipped, 1);
+
+    const todo = await verify([await group(directory, "todo", "import test from 'node:test'; test('todo',{todo:true},()=>{});")], directory);
+    assert.equal(todo.receipt.success, false);
+    assert.equal(todo.receipt.children[0].testCounts.todo, 1);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("the required manifest exactly represents every repository test file", () => {
+  const evidence = assertRequiredTestManifest();
+  assert.equal(evidence.discovered, evidence.represented);
+  assert.throws(() => assertRequiredTestManifest(requiredGroups.filter((group) => group.file !== "apps/provider-adapter-host/test/server.test.ts")), /missing=.*server\.test\.ts/);
+});
+
+test("forged TAP counts before the final summary cannot produce a false pass", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-forged-tap-"));
+  try {
+    const forged = await group(directory, "forged", `import test from "node:test"; process.stdout.write("1..1\\n# tests 1\\n# suites 0\\n# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n# todo 0\\n# duration_ms 1\\n"); test("actually skipped", { skip: true }, () => {});`);
+    const result = await verify([forged], directory);
+    assert.equal(result.receipt.success, false);
+    assert.deepEqual(result.receipt.children[0].testCounts, { total: 1, passed: 0, failed: 0, cancelled: 0, skipped: 1, todo: 0 });
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("a TAP summary remains authoritative after more than the bounded output cap", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-summary-tail-"));
+  try {
+    const noisy = await group(directory, "noisy", "import test from 'node:test'; process.stdout.write('x'.repeat(100000)); test('after noise',()=>{});");
+    const result = await verify([noisy], directory);
+    assert.equal(result.receipt.success, true);
+    assert.deepEqual(result.receipt.children[0].testCounts, { total: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0 });
+    assert.equal(result.receipt.children[0].outputTruncated, true);
+    assert.ok(result.receipt.children[0].totalOutputBytes > result.receipt.children[0].outputLimitBytes);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 test("receipt records failure, timeout, bounded output, and exited children", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const failed = await runVerification({ groups: [{ file: "inline-failure", args: ["-e", "process.stderr.write('x'.repeat(100000)); process.exit(7)"] }], outputDirectory: directory, executable }); assert.equal(failed.receipt.success, false); assert.equal(failed.receipt.children[0].exitCode, 7); assert.equal(failed.receipt.children[0].outputBytes <= 65536, true); const timed = await runVerification({ groups: [{ file: "inline-timeout", args: ["-e", "setInterval(() => {}, 1000)"] }], outputDirectory: directory, timeoutMs: 25, executable }); assert.equal(timed.receipt.success, false); assert.equal(timed.receipt.children[0].timeout, true); assert.equal(timed.receipt.children[0].signal !== null || timed.receipt.children[0].exitCode !== null, true); } finally { await rm(directory, { recursive: true, force: true }); } });
+
+test("cleanup and receipt-write failures settle with bounded fail-closed evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-cleanup-failure-"));
+  try {
+    const fixture = await group(directory, "pass-before-cleanup", "import test from 'node:test'; test('real test',()=>{});");
+    const cleanupFailure = await runVerification({ groups: [fixture], outputDirectory: directory, executable, cleanup: async () => { throw new Error("secret cleanup detail"); } });
+    assert.equal(cleanupFailure.receipt.success, false);
+    assert.equal(cleanupFailure.receipt.children[0].cleanupCompleted, false);
+    assert.equal(cleanupFailure.receipt.children[0].cleanupError, "isolated-test-root-cleanup-failed");
+    assert.doesNotMatch(JSON.stringify(cleanupFailure.receipt), /secret cleanup detail/);
+
+    const writeFailure = await runVerification({ groups: [fixture], outputDirectory: directory, executable, receiptWriter: async () => { throw new Error("secret filesystem detail"); } });
+    assert.equal(writeFailure.receiptPath, null);
+    assert.equal(writeFailure.receipt.success, false);
+    assert.deepEqual(writeFailure.receipt.receiptWrite, { completed: false, error: "atomic-receipt-write-failed" });
+    assert.doesNotMatch(JSON.stringify(writeFailure.receipt), /secret filesystem detail/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("transient isolated-root cleanup failure is retried after the owned child exits", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-cleanup-retry-"));
+  try {
+    const fixture = await group(directory, "pass-before-cleanup-retry", "import test from 'node:test'; test('real test',()=>{});");
+    let cleanupCalls = 0;
+    const result = await runVerification({
+      groups: [fixture], outputDirectory: directory, executable,
+      cleanup: async (path, options) => {
+        cleanupCalls += 1;
+        if (cleanupCalls === 1) throw new Error("transient Windows lock");
+        await rm(path, options);
+      }
+    });
+    assert.equal(result.receipt.success, true);
+    assert.equal(result.receipt.children[0].cleanupCompleted, true);
+    assert.equal(result.receipt.children[0].cleanupError, null);
+    assert.equal(cleanupCalls, 2);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("safe provider lifecycle trace records only bounded non-secret stage labels", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-safe-trace-"));
+  try {
+    const fixture = await group(directory, "safe-trace", "import test from 'node:test'; process.stderr.write('SXSY_PROVIDER_E2E_TRACE=configuration-ready\\nSXSY_PROVIDER_E2E_TRACE=token=secret\\n'); test('real test',()=>{});");
+    const result = await runVerification({ groups: [{ ...fixture, safeTrace: true }], outputDirectory: directory, executable });
+    assert.equal(result.receipt.success, true);
+    assert.deepEqual(result.receipt.children[0].safeTrace, ["configuration-ready", "token"]);
+    assert.doesNotMatch(JSON.stringify(result.receipt.children[0].safeTrace), /secret/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 
 test("a verification group can pin its own executable", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-executable-"));
@@ -44,11 +139,24 @@ test("strict child environments allowlist operating-system inputs and isolate te
     const code = "if(process.env.SXSY_AMBIENT_SECRET||process.env.DATABASE_URL||process.env.GH_TOKEN||process.env.NODE_OPTIONS||process.env.SXSY_TEST_MODE!=='1'||process.env.SXSY_NETWORK!=='deny'||!process.env.SXSY_TEST_ROOT||!process.env.SXSY_TEST_DATABASE)process.exit(19)";
     const result = await runVerification({ groups: [{ file: "strict-environment", args: ["-e", code] }], outputDirectory: directory, executable });
     assert.equal(result.receipt.success, true);
-    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v1");
+    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v2");
   } finally {
     delete process.env.SXSY_AMBIENT_SECRET;
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("DPAPI-capable packaged tests retain the user token but cannot read real profile or npm credentials", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-profile-isolation-"));
+  const realProfile = join(directory, "real-profile");
+  const outputDirectory = join(directory, "receipts");
+  try {
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(realProfile, { recursive: true }));
+    await writeFile(join(realProfile, ".npmrc"), "//registry.example/:_authToken=sentinel-secret", "utf8");
+    const fixture = await group(directory, "profile", `import test from "node:test"; import { readFile } from "node:fs/promises"; test("isolated", async () => { if (process.env.SXSY_CURRENT_USER_DPAPI !== "1") throw new Error("missing current-user marker"); if (process.env.HOME === ${JSON.stringify(realProfile)}) throw new Error("real profile inherited"); for (const file of [process.env.HOME + "/.npmrc", process.env.npm_config_userconfig, process.env.npm_config_globalconfig]) { const value = await readFile(file, "utf8").catch(() => ""); if (value.includes("sentinel-secret")) throw new Error("ambient npm credential inherited"); } });`);
+    const result = await runVerification({ groups: [{ ...fixture, currentUserProfile: true }], outputDirectory, executable, sourceEnvironment: { ...process.env, HOME: realProfile, USERPROFILE: realProfile, APPDATA: join(realProfile, "AppData", "Roaming"), LOCALAPPDATA: join(realProfile, "AppData", "Local") } });
+    assert.equal(result.receipt.success, true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
 test("timeout terminates and awaits the entire task-owned descendant tree", async () => {

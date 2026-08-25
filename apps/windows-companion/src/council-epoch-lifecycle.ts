@@ -16,12 +16,35 @@ export interface CouncilEpochLifecycleScheduler {
   clearInterval(handle: unknown): void;
 }
 
+export interface CouncilEpochProviderControl {
+  /** Distinguishes configured host sessions from an installed local gateway with the same provider id. */
+  managesSession?(session: ManagedSession): boolean;
+  managesProvider?(provider: "claude" | "codex"): boolean;
+  reconcile(repositoryRoot: string): Promise<Readonly<{
+    operationsInspected: number;
+    operationsSettled: number;
+    councilsInspected: number;
+    councilsSettled: number;
+  }>>;
+  refreshSessions(sessions: readonly ManagedSession[]): Promise<readonly ManagedSession[]>;
+  cleanupCouncilResources(input: Readonly<{
+    provider: "claude" | "codex";
+    epochId: string;
+    sessionId: string;
+    targetSnapshotId: string;
+    resourceHostDigest: string;
+    outcome: "completed" | "aborted" | "cancelled";
+    repositoryRoot: string;
+  }>): Promise<void>;
+}
+
 export interface CouncilEpochLifecycleOptions {
   readonly now?: () => number;
   readonly heartbeatMaxAgeMs?: number;
   readonly pollIntervalMs?: number;
   readonly scheduler?: CouncilEpochLifecycleScheduler;
   readonly resources?: Readonly<{ assertPlanOperational(plan: CouncilIsolationPlan): Promise<void> }>;
+  readonly providerControl?: CouncilEpochProviderControl;
 }
 
 const defaultScheduler: CouncilEpochLifecycleScheduler = {
@@ -47,6 +70,7 @@ export class CouncilEpochLifecycleManager {
   private readonly pollIntervalMs: number;
   private readonly scheduler: CouncilEpochLifecycleScheduler;
   private readonly resources?: Readonly<{ assertPlanOperational(plan: CouncilIsolationPlan): Promise<void> }>;
+  private readonly providerControl?: CouncilEpochProviderControl;
   private timer: unknown;
   private inFlight?: Promise<readonly CouncilEpoch[]>;
   private started = false;
@@ -63,6 +87,7 @@ export class CouncilEpochLifecycleManager {
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
     this.scheduler = options.scheduler ?? defaultScheduler;
     this.resources = options.resources;
+    this.providerControl = options.providerControl;
     if (!Number.isSafeInteger(this.heartbeatMaxAgeMs) || this.heartbeatMaxAgeMs < 1) throw new Error("Council lifecycle heartbeat maximum age must be a positive integer.");
     if (!Number.isSafeInteger(this.pollIntervalMs) || this.pollIntervalMs < 100) throw new Error("Council lifecycle poll interval must be at least 100 milliseconds.");
   }
@@ -101,8 +126,9 @@ export class CouncilEpochLifecycleManager {
   }
 
   private async recoverAndReconcile(): Promise<void> {
+    await this.refreshConfiguredProviderState(true);
     for (const epoch of await this.council.listOngoing()) {
-      if (epoch.status === "completion_pending") continue;
+      if (epoch.status === "completion_pending" || epoch.status === "abort_pending") continue;
       try {
         const recovered = await this.isolation.recover(epoch.id);
         if (recovered.status !== "prepared") throw new Error(`Council isolation recovery returned ${recovered.status}.`);
@@ -114,41 +140,94 @@ export class CouncilEpochLifecycleManager {
   }
 
   private async reconcileAll(): Promise<readonly CouncilEpoch[]> {
+    await this.refreshConfiguredProviderState(false);
     const results: CouncilEpoch[] = [];
     for (const epoch of await this.council.listOngoing()) results.push(await this.reconcileEpoch(epoch));
     return results;
   }
 
   private async reconcileEpoch(epoch: CouncilEpoch): Promise<CouncilEpoch> {
-    if (epoch.status === "completion_pending") return this.finishCleanup(epoch);
+    if (epoch.status === "completion_pending") return this.finishCompletionCleanup(epoch);
+    if (epoch.status === "abort_pending") return this.finishAbortCleanup(epoch);
     try {
       const observations = await this.observations(epoch);
       const validated = await this.council.validate(epoch.id, observations);
-      if (validated.status === "aborted") {
-        await this.isolation.cleanup(epoch.id).catch(() => undefined);
-        return validated;
-      }
+      if (validated.status === "abort_pending") return this.finishAbortCleanup(validated);
       const plan = await this.isolation.assertCurrent(epoch.id);
-      if (validated.participants.every((participant) => participant.status === "verified_finished")) {
-        return this.finishCleanup(await this.council.beginCompletion(epoch.id));
-      }
       await this.resources?.assertPlanOperational(plan);
+      if (validated.participants.every((participant) => participant.status === "verified_finished")) {
+        return this.finishCompletionCleanup(await this.council.beginCompletion(epoch.id));
+      }
       return validated;
     } catch (error) {
       return this.abortAndCleanup(epoch.id, reason(error, "Council ongoing verification failed closed."));
     }
   }
 
-  private async finishCleanup(epoch: CouncilEpoch): Promise<CouncilEpoch> {
+  private async finishCompletionCleanup(epoch: CouncilEpoch): Promise<CouncilEpoch> {
+    if (!await this.cleanupProviderResources(epoch, "completed")) return epoch;
     const cleaned = await this.isolation.cleanup(epoch.id);
     if (cleaned.status !== "cleaned") return epoch;
     return this.council.complete(epoch.id);
   }
 
   private async abortAndCleanup(epochId: string, failure: string): Promise<CouncilEpoch> {
-    const stopped = await this.council.abort(epochId, failure);
-    await this.isolation.cleanup(epochId).catch(() => undefined);
-    return stopped;
+    return this.finishAbortCleanup(await this.council.abort(epochId, failure));
+  }
+
+  private async finishAbortCleanup(epoch: CouncilEpoch): Promise<CouncilEpoch> {
+    const providerCleaned = await this.cleanupProviderResources(epoch, "aborted");
+    const local = await this.isolation.cleanup(epoch.id).catch(() => undefined);
+    if (!providerCleaned || local?.status !== "cleaned") return (await this.council.get(epoch.id)) ?? epoch;
+    return this.council.settleAbort(epoch.id);
+  }
+
+  private async cleanupProviderResources(epoch: CouncilEpoch, outcome: "completed" | "aborted"): Promise<boolean> {
+    const requests = epoch.participants.flatMap((participant) => {
+      const digest = epoch.assignments[participant.id]?.resourceHostDigest;
+      if (!digest) return [];
+      if ((participant.provider === "claude" || participant.provider === "codex") && this.providerControl?.managesProvider?.(participant.provider) === false) return [];
+      if ((participant.provider !== "claude" && participant.provider !== "codex") || !this.providerControl) return [undefined];
+      return [{
+        provider: participant.provider,
+        epochId: epoch.id,
+        sessionId: participant.id,
+        targetSnapshotId: epoch.targetSnapshotId,
+        resourceHostDigest: digest,
+        outcome,
+        repositoryRoot: epoch.repositoryRoot
+      }];
+    });
+    if (requests.some((request) => request === undefined)) return false;
+    const settled = await Promise.allSettled(requests.map((request) => this.providerControl!.cleanupCouncilResources(request!)));
+    return settled.every((result) => result.status === "fulfilled");
+  }
+
+  private async refreshConfiguredProviderState(reconcile: boolean): Promise<void> {
+    if (!this.providerControl) return;
+    const candidates = (await this.sessions.list()).filter((session) => hostedProviderSession(session) && (this.providerControl?.managesSession?.(session) ?? true));
+    if (!candidates.length) return;
+    if (reconcile) {
+      const roots = [...new Map(candidates.map((session) => [pathKey(session.workspaceRoot!), session.workspaceRoot!])).values()];
+      await Promise.allSettled(roots.map((root) => this.providerControl!.reconcile(root)));
+    }
+    let refreshed: readonly ManagedSession[];
+    try {
+      refreshed = await this.providerControl.refreshSessions(candidates);
+    } catch {
+      refreshed = candidates.map(unreachableProviderSession);
+    }
+    if (refreshed.length !== candidates.length) throw new Error("The configured provider-host session refresh changed the exact participant set.");
+    const byId = new Map(candidates.map((session) => [session.id, session]));
+    const seen = new Set<string>();
+    for (const session of refreshed) {
+      const expected = byId.get(session.id);
+      if (!expected || seen.has(session.id) || !sameProviderBinding(expected, session)) {
+        throw new Error("The configured provider-host session refresh changed an exact session binding.");
+      }
+      seen.add(session.id);
+      await this.sessions.upsert(session);
+    }
   }
 
   private async observations(epoch: CouncilEpoch): Promise<readonly CouncilParticipant[]> {
@@ -171,6 +250,27 @@ function exactEpochSession(session: ManagedSession, epoch: CouncilEpoch): boolea
     && session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1";
 }
 
+function hostedProviderSession(session: ManagedSession): boolean {
+  return (session.provider === "claude" || session.provider === "codex")
+    && session.workspaceRoot !== undefined
+    && session.targetSnapshotId !== undefined
+    && session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1"
+    && session.metadata["sxsy-b122.providerHandshakeTarget"] === session.targetSnapshotId;
+}
+
+function unreachableProviderSession(session: ManagedSession): ManagedSession {
+  return { ...session, status: "unreachable", capabilities: ["registered"] };
+}
+
+function sameProviderBinding(expected: ManagedSession, observed: ManagedSession): boolean {
+  return observed.id === expected.id && observed.provider === expected.provider
+    && observed.targetSnapshotId === expected.targetSnapshotId
+    && observed.workspaceRoot !== undefined && expected.workspaceRoot !== undefined
+    && pathKey(observed.workspaceRoot) === pathKey(expected.workspaceRoot)
+    && observed.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1"
+    && observed.metadata["sxsy-b122.providerHandshakeTarget"] === expected.targetSnapshotId;
+}
+
 function participantFromSession(session: ManagedSession, epoch: CouncilEpoch, now: number, heartbeatMaxAgeMs: number): CouncilParticipant {
   const heartbeat = Date.parse(session.lastHeartbeat);
   if (!Number.isFinite(heartbeat) || heartbeat > now + 30_000 || now - heartbeat > heartbeatMaxAgeMs) throw new Error(`Council participant ${session.id} heartbeat is stale or invalid.`);
@@ -180,6 +280,7 @@ function participantFromSession(session: ManagedSession, epoch: CouncilEpoch, no
   if (!diffDigest || !/^[a-f0-9]{64}$/i.test(diffDigest)) throw new Error(`Council participant ${session.id} lacks a trusted current diff digest.`);
   return {
     id: session.id,
+    provider: session.provider,
     targetSnapshotId: epoch.targetSnapshotId,
     status: session.status,
     capabilities: session.capabilities,
@@ -207,8 +308,10 @@ function declarations(session: ManagedSession, key: string): readonly string[] {
 }
 
 function samePath(left: string, right: string): boolean {
-  return resolve(left).replace(/[\\/]+$/, "").toLowerCase() === resolve(right).replace(/[\\/]+$/, "").toLowerCase();
+  return pathKey(left) === pathKey(right);
 }
+
+function pathKey(value: string): string { return resolve(value).replace(/[\\/]+$/, "").toLowerCase(); }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);

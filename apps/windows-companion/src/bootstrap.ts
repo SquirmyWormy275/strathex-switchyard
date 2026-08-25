@@ -17,6 +17,7 @@ import { DurableHostActionQueue } from "./host-actions.ts";
 import { hostActionCommandActions } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
+import { ConfiguredProviderHostClient } from "./configured-provider-host.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableGitMutationReviewQueue } from "./git-review.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
@@ -330,13 +331,24 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const council = new CouncilCoordinator(store);
   const networkPolicyRegistry = new DurableNetworkPolicyRegistry(store, resolve(options.localStateDirectory ?? dirname(store.filePath), "network-policy.json"));
   const councilResources = new InstalledCouncilResourceBroker(councilIsolation, councilResourceHost, networkPolicyRegistry, containmentManager);
-  const councilLifecycle = new CouncilEpochLifecycleManager(council, sessions, councilIsolation, { resources: councilResources });
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
   const configuredNetwork = new DynamicConfiguredNetworkClient({
     registry: networkPolicyRegistry,
     containment: containmentManager,
     credentials: credentialVault.createAdapter("configured-network")
+  });
+  const configuredProviderHost = new ConfiguredProviderHostClient(configuredNetwork);
+  const configuredProviderControl = {
+    managesSession(session: ManagedSession) { return (session.provider === "claude" || session.provider === "codex") && !providerGateway.supportsProvider(session.provider); },
+    managesProvider(provider: "claude" | "codex") { return !providerGateway.supportsProvider(provider); },
+    reconcile: (repositoryRoot: string) => configuredProviderHost.reconcile(repositoryRoot),
+    refreshSessions: (managedSessions: readonly ManagedSession[]) => configuredProviderHost.refreshSessions(managedSessions),
+    cleanupCouncilResources: (input: Parameters<ConfiguredProviderHostClient["cleanupCouncilResources"]>[0]) => configuredProviderHost.cleanupCouncilResources(input)
+  };
+  const councilLifecycle = new CouncilEpochLifecycleManager(council, sessions, councilIsolation, {
+    resources: councilResources,
+    providerControl: configuredProviderControl
   });
   const providerTransport = new ProviderGatewayRouteRouter(providerGateway, configuredNetwork);
   const runtimePins = options.runtimePinPresence
@@ -546,6 +558,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
+      const hosted = await configuredProviderHost.refreshSessions((await sessions.list()).filter((session) => configuredProviderControl.managesSession(session)));
+      for (const session of hosted) await sessions.upsert(session);
       return sessionFreshness.refresh();
     },
     startupRecovery: async () => {

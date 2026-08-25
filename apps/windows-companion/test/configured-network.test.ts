@@ -49,6 +49,7 @@ class RecordingTransport implements PinnedNetworkTransport {
 }
 
 const repositoryRoot = join(tmpdir(), "sxsy-b122-network-owned-repository");
+const testCertificatePem = "-----BEGIN CERTIFICATE-----\nQQ==\n-----END CERTIFICATE-----\n";
 const route = {
   id: "github-create-pr",
   method: "POST",
@@ -177,6 +178,73 @@ test("policy loader validates host-owned configuration without contacting the ne
   const filePath = join(setup.directory, "network-policy.json");
   await writeFile(filePath, JSON.stringify({ version: 1, proxy: "direct", routes: [route] }), "utf8");
   assert.deepEqual(await loadConfiguredNetworkPolicy(filePath), { version: 1, proxy: "direct", routes: [route] });
+});
+
+test("an install-owned provider route admits only an exact pinned literal loopback and preserves its explicit port", async (context) => {
+  const setup = await fixture(context);
+  const localRoute = {
+    ...route,
+    id: "provider.health",
+    method: "GET",
+    url: "https://127.0.0.1:4747/v1/b122/health",
+    boundary: "provider-host-loopback",
+    tlsSpkiSha256: "a".repeat(64),
+    tlsCaCertificatePem: testCertificatePem
+  } as const;
+  const transport = new RecordingTransport();
+  const broker = new ConfiguredHttpsNetworkBroker(
+    { version: 1, proxy: "direct", routes: [localRoute] },
+    new FakeResolver([{ address: "127.0.0.1", family: 4 }]),
+    transport,
+    setup.fence,
+    setup.vault.createAdapter("configured-network")
+  );
+  assert.equal((await broker.request({ routeId: localRoute.id, repositoryRoot })).outcome, "passed");
+  assert.equal(new URL(transport.requests[0]!.url).port, "4747");
+  assert.equal(transport.requests[0]!.tlsSpkiSha256, localRoute.tlsSpkiSha256);
+  assert.equal(transport.requests[0]!.tlsCaCertificatePem, testCertificatePem);
+
+  for (const addresses of [
+    [{ address: "127.0.0.2", family: 4 as const }],
+    [{ address: "10.0.0.8", family: 4 as const }],
+    [{ address: "127.0.0.1", family: 4 as const }, { address: "::1", family: 6 as const }]
+  ]) {
+    const rejectedTransport = new RecordingTransport();
+    const rejected = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [localRoute] }, new FakeResolver(addresses), rejectedTransport, setup.fence, setup.vault.createAdapter("configured-network"));
+    assert.equal((await rejected.request({ routeId: localRoute.id, repositoryRoot })).outcome, "blocked");
+    assert.equal(rejectedTransport.requests.length, 0);
+  }
+});
+
+test("loopback trust cannot be request-selected or generalized to private and local destinations", async (context) => {
+  const setup = await fixture(context);
+  const exact = {
+    ...route,
+    id: "provider.health",
+    method: "GET",
+    url: "https://127.0.0.1:4747/v1/b122/health",
+    boundary: "provider-host-loopback" as const,
+    tlsSpkiSha256: "a".repeat(64),
+    tlsCaCertificatePem: testCertificatePem
+  };
+  const construct = (candidate: unknown) => new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [candidate] } as never, new FakeResolver([{ address: "127.0.0.1", family: 4 }]), setup.transport, setup.fence);
+  for (const candidate of [
+    { ...exact, boundary: undefined },
+    { ...exact, boundary: "provider-host-loopback", tlsSpkiSha256: undefined },
+    { ...exact, boundary: "provider-host-loopback", tlsCaCertificatePem: undefined },
+    { ...exact, tlsSpkiSha256: "A".repeat(64) },
+    { ...exact, url: "https://localhost:4747/v1/b122/health" },
+    { ...exact, url: "https://127.0.0.1/v1/b122/health" },
+    { ...exact, url: "https://10.0.0.8:4747/v1/b122/health" },
+    { ...exact, id: "github.graphql" },
+    { ...exact, redirects: "single-use-signed-download" }
+  ]) assert.throws(() => construct(candidate), /loopback|SPKI|trust|boundary|redirect/i);
+
+  const explicitPublicPort = { ...route, url: "https://api.github.com:8443/repos/example/repo/pulls" };
+  const publicTransport = new RecordingTransport();
+  const publicBroker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [explicitPublicPort] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), publicTransport, setup.fence, setup.vault.createAdapter("configured-network"));
+  assert.equal((await publicBroker.request({ routeId: route.id, repositoryRoot })).outcome, "passed");
+  assert.equal(new URL(publicTransport.requests[0]!.url).port, "8443");
 });
 
 test("one reviewed numeric resource ID may extend an exact dynamic API path without changing its host or prefix", async (context) => {

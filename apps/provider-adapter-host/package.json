@@ -1,0 +1,21 @@
+{
+  "name": "@strathex/switchyard-provider-adapter-host",
+  "private": true,
+  "license": "UNLICENSED",
+  "version": "0.1.0",
+  "description": "Authenticated SXSY-B122 provider adapter host for exact Claude and Codex runtime ports.",
+  "type": "module",
+  "bin": { "sxsy-b122-provider-adapter-host": "dist/apps/provider-adapter-host/src/main.js" },
+  "files": ["dist/apps", "dist/packages", "README.md", "package.json"],
+  "b122Distribution": {
+    "scope": "provider-adapter-host",
+    "fixtureBackendIncluded": true,
+    "liveProviderCredentialsIncluded": false,
+    "liveProviderAcceptanceIncluded": false,
+    "verifiedWindowsBundleBuilder": "deployment/windows/Build-B122Release.ps1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --experimental-transform-types --test test/*.test.ts"
+  }
+}

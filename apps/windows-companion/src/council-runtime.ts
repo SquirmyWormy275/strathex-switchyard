@@ -87,7 +87,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       isolationPlan = await this.prepareIsolation(request, epoch.id, participants, defaultBranch);
       for (const participant of participants) {
         const binding = await this.currentBinding(epoch.id, participant.id, requiredBinding(isolationPlan, participant.id));
-        await this.council.assign(epoch.id, participant.id, participant.plannedFiles, participant.resources, binding.assignmentDigest);
+        await this.council.assign(epoch.id, participant.id, participant.plannedFiles, participant.resources, binding.assignmentDigest, binding.resourceHost!.digest);
         await this.phase(request, epoch.id, participant, "assignment", binding);
         await this.council.acknowledgeAssignment(epoch.id, participant.id, binding.assignmentDigest);
       }
@@ -107,9 +107,9 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       const active = await this.council.activate(epoch.id);
       return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint host-isolated assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, isolationDigest: isolationPlan.digest, participants: participants.length, status: active.status } };
     } catch (error) {
-      await this.council.abort(epoch.id, error instanceof Error ? error.message : "A Council provider acknowledgement failed.").catch(() => undefined);
+      const aborted = await this.council.abort(epoch.id, error instanceof Error ? error.message : "A Council provider acknowledgement failed.").catch(() => undefined);
       if (isolationPlan) await this.isolation.cleanup(epoch.id).catch(() => undefined);
-      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), effectDisposition: "ambiguous", data: { epochId: epoch.id, status: "aborted" } };
+      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), effectDisposition: "ambiguous", data: { epochId: epoch.id, status: aborted?.status ?? "abort_pending" } };
     }
   }
 
@@ -123,6 +123,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       if (this.now() - Date.parse(session.lastHeartbeat) > 5 * 60_000) continue;
       result.push({
         id: session.id,
+        provider: session.provider,
         targetSnapshotId: request.target.id,
         status: session.status,
         capabilities: session.capabilities,
@@ -150,7 +151,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       const current = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final effect guard." };
       if (!current.allowed) throw new Error(current.reason);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
-      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal });
+      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal });
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
       const acknowledgement = parseAcknowledgement(response.body, response.outcome, { epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(binding ? { assignmentDigest: binding.assignmentDigest, resourceHostDigest: binding.resourceHost!.digest } : {}) });
       if (!acknowledgement) throw new Error(`Council ${phase} was not acknowledged by ${participant.id}.`);

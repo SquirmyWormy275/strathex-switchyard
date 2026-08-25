@@ -2,6 +2,31 @@
 
 This protocol is the software boundary between the installed companion and an explicitly configured provider service. A repository, terminal, prompt, or VS Code setting cannot select an endpoint. The operator installs one exact-route HTTPS policy through Windows user presence and provisions DPAPI-protected credential references separately.
 
+The repository now ships the executable service implementation in
+[`apps/provider-adapter-host`](../apps/provider-adapter-host/README.md). It is
+packageable independently from the Windows companion and provides typed Claude
+and Codex runtime ports, an authenticated durable journal, a credential-free
+loopback fixture, and an HTTPS listener. Proprietary credentials and live
+provider parity remain deployment evidence, not source-code claims.
+
+## Installed boundary and nonclaims
+
+The shipped host is an authenticated loopback service, not an embedded
+provider implementation. Package-configurable fixture backends are health and
+protocol diagnostics only: they advertise no capability and fail handshake,
+execution, cancellation, and Council effects with HTTP 503. The repository's
+effectful fixture is constructible only by tests and is not an installed
+configuration kind.
+
+A digest-pinned in-process provider module receives its DPAPI-opened provider
+credential during construction. That boundary is not independently mediated:
+the host removes `mediated` from its handshake and observation, regardless of
+what the module returns, and Automatic Council fails closed. A live provider
+connector can become Mediated only through a separately installed, host-owned
+effects contract whose enforcement and attestation are outside the
+credential-bearing module. No such proprietary connector or its acceptance
+evidence is bundled or claimed by this repository.
+
 ## Capability handshake
 
 The companion sends `sxsy-b122.provider-handshake-request` version 1 to the exact `provider.handshake.<provider>` route. It binds the request to the registered session ID, provider, complete TargetSnapshot ID, canonical repository root, branch, head, and host timestamp.
@@ -51,6 +76,113 @@ Automatic Council uses `provider.council.<provider>`. The request is an exact `s
 ```
 
 Any missing acknowledgement aborts the durable epoch. Assignments remain limited to provider-attested planned files and resources, and overlaps stop before pause.
+
+Assignment and resume requests additionally carry one exact
+`sxsy-b122.council-resource-host` v1 binding created by the companion. It
+describes only fenced capabilities, hosted resource metadata, and the exact
+environment projection; credential resources contain a non-bearer opaque
+capability, never credential bytes. The host validates the binding's complete
+field set and SHA-256 digest, rejects any added environment field, persists it
+with the assignment, and requires the acknowledgement to echo both
+`assignmentDigest` and `resourceHostDigest`. Resume must use the same two
+digests. A stale or secret-bearing resource binding fails before provider
+dispatch and is not journaled.
+
+## Observation, cancellation, health, and restart recovery
+
+The installed provider host also owns these exact authenticated endpoints:
+
+| Route ID | Method and path | Purpose |
+| --- | --- | --- |
+| `provider.health` | `GET /v1/b122/health` | Authenticated listener/package readiness; it does not claim live-provider acceptance. |
+| `provider.observe-session.<provider>` | `POST /v1/b122/observe/session/<provider>` | Refresh one exact session/TargetSnapshot binding. |
+| `provider.observe-operation.<provider>` | `POST /v1/b122/observe/operation/<provider>` | Reconcile one durable external operation without replay. |
+| `provider.cancel.<provider>` | `POST /v1/b122/cancel/<provider>` | Cancel one exact nonterminal external operation and observe its result. |
+| `provider.reconcile` | `POST /v1/b122/reconcile` | Observe every unresolved host-owned operation and Council phase after restart. |
+
+`<provider>` is exactly `claude` or `codex` for the repository-owned host.
+Operation observation and cancellation bind the operation ID, external ID,
+original route ID, session ID, repository root, and TargetSnapshot ID. Council
+phase recovery binds the epoch, participant, phase, target, and assignment
+digest. Submitted work is observed, never automatically replayed.
+
+## Windows configuration and lifecycle contracts
+
+The package executable is `sxsy-b122-provider-adapter-host`, compiled at
+`provider-adapter-host/dist/apps/provider-adapter-host/src/main.js`. Installed
+startup is exactly:
+
+```text
+node.exe <main.js> --config <absolute-provider-host.json> --lifecycle-nonce <64-lowercase-hex>
+```
+
+`provider-host.json` is exact schema `sxsy-b122.provider-host-config` version 1.
+It contains `protectedStateRoot`, literal-loopback `listen`, a TLS object with
+absolute certificate/private-key paths plus file and SPKI SHA-256 pins,
+separate `authenticationTokenEnvelopeFile` and
+`journalAuthenticationEnvelopeFile`, one absolute `stateFile`, one or two
+exact provider entries, and only the optional `allowFixtureBackends` flag.
+Every secret is a DPAPI CurrentUser envelope beneath the dedicated protected
+LocalAppData root. TLS validation requires a matching private key, current
+validity, a non-CA certificate, serverAuth EKU, and the `127.0.0.1` identity.
+
+The provisioning tools have these stable responsibilities:
+
+- `Protect-B122ProviderHostSecret.ps1` generates or validates the rotatable
+  bearer token, stable journal key, and named provider credential envelopes.
+- `New-B122LoopbackTlsIdentity.mjs` creates one non-CA 90-day loopback identity;
+  `Get-B122TlsIdentity.mjs` validates certificate/key match and emits
+  `sxsy-b122.tls-identity` v1.
+- `New-B122ProviderHostConfiguration.ps1` creates an atomic, pinned config and
+  preserves `<config>.previous`; `Restore-B122ProviderHostConfiguration.ps1`
+  swaps that validated prior config back for rollback. A TLS rotation creates
+  new certificate/key files, replaces the config, regenerates the network
+  policy, reprovisions the sealed bearer reference, verifies health, and keeps
+  the old identity until rollback is no longer required.
+- `Test-B122ProviderHostConfiguration.ps1` emits
+  `sxsy-b122.provider-host-configuration-validation` v1 only after schema,
+  root, reparse, ACL, DPAPI-envelope, module-digest, TLS, and credential
+  reference checks pass.
+- `New-B122NetworkPolicy.ps1` produces the secret-free exact-route policy;
+  `Provision-B122ProviderHostCompanion.mjs` transfers only the DPAPI-sealed
+  bearer reference through authenticated local IPC and emits
+  `sxsy-b122.provider-host-companion-provisioning-receipt` v1.
+- `Manage-B122ProviderHost.ps1` provides `Start`, `Health`, `Status`, and `Stop`.
+  It durably records a `starting` intent before process creation, reconciles or
+  terminates exact-nonce orphans, and never selects a process by command-line
+  substring. Stop requests authenticated graceful shutdown and otherwise uses
+  a bounded exact-identity process-tree fallback with a no-survivor receipt.
+
+The lifecycle record is exact `sxsy-b122.provider-host-process` v2 and is kept
+under the protected configuration root. It binds state, raw lifecycle nonce,
+nonce SHA-256, PID, exact Node/main/config paths, configuration SHA-256, source
+commit, intent time, and process-start time. Raw nonce and bearer values never
+appear in emitted receipts. Public lifecycle receipts use
+`sxsy-b122.provider-host-lifecycle` v1; authenticated checks use
+`sxsy-b122.provider-host-health-check` or
+`sxsy-b122.provider-host-shutdown-check` v1 and bind PID, nonce digest,
+configuration digest, TLS pinning, and authentication. The host health body is
+`sxsy-b122.provider-host-health` v1; graceful shutdown requires an exact
+`sxsy-b122.provider-host-shutdown` v1 request and returns
+`sxsy-b122.provider-host-shutdown-ack` v1 only after all lifecycle bindings
+match.
+
+Generate all companion routes with
+[`New-B122NetworkPolicy.ps1`](../deployment/windows/New-B122NetworkPolicy.ps1)
+and an exact `-ProviderBaseUri`. The generated policy retains fixed HTTPS URLs,
+one DPAPI-backed bearer credential reference, bounded request/response sizes,
+and no provider redirect behavior.
+
+## Executable release payload
+
+The Windows release ships the provider adapter as an independent Node payload
+at `provider-adapter-host/`; it is not folded into the companion process. The
+bundle's `release.json` pins the host package version, its checksum inventory
+binds every compiled file, and its SPDX document assigns those files to
+`SPDXRef-Package-ProviderAdapterHost`. Release validation also requires the
+host's package metadata and core implementation sources in the exact Git-commit
+source archive. Portable smoke runs `--self-test` with the bundled Node runtime
+and rejects a receipt that reports network or proprietary-credential access.
 
 ## GitHub and Git smart HTTP
 

@@ -1,7 +1,9 @@
+import { createHash, timingSafeEqual, X509Certificate } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest, type RequestOptions } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 import { readFile } from "node:fs/promises";
+import { checkServerIdentity, type PeerCertificate } from "node:tls";
 
 import type { ContainmentCheck } from "../../../packages/control-plane/src/containment.ts";
 import type { EffectDisposition } from "../../../packages/control-plane/src/contracts.ts";
@@ -16,6 +18,8 @@ const forbiddenStaticHeaderName = /^(authorization|connection|content-length|coo
 // 4 MiB scaffold cap. Routes remain explicitly host-capped and memory-bounded.
 const maximumConfiguredBytes = 256 * 1024 * 1024;
 const maximumTimeoutMs = 60_000;
+const maximumCertificatePemBytes = 64 * 1024;
+const tlsSha256Pattern = /^[a-f0-9]{64}$/;
 const nonPublicAddresses = createNonPublicAddressBlockLists();
 
 export interface NetworkContainmentFence {
@@ -48,6 +52,15 @@ export interface ConfiguredNetworkRoute {
   /** Signed download redirects are single-hop, credentialless, and exact-host allowlisted. */
   readonly redirects: "deny" | "single-use-signed-download";
   readonly redirectHosts?: readonly string[];
+  /**
+   * Absent means the existing public-Internet-only boundary. The one special
+   * boundary is install-owned and accepts only a literal loopback provider host.
+   */
+  readonly boundary?: "provider-host-loopback";
+  /** Exact peer public-key identity. Required for the loopback host. */
+  readonly tlsSpkiSha256?: string;
+  /** Public trust material for an install-owned self-signed loopback host. */
+  readonly tlsCaCertificatePem?: string;
 }
 
 export interface ConfiguredNetworkPolicy {
@@ -77,6 +90,8 @@ export interface PinnedNetworkTransportRequest {
   readonly rejectUnauthorized: true;
   readonly proxy: "direct";
   readonly signal: AbortSignal;
+  readonly tlsSpkiSha256?: string;
+  readonly tlsCaCertificatePem?: string;
 }
 
 export interface PinnedNetworkTransportResponse {
@@ -118,7 +133,7 @@ export class SystemNetworkAddressResolver implements NetworkAddressResolver {
   }
 }
 
-/** Direct TLS transport with pinned DNS and Node's default CA/hostname checks. */
+/** Direct TLS transport with pinned DNS, explicit ports, and exact optional SPKI identity. */
 export class DirectPinnedHttpsTransport implements PinnedNetworkTransport {
   async send(input: PinnedNetworkTransportRequest): Promise<PinnedNetworkTransportResponse> {
     const url = new URL(input.url);
@@ -129,17 +144,20 @@ export class DirectPinnedHttpsTransport implements PinnedNetworkTransport {
       const lookupPinned: LookupFunction = (_hostname, _options, callback) => {
         callback(null, input.resolvedAddress.address, input.resolvedAddress.family);
       };
+      const hostname = unbracketedHostname(url.hostname);
       const options: RequestOptions = {
         protocol: "https:",
-        hostname: url.hostname,
-        port: 443,
+        hostname,
+        port: url.port ? Number(url.port) : 443,
         path: `${url.pathname}${url.search}`,
         method: input.method,
         headers: input.headers,
         agent: false,
         rejectUnauthorized: true,
-        servername: url.hostname,
-        lookup: lookupPinned
+        ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
+        lookup: lookupPinned,
+        ...(input.tlsCaCertificatePem ? { ca: input.tlsCaCertificatePem } : {}),
+        ...(input.tlsSpkiSha256 ? { checkServerIdentity: pinnedServerIdentity(input.tlsSpkiSha256) } : {})
       };
       let settled = false;
       const finishError = (error: Error): void => {
@@ -237,8 +255,11 @@ export class ConfiguredHttpsNetworkBroker {
     try {
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
       const url = new URL(dispatchUrl);
-      const addresses = await this.resolver.resolve(url.hostname, controller.signal);
-      const resolvedAddress = validatedPublicAddresses(addresses)[0]!;
+      const routeHostname = unbracketedHostname(url.hostname);
+      const addresses = await this.resolver.resolve(routeHostname, controller.signal);
+      const resolvedAddress = route.boundary === "provider-host-loopback"
+        ? validatedProviderHostLoopbackAddresses(addresses, routeHostname)[0]!
+        : validatedPublicAddresses(addresses)[0]!;
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
       const dispatch = (credential?: Uint8Array) => {
         if (controller.signal.aborted) throw new Error("Network request was cancelled before the external effect.");
@@ -261,7 +282,9 @@ export class ConfiguredHttpsNetworkBroker {
             resolvedAddress,
             rejectUnauthorized: true,
             proxy: "direct",
-            signal: controller.signal
+            signal: controller.signal,
+            ...(route.tlsSpkiSha256 ? { tlsSpkiSha256: route.tlsSpkiSha256 } : {}),
+            ...(route.tlsCaCertificatePem ? { tlsCaCertificatePem: route.tlsCaCertificatePem } : {})
           });
         });
       };
@@ -298,7 +321,7 @@ export class ConfiguredHttpsNetworkBroker {
         : { outcome: "failed", detail: `Configured network route ${route.id} returned HTTP ${response.status}.`, ...common };
     } catch (error) {
       const detail = redactText(error instanceof Error ? error.message : "Configured network route failed.").slice(0, 512);
-      const failClosed = /containment|cancel|timed out|timeout|scope|lease|credential reference|public address|DNS|output cap/i.test(detail);
+      const failClosed = /containment|cancel|timed out|timeout|scope|lease|credential reference|public address|loopback|DNS|output cap|TLS|certificate|SPKI|pin/i.test(detail);
       return { outcome: failClosed ? "blocked" : "failed", routeId: route.id, detail, effectDisposition: effectStarted ? "ambiguous" : "not_started" };
     } finally {
       clearTimeout(timer);
@@ -337,7 +360,17 @@ function validateRoute(candidate: unknown): ConfiguredNetworkRoute {
   const method = typeof route.method === "string" ? route.method.toUpperCase() : "";
   if (!supportedMethods.has(method)) throw new Error(`Configured network route ${id} uses an unsupported method.`);
   if (typeof route.url !== "string") throw new Error(`Configured network route ${id} needs an exact HTTPS URL.`);
-  const url = validatedRouteUrl(route.url);
+  const boundary = route.boundary === undefined ? undefined : route.boundary;
+  if (route.boundary !== undefined && route.boundary !== "provider-host-loopback") throw new Error(`Configured network route ${id} has an invalid network boundary.`);
+  const url = validatedRouteUrl(route.url, boundary);
+  const tlsSpkiSha256 = route.tlsSpkiSha256 === undefined ? undefined : validatedTlsSha256(route.tlsSpkiSha256, `Configured network route ${id} TLS SPKI pin`);
+  const tlsCaCertificatePem = route.tlsCaCertificatePem === undefined ? undefined : validatedCertificatePem(route.tlsCaCertificatePem, id);
+  if (boundary === "provider-host-loopback") {
+    if (!/^provider\.|^automation\./.test(id)) throw new Error(`Configured network route ${id} cannot use the provider-host loopback boundary.`);
+    if (!tlsSpkiSha256 || !tlsCaCertificatePem) throw new Error(`Configured network route ${id} requires an exact TLS SPKI pin and CA certificate for provider-host loopback.`);
+  } else if (tlsCaCertificatePem !== undefined) {
+    throw new Error(`Configured network route ${id} cannot replace public TLS trust material.`);
+  }
   if (route.redirects !== "deny" && route.redirects !== "single-use-signed-download") throw new Error(`Configured network route ${id} has an invalid redirect policy.`);
   const staticHeaders: Record<string, string> = {};
   for (const [rawName, rawValue] of Object.entries(route.staticHeaders ?? {})) {
@@ -384,7 +417,10 @@ function validateRoute(candidate: unknown): ConfiguredNetworkRoute {
     ...(maxResponseBytes ? { maxResponseBytes } : {}),
     ...(pathParameter ? { pathParameter } : {}),
     redirects: route.redirects,
-    ...(redirectHosts ? { redirectHosts } : {})
+    ...(redirectHosts ? { redirectHosts } : {}),
+    ...(boundary ? { boundary } : {}),
+    ...(tlsSpkiSha256 ? { tlsSpkiSha256 } : {}),
+    ...(tlsCaCertificatePem ? { tlsCaCertificatePem } : {})
   };
 }
 
@@ -423,20 +459,66 @@ function validatedExactHost(value: unknown, label: string): string {
   return host;
 }
 
-function validatedRouteUrl(value: string): URL {
+function validatedRouteUrl(value: string, boundary?: ConfiguredNetworkRoute["boundary"]): URL {
   let url: URL;
   try { url = new URL(value); } catch { throw new Error("Configured network routes require valid exact HTTPS URLs."); }
-  if (url.protocol !== "https:" || url.port && url.port !== "443") throw new Error("Configured network routes require HTTPS on the default TLS port.");
+  if (url.protocol !== "https:") throw new Error("Configured network routes require HTTPS.");
   if (url.username || url.password) throw new Error("Configured network route URLs cannot contain credentials.");
   if (url.hash) throw new Error("Configured network route URLs cannot contain fragments.");
-  if (!url.hostname || url.hostname.endsWith(".")) throw new Error("Configured network route hosts must be exact canonical names.");
-  if (/^(?:localhost|.*\.localhost|.*\.local|.*\.internal|.*\.home\.arpa|.*\.onion)$/i.test(url.hostname)) {
+  const hostname = unbracketedHostname(url.hostname);
+  if (!hostname || hostname.endsWith(".")) throw new Error("Configured network route hosts must be exact canonical names.");
+  if (boundary === "provider-host-loopback") {
+    if (hostname !== "127.0.0.1" && hostname !== "::1") throw new Error("The provider-host loopback boundary requires an exact literal loopback address.");
+    if (!url.port) throw new Error("The provider-host loopback boundary requires an exact explicit non-default TLS port.");
+  } else if (/^(?:localhost|.*\.localhost|.*\.local|.*\.internal|.*\.home\.arpa|.*\.onion)$/i.test(hostname)) {
     throw new Error("Configured network route hosts cannot use local or special-use names.");
   }
   const rawPath = value.split(/[?#]/, 1)[0] ?? value;
   if (/%(?:2e|2f|5c)/i.test(rawPath)) throw new Error("Configured network route paths cannot contain encoded traversal or separator bytes.");
   for (const name of url.searchParams.keys()) if (sensitiveQueryName.test(name)) throw new Error("Configured network route query strings cannot carry credentials.");
   return url;
+}
+
+function validatedProviderHostLoopbackAddresses(addresses: readonly ResolvedNetworkAddress[], hostname: string): readonly ResolvedNetworkAddress[] {
+  const expectedFamily = hostname === "127.0.0.1" ? 4 : hostname === "::1" ? 6 : 0;
+  if (expectedFamily === 0 || addresses.length !== 1) throw new Error("The provider-host loopback boundary requires one exact literal loopback resolution.");
+  const address = addresses[0]!;
+  if (address.family !== expectedFamily || isIP(address.address) !== expectedFamily || address.address.toLowerCase() !== hostname) {
+    throw new Error("The provider-host loopback resolution changed its exact installed address.");
+  }
+  return [{ address: hostname, family: expectedFamily }];
+}
+
+function validatedTlsSha256(value: unknown, label: string): string {
+  if (typeof value !== "string" || !tlsSha256Pattern.test(value)) throw new Error(`${label} must be one lower-case SHA-256 digest.`);
+  return value;
+}
+
+function validatedCertificatePem(value: unknown, routeId: string): string {
+  if (typeof value !== "string" || Buffer.byteLength(value, "utf8") > maximumCertificatePemBytes || !/^-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+\r?\n-----END CERTIFICATE-----\r?\n?$/.test(value)) {
+    throw new Error(`Configured network route ${routeId} has invalid bounded public TLS trust material.`);
+  }
+  return value;
+}
+
+function unbracketedHostname(hostname: string): string {
+  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1).toLowerCase() : hostname.toLowerCase();
+}
+
+function pinnedServerIdentity(expectedSha256: string): (hostname: string, certificate: PeerCertificate) => Error | undefined {
+  const expected = Buffer.from(validatedTlsSha256(expectedSha256, "TLS SPKI pin"), "hex");
+  return (hostname, certificate) => {
+    const identityError = checkServerIdentity(hostname, certificate);
+    if (identityError) return identityError;
+    try {
+      if (!certificate.raw?.byteLength) return new Error("The TLS peer did not provide a leaf certificate for SPKI pinning.");
+      const publicKey = new X509Certificate(certificate.raw).publicKey.export({ type: "spki", format: "der" });
+      const observed = createHash("sha256").update(publicKey).digest();
+      return timingSafeEqual(expected, observed) ? undefined : new Error("The TLS peer SPKI identity does not match the exact configured pin.");
+    } catch {
+      return new Error("The TLS peer certificate could not be verified against the exact SPKI pin.");
+    }
+  };
 }
 
 function validatedPublicAddresses(addresses: readonly ResolvedNetworkAddress[]): readonly ResolvedNetworkAddress[] {

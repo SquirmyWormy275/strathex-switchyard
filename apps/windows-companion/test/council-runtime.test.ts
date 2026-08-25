@@ -113,7 +113,7 @@ test("automatic Council aborts durably when provider acknowledges a stale resour
     const isolation = fakeIsolation();
     const result = await new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), { isolation, automaticGate: acceptedGate }).execute({ action: "council_automatic", operationId: "operation-auto", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "incomplete");
-    assert.equal((await council.get("epoch-2"))?.status, "aborted");
+    assert.equal((await council.get("epoch-2"))?.status, "abort_pending", "remote resource cleanup must remain durable across restart");
     assert.deepEqual(isolation.cleaned, ["epoch-2"]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
