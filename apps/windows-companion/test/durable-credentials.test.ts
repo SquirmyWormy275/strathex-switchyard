@@ -16,6 +16,7 @@ import type { UserSecretProtector } from "../src/windows-secret.ts";
 
 class OpaqueTestProtector implements UserSecretProtector {
   readonly provider = "opaque-test-protector";
+  readonly opened: Uint8Array[] = [];
   private readonly values = new Map<string, Uint8Array>();
   private sequence = 0;
 
@@ -28,7 +29,9 @@ class OpaqueTestProtector implements UserSecretProtector {
   async open(sealed: string): Promise<Uint8Array> {
     const value = this.values.get(sealed);
     if (!value) throw new Error("Unknown opaque test envelope.");
-    return new Uint8Array(value);
+    const opened = new Uint8Array(value);
+    this.opened.push(opened);
+    return opened;
   }
 }
 
@@ -123,6 +126,7 @@ test("adapter capabilities redeem opaque leases once, honor expiry, and zero the
   });
   assert.equal(value, "ephemeral-token");
   assert.deepEqual([...observed!], Array(observed!.length).fill(0));
+  assert.equal(setup.protector.opened.at(-1)?.every((byte) => byte === 0), true);
   await assert.rejects(() => network.redeem(lease, async () => undefined), /used, expired, or revoked/i);
 
   const expiring = await network.acquireLease({ reference: "github-primary", repositoryRoot: scope.repositoryRoot, purpose: scope.purpose, ttlMs: 100 });

@@ -18,8 +18,8 @@ export async function openProviderHostSecretEnvelope(filePath: string, protector
   let parsed: unknown;
   try { parsed = JSON.parse(bytes.toString("utf8")); } finally { bytes.fill(0); }
   if (!isEnvelope(parsed) || parsed.protector !== protector.provider) throw new Error("The provider-host secret envelope is malformed or belongs to another protector.");
-  const cleartext = new Uint8Array(await protector.open(parsed.sealed));
-  if (cleartext.byteLength < 1 || cleartext.byteLength > maximumOpenedBytes || Buffer.from(cleartext).includes(0)) { cleartext.fill(0); throw new Error("The provider-host protected secret is empty, oversized, or malformed."); }
+  const cleartext = await protector.open(parsed.sealed);
+  if (cleartext.byteLength < 1 || cleartext.byteLength > maximumOpenedBytes || cleartext.some((byte) => byte === 0)) { cleartext.fill(0); throw new Error("The provider-host protected secret is empty, oversized, or malformed."); }
   return cleartext;
 }
 

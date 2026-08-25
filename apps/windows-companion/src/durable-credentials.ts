@@ -263,7 +263,7 @@ export class DurableCredentialReferenceVault {
     }
     let cleartext: Uint8Array | undefined;
     try {
-      cleartext = new Uint8Array(await this.protector.open(record.sealedValue));
+      cleartext = await this.protector.open(record.sealedValue);
       if (cleartext.byteLength === 0 || cleartext.byteLength > maximumSecretBytes) throw new Error("The protected credential value is invalid.");
       return await consume(cleartext);
     } finally {

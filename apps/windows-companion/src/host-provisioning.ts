@@ -43,7 +43,7 @@ export class AttestedCredentialProvisioningCoordinator implements CredentialProv
     if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve credential provisioning.");
     let cleartext: Uint8Array | undefined;
     try {
-      cleartext = new Uint8Array(await this.protector.open(input.sealedSecret));
+      cleartext = await this.protector.open(input.sealedSecret);
       return await this.vault.provision({
         reference: input.reference,
         scopes,

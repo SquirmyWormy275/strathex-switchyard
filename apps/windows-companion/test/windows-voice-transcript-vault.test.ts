@@ -17,16 +17,27 @@ const entry = (id: string, text: string, expiresAt = "2026-08-24T12:10:00.000Z")
   expiresAt
 });
 
+class TrackingVoiceProtector extends FakeUserSecretProtector {
+  readonly opened: Uint8Array[] = [];
+  override async open(sealed: string): Promise<Uint8Array> {
+    const value = await super.open(sealed);
+    this.opened.push(value);
+    return value;
+  }
+}
+
 test("Windows transcript vault survives restart without storing plaintext and deletion destroys every wrapping key", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "b122-voice-vault-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
-  const protector = new FakeUserSecretProtector();
+  const protector = new TrackingVoiceProtector();
   const first = new WindowsErasableVoiceTranscriptVault(directory, protector);
   await first.append(entry("entry-1", "redacted but still personally identifying summary"));
 
   const rawFiles = await allFiles(directory);
   assert.equal(rawFiles.some((value) => value.includes("personally identifying")), false);
   assert.equal((await new WindowsErasableVoiceTranscriptVault(directory, protector).list("voice-binding-1", at))[0]?.text, "redacted but still personally identifying summary");
+  assert.equal(protector.opened.length, 1);
+  assert.equal(protector.opened[0]?.every((byte) => byte === 0), true);
 
   await first.delete("voice-binding-1");
   assert.deepEqual(await first.list("voice-binding-1", at), []);

@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { readFile, unlink, writeFile } from "node:fs/promises";
+import { lstat, open, rename, rm, unlink } from "node:fs/promises";
 import { createServer, connect, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join } from "node:path";
 
@@ -10,6 +10,8 @@ import { createSealedRandomToken } from "./windows-secret.ts";
 
 export const maxPipeFrameBytes = 64 * 1024;
 const defaultPipeTimeoutMs = 5_000;
+const maximumPipeConfigurationBytes = 64 * 1024;
+const maximumSealedTokenCharacters = 16 * 1024;
 
 export interface AuthenticatedPipeConfiguration {
   readonly version: 1;
@@ -33,6 +35,7 @@ interface AuthenticatedResponseEnvelope { readonly version: 2; readonly response
 export interface AuthenticatedPipeServerOptions {
   readonly timeoutMs?: number;
   readonly maxFrameBytes?: number;
+  readonly drainTimeoutMs?: number;
 }
 
 export function defaultPipePath(stateDirectory: string, suffix?: string): string {
@@ -57,13 +60,43 @@ export async function createPipeConfiguration(stateDirectory: string, protector:
 /** Persist public endpoint metadata and an opaque sealed token only. */
 export async function savePipeConfiguration(filePath: string, configuration: AuthenticatedPipeConfiguration): Promise<void> {
   if (!isPipeConfiguration(configuration)) throw new Error("Refusing to persist an invalid local pipe configuration.");
-  await writeFile(filePath, JSON.stringify(configuration), { encoding: "utf8", mode: 0o600 });
+  const bytes = Buffer.from(`${JSON.stringify(configuration)}\n`, "utf8");
+  if (bytes.byteLength > maximumPipeConfigurationBytes) { bytes.fill(0); throw new Error("The local pipe configuration is oversized."); }
+  const temporary = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    const handle = await open(temporary, "wx", 0o600);
+    try { await handle.writeFile(bytes); await handle.sync(); }
+    finally { await handle.close(); }
+    await rename(temporary, filePath);
+  } finally {
+    bytes.fill(0);
+    await rm(temporary, { force: true }).catch(() => undefined);
+  }
 }
 
 export async function loadPipeConfiguration(filePath: string): Promise<AuthenticatedPipeConfiguration> {
-  const value: unknown = JSON.parse(await readFile(filePath, "utf8"));
+  const value: unknown = JSON.parse(await readBoundedConfiguration(filePath));
   if (!isPipeConfiguration(value)) throw new Error("The local pipe configuration is invalid.");
   return value;
+}
+
+async function readBoundedConfiguration(filePath: string): Promise<string> {
+  const before = await lstat(filePath);
+  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > maximumPipeConfigurationBytes) throw new Error("The local pipe configuration file is invalid or oversized.");
+  const handle = await open(filePath, "r");
+  const bytes = Buffer.alloc(maximumPipeConfigurationBytes + 1);
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.size !== before.size) throw new Error("The local pipe configuration changed during validation.");
+    let offset = 0;
+    while (offset < bytes.byteLength) {
+      const { bytesRead } = await handle.read(bytes, offset, bytes.byteLength - offset, null);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset < 2 || offset > maximumPipeConfigurationBytes || offset !== opened.size) throw new Error("The local pipe configuration changed or is oversized.");
+    return bytes.subarray(0, offset).toString("utf8");
+  } finally { bytes.fill(0); await handle.close(); }
 }
 
 export class AuthenticatedPipeServer {
@@ -72,9 +105,13 @@ export class AuthenticatedPipeServer {
   private readonly handler: CompanionRequestHandler;
   private readonly timeoutMs: number;
   private readonly maxFrameBytes: number;
+  private readonly drainTimeoutMs: number;
   private server?: Server;
   private token?: Buffer;
   private readonly sockets = new Set<Socket>();
+  private readonly activeHandlers = new Set<Promise<void>>();
+  private stopping = false;
+  private stopPromise?: Promise<void>;
 
   constructor(configuration: AuthenticatedPipeConfiguration, protector: UserSecretProtector, handler: CompanionRequestHandler, options: AuthenticatedPipeServerOptions = {}) {
     if (!isPipeConfiguration(configuration)) throw new Error("The local pipe configuration is invalid.");
@@ -83,34 +120,79 @@ export class AuthenticatedPipeServer {
     this.handler = handler;
     this.timeoutMs = positiveBounded(options.timeoutMs ?? defaultPipeTimeoutMs, "timeout");
     this.maxFrameBytes = positiveBounded(options.maxFrameBytes ?? maxPipeFrameBytes, "frame", 256 * 1024);
+    this.drainTimeoutMs = positiveBounded(options.drainTimeoutMs ?? 10_000, "handler drain");
   }
 
   async start(): Promise<void> {
     if (this.server) throw new Error("The authenticated companion pipe is already started.");
+    if (this.stopping) throw new Error("The authenticated companion pipe cannot restart after shutdown begins.");
     assertLocalPipePath(this.configuration.pipePath);
-    this.token = Buffer.from(await this.protector.open(this.configuration.sealedToken));
-    if (this.token.length < 32) throw new Error("The protected local pipe token is too short.");
-    if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
-    this.server = createServer((socket) => this.accept(socket));
-    await new Promise<void>((resolve, reject) => {
-      this.server!.once("error", reject);
-      this.server!.listen(this.configuration.pipePath, resolve);
-    });
+    const opened = await this.protector.open(this.configuration.sealedToken);
+    const token = Buffer.from(opened);
+    opened.fill(0);
+    if (token.length < 32) { token.fill(0); throw new Error("The protected local pipe token is too short."); }
+    this.stopping = false;
+    this.stopPromise = undefined;
+    this.token = token;
+    try {
+      if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
+      this.server = createServer((socket) => this.accept(socket));
+      await new Promise<void>((resolve, reject) => {
+        this.server!.once("error", reject);
+        this.server!.listen(this.configuration.pipePath, resolve);
+      });
+    } catch (error) {
+      this.server = undefined;
+      this.token?.fill(0);
+      this.token = undefined;
+      throw error;
+    }
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    if (this.stopPromise) return this.stopPromise;
+    this.stopping = true;
+    const attempt = this.stopInternal();
+    this.stopPromise = attempt;
+    void attempt.catch(() => { if (this.stopPromise === attempt) this.stopPromise = undefined; });
+    return attempt;
+  }
+
+  private async stopInternal(): Promise<void> {
     const server = this.server;
     this.server = undefined;
     for (const socket of this.sockets) socket.destroy();
     this.sockets.clear();
-    this.token?.fill(0);
-    this.token = undefined;
-    if (server) await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
+    const failures: Error[] = [];
+    if (server) {
+      try { await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
+      catch (error) { failures.push(error instanceof Error ? error : new Error("The authenticated companion pipe server could not close.")); }
+    }
+    try { await this.drainHandlers(); }
+    catch (error) { failures.push(error instanceof Error ? error : new Error("The authenticated companion pipe handlers could not drain.")); }
+    try {
+      if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
+    } finally {
+      this.token?.fill(0);
+      this.token = undefined;
+    }
+    if (failures.length) throw new AggregateError(failures, "The authenticated companion pipe did not stop cleanly.");
+  }
+
+  private async drainHandlers(): Promise<void> {
+    if (!this.activeHandlers.size) return;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timeout">((resolveTimeout) => {
+      timeoutHandle = setTimeout(() => resolveTimeout("timeout"), this.drainTimeoutMs);
+    });
+    const drained = Promise.allSettled([...this.activeHandlers]).then(() => "drained" as const);
+    const outcome = await Promise.race([drained, timeout]);
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    if (outcome === "timeout") throw new Error("The authenticated companion pipe could not drain active handlers before shutdown.");
   }
 
   private accept(socket: Socket): void {
-    if (!this.server) {
+    if (!this.server || this.stopping) {
       socket.destroy();
       return;
     }
@@ -132,7 +214,7 @@ export class AuthenticatedPipeServer {
       pending = Buffer.concat([pending, chunk]);
       if (processing) return;
       processing = true;
-      void (async () => {
+      const work = Promise.resolve().then(async () => {
         try {
           while (state !== "done") {
             const newline = pending.indexOf(0x0a);
@@ -157,12 +239,15 @@ export class AuthenticatedPipeServer {
             }
             if (!clientNonce || !serverNonce) { socket.destroy(); state = "done"; break; }
             state = "done";
+            if (this.stopping || pending.length) { socket.destroy(); break; }
             await this.respond(socket, line, clientNonce, serverNonce);
           }
           if (state !== "done" && pending.length > this.maxFrameBytes) socket.destroy();
         } catch { socket.destroy(); state = "done"; }
         finally { processing = false; }
-      })();
+      });
+      this.activeHandlers.add(work);
+      void work.finally(() => this.activeHandlers.delete(work));
     });
   }
 
@@ -170,6 +255,7 @@ export class AuthenticatedPipeServer {
     const fallback = invalidPipeResponse("invalid", "The companion rejected an unauthenticated local request.");
     let response = fallback;
     try {
+      if (this.stopping) throw new Error("stopping");
       const envelope: unknown = JSON.parse(line);
       if (!isAuthenticatedEnvelope(envelope) || !this.token || envelope.clientNonce !== clientNonce || envelope.serverNonce !== serverNonce
         || !constantTimeTextMatches(envelope.proof, pipeProof(this.token, "client", clientNonce, serverNonce, JSON.stringify(envelope.request)))) {
@@ -206,7 +292,8 @@ export class AuthenticatedPipeClient {
 
   async request(request: CompanionRequest): Promise<CompanionResponse> {
     if (!isCompanionRequest(request)) throw new Error("The local companion request is invalid.");
-    const token = Buffer.from(await this.protector.open(this.configuration.sealedToken));
+    const opened = await this.protector.open(this.configuration.sealedToken);
+    const token = Buffer.from(opened);
     try {
       if (token.length < 32) throw new Error("The protected local pipe token is too short.");
       const requestJson = JSON.stringify(request);
@@ -214,6 +301,7 @@ export class AuthenticatedPipeClient {
       return await this.roundTrip(request, requestJson, request.id, token);
     } finally {
       token.fill(0);
+      opened.fill(0);
     }
   }
 
@@ -233,6 +321,8 @@ export class AuthenticatedPipeClient {
       };
       socket.setTimeout(this.timeoutMs, () => finish(() => reject(new Error("The local companion pipe timed out."))));
       socket.once("error", () => finish(() => reject(new Error("The local companion pipe is unavailable."))));
+      socket.once("end", () => finish(() => reject(new Error("The local companion pipe closed before an authenticated response."))));
+      socket.once("close", () => finish(() => reject(new Error("The local companion pipe closed before an authenticated response."))));
       socket.on("data", (chunk: Buffer) => {
         if (pending.length + chunk.length > this.maxFrameBytes + 1) return finish(() => reject(new Error("The local companion response is too large.")));
         pending = Buffer.concat([pending, chunk]);
@@ -278,7 +368,8 @@ function assertLocalPipePath(path: string): void {
 }
 
 function isPipeConfiguration(value: unknown): value is AuthenticatedPipeConfiguration {
-  if (!isRecord(value) || value.version !== 1 || typeof value.pipePath !== "string" || typeof value.sealedToken !== "string" || !value.sealedToken) return false;
+  if (!isRecord(value) || !exactKeys(value, ["version", "pipePath", "sealedToken"]) || value.version !== 1 || typeof value.pipePath !== "string"
+    || typeof value.sealedToken !== "string" || !/^[A-Za-z0-9+/=:_-]+$/.test(value.sealedToken) || value.sealedToken.length > maximumSealedTokenCharacters) return false;
   try { assertLocalPipePath(value.pipePath); return true; } catch { return false; }
 }
 

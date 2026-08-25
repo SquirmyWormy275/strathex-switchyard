@@ -7,6 +7,7 @@ import test from "node:test";
 
 import type { UserSecretProtector } from "../../windows-companion/src/windows-secret.ts";
 import { loadProviderBackendRuntime, loadProviderHostConfiguration, type ProviderHostConfigurationLoadOptions } from "../src/config.ts";
+import { openProviderHostSecretEnvelope } from "../src/secret-envelope.ts";
 import type { ProviderHostPathSecurity } from "../src/windows-path-security.ts";
 import { createProviderHostStore } from "../src/state.ts";
 import { createLoopbackTlsFixture } from "./support/tls-fixture.ts";
@@ -38,6 +39,23 @@ async function envelope(path: string, secret: string): Promise<void> {
     protector: protector.provider, sealed: await protector.seal(Buffer.from(secret, "utf8"))
   }));
 }
+
+test("provider secret envelope returns the protector-owned buffer so caller zeroization leaves no duplicate", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "b122-provider-secret-zero-"));
+  context.after(async () => rm(root, { recursive: true, force: true }));
+  const path = join(root, "secret.json");
+  const protectorOwned = Buffer.from("provider-secret", "utf8");
+  const trackingProtector: UserSecretProtector = {
+    provider: "tracking-protector",
+    async seal() { throw new Error("not used"); },
+    async open() { return protectorOwned; }
+  };
+  await writeFile(path, JSON.stringify({ schema: "sxsy-b122.provider-host-secret-envelope", version: 1, protector: trackingProtector.provider, sealed: "YQ==" }));
+  const opened = await openProviderHostSecretEnvelope(path, trackingProtector);
+  assert.equal(opened, protectorOwned);
+  opened.fill(0);
+  assert.equal(protectorOwned.every((byte) => byte === 0), true);
+});
 
 function options(root: string, security = new RecordingPathSecurity()): ProviderHostConfigurationLoadOptions {
   return { secretProtector: protector, pathSecurity: security, allowedProtectedBaseRoot: root };

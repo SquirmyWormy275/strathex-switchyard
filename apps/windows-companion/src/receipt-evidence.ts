@@ -205,7 +205,9 @@ export async function loadOrCreateHostReceiptEvidenceFactory(options: InstalledH
   const filePath = resolve(options.filePath);
   let key: Buffer;
   try {
-    key = Buffer.from(await options.protector.open(await readSealedKey(filePath, options.protector.provider)));
+    const opened = await options.protector.open(await readSealedKey(filePath, options.protector.provider));
+    try { key = Buffer.from(opened); }
+    finally { opened.fill(0); }
   } catch (error) {
     if (!missing(error)) throw new Error("The installed receipt evidence key could not be opened or verified.");
     key = randomBytes(32);

@@ -112,7 +112,7 @@ export class WindowsErasableVoiceTranscriptVault implements VoiceTranscriptStore
         const envelope = await readCipher(cipherPath);
         if (envelope.bindingDigest !== digest(bindingId)) throw new Error("The encrypted transcript binding changed.");
         const keyEnvelope = await readKey(keyPath, this.protector.provider);
-        const clearKey = new Uint8Array(await this.protector.open(keyEnvelope.sealedKey));
+        const clearKey = await this.protector.open(keyEnvelope.sealedKey);
         try {
           if (clearKey.byteLength !== 32) throw new Error("The protected transcript key is invalid.");
           const metadata = {

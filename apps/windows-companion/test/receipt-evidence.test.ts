@@ -111,17 +111,20 @@ test("installed receipt key is created once behind the host protector, reloads i
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-receipt-key-"));
   context.after(async () => { await rm(folder, { recursive: true, force: true }); });
   const values = new Map<string, Uint8Array>();
+  const openedValues: Uint8Array[] = [];
   let seals = 0;
   const protector: UserSecretProtector = {
     provider: "isolated-opaque-protector",
     async seal(cleartext) { const id = `opaque-${++seals}`; values.set(id, new Uint8Array(cleartext)); return id; },
-    async open(sealed) { const value = values.get(sealed); if (!value) throw new Error("tampered"); return new Uint8Array(value); }
+    async open(sealed) { const value = values.get(sealed); if (!value) throw new Error("tampered"); const opened = new Uint8Array(value); openedValues.push(opened); return opened; }
   };
   const path = join(folder, "receipt-evidence-key.json");
   const options = { filePath: path, protector, policyVersion: "policy-v7", exactVersions: versions, clock: () => new Date("2026-08-24T12:01:00.000Z") } as const;
   const first = await loadOrCreateHostReceiptEvidenceFactory(options);
   const second = await loadOrCreateHostReceiptEvidenceFactory(options);
   assert.equal(seals, 1);
+  assert.equal(openedValues.length, 1);
+  assert.equal(openedValues[0]?.every((byte) => byte === 0), true);
   const document = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
   assert.deepEqual(Object.keys(document).sort(), ["protector", "schema", "sealedKey", "version"]);
   const envelope = first.issue({

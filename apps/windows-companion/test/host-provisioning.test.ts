@@ -14,9 +14,18 @@ import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordin
 import { CompanionService } from "../src/service.ts";
 import { FakeUserSecretProtector } from "../src/windows-secret.ts";
 
+class TrackingProvisioningProtector extends FakeUserSecretProtector {
+  readonly opened: Uint8Array[] = [];
+  override async open(sealed: string): Promise<Uint8Array> {
+    const value = await super.open(sealed);
+    this.opened.push(value);
+    return value;
+  }
+}
+
 test("credential provisioning attests and durably records only the exact submitted scope triples", async () => {
   const root = await mkdtemp(join(tmpdir(), "b122-host-provision-"));
-  const protector = new FakeUserSecretProtector();
+  const protector = new TrackingProvisioningProtector();
   const store = new ProtectedJsonStore({ filePath: join(root, "journal.jsonl") });
   const vault = new DurableCredentialReferenceVault(store, protector, { async check() { return { allowed: true, reason: "test" }; } });
   const prompts: string[] = [];
@@ -29,6 +38,8 @@ test("credential provisioning attests and durably records only the exact submitt
     { repositoryRoot: root, adapterId: "council-resource-host", purpose: "council-session" }
   ] as const;
   const summary = await coordinator.provision({ reference: "provider-read", scopes, sealedSecret });
+  assert.equal(protector.opened.length, 1);
+  assert.equal(protector.opened[0]?.every((byte) => byte === 0), true);
   const expectedRoot = process.platform === "win32" ? root.replaceAll("\\", "/").toLowerCase() : root.replaceAll("\\", "/");
   assert.equal(summary.reference, "provider-read");
   assert.deepEqual(summary.scopes, scopes.map((scope) => ({ ...scope, repositoryRoot: expectedRoot })));
