@@ -256,10 +256,13 @@ export interface AcceptanceAdministration {
   readonly trust: DurableAcceptanceTrustRegistry;
   readonly activations: DurableHighConsequenceActivationRegistry;
   installTrustPolicy(sourcePath: string): Promise<InstalledAcceptanceTrust>;
+  listTrust(): Promise<readonly InstalledAcceptanceTrust[]>;
   revokeTrust(authorityId: string, keyId: string, reason: string): Promise<InstalledAcceptanceTrust>;
   importEvidence(sourcePath: string): Promise<GateEvidence>;
+  listEvidence(): Promise<readonly GateEvidence[]>;
   invalidateEvidence(evidenceId: string, reason: string): Promise<void>;
   activate(action: CommandAction, targetSnapshotId: string, expiresAt: string): Promise<HighConsequenceActivation>;
+  listActivations(): Promise<readonly HighConsequenceActivation[]>;
   revokeActivation(activationId: string, reason: string): Promise<void>;
 }
 
@@ -292,6 +295,7 @@ export function createAcceptanceAdministration(options: Readonly<{
       const approvedBy = await operator(`Approve acceptance authority ${policy.authorityId} key ${policy.keyId.slice(0, 12)} for gates ${policy.allowedGates.join(", ")}.`);
       return trust.install(policy, approvedBy);
     },
+    async listTrust() { return trust.list(); },
     async revokeTrust(authorityId, keyId, reason) {
       const approvedBy = await operator(`Revoke acceptance authority ${authorityId} key ${keyId.slice(0, 12)}.`);
       return trust.revoke(authorityId, keyId, reason, approvedBy);
@@ -321,6 +325,7 @@ export function createAcceptanceAdministration(options: Readonly<{
         throw error;
       }
     },
+    async listEvidence() { return ledger.list(); },
     async invalidateEvidence(evidenceId, reason) {
       const evidence = await ledger.get(evidenceId);
       if (!evidence) throw new Error("The selected acceptance evidence does not exist.");
@@ -340,6 +345,7 @@ export function createAcceptanceAdministration(options: Readonly<{
       const approvedBy = await operator(`Enable ${definition.title} only for target ${targetSnapshotId.slice(0, 12)} until ${expiresAt}.`);
       return activations.activate({ action, targetSnapshotId, policyVersion: options.policyVersion, gateEvidenceIds: evidence.map((item) => item.id), expiresAt, activatedBy: approvedBy });
     },
+    async listActivations() { return activations.list(); },
     async revokeActivation(activationId, reason) {
       const approvedBy = await operator(`Revoke high-consequence activation ${activationId}.`);
       await activations.revoke(activationId, reason, approvedBy);

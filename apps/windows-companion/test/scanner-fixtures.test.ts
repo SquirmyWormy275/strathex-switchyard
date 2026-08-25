@@ -47,6 +47,8 @@ test("installed signed scanner and advisory fixtures are rehashed and SLA-checke
   const setup = await fixture(context);
   await setup.administration.installFixture(await signedManifest(setup, "scanner-feed-1", "scanner"));
   await setup.administration.installFixture(await signedManifest(setup, "advisory-feed-1", "advisory"));
+  assert.deepEqual((await setup.administration.listTrust()).map((item) => [item.authorityId, item.status]), [["security-lab", "active"]]);
+  assert.deepEqual((await setup.administration.listFixtures()).map((item) => [item.id, item.kind, item.status]), [["scanner-feed-1", "scanner", "active"], ["advisory-feed-1", "advisory", "active"]]);
   const resolved = await setup.registry.resolve({ scannerFixtureIds: ["scanner-feed-1"], advisoryFixtureIds: ["advisory-feed-1"], observedAt });
   assert.deepEqual(resolved.map((item) => [item.id, item.kind]), [["scanner-feed-1", "scanner"], ["advisory-feed-1", "advisory"]]);
   assert.ok(resolved.every((item) => /^[a-f0-9]{64}$/.test(item.manifestSha256) && item.feedVersion.endsWith("-v1")));

@@ -64,8 +64,8 @@ export interface ScannerFixtureResolver {
   resolve(input: Readonly<{ scannerFixtureIds: readonly string[]; advisoryFixtureIds: readonly string[]; observedAt: Date }>): Promise<readonly VerifiedScannerFixture[]>;
 }
 
-interface InstalledTrust extends ScannerFixtureTrustPolicy { readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
-interface InstalledFixture { readonly id: string; readonly kind: ScannerFixtureKind; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface InstalledScannerFixtureTrust extends ScannerFixtureTrustPolicy { readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface InstalledScannerFixture { readonly id: string; readonly kind: ScannerFixtureKind; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
 
 /**
  * Protected installed-state registry. Every resolve rehashes the copied files,
@@ -79,7 +79,7 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     this.packageRoot = resolve(stateDirectory, "scanner-fixtures");
   }
 
-  async installTrust(policyInput: ScannerFixtureTrustPolicy, installedBy: string): Promise<InstalledTrust> {
+  async installTrust(policyInput: ScannerFixtureTrustPolicy, installedBy: string): Promise<InstalledScannerFixtureTrust> {
     const policy = validateTrust(policyInput, this.now());
     if ((await this.trust()).some((item) => item.authorityId === policy.authorityId && item.status === "active")) throw new Error("An active scanner-fixture authority already exists under that identity.");
     const entry = await this.store.append(trustInstallKind, { policy: policy as unknown as JsonValue, installedBy: bounded(installedBy, "scanner trust operator", 160) });
@@ -92,7 +92,7 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     await this.store.append(trustRevokeKind, { authorityId: identifier(authorityId, "scanner authority"), keyId: digest(keyId, "scanner key"), reason: bounded(reason, "scanner trust revocation", 512), revokedBy: bounded(revokedBy, "scanner trust operator", 160) });
   }
 
-  async installFixture(manifestPath: string, installedBy: string): Promise<InstalledFixture> {
+  async installFixture(manifestPath: string, installedBy: string): Promise<InstalledScannerFixture> {
     const source = await concreteFile(manifestPath, maximumManifestBytes, "scanner fixture manifest");
     const manifest = parseManifest(source.bytes, this.now());
     const sourceRoot = dirname(source.path);
@@ -165,8 +165,11 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     if (!digestPattern.test(sha256(bytes))) throw new Error("Scanner fixture manifest digest is invalid.");
   }
 
-  private async trust(): Promise<readonly InstalledTrust[]> {
-    const values = new Map<string, InstalledTrust>();
+  async listTrust(): Promise<readonly InstalledScannerFixtureTrust[]> { return this.trust(); }
+  async listFixtures(): Promise<readonly InstalledScannerFixture[]> { return this.fixtures(); }
+
+  private async trust(): Promise<readonly InstalledScannerFixtureTrust[]> {
+    const values = new Map<string, InstalledScannerFixtureTrust>();
     for (const entry of await this.store.readEntries<JsonValue>()) {
       const payload = entry.payload as unknown as Record<string, unknown>;
       if (entry.kind === trustInstallKind) {
@@ -181,8 +184,8 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     return [...values.values()];
   }
 
-  private async fixtures(): Promise<readonly InstalledFixture[]> {
-    const values = new Map<string, InstalledFixture>();
+  private async fixtures(): Promise<readonly InstalledScannerFixture[]> {
+    const values = new Map<string, InstalledScannerFixture>();
     for (const entry of await this.store.readEntries<JsonValue>()) {
       const payload = entry.payload as unknown as Record<string, unknown>;
       if (entry.kind === fixtureInstallKind) {
@@ -197,12 +200,23 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
   }
 }
 
-export function createScannerFixtureAdministration(options: Readonly<{ registry: DurableScannerFixtureRegistry; presence: WindowsUserPresenceRunner; now?: () => Date }>) {
+export interface ScannerFixtureAdministration {
+  installTrust(sourcePath: string): Promise<InstalledScannerFixtureTrust>;
+  listTrust(): Promise<readonly InstalledScannerFixtureTrust[]>;
+  revokeTrust(authorityId: string, keyId: string, reason: string): Promise<void>;
+  installFixture(sourcePath: string): Promise<InstalledScannerFixture>;
+  listFixtures(): Promise<readonly InstalledScannerFixture[]>;
+  revokeFixture(id: string, reason: string): Promise<void>;
+}
+
+export function createScannerFixtureAdministration(options: Readonly<{ registry: DurableScannerFixtureRegistry; presence: WindowsUserPresenceRunner; now?: () => Date }>): ScannerFixtureAdministration {
   const operator = async (prompt: string): Promise<string> => { const result = await options.presence.verify(prompt); if (!result.verified || !result.operator?.trim()) throw new Error("Current-user presence did not approve scanner fixture administration."); return result.operator; };
   return {
     async installTrust(sourcePath: string) { const policy = parseTrust(await readBounded(sourcePath, maximumManifestBytes), (options.now ?? (() => new Date()))()); return options.registry.installTrust(policy, await operator(`Install scanner fixture authority ${policy.authorityId} for ${policy.allowedKinds.join(" and ")}.`)); },
+    async listTrust() { return options.registry.listTrust(); },
     async revokeTrust(authorityId: string, keyId: string, reason: string) { return options.registry.revokeTrust(authorityId, keyId, reason, await operator(`Revoke scanner fixture authority ${authorityId}.`)); },
     async installFixture(sourcePath: string) { const bytes = await readBounded(sourcePath, maximumManifestBytes); const manifest = parseManifest(bytes, (options.now ?? (() => new Date()))()); return options.registry.installFixture(sourcePath, await operator(`Install signed ${manifest.kind} fixture ${manifest.id} until ${manifest.expiresAt}.`)); },
+    async listFixtures() { return options.registry.listFixtures(); },
     async revokeFixture(id: string, reason: string) { return options.registry.revokeFixture(id, reason, await operator(`Revoke scanner fixture ${id}.`)); }
   };
 }
