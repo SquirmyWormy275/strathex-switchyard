@@ -6,7 +6,7 @@ This tree contains the complete hardware-independent firmware and transport sour
 
 `packages/protocol/src/b122.ts` exports the one canonical machine-readable map: 22 controls, 65 settled assignments, and intentionally absent assignments for all other chord slots. `packages/protocol/scripts/generate-manifest.mjs` SHA-256 hashes its canonical JSON and generates both the package JSON and `b122_manifest.h`. The current map SHA-256 is:
 
-`5d2c8804edf2890f45dda030f871c0738785fc8b4976517fecfd40b549a7036b`
+`7b8a6eb7e043665c04751a0fee15ee54d9793f9df288f9278bc8dc955f4174fc`
 
 Every QMK Raw-HID report is exactly 32 bytes:
 
