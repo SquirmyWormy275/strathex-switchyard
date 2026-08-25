@@ -67,13 +67,20 @@ function submittedResponse(artifact: WorkflowArtifact, result: unknown) {
 }
 
 test("Option Provider sends only one user question and requires exactly five provider options plus one recommendation", async (context) => {
-  const artifacts = new WorkflowArtifactStore(await store(context));
+  const protectedStore = await store(context);
+  const artifacts = new WorkflowArtifactStore(protectedStore);
   const created = await artifacts.create(base("option_provider", decisionPayload()));
   const submitted = await artifacts.claimForDispatch({ action: "option_provider", targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-1" });
   assert.ok(submitted);
   const options = Array.from({ length: 5 }, (_, index) => ({ id: `option-${index + 1}`, label: `Option ${index + 1}`, tradeoffs: [`tradeoff-${index + 1}`], risks: [`risk-${index + 1}`] }));
   const result = { kind: "decision", decisionPacketId: "packet-1", decisions: [{ decisionId: "decision-1", options, recommendationId: "option-2" }], userSelectionRequired: true };
-  assert.equal(parseWorkflowProviderResponse(submittedResponse(submitted, result), submitted).result.kind, "decision");
+  const response = parseWorkflowProviderResponse(submittedResponse(submitted, result), submitted);
+  assert.equal(response.result.kind, "decision");
+  const acknowledged = await artifacts.acknowledge(response);
+  assert.deepEqual(acknowledged.providerResult, result);
+  assert.equal(acknowledged.providerSummary, "The exact workflow completed.");
+  const afterRestart = await new WorkflowArtifactStore(protectedStore).get(acknowledged.id);
+  assert.deepEqual(afterRestart?.providerResult, result, "the substantive provider answer must survive restart");
   assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submitted, { ...result, decisions: [{ ...result.decisions[0], options: options.slice(0, 4) }] }), submitted), /exactly five/i);
   assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submitted, { ...result, userSelectionRequired: false }), submitted), /invalid/i);
   await assert.rejects(() => artifacts.create(base("option_packet", { ...decisionPayload("one"), mode: "packet" })), /multi-decision/i);
@@ -105,8 +112,10 @@ test("Plan Approval binds the immutable originating plan, current session, autho
   const result = { kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision, originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId, acknowledgementId: "ack-plan-1", executionStarted: true };
   const response = parseWorkflowProviderResponse(submittedResponse(submitted, result), submitted);
   assert.equal(response.result.kind === "plan" && response.result.mode === "execution_ack" ? response.result.originSessionId : undefined, "planner-session");
-  assert.equal((await artifacts.acknowledge(response)).status, "acknowledged");
-  assert.equal((await artifacts.acknowledge(response)).status, "acknowledged");
+  const acknowledged = await artifacts.acknowledge(response);
+  assert.equal(acknowledged.status, "acknowledged");
+  assert.deepEqual(acknowledged.providerResult, result);
+  assert.deepEqual((await artifacts.acknowledge(response)).providerResult, result);
   assert.equal((await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-plan-2" })), undefined);
 });
 

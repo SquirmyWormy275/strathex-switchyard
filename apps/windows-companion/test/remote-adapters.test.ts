@@ -68,6 +68,12 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   const outcome = await adapter.execute(providerRequest({ injectedPrompt: "must-not-cross-boundary" }, childSaga));
   assert.equal(outcome.status, "completed");
   assert.equal(outcome.effectDisposition, "committed");
+  assert.deepEqual(outcome.data?.workflowResult, {
+    kind: "proof",
+    verifiedClaims: ["claim"],
+    evidenceReferences: ["receipt:1"],
+    backendResults: [{ backend: "local", status: "passed" }]
+  });
   assert.equal(outcome.data?.artifactId, artifact.id);
   assert.equal(acknowledged?.artifactId, artifact.id);
   assert.equal(requests.length, 1);

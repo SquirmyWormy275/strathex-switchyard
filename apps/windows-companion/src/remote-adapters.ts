@@ -321,7 +321,14 @@ function targetDocument(target: NonNullable<AdapterRequest["target"]>) { return 
 function sessionDocument(session: NonNullable<AdapterRequest["session"]>) { return { id: session.id, provider: session.provider, surface: session.surface, capabilities: session.capabilities, taskId: session.taskId, planRevision: session.planRevision, plannedFiles: session.plannedFiles }; }
 function providerWorkflowAction(action: CommandAction): WorkflowArtifactAction | undefined { return (providerCommandActions as readonly string[]).includes(action) ? action as WorkflowArtifactAction : undefined; }
 function workflowOutcomeData(artifact: WorkflowArtifact, response: WorkflowProviderResponse): Readonly<Record<string, unknown>> {
-  return redactRecord({ artifactId: artifact.id, artifactDigest: artifact.digest, resultKind: response.result.kind, ...(response.externalId ? { externalId: response.externalId } : {}) });
+  return redactRecord({
+    artifactId: artifact.id,
+    artifactDigest: artifact.digest,
+    resultKind: response.result.kind,
+    workflowResult: response.result,
+    providerSummary: response.summary,
+    ...(response.externalId ? { externalId: response.externalId } : {})
+  });
 }
 
 function adapterOutcome(result: ConfiguredNetworkResult): AdapterOutcome {

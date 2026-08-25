@@ -123,6 +123,11 @@ export interface WorkflowArtifact extends Omit<WorkflowArtifactInput, "id"> {
   readonly status: WorkflowArtifactStatus;
   readonly operationId?: string;
   readonly providerExternalId?: string;
+  /** Latest exact typed provider result, retained so UI/recovery never discards the substantive answer. */
+  readonly providerResult?: WorkflowProviderResult;
+  readonly providerSummary?: string;
+  readonly providerResponseStatus?: WorkflowProviderResponse["status"];
+  readonly providerEffectDisposition?: EffectDisposition;
   readonly executionAuthorized: false;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -266,7 +271,20 @@ export class WorkflowArtifactStore {
       const found = artifactMap(await transaction.readEntries()).get(response.artifactId);
       if (!found) throw new WorkflowArtifactError("The provider response references an unknown workflow artifact.");
       const parsed = parseWorkflowProviderResponse(response, found);
-      if (found.status === "acknowledged" && found.providerExternalId === parsed.externalId) return clone(found);
+      if (found.status === "acknowledged" && found.providerExternalId === parsed.externalId && found.providerResult !== undefined) return clone(found);
+      if (found.status === "acknowledged" && found.providerExternalId === parsed.externalId) {
+        const backfilled: WorkflowArtifact = {
+          ...found,
+          providerResult: parsed.result,
+          providerSummary: parsed.summary,
+          providerResponseStatus: parsed.status,
+          providerEffectDisposition: parsed.effectDisposition,
+          updatedAt: timestamp(this.clock(), "artifact clock"),
+          executionAuthorized: false
+        };
+        await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: backfilled });
+        return clone(backfilled);
+      }
       if (found.status !== "submitted" && found.status !== "cancelling") throw new WorkflowArtifactError(`Workflow artifact is already ${found.status}.`);
       const finalStatus: WorkflowArtifactStatus = parsed.status === "completed" && parsed.effectDisposition === "committed"
         ? "acknowledged"
@@ -281,6 +299,10 @@ export class WorkflowArtifactStore {
         ...found,
         status: finalStatus,
         ...(parsed.externalId ? { providerExternalId: parsed.externalId } : {}),
+        providerResult: parsed.result,
+        providerSummary: parsed.summary,
+        providerResponseStatus: parsed.status,
+        providerEffectDisposition: parsed.effectDisposition,
         updatedAt: timestamp(this.clock(), "artifact clock"),
         executionAuthorized: false
       };
@@ -542,7 +564,7 @@ export function parseWorkflowProviderResponse(value: unknown, artifact: Workflow
   };
 }
 
-function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }): Omit<WorkflowArtifact, "digest" | "status" | "operationId" | "providerExternalId" | "executionAuthorized" | "createdAt" | "updatedAt"> {
+function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }): Omit<WorkflowArtifact, "digest" | "status" | "operationId" | "providerExternalId" | "providerResult" | "providerSummary" | "providerResponseStatus" | "providerEffectDisposition" | "executionAuthorized" | "createdAt" | "updatedAt"> {
   const action = workflowAction(input.action);
   const payload = normalizePayload(input.payload, action);
   if (payload.kind === "plan" && payload.mode === "approve") {
@@ -848,7 +870,20 @@ function artifactMap(entries: readonly JournalEntry<unknown>[]): Map<string, Wor
     if (!raw || raw.executionAuthorized !== false || !workflowStatus(raw.status)) throw new WorkflowArtifactError("Protected workflow artifact is malformed.");
     const immutable = normalizeInput({ id: raw.id, action: raw.action, repositoryRoot: raw.repositoryRoot, targetSnapshotId: raw.targetSnapshotId, sessionId: raw.sessionId, ...(raw.taskId ? { taskId: raw.taskId } : {}), ...(raw.planRevision ? { planRevision: raw.planRevision } : {}), payload: raw.payload });
     if (artifactDigest(immutable) !== raw.digest || !timestamp(raw.createdAt, "artifact creation time") || !timestamp(raw.updatedAt, "artifact update time")) throw new WorkflowArtifactError("Protected workflow artifact digest is invalid.");
-    result.set(raw.id, clone({ ...raw, ...immutable }));
+    let providerFields: Pick<WorkflowArtifact, "providerResult" | "providerSummary" | "providerResponseStatus" | "providerEffectDisposition"> = {};
+    if (raw.providerResult !== undefined || raw.providerSummary !== undefined || raw.providerResponseStatus !== undefined || raw.providerEffectDisposition !== undefined) {
+      if (raw.providerResult === undefined || !providerStatus(raw.providerResponseStatus) || !disposition(raw.providerEffectDisposition)
+        || typeof raw.providerSummary !== "string" || !raw.providerSummary.trim() || raw.providerSummary.length > 1_024) {
+        throw new WorkflowArtifactError("Protected workflow provider result metadata is malformed.");
+      }
+      providerFields = {
+        providerResult: normalizeProviderResult(raw.providerResult, { ...raw, ...immutable }),
+        providerSummary: redactText(raw.providerSummary.trim()),
+        providerResponseStatus: raw.providerResponseStatus,
+        providerEffectDisposition: raw.providerEffectDisposition
+      };
+    }
+    result.set(raw.id, clone({ ...raw, ...immutable, ...providerFields }));
   }
   return result;
 }
