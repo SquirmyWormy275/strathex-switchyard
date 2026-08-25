@@ -10,7 +10,8 @@ import { SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 
 const zeroOid = "0".repeat(40);
-const defaultMaximumPushBytes = 4 * 1024 * 1024;
+const defaultMaximumPushBytes = 64 * 1024 * 1024;
+const maximumSupportedPushBytes = 256 * 1024 * 1024;
 
 export interface SmartPushResult { readonly status: BrokerOutcome["status"]; readonly summary: string; readonly oldHead?: string; readonly newHead?: string; }
 export interface ReviewedRemotePusher { push(input: Readonly<{ repositoryRoot: string; sourceHead: string; destinationBranch: string; request: GitRequest }>): Promise<SmartPushResult>; }
@@ -302,7 +303,7 @@ function configuredRepository(url: URL, kind: "advertise" | "receive"): { readon
   } else if (url.search) return undefined;
   return { owner: match[1]!, name: match[2]! };
 }
-function boundedPushCap(value: number): number { if (!Number.isSafeInteger(value) || value < 1 || value > defaultMaximumPushBytes) throw new Error("Configured Git receive-pack cap is outside the supported bounded range."); return value; }
+function boundedPushCap(value: number): number { if (!Number.isSafeInteger(value) || value < 1 || value > maximumSupportedPushBytes) throw new Error("Configured Git receive-pack cap is outside the supported bounded range."); return value; }
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") && !value.startsWith("-"); }
 async function fixedExecutable(candidates: readonly string[]): Promise<string> { for (const candidate of candidates) try { if ((await stat(candidate)).isFile()) return realpath(candidate); } catch { /* continue */ } throw new Error("A trusted absolute Git executable is unavailable."); }
 async function finalEffect(request: GitRequest): Promise<BrokerOutcome | undefined> { const cancellation = await cancelled(request); if (cancellation) return cancellation; const result = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); return result.allowed ? undefined : { status: "incomplete", summary: result.reason }; }

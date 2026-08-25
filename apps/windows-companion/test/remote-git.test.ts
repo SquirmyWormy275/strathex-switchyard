@@ -55,6 +55,12 @@ test("smart HTTP push enforces the exact reviewed network-policy request cap bef
   assert.deepEqual(routes, ["git.receive-pack.advertise"], "the oversized update never reaches receive-pack");
 });
 
+test("reviewed Git policies may raise the bounded push cap above the old four MiB scaffold limit", () => {
+  const host = configuredGitHostFromPolicy(gitPolicy("github.com", 64 * 1024 * 1024));
+  assert.equal(host.maximumPushBytes, 64 * 1024 * 1024);
+  assert.throws(() => configuredGitHostFromPolicy(gitPolicy("github.com", 256 * 1024 * 1024 + 1)), /bounded range/i);
+});
+
 test("reviewed remote Git handler pushes and upserts only the bound branch and head", async () => {
   const effects: string[] = [];
   const pusher: ReviewedRemotePusher = { async push(input) { effects.push(`push:${input.destinationBranch}:${input.sourceHead}`); return { status: "completed", summary: "pushed" }; } };

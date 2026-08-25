@@ -12,7 +12,9 @@ const supportedMethods = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE
 const sensitiveQueryName = /(?:^|[-_.])(access[-_.]?token|api[-_.]?key|credential|password|secret|token)(?:$|[-_.])/i;
 const credentialHeaderName = /^(authorization|private-token|x-api-key|x-github-token)$/i;
 const forbiddenStaticHeaderName = /^(authorization|connection|content-length|cookie|host|proxy-authorization|te|trailer|transfer-encoding|upgrade|x-api-key|x-github-token)$/i;
-const maximumConfiguredBytes = 4 * 1024 * 1024;
+// Large Git packs and bounded CI artifacts legitimately exceed the historical
+// 4 MiB scaffold cap. Routes remain explicitly host-capped and memory-bounded.
+const maximumConfiguredBytes = 256 * 1024 * 1024;
 const maximumTimeoutMs = 60_000;
 const nonPublicAddresses = createNonPublicAddressBlockLists();
 
