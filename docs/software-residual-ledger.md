@@ -25,10 +25,13 @@ policy and acceptance gates remain independent of adapter availability.
 Direct composition evidence is in `apps/windows-companion/src/bootstrap.ts`,
 `default-composition.ts`, `repository-runtime.ts`, `remote-adapters.ts`,
 `remote-git.ts`, `pipeline-adapters.ts`, `council-runtime.ts`,
-`sandbox-installation.ts`, and `raw-hid-protocol.ts`. Isolated evidence includes
+`sandbox-installation.ts`, `raw-hid-protocol.ts`, `voice-gateway.ts`,
+`voice-runtime.ts`, and `windows-voice-transcript-vault.ts`. Isolated evidence includes
 `bootstrap.test.ts`, `repository-runtime.test.ts`, `remote-adapters.test.ts`,
 `remote-git.test.ts`, `pipeline-adapters.test.ts`, `council-runtime.test.ts`,
 `sandbox-installation.test.ts`, `raw-hid-protocol.test.ts`,
+`voice-gateway.test.ts`, `voice-runtime.test.ts`,
+`windows-voice-port.test.ts`, `windows-voice-transcript-vault.test.ts`,
 `authenticated-pipe.test.ts`, and `packaged-runtime.test.ts`.
 
 ## Genuine external or hardware residuals
@@ -72,7 +75,7 @@ their adapter source is present.
 | GitHub | normal, shift, alt, shift-alt | Fixed navigation plus configured GitHub GraphQL/CI routes | External-account authorization and live acceptance |
 | Compound | normal, shift, alt, shift-alt | Fixed palette action and configured automation route | Installed Compound authorization; `lfg` remains gate-disabled |
 | Run | normal, shift, alt, shift-alt | Host-attested run/debug/web/stop recipes and managed processes | Repository-specific manifest installation and live acceptance |
-| Voice | normal, shift, alt, shift-alt | Selected-session UI and configured provider handshake | Live microphone/transcript/provider binding acceptance |
+| Voice | normal, shift, alt, shift-alt | Packaged digest-bound WinMM/SAPI helper; exact managed-session/provider binding; serialized lifecycle; configured exact HTTPS routes; per-entry encrypted transcript keys with autonomous expiry and conversation-lineage deletion | Live microphone permission, authorized provider-route compatibility, external deletion acknowledgement, and single-target/no-leakage acceptance |
 | Pipeline | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested recipes, Windows Sandbox, configured GitHub CI status/trace | Installed routes/accounts; Repair remains gate-disabled |
 | Shield | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested scanner recipes, Windows Sandbox, protected receipts, configured feeds | Live scanner/advisory freshness evidence; containment release gate-disabled |
 | Sandbox | normal, shift, alt, shift-alt, ctrl-shift-alt | Attested catalog/helper, Windows Sandbox runtime, venv host action, durable quarantine state | Target-host isolation acceptance; high-consequence modes gate-disabled |

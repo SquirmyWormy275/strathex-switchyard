@@ -25,6 +25,16 @@ command, repository string, or provider response is never authority.
   Sandbox, containment, cancellation, Council, and reconciliation. In-memory
   implementations remain test-only. Concrete routes are unavailable until
   their exact host-attested configuration and authorization are installed.
+- The verified Windows bundle composes a digest-pinned native voice helper with
+  a single serialized conversation runtime. Voice startup requires fresh exact
+  consent and one explicit managed-session binding; provider switches preserve
+  canonical context, interruption cancels the in-flight turn, and missing or
+  changed provider routes fail closed without a browser or cross-provider
+  fallback.
+- Retained redacted transcripts are not written to the append-only authority
+  journal. Production uses independent AES-GCM entry keys wrapped by the
+  CurrentUser protector. Expiry and explicit deletion destroy the entry keys
+  before ciphertext and before a durable deletion tombstone is recorded.
 
 ## Deliberate limits
 
@@ -49,12 +59,22 @@ operator-reviewed input, and the companion binds it to the current target,
 authority, confirmation, and final effect guard.
 
 The npm workspace package is deliberately the JavaScript companion only. It
-does not contain the native Sandbox, repository-runtime, Raw-HID, or
-provider-desktop helpers and is not eligible release evidence or a complete
+does not contain the native Sandbox, repository-runtime, Raw-HID,
+provider-desktop, or voice helpers and is not eligible release evidence or a complete
 Windows installation. `deployment/windows/Build-B122Release.ps1` is the sole
 packager for the verified Windows bundle; that bundle builds or accepts
 digest-pinned native helpers, includes them beside the compiled companion, and
 validates their provenance and self-tests.
+
+The installed voice route is administered only by
+`deployment/windows/Manage-B122VoiceRoute.ps1`. It asks for an exact typed
+current-user confirmation and hidden provider secret; no command request may
+choose a helper executable, route identity, authorization reference, or
+alternate provider. The native helper's self-test proves only its protocol,
+DPAPI, and hardware-independent boundary. A real microphone permission grant,
+provider authorization/parity, provider-side transcript deletion, and
+single-target/no-leakage behavior remain acceptance evidence rather than source
+claims.
 
 No control silently commits, pushes, merges, force-pushes, approves a
 permission, submits a prompt, or kills an inferred process. High-consequence

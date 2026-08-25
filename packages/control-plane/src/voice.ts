@@ -25,6 +25,8 @@ export interface VoiceBinding {
   readonly id: string;
   readonly consentId: string;
   readonly voiceSessionId: string;
+  /** Previous exact binding in the same provider-switch conversation. */
+  readonly previousBindingId?: string;
   readonly managedSessionId?: string;
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
@@ -63,7 +65,43 @@ export interface VoiceConsentInput {
 
 interface VoiceConsentEvent { readonly consent: VoiceConsent; }
 interface VoiceBindingEvent { readonly binding: VoiceBinding; }
-interface VoiceTranscriptEvent { readonly entry: VoiceTranscriptEntry; }
+
+/**
+ * Transcript text deliberately lives outside the append-only authority journal.
+ * Production supplies an erasable encrypted vault; the default is process-only
+ * so an unconfigured host can never create undeletable plaintext history.
+ */
+export interface VoiceTranscriptStore {
+  append(entry: VoiceTranscriptEntry): Promise<void>;
+  list(bindingId: string, now: string): Promise<readonly VoiceTranscriptEntry[]>;
+  delete(bindingId: string): Promise<void>;
+  purgeExpired(now: string): Promise<void>;
+}
+
+export class EphemeralVoiceTranscriptStore implements VoiceTranscriptStore {
+  private readonly entries = new Map<string, VoiceTranscriptEntry[]>();
+
+  async append(entry: VoiceTranscriptEntry): Promise<void> {
+    const current = this.entries.get(entry.bindingId) ?? [];
+    this.entries.set(entry.bindingId, [...current, clone(entry)]);
+  }
+
+  async list(bindingId: string, now: string): Promise<readonly VoiceTranscriptEntry[]> {
+    await this.purgeExpired(now);
+    return (this.entries.get(bindingId) ?? []).map(clone);
+  }
+
+  async delete(bindingId: string): Promise<void> { this.entries.delete(bindingId); }
+
+  async purgeExpired(now: string): Promise<void> {
+    const cutoff = Date.parse(time(now, "transcript purge clock"));
+    for (const [bindingId, values] of this.entries) {
+      const retained = values.filter((entry) => Date.parse(entry.expiresAt) > cutoff);
+      if (retained.length) this.entries.set(bindingId, retained);
+      else this.entries.delete(bindingId);
+    }
+  }
+}
 
 export class VoiceCoordinatorError extends Error {
   constructor(message: string) { super(message); this.name = "VoiceCoordinatorError"; }
@@ -72,11 +110,13 @@ export class VoiceCoordinatorError extends Error {
 /** Durable single-binding voice state. It stores no audio and transcripts default off. */
 export class VoiceCoordinator {
   private readonly store: ProtectedJsonStore;
+  private readonly transcripts: VoiceTranscriptStore;
   private readonly clock: () => string;
   private readonly idFactory: () => string;
 
-  constructor(store: ProtectedJsonStore, options: Readonly<{ clock?: () => string; idFactory?: () => string }> = {}) {
+  constructor(store: ProtectedJsonStore, options: Readonly<{ clock?: () => string; idFactory?: () => string; transcripts?: VoiceTranscriptStore }> = {}) {
     this.store = store;
+    this.transcripts = options.transcripts ?? new EphemeralVoiceTranscriptStore();
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? randomUUID;
   }
@@ -118,15 +158,17 @@ export class VoiceCoordinator {
   async switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>): Promise<VoiceBinding> {
     return this.store.transaction(async (transaction) => {
       const entries = await transaction.readEntries();
-      const current = bindings(entries).get(text(bindingId, "voice binding id"));
+      const allBindings = bindings(entries);
+      const current = allBindings.get(text(bindingId, "voice binding id"));
       const consent = consents(entries).get(text(input.consentId, "voice consent id"));
       if (!current || !live(current.status)) throw new VoiceCoordinatorError("Only the current live voice binding can switch provider.");
       if (!consent || Date.parse(consent.expiresAt) <= Date.parse(this.clock())) throw new VoiceCoordinatorError("Provider switch requires fresh consent for the destination provider.");
       if (consent.provider === current.provider) throw new VoiceCoordinatorError("Provider switch must select a different provider.");
       if (consent.repositoryRoot !== current.repositoryRoot || consent.targetSnapshotId !== current.targetSnapshotId || consent.contextPackageId !== current.contextPackageId || consent.contextDigest !== current.contextDigest) throw new VoiceCoordinatorError("Provider switch consent does not preserve the exact work context.");
+      if (lineage(allBindings, current).length >= 32) throw new VoiceCoordinatorError("The voice provider-switch lineage reached its bounded limit; end it before starting another conversation.");
       const now = time(this.clock(), "voice switch clock");
       const ended: VoiceBinding = { ...current, status: "ended", endedAt: now, updatedAt: now };
-      const next = makeBinding(consent, { voiceSessionId: input.voiceSessionId, ...(current.managedSessionId ? { managedSessionId: current.managedSessionId } : {}) }, text(this.idFactory(), "voice binding id"), now);
+      const next = makeBinding(consent, { voiceSessionId: input.voiceSessionId, previousBindingId: current.id, ...(current.managedSessionId ? { managedSessionId: current.managedSessionId } : {}) }, text(this.idFactory(), "voice binding id"), now);
       await transaction.append<VoiceBindingEvent>("voice.binding.saved", { binding: ended });
       await transaction.append<VoiceBindingEvent>("voice.binding.saved", { binding: next });
       return clone(next);
@@ -136,6 +178,13 @@ export class VoiceCoordinator {
   async getBinding(id: string): Promise<VoiceBinding | undefined> {
     const found = bindings(await this.store.readEntries()).get(text(id, "voice binding id"));
     return found ? clone(found) : undefined;
+  }
+
+  async bindingLineage(id: string): Promise<readonly VoiceBinding[]> {
+    const all = bindings(await this.store.readEntries());
+    const found = all.get(text(id, "voice binding id"));
+    if (!found) throw new VoiceCoordinatorError(`Unknown voice binding: ${id}`);
+    return lineage(all, found).map(clone);
   }
 
   async active(): Promise<VoiceBinding | undefined> {
@@ -150,27 +199,53 @@ export class VoiceCoordinator {
   async end(id: string): Promise<VoiceBinding> { return this.mutate(id, (binding, now) => binding.status === "ended" ? binding : { ...binding, status: "ended", endedAt: now }); }
 
   async appendTranscript(bindingId: string, value: string): Promise<VoiceTranscriptEntry> {
-    const binding = await this.getBinding(bindingId);
-    if (!binding || !live(binding.status)) throw new VoiceCoordinatorError("Transcript input requires a live voice binding.");
-    if (binding.transcript !== "redacted") throw new VoiceCoordinatorError("Voice transcripts are disabled for this binding.");
-    const recordedAt = time(this.clock(), "transcript clock");
-    const entry: VoiceTranscriptEntry = {
-      id: text(this.idFactory(), "transcript id"), bindingId: binding.id,
-      text: redactText(text(value.replace(/[\r\n\0]+/g, " ").slice(0, 4_096), "transcript text")),
-      recordedAt, expiresAt: new Date(Date.parse(recordedAt) + binding.retentionMinutes * 60_000).toISOString()
-    };
-    await this.store.append<VoiceTranscriptEvent>("voice.transcript.appended", { entry });
-    return clone(entry);
+    return this.store.transaction(async (transaction) => {
+      const binding = bindings(await transaction.readEntries()).get(text(bindingId, "voice binding id"));
+      if (!binding || !live(binding.status) || binding.transcriptDeletedAt) throw new VoiceCoordinatorError("Transcript input requires a live, non-deleted voice binding.");
+      if (binding.transcript !== "redacted") throw new VoiceCoordinatorError("Voice transcripts are disabled for this binding.");
+      const recordedAt = time(this.clock(), "transcript clock");
+      const entry: VoiceTranscriptEntry = {
+        id: text(this.idFactory(), "transcript id"), bindingId: binding.id,
+        text: redactVoiceTranscript(text(value.replace(/[\r\n\0]+/g, " ").slice(0, 4_096), "transcript text")),
+        recordedAt, expiresAt: new Date(Date.parse(recordedAt) + binding.retentionMinutes * 60_000).toISOString()
+      };
+      await this.transcripts.purgeExpired(recordedAt);
+      await this.transcripts.append(entry);
+      return clone(entry);
+    });
   }
 
   async transcript(bindingId: string): Promise<readonly VoiceTranscriptEntry[]> {
-    const binding = await this.getBinding(bindingId);
-    if (!binding || binding.transcriptDeletedAt) return [];
-    const now = Date.parse(this.clock());
-    return transcripts(await this.store.readEntries()).filter((entry) => entry.bindingId === binding.id && Date.parse(entry.expiresAt) > now).map(clone);
+    return this.store.transaction(async (transaction) => {
+      const all = bindings(await transaction.readEntries());
+      const binding = all.get(text(bindingId, "voice binding id"));
+      if (!binding || binding.transcriptDeletedAt) return [];
+      const now = time(this.clock(), "transcript clock");
+      const entries = (await Promise.all(lineage(all, binding).map((entry) => this.transcripts.list(entry.id, now)))).flat();
+      return entries.sort((left, right) => left.recordedAt.localeCompare(right.recordedAt) || left.id.localeCompare(right.id)).map(clone);
+    });
   }
 
-  async deleteTranscript(id: string): Promise<VoiceBinding> { return this.mutate(id, (binding, now) => ({ ...binding, transcriptDeletedAt: now })); }
+  async deleteTranscript(id: string): Promise<VoiceBinding> {
+    return this.store.transaction(async (transaction) => {
+      const exactId = text(id, "voice binding id");
+      const all = bindings(await transaction.readEntries());
+      const found = all.get(exactId);
+      if (!found) throw new VoiceCoordinatorError(`Unknown voice binding: ${id}`);
+      const now = time(this.clock(), "voice binding clock");
+      // Destroy transcript keys/content before recording success. A crash can
+      // therefore leave an over-conservative missing transcript, never retained
+      // plaintext or a false deletion receipt.
+      let selected: VoiceBinding | undefined;
+      for (const prior of lineage(all, found)) {
+        await this.transcripts.delete(prior.id);
+        const changed: VoiceBinding = { ...prior, transcriptDeletedAt: now, updatedAt: now };
+        await transaction.append<VoiceBindingEvent>("voice.binding.saved", { binding: changed });
+        if (prior.id === exactId) selected = changed;
+      }
+      return clone(selected!);
+    });
+  }
 
   private async mutate(id: string, change: (binding: VoiceBinding, now: string) => VoiceBinding): Promise<VoiceBinding> {
     return this.store.transaction(async (transaction) => {
@@ -184,12 +259,24 @@ export class VoiceCoordinator {
   }
 }
 
-function makeBinding(consent: VoiceConsent, input: Readonly<{ voiceSessionId: string; managedSessionId?: string }>, id: string, now: string): VoiceBinding {
-  return { id, consentId: consent.id, voiceSessionId: text(input.voiceSessionId, "voice session id"), ...(input.managedSessionId ? { managedSessionId: text(input.managedSessionId, "managed session id") } : {}), repositoryRoot: consent.repositoryRoot, targetSnapshotId: consent.targetSnapshotId, contextPackageId: consent.contextPackageId, contextDigest: consent.contextDigest, provider: consent.provider, transcript: consent.transcript, retentionMinutes: consent.retentionMinutes, status: "active", createdAt: now, updatedAt: now };
+function makeBinding(consent: VoiceConsent, input: Readonly<{ voiceSessionId: string; previousBindingId?: string; managedSessionId?: string }>, id: string, now: string): VoiceBinding {
+  return { id, consentId: consent.id, voiceSessionId: text(input.voiceSessionId, "voice session id"), ...(input.previousBindingId ? { previousBindingId: text(input.previousBindingId, "previous voice binding id") } : {}), ...(input.managedSessionId ? { managedSessionId: text(input.managedSessionId, "managed session id") } : {}), repositoryRoot: consent.repositoryRoot, targetSnapshotId: consent.targetSnapshotId, contextPackageId: consent.contextPackageId, contextDigest: consent.contextDigest, provider: consent.provider, transcript: consent.transcript, retentionMinutes: consent.retentionMinutes, status: "active", createdAt: now, updatedAt: now };
 }
 function consents(entries: readonly JournalEntry<unknown>[]): Map<string, VoiceConsent> { const result = new Map<string, VoiceConsent>(); for (const entry of entries) if (entry.kind === "voice.consent.saved") { const value = (entry.payload as VoiceConsentEvent | undefined)?.consent; if (!value) throw new VoiceCoordinatorError("Protected voice consent is malformed."); result.set(value.id, clone(value)); } return result; }
 function bindings(entries: readonly JournalEntry<unknown>[]): Map<string, VoiceBinding> { const result = new Map<string, VoiceBinding>(); for (const entry of entries) if (entry.kind === "voice.binding.saved") { const value = (entry.payload as VoiceBindingEvent | undefined)?.binding; if (!value || !bindingStatus(value.status)) throw new VoiceCoordinatorError("Protected voice binding is malformed."); result.set(value.id, clone(value)); } return result; }
-function transcripts(entries: readonly JournalEntry<unknown>[]): readonly VoiceTranscriptEntry[] { const result: VoiceTranscriptEntry[] = []; for (const entry of entries) if (entry.kind === "voice.transcript.appended") { const value = (entry.payload as VoiceTranscriptEvent | undefined)?.entry; if (!value) throw new VoiceCoordinatorError("Protected voice transcript is malformed."); result.push(clone(value)); } return result; }
+function lineage(all: ReadonlyMap<string, VoiceBinding>, selected: VoiceBinding): VoiceBinding[] {
+  const result: VoiceBinding[] = [];
+  const seen = new Set<string>();
+  let current: VoiceBinding | undefined = selected;
+  while (current) {
+    if (seen.has(current.id)) throw new VoiceCoordinatorError("Protected voice binding lineage contains a cycle.");
+    seen.add(current.id);
+    result.unshift(current);
+    current = current.previousBindingId ? all.get(current.previousBindingId) : undefined;
+    if (result.length > 32) throw new VoiceCoordinatorError("Protected voice binding lineage exceeds its bounded length.");
+  }
+  return result;
+}
 function live(value: VoiceBindingStatus): boolean { return value === "active" || value === "muted" || value === "interrupted"; }
 function bindingStatus(value: unknown): value is VoiceBindingStatus { return value === "active" || value === "muted" || value === "interrupted" || value === "ended"; }
 function provider(value: unknown): VoiceProvider { if (value === "claude" || value === "chatgpt" || value === "system") return value; throw new VoiceCoordinatorError("Unknown voice provider."); }
@@ -199,4 +286,15 @@ function absoluteRoot(value: unknown): string { const result = text(value, "repo
 function digest(value: unknown, label: string): string { if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value)) throw new VoiceCoordinatorError(`${label} must be a SHA-256 digest.`); return value.toLowerCase(); }
 function text(value: unknown, label: string): string { if (typeof value !== "string" || !value.trim() || value.length > 16_384 || /\0/.test(value)) throw new VoiceCoordinatorError(`${label} must be bounded nonempty text.`); return value.trim(); }
 function time(value: unknown, label: string): string { if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) throw new VoiceCoordinatorError(`${label} must be an ISO timestamp.`); return value; }
+function redactVoiceTranscript(value: string): string {
+  return redactText(value)
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted-pii]")
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "[redacted-pii]")
+    .replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[redacted-pii]")
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[redacted-pii]")
+    .replace(/(?<!\w)(?:\+?1[ .-]?)?(?:\(\d{3}\)|\d{3})[ .-]?\d{3}[ .-]?\d{4}(?!\w)/g, "[redacted-pii]")
+    .replace(/\b\d{1,6}\s+(?:[A-Za-z0-9.'-]+\s+){1,5}(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way)\b\.?/gi, "[redacted-pii]")
+    .replace(/\b(?:account|customer|member|patient|case)\s*(?:id|number|no\.?|#)?\s*[:=#-]?\s*[A-Za-z0-9-]{4,}\b/gi, "[redacted-pii]")
+    .replace(/\b(?:my name is|this is)\s+[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+){0,3}\b/g, "[redacted-pii]");
+}
 function clone<T>(value: T): T { return jsonClone(value); }

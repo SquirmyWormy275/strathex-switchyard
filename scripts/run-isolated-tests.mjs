@@ -30,21 +30,21 @@ const controlPlaneTests = [
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "acceptance-administration", "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
+  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "configured-network", "control-plane",
   "council-runtime", "council-workspace-isolation", "durable-credentials",
   "durable-endpoint", "git-review", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
   "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
   "operation-recovery", "packaged-runtime", "pipeline-adapters",
-  "provider-desktop", "provider-desktop-adapter", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",
+  "provider-desktop", "provider-desktop-adapter", "provider-desktop-configuration", "provider-desktop-effects", "provider-gateway", "raw-hid-installation", "raw-hid-main-wiring",
   "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
   "repository-process-supervisor", "repository-recipe-evidence",
   "repository-recipe-host-evidence", "repository-runner-helper",
   "repository-runtime", "repository-runtime-broker", "scanner-fixtures",
   "repository-runtime-release-package", "router", "runtime-provisioning",
   "runtime-registry", "sandbox-installation", "service", "session-freshness", "stdio",
-  "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
-  "windows-user-presence", "workflow-voice-service"
+  "voice-gateway", "voice-helper-source", "voice-runtime", "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
+  "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-voice-service"
 ].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime" }));
 const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
@@ -56,6 +56,7 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
 export const requiredGroups = [
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
+  { file: "firmware/verify-require-compiler.test.mjs" },
   { file: "build:companion", args: [npmCli, "run", "build:companion"] },
   ...(process.platform === "win32" ? [{
     file: "deployment/windows/Test-B122ManifestGenerators.ps1",

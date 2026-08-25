@@ -22,7 +22,9 @@ export type VoiceGatewayErrorCode =
   | "busy"
   | "cancelled"
   | "consent_invalid"
+  | "deletion_incomplete"
   | "deadline"
+  | "no_input"
   | "no_binding"
   | "provider_invalid"
   | "provider_unavailable"
@@ -40,6 +42,10 @@ export class VoiceGatewayError extends Error {
 
 export interface VoiceContextSource {
   get(id: string): Promise<HandoffPackage | undefined>;
+}
+
+export interface VoiceSessionScopeVerifier {
+  assertCurrent(scope: VoiceBindingScope, context: CanonicalVoiceContext): Promise<void>;
 }
 
 /** Canonical, non-authorizing context injected on every provider turn. */
@@ -137,6 +143,7 @@ export interface HybridVoiceGatewayOptions {
   readonly contexts: VoiceContextSource;
   readonly audio: VoiceAudioPort;
   readonly providers: readonly VoiceProviderPort[];
+  readonly sessionScopeVerifier?: VoiceSessionScopeVerifier;
   readonly now?: () => string;
   readonly defaultDeadlineMs?: number;
 }
@@ -168,6 +175,7 @@ export class HybridVoiceGateway {
   private readonly contexts: VoiceContextSource;
   private readonly audio: VoiceAudioPort;
   private readonly providers = new Map<VoiceProvider, VoiceProviderPort>();
+  private readonly sessionScopeVerifier?: VoiceSessionScopeVerifier;
   private readonly now: () => string;
   private readonly defaultDeadlineMs: number;
   private runtime?: RuntimeBinding;
@@ -179,6 +187,7 @@ export class HybridVoiceGateway {
     this.audio = options.audio;
     this.now = options.now ?? (() => new Date().toISOString());
     this.defaultDeadlineMs = deadline(options.defaultDeadlineMs ?? 30_000);
+    this.sessionScopeVerifier = options.sessionScopeVerifier;
     for (const provider of options.providers) {
       if (this.providers.has(provider.provider)) {
         throw new VoiceGatewayError("provider_invalid", `Duplicate voice provider route: ${provider.provider}`);
@@ -230,13 +239,17 @@ export class HybridVoiceGateway {
     try {
       const runtime = await this.freshRuntime(bindingId, "active");
       if (controller.signal.aborted) throw abortError(controller);
-      const frames = validateFrames(await raced(this.audio.capture(runtime.scope, controller.signal), controller));
+      const captured = await raced(this.audio.capture(runtime.scope, controller.signal), controller);
+      if (captured.length === 0) throw new VoiceGatewayError("no_input", "No bounded voice activity was captured.");
+      const frames = validateFrames(captured);
       const beforeProvider = await this.freshRuntime(bindingId, "active");
+      if (controller.signal.aborted) throw abortError(controller);
       const response = validateResponse(await raced(
         runtime.providerPort.respond(beforeProvider.scope, beforeProvider.context, frames, controller.signal),
         controller
       ), runtime.externalSessionId);
       const final = await this.freshRuntime(bindingId, "active");
+      if (controller.signal.aborted) throw abortError(controller);
       const routed: VoiceProviderTurnResult = {
         externalSessionId: response.externalSessionId,
         recognizedText: redactText(response.recognizedText),
@@ -247,6 +260,7 @@ export class HybridVoiceGateway {
       };
       await raced(this.audio.speak(final.scope, routed, controller.signal), controller);
       await this.freshRuntime(bindingId, "active");
+      if (controller.signal.aborted) throw abortError(controller);
       if (final.binding.transcript === "redacted") {
         if (routed.recognizedText.trim()) await this.voice.appendTranscript(bindingId, routed.recognizedText);
         if (routed.responseText.trim()) await this.voice.appendTranscript(bindingId, routed.responseText);
@@ -254,7 +268,7 @@ export class HybridVoiceGateway {
       return routed;
     } catch (error) {
       const runtime = this.runtime;
-      if (runtime?.scope.bindingId === bindingId) {
+      if (!(error instanceof VoiceGatewayError && error.code === "no_input") && runtime?.scope.bindingId === bindingId) {
         await Promise.allSettled([
           runtime.providerPort.interrupt(runtime.scope),
           this.audio.interrupt(runtime.scope)
@@ -263,6 +277,65 @@ export class HybridVoiceGateway {
       throw normalizeAbort(error, controller);
     } finally {
       if (this.activeTurn?.controller === controller) this.activeTurn = undefined;
+      controller.dispose();
+    }
+  }
+
+  async switchProvider(
+    bindingId: string,
+    input: Readonly<{ consentId: string; voiceSessionId: string }>,
+    options: Readonly<{ signal?: AbortSignal; deadlineMs?: number }> = {}
+  ): Promise<VoiceBinding> {
+    if (this.activeTurn) throw new VoiceGatewayError("busy", "A voice turn is already in progress.");
+    const runtime = await this.freshRuntime(bindingId, "live");
+    const next = await this.voice.switchProvider(bindingId, input);
+    const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
+    try {
+      await raced(Promise.all([
+        runtime.providerPort.close(runtime.scope, controller.signal),
+        this.audio.close(runtime.scope, controller.signal)
+      ]), controller);
+      this.runtime = undefined;
+      await this.open(next.id, { signal: controller.signal, deadlineMs: options.deadlineMs ?? this.defaultDeadlineMs });
+      return (await this.voice.getBinding(next.id)) ?? next;
+    } catch (error) {
+      this.runtime = undefined;
+      await this.voice.end(next.id).catch(() => undefined);
+      throw normalizeAbort(error, controller);
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  async bindManagedSession(
+    bindingId: string,
+    managedSessionId: string,
+    options: Readonly<{ signal?: AbortSignal; deadlineMs?: number }> = {}
+  ): Promise<VoiceBinding> {
+    if (this.activeTurn) throw new VoiceGatewayError("busy", "A voice turn is already in progress.");
+    const current = await this.voice.getBinding(boundedIdentifier(bindingId, "voice binding"));
+    if (!current || !["active", "muted", "interrupted"].includes(current.status)) throw new VoiceGatewayError("no_binding", "Only the current live voice binding can be rebound.");
+    const exactSessionId = boundedIdentifier(managedSessionId, "managed session");
+    if (current.managedSessionId === exactSessionId && this.runtime?.scope.bindingId === bindingId) return current;
+    const prior = this.runtime?.scope.bindingId === bindingId ? this.runtime : undefined;
+    const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
+    try {
+      if (prior) {
+        await raced(Promise.all([
+          prior.providerPort.close(prior.scope, controller.signal),
+          this.audio.close(prior.scope, controller.signal)
+        ]), controller);
+      }
+      this.runtime = undefined;
+      const rebound = await this.voice.bindManagedSession(bindingId, exactSessionId);
+      if (rebound.status !== "active") await this.voice.resume(bindingId);
+      await this.open(bindingId, { signal: controller.signal, deadlineMs: options.deadlineMs ?? this.defaultDeadlineMs });
+      return (await this.voice.getBinding(bindingId)) ?? rebound;
+    } catch (error) {
+      this.runtime = undefined;
+      await this.voice.end(bindingId).catch(() => undefined);
+      throw normalizeAbort(error, controller);
+    } finally {
       controller.dispose();
     }
   }
@@ -339,15 +412,29 @@ export class HybridVoiceGateway {
   }
 
   async deleteTranscript(bindingId: string, options: Readonly<{ signal?: AbortSignal; deadlineMs?: number }> = {}): Promise<VoiceBinding> {
-    const exact = await this.deletionState(bindingId);
-    const providerPort = this.exactProvider(exact.scope.provider);
+    const history = await this.voice.bindingLineage(bindingId);
+    const exactHistory = await Promise.all(history.map((binding) => this.deletionState(binding.id)));
+    // Local key destruction is the privacy invariant. Do it before waiting on
+    // any provider/device boundary, which may be unavailable or hang until its
+    // deadline. External deletion is then reported independently.
+    const deleted = await this.voice.deleteTranscript(bindingId);
+    const ended = deleted.status === "ended" ? deleted : await this.voice.end(bindingId);
+    if (this.runtime?.scope.bindingId === bindingId) this.runtime = undefined;
     const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
     try {
-      await raced(Promise.all([
-        providerPort.deleteTranscript(exact.scope, controller.signal),
-        this.audio.deleteTranscript(exact.scope, controller.signal)
-      ]), controller);
-      return await this.voice.deleteTranscript(bindingId);
+      let external: readonly PromiseSettledResult<void>[];
+      try {
+        external = await raced(Promise.allSettled([
+          ...exactHistory.map((exact) => this.exactProvider(exact.scope.provider).deleteTranscript(exact.scope, controller.signal)),
+          ...exactHistory.map((exact) => this.audio.deleteTranscript(exact.scope, controller.signal))
+        ]), controller);
+      } catch {
+        throw new VoiceGatewayError("deletion_incomplete", "Local transcript keys were destroyed, but bounded external deletion did not complete.");
+      }
+      if (external.some((result) => result.status === "rejected")) {
+        throw new VoiceGatewayError("deletion_incomplete", "Local transcript keys were destroyed, but at least one external deletion could not be confirmed.");
+      }
+      return ended;
     } catch (error) {
       throw normalizeAbort(error, controller);
     } finally {
@@ -383,7 +470,9 @@ export class HybridVoiceGateway {
       ]), controller);
       if (audio === "active" && provider === "active") {
         this.runtime = { ...exact, providerPort, externalSessionId: exact.scope.voiceSessionId };
-        return cloneScope(exact.scope);
+        // Paused/interrupted state remains recoverable but must not restart the
+        // microphone turn loop until the operator explicitly resumes it.
+        return active.status === "active" ? cloneScope(exact.scope) : undefined;
       }
       await Promise.allSettled([
         providerPort.close(exact.scope),
@@ -476,7 +565,12 @@ export class HybridVoiceGateway {
     if (Buffer.byteLength(stableJson(context), "utf8") > maximumContextBytes) {
       throw new VoiceGatewayError("target_changed", "The canonical voice context exceeds its bounded transport size.");
     }
-    return { binding, consent, scope: scope(binding, consent), context };
+    const exactScope = scope(binding, consent);
+    if (this.sessionScopeVerifier) {
+      try { await this.sessionScopeVerifier.assertCurrent(exactScope, context); }
+      catch { throw new VoiceGatewayError("target_changed", "The selected managed session is no longer current for the exact voice target."); }
+    }
+    return { binding, consent, scope: exactScope, context };
   }
 
   private async deletionState(bindingId: string): Promise<Readonly<{ binding: VoiceBinding; consent: VoiceConsent; scope: VoiceBindingScope }>> {

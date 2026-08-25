@@ -139,7 +139,7 @@ try {
   $developmentRelease = [ordered]@{
     schema='sxsy-b122.windows-release'; version=1; sourceCommit=('a' * 40); sourceAssembly='git-archive';
     verificationSkipped=$true; evidenceEligible=$false; hardwareAcceptance=$false; highConsequenceAcceptance=$false;
-    sandboxHelperSha256=('b' * 64); repositoryRuntimeHelperSha256=('c' * 64); rawHidHelperSha256=('d' * 64); providerDesktopHelperSha256=('e' * 64)
+    sandboxHelperSha256=('b' * 64); repositoryRuntimeHelperSha256=('c' * 64); rawHidHelperSha256=('d' * 64); providerDesktopHelperSha256=('e' * 64); voiceHelperSha256=('f' * 64)
   }
   [IO.File]::WriteAllText((Join-Path $developmentBundle 'release.json'), ($developmentRelease | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
   Assert-Rejected { & (Join-Path $PSScriptRoot 'Test-B122ReleaseArtifact.ps1') -BundleRoot $developmentBundle } 'ineligible for release evidence or installation'

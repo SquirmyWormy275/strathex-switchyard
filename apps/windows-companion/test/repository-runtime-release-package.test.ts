@@ -36,6 +36,46 @@ test("Windows release packages and attests the pinned Job-Object helper", async 
   assert.match(start, /b122-repository-runner\.exe/);
 });
 
+test("Windows release packages, self-tests, and provenance-binds the native voice helper", async () => {
+  const build = await readFile(join(deployment, "Build-B122Release.ps1"), "utf8");
+  const artifact = await readFile(join(deployment, "Test-B122ReleaseArtifact.ps1"), "utf8");
+  const portable = await readFile(join(deployment, "Test-B122PortableBundle.ps1"), "utf8");
+  const start = await readFile(join(deployment, "Start-B122.ps1"), "utf8");
+  const routes = await readFile(join(deployment, "Manage-B122VoiceRoute.ps1"), "utf8");
+  for (const expected of [
+    "VoiceHelperPath",
+    "VoiceHelperSha256",
+    "voice-helper\\Sxsy.B122.VoiceHelper.csproj",
+    "sxsy-b122-voice-helper.exe",
+    "sxsy-b122.voice-helper-self-test",
+    "voiceHelperSha256",
+    "Manage-B122VoiceRoute.ps1"
+  ]) assert.equal(build.includes(expected), true, `release build is missing ${expected}`);
+  assert.match(artifact, /voiceHelperSha256/);
+  assert.match(artifact, /voice-helper\/Program\.cs/);
+  assert.match(artifact, /Manage-B122VoiceRoute\.ps1/);
+  assert.match(portable, /voiceHelperSelfTest=\$true/);
+  assert.match(portable, /unconsented portable companion launched the voice helper/);
+  assert.match(start, /sxsy-b122-voice-helper\.exe/);
+  assert.match(routes, /credential-ref:(?:claude|chatgpt)-current-user/);
+  assert.match(routes, /Exact current-user confirmation/);
+  assert.match(routes, /Test-B122ReleaseArtifact\.ps1/);
+  assert.match(routes, /Assert-VoiceHelperIdentity/);
+  assert.match(routes, /voiceHelperSha256/);
+  assert.match(routes, /ReparsePoint/);
+});
+
+test("evidence-eligible release requires and hashes a compiler-bound firmware receipt", async () => {
+  const build = await readFile(join(deployment, "Build-B122Release.ps1"), "utf8");
+  const artifact = await readFile(join(deployment, "Test-B122ReleaseArtifact.ps1"), "utf8");
+  for (const expected of ["--require-c-compiler", "--receipt", "firmware-verification.json", "compiler.fingerprintSha256"]) {
+    assert.equal(build.includes(expected), true, `release build is missing ${expected}`);
+    assert.equal(artifact.includes(expected === "--require-c-compiler" || expected === "--receipt" ? "compilerRequired" : expected), true, `release validation is missing ${expected}`);
+  }
+  assert.match(artifact, /payload checksum manifest/);
+  assert.match(artifact, /development-only release must not present a compiler receipt/);
+});
+
 test("deployment templates expose every typed recipe and never pretend the supervisor is a project command", async () => {
   const runtimePlan = JSON.parse(await readFile(join(deployment, "repository-runtime-plan.template.json"), "utf8")) as { recipes: Record<string, { executable?: string }> };
   const sandboxPlan = JSON.parse(await readFile(join(deployment, "windows-sandbox-catalog-plan.template.json"), "utf8")) as { recipes: Record<string, { executable: string; arguments: string[]; artifacts: string[] }> };

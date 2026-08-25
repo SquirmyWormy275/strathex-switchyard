@@ -58,6 +58,8 @@ class FakeProviderPort implements VoiceProviderPort {
   readonly provider: VoiceProvider;
   observation: "active" | "absent" = "active";
   beforeResponse?: () => Promise<void>;
+  beforeDelete?: () => Promise<void>;
+  deleteFailure?: Error;
   turn: VoiceProviderTurnResult = {
     externalSessionId: "provider-session-1",
     recognizedText: "Authorization: Bearer abcdefgh safe request",
@@ -78,7 +80,7 @@ class FakeProviderPort implements VoiceProviderPort {
   }
   async interrupt(scope: VoiceBindingScope): Promise<void> { this.calls.push(`interrupt:${scope.bindingId}`); }
   async close(scope: VoiceBindingScope): Promise<void> { this.calls.push(`close:${scope.bindingId}`); }
-  async deleteTranscript(scope: VoiceBindingScope): Promise<void> { this.calls.push(`delete:${scope.bindingId}`); }
+  async deleteTranscript(scope: VoiceBindingScope): Promise<void> { this.calls.push(`delete:${scope.bindingId}`); await this.beforeDelete?.(); if (this.deleteFailure) throw this.deleteFailure; }
   async observe(scope: VoiceBindingScope): Promise<"active" | "absent"> { this.calls.push(`observe:${scope.bindingId}`); return this.observation; }
 }
 
@@ -92,6 +94,8 @@ async function fixture(
   bindingId: string;
   audio: FakeAudioPort;
   route: FakeProviderPort;
+  alternate: FakeProviderPort;
+  sessionScope: { current: boolean };
   gateway: HybridVoiceGateway;
 }> {
   const directory = await mkdtemp(join(tmpdir(), "b122-voice-gateway-"));
@@ -129,15 +133,18 @@ async function fixture(
   const binding = await voice.start({ consentId: consent.id, voiceSessionId: "voice-session-1", managedSessionId: "managed-agent-1" });
   const audio = new FakeAudioPort();
   const route = new FakeProviderPort(provider);
+  const alternate = new FakeProviderPort(provider === "claude" ? "chatgpt" : "claude");
+  const sessionScope = { current: true };
   const gateway = new HybridVoiceGateway({
     voice,
     contexts: handoffs,
     audio,
-    providers: [route],
+    providers: [route, alternate],
+    sessionScopeVerifier: { async assertCurrent() { if (!sessionScope.current) throw new Error("managed session changed"); } },
     now: () => at,
     defaultDeadlineMs: 1_000
   });
-  return { voice, handoff, bindingId: binding.id, audio, route, gateway };
+  return { voice, handoff, bindingId: binding.id, audio, route, alternate, sessionScope, gateway };
 }
 
 test("hybrid gateway injects the exact canonical context, bounds audio, speaks the exact response, and stores only redacted text", async (context) => {
@@ -172,6 +179,33 @@ test("provider selection is exact and never falls back when the consented route 
   await assert.rejects(gateway.open(setup.bindingId), (error: unknown) => error instanceof VoiceGatewayError && error.code === "provider_unavailable");
   assert.deepEqual(wrong.calls, []);
   assert.deepEqual(setup.audio.calls, []);
+});
+
+test("explicit provider switch closes the old exact route and opens only the freshly consented route", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  const consent = await setup.voice.grantConsent({
+    repositoryRoot: setup.handoff.repositoryRoot,
+    targetSnapshotId: setup.handoff.targetSnapshotId,
+    contextPackageId: setup.handoff.id,
+    contextDigest: setup.handoff.digest,
+    provider: "chatgpt",
+    operatorPresenceId: "presence-2",
+    transcript: "redacted",
+    retentionMinutes: 10,
+    expiresAt
+  });
+  const switched = await setup.gateway.switchProvider(setup.bindingId, { consentId: consent.id, voiceSessionId: "voice-session-2" });
+  assert.equal(switched.provider, "chatgpt");
+  assert.equal(setup.route.calls.includes(`close:${setup.bindingId}`), true);
+  assert.equal(setup.alternate.calls.some((call) => call.startsWith(`open:${switched.id}:`)), true);
+  await setup.gateway.runTurn(switched.id);
+  assert.equal(setup.alternate.calls.some((call) => call.startsWith(`respond:${switched.id}:`)), true);
+  await setup.gateway.deleteTranscript(switched.id);
+  assert.equal(setup.route.calls.includes(`delete:${setup.bindingId}`), true);
+  assert.equal(setup.alternate.calls.includes(`delete:${switched.id}`), true);
+  assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
+  assert.deepEqual(await setup.voice.transcript(switched.id), []);
 });
 
 test("gateway blocks changed context or session state at the final response-routing barrier", async (context) => {
@@ -209,6 +243,62 @@ test("mute, interruption, end, deletion, and deterministic restart reconciliatio
   assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
   assert.equal(setup.audio.calls.includes(`delete:${setup.bindingId}`), true);
   assert.equal(setup.route.calls.includes(`delete:${setup.bindingId}`), true);
+});
+
+test("local transcript keys are destroyed even when an external provider cannot confirm deletion", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  await setup.gateway.runTurn(setup.bindingId);
+  setup.route.deleteFailure = new Error("provider unavailable");
+  await assert.rejects(
+    setup.gateway.deleteTranscript(setup.bindingId),
+    (error: unknown) => error instanceof VoiceGatewayError && error.code === "deletion_incomplete"
+  );
+  assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
+  assert.ok((await setup.voice.getBinding(setup.bindingId))?.transcriptDeletedAt);
+});
+
+test("local transcript keys are destroyed before a hung external deletion reaches its deadline", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  await setup.gateway.runTurn(setup.bindingId);
+  setup.route.beforeDelete = async () => new Promise<void>(() => undefined);
+  await assert.rejects(
+    setup.gateway.deleteTranscript(setup.bindingId, { deadlineMs: 20 }),
+    (error: unknown) => error instanceof VoiceGatewayError && error.code === "deletion_incomplete"
+  );
+  assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
+  assert.ok((await setup.voice.getBinding(setup.bindingId))?.transcriptDeletedAt);
+});
+
+test("live managed-session churn interrupts routing before speech or transcript persistence", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  setup.route.beforeResponse = async () => { setup.sessionScope.current = false; };
+  await assert.rejects(
+    setup.gateway.runTurn(setup.bindingId),
+    (error: unknown) => error instanceof VoiceGatewayError && error.code === "target_changed"
+  );
+  assert.equal(setup.audio.calls.some((call) => call.startsWith("speak:")), false);
+  assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
+});
+
+test("restart recovery preserves muted state without starting a turn loop", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  await setup.gateway.mute(setup.bindingId);
+  const restarted = new HybridVoiceGateway({
+    voice: setup.voice,
+    contexts: { get: async () => setup.handoff },
+    audio: setup.audio,
+    providers: [setup.route],
+    sessionScopeVerifier: { async assertCurrent() {} },
+    now: () => at
+  });
+  assert.equal(await restarted.reconcile(), undefined);
+  assert.equal((await setup.voice.getBinding(setup.bindingId))?.status, "muted");
+  const resumed = await restarted.resume(setup.bindingId);
+  assert.equal(resumed.status, "active");
 });
 
 test("oversized frames and expired deadlines fail closed without reaching or falling back to a provider", async (context) => {

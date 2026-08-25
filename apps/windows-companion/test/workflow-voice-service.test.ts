@@ -11,6 +11,7 @@ import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { CompanionMethod } from "../src/bridge.ts";
 import { CompanionService } from "../src/service.ts";
+import { VoiceGatewayError } from "../src/voice-gateway.ts";
 
 const at = "2026-08-24T12:00:00.000Z";
 const session = (id: string): ManagedSession => ({ id, provider: "codex", surface: "bridge", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), taskId: "task-1", planRevision: "plan-1", plannedFiles: ["src/index.ts"], lastHeartbeat: at, adapterVersion: "test", metadata: {} });
@@ -80,6 +81,37 @@ test("installed service refuses voice binding to a different exact target", asyn
     const response = await service.handle({ version: 1, id: "request-1", method: "voice.start", payload: { consentId: consent.id, voiceSessionId: "voice-session-1", managedSessionId: "other" } });
     assert.equal(response.ok, false);
     assert.equal(response.error?.code, "capability_denied");
+    assert.equal(await voice.active(), undefined);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("installed service opens the configured voice runtime and ends the binding when native startup is unavailable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-workflow-runtime-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const voice = new VoiceCoordinator(store, { clock: () => at, idFactory: (() => { let id = 0; return () => `voice-${++id}`; })() });
+    const consent = await voice.grantConsent({ repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), contextPackageId: "handoff-1", contextDigest: "b".repeat(64), provider: "claude", operatorPresenceId: "presence", transcript: "off", retentionMinutes: 0, expiresAt: "2026-08-24T12:15:00.000Z" });
+    const opened: string[] = [];
+    const service = new CompanionService({
+      now: () => at,
+      voice,
+      voiceRuntime: {
+        async open(id) { opened.push(id); throw new VoiceGatewayError("provider_unavailable", "missing route"); },
+        async switchProvider() { throw new Error("not used"); }, async bindManagedSession() { throw new Error("not used"); },
+        async mute() { throw new Error("not used"); }, async resume() { throw new Error("not used"); }, async interrupt() { throw new Error("not used"); },
+        async end() { throw new Error("not used"); }, async deleteTranscript() { throw new Error("not used"); }
+      }
+    });
+    service.installTrustedSession(session("coder"));
+    const unbound = await service.handle({ version: 1, id: "request-unbound", method: "voice.start", payload: { consentId: consent.id, voiceSessionId: "voice-session-unbound" } });
+    assert.equal(unbound.ok, false);
+    assert.equal(unbound.error?.code, "capability_denied");
+    assert.equal(await voice.active(), undefined);
+    const response = await service.handle({ version: 1, id: "request-1", method: "voice.start", payload: { consentId: consent.id, voiceSessionId: "voice-session-1", managedSessionId: "coder" } });
+    assert.equal(response.ok, false);
+    assert.equal(response.error?.code, "companion_unavailable");
+    assert.equal(opened.length, 1);
+    assert.equal((await voice.getBinding(opened[0]!))?.status, "ended");
     assert.equal(await voice.active(), undefined);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

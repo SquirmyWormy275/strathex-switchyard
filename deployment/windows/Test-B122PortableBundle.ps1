@@ -10,7 +10,8 @@ $sandboxHelper = Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper
 $repositoryRuntimeHelper = Join-Path $root 'app\dist\apps\windows-companion\repository-runtime\b122-repository-runner.exe'
 $rawHidHelper = Join-Path $root 'app\dist\apps\windows-companion\raw-hid\strathex-b122-hid-helper.exe'
 $providerDesktopHelper = Join-Path $root 'app\dist\apps\windows-companion\provider-desktop\sxsy-b122-provider-desktop-helper.exe'
-foreach ($file in @($node, $main, $health, $sandboxHelper, $repositoryRuntimeHelper, $rawHidHelper, $providerDesktopHelper)) {
+$voiceHelper = Join-Path $root 'app\dist\apps\windows-companion\voice\sxsy-b122-voice-helper.exe'
+foreach ($file in @($node, $main, $health, $sandboxHelper, $repositoryRuntimeHelper, $rawHidHelper, $providerDesktopHelper, $voiceHelper)) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Portable SXSY-B122 file is missing: $file" }
   if ($file.Contains('"')) { throw 'Portable bundle paths containing quotation marks are unsupported.' }
 }
@@ -22,6 +23,10 @@ $providerDesktopSelfTestRaw = & $providerDesktopHelper --self-test
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($providerDesktopSelfTestRaw)) { throw 'The portable provider-desktop helper failed its self-test.' }
 $providerDesktopSelfTest = $providerDesktopSelfTestRaw | ConvertFrom-Json
 if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' -or $providerDesktopSelfTest.version -ne 1 -or $providerDesktopSelfTest.status -cne 'ok') { throw 'The portable provider-desktop helper returned an invalid self-test receipt.' }
+$voiceSelfTestRaw = & $voiceHelper --self-test
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($voiceSelfTestRaw)) { throw 'The portable voice helper failed its self-test.' }
+$voiceSelfTest = $voiceSelfTestRaw | ConvertFrom-Json
+if ($voiceSelfTest.schema -cne 'sxsy-b122.voice-helper-self-test' -or $voiceSelfTest.version -ne 1 -or $voiceSelfTest.status -cne 'ok' -or $voiceSelfTest.hardwareAccessed -ne $false -or $voiceSelfTest.networkAccessed -ne $false) { throw 'The portable voice helper returned an invalid hardware-independent self-test receipt.' }
 
 $temporaryBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
 $testRoot = [IO.Path]::GetFullPath((Join-Path $temporaryBase ("sxsy-b122-portable-smoke-" + [guid]::NewGuid().ToString('N'))))
@@ -53,7 +58,9 @@ try {
       if ($unexpectedRepositoryRuntime.Count -ne 0) { throw 'The unprovisioned portable companion launched the repository runtime helper.' }
       $unexpectedProviderDesktop = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'sxsy-b122-provider-desktop-helper.exe' })
       if ($unexpectedProviderDesktop.Count -ne 0) { throw 'The unprovisioned portable companion launched the provider-desktop helper.' }
-      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); sandboxHelperPresent=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; rawHidHelperPresent=$true; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true } | ConvertTo-Json -Compress
+      $unexpectedVoice = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'sxsy-b122-voice-helper.exe' })
+      if ($unexpectedVoice.Count -ne 0) { throw 'The unconsented portable companion launched the voice helper.' }
+      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=(& $node -p 'process.version'); sandboxHelperPresent=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; rawHidHelperPresent=$true; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true; voiceHelperPresent=$true; voiceHelperSelfTest=$true; microphoneAccessed=$false; providerNetworkAccessed=$false } | ConvertTo-Json -Compress
       return
     }
   } while ([DateTime]::UtcNow -lt $deadline)

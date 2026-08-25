@@ -428,6 +428,7 @@ function encodeFrames(frames: readonly VoiceAudioFrame[]): readonly Record<strin
 
 function parseFrames(value: unknown): readonly VoiceAudioFrame[] {
   if (!Array.isArray(value)) throw new Error("The voice helper returned invalid audio frames.");
+  if (value.length === 0) return [];
   return validateFrameSet(value.map((item) => parseFrame(item)), (frame) => frame);
 }
 

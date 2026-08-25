@@ -12,6 +12,8 @@ param(
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$RawHidHelperSha256,
   [string]$ProviderDesktopHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ProviderDesktopHelperSha256,
+  [string]$VoiceHelperPath,
+  [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$VoiceHelperSha256,
   [switch]$SkipVerification
 )
 $ErrorActionPreference = 'Stop'
@@ -62,8 +64,12 @@ if (-not $SkipVerification) {
   if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed.' }
   & npm.cmd test
   if ($LASTEXITCODE -ne 0) { throw 'Test verification failed.' }
-  & node.exe firmware\verify.mjs
+  $firmwareVerificationReceipt = Join-Path $output 'firmware-verification.json'
+  Assert-Child $output $firmwareVerificationReceipt
+  & node.exe firmware\verify.mjs --require-c-compiler --receipt $firmwareVerificationReceipt
   if ($LASTEXITCODE -ne 0) { throw 'Firmware and Raw-HID protocol verification failed.' }
+  $firmwareVerification = Get-Content -LiteralPath $firmwareVerificationReceipt -Raw | ConvertFrom-Json
+  if ($firmwareVerification.schema -cne 'sxsy-b122.firmware-verification' -or $firmwareVerification.version -ne 1 -or $firmwareVerification.status -cne 'passed' -or $firmwareVerification.compilerRequired -ne $true -or $firmwareVerification.compiled -ne $true -or $firmwareVerification.protocolSelfTest -ne $true -or $firmwareVerification.hardwareAccessed -ne $false -or $firmwareVerification.compiler.fingerprintSha256 -notmatch '^[0-9a-f]{64}$') { throw 'Firmware verification did not produce a valid compiler-bound receipt.' }
   $previousNpmCache = $env:npm_config_cache
   try {
     $env:npm_config_cache = Join-Path $repo '.npm-cache-release'
@@ -159,10 +165,33 @@ $providerDesktopSelfTestRaw = & $providerDesktopHelper --self-test
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($providerDesktopSelfTestRaw)) { throw 'Provider-desktop helper self-test failed.' }
 $providerDesktopSelfTest = $providerDesktopSelfTestRaw | ConvertFrom-Json
 if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' -or $providerDesktopSelfTest.version -ne 1 -or $providerDesktopSelfTest.status -cne 'ok') { throw 'Provider-desktop helper returned an invalid self-test receipt.' }
+
+$voiceHelper = $VoiceHelperPath
+if (-not $voiceHelper) {
+  if ($VoiceHelperSha256) { throw '-VoiceHelperSha256 is valid only with -VoiceHelperPath.' }
+  $dotnet = (Get-Command dotnet.exe -ErrorAction SilentlyContinue).Source
+  if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -VoiceHelperPath is required to build the fixed Windows voice helper.' }
+  $voiceHelperPublish = Join-Path $output '.voice-helper-publish'
+  Assert-Child $output $voiceHelperPublish
+  & $dotnet publish (Join-Path $buildRoot 'apps\windows-companion\voice-helper\Sxsy.B122.VoiceHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $voiceHelperPublish
+  if ($LASTEXITCODE -ne 0) { throw 'Windows voice native helper build failed.' }
+  $voiceHelper = Join-Path $voiceHelperPublish 'sxsy-b122-voice-helper.exe'
+}
+$voiceHelper = [IO.Path]::GetFullPath($voiceHelper)
+if (-not (Test-Path -LiteralPath $voiceHelper -PathType Leaf)) { throw 'The fixed Windows voice helper executable is missing.' }
+if ($VoiceHelperPath) {
+  if (-not $VoiceHelperSha256) { throw '-VoiceHelperSha256 is required with a prebuilt voice helper.' }
+  if (-not ((Get-FileHash -LiteralPath $voiceHelper -Algorithm SHA256).Hash.Equals($VoiceHelperSha256, [StringComparison]::OrdinalIgnoreCase))) { throw 'The voice helper digest does not match the reviewed value.' }
+}
+$voiceSelfTestRaw = & $voiceHelper --self-test
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($voiceSelfTestRaw)) { throw 'Voice helper self-test failed.' }
+$voiceSelfTest = $voiceSelfTestRaw | ConvertFrom-Json
+if ($voiceSelfTest.schema -cne 'sxsy-b122.voice-helper-self-test' -or $voiceSelfTest.version -ne 1 -or $voiceSelfTest.status -cne 'ok' -or $voiceSelfTest.dpapiCurrentUser -ne $true -or $voiceSelfTest.hardwareAccessed -ne $false -or $voiceSelfTest.networkAccessed -ne $false) { throw 'Voice helper returned an invalid hardware-independent self-test receipt.' }
 $helperDigest = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
 $repositoryRuntimeHelperDigest = (Get-FileHash -LiteralPath $repositoryRuntimeHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 $rawHidHelperDigest = (Get-FileHash -LiteralPath $rawHidHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 $providerDesktopHelperDigest = (Get-FileHash -LiteralPath $providerDesktopHelper -Algorithm SHA256).Hash.ToLowerInvariant()
+$voiceHelperDigest = (Get-FileHash -LiteralPath $voiceHelper -Algorithm SHA256).Hash.ToLowerInvariant()
 
 $runtimeExtract = Join-Path $output '.node-runtime'
 Assert-Child $output $runtimeExtract
@@ -199,6 +228,9 @@ Copy-Item -LiteralPath $rawHidHelper -Destination (Join-Path $rawHidDestination 
 $providerDesktopDestination = Join-Path $app 'dist\apps\windows-companion\provider-desktop'
 New-Item -ItemType Directory -Path $providerDesktopDestination | Out-Null
 Copy-Item -LiteralPath $providerDesktopHelper -Destination (Join-Path $providerDesktopDestination 'sxsy-b122-provider-desktop-helper.exe')
+$voiceDestination = Join-Path $app 'dist\apps\windows-companion\voice'
+New-Item -ItemType Directory -Path $voiceDestination | Out-Null
+Copy-Item -LiteralPath $voiceHelper -Destination (Join-Path $voiceDestination 'sxsy-b122-voice-helper.exe')
 Copy-Item -LiteralPath $node.FullName -Destination (Join-Path $runtime 'node.exe')
 Copy-Item -LiteralPath $nodeLicense.FullName -Destination (Join-Path $runtime 'NODE-LICENSE.txt')
 
@@ -231,7 +263,7 @@ foreach ($name in @(
   'Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1',
   'B122InstallTools.psm1','Invoke-B122Current.ps1','Install-B122.ps1','Update-B122.ps1','Rollback-B122.ps1','Uninstall-B122.ps1'
 )) { Copy-Item -LiteralPath (Join-Path $sourceScripts $name) -Destination $scripts }
-foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','New-B122ProviderDesktopPaths.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $sourceScripts $name) -Destination $provisioning }
+foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','New-B122ProviderDesktopPaths.ps1','Manage-B122VoiceRoute.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $sourceScripts $name) -Destination $provisioning }
 $documentationSource = [IO.Path]::GetFullPath((Join-Path $buildRoot 'docs')).TrimEnd('\')
 foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Recurse | Sort-Object FullName)) {
   $relativeDocument = $document.FullName.Substring($documentationSource.Length + 1)
@@ -252,6 +284,7 @@ if (Test-Path -LiteralPath (Join-Path $output '.helper-publish')) { Remove-Item 
 if (Test-Path -LiteralPath (Join-Path $output '.repository-runtime-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.repository-runtime-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.raw-hid-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.raw-hid-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.provider-desktop-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.provider-desktop-helper-publish') -Recurse -Force }
+if (Test-Path -LiteralPath (Join-Path $output '.voice-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.voice-helper-publish') -Recurse -Force }
 Set-Location -LiteralPath $output
 Remove-Item -LiteralPath $buildRoot -Recurse -Force
 
@@ -285,7 +318,7 @@ Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='S
 Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
 $verificationSkipped = [bool]$SkipVerification
 $evidenceEligible = -not $verificationSkipped
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; sourceAssembly='git-archive'; verificationSkipped=$verificationSkipped; evidenceEligible=$evidenceEligible; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; providerDesktopHelperSha256=$providerDesktopHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; sourceAssembly='git-archive'; verificationSkipped=$verificationSkipped; evidenceEligible=$evidenceEligible; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; firmwareVerificationReceipt=$(if ($SkipVerification) { $null } else { 'firmware-verification.json' }); sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; providerDesktopHelperSha256=$providerDesktopHelperDigest; voiceHelperSha256=$voiceHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output -AllowDevelopmentArtifact:$SkipVerification
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
