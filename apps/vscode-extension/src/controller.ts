@@ -2285,8 +2285,7 @@ function expectedLocalAction(command: ChordCommand): LocalHostAction | undefined
   const actions: Readonly<Record<string, LocalHostAction>> = {
     "HANDOFF:shift_alt": "toggle_handoff_routing",
     "FIND_BLOCKED_AGENT:shift": "show_blocker_queue", "FIND_FINISHED_AGENT:shift": "show_done_queue",
-    "CLAUDE:normal": "open_external_url", "CLAUDE:shift": "open_external_url", "CLAUDE:alt": "create_claude_terminal",
-    "CHATGPT:normal": "open_external_url", "CHATGPT:shift": "open_external_url", "CHATGPT:alt": "create_codex_terminal",
+    "CLAUDE:alt": "create_claude_terminal", "CHATGPT:alt": "create_codex_terminal",
     "VSCODE:normal": "focus_vscode", "VSCODE:shift": "new_vscode_window",
     "TERMINAL:normal": "focus_external_terminal", "TERMINAL:shift": "focus_integrated_terminal",
     "COMMIT:shift": "open_external_url",

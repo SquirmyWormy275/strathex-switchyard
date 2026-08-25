@@ -1055,12 +1055,20 @@ test("a disconnected or malicious companion cannot cause a host action", async (
 
   const vscode = new FakeVscode();
   const bridge = new FakeBridge();
+  const opened: string[] = [];
   bridge.nextDispatch = { status: "running", summary: "bad response", data: { hostActionId: `host-action:${"b".repeat(64)}`, hostActionKind: "create_codex_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
-  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), openExternal: async (url) => { opened.push(url); return true; } });
   await controller.start();
   await vscode.invoke("sxsy-b122.chord.claude.alt");
   assert.equal(vscode.createdTerminals.length, 0);
   assert.match(vscode.warnings.at(-1) ?? "", /malformed host-action/i);
+
+  bridge.nextDispatch = { status: "running", summary: "stale provider fallback", data: { hostActionId: `host-action:${"c".repeat(64)}`, hostActionKind: "open_external_url", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionUrl: "https://claude.example.invalid/" } };
+  await vscode.invoke("sxsy-b122.chord.claude.normal");
+  bridge.nextDispatch = { status: "running", summary: "stale provider fallback", data: { hostActionId: `host-action:${"d".repeat(64)}`, hostActionKind: "open_external_url", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionUrl: "https://chatgpt.example.invalid/" } };
+  await vscode.invoke("sxsy-b122.chord.chatgpt.shift");
+  assert.deepEqual(opened, []);
+  assert.match(vscode.warnings.at(-1) ?? "", /unexpected local host action/i);
 });
 
 test("public hardware dispatch traverses canonical prepare, authority, dispatch, and receipt completion without a client-selected chord", async () => {
