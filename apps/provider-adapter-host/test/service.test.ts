@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { canonicalWorkflowArtifact, planApprovalReviewScopeDigest } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
   ClaudeProviderAdapterBackend,
   CodexProviderAdapterBackend,
@@ -79,24 +80,46 @@ function automation(operationId = "operation-automation-1", snapshot = target) {
   };
 }
 
-function workflow(operationId = "operation-proof-1") {
+function existingPlan() {
   const planMaterial = {
     revision: "plan-1",
     originSessionId: "codex-session",
     taskId: "task-provider-host",
     objective: "Verify provider host",
-    steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/example.ts"], dependencies: [], status: "approved" }],
-    decisions: []
+    steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/example.ts"], dependencies: [] as string[], status: "approved" as const }],
+    decisions: [] as string[]
   };
-  const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+  return { digest: sha256(stableJson(planMaterial)), ...planMaterial };
+}
+
+function coordinatorEvidence() {
+  const plan = existingPlan();
   const evidenceMaterial = {
-    instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context", summary: "Instructions" }],
+    instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }],
     plan,
-    documentation: [{ id: "documentation", digest: "2".repeat(64), source: "repository", summary: "Documentation" }],
-    diff: { id: "diff", digest: "3".repeat(64), source: "target_snapshot", summary: "Diff" },
-    files: [{ id: "file", digest: "4".repeat(64), source: "repository", summary: "File" }],
-    tests: [{ id: "receipt", digest: "5".repeat(64), source: "receipt", summary: "Test", status: "passed" }]
+    documentation: [{ id: "documentation", digest: "2".repeat(64), source: "repository" as const, summary: "Documentation" }],
+    diff: { id: "diff", digest: "3".repeat(64), source: "target_snapshot" as const, summary: "Diff" },
+    files: [{ id: "file", digest: "4".repeat(64), source: "repository" as const, summary: "File" }],
+    tests: [{ id: "receipt", digest: "5".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }]
   };
+  return { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial };
+}
+
+function workflow(operationId = "operation-proof-1") {
+  const payload = {
+    kind: "proof" as const,
+    evidence: coordinatorEvidence(),
+    claims: ["The host returned exact evidence."],
+    requiredBackends: ["fixture"],
+    independentBackendRequired: false
+  };
+  const coordinatorContextDigest = "7".repeat(64);
+  const coordinatorContextRevision = 3;
+  const canonical = canonicalWorkflowArtifact({
+    id: "artifact-proof-1", action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: target,
+    sessionId: "codex-session", taskId: "task-provider-host", planRevision: "plan-1",
+    authorityId: "authority-provider-host", coordinatorContextDigest, coordinatorContextRevision, payload
+  });
   return {
     schema: "sxsy-b122.workflow-command",
     version: 1,
@@ -107,18 +130,79 @@ function workflow(operationId = "operation-proof-1") {
     session: automation(operationId).session,
     artifact: {
       id: "artifact-proof-1",
-      digest: "6".repeat(64),
+      digest: canonical.digest,
       taskId: "task-provider-host",
       planRevision: "plan-1",
-      payload: {
-        kind: "proof",
-        evidence: { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial },
-        claims: ["The host returned exact evidence."],
-        requiredBackends: ["fixture"],
-        independentBackendRequired: false
-      },
+      authorityId: "authority-provider-host",
+      coordinatorContextDigest,
+      coordinatorContextRevision,
+      payload,
       executionAuthorized: false
     }
+  };
+}
+
+function planApprovalWorkflow(operationId = "operation-plan-approval-1") {
+  const plan = existingPlan();
+  const authorityId = "authority-provider-host";
+  const coordinatorContextDigest = "7".repeat(64);
+  const coordinatorContextRevision = 3;
+  const providerContextDigest = "8".repeat(64);
+  const confirmationDigest = sha256("provider-host-current-user-confirmation");
+  const confirmationScopeDigest = planApprovalReviewScopeDigest({
+    sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo",
+    taskId: plan.taskId, planRevision: plan.revision, planDigest: plan.digest,
+    originSessionId: plan.originSessionId, providerContextDigest, sourceRevision: coordinatorContextRevision
+  });
+  const payload = {
+    kind: "plan" as const,
+    mode: "approve" as const,
+    plan,
+    executorSessionId: "codex-session",
+    authorityId,
+    confirmationDigest,
+    confirmationScopeDigest,
+    providerContextDigest,
+    executeOnce: true as const
+  };
+  const canonical = canonicalWorkflowArtifact({
+    id: "artifact-plan-approval-1", action: "plan_approval", repositoryRoot: "C:\\repo", targetSnapshotId: target,
+    sessionId: "codex-session", taskId: plan.taskId, planRevision: plan.revision, authorityId,
+    coordinatorContextDigest, coordinatorContextRevision, payload
+  });
+  return {
+    schema: "sxsy-b122.workflow-command",
+    version: 1,
+    action: "plan_approval",
+    operationId,
+    authorityId,
+    target: automation(operationId).target,
+    session: automation(operationId).session,
+    artifact: {
+      id: "artifact-plan-approval-1", digest: canonical.digest, taskId: plan.taskId, planRevision: plan.revision,
+      authorityId, coordinatorContextDigest, coordinatorContextRevision, payload, executionAuthorized: false
+    },
+    executionAuthorization: {
+      executionAuthorized: true, executeOnce: true, currentUserConfirmed: true,
+      confirmationDigest, confirmationScopeDigest, operationId,
+      artifactId: "artifact-plan-approval-1", artifactDigest: canonical.digest,
+      targetSnapshotId: target, sessionId: "codex-session", authorityId,
+      planDigest: plan.digest, planRevision: plan.revision, originSessionId: plan.originSessionId
+    }
+  };
+}
+
+function backendAutomationCommand(operationId: string) {
+  return {
+    kind: "automation" as const,
+    routeId: "automation.compound_capture",
+    operationId,
+    externalId: operationId,
+    action: "compound_capture",
+    repositoryRoot: "C:\\repo",
+    targetSnapshotId: target,
+    sessionId: "codex-session",
+    provider: "codex" as const
   };
 }
 
@@ -172,10 +256,17 @@ test("authenticated health, handshake, workflow, and automation routes use exact
   assert.equal((proof.body as { schema: string }).schema, "sxsy-b122.workflow-result");
   assert.equal((proof.body as { result: { kind: string } }).result.kind, "proof");
 
+  const approved = await service.handle(request("/v1/b122/command/plan_approval", planApprovalWorkflow()));
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  assert.deepEqual(
+    { kind: (approved.body as { result: { kind: string; mode: string } }).result.kind, mode: (approved.body as { result: { kind: string; mode: string } }).result.mode },
+    { kind: "plan", mode: "execution_ack" }
+  );
+
   const automated = await service.handle(request("/v1/b122/automation/compound_capture", automation()));
   assert.equal(automated.status, 200);
   assert.equal((automated.body as { schema: string }).schema, "sxsy-b122.remote-result");
-  assert.equal(codex.executeCalls, 2);
+  assert.equal(codex.executeCalls, 3);
 });
 
 test("authenticated graceful shutdown is fenced to the exact lifecycle nonce, process, and configuration", async (context) => {
@@ -226,6 +317,82 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
   }));
   assert.equal(blockedCouncil.status, 503);
   assert.deepEqual(source.councilPhases, []);
+});
+
+test("provider execution requires a fresh host-attested Mediated session before calling the module", async (context) => {
+  const controller = new AbortController();
+  const externalSource = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true });
+  const externalModule = {
+    provider: "codex",
+    handshake: externalSource.handshake.bind(externalSource), execute: externalSource.execute.bind(externalSource),
+    observeSession: externalSource.observeSession.bind(externalSource), observeWorkflowContext: externalSource.observeWorkflowContext.bind(externalSource),
+    observeOperation: externalSource.observeOperation.bind(externalSource), cancelOperation: externalSource.cancelOperation.bind(externalSource),
+    council: externalSource.council.bind(externalSource), observeCouncil: externalSource.observeCouncil.bind(externalSource),
+    shutdown: externalSource.shutdown.bind(externalSource)
+  } as ProviderRuntimePort;
+  const externalBackend = new CodexProviderAdapterBackend(externalModule, {
+    adapterId: "test.module.codex",
+    moduleSha256: "e".repeat(64)
+  });
+  await externalBackend.handshake(handshake(), controller.signal);
+  await assert.rejects(
+    externalBackend.execute(backendAutomationCommand("operation-external-module"), controller.signal),
+    /fresh, running, Controllable, and Mediated/
+  );
+  assert.equal(externalSource.executeCalls, 0);
+
+  for (const status of ["stale", "unreachable"] as const) {
+    await context.test(`rejects ${status}`, async () => {
+      const port = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true });
+      const backend = new CodexProviderAdapterBackend(port);
+      await backend.handshake(handshake(), controller.signal);
+      port.setSessionObservation("codex-session", { status });
+      await assert.rejects(
+        backend.execute(backendAutomationCommand(`operation-${status}`), controller.signal),
+        /fresh, running, Controllable, and Mediated/
+      );
+      assert.equal(port.executeCalls, 0);
+    });
+  }
+
+  for (const capabilities of [
+    ["observable", "controllable", "mediated"],
+    ["registered", "controllable", "mediated"],
+    ["registered", "observable", "mediated"],
+    ["registered", "observable", "controllable"]
+  ] as const) {
+    await context.test(`rejects capabilities ${capabilities.join(",")}`, async () => {
+      const port = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true });
+      const backend = new CodexProviderAdapterBackend(port);
+      await backend.handshake(handshake(), controller.signal);
+      port.setSessionObservation("codex-session", { capabilities });
+      await assert.rejects(
+        backend.execute(backendAutomationCommand(`operation-capability-${capabilities.length}-${capabilities[0]}`), controller.signal),
+        /fresh, running, Controllable, and Mediated/
+      );
+      assert.equal(port.executeCalls, 0);
+    });
+  }
+});
+
+test("provider execution rechecks the exact session after the module returns", async () => {
+  class PostExecutionStalePort extends FixtureProviderRuntimePort {
+    constructor() { super("codex", { effectfulTestOnly: true }); }
+    override async execute(request: Parameters<ProviderRuntimePort["execute"]>[0]) {
+      const response = await super.execute(request);
+      this.setSessionObservation(request.sessionId, { status: "stale" });
+      return response;
+    }
+  }
+  const controller = new AbortController();
+  const port = new PostExecutionStalePort();
+  const backend = new CodexProviderAdapterBackend(port);
+  await backend.handshake(handshake(), controller.signal);
+  await assert.rejects(
+    backend.execute(backendAutomationCommand("operation-post-execution-stale"), controller.signal),
+    /fresh, running, Controllable, and Mediated/
+  );
+  assert.equal(port.executeCalls, 1);
 });
 
 test("operation IDs are restart-durable, exact-request idempotent, and conflict-safe", async (context) => {

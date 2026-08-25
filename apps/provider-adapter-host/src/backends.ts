@@ -132,10 +132,14 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
   async execute(request: ProviderGatewayCommand, signal: AbortSignal): Promise<ProviderGatewayCommandResult> {
     this.exactProvider(request.provider);
     if (this.port.diagnosticOnly === true) throw new Error("The credential-free fixture is health/protocol diagnostic only.");
-    requireSessionBinding(await this.port.observeSession(sessionRequest(request), signal), sessionRequest(request));
+    const exactSession = sessionRequest(request);
+    const before = await this.port.observeSession(exactSession, signal);
+    requireExecutionSession(before, exactSession, this.mediationAttestedForTests, "before");
     const response = await this.port.execute(request, signal);
+    const after = await this.port.observeSession(exactSession, signal);
+    requireExecutionSession(after, exactSession, this.mediationAttestedForTests, "after");
+    if (before.adapterVersion !== after.adapterVersion) throw new Error("The provider adapter identity changed during execution.");
     validateCommandResponse(request, response);
-    requireSessionBinding(await this.port.observeSession(sessionRequest(request), signal), sessionRequest(request));
     return response;
   }
 
@@ -470,6 +474,20 @@ function requireCouncilSession(observed: ProviderRuntimeSessionObservation, requ
   const capabilities = truthfulCapabilities(observed.capabilities, true);
   if (observed.status !== "running" || !["registered", "observable", "controllable", "mediated"].every((capability) => capabilities.includes(capability as Capability))) {
     throw new Error(`The Council provider session is not fresh, running, Controllable, and Mediated ${when} acknowledgement.`);
+  }
+}
+
+function requireExecutionSession(
+  observed: ProviderRuntimeSessionObservation,
+  request: ProviderGatewaySessionObservationRequest,
+  mediationAttested: boolean,
+  when: "before" | "after"
+): void {
+  requireSessionBinding(observed, request);
+  const capabilities = truthfulCapabilities(observed.capabilities, mediationAttested);
+  if (observed.status !== "running" || !safeAdapterVersion(observed.adapterVersion)
+    || !["registered", "observable", "controllable", "mediated"].every((capability) => capabilities.includes(capability as Capability))) {
+    throw new Error(`Provider execution requires one fresh, running, Controllable, and Mediated exact session ${when} dispatch.`);
   }
 }
 
