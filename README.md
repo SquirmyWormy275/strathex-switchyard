@@ -13,8 +13,9 @@ mutually authenticated, single-instance Windows companion; the VS Code
 operator and provisioning surfaces; durable mediation, receipts, recovery,
 containment, and Council; host-attested repository recipes; DPAPI credential
 references; exact-route HTTPS; configured provider, GitHub/Git/CI and scanner
-adapters; the Windows Sandbox guest/helper boundary; and reproducible per-user
-release tooling. Source availability is **not** production, hardware, provider,
+adapters; the Windows Sandbox guest-worker/host-lifecycle boundary; an exhaustive
+hardware-independent 176-chord Raw-HID product simulator; and reproducible
+per-user release tooling. Source availability is **not** production, hardware, provider,
 or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
 
 The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
@@ -55,7 +56,10 @@ safe and available in the current context.
   TCP. Host-attested registries connect reviewed repository recipes, Windows
   Sandbox, credential references, exact-route HTTPS, provider handshakes,
   GitHub/Git, CI, scanner, and Council adapters when their required local
-  configuration and authorization are present.
+  configuration and authorization are present. Its separate Raw-HID simulator
+  exercises all 65 assigned and 111 deliberately unassigned chord combinations,
+  replay/epoch recovery, and corrupt framing without opening hardware or the
+  network.
 - `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It reads
   only the companion-created sealed endpoint record, may identify/focus
   approved local surfaces and route a canonical request, and does not use
@@ -120,6 +124,10 @@ unauthorized integrations fail closed. See
 QMK compilation is not part of the default suite because it needs the selected
 physical B122-compatible target and toolchain. See
 [firmware/qmk/README.md](firmware/qmk/README.md) before adapting the matrix.
+After `npm run build:companion`, run
+`node apps/windows-companion/dist/apps/windows-companion/src/raw-hid-simulator.js --self-test`
+for the hardware-independent exhaustive protocol receipt. That receipt is not
+physical-device, hot-plug, Vial, LED, or ergonomic acceptance evidence.
 
 ## Contributing
 
@@ -163,6 +171,7 @@ OpenAI, Anthropic, or any other referenced project or company.
 
 The audit is the current evidence boundary: it documents source-controlled
 mechanisms and isolated tests, including the configured provider/GitHub,
-credential-reference, Raw-HID-helper, and Windows Sandbox implementations. It
+credential-reference, Raw-HID helper/simulator, and Windows Sandbox guest-worker
+plus host-lifecycle implementations. It
 does not claim physical hardware, live external authorization, pipe-ACL or
 same-user adversarial acceptance, a signed release, or production readiness.

@@ -21,10 +21,11 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
   try {
     const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
     let id = 0;
+    let artifactId = 0;
     const service = new CompanionService({
       now: () => at,
       handoffs: new HandoffPackageStore(store, { clock: () => at, idFactory: () => "handoff-1" }),
-      workflowArtifacts: new WorkflowArtifactStore(store, { clock: () => at, idFactory: () => "artifact-1" }),
+      workflowArtifacts: new WorkflowArtifactStore(store, { clock: () => at, idFactory: () => `artifact-${++artifactId}` }),
       workflowCoordinator: {
         async prepare(request) {
           assert.equal(request.action, "handoff_queue");
@@ -67,6 +68,17 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
     assert.equal((switched.binding as { provider: string }).provider, "chatgpt");
     const current = await call("voice.current", undefined);
     assert.equal((current.binding as { provider: string }).provider, "chatgpt");
+    const voiceWorkflow = await call("workflow.prepare", { action: "bind_voice_session", sessionId: "coder", authorityId: "authority-1", intent: { kind: "none" } });
+    const voiceArtifact = voiceWorkflow.artifact as { action: string; sessionId: string; payload: { kind: string; voiceSessionId: string; consentId: string } };
+    assert.equal(voiceArtifact.action, "bind_voice_session");
+    assert.equal(voiceArtifact.sessionId, "coder");
+    assert.deepEqual(voiceArtifact.payload, {
+      kind: "voice_binding",
+      voiceSessionId: "voice-session-2",
+      provider: "generic",
+      contextPackageId: "handoff-1",
+      consentId: nextConsent.id
+    });
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

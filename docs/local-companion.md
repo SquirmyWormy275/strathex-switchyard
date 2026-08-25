@@ -20,9 +20,11 @@ node apps/windows-companion/dist/apps/windows-companion/src/main.js
 ```
 
 `npm run start:companion` is a source-development shortcut; release evidence
-uses the built and packed declared binary instead. The companion is deliberately
-not installed as a Scheduled Task or login item. Starting it is a user-local
-choice; the repository never changes startup settings silently.
+uses the built and packed declared binary instead. The reviewed per-user
+installer configures an explicit, rollback-safe `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`
+entry by default so the companion is available after sign-in; pass
+`-SkipAutostart` to opt out. It does not install a Scheduled Task or Windows
+service, and failed installation restores the prior Run entry.
 
 At first start, the companion creates host-owned state under
 `%LOCALAPPDATA%\STRATHEX\switchyard`:

@@ -30,7 +30,9 @@ command, repository string, or provider response is never authority.
   consent and one explicit managed-session binding; provider switches preserve
   canonical context, interruption cancels the in-flight turn, and missing or
   changed provider routes fail closed without a browser or cross-provider
-  fallback.
+  fallback. The VS Code surface is a native Voice Center rather than a provider
+  web page; repeated Normal presses toggle mute/resume and ending remains an
+  explicit reviewed Center action until physical long-press timing is accepted.
 - Retained redacted transcripts are not written to the append-only authority
   journal. Production uses independent AES-GCM entry keys wrapped by the
   CurrentUser protector. Expiry and explicit deletion destroy the entry keys
@@ -52,16 +54,20 @@ adversary acceptance are not claimed. `npm run start:companion` starts the
 DPAPI-protected local host; it does not invent a plaintext key or fall back to
 hash-chain-only persistence.
 
-The package command `sxsy-b122-companion` starts the authenticated named-pipe
-entry point with a durable reviewed-mutation queue. A bridge request still
+The package commands `sxsy-b122-companion` and
+`sxsy-b122-hid-simulator --self-test` respectively start the authenticated
+named-pipe entry point and exercise all 176 logical chord combinations without
+opening hardware or the network. The simulator is product protocol evidence,
+not physical keyboard acceptance. A bridge request still
 cannot invent a commit message or path set: the extension collects exact
 operator-reviewed input, and the companion binds it to the current target,
 authority, confirmation, and final effect guard.
 
-The npm workspace package is deliberately the JavaScript companion only. It
-does not contain the native Sandbox, repository-runtime, Raw-HID,
-provider-desktop, or voice helpers and is not eligible release evidence or a complete
-Windows installation. `deployment/windows/Build-B122Release.ps1` is the sole
+The npm workspace package is deliberately the JavaScript companion and its
+hardware-independent Raw-HID simulator only. It does not contain the native
+Sandbox guest worker or host lifecycle helper, repository-runtime, Raw-HID,
+provider-desktop, or voice helpers and is not eligible release evidence or a
+complete Windows installation. `deployment/windows/Build-B122Release.ps1` is the sole
 packager for the verified Windows bundle; that bundle builds or accepts
 digest-pinned native helpers, includes them beside the compiled companion, and
 validates their provenance and self-tests.

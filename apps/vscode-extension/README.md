@@ -25,8 +25,13 @@ Durable workflow provider results are validated against the exact prepared
 artifact ID, digest, and result kind before the extension renders bounded
 read-only Re-anchor, Proof, decision, plan, Handoff, focus, authority, or voice
 result details. A Quick Pick selection never approves or executes a returned
-option. Voice start and switch use the companion-owned native runtime and bind
-one exact matching VS Code managed session; they do not open provider web pages.
+option. Normal Voice opens the extension-owned native Voice Center; it can
+start/focus the current conversation, mute/resume it, switch the exact provider,
+bind one exact matching VS Code managed session, end it, or delete its retained
+transcript. A repeated Normal Voice press inside the bounded repeat window
+toggles mute/resume. Ending remains an explicit reviewed Voice Center choice
+until physical long-press timing is accepted. Voice start and switch use the
+companion-owned native runtime and never open provider web pages.
 
 There is intentionally no Configure Local Companion command. The
 extension reads only the companion-created canonical endpoint record under the

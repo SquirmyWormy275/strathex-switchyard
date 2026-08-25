@@ -1198,6 +1198,7 @@ export class ManagedSessionController {
       await this.vscode.window.showWarningMessage("SXSY-B122 stopped because the selected session is not bound to a current exact target. Connect its provider adapter first.");
       return false;
     }
+    if (action === "bind_voice_session" && !await this.bindVoiceToExactWorkflowSession(session)) return false;
     const listed = await this.bridge.listWorkflows();
     if (!listed.ok) {
       await this.vscode.window.showWarningMessage(`SXSY-B122 workflow registry unavailable: ${listed.message}`);
@@ -1576,6 +1577,45 @@ export class ManagedSessionController {
     return `Bound voice ${bound.value.id} to the single exact managed session ${session.id}.`;
   }
 
+  /** Alt Voice binds the already-selected focused agent before its protected workflow artifact is prepared. */
+  private async bindVoiceToExactWorkflowSession(session: ExtensionManagedSession): Promise<boolean> {
+    if ((session.provider !== "claude" && session.provider !== "codex")
+      || (session.surface !== "vscode_terminal" && session.surface !== "vscode_window")
+      || session.status === "stale" || session.status === "unreachable" || session.status === "unknown") {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Alt Voice requires the currently focused, reachable managed Claude or Codex VS Code session.");
+      return false;
+    }
+    const current = await this.bridge.currentVoice();
+    if (!current.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 could not read the protected voice binding: ${current.message}`);
+      return false;
+    }
+    if (!current.value || current.value.status === "ended") {
+      await this.vscode.window.showWarningMessage("SXSY-B122 Alt Voice requires one current durable voice conversation.");
+      return false;
+    }
+    if (!samePath(current.value.repositoryRoot, session.workspaceRoot!) || current.value.targetSnapshotId !== session.targetSnapshotId) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 stopped because the focused managed session does not match the voice conversation's exact repository and TargetSnapshot.");
+      return false;
+    }
+    let binding = current.value;
+    if (binding.managedSessionId !== session.id) {
+      const bound = await this.bridge.bindVoice(binding.id, session.id);
+      if (!bound.ok) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 could not bind voice to the focused managed session: ${bound.message}`);
+        return false;
+      }
+      binding = bound.value;
+    }
+    if (binding.id !== current.value.id || binding.managedSessionId !== session.id
+      || binding.status === "ended" || !samePath(binding.repositoryRoot, session.workspaceRoot!)
+      || binding.targetSnapshotId !== session.targetSnapshotId) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected a voice binding that changed its exact conversation, managed session, repository, target, or lifecycle state.");
+      return false;
+    }
+    return true;
+  }
+
   private async pickVoiceProvider(exclude?: ExtensionVoiceProvider): Promise<ExtensionVoiceProvider | undefined> {
     const providers = (["chatgpt", "claude"] as const).filter((provider) => provider !== exclude);
     return this.vscode.window.showQuickPick(providers, { placeHolder: "Choose the reviewed voice provider" });
@@ -1882,6 +1922,15 @@ export class ManagedSessionController {
   }
 
   private async resolveDispatchSession(command: ChordCommand): Promise<string | null | undefined> {
+    if (command.control === "VOICE" && command.modifier === "alt") {
+      const active = this.activeSessionId();
+      const session = active ? this.sessions.get(active) : undefined;
+      return session?.workspaceRoot && session.targetSnapshotId
+        && (session.provider === "claude" || session.provider === "codex")
+        && (session.surface === "vscode_terminal" || session.surface === "vscode_window")
+        ? session.id
+        : null;
+    }
     if (!requiresExactTarget(command)) return this.activeSessionId();
     const candidates = [...this.sessions.values()].filter((session) => session.metadata["sxsy-b122.kind"] === "git-root" && !!session.workspaceRoot);
     if (candidates.length === 0) return this.activeSessionId();
