@@ -16,7 +16,7 @@ if (receiptArgument >= 0 && (!receiptPath || receiptPath.startsWith("--"))) thro
 if (compilerArgument >= 0 && (!explicitCompiler || explicitCompiler.startsWith("--"))) throw new Error("--c-compiler requires one exact executable path.");
 const checks = [
   ["manifest generation", process.execPath, ["packages/protocol/scripts/generate-manifest.mjs"]],
-  ["TypeScript protocol simulator", process.execPath, ["--experimental-transform-types", "--test", "packages/protocol/test/b122.test.ts", "packages/protocol/test/raw-hid.test.ts", "apps/windows-companion/test/raw-hid-protocol.test.ts"]],
+  ["TypeScript protocol simulator", process.execPath, ["--experimental-transform-types", "--test", "packages/protocol/test/b122.test.ts", "packages/protocol/test/raw-hid.test.ts", "apps/windows-companion/test/raw-hid-protocol.test.ts", "apps/windows-companion/test/raw-hid-simulator.test.ts"]],
 ];
 for (const [label, command, args] of checks) {
   const result = spawnSync(command, args, { cwd: root, encoding: "utf8", stdio: "pipe" });

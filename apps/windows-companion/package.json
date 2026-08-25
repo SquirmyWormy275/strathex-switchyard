@@ -5,7 +5,10 @@
   "version": "0.2.0",
   "description": "JavaScript SXSY-B122 companion control plane; native Windows helpers ship only in the verified Windows bundle.",
   "type": "module",
-  "bin": { "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js" },
+  "bin": {
+    "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js",
+    "sxsy-b122-hid-simulator": "dist/apps/windows-companion/src/raw-hid-simulator.js"
+  },
   "files": ["dist/apps", "dist/packages", "README.md", "package.json"],
   "b122Distribution": {
     "scope": "javascript-companion-only",
