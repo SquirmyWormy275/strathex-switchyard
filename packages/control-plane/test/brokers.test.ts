@@ -130,7 +130,7 @@ test("Git broker refuses force semantics and containment fences every Git mutati
 test("credential, network, and test-environment brokers deny unsafe access without exposing secret material", async () => {
   const pipeline = permitted("pipeline_local_gate");
   const containment = new InMemoryContainmentManager();
-  const credentials = new InMemoryCredentialBroker(pipeline.policy, containment);
+  const credentials = new InMemoryCredentialBroker(pipeline.policy, containment, () => new Date(now));
   credentials.register({ id: "ci-token", repositoryRoot: target.repositoryRoot, actions: ["pipeline_local_gate"], scopes: ["read:checks"], expiresAt: "2026-08-24T12:00:00.000Z", material: "never-return-this" });
   const lease = await credentials.acquire({ ...pipeline.invocation, scope: "read:checks" });
   assert.equal(lease.status, "completed");

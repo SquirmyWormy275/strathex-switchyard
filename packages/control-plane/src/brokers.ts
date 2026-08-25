@@ -297,10 +297,12 @@ export class InMemoryCredentialBroker {
   private readonly credentials = new Map<string, CredentialRegistration>();
   private readonly policy: PermitVerifier;
   private readonly containment?: ContainmentGuard;
+  private readonly now: () => Date;
 
-  constructor(policy: PermitVerifier, containment?: ContainmentGuard) {
+  constructor(policy: PermitVerifier, containment?: ContainmentGuard, now: () => Date = () => new Date()) {
     this.policy = policy;
     this.containment = containment;
+    this.now = now;
   }
 
   register(credential: CredentialRegistration): void {
@@ -316,7 +318,7 @@ export class InMemoryCredentialBroker {
       candidate.repositoryRoot === request.target.repositoryRoot
       && candidate.actions.includes(request.action)
       && candidate.scopes.includes(request.scope)
-      && new Date(candidate.expiresAt).getTime() > Date.now());
+      && new Date(candidate.expiresAt).getTime() > this.now().getTime());
     if (!credential) return { status: "unavailable", summary: "No current credential is scoped to this repository, action, and requested capability.", effectDisposition: "not_started" };
     const lease: CredentialLease = {
       id: randomUUID(),
