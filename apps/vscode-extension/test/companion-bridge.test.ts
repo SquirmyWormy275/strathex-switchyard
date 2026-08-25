@@ -61,6 +61,46 @@ test("the VS Code JSON-lines client sends bounded companion methods and preserve
   assert.equal(seen.every((entry) => entry.id.startsWith("isolated-vscode-")), true);
 });
 
+test("credential IPC carries exact scope triples and rejects a broadened durable receipt", async () => {
+  const scopes = [
+    { repositoryRoot: "C:/isolated/repo", adapterId: "configured-network", purpose: "provider-api" },
+    { repositoryRoot: "C:/isolated/repo", adapterId: "council-resource-host", purpose: "council-session" }
+  ] as const;
+  const seen: unknown[] = [];
+  let broaden = false;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      assert.equal(request.method, "credential.provision");
+      seen.push(request.payload);
+      return JSON.stringify({
+        version: 1,
+        id: request.id,
+        ok: true,
+        result: {
+          credential: {
+            reference: "provider-read",
+            protectorProvider: "windows-dpapi-current-user",
+            generation: 1,
+            createdAt: "2026-08-25T00:00:00.000Z",
+            updatedAt: "2026-08-25T00:00:00.000Z",
+            scopes: broaden ? [...scopes, { repositoryRoot: "C:/other/repo", adapterId: "configured-network", purpose: "provider-api" }] : scopes
+          }
+        }
+      });
+    }
+  }, "credential-vscode");
+  const input = { reference: "provider-read", scopes, sealedSecret: "dpapi-current-user-envelope" } as const;
+  const accepted = await bridge.provisionCredential(input);
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(seen[0], input);
+  assert.equal(JSON.stringify(seen[0]).includes("cleartext"), false);
+  broaden = true;
+  const rejected = await bridge.provisionCredential(input);
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
+});
+
 test("malformed or mismatched local-companion replies fail closed in the extension bridge", async () => {
   const malformed = new JsonLineCompanionBridge({ request: async () => "not json" });
   const malformedResult = await malformed.dispatch({ control: "RUN", modifier: "normal" });

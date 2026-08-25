@@ -118,7 +118,8 @@ export interface SandboxInstallationPin {
   readonly status: "active" | "revoked";
 }
 
-export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string }[]; readonly revokedAt?: string; }
+export interface CredentialProvisionScope { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string; }
+export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly CredentialProvisionScope[]; readonly revokedAt?: string; readonly revocationReason?: string; }
 export interface InstalledNetworkPolicy { readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
 export interface AcceptanceTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedGates: readonly number[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
 export interface AcceptanceEvidenceSummary { readonly id: string; readonly gate: number; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly targetSnapshotId?: string; readonly operationId?: string; readonly evidenceDigest: string; readonly policyVersion: string; readonly evaluatedBy: string; readonly evaluatedAt: string; readonly expiresAt?: string; readonly rationale: string; readonly invalidatedAt?: string; readonly invalidatedReason?: string; }
@@ -188,7 +189,7 @@ export interface ExtensionCompanionBridge {
   installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>>;
   listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>>;
   revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>>;
-  provisionCredential(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>>;
+  provisionCredential(input: Readonly<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>>;
   listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>>;
   revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>>;
   installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
@@ -361,8 +362,19 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return result.ok ? { ok: true, value: result.value.installation } : result;
   }
 
-  async provisionCredential(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>> { const result = await this.call<{ credential: CredentialReferenceSummary }>("credential.provision", input); return result.ok ? { ok: true, value: result.value.credential } : result; }
-  async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { const result = await this.call<{ credentials: readonly CredentialReferenceSummary[] }>("credential.list", undefined); return result.ok ? { ok: true, value: result.value.credentials } : result; }
+  async provisionCredential(input: Readonly<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>> {
+    const result = await this.call<unknown>("credential.provision", input);
+    if (!result.ok) return result;
+    const credential = isRecord(result.value) && exactKeys(result.value, ["credential"]) ? result.value.credential : undefined;
+    if (!isCredentialReferenceSummary(credential) || credential.reference !== input.reference || !sameCredentialScopes(credential.scopes, input.scopes)) return invalidResponse();
+    return { ok: true, value: credential };
+  }
+  async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> {
+    const result = await this.call<unknown>("credential.list", undefined);
+    if (!result.ok) return result;
+    const credentials = isRecord(result.value) && exactKeys(result.value, ["credentials"]) ? result.value.credentials : undefined;
+    return Array.isArray(credentials) && credentials.length <= 1_024 && credentials.every(isCredentialReferenceSummary) ? { ok: true, value: credentials } : invalidResponse();
+  }
   async revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>> { const result = await this.call<{ revoked: boolean }>("credential.revoke", { reference, reason }); return result.ok ? { ok: true, value: result.value.revoked } : result; }
   async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
   async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
@@ -876,6 +888,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidResponse<T>(): BridgeResult<T> {
   return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict SXSY-B122 schema." };
+}
+
+function isCredentialReferenceSummary(value: unknown): value is CredentialReferenceSummary {
+  if (!isRecord(value) || !allowedExactKeys(value, ["reference", "protectorProvider", "generation", "createdAt", "updatedAt", "scopes"], ["revokedAt", "revocationReason"])
+    || !credentialIdentifier(value.reference) || !reference(value.protectorProvider)
+    || !Number.isSafeInteger(value.generation) || (value.generation as number) < 1
+    || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 64 || !value.scopes.every(isCredentialScope)
+    || (value.revokedAt !== undefined && !timeText(value.revokedAt))
+    || (value.revocationReason !== undefined && !contentText(value.revocationReason, 256))
+    || (value.revokedAt === undefined) !== (value.revocationReason === undefined)) return false;
+  const identities = (value.scopes as CredentialProvisionScope[]).map(credentialScopeIdentity);
+  return new Set(identities).size === identities.length;
+}
+
+function isCredentialScope(value: unknown): value is CredentialProvisionScope {
+  return isRecord(value) && exactKeys(value, ["repositoryRoot", "adapterId", "purpose"])
+    && pathText(value.repositoryRoot) && credentialIdentifier(value.adapterId) && credentialIdentifier(value.purpose);
+}
+
+function sameCredentialScopes(left: readonly CredentialProvisionScope[], right: readonly CredentialProvisionScope[]): boolean {
+  return left.length === right.length && left.every((scope, index) => credentialScopeIdentity(scope) === credentialScopeIdentity(right[index]!));
+}
+
+function credentialScopeIdentity(scope: CredentialProvisionScope): string {
+  return `${scope.repositoryRoot.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase()}\0${scope.adapterId}\0${scope.purpose}`;
+}
+
+function credentialIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
 }
 
 function isExtensionManagedSession(value: unknown): value is ExtensionManagedSession {

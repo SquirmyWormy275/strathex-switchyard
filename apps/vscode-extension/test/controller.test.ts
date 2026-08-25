@@ -18,6 +18,7 @@ import {
   type ReviewedGitMutation,
   type RepositoryRuntimePin,
   type SandboxInstallationPin,
+  type CredentialProvisionScope,
   type CredentialReferenceSummary,
   type InstalledNetworkPolicy,
   type AcceptanceTrustSummary,
@@ -227,6 +228,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly scannerFixtureInstallRequests: string[] = [];
   readonly providerInstallRequests: ProviderDesktopId[] = [];
   readonly providerRevokeRequests: ProviderDesktopId[] = [];
+  readonly credentialProvisionRequests: Array<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }> = [];
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
   readonly voiceBindingSequence: string[] = [];
@@ -303,7 +305,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   async revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>> {
     return { ok: true, value: { canonicalRepositoryRoot: repositoryRoot, catalogPath: "C:\\repo\\sandbox.json", catalogSha256: "a".repeat(64), helperPath: "C:\\host\\b122-sandbox-worker.exe", helperSha256: "b".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } };
   }
-  async provisionCredential(input: { reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }): Promise<BridgeResult<CredentialReferenceSummary>> { return { ok: true, value: { reference: input.reference, protectorProvider: "fake", generation: 1, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", scopes: input.purposes.map((purpose) => ({ repositoryRoot: input.repositoryRoot, adapterId: "configured-network", purpose })) } }; }
+  async provisionCredential(input: { reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }): Promise<BridgeResult<CredentialReferenceSummary>> { this.credentialProvisionRequests.push(input); return { ok: true, value: { reference: input.reference, protectorProvider: "fake", generation: 1, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", scopes: input.scopes } }; }
   async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { return { ok: true, value: [] }; }
   async revokeCredential(): Promise<BridgeResult<boolean>> { return { ok: true, value: true }; }
   async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: sourcePath, sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" } }; }
@@ -427,6 +429,37 @@ test("registers VS Code window, workspace, terminals, and debug configurations w
   assert.equal(bridge.adopted[0].provider, "claude");
   await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Manual terminal", provider: "codex" });
   assert.match(vscode.warnings.at(-1) ?? "", /already been adopted/i);
+});
+
+test("credential provisioning sends only operator-entered exact adapter/purpose triples for the selected repository", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  let openedSecret = "";
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/credential-scope" }],
+    sealSecret: async (cleartext) => { openedSecret = Buffer.from(cleartext).toString("utf8"); return "dpapi-current-user-envelope"; }
+  });
+  await controller.start();
+  vscode.input("provider-read");
+  vscode.input("configured-network/provider-api,council-resource-host/council-session");
+  vscode.input("cleartext-never-forwarded");
+  await vscode.invoke("sxsy-b122.provisionCredential");
+
+  assert.equal(openedSecret, "cleartext-never-forwarded");
+  assert.deepEqual(bridge.credentialProvisionRequests, [{
+    reference: "provider-read",
+    scopes: [
+      { repositoryRoot: "C:\\repo", adapterId: "configured-network", purpose: "provider-api" },
+      { repositoryRoot: "C:\\repo", adapterId: "council-resource-host", purpose: "council-session" }
+    ],
+    sealedSecret: "dpapi-current-user-envelope"
+  }]);
+  assert.equal(JSON.stringify(bridge.credentialProvisionRequests).includes("cleartext-never-forwarded"), false);
+  assert.match(vscode.inputPrompts[1]!, /C:\\repo/);
+  assert.match(vscode.information.at(-1) ?? "", /configured-network\/provider-api/);
+  assert.match(vscode.information.at(-1) ?? "", /council-resource-host\/council-session/);
+  controller.stop();
 });
 
 test("tracks terminal, workspace, and debug lifecycle events as identities rather than inferred agent completion", async () => {

@@ -5,7 +5,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import type { JournalEntry, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
 import { loadConfiguredNetworkPolicy } from "./configured-network.ts";
-import type { CredentialReferenceSummary, DurableCredentialReferenceVault } from "./durable-credentials.ts";
+import type { CredentialReferenceSummary, CredentialScope, DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
@@ -14,9 +14,16 @@ const networkRevokeKind = "b122.network-policy.revoke.v1";
 const maximumPolicyBytes = 1024 * 1024;
 
 export interface CredentialProvisioningCoordinator {
-  provision(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<CredentialReferenceSummary>;
+  provision(input: CredentialProvisioningRequest): Promise<CredentialReferenceSummary>;
   list(): Promise<readonly CredentialReferenceSummary[]>;
   revoke(reference: string, reason: string): Promise<boolean>;
+}
+
+export interface CredentialProvisioningRequest {
+  readonly reference: string;
+  readonly scopes: readonly CredentialScope[];
+  readonly sealedSecret: string;
+  readonly replaceExisting?: boolean;
 }
 
 export class AttestedCredentialProvisioningCoordinator implements CredentialProvisioningCoordinator {
@@ -29,16 +36,17 @@ export class AttestedCredentialProvisioningCoordinator implements CredentialProv
     presence: WindowsUserPresenceRunner
   ) { this.vault = vault; this.protector = protector; this.presence = presence; }
 
-  async provision(input: Readonly<{ reference: string; repositoryRoot: string; purposes: readonly string[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<CredentialReferenceSummary> {
-    if (!identifier(input.reference) || !boundedAbsolute(input.repositoryRoot) || !Array.isArray(input.purposes) || input.purposes.length < 1 || input.purposes.length > 16 || input.purposes.some((purpose) => !identifier(purpose)) || typeof input.sealedSecret !== "string" || !input.sealedSecret || input.sealedSecret.length > 256 * 1024) throw new Error("Credential provisioning fields are invalid.");
-    const approved = await this.presence.verify("Approve this DPAPI-sealed credential reference for the exact selected Git root and listed network purposes.");
+  async provision(input: CredentialProvisioningRequest): Promise<CredentialReferenceSummary> {
+    if (!record(input) || !allowedCredentialProvisionKeys(input) || !identifier(input.reference) || typeof input.sealedSecret !== "string" || !input.sealedSecret || input.sealedSecret.length > 256 * 1024 || (input.replaceExisting !== undefined && typeof input.replaceExisting !== "boolean")) throw new Error("Credential provisioning fields are invalid.");
+    const scopes = exactCredentialScopes(input.scopes);
+    const approved = await this.presence.verify(credentialPresencePrompt(input.reference, scopes, input.replaceExisting === true));
     if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve credential provisioning.");
     let cleartext: Uint8Array | undefined;
     try {
       cleartext = new Uint8Array(await this.protector.open(input.sealedSecret));
       return await this.vault.provision({
         reference: input.reference,
-        scopes: [...new Set(input.purposes)].map((purpose) => ({ repositoryRoot: input.repositoryRoot, adapterId: "configured-network", purpose })),
+        scopes,
         ...(input.replaceExisting ? { replaceExisting: true } : {})
       }, cleartext);
     } finally { cleartext?.fill(0); }
@@ -136,6 +144,42 @@ export class AttestedNetworkPolicyCoordinator implements NetworkPolicyCoordinato
 interface NetworkInstallPayload extends Record<string, JsonValue> { readonly filePath: string; readonly sha256: string; readonly attestedAt: string; }
 function parseInstall(value: JsonValue): NetworkInstallPayload { if (!record(value) || typeof value.filePath !== "string" || typeof value.sha256 !== "string" || typeof value.attestedAt !== "string" || !/^[a-f0-9]{64}$/i.test(value.sha256)) throw new Error("The protected network policy journal is malformed."); return value as unknown as NetworkInstallPayload; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
-function identifier(value: string): boolean { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
-function boundedAbsolute(value: string): boolean { return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value) && isAbsolute(value); }
+function identifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
+function boundedAbsolute(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value) && isAbsolute(value); }
 function digest(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
+
+function exactCredentialScopes(value: readonly CredentialScope[]): readonly CredentialScope[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 16) throw new Error("Credential provisioning requires 1-16 explicit scope triples.");
+  const scopes = value.map((scope) => {
+    if (!record(scope) || Object.keys(scope).length !== 3 || !["repositoryRoot", "adapterId", "purpose"].every((key) => key in scope)
+      || !boundedAbsolute(scope.repositoryRoot) || !identifier(scope.adapterId) || !identifier(scope.purpose)) throw new Error("Credential provisioning scope triples are invalid.");
+    return {
+      repositoryRoot: canonicalCredentialRoot(scope.repositoryRoot),
+      adapterId: scope.adapterId,
+      purpose: scope.purpose
+    };
+  });
+  const identities = scopes.map((scope) => `${scope.repositoryRoot}\0${scope.adapterId}\0${scope.purpose}`);
+  if (new Set(identities).size !== identities.length) throw new Error("Credential provisioning scope triples must be unique.");
+  return scopes;
+}
+
+function credentialPresencePrompt(reference: string, scopes: readonly CredentialScope[], replacing: boolean): string {
+  const grouped = new Map<string, string[]>();
+  for (const scope of scopes) grouped.set(scope.repositoryRoot, [...(grouped.get(scope.repositoryRoot) ?? []), `${scope.adapterId}/${scope.purpose}`]);
+  const exactScopes = [...grouped].map(([repositoryRoot, pairs]) => `${JSON.stringify(repositoryRoot)}=>${pairs.join(",")}`).join("; ");
+  const prompt = `${replacing ? "Rotate" : "Provision"} B122 credential ${reference} for ${exactScopes}`;
+  if (prompt.length > 240) throw new Error("The exact credential scope set is too large for the trusted presence prompt.");
+  return prompt;
+}
+
+function canonicalCredentialRoot(value: string): string {
+  const normalized = resolve(value).replaceAll("\\", "/").replace(/\/+$/, "");
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function allowedCredentialProvisionKeys(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value);
+  return ["reference", "scopes", "sealedSecret"].every((key) => key in value)
+    && keys.every((key) => key === "reference" || key === "scopes" || key === "sealedSecret" || key === "replaceExisting");
+}

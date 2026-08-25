@@ -735,7 +735,8 @@ export class CompanionService {
   private async provisionCredential(payload: CredentialProvisionPayload) {
     if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
     const credential = await this.credentialProvisioning.provision(payload);
-    this.record("credential.provision", "completed", "Provisioned one DPAPI-sealed, repository-and-purpose-scoped credential reference.");
+    const exactScopes = credential.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ");
+    this.record("credential.provision", "completed", `Provisioned one DPAPI-sealed credential reference for exact scopes: ${exactScopes}.`);
     return credential;
   }
 
@@ -803,9 +804,22 @@ export class CompanionService {
   }
 
   private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
-    if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "repositoryRoot", "purposes", "sealedSecret"], ["replaceExisting"])
-      || typeof payload.reference !== "string" || !boundedHostPath(payload.repositoryRoot) || !Array.isArray(payload.purposes) || !payload.purposes.every((value) => typeof value === "string") || typeof payload.sealedSecret !== "string" || (payload.replaceExisting !== undefined && typeof payload.replaceExisting !== "boolean")) throw new CompanionServiceError("invalid_request", "Credential provisioning requires only a reference, exact repository, bounded purposes, and a DPAPI-sealed secret.");
-    return { reference: payload.reference, repositoryRoot: payload.repositoryRoot, purposes: payload.purposes as string[], sealedSecret: payload.sealedSecret, ...(payload.replaceExisting === true ? { replaceExisting: true } : {}) };
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "scopes", "sealedSecret"], ["replaceExisting"])
+      || !credentialIdentifier(payload.reference) || !Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 16
+      || typeof payload.sealedSecret !== "string" || !payload.sealedSecret || payload.sealedSecret.length > 256 * 1024
+      || (payload.replaceExisting !== undefined && typeof payload.replaceExisting !== "boolean")) {
+      throw new CompanionServiceError("invalid_request", "Credential provisioning requires only a bounded reference, 1-16 exact repository/adapter/purpose scope triples, and a DPAPI-sealed secret.");
+    }
+    const scopes = payload.scopes.map((scope) => {
+      if (!isRecord(scope) || !exactKeys(scope, ["repositoryRoot", "adapterId", "purpose"])
+        || !boundedHostPath(scope.repositoryRoot) || !credentialIdentifier(scope.adapterId) || !credentialIdentifier(scope.purpose)) {
+        throw new CompanionServiceError("invalid_request", "Each credential scope must be one exact repositoryRoot, adapterId, and purpose triple.");
+      }
+      return { repositoryRoot: scope.repositoryRoot, adapterId: scope.adapterId, purpose: scope.purpose };
+    });
+    const identities = scopes.map((scope) => `${normalizeHostPath(scope.repositoryRoot)}\0${scope.adapterId}\0${scope.purpose}`);
+    if (new Set(identities).size !== identities.length) throw new CompanionServiceError("invalid_request", "Credential scope triples must be unique.");
+    return { reference: payload.reference, scopes, sealedSecret: payload.sealedSecret, ...(payload.replaceExisting === true ? { replaceExisting: true } : {}) };
   }
 
   private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
@@ -1362,6 +1376,10 @@ function requireEmptyPayload(payload: unknown, label: string): void {
 function boundedHostPath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value)
     && (isAbsolute(value) || /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value));
+}
+
+function credentialIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
 }
 
 function parseHardwareBinding(value: Record<string, unknown>): HardwareSignalClaimBinding {

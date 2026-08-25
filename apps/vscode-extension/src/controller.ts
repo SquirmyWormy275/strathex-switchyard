@@ -17,6 +17,7 @@ import {
   type ExtensionWorkflowProviderResult,
   type ExtensionVoiceBinding,
   type ExtensionVoiceProvider,
+  type CredentialProvisionScope,
   type HardwareSignalClaim,
   type ForwardedCommand,
   type ForwardedCommandResult,
@@ -591,17 +592,22 @@ export class ManagedSessionController {
     const input = this.vscode.window.showInputBox;
     if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed Windows DPAPI host."); return; }
     const reference = await input({ prompt: "Credential reference name", value: "github-token", validateInput: (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? undefined : "Use a bounded reference name." });
-    const purposesText = reference ? await input({ prompt: "Exact allowed purposes (comma-separated)", value: "github-api", validateInput: (value) => splitIdentifiers(value).length ? undefined : "Enter at least one bounded purpose." }) : undefined;
-    const secretText = purposesText ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
-    if (!reference || !purposesText || !secretText) return;
+    const scopesText = reference ? await input({
+      prompt: `Exact adapter/purpose scopes for ${root.gitRoot} (comma-separated)`,
+      value: "configured-network/provider-api",
+      validateInput: (value) => parseCredentialScopePairs(value, root.gitRoot) ? undefined : "Enter 1-16 unique adapterId/purpose pairs."
+    }) : undefined;
+    const scopes = scopesText ? parseCredentialScopePairs(scopesText, root.gitRoot) : undefined;
+    const secretText = scopes ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
+    if (!reference || !scopes || !secretText) return;
     const bytes = Buffer.from(secretText, "utf8");
     let sealedSecret: string;
     try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with Windows DPAPI; nothing was sent."); return; } finally { bytes.fill(0); }
     const existing = await this.bridge.listCredentials();
     const replaceExisting = existing.ok && existing.value.some((item) => item.reference === reference && !item.revokedAt);
-    const result = await this.bridge.provisionCredential({ reference, repositoryRoot: root.gitRoot, purposes: splitIdentifiers(purposesText), sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
+    const result = await this.bridge.provisionCredential({ reference, scopes, sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
     if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not provisioned: ${result.message}`);
-    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for the selected root.`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
   }
 
   private async listCredentials(): Promise<void> {
@@ -2333,8 +2339,21 @@ function splitReviewedPaths(value: string): readonly string[] {
   return [...new Set(value.split(",").map((path) => path.trim().replaceAll("\\", "/")).filter(Boolean))];
 }
 
-function splitIdentifiers(value: string): readonly string[] {
-  return [...new Set(value.split(",").map((item) => item.trim()).filter((item) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(item)))];
+function parseCredentialScopePairs(value: string, repositoryRoot: string): readonly CredentialProvisionScope[] | undefined {
+  const pairs = value.split(",").map((item) => item.trim()).filter(Boolean);
+  if (pairs.length < 1 || pairs.length > 16) return undefined;
+  const identifier = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  const scopes: CredentialProvisionScope[] = [];
+  for (const pair of pairs) {
+    const separator = pair.indexOf("/");
+    if (separator < 1 || separator !== pair.lastIndexOf("/")) return undefined;
+    const adapterId = pair.slice(0, separator);
+    const purpose = pair.slice(separator + 1);
+    if (!identifier.test(adapterId) || !identifier.test(purpose)) return undefined;
+    scopes.push({ repositoryRoot, adapterId, purpose });
+  }
+  const identities = scopes.map((scope) => `${normalizePath(scope.repositoryRoot)}\0${scope.adapterId}\0${scope.purpose}`);
+  return new Set(identities).size === identities.length ? scopes : undefined;
 }
 
 function normalizePath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
