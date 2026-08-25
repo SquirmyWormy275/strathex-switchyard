@@ -44,6 +44,7 @@ test("GitHub host action derives only a trusted canonical URL and is durably ide
   assert.equal(first.data?.hostActionUrl, "https://github.com/acme/switchyard/pull/23");
   assert.equal((await queue.listPending()).length, 1);
   const authorization = await queue.authorize({ hostActionId: String(first.data?.hostActionId), adapterVersion: "isolated-extension-1" });
+  assert.equal(authorization.url, "https://github.com/acme/switchyard/pull/23", "final authorization must rebind the exact durable URL");
   const completion = await queue.settle({ hostActionId: String(first.data?.hostActionId), succeeded: true, summary: "Opened the exact reviewed host destination.", adapterVersion: "isolated-extension-1", authorizationToken: authorization.authorizationToken });
   assert.equal("evidenceDigest" in completion, false, "host UI acknowledgement must not mint gate-bearing receipt evidence");
   assert.equal("toolVersions" in completion, false, "only typed runtime/scanner issuers may supply receipt tool evidence");

@@ -156,7 +156,11 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       adapterVersion,
       authorizedAt: now.toISOString(),
       expiresAt: new Date(Math.min(Date.parse(intent.expiresAt), now.getTime() + this.authorizationLifetimeMs)).toISOString(),
-      ...(selected ? { selectionId: selected.id, url: selected.url } : {})
+      ...(selected
+        ? { selectionId: selected.id, url: selected.url }
+        : intent.hostAction === "open_external_url"
+          ? { url: exactAuthorizedUrl(intent.url) }
+          : {})
     };
     return this.store.transaction(async (transaction) => {
       const current = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
@@ -452,6 +456,17 @@ function selectGitHubCandidate(intent: HostActionIntent, selectionId: string | u
 function trustedHttpsUrl(value: string): boolean {
   try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && url.hash === ""; }
   catch { return false; }
+}
+
+function exactAuthorizedUrl(value: string | undefined): string {
+  if (typeof value !== "string") throw new Error("An external host action requires one exact durable URL before authorization.");
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || !url.hostname || url.hash) throw new Error();
+    if (url.protocol === "https:") return value;
+    if (url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) return value;
+  } catch {}
+  throw new Error("The durable external host-action URL is outside the exact HTTPS or loopback boundary.");
 }
 
 function exactHostActionId(value: string): string {

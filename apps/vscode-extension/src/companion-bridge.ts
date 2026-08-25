@@ -242,7 +242,7 @@ export interface ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
-  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
+  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
   completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
@@ -521,7 +521,7 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
 
-  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
+  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
     const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion, ...(selectionId ? { selectionId } : {}) });
     if (!result.ok) return result;
     const authorization = isRecord(result.value) ? result.value.authorization : undefined;
@@ -529,9 +529,12 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
       || authorization.hostActionId !== hostActionId
       || typeof authorization.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(authorization.authorizationToken)
       || typeof authorization.expiresAt !== "string" || !Number.isFinite(Date.parse(authorization.expiresAt))
-      || (selectionId === undefined && (authorization.selectionId !== undefined || authorization.url !== undefined))
+      || (expectedUrl !== undefined && !trustedHostActionUrl(expectedUrl))
+      || (selectionId === undefined && authorization.selectionId !== undefined)
+      || (selectionId === undefined && expectedUrl === undefined && authorization.url !== undefined)
+      || (selectionId === undefined && expectedUrl !== undefined && authorization.url !== expectedUrl)
       || (selectionId !== undefined && (authorization.selectionId !== selectionId || typeof authorization.url !== "string" || !trustedHttpsUrl(authorization.url)))) return invalidResponse();
-    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}) } };
+    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}), ...(selectionId === undefined && expectedUrl !== undefined ? { url: authorization.url as string } : {}) } };
   }
 
   async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>> {
@@ -841,6 +844,15 @@ function uint64Decimal(value: unknown): value is string {
 function trustedHttpsUrl(value: string): boolean {
   try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && url.hash === ""; }
   catch { return false; }
+}
+
+function trustedHostActionUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || !url.hostname || url.hash) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch { return false; }
 }
 
 function safeBranch(value: string): boolean {

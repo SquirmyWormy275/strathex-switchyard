@@ -92,24 +92,26 @@ test("managed-session listing accepts only the strict protected-registry shape",
   if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
 });
 
-test("host-action authorization accepts only the exact one-time companion token shape", async () => {
+test("non-picker URL authorization accepts only an exact URL rebound by the companion", async () => {
   const hostActionId = `host-action:${"a".repeat(64)}`;
   let malformed = false;
+  const expectedUrl = "http://127.0.0.1:4317/";
   const bridge = new JsonLineCompanionBridge({
     async request(line) {
       const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
       assert.equal(request.method, "host-action.authorize");
       assert.deepEqual(request.payload, { hostActionId, adapterVersion: "extension-1" });
       const authorization = malformed
-        ? { hostActionId, authorizationToken: "client-selected", expiresAt: "2099-01-01T00:00:00.000Z" }
-        : { hostActionId, authorizationToken: `host-action-auth:${"b".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z" };
+        ? { hostActionId, authorizationToken: `host-action-auth:${"b".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", url: "http://127.0.0.1:4318/" }
+        : { hostActionId, authorizationToken: `host-action-auth:${"b".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", url: expectedUrl };
       return JSON.stringify({ version: 1, id: request.id, ok: true, result: { authorization } });
     }
   });
-  const accepted = await bridge.authorizeHostAction(hostActionId, "extension-1");
+  const accepted = await bridge.authorizeHostAction(hostActionId, "extension-1", undefined, expectedUrl);
   assert.equal(accepted.ok, true);
+  if (accepted.ok) assert.equal(accepted.value.url, expectedUrl);
   malformed = true;
-  const rejected = await bridge.authorizeHostAction(hostActionId, "extension-1");
+  const rejected = await bridge.authorizeHostAction(hostActionId, "extension-1", undefined, expectedUrl);
   assert.equal(rejected.ok, false);
   if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
 });

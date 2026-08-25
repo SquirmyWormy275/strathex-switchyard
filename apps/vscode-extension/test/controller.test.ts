@@ -221,6 +221,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly hardwareCompleted: Array<{ claim: HardwareSignalClaim; outcome: string; dispatchReceiptId?: string }> = [];
   readonly hardwareClaims: HardwareSignalClaim[] = [];
   readonly hardwareClaimBindings: Array<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }> = [];
+  authorizationUrlOverride?: string;
   readonly rawHidInstallRequests: RawHidDeviceIdentity[] = [];
   readonly acceptanceTrustInstallRequests: string[] = [];
   readonly scannerFixtureInstallRequests: string[] = [];
@@ -391,9 +392,10 @@ class FakeBridge implements ExtensionCompanionBridge {
   async listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return { ok: true, value: this.listedProviderDesktops ?? [] }; }
   async revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> { this.providerRevokeRequests.push(provider); return { ok: true, value: fakeProviderInstallation(provider, "revoked") }; }
   private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { this.currentVoiceValue = { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status }; return { ok: true, value: this.currentVoiceValue }; }
-  async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string) {
+  async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string, expectedUrl?: string) {
     this.authorizedHostActions.push({ id, adapterVersion, ...(selectionId ? { selectionId } : {}) });
-    return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", ...(selectionId ? { selectionId, url: `https://github.com/acme/project/pull/${selectionId.split(":")[1]}` } : {}) } } as const;
+    const url = selectionId ? `https://github.com/acme/project/pull/${selectionId.split(":")[1]}` : this.authorizationUrlOverride ?? expectedUrl;
+    return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", ...(selectionId ? { selectionId } : {}), ...(url ? { url } : {}) } } as const;
   }
   async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string, _authorizationToken?: string): Promise<BridgeResult<ForwardedCommandResult>> {
     this.completedHostActions.push({ id, succeeded, summary, adapterVersion });
@@ -888,6 +890,36 @@ test("PR upsert reviews title and body and opens only the companion-verified PR 
   assert.deepEqual(opened, ["https://github.com/acme/project/pull/12"]);
   assert.equal(bridge.authorizedHostActions.at(-1)?.id, `host-action:${"c".repeat(64)}`);
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+});
+
+test("refuses a dispatch URL that is not rebound by the final durable authorization", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const opened: string[] = [];
+  bridge.authorizationUrlOverride = "http://127.0.0.1:4318/";
+  bridge.nextDispatch = {
+    status: "running",
+    summary: "The verified web process awaits its exact host effect.",
+    data: {
+      hostActionId: `host-action:${"9".repeat(64)}`,
+      hostActionKind: "open_external_url",
+      hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+      hostActionUrl: "http://127.0.0.1:4317/"
+    }
+  };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-23T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/review", changedPaths: [] }],
+    openExternal: async (url) => { opened.push(url); return true; }
+  });
+  await controller.start();
+
+  await vscode.invoke("sxsy-b122.chord.run.shift_alt");
+
+  assert.deepEqual(opened, []);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
+  assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /mismatch|rebound|authorization/i);
 });
 
 test("ambiguous GitHub navigation selects and authorizes one exact companion candidate", async () => {

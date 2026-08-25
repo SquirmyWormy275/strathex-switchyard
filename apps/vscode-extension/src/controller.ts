@@ -973,7 +973,8 @@ export class ManagedSessionController {
         if (action.kind === "create_claude_terminal" || action.kind === "create_codex_terminal") {
           preparedManagedTerminal = await this.prepareManagedAgentTerminal(action.managedTerminalProfile, action.kind === "create_claude_terminal" ? "claude_code" : "codex", action.workspaceRoot);
         }
-        const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion, selectionId);
+        const expectedUrl = action.kind === "open_external_url" ? action.url : undefined;
+        const authorization = await this.bridge.authorizeHostAction(action.id, this.extensionVersion, selectionId, expectedUrl);
         if (!authorization.ok) throw new Error(`The companion refused the final host-action barrier: ${authorization.message}`);
         if (authorization.value.hostActionId !== action.id || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The final host-action authorization is mismatched or expired.");
         authorizationToken = authorization.value.authorizationToken;
@@ -1330,8 +1331,9 @@ export class ManagedSessionController {
         await this.showSessionQueue("verified_finished", "Verified finished sessions");
         return "Opened the verified finished queue.";
       case "open_external_url": {
-        if (!action.url || !trustedExternalUrl(action.url)) throw new Error("The companion supplied an untrusted external URL.");
-        if (!await this.openExternal(action.url)) throw new Error("VS Code did not confirm opening the trusted external URL.");
+        if (!action.url || !authorization.url || authorization.url !== action.url) throw new Error("The final authorization did not rebind the exact dispatch URL.");
+        if (!trustedExternalUrl(authorization.url)) throw new Error("The companion authorized an untrusted external URL.");
+        if (!await this.openExternal(authorization.url)) throw new Error("VS Code did not confirm opening the trusted external URL.");
         return "Opened the verified external destination.";
       }
       case "select_github_navigation": {
