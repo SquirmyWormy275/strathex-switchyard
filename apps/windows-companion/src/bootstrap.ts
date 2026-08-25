@@ -552,7 +552,17 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
-  const containmentRelease = new AttestedContainmentReleaseCoordinator(executor);
+  const containmentRelease = new AttestedContainmentReleaseCoordinator(executor, {
+    inspect: async (sessionId) => {
+      const session = await sessions.get(sessionId);
+      if (!session) return undefined;
+      let target;
+      try { target = await targetResolver.resolve({ definition: commandForAction("containment_release"), session }); }
+      catch { return undefined; }
+      if (!target || target.completeness !== "complete") return undefined;
+      return containmentManager.get(target.repositoryRoot);
+    }
+  });
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
   const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {

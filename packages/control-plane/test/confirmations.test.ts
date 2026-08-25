@@ -14,12 +14,13 @@ test("durable confirmations bind exact scope and atomically reject replay after 
   const ledger = new DurableConfirmationLedger(new ProtectedJsonStore({ filePath: path }), {
     clock: () => "2026-08-23T12:00:00.000Z", tokenFactory: () => "token-1", idFactory: () => "confirmation-1"
   });
-  const issued = await ledger.issue({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1", reason: "Reviewed PR publication", reauthenticated: true });
+  const issued = await ledger.issue({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1", scopeDigest: "a".repeat(64), reason: "Reviewed PR publication", reauthenticated: true });
   assert.equal(issued.record.reauthenticated, true);
   assert.equal((await ledger.consume({ token: issued.token, action: "pr_upsert", targetSnapshotId: "wrong", sessionId: "session-1", authorityId: "authority-1" })).allowed, false);
+  assert.equal((await ledger.consume({ token: issued.token, action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1", scopeDigest: "b".repeat(64) })).allowed, false);
   const restarted = new DurableConfirmationLedger(new ProtectedJsonStore({ filePath: path }), { clock: () => "2026-08-23T12:00:01.000Z" });
   assert.equal((await restarted.consume({
-    token: issued.token, action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1"
+    token: issued.token, action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1", scopeDigest: "a".repeat(64)
   })).allowed, true);
   assert.equal((await ledger.consume({ token: issued.token, action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "authority-1" })).allowed, false);
 });

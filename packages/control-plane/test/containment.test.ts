@@ -21,8 +21,9 @@ test("containment survives an in-memory restart snapshot and cannot be released 
   const restored = InMemoryContainmentManager.restore(original.exportState());
 
   assert.equal(restored.check("C:/work/example", "git").allowed, false);
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: false, incidentStatus: "rotation_complete" }).status, "blocked");
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: true, incidentStatus: "rotation_pending" }).status, "blocked");
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "rotation complete", reauthenticated: true, incidentStatus: "rotation_complete" }).status, "released");
+  const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "op-1" } as const;
+  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: false, incidentStatus: "rotation_complete", ...binding }).status, "blocked");
+  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: true, incidentStatus: "rotation_pending", ...binding }).status, "blocked");
+  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "rotation complete", reauthenticated: true, incidentStatus: "rotation_complete", ...binding }).status, "released");
   assert.equal(restored.check("C:/work/example", "git").allowed, true);
 });

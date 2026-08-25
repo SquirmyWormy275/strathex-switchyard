@@ -65,6 +65,7 @@ export type CompanionMethod =
   | "provider-desktop.list"
   | "provider-desktop.revoke"
   | "provider.handshake"
+  | "containment.inspect"
   | "containment.release"
   | "raw-hid.install"
   | "raw-hid.list"
@@ -263,7 +264,14 @@ export interface ScannerTrustRevokePayload { readonly authorityId: string; reado
 export interface ScannerFixtureRevokePayload { readonly fixtureId: string; readonly reason: string; }
 export interface ProviderDesktopReferencePayload { readonly provider: "claude_desktop" | "chatgpt_desktop" | "claude_code" | "codex"; }
 export interface ProviderHandshakePayload { readonly sessionId: string; readonly repositoryRoot: string; }
-export interface ContainmentReleasePayload { readonly sessionId: string; readonly reason: string; readonly incidentStatus: "rotation_complete" | "not_required"; }
+export interface ContainmentInspectionPayload { readonly sessionId: string; }
+export interface ContainmentReleasePayload {
+  readonly sessionId: string;
+  readonly reason: string;
+  readonly incidentStatus: "rotation_complete" | "not_required";
+  readonly expectedFenceEpoch: number;
+  readonly expectedActivationOperationId: string;
+}
 export type RawHidInstallPayload = RawHidDeviceIdentity;
 export interface HardwareSignalBindingPayload { readonly signalId: string; readonly claimToken: string; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
 export interface HardwareSignalClaimPayload { readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; readonly focused: true; }
@@ -339,7 +347,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
     "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
     "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
-    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider.handshake", "containment.release",
+    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider.handshake", "containment.inspect", "containment.release",
     "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"

@@ -60,6 +60,7 @@ import {
   type ScannerFixtureRevokePayload,
   type ProviderDesktopReferencePayload,
   type ProviderHandshakePayload,
+  type ContainmentInspectionPayload,
   type ContainmentReleasePayload,
   type RawHidInstallPayload,
   type HardwareSignalBindingPayload,
@@ -323,6 +324,8 @@ export class CompanionService {
         case "provider-desktop.revoke": return this.success(request.id, { installation: await this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload)) });
         case "provider.handshake":
           return this.success(request.id, await this.providerHandshake(this.requireProviderHandshake(request.payload)));
+        case "containment.inspect":
+          return this.success(request.id, { containment: await this.inspectContainment(this.requireContainmentInspection(request.payload)) });
         case "containment.release":
           return this.success(request.id, { command: await this.releaseContainment(this.requireContainmentRelease(request.payload)) });
         case "raw-hid.install":
@@ -803,6 +806,13 @@ export class CompanionService {
     return result;
   }
 
+  private async inspectContainment(payload: ContainmentInspectionPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No durable containment inspection boundary is attached.");
+    const result = await this.containmentRelease.inspect(payload.sessionId);
+    if (!result) throw new CompanionServiceError("not_found", "No exact active containment fence exists for this protected session target.");
+    return result;
+  }
+
   private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
     if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "scopes", "sealedSecret"], ["replaceExisting"])
       || !credentialIdentifier(payload.reference) || !Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 16
@@ -856,7 +866,32 @@ export class CompanionService {
   private requireScannerFixtureRevoke(payload: unknown): ScannerFixtureRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["fixtureId", "reason"]) || !boundedIdentifier(payload.fixtureId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner fixture revocation requires one exact fixture ID and bounded reason."); return { fixtureId: payload.fixtureId, reason: payload.reason }; }
   private requireProviderDesktopReference(payload: unknown): ProviderDesktopReferencePayload { if (!isRecord(payload) || !exactKeys(payload, ["provider"]) || typeof payload.provider !== "string" || !(providerIds as readonly string[]).includes(payload.provider)) throw new CompanionServiceError("invalid_request", "Provider installation administration accepts only one compiled provider identity."); return { provider: payload.provider as ProviderId }; }
   private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
-  private requireContainmentRelease(payload: unknown): ContainmentReleasePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "incidentStatus"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /\0/.test(payload.reason) || (payload.incidentStatus !== "rotation_complete" && payload.incidentStatus !== "not_required")) throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, bounded incident-review reason, and completed-or-not-required credential rotation status."); return { sessionId: payload.sessionId, reason: payload.reason.trim(), incidentStatus: payload.incidentStatus }; }
+  private requireContainmentInspection(payload: unknown): ContainmentInspectionPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim()
+      || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)) {
+      throw new CompanionServiceError("invalid_request", "Containment inspection requires one exact bounded protected session ID.");
+    }
+    return { sessionId: payload.sessionId.trim() };
+  }
+
+  private requireContainmentRelease(payload: unknown): ContainmentReleasePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "incidentStatus", "expectedFenceEpoch", "expectedActivationOperationId"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /[\0]/.test(payload.reason)
+      || (payload.incidentStatus !== "rotation_complete" && payload.incidentStatus !== "not_required")
+      || !Number.isSafeInteger(payload.expectedFenceEpoch) || Number(payload.expectedFenceEpoch) < 1
+      || typeof payload.expectedActivationOperationId !== "string" || !payload.expectedActivationOperationId.trim()
+      || payload.expectedActivationOperationId.length > 256 || /[\r\n\0]/.test(payload.expectedActivationOperationId)) {
+      throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, reviewed fence epoch and activation operation, bounded incident reason, and completed-or-not-required credential rotation status.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(),
+      reason: payload.reason.trim(),
+      incidentStatus: payload.incidentStatus,
+      expectedFenceEpoch: Number(payload.expectedFenceEpoch),
+      expectedActivationOperationId: payload.expectedActivationOperationId.trim()
+    };
+  }
 
   private async installRawHid(payload: RawHidInstallPayload) {
     if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");

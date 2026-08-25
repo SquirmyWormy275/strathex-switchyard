@@ -15,7 +15,7 @@ import {
   type DispatchGovernanceRequest,
   type DispatchReceiptEvidenceFactory
 } from "./dispatch.ts";
-import type { IncidentStatus } from "./containment.ts";
+import { containmentReleaseScopeDigest, type IncidentStatus } from "./containment.ts";
 import { DurableOperationCoordinator, NoReplayOperationRecovery, OperationSagaStore, type OperationReconciler, type ReconciliationResult } from "./operations.ts";
 import { ExecutionControlRegistry, type ExecutionControl, type OperationControlAdapter } from "./execution-control.ts";
 import type { EffectGuard } from "./brokers.ts";
@@ -104,12 +104,16 @@ export interface RuntimeContainmentReleaseRequest {
   readonly confirmationToken: string;
   readonly reason: string;
   readonly incidentStatus: IncidentStatus;
+  readonly expectedFenceEpoch: number;
+  readonly expectedActivationOperationId: string;
 }
 
 export interface RuntimeCommandPreparationRequest {
   readonly action: CommandAction;
   readonly sessionId?: string;
   readonly reason: string;
+  /** Host-internal reviewed scope; public command preparation never accepts this field. */
+  readonly confirmationScopeDigest?: string;
 }
 
 export interface RuntimeCommandPreparationResult {
@@ -602,6 +606,7 @@ export class DurableMediatedExecutor {
           ...(target ? { targetSnapshotId: target.id } : {}),
           ...(session ? { sessionId: session.id } : {}),
           ...(authority ? { authorityId: authority.id } : {}),
+          ...(request.confirmationScopeDigest ? { scopeDigest: request.confirmationScopeDigest } : {}),
           reason: `${request.reason} (attested by ${operator})`,
           reauthenticated: true
         });
@@ -646,7 +651,14 @@ export class DurableMediatedExecutor {
     const policy = await this.createPolicy(target);
     const preliminary = policy.authorize({ definition, target, session, authority });
     if (preliminary.status !== "awaiting_confirmation") return this.auditWithoutOperation(definition, { status: policyStatus(preliminary.status), summary: preliminary.reason }, target);
-    const consumed = await this.confirmations.consume({ token: request.confirmationToken, action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id });
+    const consumed = await this.confirmations.consume({
+      token: request.confirmationToken,
+      action: definition.action,
+      targetSnapshotId: target.id,
+      sessionId: session.id,
+      authorityId: authority.id,
+      scopeDigest: containmentReleaseScopeDigest(request)
+    });
     if (!consumed.allowed || !consumed.record) return this.auditWithoutOperation(definition, { status: "blocked", summary: consumed.reason }, target);
     const ephemeral = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: consumed.record.reason, reauthenticated: consumed.record.reauthenticated });
     const context: RuntimeDispatcherContext = { policy, sessions: this.sessions, authorities: this.authorities, operationCoordinator: this.operationCoordinator, receiptEvidence: this.options.receiptEvidence };
@@ -664,7 +676,13 @@ export class DurableMediatedExecutor {
       sessionId: session.id,
       authorityId: authority.id,
       confirmationToken: ephemeral.token,
-      review: { reauthenticated: true, reason: request.reason, incidentStatus: request.incidentStatus }
+      review: {
+        reauthenticated: true,
+        reason: request.reason,
+        incidentStatus: request.incidentStatus,
+        expectedFenceEpoch: request.expectedFenceEpoch,
+        expectedActivationOperationId: request.expectedActivationOperationId
+      }
     };
     return dispatcher.dispatchContainmentRelease(release);
   }

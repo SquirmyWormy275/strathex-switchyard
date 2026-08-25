@@ -9,6 +9,8 @@ export interface DurableConfirmationRequest {
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;
+  /** Digest of additional reviewed scope that must match exactly at consume time. */
+  readonly scopeDigest?: string;
   readonly reason: string;
   /** This bit is written only after a host-owned reauthentication attestor succeeds. */
   readonly reauthenticated: boolean;
@@ -35,6 +37,7 @@ export interface ConfirmationConsumeRequest {
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;
+  readonly scopeDigest?: string;
 }
 
 export interface ConfirmationDecision {
@@ -54,6 +57,12 @@ function text(value: string, field: string): string {
 
 function optionalReference(value: string | undefined, field: string): string | undefined {
   return value === undefined ? undefined : text(value, field);
+}
+
+function optionalDigest(value: string | undefined, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (!/^[a-f0-9]{64}$/.test(value)) throw new DurableConfirmationError(`${field} must be an exact SHA-256 digest.`);
+  return value;
 }
 
 function timestamp(value: string, field: string): string {
@@ -92,7 +101,8 @@ function matches(record: DurableConfirmationRecord, request: Omit<ConfirmationCo
   return record.action === request.action
     && record.targetSnapshotId === request.targetSnapshotId
     && record.sessionId === request.sessionId
-    && record.authorityId === request.authorityId;
+    && record.authorityId === request.authorityId
+    && record.scopeDigest === request.scopeDigest;
 }
 
 export class DurableConfirmationError extends Error {
@@ -138,6 +148,7 @@ export class DurableConfirmationLedger {
       ...(optionalReference(request.targetSnapshotId, "target snapshot id") ? { targetSnapshotId: optionalReference(request.targetSnapshotId, "target snapshot id") } : {}),
       ...(optionalReference(request.sessionId, "session id") ? { sessionId: optionalReference(request.sessionId, "session id") } : {}),
       ...(optionalReference(request.authorityId, "authority id") ? { authorityId: optionalReference(request.authorityId, "authority id") } : {}),
+      ...(optionalDigest(request.scopeDigest, "confirmation scope digest") ? { scopeDigest: optionalDigest(request.scopeDigest, "confirmation scope digest") } : {}),
       reason: text(request.reason, "confirmation reason"),
       reauthenticated: request.reauthenticated === true,
       tokenDigest: sha256(token),
@@ -163,7 +174,7 @@ export class DurableConfirmationLedger {
       if (!found) return { allowed: false, reason: "Confirmation token is unknown or was not issued by the protected companion." };
       if (found.consumedAt) return { allowed: false, reason: "Confirmation token has already been consumed." , record: clone(found) };
       if (Date.parse(found.expiresAt) <= Date.parse(now)) return { allowed: false, reason: "Confirmation token has expired.", record: clone(found) };
-      if (!matches(found, request)) return { allowed: false, reason: "Confirmation does not match the exact action, target, session, and authority.", record: clone(found) };
+      if (!matches(found, request)) return { allowed: false, reason: "Confirmation does not match the exact action, target, session, authority, and reviewed scope.", record: clone(found) };
       await transaction.append<ConfirmationConsumedEvent>("confirmation.consumed", { confirmationId: found.id, consumedAt: now });
       return { allowed: true, reason: "Protected confirmation was consumed for this exact action once.", record: { ...found, consumedAt: now } };
     });

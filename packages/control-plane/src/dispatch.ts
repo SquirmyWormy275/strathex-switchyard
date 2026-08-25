@@ -168,7 +168,13 @@ export interface ContainmentReleaseCommandRequest {
   readonly authorityId: string;
   readonly confirmationToken: string;
   /** Obtained only from the companion-UI incident-review and reauth flow. */
-  readonly review: Readonly<{ reauthenticated: boolean; reason: string; incidentStatus: IncidentStatus }>;
+  readonly review: Readonly<{
+    reauthenticated: boolean;
+    reason: string;
+    incidentStatus: IncidentStatus;
+    expectedFenceEpoch: number;
+    expectedActivationOperationId: string;
+  }>;
 }
 
 /**

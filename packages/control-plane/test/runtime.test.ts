@@ -9,7 +9,9 @@ import { InMemoryGitBroker } from "../src/brokers.ts";
 import { commandForAction } from "../src/command-catalog.ts";
 import type { ManagedSession, TargetSnapshot } from "../src/contracts.ts";
 import { AuthorityLedger } from "../src/authority.ts";
+import { AllowlistedEvidenceAuthorizer, GateEvidenceLedger } from "../src/acceptance-evidence.ts";
 import { DurableBudgetManager } from "../src/budgets.ts";
+import { containmentReleaseScopeDigest, DurableContainmentManager } from "../src/containment.ts";
 import { DurableMediatedExecutor } from "../src/runtime.ts";
 import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
@@ -182,6 +184,60 @@ test("installed preparation attests one Git-root session and binds exact authori
     });
     assert.equal(blocked.status, "blocked", JSON.stringify(blocked));
     assert.match(blocked.summary, /high-consequence|acceptance/i);
+  });
+});
+
+test("containment release consumes a confirmation bound to the exact reviewed fence and transactionally rejects stale generations", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const session = await sessions.register({
+      id: "session-containment-release", provider: "generic", surface: "vscode_window", capabilities: ["registered", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-containment", planRevision: "plan-containment",
+      plannedFiles: [], adapterVersion: "installed-extension", metadata: { "sxsy-b122.kind": "git-root" }
+    });
+    const gates = new GateEvidenceLedger(store, new AllowlistedEvidenceAuthorizer(["isolated-acceptance"]), {
+      clock: () => now,
+      artifactVerifier: { verify: async () => true }
+    });
+    for (const gate of [8, 20] as const) {
+      await gates.record({
+        id: `isolated-gate-${gate}`, gate, status: "passed", targetSnapshotId: target.id, evidenceDigest: `digest-${gate}`,
+        evidenceReference: `test://gate/${gate}`, policyVersion: "policy-runtime", evaluatedBy: "isolated-acceptance", rationale: "isolated release-path test"
+      });
+    }
+    const containment = new DurableContainmentManager(store, {
+      revokeCredentialLeases: async () => undefined,
+      cancelQueuedOperations: async () => undefined
+    }, { clock: () => now });
+    await containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment-op-7", reason: "isolated incident" });
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, gateEvidence: gates, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      enabledHighConsequenceActions: ["containment_release"],
+      confirmationAttestor: { attest: async () => ({ reauthenticated: true, operator: "windows-user-presence" }) },
+      dependencies: () => ({ containment })
+    });
+    const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "containment-op-7" } as const;
+    const prepared = await runtime.prepareCommand({
+      action: "containment_release", sessionId: session.id, reason: "review exact fence",
+      confirmationScopeDigest: containmentReleaseScopeDigest(binding)
+    });
+    assert.equal(prepared.status, "prepared");
+    assert.ok(prepared.authorityId);
+    assert.ok(prepared.confirmationToken);
+
+    const stale = await runtime.releaseContainment({
+      sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "stale",
+      incidentStatus: "rotation_complete", expectedFenceEpoch: 2, expectedActivationOperationId: "containment-op-7"
+    });
+    assert.equal(stale.status, "blocked");
+    assert.equal((await containment.get(target.repositoryRoot))?.active, true);
+
+    const released = await runtime.releaseContainment({
+      sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "incident resolved",
+      incidentStatus: "rotation_complete", ...binding
+    });
+    assert.equal(released.status, "completed", JSON.stringify(released));
+    assert.equal((await containment.get(target.repositoryRoot))?.active, false);
   });
 });
 

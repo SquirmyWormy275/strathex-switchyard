@@ -165,7 +165,7 @@ test("active containment prevents a test-environment allocation before any dispo
   assert.equal(blocked.status, "blocked");
   assert.equal(blocked.environment, undefined);
 
-  const released = containment.release({ repositoryRoot: target.repositoryRoot, reason: "isolated test release", reauthenticated: true, incidentStatus: "not_required" });
+  const released = containment.release({ repositoryRoot: target.repositoryRoot, reason: "isolated test release", reauthenticated: true, incidentStatus: "not_required", expectedFenceEpoch: 1, expectedActivationOperationId: "containment" });
   assert.equal(released.status, "released");
   const afterRelease = await testEnvironment.prepare(request);
   assert.equal(afterRelease.status, "completed");
