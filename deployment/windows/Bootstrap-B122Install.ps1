@@ -12,7 +12,9 @@ param(
   [ValidateRange(30,3600)][int]$InstallerTimeoutSeconds=900,
   [string]$TestStagingRoot,
   [switch]$AllowTestStagingRoot,
-  [ValidateSet('none','replace-root-before-file-delete','replace-root-before-root-delete')][string]$TestCleanupMutation='none'
+  [ValidateSet('none','replace-root-before-file-delete','replace-root-before-root-delete')][string]$TestCleanupMutation='none',
+  [string]$TestSupervisorRunningMarker,
+  [string]$TestPreparationRunningMarker
 )
 
 Set-StrictMode -Version Latest
@@ -39,9 +41,30 @@ namespace SxsyB122BootstrapNative {
   public static class __TYPE__ {
     [StructLayout(LayoutKind.Sequential)] struct FileTime { public uint Low; public uint High; }
     [StructLayout(LayoutKind.Sequential)] struct ByHandleFileInformation { public uint Attributes; public FileTime Creation; public FileTime Access; public FileTime Write; public uint VolumeSerial; public uint SizeHigh; public uint SizeLow; public uint Links; public uint FileIndexHigh; public uint FileIndexLow; }
+    [StructLayout(LayoutKind.Sequential)] struct SecurityAttributes { public int Length; public IntPtr SecurityDescriptor; [MarshalAs(UnmanagedType.Bool)] public bool InheritHandle; }
+    [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] struct StartupInfo { public int cb; public string reserved; public string desktop; public string title; public uint x,y,xSize,ySize,xCountChars,yCountChars,fillAttribute,flags; public ushort showWindow,reserved2; public IntPtr reserved2Pointer,stdInput,stdOutput,stdError; }
+    [StructLayout(LayoutKind.Sequential)] struct StartupInfoEx { public StartupInfo StartupInfo; public IntPtr AttributeList; }
+    [StructLayout(LayoutKind.Sequential)] struct ProcessInformation { public IntPtr Process,Thread; public uint ProcessId,ThreadId; }
+    [StructLayout(LayoutKind.Sequential)] struct IoCounters { public ulong ReadOperations,WriteOperations,OtherOperations,ReadBytes,WriteBytes,OtherBytes; }
+    [StructLayout(LayoutKind.Sequential)] struct BasicLimits { public long PerProcessTime,PerJobTime; public uint LimitFlags; public UIntPtr MinimumWorkingSet,MaximumWorkingSet; public uint ActiveProcessLimit; public UIntPtr Affinity; public uint PriorityClass,SchedulingClass; }
+    [StructLayout(LayoutKind.Sequential)] struct ExtendedLimits { public BasicLimits Basic; public IoCounters Io; public UIntPtr ProcessMemory,JobMemory,PeakProcessMemory,PeakJobMemory; }
     [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr CreateFileW(string path,uint access,uint share,IntPtr security,uint disposition,uint flags,IntPtr template);
+    [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode,EntryPoint="CreateFileW")] static extern IntPtr CreateFileInheritable(string path,uint access,uint share,ref SecurityAttributes security,uint disposition,uint flags,IntPtr template);
     [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern uint GetFinalPathNameByHandleW(IntPtr handle,StringBuilder path,uint length,uint flags);
     [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr handle,out ByHandleFileInformation information);
+    [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr CreateJobObjectW(IntPtr attributes,string name);
+    [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr OpenJobObjectW(uint access,bool inherit,string name);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job,int informationClass,ref ExtendedLimits information,uint length);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool TerminateJobObject(IntPtr job,uint exitCode);
+    [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern bool CreateProcessW(string application,StringBuilder commandLine,IntPtr processAttributes,IntPtr threadAttributes,bool inheritHandles,uint flags,IntPtr environment,string currentDirectory,ref StartupInfoEx startup,out ProcessInformation process);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool InitializeProcThreadAttributeList(IntPtr list,int count,uint flags,ref IntPtr size);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool UpdateProcThreadAttribute(IntPtr list,uint flags,IntPtr attribute,IntPtr value,IntPtr size,IntPtr previous,IntPtr returned);
+    [DllImport("kernel32.dll")] static extern void DeleteProcThreadAttributeList(IntPtr list);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetHandleInformation(IntPtr handle,uint mask,uint flags);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern uint ResumeThread(IntPtr thread);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern uint WaitForSingleObject(IntPtr handle,uint milliseconds);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetExitCodeProcess(IntPtr process,out uint exitCode);
+    [DllImport("kernel32.dll",SetLastError=true)] static extern bool TerminateProcess(IntPtr process,uint exitCode);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     public static FileIdentitySnapshot___TOKEN__ Capture(string path){
       IntPtr handle=CreateFileW(path,0,7,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
@@ -54,6 +77,37 @@ namespace SxsyB122BootstrapNative {
         string identity=information.VolumeSerial.ToString("x8")+":"+information.FileIndexHigh.ToString("x8")+information.FileIndexLow.ToString("x8");
         return new FileIdentitySnapshot___TOKEN__(finalPath,identity,information.Attributes);
       }finally{CloseHandle(handle);}
+    }
+    public sealed class OwnedSupervisorProcess : IDisposable {
+      IntPtr job,process;bool disposed;
+      internal OwnedSupervisorProcess(IntPtr jobHandle,IntPtr processHandle,int processId){job=jobHandle;process=processHandle;ProcessId=processId;}
+      public int ProcessId {get;private set;}
+      public bool Wait(int milliseconds){return WaitForSingleObject(process,(uint)milliseconds)==0;}
+      public int ExitCode {get{uint code;if(!GetExitCodeProcess(process,out code))throw new Win32Exception(Marshal.GetLastWin32Error());return unchecked((int)code);}}
+      public void TerminateAndWait(int exitCode,int milliseconds){if(job!=IntPtr.Zero&&!TerminateJobObject(job,(uint)exitCode))throw new Win32Exception(Marshal.GetLastWin32Error());if(WaitForSingleObject(process,(uint)milliseconds)!=0)throw new TimeoutException("The bootstrap supervisor Job did not terminate within its bound.");}
+      public void Dispose(){if(disposed)return;disposed=true;if(job!=IntPtr.Zero){CloseHandle(job);job=IntPtr.Zero;}if(process!=IntPtr.Zero){WaitForSingleObject(process,10000);CloseHandle(process);process=IntPtr.Zero;}}
+    }
+    public static bool JobExists(string name){IntPtr job=OpenJobObjectW(4,false,name);if(job==IntPtr.Zero){int error=Marshal.GetLastWin32Error();if(error==2)return false;throw new Win32Exception(error);}CloseHandle(job);return true;}
+    public static OwnedSupervisorProcess StartSupervisor(string executable,string commandLine,string workingDirectory,string environmentBlock,string stdoutPath,string stderrPath,string jobName){
+      var security=new SecurityAttributes{Length=Marshal.SizeOf(typeof(SecurityAttributes)),InheritHandle=true};IntPtr stdout=IntPtr.Zero,stderr=IntPtr.Zero,input=IntPtr.Zero,job=IntPtr.Zero,environment=IntPtr.Zero,handles=IntPtr.Zero,jobs=IntPtr.Zero;var startup=new StartupInfoEx();var created=new ProcessInformation();
+      try{
+        stdout=CreateFileInheritable(stdoutPath,0x40000000,1,ref security,1,0x80,IntPtr.Zero);if(stdout==new IntPtr(-1))throw new Win32Exception(Marshal.GetLastWin32Error());
+        stderr=CreateFileInheritable(stderrPath,0x40000000,1,ref security,1,0x80,IntPtr.Zero);if(stderr==new IntPtr(-1))throw new Win32Exception(Marshal.GetLastWin32Error());
+        input=CreateFileInheritable("NUL",0x80000000,3,ref security,3,0x80,IntPtr.Zero);if(input==new IntPtr(-1))throw new Win32Exception(Marshal.GetLastWin32Error());
+        if(!SetHandleInformation(stdout,1,1)||!SetHandleInformation(stderr,1,1)||!SetHandleInformation(input,1,1))throw new Win32Exception(Marshal.GetLastWin32Error());
+        job=CreateJobObjectW(IntPtr.Zero,jobName);int jobError=Marshal.GetLastWin32Error();if(job==IntPtr.Zero)throw new Win32Exception(jobError);if(jobError==183)throw new InvalidOperationException("The bootstrap supervisor Job name is already owned.");
+        var limits=new ExtendedLimits();limits.Basic.LimitFlags=0x2000;if(!SetInformationJobObject(job,9,ref limits,(uint)Marshal.SizeOf(typeof(ExtendedLimits))))throw new Win32Exception(Marshal.GetLastWin32Error());
+        startup.StartupInfo.cb=Marshal.SizeOf(typeof(StartupInfoEx));startup.StartupInfo.flags=0x100;startup.StartupInfo.stdInput=input;startup.StartupInfo.stdOutput=stdout;startup.StartupInfo.stdError=stderr;
+        IntPtr size=IntPtr.Zero;InitializeProcThreadAttributeList(IntPtr.Zero,2,0,ref size);startup.AttributeList=Marshal.AllocHGlobal(size);if(!InitializeProcThreadAttributeList(startup.AttributeList,2,0,ref size))throw new Win32Exception(Marshal.GetLastWin32Error());
+        handles=Marshal.AllocHGlobal(IntPtr.Size*3);Marshal.WriteIntPtr(handles,0,input);Marshal.WriteIntPtr(handles,IntPtr.Size,stdout);Marshal.WriteIntPtr(handles,IntPtr.Size*2,stderr);
+        if(!UpdateProcThreadAttribute(startup.AttributeList,0,new IntPtr(0x00020002),handles,new IntPtr(IntPtr.Size*3),IntPtr.Zero,IntPtr.Zero))throw new Win32Exception(Marshal.GetLastWin32Error());
+        jobs=Marshal.AllocHGlobal(IntPtr.Size);Marshal.WriteIntPtr(jobs,job);if(!UpdateProcThreadAttribute(startup.AttributeList,0,new IntPtr(0x0002000d),jobs,new IntPtr(IntPtr.Size),IntPtr.Zero,IntPtr.Zero))throw new Win32Exception(Marshal.GetLastWin32Error());
+        environment=Marshal.StringToHGlobalUni(environmentBlock);
+        if(!CreateProcessW(executable,new StringBuilder(commandLine),IntPtr.Zero,IntPtr.Zero,true,0x08080404,environment,workingDirectory,ref startup,out created))throw new Win32Exception(Marshal.GetLastWin32Error());
+        if(ResumeThread(created.Thread)==0xffffffff)throw new Win32Exception(Marshal.GetLastWin32Error());CloseHandle(created.Thread);created.Thread=IntPtr.Zero;
+        var result=new OwnedSupervisorProcess(job,created.Process,checked((int)created.ProcessId));job=IntPtr.Zero;created.Process=IntPtr.Zero;return result;
+      }catch{if(job!=IntPtr.Zero){CloseHandle(job);job=IntPtr.Zero;}if(created.Process!=IntPtr.Zero){TerminateProcess(created.Process,130);WaitForSingleObject(created.Process,10000);CloseHandle(created.Process);created.Process=IntPtr.Zero;}if(created.Thread!=IntPtr.Zero){CloseHandle(created.Thread);created.Thread=IntPtr.Zero;}throw;}
+      finally{if(startup.AttributeList!=IntPtr.Zero)DeleteProcThreadAttributeList(startup.AttributeList);if(handles!=IntPtr.Zero)Marshal.FreeHGlobal(handles);if(jobs!=IntPtr.Zero)Marshal.FreeHGlobal(jobs);if(environment!=IntPtr.Zero)Marshal.FreeHGlobal(environment);if(stdout!=IntPtr.Zero&&stdout!=new IntPtr(-1))CloseHandle(stdout);if(stderr!=IntPtr.Zero&&stderr!=new IntPtr(-1))CloseHandle(stderr);if(input!=IntPtr.Zero&&input!=new IntPtr(-1))CloseHandle(input);if(startup.AttributeList!=IntPtr.Zero)Marshal.FreeHGlobal(startup.AttributeList);}
     }
   }
 }
@@ -322,27 +376,45 @@ function ConvertTo-B122BootstrapWindowsArgument([string]$Value){
   if($slashes){[void]$builder.Append(('\'*($slashes*2)))};[void]$builder.Append('"');return $builder.ToString()
 }
 
-function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath,[string]$StatePath,[System.Collections.IDictionary]$Environment,[int]$TimeoutSeconds){
-  $start=New-Object Diagnostics.ProcessStartInfo
-  $start.FileName=$HelperPath
-  $start.Arguments=(@('--supervise',$RequestPath,$StatePath)|ForEach-Object{ConvertTo-B122BootstrapWindowsArgument ([string]$_)})-join' '
-  $start.WorkingDirectory=[IO.Path]::GetDirectoryName($RequestPath)
-  $start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true
-  $start.EnvironmentVariables.Clear()
-  foreach($entry in $Environment.GetEnumerator()){$start.EnvironmentVariables[[string]$entry.Key]=[string]$entry.Value}
-  $process=New-Object Diagnostics.Process;$process.StartInfo=$start
+function New-B122BootstrapEnvironmentBlock([System.Collections.IDictionary]$Environment,[string]$WorkingDirectory){
+  $builder=New-Object Text.StringBuilder;$drive=[IO.Path]::GetPathRoot($WorkingDirectory)
+  if($drive-match'^[A-Za-z]:\\$'){[void]$builder.Append('=').Append([char]::ToUpperInvariant($drive[0])).Append(':=').Append($WorkingDirectory).Append([char]0)}
+  foreach($key in @($Environment.Keys|Sort-Object)) {[void]$builder.Append([string]$key).Append('=').Append([string]$Environment[$key]).Append([char]0)}
+  [void]$builder.Append([char]0);return $builder.ToString()
+}
+
+function Read-B122BootstrapOutput([string]$Path,[int]$MaximumBytes){
+  $item=Get-B122BootstrapItem $Path $false;if($item.Length-lt0-or$item.Length-gt$MaximumBytes){throw 'The trusted installer exceeded its bootstrap output bound.'}
+  $bytes=[IO.File]::ReadAllBytes($item.FullName);try{return [Text.Encoding]::UTF8.GetString($bytes)}finally{if($bytes.Length){[Array]::Clear($bytes,0,$bytes.Length)}}
+}
+
+function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath,[string]$StatePath,[System.Collections.IDictionary]$Environment,[int]$TimeoutSeconds,[string]$JobName,[string]$StdoutPath,[string]$StderrPath,[string]$RunningMarker){
+  $working=[IO.Path]::GetDirectoryName($RequestPath);$command=(@($HelperPath,'--supervise',$RequestPath,$StatePath)|ForEach-Object{ConvertTo-B122BootstrapWindowsArgument ([string]$_)})-join' '
+  $environmentBlock=New-B122BootstrapEnvironmentBlock $Environment $working
+  $process=$script:B122BootstrapIdentityType::StartSupervisor($HelperPath,$command,$working,$environmentBlock,$StdoutPath,$StderrPath,$JobName)
   try{
-    if(-not$process.Start()){throw 'The trusted repository supervisor could not start.'}
-    $stdoutTask=$process.StandardOutput.ReadToEndAsync();$stderrTask=$process.StandardError.ReadToEndAsync()
-    if(-not$process.WaitForExit([Math]::Min([int]::MaxValue,($TimeoutSeconds+30)*1000))){
-      try{$process.Kill()}catch{};[void]$process.WaitForExit(10000)
+    if(-not[string]::IsNullOrWhiteSpace($RunningMarker)){
+      $deadline=[DateTime]::UtcNow.AddSeconds(15);$runningState=$null
+      do{
+        if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
+        if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}
+        [Threading.Thread]::Sleep(20)
+      }while([DateTime]::UtcNow-lt$deadline)
+      if($null-eq$runningState-or[string]$runningState.state-cne'running'){throw 'The supervisor crash probe did not reach an exact running child state.'}
+      $markerBytes=[Text.Encoding]::UTF8.GetBytes(([ordered]@{schema='sxsy-b122.bootstrap-supervisor-running';version=1;bootstrapPid=$PID;supervisorPid=[int]$process.ProcessId;childPid=[int]$runningState.childPid;statePath=$StatePath}|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress))
+      $markerStream=New-Object IO.FileStream($RunningMarker,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+      try{$markerStream.Write($markerBytes,0,$markerBytes.Length);$markerStream.Flush($true)}finally{$markerStream.Dispose();[Array]::Clear($markerBytes,0,$markerBytes.Length)}
+      [Threading.Thread]::Sleep(120000)
+    }
+    if(-not$process.Wait([Math]::Min([int]::MaxValue,($TimeoutSeconds+30)*1000))){
+      $process.TerminateAndWait(124,10000)
       throw 'The trusted repository supervisor exceeded its bounded lifecycle.'
     }
-    $process.WaitForExit()
-    $stdout=[string]$stdoutTask.GetAwaiter().GetResult();$stderr=[string]$stderrTask.GetAwaiter().GetResult()
-    if([Text.Encoding]::UTF8.GetByteCount($stdout)+[Text.Encoding]::UTF8.GetByteCount($stderr)-gt262144){throw 'The trusted installer exceeded its bootstrap output bound.'}
-    return [pscustomobject]@{exitCode=[int]$process.ExitCode;stdout=$stdout;stderr=$stderr}
-  }finally{$process.Dispose()}
+    $exitCode=[int]$process.ExitCode
+  }finally{$process.Dispose();$environmentBlock=$null}
+  $stdout=Read-B122BootstrapOutput $StdoutPath 262144;$stderr=Read-B122BootstrapOutput $StderrPath 262144
+  if([Text.Encoding]::UTF8.GetByteCount($stdout)+[Text.Encoding]::UTF8.GetByteCount($stderr)-gt262144){throw 'The trusted installer exceeded its combined bootstrap output bound.'}
+  return [pscustomobject]@{exitCode=$exitCode;stdout=$stdout;stderr=$stderr}
 }
 
 function Assert-B122BootstrapInstallResult([string]$Raw,[string]$ExpectedOperation,[string]$ExpectedCommit,[string]$ExpectedDigest,[string]$ExpectedInstallRoot,[string]$ExpectedStateRoot){
@@ -373,6 +445,62 @@ function Write-B122BootstrapOperationReceipt([string]$StagingBase,[string]$Opera
   $stream=New-Object IO.FileStream($path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
   try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose();[Array]::Clear($bytes,0,$bytes.Length)}
   return $path
+}
+
+function Read-B122BootstrapOperationReceipt([string]$Path,[string]$Suffix){
+  $item=Get-B122BootstrapItem $Path $false;if($item.Length-lt2-or$item.Length-gt65536){throw 'An external bootstrap receipt is outside its size bound.'}
+  $raw=[IO.File]::ReadAllText($item.FullName)
+  try{$convertFromJson=Microsoft.PowerShell.Core\Get-Command -Name 'Microsoft.PowerShell.Utility\ConvertFrom-Json';$value=if($convertFromJson.Parameters.ContainsKey('DateKind')){$raw|Microsoft.PowerShell.Utility\ConvertFrom-Json -DateKind String}else{$raw|Microsoft.PowerShell.Utility\ConvertFrom-Json}}catch{throw 'An external bootstrap receipt is malformed.'}
+  $keys=@($value.PSObject.Properties.Name);$expected=@('schema','version','operationId','status','cleanup','sourceCommit','trustDigest','operation','installRoot','stateRoot','stagingRoot','startedAt','completedAt','childExitCode','resultSha256','error','receiptSha256')
+  $orderMismatch=$keys.Count-ne$expected.Count;if(-not$orderMismatch){for($index=0;$index-lt$expected.Count;$index++){if([string]$keys[$index]-cne[string]$expected[$index]){$orderMismatch=$true;break}}}
+  if($orderMismatch){throw 'An external bootstrap receipt does not use its exact canonical schema.'}
+  if($item.Name-cnotmatch'^(?<stem>[a-f0-9]{64})\.(?<suffix>started|outcome|cleanup)\.json$'-or$Matches.suffix-cne$Suffix-or[string]$value.operationId-cne("bootstrap:"+$Matches.stem)){throw 'An external bootstrap receipt filename is not bound to its operation.'}
+  if($value.schema-cne'sxsy-b122.bootstrap-operation'-or$value.version-ne1-or[string]$value.status-cnotin@('started','installer_succeeded','installer_failed','bootstrap_interrupted')-or[string]$value.cleanup-cnotin@('pending','retained','completed')-or[string]$value.sourceCommit-cnotmatch'^[a-f0-9]{40}$'-or[string]$value.trustDigest-cnotmatch'^[a-f0-9]{64}$'-or[string]$value.operation-cnotin@('install','update')-or[string]$value.receiptSha256-cnotmatch'^[a-f0-9]{64}$'){throw 'An external bootstrap receipt contains an invalid operation identity.'}
+  foreach($root in @([string]$value.installRoot,[string]$value.stateRoot,[string]$value.stagingRoot)){if([string]::IsNullOrWhiteSpace($root)-or-not[IO.Path]::IsPathRooted($root)-or$root.IndexOfAny([char[]]@([char]0,[char]10,[char]13,[char]34))-ge0){throw 'An external bootstrap receipt contains an invalid root.'}}
+  if($Suffix-ceq'started'){
+    if([string]$value.status-cne'started'-or[string]$value.cleanup-cne'pending'-or$null-ne$value.completedAt-or$null-ne$value.childExitCode-or$null-ne$value.resultSha256-or$null-ne$value.error){throw 'An external bootstrap started receipt has invalid terminal fields.'}
+  }elseif($Suffix-ceq'outcome'){
+    if([string]$value.status-ceq'started'-or[string]$value.cleanup-cne'pending'-or[string]::IsNullOrWhiteSpace([string]$value.completedAt)){throw 'An external bootstrap outcome receipt has invalid lifecycle fields.'}
+    if([string]$value.status-ceq'installer_succeeded'-and($value.childExitCode-ne0-or[string]$value.resultSha256-cnotmatch'^[a-f0-9]{64}$'-or$null-ne$value.error)){throw 'A successful external bootstrap outcome is not exact.'}
+    if([string]$value.status-ceq'installer_failed'-and($null-ne$value.resultSha256-or[string]::IsNullOrWhiteSpace([string]$value.error))){throw 'A failed external bootstrap outcome is not exact.'}
+    if([string]$value.status-ceq'bootstrap_interrupted'-and($null-ne$value.childExitCode-or$null-ne$value.resultSha256-or[string]::IsNullOrWhiteSpace([string]$value.error))){throw 'An interrupted external bootstrap outcome is not exact.'}
+  }elseif($Suffix-ceq'cleanup'){
+    if([string]$value.status-ceq'started'-or[string]$value.cleanup-cnotin@('retained','completed')-or[string]::IsNullOrWhiteSpace([string]$value.completedAt)-or$null-ne$value.resultSha256){throw 'An external bootstrap cleanup receipt has invalid lifecycle fields.'}
+    if([string]$value.cleanup-ceq'retained'-and[string]::IsNullOrWhiteSpace([string]$value.error)){throw 'A retained external bootstrap cleanup receipt lacks its reason.'}
+  }else{throw 'An unknown external bootstrap receipt suffix was requested.'}
+  foreach($timestamp in @([string]$value.startedAt,[string]$value.completedAt)){if([string]::IsNullOrWhiteSpace($timestamp)){continue};$parsedTimestamp=[DateTimeOffset]::MinValue;if(-not[DateTimeOffset]::TryParseExact($timestamp,'O',[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind,[ref]$parsedTimestamp)){throw 'An external bootstrap receipt contains a non-canonical timestamp.'}}
+  $digestSuffix=',"receiptSha256":"'+[string]$value.receiptSha256+'"}';if(-not$raw.EndsWith($digestSuffix,[StringComparison]::Ordinal)){throw 'An external bootstrap receipt integrity envelope is not canonical.'}
+  $bodyText=$raw.Substring(0,$raw.Length-$digestSuffix.Length)+'}';$bodyBytes=[Text.Encoding]::UTF8.GetBytes($bodyText);try{$actual=Get-B122BootstrapSha256Bytes $bodyBytes}finally{[Array]::Clear($bodyBytes,0,$bodyBytes.Length)}
+  if($actual-cne[string]$value.receiptSha256){throw 'An external bootstrap receipt failed its integrity digest.'};return $value
+}
+
+function Assert-B122BootstrapReceiptBinding($Started,$Other){
+  foreach($field in @('operationId','sourceCommit','trustDigest','operation','installRoot','stateRoot','stagingRoot','startedAt')){if([string]$Started.$field-cne[string]$Other.$field){throw "External bootstrap receipt binding changed: $field"}}
+}
+
+function Invoke-B122BootstrapInterruptedReconciliation([string]$StagingBase){
+  $receiptDirectory=Join-Path $StagingBase 'receipts';if(-not[IO.Directory]::Exists($receiptDirectory)){return 0};Assert-B122BootstrapProtectedAcl $receiptDirectory
+  $files=@(Microsoft.PowerShell.Management\Get-ChildItem -LiteralPath $receiptDirectory -File -Force);if($files.Count-gt10000){throw 'The external bootstrap receipt journal exceeds its reconciliation bound.'}
+  foreach($file in $files){if($file.Name-cnotmatch'^[a-f0-9]{64}\.(?:started|outcome|cleanup)\.json$'){throw 'The external bootstrap receipt journal contains an unknown file.'}}
+  $reconciled=0
+  foreach($startedFile in @($files|Where-Object{$_.Name.EndsWith('.started.json',[StringComparison]::Ordinal)})){
+    $stem=$startedFile.Name.Substring(0,64);$started=Read-B122BootstrapOperationReceipt $startedFile.FullName 'started';$outcomePath=Join-Path $receiptDirectory "$stem.outcome.json";$cleanupPath=Join-Path $receiptDirectory "$stem.cleanup.json"
+    if([IO.File]::Exists($cleanupPath)){if(-not[IO.File]::Exists($outcomePath)){throw 'A bootstrap cleanup receipt exists without its outcome.'};$outcome=Read-B122BootstrapOperationReceipt $outcomePath 'outcome';$cleanup=Read-B122BootstrapOperationReceipt $cleanupPath 'cleanup';Assert-B122BootstrapReceiptBinding $started $outcome;Assert-B122BootstrapReceiptBinding $started $cleanup;continue}
+    $bootstrapJob=$false;$installerJob=$false;$jobDeadline=[DateTime]::UtcNow.AddSeconds(10);do{$bootstrapJob=$script:B122BootstrapIdentityType::JobExists("Local\SxsyB122-BootstrapHost-$stem");$installerJob=$script:B122BootstrapIdentityType::JobExists("Local\SxsyB122-$stem");if(-not$bootstrapJob-and-not$installerJob){break};[Threading.Thread]::Sleep(25)}while([DateTime]::UtcNow-lt$jobDeadline)
+    if($bootstrapJob-or$installerJob){throw 'An interrupted trusted-bootstrap Job is still alive; reconciliation refused to race it.'}
+    $expectedStaging=[IO.Path]::GetFullPath((Join-Path $StagingBase ("c-"+$stem.Substring(0,24))));$actualStaging=[IO.Path]::GetFullPath([string]$started.stagingRoot)
+    if(-not$actualStaging.Equals($expectedStaging,[StringComparison]::OrdinalIgnoreCase)){throw 'An interrupted bootstrap receipt escaped its exact staging generation.'}
+    $retained=[IO.Directory]::Exists($expectedStaging);$retentionReason=$null
+    if($retained){
+      try{Assert-B122BootstrapProtectedAcl $expectedStaging;Get-B122BootstrapDirectoryIdentity $expectedStaging|Out-Null;$retentionReason='Interrupted staging was retained for explicit identity-bound review.'}
+      catch{$identityError=([string]$_.Exception.Message).Replace([char]0,[char]' ').Replace("`r",' ').Replace("`n",' ');if($identityError.Length-gt512){$identityError=$identityError.Substring(0,512)};$retentionReason="Interrupted staging could not be trusted for cleanup and was retained: $identityError"}
+    }
+    if([IO.File]::Exists($outcomePath)){$outcome=Read-B122BootstrapOperationReceipt $outcomePath 'outcome';Assert-B122BootstrapReceiptBinding $started $outcome;$status=[string]$outcome.status;$childExit=$outcome.childExitCode}
+    else{$status='bootstrap_interrupted';$childExit=$null;Write-B122BootstrapOperationReceipt $StagingBase $stem 'outcome' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=[string]$started.operationId;status=$status;cleanup='pending';sourceCommit=[string]$started.sourceCommit;trustDigest=[string]$started.trustDigest;operation=[string]$started.operation;installRoot=[string]$started.installRoot;stateRoot=[string]$started.stateRoot;stagingRoot=$expectedStaging;startedAt=[string]$started.startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=$null;resultSha256=$null;error='The prior trusted-bootstrap host exited before a terminal outcome; its atomically contained supervisor tree is no longer running.'})|Out-Null}
+    Write-B122BootstrapOperationReceipt $StagingBase $stem 'cleanup' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=[string]$started.operationId;status=$status;cleanup=if($retained){'retained'}else{'completed'};sourceCommit=[string]$started.sourceCommit;trustDigest=[string]$started.trustDigest;operation=[string]$started.operation;installRoot=[string]$started.installRoot;stateRoot=[string]$started.stateRoot;stagingRoot=$expectedStaging;startedAt=[string]$started.startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=$childExit;resultSha256=$null;error=$retentionReason})|Out-Null;$reconciled++
+  }
+  foreach($file in @(Microsoft.PowerShell.Management\Get-ChildItem -LiteralPath $receiptDirectory -File -Force|Where-Object{$_.Name-match'^[a-f0-9]{64}\.(?:outcome|cleanup)\.json$'})){if(-not[IO.File]::Exists((Join-Path $receiptDirectory ($file.Name.Substring(0,64)+'.started.json')))){throw 'An external bootstrap terminal receipt has no started receipt.'}}
+  return $reconciled
 }
 
 function Invoke-B122BootstrapCleanupReplacementProbe([string]$Root){
@@ -433,10 +561,28 @@ function Remove-B122BootstrapStaging([string]$Root,[string[]]$RelativeFiles,[Sys
   return @($failures.ToArray()|Sort-Object -Unique)
 }
 
+function Get-B122BootstrapTestMarker([string]$Value,[string]$Purpose,[string]$StagingRoot,[bool]$Allowed){
+  if([string]::IsNullOrWhiteSpace($Value)){return $null}
+  if(-not$Allowed-or[string]::IsNullOrWhiteSpace($StagingRoot)){throw "A $Purpose crash probe requires the explicit temporary test staging boundary."}
+  $marker=[IO.Path]::GetFullPath($Value);$temporary=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')+'\';$testBase=[IO.Path]::GetFullPath($StagingRoot)
+  if(-not($marker.TrimEnd('\')+'\').StartsWith($temporary,[StringComparison]::OrdinalIgnoreCase)-or(Test-B122BootstrapContainsPath $testBase $marker)-or[IO.File]::Exists($marker)-or[IO.Directory]::Exists($marker)){throw "The $Purpose crash-probe marker must be a new file below the operating-system temporary directory and outside staging."}
+  $parent=[IO.Path]::GetDirectoryName($marker);Get-B122BootstrapItem $parent $true|Out-Null;Assert-B122BootstrapNoReparseAncestors $parent;return $marker
+}
+
+function Write-B122BootstrapTestMarkerAndWait([string]$Path,[System.Collections.Specialized.OrderedDictionary]$Fields){
+  if([string]::IsNullOrWhiteSpace($Path)){return}
+  $bytes=[Text.Encoding]::UTF8.GetBytes(($Fields|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress));$stream=New-Object IO.FileStream($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+  try{$stream.Write($bytes,0,$bytes.Length);$stream.Flush($true)}finally{$stream.Dispose();[Array]::Clear($bytes,0,$bytes.Length)}
+  [Threading.Thread]::Sleep(120000)
+}
+
 $bundle=[IO.Path]::GetFullPath($BundleRoot)
 if($bundle.IndexOfAny([char[]]@([char]0,[char]10,[char]13,[char]34))-ge0){throw 'The candidate bundle path contains unsafe characters.'}
 Get-B122BootstrapItem $bundle $true|Out-Null
 if($TestCleanupMutation-cne'none'-and(-not$AllowTestStagingRoot-or[string]::IsNullOrWhiteSpace($TestStagingRoot))){throw 'A cleanup-mutation probe requires the explicit temporary test staging boundary.'}
+$testMarker=Get-B122BootstrapTestMarker $TestSupervisorRunningMarker 'supervisor' $TestStagingRoot ([bool]$AllowTestStagingRoot)
+$preparationMarker=Get-B122BootstrapTestMarker $TestPreparationRunningMarker 'preparation' $TestStagingRoot ([bool]$AllowTestStagingRoot)
+if($null-ne$testMarker-and$null-ne$preparationMarker-and$testMarker.Equals($preparationMarker,[StringComparison]::OrdinalIgnoreCase)){throw 'Bootstrap crash probes require distinct marker paths.'}
 $expectedDigest=$ExpectedTrustDigest.ToLowerInvariant();$expectedCommit=$ExpectedSourceCommit.ToLowerInvariant()
 $hostIdentity=Get-B122BootstrapHost $ExpectedPowerShellSha256
 $defaultState=[IO.Path]::GetFullPath((Join-Path (Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::LocalApplicationData) 'LocalApplicationData') 'STRATHEX\switchyard'))
@@ -476,13 +622,22 @@ $helperRelative='app/dist/apps/windows-companion/repository-runtime/b122-reposit
 foreach($required in @('scripts/Install-B122.ps1','scripts/B122InstallTools.psm1','scripts/B122ReleaseIntegrity.psm1','scripts/Test-B122ReleaseArtifact.ps1',$helperRelative)){if(-not$paths.Contains($required)){throw "The trusted candidate is missing a bootstrap-critical file: $required"}}
 
 $stagingBase=Get-B122BootstrapStagingBase $TestStagingRoot ([bool]$AllowTestStagingRoot)
-[IO.Directory]::CreateDirectory($stagingBase)|Out-Null;Get-B122BootstrapItem $stagingBase $true|Out-Null;Set-B122BootstrapProtectedAcl $stagingBase
-$operationStem=New-B122BootstrapHex;$operationId="bootstrap:$operationStem"
-$staging=Join-Path $stagingBase ("c-$($operationStem.Substring(0,24))");[IO.Directory]::CreateDirectory($staging)|Out-Null
-try{Get-B122BootstrapItem $staging $true|Out-Null;Set-B122BootstrapProtectedAcl $staging}catch{try{[IO.Directory]::Delete($staging,$false)}catch{};throw}
-$stagedRelative=[Collections.Generic.List[string]]::new();$stagedFiles=[ordered]@{};$locks=[Collections.Generic.List[IDisposable]]::new();$directoryIdentities=$null
-$startedAt=[DateTimeOffset]::UtcNow.ToString('O');$outcomeWritten=$false;$installSucceeded=$false;$caught=$null;$supervisorExit=$null;$installResult=$null
+$identity=[Security.Principal.WindowsIdentity]::GetCurrent();try{$sid=[string]$identity.User.Value}finally{$identity.Dispose()}
+$mutexBytes=[Text.Encoding]::UTF8.GetBytes($sid+([char]0)+$stagingBase.ToUpperInvariant());try{$mutexDigest=Get-B122BootstrapSha256Bytes $mutexBytes}finally{[Array]::Clear($mutexBytes,0,$mutexBytes.Length)}
+$bootstrapMutex=New-Object Threading.Mutex($false,"Local\SxsyB122-TrustedBootstrap-$mutexDigest");$bootstrapMutexOwned=$false
+try{$bootstrapMutexOwned=$bootstrapMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$bootstrapMutexOwned=$true}
+if(-not$bootstrapMutexOwned){$bootstrapMutex.Dispose();throw 'Another trusted-bootstrap operation owns this staging journal.'}
 try{
+[IO.Directory]::CreateDirectory($stagingBase)|Out-Null;Get-B122BootstrapItem $stagingBase $true|Out-Null;Set-B122BootstrapProtectedAcl $stagingBase
+[void](Invoke-B122BootstrapInterruptedReconciliation $stagingBase)
+$operationStem=New-B122BootstrapHex;$operationId="bootstrap:$operationStem"
+$staging=Join-Path $stagingBase ("c-$($operationStem.Substring(0,24))")
+$stagedRelative=[Collections.Generic.List[string]]::new();$stagedFiles=[ordered]@{};$locks=[Collections.Generic.List[IDisposable]]::new();$directoryIdentities=$null
+$startedAt=[DateTimeOffset]::UtcNow.ToString('O');$startedWritten=$false;$outcomeWritten=$false;$installSucceeded=$false;$caught=$null;$supervisorExit=$null;$installResult=$null
+Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'started' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status='started';cleanup='pending';sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=$null;childExitCode=$null;resultSha256=$null;error=$null})|Out-Null;$startedWritten=$true
+try{
+  [IO.Directory]::CreateDirectory($staging)|Out-Null
+  try{Get-B122BootstrapItem $staging $true|Out-Null;Set-B122BootstrapProtectedAcl $staging}catch{try{[IO.Directory]::Delete($staging,$false)}catch{};throw}
   foreach($metadata in @('release.json','SHA256SUMS.json','sbom.spdx.json')){
     $source=Assert-B122BootstrapConcreteSource $bundle @($metadata);$destination=Join-Path $staging $metadata
     [IO.File]::Copy($source,$destination,$false);$stagedRelative.Add($metadata)
@@ -503,6 +658,7 @@ try{
 
   $environment=Get-B122BootstrapChildEnvironment $hostIdentity $staging
   $directoryIdentities=New-B122BootstrapDirectoryIdentityInventory $stagingBase $staging $stagedRelative.ToArray()
+  Write-B122BootstrapTestMarkerAndWait $preparationMarker ([ordered]@{schema='sxsy-b122.bootstrap-preparation-running';version=1;bootstrapPid=$PID;operationId=$operationId;stagingRoot=$staging})
   $helper=Join-Path $staging $helperRelative.Replace('/','\');$installer=Join-Path $staging 'scripts\Install-B122.ps1'
   $helperEntry=@($entries|Where-Object{[string]$_.path-ceq$helperRelative});if($helperEntry.Count-ne1){throw 'The trusted process supervisor has an ambiguous manifest identity.'}
   $arguments=[Collections.Generic.List[string]]::new()
@@ -522,14 +678,17 @@ try{
   try{$requestStream.Write($requestBytes,0,$requestBytes.Length);$requestStream.Flush($true)}finally{$requestStream.Dispose()}
   $requestLength=[long]$requestBytes.Length;$requestSha=Get-B122BootstrapSha256Bytes $requestBytes;$stagedFiles['bootstrap-supervisor.request.json']=[pscustomobject]@{sha256=$requestSha;bytes=$requestLength};$stagedRelative.Add('bootstrap-supervisor.request.json')
   [Array]::Clear($requestBytes,0,$requestBytes.Length);$locks.Add((Open-B122BootstrapVerifiedFile $requestPath $requestSha $requestLength))
-  Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'started' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status='started';cleanup='pending';sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=$null;childExitCode=$null;resultSha256=$null;error=$null})|Out-Null
 
-  $run=Invoke-B122BootstrapSupervisor $helper $requestPath $statePath $environment $InstallerTimeoutSeconds;$supervisorExit=[int]$run.exitCode
-  if([IO.File]::Exists($statePath)){
-    $stateItem=Get-B122BootstrapItem $statePath $false
-    if($stateItem.Length-lt2-or$stateItem.Length-gt262144){throw 'The trusted supervisor state is outside its size bound.'}
-    $stateSha=Get-B122BootstrapSha256File $statePath;$stagedFiles['bootstrap-supervisor.state.json']=[pscustomobject]@{sha256=$stateSha;bytes=[long]$stateItem.Length};$stagedRelative.Add('bootstrap-supervisor.state.json')
+  $stdoutName='bootstrap-supervisor.stdout.txt';$stderrName='bootstrap-supervisor.stderr.txt';$stdoutPath=Join-Path $staging $stdoutName;$stderrPath=Join-Path $staging $stderrName
+  try{$run=Invoke-B122BootstrapSupervisor $helper $requestPath $statePath $environment $InstallerTimeoutSeconds "Local\SxsyB122-BootstrapHost-$operationStem" $stdoutPath $stderrPath $testMarker}
+  finally{
+    foreach($dynamic in @([pscustomobject]@{name=$stdoutName;path=$stdoutPath;minimum=0},[pscustomobject]@{name=$stderrName;path=$stderrPath;minimum=0},[pscustomobject]@{name='bootstrap-supervisor.state.json';path=$statePath;minimum=2})){
+      if(-not[IO.File]::Exists([string]$dynamic.path)){continue};$item=Get-B122BootstrapItem ([string]$dynamic.path) $false
+      if($item.Length-lt[int]$dynamic.minimum-or$item.Length-gt262144){throw 'A dynamic trusted-supervisor artifact is outside its size bound.'}
+      $stagedFiles[[string]$dynamic.name]=[pscustomobject]@{sha256=Get-B122BootstrapSha256File ([string]$dynamic.path);bytes=[long]$item.Length};$stagedRelative.Add([string]$dynamic.name)
+    }
   }
+  $supervisorExit=[int]$run.exitCode
   if($run.exitCode-ne0){$diagnostic=([string]$run.stderr).Trim().Replace("`r",' ').Replace("`n",' ');if($diagnostic.Length-gt2048){$diagnostic=$diagnostic.Substring(0,2048)};throw "The independently verified B122 installer failed in its Job-contained host (exit $($run.exitCode)): $diagnostic"}
   if(-not[string]::IsNullOrWhiteSpace([string]$run.stderr)){throw 'The independently verified B122 installer emitted unexpected diagnostics on success.'}
   $stateBytes=Read-B122BootstrapBytes $statePath 262144
@@ -543,16 +702,20 @@ try{
   $outcomeWritten=$true;$installSucceeded=$true
 }catch{
   $caught=$_
-  if(-not$outcomeWritten){
+  if($startedWritten-and-not$outcomeWritten){
     $message=([string]$_.Exception.Message).Replace([char]0,[char]' ').Replace("`r",' ').Replace("`n",' ');if($message.Length-gt1024){$message=$message.Substring(0,1024)}
     try{Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'outcome' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status='installer_failed';cleanup='pending';sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=$supervisorExit;resultSha256=$null;error=$message})|Out-Null;$outcomeWritten=$true}catch{}
   }
 }finally{
   foreach($lock in $locks){try{$lock.Dispose()}catch{}}
-  $cleanupFailures=@(if($null-eq$directoryIdentities){'. (staging directory identities were not established)'}else{Remove-B122BootstrapStaging $staging $stagedRelative.ToArray() $stagedFiles $directoryIdentities $TestCleanupMutation})
+  $cleanupFailures=@(if($null-eq$directoryIdentities){if([IO.Directory]::Exists($staging)){'. (staging directory identities were not established)'}}else{Remove-B122BootstrapStaging $staging $stagedRelative.ToArray() $stagedFiles $directoryIdentities $TestCleanupMutation})
   $cleanup=if($cleanupFailures.Count){'retained'}else{'completed'}
-  try{Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'cleanup' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status=if($installSucceeded){'installer_succeeded'}else{'installer_failed'};cleanup=$cleanup;sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=$supervisorExit;resultSha256=$null;error=if($cleanupFailures.Count){"Retained exact staging paths: $($cleanupFailures-join', ')"}else{$null}})|Out-Null}catch{}
+  if($startedWritten){try{Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'cleanup' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status=if($installSucceeded){'installer_succeeded'}else{'installer_failed'};cleanup=$cleanup;sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=$supervisorExit;resultSha256=$null;error=if($cleanupFailures.Count){"Retained exact staging paths: $($cleanupFailures-join', ')"}else{$null}})|Out-Null}catch{}}
 }
 if($null-ne$caught){throw $caught}
 if($cleanupFailures.Count){Microsoft.PowerShell.Utility\Write-Warning "The successful bootstrap retained exact staging content; consult the durable external cleanup receipt: $($cleanupFailures-join', ')"}
 $installResult|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress|Write-Output
+}finally{
+  if($bootstrapMutexOwned){try{$bootstrapMutex.ReleaseMutex()}catch{}}
+  $bootstrapMutex.Dispose()
+}
