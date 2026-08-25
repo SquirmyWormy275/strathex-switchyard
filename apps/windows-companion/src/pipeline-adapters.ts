@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
 import type { ProtectedReceipt } from "../../../packages/control-plane/src/contracts.ts";
-import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import { configuredGitRepository, type ConfiguredGitHostIdentity } from "./remote-git.ts";
@@ -46,6 +46,8 @@ interface PipelineContext {
   readonly summary?: string;
   readonly startedAt?: string;
   readonly completedAt?: string;
+  readonly runId?: string;
+  readonly jobId?: string;
 }
 
 interface PipelineObservation {
@@ -143,13 +145,34 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
     catch { return { status: "failed", summary: "The protected failure-trace cursor could not be advanced; no failure identity was guessed.", effectDisposition: "ambiguous" }; }
     const selected = failures[selectedIndex];
     if (!selected) return { status: "failed", summary: "The protected failure-trace cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
-    const logExcerpt = selected.summary ?? "The provider supplied no bounded check output for this failed context.";
+    let logExcerpt = selected.summary ?? "The provider supplied no bounded check output for this failed context.";
+    let logSource: "actions-job-log" | "check-output" = "check-output";
+    if (selected.kind === "check" && selected.jobId) {
+      if (request.executionControl && (Date.parse(request.executionControl.deadline) <= Date.now() || await request.executionControl.isCancellationRequested())) {
+        return { status: Date.parse(request.executionControl.deadline) <= Date.now() ? "timed_out" : "cancelled", summary: "Hosted failure-log retrieval stopped before its network effect.", effectDisposition: "not_started" };
+      }
+      const logGuard = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+      if (!logGuard.allowed) return { status: "blocked", summary: logGuard.reason, effectDisposition: "not_started" };
+      const logControl = abortControl(request);
+      let logResponse;
+      try {
+        logResponse = await this.network.request({ routeId: "github.actions-job-log", repositoryRoot: request.target.repositoryRoot, pathParameters: { jobId: selected.jobId }, signal: logControl.signal });
+      } finally { logControl.dispose(); }
+      if (logResponse.outcome !== "passed" || !logResponse.body) {
+        return { status: logResponse.outcome === "blocked" ? "blocked" : "unavailable", summary: `Selected exact-head Actions job ${selected.jobId} log is unavailable: ${untrustedSummary(logResponse.detail)}`, effectDisposition: logResponse.effectDisposition, data: { head: observation.oid, selectedIndex, failureCount: failures.length, repeatAvailable: failures.length > 1, selectedFailure: selected } };
+      }
+      try { logExcerpt = sanitizedHostedLog(logResponse.body); }
+      catch { return { status: "failed", summary: "The selected Actions job returned an invalid or oversized text log; no excerpt was displayed.", effectDisposition: "ambiguous" }; }
+      const afterLog = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+      if (!afterLog.allowed) return { status: "blocked", summary: "The exact target changed while the selected hosted log was being read; the downloaded output was discarded.", effectDisposition: "ambiguous" };
+      logSource = "actions-job-log";
+    }
     const diagnosis = diagnoseFailure(selected, logExcerpt);
     return {
       status: "completed",
       summary: `Failure ${selectedIndex + 1} of ${failures.length}: ${selected.name}=${selected.conclusion ?? selected.state}. ${diagnosis}`.slice(0, 512),
       effectDisposition: "committed",
-      data: { head: observation.oid, selectedIndex, failureCount: failures.length, repeatAvailable: failures.length > 1, selectedFailure: selected, logExcerpt, diagnosis }
+      data: { head: observation.oid, selectedIndex, failureCount: failures.length, repeatAvailable: failures.length > 1, selectedFailure: selected, logExcerpt, logSource, diagnosis }
     };
   }
 }
@@ -172,9 +195,11 @@ function parseContext(value: unknown, host: string, owner: string, name: string)
   if (value.__typename === "CheckRun") {
     if (typeof value.name !== "string" || !bounded(value.name, 256) || !["QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED", "COMPLETED"].includes(String(value.status))
       || (value.conclusion !== null && !["ACTION_REQUIRED", "CANCELLED", "FAILURE", "NEUTRAL", "SKIPPED", "STALE", "STARTUP_FAILURE", "SUCCESS", "TIMED_OUT"].includes(String(value.conclusion)))) throw new Error("invalid check run");
+    const runIdentity = typeof value.detailsUrl === "string" ? exactRunIdentity(value.detailsUrl, host, owner, name) : undefined;
     return {
       kind: "check", name: value.name, state: String(value.status), ...(typeof value.conclusion === "string" ? { conclusion: value.conclusion } : {}),
       ...(safeUrl(value.detailsUrl, host, owner, name) ? { url: exactRunUrl(value.detailsUrl as string, host, owner, name) ?? value.detailsUrl as string } : {}),
+      ...(runIdentity ? { runId: runIdentity.runId, ...(runIdentity.jobId ? { jobId: runIdentity.jobId } : {}) } : {}),
       ...(boundedNullable(value.summary, 4_096) || boundedNullable(value.text, 4_096) || boundedNullable(value.title, 512) ? { summary: boundedSummary([value.title, value.summary, value.text]) } : {}),
       ...(validTimestamp(value.startedAt) ? { startedAt: value.startedAt } : {}), ...(validTimestamp(value.completedAt) ? { completedAt: value.completedAt } : {})
     };
@@ -194,8 +219,18 @@ function boundedNullable(value: unknown, maximum: number): value is string { ret
 function boundedSummary(values: readonly unknown[]): string { return untrustedSummary(values.filter((value): value is string => typeof value === "string" && !!value.trim()).join(" | ").slice(0, 4_096)); }
 function safeUrl(value: unknown, host: string, owner: string, name: string): value is string { try { if (typeof value !== "string" || value.length > 2_048) return false; const url = new URL(value); return url.protocol === "https:" && url.hostname.toLowerCase() === host && !url.username && !url.password && !url.hash && url.pathname.toLowerCase().startsWith(`/${owner}/${name}/`.toLowerCase()); } catch { return false; } }
 function exactRunUrl(value: string, host: string, owner: string, name: string): string | undefined { try { const url = new URL(value); if (!safeUrl(value, host, owner, name) || url.search) return undefined; const prefix = `/${owner}/${name}/actions/runs/`; if (!url.pathname.toLowerCase().startsWith(prefix.toLowerCase())) return undefined; const match = /^(\d{1,20})(?:\/job\/\d{1,20})?\/?$/.exec(url.pathname.slice(prefix.length)); return match ? `https://${host}/${owner}/${name}/actions/runs/${match[1]}` : undefined; } catch { return undefined; } }
+function exactRunIdentity(value: string, host: string, owner: string, name: string): Readonly<{ runId: string; jobId?: string }> | undefined { try { const url = new URL(value); if (!safeUrl(value, host, owner, name) || url.search) return undefined; const prefix = `/${owner}/${name}/actions/runs/`; if (!url.pathname.toLowerCase().startsWith(prefix.toLowerCase())) return undefined; const match = /^([1-9]\d{0,19})(?:\/job\/([1-9]\d{0,19}))?\/?$/.exec(url.pathname.slice(prefix.length)); return match ? { runId: match[1]!, ...(match[2] ? { jobId: match[2] } : {}) } : undefined; } catch { return undefined; } }
 function validTimestamp(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
-function failureFingerprint(value: PipelineContext): string { return digest(JSON.stringify({ kind: value.kind, name: value.name, state: value.state, conclusion: value.conclusion ?? null, url: value.url ?? null, summary: value.summary ?? null })); }
+function failureFingerprint(value: PipelineContext): string { return digest(JSON.stringify({ kind: value.kind, name: value.name, state: value.state, conclusion: value.conclusion ?? null, url: value.url ?? null, runId: value.runId ?? null, jobId: value.jobId ?? null, summary: value.summary ?? null })); }
+function sanitizedHostedLog(bytes: Uint8Array): string {
+  if (bytes.byteLength < 1 || bytes.byteLength > 8 * 1024 * 1024) throw new Error("hosted log size is invalid");
+  const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  if (decoded.includes("\0")) throw new Error("hosted log contains a null byte");
+  const normalized = redactText(decoded.replaceAll("\r\n", "\n").replaceAll("\r", "\n")).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "�");
+  const excerpt = normalized.slice(0, 64 * 1024);
+  if (!excerpt.trim()) throw new Error("hosted log is empty");
+  return excerpt;
+}
 function diagnoseFailure(value: PipelineContext, excerpt: string): string {
   const source = `${value.name} ${value.conclusion ?? value.state} ${excerpt}`.toLowerCase();
   if (/timed?\s*out|timeout|deadline/.test(source)) return "The hosted gate exhausted its time budget; reproduce the exact command with the declared local gate before considering a retry.";

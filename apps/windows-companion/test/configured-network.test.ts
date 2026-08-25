@@ -177,3 +177,63 @@ test("policy loader validates host-owned configuration without contacting the ne
   await writeFile(filePath, JSON.stringify({ version: 1, proxy: "direct", routes: [route] }), "utf8");
   assert.deepEqual(await loadConfiguredNetworkPolicy(filePath), { version: 1, proxy: "direct", routes: [route] });
 });
+
+test("one reviewed numeric resource ID may extend an exact dynamic API path without changing its host or prefix", async (context) => {
+  const setup = await fixture(context);
+  const dynamic = {
+    ...route,
+    id: "github.actions-job-log",
+    method: "GET",
+    url: "https://api.github.com/repos/example/repo/actions/jobs/",
+    pathParameter: { name: "jobId", pattern: "unsigned-decimal", suffix: "/logs" }
+  } as const;
+  const transport = new RecordingTransport();
+  const broker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [dynamic] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), transport, setup.fence, setup.vault.createAdapter("configured-network"));
+  assert.equal((await broker.request({ routeId: dynamic.id, repositoryRoot, pathParameters: { jobId: "18446744073709551615" } })).outcome, "passed");
+  assert.equal(transport.requests[0]?.url, "https://api.github.com/repos/example/repo/actions/jobs/18446744073709551615/logs");
+  const invalidBindings: readonly Readonly<Record<string, string>>[] = [{}, { jobId: "0" }, { jobId: "01" }, { jobId: "1/../../secrets" }, { jobId: "1", extra: "2" }];
+  for (const pathParameters of invalidBindings) {
+    const before = transport.requests.length;
+    assert.equal((await broker.request({ routeId: dynamic.id, repositoryRoot, pathParameters })).outcome, "blocked");
+    assert.equal(transport.requests.length, before);
+  }
+  assert.equal((await setup.broker.request({ routeId: route.id, repositoryRoot, pathParameters: { jobId: "1" } })).outcome, "blocked");
+  assert.throws(() => new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [{ ...dynamic, url: "https://api.github.com/repos/example/repo/actions/jobs?x=1" }] }, new FakeResolver([{ address: "93.184.216.34", family: 4 }]), transport, setup.fence), /slash|query/i);
+});
+
+test("Actions log downloads follow at most one credentialless redirect to one exact reviewed public host", async (context) => {
+  const setup = await fixture(context);
+  const dynamic = {
+    ...route,
+    id: "github.actions-job-log",
+    method: "GET",
+    url: "https://api.github.com/repos/example/repo/actions/jobs/",
+    pathParameter: { name: "jobId", pattern: "unsigned-decimal", suffix: "/logs" },
+    redirects: "single-use-signed-download",
+    redirectHosts: ["results.example.net"]
+  } as const;
+  const requests: PinnedNetworkTransportRequest[] = [];
+  const transport: PinnedNetworkTransport = { async send(request) {
+    requests.push({ ...request, headers: { ...request.headers } });
+    return requests.length === 1
+      ? { status: 302, headers: { location: "https://results.example.net/logs/job-44.txt?sig=ephemeral" }, body: Buffer.alloc(0) }
+      : { status: 200, headers: { "content-type": "text/plain" }, body: Buffer.from("real job log") };
+  } };
+  const resolver = new FakeResolver([{ address: "93.184.216.34", family: 4 }]);
+  const broker = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [dynamic] }, resolver, transport, setup.fence, setup.vault.createAdapter("configured-network"));
+  const result = await broker.request({ routeId: dynamic.id, repositoryRoot, pathParameters: { jobId: "44" } });
+  assert.equal(result.outcome, "passed");
+  assert.equal(Buffer.from(result.body!).toString("utf8"), "real job log");
+  assert.equal(requests[0]?.headers.authorization, "Bearer network-only-token");
+  assert.deepEqual(requests[1]?.headers, {}, "the signed download receives no API credential or static headers");
+  assert.equal(requests[1]?.url, "https://results.example.net/logs/job-44.txt?sig=ephemeral");
+
+  for (const location of ["https://evil.example/log", "http://results.example.net/log", "https://results.example.net/log#fragment", "https://results.example.net/%2e%2e/secret"]) {
+    let calls = 0;
+    const rejectedTransport: PinnedNetworkTransport = { async send() { calls += 1; return { status: 302, headers: { location }, body: Buffer.alloc(0) }; } };
+    const rejected = new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [dynamic] }, resolver, rejectedTransport, setup.fence, setup.vault.createAdapter("configured-network"));
+    assert.equal((await rejected.request({ routeId: dynamic.id, repositoryRoot, pathParameters: { jobId: "44" } })).outcome, "blocked");
+    assert.equal(calls, 1);
+  }
+  assert.throws(() => new ConfiguredHttpsNetworkBroker({ version: 1, proxy: "direct", routes: [{ ...dynamic, redirectHosts: ["*.example.net"] }] }, resolver, transport, setup.fence), /redirect host/i);
+});

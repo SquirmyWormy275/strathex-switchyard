@@ -17,7 +17,7 @@ export interface DynamicConfiguredNetworkOptions {
 }
 
 export interface ProviderCommandTransport {
-  request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult>;
+  request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult>;
   /** A host-known idempotency identity available before the provider effect. */
   recoveryExternalId?(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined;
 }
@@ -26,7 +26,7 @@ export interface ProviderCommandTransport {
 export class DynamicConfiguredNetworkClient implements ProviderCommandTransport {
   private readonly options: DynamicConfiguredNetworkOptions;
   constructor(options: DynamicConfiguredNetworkOptions) { this.options = options; }
-  async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
+  async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
     const policy = await this.options.registry.resolve();
     return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
   }

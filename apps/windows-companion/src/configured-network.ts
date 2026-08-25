@@ -39,8 +39,15 @@ export interface ConfiguredNetworkRoute {
   readonly timeoutMs?: number;
   readonly maxRequestBytes?: number;
   readonly maxResponseBytes?: number;
-  /** Redirect following is deliberately unsupported in the software-only baseline. */
-  readonly redirects: "deny";
+  /** One host-owned dynamic path segment for APIs whose resource ID is selected from an attested response. */
+  readonly pathParameter?: Readonly<{
+    readonly name: string;
+    readonly pattern: "unsigned-decimal";
+    readonly suffix: string;
+  }>;
+  /** Signed download redirects are single-hop, credentialless, and exact-host allowlisted. */
+  readonly redirects: "deny" | "single-use-signed-download";
+  readonly redirectHosts?: readonly string[];
 }
 
 export interface ConfiguredNetworkPolicy {
@@ -86,6 +93,7 @@ export interface ConfiguredNetworkRequest {
   readonly routeId: string;
   readonly repositoryRoot: string;
   readonly body?: string | Uint8Array;
+  readonly pathParameters?: Readonly<Record<string, string>>;
   readonly signal?: AbortSignal;
 }
 
@@ -212,6 +220,9 @@ export class ConfiguredHttpsNetworkBroker {
     const route = this.routes.get(input.routeId);
     if (!route) return blocked(input.routeId, "No exact configured network route matches this request.");
     if (input.signal?.aborted) return blocked(route.id, "Network request was cancelled before dispatch.");
+    let dispatchUrl: string;
+    try { dispatchUrl = materializeRouteUrl(route, input.pathParameters); }
+    catch (error) { return blocked(route.id, redactText(error instanceof Error ? error.message : "Configured path binding failed.").slice(0, 512)); }
     const body = input.body === undefined ? undefined : typeof input.body === "string" ? Buffer.from(input.body, "utf8") : new Uint8Array(input.body);
     const maximumRequestBytes = route.maxRequestBytes ?? 256 * 1024;
     if (body && body.byteLength > maximumRequestBytes) return blocked(route.id, "Network request exceeded the configured input cap.");
@@ -225,7 +236,7 @@ export class ConfiguredHttpsNetworkBroker {
     let effectStarted = false;
     try {
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
-      const url = new URL(route.url);
+      const url = new URL(dispatchUrl);
       const addresses = await this.resolver.resolve(url.hostname, controller.signal);
       const resolvedAddress = validatedPublicAddresses(addresses)[0]!;
       await requireNetworkUncontained(this.containment, input.repositoryRoot);
@@ -241,7 +252,7 @@ export class ConfiguredHttpsNetworkBroker {
         return requireNetworkUncontained(this.containment, input.repositoryRoot).then(() => {
           effectStarted = true;
           return this.transport.send({
-            url: route.url,
+            url: dispatchUrl,
             method: route.method,
             headers,
             body,
@@ -254,7 +265,7 @@ export class ConfiguredHttpsNetworkBroker {
           });
         });
       };
-      const response = route.credential
+      let response = route.credential
         ? this.credentials
           ? await this.credentials.withCredential({
             reference: route.credential.reference,
@@ -266,7 +277,21 @@ export class ConfiguredHttpsNetworkBroker {
         : await dispatch();
       if (!response) return { outcome: "unavailable", routeId: route.id, detail: "The configured route requires a credential adapter.", effectDisposition: "not_started" };
       if (response.body.byteLength > (route.maxResponseBytes ?? 512 * 1024)) return blocked(route.id, "Network response exceeded the configured output cap.");
-      if (response.status >= 300 && response.status < 400) return blocked(route.id, "Network redirects are denied by the exact-route policy.");
+      if (response.status >= 300 && response.status < 400) {
+        if (route.redirects !== "single-use-signed-download") return blocked(route.id, "Network redirects are denied by the exact-route policy.");
+        let redirectUrl: URL;
+        try { redirectUrl = validatedSignedDownloadRedirect(response, route.redirectHosts ?? []); }
+        catch { return blocked(route.id, "The signed download redirect did not match the exact reviewed host policy."); }
+        const redirectAddresses = await this.resolver.resolve(redirectUrl.hostname, controller.signal);
+        const redirectAddress = validatedPublicAddresses(redirectAddresses)[0]!;
+        await requireNetworkUncontained(this.containment, input.repositoryRoot);
+        response = await this.transport.send({
+          url: redirectUrl.toString(), method: "GET", headers: {}, timeoutMs,
+          maxResponseBytes: route.maxResponseBytes ?? 512 * 1024,
+          resolvedAddress: redirectAddress, rejectUnauthorized: true, proxy: "direct", signal: controller.signal
+        });
+        if (response.status >= 300 && response.status < 400) return blocked(route.id, "A second network redirect is denied.");
+      }
       const common = { routeId: route.id, status: response.status, headers: safeResponseHeaders(response.headers), body: new Uint8Array(response.body), effectDisposition: "ambiguous" as const };
       return response.status >= 200 && response.status < 300
         ? { outcome: "passed", detail: `Configured network route ${route.id} completed.`, ...common }
@@ -313,7 +338,7 @@ function validateRoute(candidate: unknown): ConfiguredNetworkRoute {
   if (!supportedMethods.has(method)) throw new Error(`Configured network route ${id} uses an unsupported method.`);
   if (typeof route.url !== "string") throw new Error(`Configured network route ${id} needs an exact HTTPS URL.`);
   const url = validatedRouteUrl(route.url);
-  if (route.redirects !== "deny") throw new Error(`Configured network route ${id} must deny redirects.`);
+  if (route.redirects !== "deny" && route.redirects !== "single-use-signed-download") throw new Error(`Configured network route ${id} has an invalid redirect policy.`);
   const staticHeaders: Record<string, string> = {};
   for (const [rawName, rawValue] of Object.entries(route.staticHeaders ?? {})) {
     const name = validatedHeaderName(rawName);
@@ -332,6 +357,22 @@ function validateRoute(candidate: unknown): ConfiguredNetworkRoute {
   const timeoutMs = optionalBounded(route.timeoutMs, "network timeout", maximumTimeoutMs);
   const maxRequestBytes = optionalBounded(route.maxRequestBytes, "network request cap", maximumConfiguredBytes);
   const maxResponseBytes = optionalBounded(route.maxResponseBytes, "network response cap", maximumConfiguredBytes);
+  let pathParameter: ConfiguredNetworkRoute["pathParameter"];
+  if (route.pathParameter !== undefined) {
+    if (!route.pathParameter || typeof route.pathParameter !== "object" || Array.isArray(route.pathParameter)) throw new Error(`Configured network route ${id} has an invalid path parameter policy.`);
+    const name = identifier(route.pathParameter.name, "network path parameter name");
+    if (route.pathParameter.pattern !== "unsigned-decimal") throw new Error(`Configured network route ${id} has an unsupported path parameter pattern.`);
+    const suffix = route.pathParameter.suffix;
+    if (typeof suffix !== "string" || !/^\/[A-Za-z0-9._~-]{1,64}(?:\/[A-Za-z0-9._~-]{1,64}){0,3}$/.test(suffix) || suffix.includes("..")) throw new Error(`Configured network route ${id} has an invalid fixed path suffix.`);
+    if (url.search || !url.pathname.endsWith("/")) throw new Error(`Configured network route ${id} dynamic path bases must end in a slash and have no query.`);
+    pathParameter = { name, pattern: "unsigned-decimal", suffix };
+  }
+  let redirectHosts: readonly string[] | undefined;
+  if (route.redirects === "single-use-signed-download") {
+    if (method !== "GET" || !pathParameter || !Array.isArray(route.redirectHosts) || route.redirectHosts.length < 1 || route.redirectHosts.length > 8) throw new Error(`Configured network route ${id} signed downloads require a dynamic GET route and bounded exact redirect hosts.`);
+    redirectHosts = [...new Set(route.redirectHosts.map((host) => validatedExactHost(host, "redirect host")))];
+    if (redirectHosts.length !== route.redirectHosts.length) throw new Error(`Configured network route ${id} redirect hosts must be unique.`);
+  } else if (route.redirectHosts !== undefined) throw new Error(`Configured network route ${id} cannot declare redirect hosts while redirects are denied.`);
   return {
     id,
     method,
@@ -341,8 +382,45 @@ function validateRoute(candidate: unknown): ConfiguredNetworkRoute {
     ...(timeoutMs ? { timeoutMs } : {}),
     ...(maxRequestBytes ? { maxRequestBytes } : {}),
     ...(maxResponseBytes ? { maxResponseBytes } : {}),
-    redirects: "deny"
+    ...(pathParameter ? { pathParameter } : {}),
+    redirects: route.redirects,
+    ...(redirectHosts ? { redirectHosts } : {})
   };
+}
+
+function materializeRouteUrl(route: ConfiguredNetworkRoute, values: Readonly<Record<string, string>> | undefined): string {
+  if (!route.pathParameter) {
+    if (values && Object.keys(values).length) throw new Error("The exact configured route does not accept path parameters.");
+    return route.url;
+  }
+  const keys = Object.keys(values ?? {});
+  if (keys.length !== 1 || keys[0] !== route.pathParameter.name) throw new Error("The configured dynamic route requires one exact path parameter.");
+  const value = values![route.pathParameter.name];
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,19}$/.test(value)) throw new Error("The configured dynamic route path parameter is invalid.");
+  const url = new URL(route.url);
+  url.pathname = `${url.pathname}${value}${route.pathParameter.suffix}`;
+  return url.toString();
+}
+
+function validatedSignedDownloadRedirect(response: PinnedNetworkTransportResponse, allowedHosts: readonly string[]): URL {
+  if (response.status !== 302 && response.status !== 307) throw new Error("unsupported redirect status");
+  const location = response.headers.location;
+  if (typeof location !== "string" || !location || location.length > 8_192 || /[\r\n\0]/.test(location)) throw new Error("missing redirect location");
+  let url: URL;
+  try { url = new URL(location); } catch { throw new Error("invalid redirect URL"); }
+  const host = validatedExactHost(url.hostname, "signed download host");
+  if (!allowedHosts.includes(host) || url.protocol !== "https:" || (url.port && url.port !== "443") || url.username || url.password || url.hash) throw new Error("untrusted redirect URL");
+  const rawPath = location.split(/[?#]/, 1)[0] ?? location;
+  if (!url.pathname.startsWith("/") || /%(?:2e|2f|5c)/i.test(rawPath) || url.search.length > 4_096) throw new Error("unsafe redirect path");
+  return url;
+}
+
+function validatedExactHost(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.length > 253 || value.startsWith(".") || value.endsWith(".")) throw new Error(`${label} is invalid.`);
+  const host = value.toLowerCase();
+  if (!host.includes(".") || host.split(".").some((part) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(part))) throw new Error(`${label} is invalid.`);
+  if (/^(?:localhost|.*\.localhost|.*\.local|.*\.internal|.*\.home\.arpa|.*\.onion)$/i.test(host)) throw new Error(`${label} is invalid.`);
+  return host;
 }
 
 function validatedRouteUrl(value: string): URL {
