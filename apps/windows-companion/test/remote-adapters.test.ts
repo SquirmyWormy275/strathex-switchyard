@@ -255,3 +255,54 @@ test("configured automation creates one observable child saga and records the ga
   assert.equal(childEvents.some(([kind]) => kind === "external"), true);
   assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
 });
+
+test("configured provider routing aborts when durable cancellation polling fails", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    let checks = 0;
+    let transportAborted = false;
+    const adapter = new ConfiguredProviderCommandAdapter({
+      async request(input: { routeId: string; signal?: AbortSignal }) {
+        assert.ok(input.signal);
+        return new Promise<{
+          outcome: "blocked";
+          routeId: string;
+          detail: string;
+          effectDisposition: "not_started";
+        }>((resolve) => {
+          const finish = (): void => {
+            transportAborted = true;
+            resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled", effectDisposition: "not_started" });
+          };
+          if (input.signal!.aborted) finish();
+          else input.signal!.addEventListener("abort", finish, { once: true });
+        });
+      }
+    } as unknown as DynamicConfiguredNetworkClient, {
+      async claimForDispatch() { return proofArtifact(); },
+      async acknowledge() { throw new Error("an aborted transport must not acknowledge"); }
+    });
+    const startedAt = Date.now();
+    const request = {
+      ...(providerRequest() as unknown as Record<string, unknown>),
+      executionControl: {
+        deadline: new Date(Date.now() + 2_000).toISOString(),
+        async isCancellationRequested() {
+          checks += 1;
+          if (checks === 1) return false;
+          throw new Error("protected cancellation ledger unavailable");
+        }
+      }
+    } as unknown as AdapterRequest;
+    const outcome = await adapter.execute(request);
+    assert.equal(outcome.status, "blocked");
+    assert.equal(transportAborted, true);
+    assert.ok(Date.now() - startedAt < 700, "provider transport waited for its route deadline after cancellation polling failed");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});

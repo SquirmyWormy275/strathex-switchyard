@@ -187,6 +187,65 @@ test("automatic Council stays gate-disabled and does not allocate isolation with
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test("automatic Council aborts when durable cancellation polling fails", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-cancellation-ledger-"));
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const now = Date.now();
+    const heartbeat = new Date(now).toISOString();
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => heartbeat });
+    await sessions.upsert({ ...session("one", "codex", ["src/one.ts"]), lastHeartbeat: heartbeat });
+    await sessions.upsert({ ...session("two", "claude", ["src/two.ts"]), lastHeartbeat: heartbeat });
+    let checks = 0;
+    let transportAborted = false;
+    const network = {
+      async request(input: { routeId: string; signal?: AbortSignal }) {
+        assert.ok(input.signal);
+        return new Promise<{ outcome: "blocked"; routeId: string; detail: string }>((resolve) => {
+          const finish = (): void => { transportAborted = true; resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled" }); };
+          if (input.signal!.aborted) finish();
+          else input.signal!.addEventListener("abort", finish, { once: true });
+        });
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    const startedAt = Date.now();
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => heartbeat, idFactory: () => "epoch-cancellation-ledger" }),
+      sessions,
+      network,
+      () => now,
+      { isolation: fakeIsolation(), automaticGate: acceptedGate }
+    ).execute({
+      action: "council_automatic",
+      operationId: "operation-cancellation-ledger",
+      target,
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+      executionControl: {
+        operationId: "operation-cancellation-ledger",
+        deadline: new Date(now + 2_000).toISOString(),
+        async isCancellationRequested() {
+          checks += 1;
+          if (checks === 1) return false;
+          throw new Error("protected cancellation ledger unavailable");
+        }
+      }
+    });
+    assert.equal(result.status, "incomplete");
+    assert.equal(transportAborted, true);
+    assert.ok(Date.now() - startedAt < 700, "Council waited for its deadline after cancellation polling failed");
+    assert.equal((await new CouncilCoordinator(store).get("epoch-cancellation-ledger"))?.status, "aborted");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("automatic Council gate requires every exact-target acceptance record and rejects stale target evidence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "b122-council-evidence-"));
   try {

@@ -176,6 +176,48 @@ test("same branch name in another fork cannot alias the reviewed PR identity", a
   assert.equal(result.headRepository, "acme/project");
 });
 
+test("remote Git aborts when durable cancellation polling fails", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    let checks = 0;
+    let transportAborted = false;
+    const network = {
+      async request(input: { routeId: string; signal?: AbortSignal }) {
+        assert.ok(input.signal);
+        return new Promise<{ outcome: "blocked"; routeId: string; detail: string }>((resolve) => {
+          const finish = (): void => { transportAborted = true; resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled" }); };
+          if (input.signal!.aborted) finish();
+          else input.signal!.addEventListener("abort", finish, { once: true });
+        });
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    const request = {
+      ...requestFor({ kind: "pr_upsert", headBranch: "feat/test", baseBranch: "main", title: "Reviewed", body: "Reviewed" }),
+      executionControl: {
+        deadline: new Date(Date.now() + 2_000).toISOString(),
+        async isCancellationRequested() {
+          checks += 1;
+          if (checks <= 2) return false;
+          throw new Error("protected cancellation ledger unavailable");
+        }
+      }
+    } as GitRequest;
+    const startedAt = Date.now();
+    await assert.rejects(
+      new ConfiguredGitHubGraphqlPort(network, gitHost).defaultBranch({ repositoryRoot: target.repositoryRoot, owner: "acme", name: "project", request }),
+      /configured GitHub GraphQL route did not complete/i
+    );
+    assert.equal(transportAborted, true);
+    assert.ok(Date.now() - startedAt < 700, "remote Git waited for its durable deadline after cancellation polling failed");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});
+
 test("fork PR upsert pushes the exact head repository while creating into the separately configured base", async () => {
   const forkPolicy: ConfiguredNetworkPolicy = { version: 1, proxy: "direct", routes: [
     { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },

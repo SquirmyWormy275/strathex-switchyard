@@ -1222,7 +1222,12 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
     if (request.executionControl) {
       const remaining = Math.max(1, Date.parse(request.executionControl.deadline) - Date.now());
       deadline = setTimeout(() => controller.abort(), remaining);
-      poll = setInterval(() => { void request.executionControl!.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }); }, 100);
+      poll = setInterval(() => {
+        void request.executionControl!.isCancellationRequested().then(
+          (cancelled) => { if (cancelled) controller.abort(); },
+          () => controller.abort()
+        );
+      }, 100);
     }
     const controlPlaneGuard: WindowsSandboxEffectGuard = {
       check: async (input) => {

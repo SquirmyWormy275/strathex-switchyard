@@ -498,6 +498,56 @@ test("the control-plane wrapper claims enforcement only for a completed concrete
   assert.equal(outcome.data?.backend, "windows-sandbox");
 });
 
+test("the control-plane sandbox wrapper aborts when durable cancellation polling fails", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    let checks = 0;
+    let backendAborted = false;
+    const backend = {
+      async execute(input: { signal: AbortSignal }) {
+        return new Promise<{ status: "cancelled"; summary: string }>((resolve) => {
+          const finish = (): void => { backendAborted = true; resolve({ status: "cancelled", summary: "Sandbox operation cancelled." }); };
+          if (input.signal.aborted) finish();
+          else input.signal.addEventListener("abort", finish, { once: true });
+        });
+      }
+    };
+    const runtime = new WindowsSandboxIsolationRuntime(backend as never, {
+      destinationRoot: "C:\\validated-results",
+      permitVerifier: { verifyPermit: () => true },
+      recipeCatalogDigest: "a".repeat(64),
+      helperDigest: "b".repeat(64)
+    });
+    const startedAt = Date.now();
+    const outcome = await runtime.start({
+      action: "full_sandbox",
+      operationId: "operation-cancellation-ledger",
+      target: { id: "target-1", repositoryRoot: "C:\\repo" } as never,
+      profile: "full_sandbox",
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+      executionControl: {
+        operationId: "operation-cancellation-ledger",
+        deadline: new Date(Date.now() + 2_000).toISOString(),
+        async isCancellationRequested() {
+          checks += 1;
+          if (checks === 1) return false;
+          throw new Error("protected cancellation ledger unavailable");
+        }
+      }
+    });
+    assert.equal(outcome.status, "cancelled");
+    assert.equal(backendAborted, true);
+    assert.ok(Date.now() - startedAt < 700, "Windows Sandbox waited for its deadline after cancellation polling failed");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});
+
 function processIdentity(pid: number, creationFileTimeUtc = "133801632000000000"): WindowsSandboxProcessIdentity {
   return {
     pid,

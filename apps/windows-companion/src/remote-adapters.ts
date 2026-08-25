@@ -424,7 +424,12 @@ async function operationAbort(control: AutomationRequest["executionControl"] | A
     if (remaining <= 0 || await control.isCancellationRequested()) controller.abort();
     else {
       timer = setTimeout(() => controller.abort(), remaining);
-      poll = setInterval(() => { void control.isCancellationRequested().then((cancelled) => { if (cancelled) controller.abort(); }); }, 100);
+      poll = setInterval(() => {
+        void control.isCancellationRequested().then(
+          (cancelled) => { if (cancelled) controller.abort(); },
+          () => controller.abort()
+        );
+      }, 100);
     }
   }
   return { signal: controller.signal, dispose() { if (timer) clearTimeout(timer); if (poll) clearInterval(poll); } };
