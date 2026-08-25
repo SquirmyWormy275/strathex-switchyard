@@ -41,10 +41,11 @@ internal static class Program
     private const int JobObjectBasicAccountingInformation = 1;
     private const int JobObjectExtendedLimitInformationClass = 9;
     private static readonly IntPtr ProcThreadAttributeHandleList = new(0x00020002);
+    private static readonly IntPtr ProcThreadAttributeJobList = new(0x0002000d);
 
     private static readonly Regex SafeDigest = new("^[a-f0-9]{64}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
     private static readonly Regex SafeManagedId = new("^managed:[a-f0-9]{64}$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
-    private static readonly Regex SafeAction = new("^(?:run_target|launch_web_app|venv|rebuild_venv|pipeline_local_gate|pipeline_clean_reproduction|shield_change_scan|shield_codebase_audit|shield_supply_chain|release_shield)$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private static readonly Regex SafeAction = new("^(?:run_target|launch_web_app|venv|rebuild_venv|pipeline_local_gate|pipeline_clean_reproduction|shield_change_scan|shield_codebase_audit|shield_supply_chain|release_shield|trusted_bootstrap)$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
     private static readonly Regex SecretEnvironmentName = new("(?:^|_)(?:PASSWORD|PASSWD|SECRET|TOKEN|CREDENTIAL|AUTHORIZATION|COOKIE|API_KEY|PRIVATE_KEY|ACCESS_KEY|DATABASE_URL|DSN)(?:$|_)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
     public static async Task<int> Main(string[] args)
@@ -63,6 +64,10 @@ internal static class Program
             {
                 await Task.Delay(TimeSpan.FromMinutes(2)).ConfigureAwait(false);
                 return 0;
+            }
+            if (args.Length == 2 && StringComparer.Ordinal.Equals(args[0], "--self-test-post-create"))
+            {
+                return await SelfTestPostCreateAsync(args[1]).ConfigureAwait(false);
             }
             if (args.Length == 5 && StringComparer.Ordinal.Equals(args[0], "--recipe"))
             {
@@ -124,8 +129,7 @@ internal static class Program
         TypedRecipe recipe = ParseTypedRecipe(configBytes, recipeId, inputRoot, workRoot);
         using SafeJobHandle job = CreateKillOnCloseJob(null);
         using FileStream executableLock = OpenVerifiedExecutable(recipe.Executable, recipe.ExecutableSha256);
-        using StartedProcess child = StartSuspendedProcess(recipe.Executable, recipe.Arguments, recipe.WorkingDirectory, recipe.Environment);
-        if (!AssignProcessToJobObject(job, child.ProcessHandle)) throw LastError(74, "Typed recipe could not enter its owned Job Object.");
+        using StartedProcess child = StartSuspendedProcess(recipe.Executable, recipe.Arguments, recipe.WorkingDirectory, recipe.Environment, job);
         if (ResumeThread(child.ThreadHandle) == uint.MaxValue) throw LastError(74, "Typed recipe could not resume its reviewed tool.");
         child.ThreadHandle.Dispose();
         var budget = new SharedOutputBudget(recipe.MaxOutputBytes);
@@ -323,8 +327,7 @@ internal static class Program
         string jobName = JobName(request.SupervisorId);
         using SafeJobHandle job = CreateKillOnCloseJob(jobName);
         using FileStream executableLock = OpenVerifiedExecutable(request.Executable, request.ExecutableSha256);
-        using StartedProcess child = StartSuspendedProcess(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment);
-        if (!AssignProcessToJobObject(job, child.ProcessHandle)) throw LastError(74, "Could not assign the suspended child to the exact Job Object.");
+        using StartedProcess child = StartSuspendedProcess(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment, job);
         if (ResumeThread(child.ThreadHandle) == uint.MaxValue) throw LastError(74, "Could not resume the Job-Object child.");
         child.ThreadHandle.Dispose();
 
@@ -409,15 +412,16 @@ internal static class Program
         int childPid = 0;
         int grandchildPid = 0;
         bool grandchildObserved = false;
+        bool atomicJobAssignment = false;
         bool terminated = false;
         bool noSurvivors = false;
         try
         {
             string selfTestJobName = @"Local\SxsyB122-SelfTest-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
             using SafeJobHandle job = CreateKillOnCloseJob(selfTestJobName);
-            using StartedProcess child = StartSuspendedProcess(self, new[] { "--self-test-child", marker, selfTestJobName }, root, new Dictionary<string, string>(StringComparer.Ordinal));
+            using StartedProcess child = StartSuspendedProcess(self, new[] { "--self-test-child", marker, selfTestJobName }, root, new Dictionary<string, string>(StringComparer.Ordinal), job);
             childPid = child.ProcessId;
-            if (!AssignProcessToJobObject(job, child.ProcessHandle)) throw LastError(74, "Self-test could not assign the child Job Object.");
+            if (!IsProcessInJob(child.ProcessHandle, job, out atomicJobAssignment) || !atomicJobAssignment) throw LastError(74, "Self-test child was not atomically assigned at CreateProcess.");
             if (ResumeThread(child.ThreadHandle) == uint.MaxValue) throw LastError(74, "Self-test could not resume its child.");
             child.ThreadHandle.Dispose();
             DateTime deadline = DateTime.UtcNow.AddSeconds(5);
@@ -443,27 +447,45 @@ internal static class Program
             version = 1,
             jobObjectCreated = true,
             childStartedSuspended = true,
+            atomicJobAssignment,
             grandchildObserved,
             killOnClose = true,
             childTreeTerminated = terminated,
             noSurvivors
         };
         Console.Write(JsonSerializer.Serialize(receipt));
-        return grandchildObserved && terminated && noSurvivors ? 0 : 1;
+        return atomicJobAssignment && grandchildObserved && terminated && noSurvivors ? 0 : 1;
     }
 
     private static async Task<int> SelfTestChildAsync(string markerArgument, string jobName)
     {
         string marker = RequireAbsolutePath(markerArgument, "self-test marker");
         string self = ResolveSelf();
-        using StartedProcess grandchild = StartSuspendedProcess(self, new[] { "--self-test-grandchild" }, Path.GetDirectoryName(marker)!, new Dictionary<string, string>(StringComparer.Ordinal));
         using SafeJobHandle job = OpenJobObject(JobObjectAssignProcess | JobObjectQuery, false, jobName);
-        if (job.IsInvalid || !IsProcessInJob(grandchild.ProcessHandle, job, out bool alreadyAssigned) || !alreadyAssigned && !AssignProcessToJobObject(job, grandchild.ProcessHandle)) return 1;
+        if (job.IsInvalid) return 1;
+        using StartedProcess grandchild = StartSuspendedProcess(self, new[] { "--self-test-grandchild" }, Path.GetDirectoryName(marker)!, new Dictionary<string, string>(StringComparer.Ordinal), job);
+        if (!IsProcessInJob(grandchild.ProcessHandle, job, out bool alreadyAssigned) || !alreadyAssigned) return 1;
         if (ResumeThread(grandchild.ThreadHandle) == uint.MaxValue) return 1;
         grandchild.ThreadHandle.Dispose();
         File.WriteAllText(marker, JsonSerializer.Serialize(new { childPid = Environment.ProcessId, grandchildPid = grandchild.ProcessId }), new UTF8Encoding(false));
         await Task.Delay(TimeSpan.FromMinutes(2)).ConfigureAwait(false);
         return 0;
+    }
+
+    private static async Task<int> SelfTestPostCreateAsync(string markerArgument)
+    {
+        string marker = RequireAbsolutePath(markerArgument, "post-create self-test marker");
+        string temporary = Path.GetFullPath(Path.GetTempPath());
+        if (!Inside(marker, temporary)) throw new RunnerException(65, "The post-create self-test marker must remain under the operating-system temporary directory.");
+        string parent = RequireConcreteDirectory(Path.GetDirectoryName(marker)!, "post-create self-test directory");
+        EnsureNoReparseComponents(temporary, parent, "post-create self-test directory");
+        if (File.Exists(marker) || Directory.Exists(marker)) throw new RunnerException(65, "The post-create self-test marker already exists.");
+        using SafeJobHandle job = CreateKillOnCloseJob(@"Local\SxsyB122-PostCreate-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        using StartedProcess child = StartSuspendedProcess(ResolveSelf(), new[] { "--self-test-grandchild" }, parent, new Dictionary<string, string>(StringComparer.Ordinal), job);
+        if (!IsProcessInJob(child.ProcessHandle, job, out bool assigned) || !assigned) throw LastError(74, "The post-create self-test child was not atomically assigned.");
+        File.WriteAllText(marker, JsonSerializer.Serialize(new { schema = "sxsy-b122.repository-runner-post-create", version = 1, supervisorPid = Environment.ProcessId, childPid = child.ProcessId, atomicallyAssigned = true }), new UTF8Encoding(false));
+        await Task.Delay(TimeSpan.FromMinutes(2)).ConfigureAwait(false);
+        return 1;
     }
 
     private static Request ReadRequest(string path)
@@ -539,7 +561,7 @@ internal static class Program
         catch (JsonException) { return null; }
     }
 
-    private static StartedProcess StartSuspendedProcess(string executable, IReadOnlyList<string> arguments, string workingDirectory, IReadOnlyDictionary<string, string> environment)
+    private static StartedProcess StartSuspendedProcess(string executable, IReadOnlyList<string> arguments, string workingDirectory, IReadOnlyDictionary<string, string> environment, SafeJobHandle job)
     {
         CreatePipe(out IntPtr stdoutRead, out IntPtr stdoutWrite, inheritable: true);
         CreatePipe(out IntPtr stderrRead, out IntPtr stderrWrite, inheritable: true);
@@ -552,18 +574,21 @@ internal static class Program
             StartupInfo = new StartupInfo { cb = Marshal.SizeOf<StartupInfoEx>(), dwFlags = StartfUseStdHandles, hStdInput = nullInput.DangerousGetHandle(), hStdOutput = stdoutWrite, hStdError = stderrWrite }
         };
         string commandLine = BuildCommandLine(executable, arguments);
-        IntPtr environmentBlock = Marshal.StringToHGlobalUni(BuildEnvironmentBlock(environment));
+        IntPtr environmentBlock = Marshal.StringToHGlobalUni(BuildEnvironmentBlock(environment, workingDirectory));
         IntPtr attributeListSize = IntPtr.Zero;
-        _ = InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref attributeListSize);
+        _ = InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref attributeListSize);
         startup.AttributeList = Marshal.AllocHGlobal(attributeListSize);
         IntPtr handleList = Marshal.AllocHGlobal(IntPtr.Size * 3);
+        IntPtr jobList = Marshal.AllocHGlobal(IntPtr.Size);
         try
         {
-            if (!InitializeProcThreadAttributeList(startup.AttributeList, 1, 0, ref attributeListSize)) throw LastError(74, "Could not initialize the restricted inherited-handle list.");
+            if (!InitializeProcThreadAttributeList(startup.AttributeList, 2, 0, ref attributeListSize)) throw LastError(74, "Could not initialize the restricted process attribute list.");
             Marshal.WriteIntPtr(handleList, 0, nullInput.DangerousGetHandle());
             Marshal.WriteIntPtr(handleList, IntPtr.Size, stdoutWrite);
             Marshal.WriteIntPtr(handleList, IntPtr.Size * 2, stderrWrite);
             if (!UpdateProcThreadAttribute(startup.AttributeList, 0, ProcThreadAttributeHandleList, handleList, new IntPtr(IntPtr.Size * 3), IntPtr.Zero, IntPtr.Zero)) throw LastError(74, "Could not restrict child handle inheritance.");
+            Marshal.WriteIntPtr(jobList, job.DangerousGetHandle());
+            if (!UpdateProcThreadAttribute(startup.AttributeList, 0, ProcThreadAttributeJobList, jobList, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero)) throw LastError(74, "Could not bind the reviewed process to its Job Object at CreateProcess.");
             bool created = CreateProcessW(executable, new StringBuilder(commandLine), IntPtr.Zero, IntPtr.Zero, true, CreateSuspended | CreateNoWindow | CreateUnicodeEnvironment | ExtendedStartupInfoPresent, environmentBlock, workingDirectory, ref startup, out ProcessInformation information);
             int createError = created ? 0 : Marshal.GetLastWin32Error();
             CloseHandle(stdoutWrite);
@@ -584,6 +609,7 @@ internal static class Program
         finally
         {
             if (startup.AttributeList != IntPtr.Zero) DeleteProcThreadAttributeList(startup.AttributeList);
+            Marshal.FreeHGlobal(jobList);
             Marshal.FreeHGlobal(handleList);
             Marshal.FreeHGlobal(startup.AttributeList);
             Marshal.FreeHGlobal(environmentBlock);
@@ -593,7 +619,13 @@ internal static class Program
     private static SafeJobHandle CreateKillOnCloseJob(string? name)
     {
         SafeJobHandle job = CreateJobObjectW(IntPtr.Zero, name);
-        if (job.IsInvalid) throw LastError(74, "Could not create the owned Windows Job Object.");
+        int creationError = Marshal.GetLastWin32Error();
+        if (job.IsInvalid) throw new RunnerException(74, "Could not create the owned Windows Job Object. Win32=" + creationError.ToString(CultureInfo.InvariantCulture));
+        if (name is not null && creationError == 183)
+        {
+            job.Dispose();
+            throw new RunnerException(73, "The exact repository Job Object name is already owned by another generation.");
+        }
         var information = new JobObjectExtendedLimitInformation { BasicLimitInformation = new JobObjectBasicLimitInformation { LimitFlags = JobObjectLimitKillOnJobClose } };
         int size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
         IntPtr pointer = Marshal.AllocHGlobal(size);
@@ -683,9 +715,11 @@ internal static class Program
         return result.ToString();
     }
 
-    private static string BuildEnvironmentBlock(IReadOnlyDictionary<string, string> environment)
+    private static string BuildEnvironmentBlock(IReadOnlyDictionary<string, string> environment, string workingDirectory)
     {
         var builder = new StringBuilder();
+        string root = Path.GetPathRoot(workingDirectory) ?? string.Empty;
+        if (Regex.IsMatch(root, "^[A-Za-z]:\\\\$", RegexOptions.CultureInvariant)) builder.Append('=').Append(char.ToUpperInvariant(root[0])).Append(":=").Append(workingDirectory).Append('\0');
         foreach ((string name, string value) in environment.OrderBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)) builder.Append(name).Append('=').Append(value).Append('\0');
         if (environment.Count == 0) builder.Append('\0');
         builder.Append('\0');

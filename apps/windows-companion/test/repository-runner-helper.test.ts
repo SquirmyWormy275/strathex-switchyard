@@ -51,11 +51,33 @@ test("self-contained repository runner proves Job-Object child and grandchild co
   assert.equal(receipt.schema, "sxsy-b122.repository-runner-self-test");
   assert.equal(receipt.jobObjectCreated, true);
   assert.equal(receipt.childStartedSuspended, true);
+  assert.equal(receipt.atomicJobAssignment, true);
   assert.equal(receipt.grandchildObserved, true);
   assert.equal(receipt.killOnClose, true);
   assert.equal(receipt.childTreeTerminated, true);
   assert.equal(receipt.noSurvivors, true);
   assert.match((await readFile(project, "utf8")), /RuntimeFrameworkVersion>8\.0\.30</);
+  assert.match(await readFile(join(dirname(project), "Program.cs"), "utf8"), /trusted_bootstrap/, "the independently trusted installer action must remain explicitly allowlisted");
+
+  const postCreateMarker = join(root, "post-create.json");
+  const postCreate = spawn(helper, ["--self-test-post-create", postCreateMarker], { cwd: root, env: {}, shell: false, windowsHide: true, stdio: "ignore" });
+  const postCreateClosed = new Promise<void>((resolveExit) => postCreate.once("close", () => resolveExit()));
+  try {
+    const postCreateDeadline = Date.now() + 5_000;
+    while (Date.now() < postCreateDeadline && !(await access(postCreateMarker).then(() => true).catch(() => false))) await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
+    const postCreateReceipt = JSON.parse(await readFile(postCreateMarker, "utf8")) as { schema: string; supervisorPid: number; childPid: number; atomicallyAssigned: boolean };
+    assert.equal(postCreateReceipt.schema, "sxsy-b122.repository-runner-post-create");
+    assert.equal(postCreateReceipt.supervisorPid, postCreate.pid);
+    assert.equal(postCreateReceipt.atomicallyAssigned, true);
+    postCreate.kill("SIGKILL");
+    await postCreateClosed;
+    const postCreateGone = Date.now() + 5_000;
+    while (Date.now() < postCreateGone && alive(postCreateReceipt.childPid)) await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
+    assert.equal(alive(postCreateReceipt.childPid), false, "a supervisor killed immediately after CreateProcess must not strand its suspended child");
+  } finally {
+    if (postCreate.exitCode === null && postCreate.signalCode === null) postCreate.kill("SIGKILL");
+    await Promise.race([postCreateClosed, new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000))]);
+  }
 
   const recipeIds = [
     "full_sandbox",
