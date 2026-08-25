@@ -48,6 +48,14 @@ cannot invent a commit message or path set: the extension collects exact
 operator-reviewed input, and the companion binds it to the current target,
 authority, confirmation, and final effect guard.
 
+The npm workspace package is deliberately the JavaScript companion only. It
+does not contain the native Sandbox, repository-runtime, Raw-HID, or
+provider-desktop helpers and is not eligible release evidence or a complete
+Windows installation. `deployment/windows/Build-B122Release.ps1` is the sole
+packager for the verified Windows bundle; that bundle builds or accepts
+digest-pinned native helpers, includes them beside the compiled companion, and
+validates their provenance and self-tests.
+
 No control silently commits, pushes, merges, force-pushes, approves a
 permission, submits a prompt, or kills an inferred process. High-consequence
 actions remain disabled until the mediated host and required real acceptance

@@ -16,6 +16,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$integrityModule = Join-Path $PSScriptRoot 'B122ReleaseIntegrity.psm1'
+Import-Module -Name $integrityModule -Force
+$sourceCommit = Get-B122ReleaseSourceCommit -RepositoryRoot $repo
+Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
 $OutputDirectory = if ($OutputDirectory) { $OutputDirectory } else { Join-Path $repo 'artifacts\b122-windows' }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 Set-Location -LiteralPath $repo
@@ -36,19 +40,30 @@ $nodeSource = [Uri]$NodeRuntimeSourceUri
 if ($nodeSource.Scheme -cne 'https' -or $nodeSource.Host -cne 'nodejs.org' -or $nodeSource.Query -or $nodeSource.Fragment -or $nodeSource.UserInfo -or $nodeSource.AbsoluteUri -cne $NodeRuntimeSourceUri -or $nodeSource.AbsolutePath -notmatch '^/dist/v\d+\.\d+\.\d+/node-v\d+\.\d+\.\d+-win-x64\.zip$' -or [IO.Path]::GetFileName($nodeRuntimeArchive) -cne [IO.Path]::GetFileName($nodeSource.AbsolutePath)) { throw 'The Node runtime source must be the exact matching official nodejs.org Windows x64 archive URL.' }
 if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse -Force }
 New-Item -ItemType Directory -Path $output | Out-Null
+$sourceSnapshotArchive = Join-Path $output '.source-commit.zip'
+$buildRoot = Join-Path $output '.source-tree'
+Assert-Child $output $sourceSnapshotArchive
+Assert-Child $output $buildRoot
+& git.exe -C $repo archive --format=zip --output $sourceSnapshotArchive $sourceCommit
+if ($LASTEXITCODE -ne 0) { throw 'The pinned source-commit archive could not be created.' }
+Expand-Archive -LiteralPath $sourceSnapshotArchive -DestinationPath $buildRoot
+$sourceScripts = Join-Path $buildRoot 'deployment\windows'
+Set-Location -LiteralPath $buildRoot
+$previousNpmCache = $env:npm_config_cache
+try {
+  $env:npm_config_cache = Join-Path $repo '.npm-cache-release'
+  & npm.cmd ci --ignore-scripts --no-audit --no-fund --prefer-offline
+  if ($LASTEXITCODE -ne 0) { throw 'Pinned dependency installation from package-lock.json failed.' }
+} finally {
+  if ($null -eq $previousNpmCache) { Remove-Item Env:npm_config_cache -ErrorAction SilentlyContinue } else { $env:npm_config_cache = $previousNpmCache }
+}
 if (-not $SkipVerification) {
-  & git.exe diff --quiet
-  if ($LASTEXITCODE -ne 0) { throw 'Release verification requires a clean unstaged source tree.' }
-  & git.exe diff --cached --quiet
-  if ($LASTEXITCODE -ne 0) { throw 'Release verification requires a clean staged source tree.' }
   & npm.cmd run typecheck
   if ($LASTEXITCODE -ne 0) { throw 'Typecheck failed.' }
   & npm.cmd test
   if ($LASTEXITCODE -ne 0) { throw 'Test verification failed.' }
   & node.exe firmware\verify.mjs
   if ($LASTEXITCODE -ne 0) { throw 'Firmware and Raw-HID protocol verification failed.' }
-  & git.exe diff --quiet
-  if ($LASTEXITCODE -ne 0) { throw 'Firmware verification changed generated source; commit the canonical generated artifacts first.' }
   $previousNpmCache = $env:npm_config_cache
   try {
     $env:npm_config_cache = Join-Path $repo '.npm-cache-release'
@@ -72,7 +87,7 @@ if (-not $helper) {
   if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -SandboxHelperPath is required to build the fixed Windows Sandbox guest helper.' }
   $publish = Join-Path $output '.helper-publish'
   Assert-Child $output $publish
-  & $dotnet publish (Join-Path $repo 'apps\windows-companion\sandbox-helper\Sxsy.B122.SandboxHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $publish
+  & $dotnet publish (Join-Path $buildRoot 'apps\windows-companion\sandbox-helper\Sxsy.B122.SandboxHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $publish
   if ($LASTEXITCODE -ne 0) { throw 'Windows Sandbox guest-helper build failed.' }
   $helper = Join-Path $publish 'b122-sandbox-worker.exe'
 }
@@ -90,7 +105,7 @@ if (-not $repositoryRuntimeHelper) {
   if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -RepositoryRuntimeHelperPath is required to build the Job-Object repository runtime helper.' }
   $repositoryRuntimePublish = Join-Path $output '.repository-runtime-helper-publish'
   Assert-Child $output $repositoryRuntimePublish
-  & $dotnet publish (Join-Path $repo 'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $repositoryRuntimePublish
+  & $dotnet publish (Join-Path $buildRoot 'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $repositoryRuntimePublish
   if ($LASTEXITCODE -ne 0) { throw 'Repository runtime Job-Object helper build failed.' }
   $repositoryRuntimeHelper = Join-Path $repositoryRuntimePublish 'b122-repository-runner.exe'
 }
@@ -112,7 +127,7 @@ if (-not $rawHidHelper) {
   if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -RawHidHelperPath is required to build the fixed Windows Raw-HID helper.' }
   $rawHidPublish = Join-Path $output '.raw-hid-helper-publish'
   Assert-Child $output $rawHidPublish
-  & $dotnet publish (Join-Path $repo 'firmware\windows-hid-helper\Strathex.B122.RawHidHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $rawHidPublish
+  & $dotnet publish (Join-Path $buildRoot 'firmware\windows-hid-helper\Strathex.B122.RawHidHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $rawHidPublish
   if ($LASTEXITCODE -ne 0) { throw 'Windows Raw-HID helper build failed.' }
   $rawHidHelper = Join-Path $rawHidPublish 'strathex-b122-hid-helper.exe'
 }
@@ -130,7 +145,7 @@ if (-not $providerDesktopHelper) {
   if (-not $dotnet -or -not (& $dotnet --list-sdks)) { throw 'A .NET 8 SDK or -ProviderDesktopHelperPath is required to build the fixed provider-desktop helper.' }
   $providerDesktopPublish = Join-Path $output '.provider-desktop-helper-publish'
   Assert-Child $output $providerDesktopPublish
-  & $dotnet publish (Join-Path $repo 'apps\windows-companion\provider-desktop-helper\Sxsy.B122.ProviderDesktopHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $providerDesktopPublish
+  & $dotnet publish (Join-Path $buildRoot 'apps\windows-companion\provider-desktop-helper\Sxsy.B122.ProviderDesktopHelper.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $providerDesktopPublish
   if ($LASTEXITCODE -ne 0) { throw 'Provider-desktop native helper build failed.' }
   $providerDesktopHelper = Join-Path $providerDesktopPublish 'sxsy-b122-provider-desktop-helper.exe'
 }
@@ -163,13 +178,15 @@ $scripts = Join-Path $output 'scripts'
 $provisioning = Join-Path $scripts 'provisioning'
 $documentation = Join-Path $output 'docs'
 $source = Join-Path $output 'source'
+$firmware = Join-Path $output 'firmware'
 $licenses = Join-Path $output 'licenses'
-New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts,$provisioning,$documentation,$source,$licenses | Out-Null
-& git.exe archive --format=zip --output (Join-Path $source 'sxsy-b122-source.zip') HEAD
-if ($LASTEXITCODE -ne 0) { throw 'The exact source-commit archive could not be created.' }
-Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\dist') -Destination (Join-Path $app 'dist') -Recurse
-Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\package.json') -Destination $app
-Copy-Item -LiteralPath (Join-Path $repo 'apps\windows-companion\README.md') -Destination $app
+New-Item -ItemType Directory -Path $app,$runtime,$extension,$scripts,$provisioning,$documentation,$source,$firmware,$licenses | Out-Null
+Move-Item -LiteralPath $sourceSnapshotArchive -Destination (Join-Path $source 'sxsy-b122-source.zip')
+& (Join-Path $buildRoot 'firmware\package-qmk.ps1') -OutputDirectory $firmware
+if ($LASTEXITCODE -ne 0) { throw 'The portable QMK/Vial source overlay could not be packaged.' }
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\windows-companion\dist') -Destination (Join-Path $app 'dist') -Recurse
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\windows-companion\package.json') -Destination $app
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\windows-companion\README.md') -Destination $app
 $helperDestination = Join-Path $app 'dist\apps\windows-companion\sandbox-helper'
 New-Item -ItemType Directory -Path $helperDestination | Out-Null
 Copy-Item -LiteralPath $helper -Destination (Join-Path $helperDestination 'b122-sandbox-worker.exe')
@@ -189,12 +206,12 @@ $vsixRoot = Join-Path $output '.vsix'
 Assert-Child $output $vsixRoot
 $vsixExtension = Join-Path $vsixRoot 'extension'
 New-Item -ItemType Directory -Path $vsixExtension | Out-Null
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\dist') -Destination (Join-Path $vsixExtension 'dist') -Recurse
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\package.json') -Destination $vsixExtension
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\README.md') -Destination $vsixExtension
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\dist') -Destination (Join-Path $vsixExtension 'dist') -Recurse
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\package.json') -Destination $vsixExtension
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\README.md') -Destination $vsixExtension
 $vsixPackagePath=Join-Path $vsixExtension 'package.json'; $vsixPackage=Get-Content -LiteralPath $vsixPackagePath -Raw | ConvertFrom-Json; $vsixPackage.name='strathex-switchyard-b122'; Write-Utf8NoBom $vsixPackagePath ($vsixPackage | ConvertTo-Json -Depth 20)
-Copy-Item -LiteralPath (Join-Path $repo 'deployment\windows\extension.vsixmanifest') -Destination $vsixRoot
-Copy-Item -LiteralPath (Join-Path $repo 'deployment\windows\Content_Types.xml') -Destination (Join-Path $vsixRoot '[Content_Types].xml')
+Copy-Item -LiteralPath (Join-Path $buildRoot 'deployment\windows\extension.vsixmanifest') -Destination $vsixRoot
+Copy-Item -LiteralPath (Join-Path $buildRoot 'deployment\windows\Content_Types.xml') -Destination (Join-Path $vsixRoot '[Content_Types].xml')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.IO.Compression
 $vsix = Join-Path $extension 'sxsy-b122-switchyard.vsix'
@@ -207,27 +224,27 @@ try {
     try { $inputStream.CopyTo($outputStream) } finally { $outputStream.Dispose(); $inputStream.Dispose() }
   }
 } finally { $vsixArchive.Dispose() }
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\dist') -Destination (Join-Path $extension 'dist') -Recurse
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\package.json') -Destination $extension
-Copy-Item -LiteralPath (Join-Path $repo 'apps\vscode-extension\README.md') -Destination $extension
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\dist') -Destination (Join-Path $extension 'dist') -Recurse
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\package.json') -Destination $extension
+Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\README.md') -Destination $extension
 foreach ($name in @(
   'Start-B122.ps1','Test-B122Health.mjs','Test-B122PortableBundle.ps1','Test-B122ReleaseArtifact.ps1','New-B122NetworkPolicy.ps1',
   'B122InstallTools.psm1','Invoke-B122Current.ps1','Install-B122.ps1','Update-B122.ps1','Rollback-B122.ps1','Uninstall-B122.ps1'
-)) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $scripts }
-foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $provisioning }
-$documentationSource = [IO.Path]::GetFullPath((Join-Path $repo 'docs')).TrimEnd('\')
+)) { Copy-Item -LiteralPath (Join-Path $sourceScripts $name) -Destination $scripts }
+foreach ($name in @('B122ManifestTools.psm1','New-B122RepositoryRuntimeManifest.ps1','New-B122WindowsSandboxCatalog.ps1','New-B122ProviderDesktopPaths.ps1','README-manifest-generators.md','repository-runtime-plan.template.json','Test-B122ManifestGenerators.ps1','windows-sandbox-catalog-plan.template.json','typed-recipes.template.json')) { Copy-Item -LiteralPath (Join-Path $sourceScripts $name) -Destination $provisioning }
+$documentationSource = [IO.Path]::GetFullPath((Join-Path $buildRoot 'docs')).TrimEnd('\')
 foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Recurse | Sort-Object FullName)) {
   $relativeDocument = $document.FullName.Substring($documentationSource.Length + 1)
   $documentDestination = Join-Path $documentation $relativeDocument
   New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($documentDestination)) | Out-Null
   Copy-Item -LiteralPath $document.FullName -Destination $documentDestination
 }
-Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $output
-Copy-Item -LiteralPath (Join-Path $repo 'SECURITY.md') -Destination $output
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSING.md') -Destination $output
-Copy-Item -LiteralPath (Join-Path $repo 'ATTRIBUTION.md') -Destination $output
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\DOTNET-RUNTIME-LICENSE.txt') -Destination $licenses
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'licenses\DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt') -Destination $licenses
+Copy-Item -LiteralPath (Join-Path $buildRoot 'README.md') -Destination $output
+Copy-Item -LiteralPath (Join-Path $buildRoot 'SECURITY.md') -Destination $output
+Copy-Item -LiteralPath (Join-Path $buildRoot 'LICENSING.md') -Destination $output
+Copy-Item -LiteralPath (Join-Path $buildRoot 'ATTRIBUTION.md') -Destination $output
+Copy-Item -LiteralPath (Join-Path $sourceScripts 'licenses\DOTNET-RUNTIME-LICENSE.txt') -Destination $licenses
+Copy-Item -LiteralPath (Join-Path $sourceScripts 'licenses\DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt') -Destination $licenses
 
 Remove-Item -LiteralPath $runtimeExtract -Recurse -Force
 Remove-Item -LiteralPath $vsixRoot -Recurse -Force
@@ -235,6 +252,8 @@ if (Test-Path -LiteralPath (Join-Path $output '.helper-publish')) { Remove-Item 
 if (Test-Path -LiteralPath (Join-Path $output '.repository-runtime-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.repository-runtime-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.raw-hid-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.raw-hid-helper-publish') -Recurse -Force }
 if (Test-Path -LiteralPath (Join-Path $output '.provider-desktop-helper-publish')) { Remove-Item -LiteralPath (Join-Path $output '.provider-desktop-helper-publish') -Recurse -Force }
+Set-Location -LiteralPath $output
+Remove-Item -LiteralPath $buildRoot -Recurse -Force
 
 $portableSmoke = & (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($portableSmoke)) { throw 'Portable bundle smoke verification failed.' }
@@ -263,8 +282,15 @@ for ($index = 0; $index -lt $payload.Count; $index++) {
   $relationships += [ordered]@{ spdxElementId=$owner; relationshipType='CONTAINS'; relatedSpdxElement=$fileId }
 }
 Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='SPDX-2.3'; dataLicense='CC0-1.0'; SPDXID='SPDXRef-DOCUMENT'; name='SXSY-B122 Windows bundle'; documentNamespace=('https://strathex.invalid/spdx/b122/' + [guid]::NewGuid()); creationInfo=[ordered]@{ created=(Get-Date).ToUniversalTime().ToString('o'); creators=@('Tool: SXSY-B122 Build-B122Release.ps1') }; packages=$packages; files=$spdxFiles; relationships=$relationships } | ConvertTo-Json -Depth 10)
-$sourceCommit = (& git.exe rev-parse HEAD).Trim()
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; providerDesktopHelperSha256=$providerDesktopHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
-$releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output
+Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
+$verificationSkipped = [bool]$SkipVerification
+$evidenceEligible = -not $verificationSkipped
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; sourceAssembly='git-archive'; verificationSkipped=$verificationSkipped; evidenceEligible=$evidenceEligible; companion='0.2.0'; vscodeExtension='0.1.0'; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant() }; dotnetRuntime=[ordered]@{ version='8.0.30'; license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; sandboxHelperSha256=$helperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; providerDesktopHelperSha256=$providerDesktopHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 5)
+$releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output -AllowDevelopmentArtifact:$SkipVerification
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
-Write-Output "Built verified SXSY-B122 Windows bundle: $output"
+Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
+if ($SkipVerification) {
+  Write-Warning "Built development-only SXSY-B122 bundle; verification was skipped and the artifact is ineligible for release evidence or installation: $output"
+} else {
+  Write-Output "Built verified SXSY-B122 Windows bundle: $output"
+}

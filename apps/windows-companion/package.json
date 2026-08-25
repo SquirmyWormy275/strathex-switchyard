@@ -3,8 +3,15 @@
   "private": true,
   "license": "UNLICENSED",
   "version": "0.2.0",
+  "description": "JavaScript SXSY-B122 companion control plane; native Windows helpers ship only in the verified Windows bundle.",
   "type": "module",
   "bin": { "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js" },
   "files": ["dist/apps", "dist/packages", "README.md", "package.json"],
+  "b122Distribution": {
+    "scope": "javascript-companion-only",
+    "nativeHelpersIncluded": false,
+    "releaseEvidenceEligible": false,
+    "verifiedWindowsBundleBuilder": "deployment/windows/Build-B122Release.ps1"
+  },
   "scripts": { "build": "tsc -p tsconfig.build.json" }
 }
