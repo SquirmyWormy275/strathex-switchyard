@@ -614,7 +614,7 @@ export class CompanionService {
       const active = this.voice ? await this.voice.active() : undefined;
       const consent = active && this.voice ? await this.voice.getConsent(active.consentId) : undefined;
       if (!consent || !active || active.managedSessionId !== session.id || active.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(active.repositoryRoot) !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active protected consent, context, and managed session.");
-      workflowPayload = { kind: "voice_binding", voiceSessionId: active.voiceSessionId, provider: active.provider === "claude" ? "claude" : "generic", contextPackageId: active.contextPackageId, consentId: active.consentId };
+      workflowPayload = { kind: "voice_binding", voiceSessionId: active.voiceSessionId, provider: active.provider, contextPackageId: active.contextPackageId, consentId: active.consentId };
     } else {
       if (!this.workflowCoordinator) throw new CompanionServiceError("capability_denied", "No protected workflow preparation coordinator is attached; client-authored plans, evidence, options, and authority are rejected.");
       workflowPayload = await this.workflowCoordinator.prepare({ action: payload.action, session, authorityId: payload.authorityId, intent: payload.intent });

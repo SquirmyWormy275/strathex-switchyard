@@ -5,6 +5,7 @@ import type { AuthorityGrant, EffectDisposition, ManagedSession, SessionStatus }
 import type { HandoffPackageStore } from "./context-packages.ts";
 import { redactText } from "./redaction.ts";
 import { jsonClone, type JournalEntry, ProtectedJsonStore, sha256, stableJson } from "./store.ts";
+import type { VoiceProvider } from "./voice.ts";
 
 export type WorkflowArtifactAction =
   | "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet"
@@ -102,7 +103,7 @@ export interface AuthorityReplayPacket {
   readonly matchDigest: string;
 }
 export interface AuthorityWorkflowPayload { readonly kind: "authority"; readonly mode: "refresh" | "broadcast"; readonly packets: readonly AuthorityReplayPacket[]; readonly acknowledgementRequired: true; }
-export interface VoiceBindingWorkflowPayload { readonly kind: "voice_binding"; readonly voiceSessionId: string; readonly provider: "claude" | "codex" | "generic"; readonly contextPackageId: string; readonly consentId: string; }
+export interface VoiceBindingWorkflowPayload { readonly kind: "voice_binding"; readonly voiceSessionId: string; readonly provider: VoiceProvider; readonly contextPackageId: string; readonly consentId: string; }
 
 export type WorkflowArtifactPayload = AnchorWorkflowPayload | ProofWorkflowPayload | DecisionWorkflowPayload | PlanWorkflowPayload | HandoffWorkflowPayload | FocusWorkflowPayload | AuthorityWorkflowPayload | VoiceBindingWorkflowPayload;
 
@@ -635,7 +636,7 @@ function normalizePayload(payload: WorkflowArtifactPayload, action: WorkflowArti
       if (new Set(packets.map((packet) => packet.recipientSessionId)).size !== packets.length) throw new WorkflowArtifactError("Authority replay recipients must be unique.");
       return { kind: "authority", mode, packets, acknowledgementRequired: true };
     }
-    case "voice_binding": return { kind: "voice_binding", voiceSessionId: text(payload.voiceSessionId, "voice session id"), provider: payload.provider === "claude" || payload.provider === "codex" || payload.provider === "generic" ? payload.provider : invalid("voice provider"), contextPackageId: text(payload.contextPackageId, "voice context package id"), consentId: text(payload.consentId, "voice consent id") };
+    case "voice_binding": return { kind: "voice_binding", voiceSessionId: text(payload.voiceSessionId, "voice session id"), provider: voiceProvider(payload.provider), contextPackageId: text(payload.contextPackageId, "voice context package id"), consentId: text(payload.consentId, "voice consent id") };
   }
 }
 
@@ -902,6 +903,7 @@ function expectedKind(action: WorkflowArtifactAction): WorkflowArtifactPayload["
 }
 function workflowAction(value: unknown): WorkflowArtifactAction { if (typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value)) return value as WorkflowArtifactAction; return invalid("workflow action"); }
 function commandAction(value: unknown): CommandAction { if (typeof value === "string" && (commandActionIds as readonly string[]).includes(value)) return value as CommandAction; return invalid("authority action"); }
+function voiceProvider(value: unknown): VoiceProvider { if (value === "claude" || value === "chatgpt" || value === "system") return value; return invalid("voice provider"); }
 function planStepStatus(value: unknown): PlanStepArtifact["status"] { if (value === "proposed" || value === "approved" || value === "completed" || value === "blocked") return value; return invalid("plan step status"); }
 function workflowStatus(value: unknown): value is WorkflowArtifactStatus { return value === "prepared" || value === "submitted" || value === "cancelling" || value === "acknowledged" || value === "rejected" || value === "cancelled"; }
 function providerStatus(value: unknown): value is WorkflowProviderResponse["status"] { return typeof value === "string" && ["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value); }

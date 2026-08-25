@@ -86,6 +86,25 @@ test("Option Provider sends only one user question and requires exactly five pro
   await assert.rejects(() => artifacts.create(base("option_packet", { ...decisionPayload("one"), mode: "packet" })), /multi-decision/i);
 });
 
+test("voice binding artifacts preserve exact ChatGPT and system provider identities", async (context) => {
+  const protectedStore = await store(context);
+  const artifacts = new WorkflowArtifactStore(protectedStore);
+  const chatgpt = await artifacts.create(base("bind_voice_session", {
+    kind: "voice_binding", voiceSessionId: "voice-chatgpt", provider: "chatgpt", contextPackageId: "handoff-1", consentId: "consent-chatgpt"
+  }));
+  const system = await artifacts.create({ ...base("bind_voice_session", {
+    kind: "voice_binding", voiceSessionId: "voice-system", provider: "system", contextPackageId: "handoff-1", consentId: "consent-system"
+  }), id: "artifact-bind-voice-system" });
+  assert.equal(chatgpt.payload.kind === "voice_binding" ? chatgpt.payload.provider : undefined, "chatgpt");
+  assert.equal(system.payload.kind === "voice_binding" ? system.payload.provider : undefined, "system");
+  assert.equal((await new WorkflowArtifactStore(protectedStore).get(chatgpt.id))?.payload.kind === "voice_binding"
+    ? ((await new WorkflowArtifactStore(protectedStore).get(chatgpt.id))!.payload as Extract<WorkflowArtifactPayload, { kind: "voice_binding" }>).provider
+    : undefined, "chatgpt");
+  await assert.rejects(() => artifacts.create({ ...base("bind_voice_session", {
+    kind: "voice_binding", voiceSessionId: "voice-fallback", provider: "generic", contextPackageId: "handoff-1", consentId: "consent-fallback"
+  } as unknown as WorkflowArtifactPayload), id: "artifact-bind-voice-fallback" }), /voice provider/i);
+});
+
 test("Plan Expander accepts exactly fifteen unique ordered alternatives for the bound existing plan", async (context) => {
   const artifacts = new WorkflowArtifactStore(await store(context));
   const created = await artifacts.create(base("plan_expander", { kind: "plan", mode: "expand", plan: existingPlan(), evidence: evidence() }));

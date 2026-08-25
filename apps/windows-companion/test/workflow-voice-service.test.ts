@@ -75,10 +75,15 @@ test("installed service creates exact Handoff/workflow artifacts and privacy-bou
     assert.deepEqual(voiceArtifact.payload, {
       kind: "voice_binding",
       voiceSessionId: "voice-session-2",
-      provider: "generic",
+      provider: "chatgpt",
       contextPackageId: "handoff-1",
       consentId: nextConsent.id
     });
+    const systemConsent = (await call("voice.consent", { handoffId: handoff.id, provider: "system", transcript: "off", retentionMinutes: 0, expiresInMinutes: 15 })).consent as { id: string };
+    const systemSwitch = await call("voice.switch", { bindingId: (switched.binding as { id: string }).id, consentId: systemConsent.id, voiceSessionId: "voice-session-3" });
+    assert.equal((systemSwitch.binding as { provider: string }).provider, "system");
+    const systemWorkflow = await call("workflow.prepare", { action: "bind_voice_session", sessionId: "coder", authorityId: "authority-1", intent: { kind: "none" } });
+    assert.equal((systemWorkflow.artifact as { payload: { provider: string } }).payload.provider, "system");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
