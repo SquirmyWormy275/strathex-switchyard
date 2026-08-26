@@ -54,6 +54,8 @@ export interface ProofWorkflowPayload {
   readonly claims: readonly string[];
   readonly requiredBackends: readonly string[];
   readonly independentBackendRequired: boolean;
+  /** Exact host-observed provider effects. Required for adversarial proof. */
+  readonly providerEffects?: readonly WorkflowProviderEffectBinding[];
 }
 export interface DecisionOption { readonly id: string; readonly label: string; readonly tradeoffs: readonly string[]; readonly risks: readonly string[]; }
 export interface PlanStepArtifact { readonly id: string; readonly summary: string; readonly ownedFiles: readonly string[]; readonly dependencies: readonly string[]; readonly status: "proposed" | "approved" | "completed" | "blocked"; }
@@ -105,6 +107,8 @@ export interface AuthorityReplayPacket {
   readonly expiresAt: string;
   readonly pendingRequest: AuthorityPendingRequest;
   readonly matchDigest: string;
+  /** Exact recipient/provider dispatch boundary. Required for broadcast. */
+  readonly providerEffect?: WorkflowProviderEffectBinding;
 }
 export interface AuthorityWorkflowPayload { readonly kind: "authority"; readonly mode: "refresh" | "broadcast"; readonly packets: readonly AuthorityReplayPacket[]; readonly acknowledgementRequired: true; }
 export interface VoiceBindingWorkflowPayload { readonly kind: "voice_binding"; readonly voiceSessionId: string; readonly provider: VoiceProvider; readonly contextPackageId: string; readonly consentId: string; }
@@ -138,6 +142,8 @@ export interface WorkflowArtifact extends Omit<WorkflowArtifactInput, "id"> {
   readonly providerSummary?: string;
   readonly providerResponseStatus?: WorkflowProviderResponse["status"];
   readonly providerEffectDisposition?: EffectDisposition;
+  /** Durable independently-settled child effects retained across restart. */
+  readonly childResults?: readonly WorkflowChildProviderResponse[];
   readonly executionAuthorized: false;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -145,7 +151,46 @@ export interface WorkflowArtifact extends Omit<WorkflowArtifactInput, "id"> {
 
 export type WorkflowArtifactImmutable = Omit<WorkflowArtifact,
   "digest" | "status" | "operationId" | "providerExternalId" | "providerResult" | "providerSummary" |
-  "providerResponseStatus" | "providerEffectDisposition" | "executionAuthorized" | "createdAt" | "updatedAt">;
+  "providerResponseStatus" | "providerEffectDisposition" | "childResults" | "executionAuthorized" | "createdAt" | "updatedAt">;
+
+export type WorkflowProviderEffectRole = "proof_backend" | "authority_recipient";
+
+/** Immutable host-selected identity for one genuinely separate provider effect. */
+export interface WorkflowProviderEffectBinding {
+  readonly role: WorkflowProviderEffectRole;
+  readonly provider: "claude" | "codex";
+  readonly session: ManagedSession;
+  readonly authority: AuthorityGrant;
+  readonly adapterId: string;
+  readonly adapterVersion: string;
+  readonly moduleSha256: string;
+  readonly providerContextDigest: string;
+  readonly bindingDigest: string;
+}
+
+export type WorkflowChildProviderResult =
+  | { readonly kind: "proof_backend"; readonly backend: "claude" | "codex"; readonly status: "passed" | "failed" | "unavailable"; readonly verifiedClaims: readonly string[]; readonly evidenceReferences: readonly string[] }
+  | { readonly kind: "authority_recipient"; readonly recipientSessionId: string; readonly grantId: string; readonly matchDigest: string; readonly acknowledged: true };
+
+export interface WorkflowChildProviderResponse {
+  readonly schema: "sxsy-b122.workflow-child-result";
+  readonly version: 1;
+  readonly artifactId: string;
+  readonly artifactDigest: string;
+  readonly parentOperationId: string;
+  readonly childOperationId: string;
+  readonly action: WorkflowArtifactAction;
+  readonly role: WorkflowProviderEffectRole;
+  readonly bindingDigest: string;
+  readonly provider: "claude" | "codex";
+  readonly adapterId: string;
+  readonly moduleSha256: string;
+  readonly status: "completed" | "failed" | "unavailable";
+  readonly effectDisposition: EffectDisposition;
+  readonly summary: string;
+  readonly externalId?: string;
+  readonly result: WorkflowChildProviderResult;
+}
 
 /** Canonicalize and hash exactly the immutable fields protected by an artifact digest. */
 export function canonicalWorkflowArtifact(input: WorkflowArtifactInput & { readonly id: string }): Readonly<{ immutable: WorkflowArtifactImmutable; digest: string }> {
@@ -379,6 +424,33 @@ export class WorkflowArtifactStore {
     });
   }
 
+  /** Records one exact child result before its saga is settled, enabling no-replay aggregate recovery. */
+  async recordChildResult(response: WorkflowChildProviderResponse): Promise<WorkflowArtifact> {
+    return this.store.transaction(async (transaction) => {
+      const entries = artifactMap(await transaction.readEntries());
+      const found = entries.get(identifier(response.artifactId, "child artifact id"));
+      if (!found || !found.operationId || (found.status !== "submitted" && found.status !== "cancelling" && found.status !== "acknowledged")) {
+        throw new WorkflowArtifactError("The workflow child result has no dispatchable durable parent artifact.");
+      }
+      const effect = workflowProviderEffect(found.payload, response.role, response.bindingDigest);
+      const parsed = parseWorkflowChildProviderResponse(response, found, effect, response.childOperationId, response.role);
+      const existing = found.childResults?.find((entry) => entry.bindingDigest === parsed.bindingDigest);
+      if (existing) {
+        if (stableJson(existing) !== stableJson(parsed)) throw new WorkflowArtifactError("The workflow child result conflicts with the durable binding receipt.");
+        return clone(found);
+      }
+      if (found.childResults?.some((entry) => entry.childOperationId === parsed.childOperationId)) throw new WorkflowArtifactError("The workflow child operation is already bound to another provider effect.");
+      const updated: WorkflowArtifact = {
+        ...found,
+        childResults: [...(found.childResults ?? []), parsed],
+        updatedAt: timestamp(this.clock(), "artifact clock"),
+        executionAuthorized: false
+      };
+      await transaction.append<ArtifactSavedEvent>("workflow-artifact.saved", { artifact: updated });
+      return clone(updated);
+    });
+  }
+
   async cancelPrepared(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<WorkflowArtifact> {
     return this.store.transaction(async (transaction) => {
       const journal = await transaction.readEntries();
@@ -586,9 +658,28 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
         requireIntent(request.intent, "none");
         return this.prepared(context, authority, { kind: "anchor", evidence: context.evidence, cooperativeStopRequested: true, resumeAuthorized: false, unresolved: context.pendingDecisions.map((decision) => decision.question) });
       case "proof":
-      case "proof_adversarial":
         requireIntent(request.intent, "none");
-        return this.prepared(context, authority, { kind: "proof", evidence: context.evidence, claims: proofClaims(context.evidence), requiredBackends: request.action === "proof_adversarial" ? [session.provider, independentProvider(session.provider)] : [session.provider], independentBackendRequired: request.action === "proof_adversarial" });
+        return this.prepared(context, authority, { kind: "proof", evidence: context.evidence, claims: proofClaims(context.evidence), requiredBackends: [session.provider], independentBackendRequired: false });
+      case "proof_adversarial": {
+        requireIntent(request.intent, "none");
+        if (session.provider !== "claude" && session.provider !== "codex") throw new WorkflowArtifactError("Adversarial proof requires an exact Claude or Codex source provider.");
+        const expectedProvider = independentProvider(session.provider);
+        const candidates = (await this.sessions.list()).filter((candidate) => candidate.provider === expectedProvider && candidate.id !== session.id
+          && candidate.workspaceRoot && candidate.targetSnapshotId === session.targetSnapshotId && sameRepositoryRoot(candidate.workspaceRoot, session.workspaceRoot!)
+          && candidate.taskId === session.taskId && candidate.planRevision === session.planRevision && candidate.capabilities.includes("observable")
+          && candidate.status !== "stale" && candidate.status !== "unreachable");
+        if (candidates.length !== 1) throw new WorkflowArtifactError("Adversarial proof requires exactly one current independent provider session for the same target and plan.");
+        const independent = candidates[0]!;
+        const independentContext = await this.contexts.current(independent.id, independent.targetSnapshotId!);
+        if (!independentContext || !sameRepositoryRoot(independentContext.repositoryRoot, context.repositoryRoot) || independentContext.evidence.plan.digest !== context.evidence.plan.digest) throw new WorkflowArtifactError("Adversarial proof independent provider lacks the exact protected evidence and plan binding.");
+        const independentAuthority = await this.requireAuthority(independentContext, independent, "proof_adversarial");
+        const providerEffects = [
+          this.providerEffect(context, session, authority, "proof_backend"),
+          this.providerEffect(independentContext, independent, independentAuthority, "proof_backend")
+        ];
+        if (providerEffects[0]!.adapterId === providerEffects[1]!.adapterId || providerEffects[0]!.moduleSha256 === providerEffects[1]!.moduleSha256) throw new WorkflowArtifactError("Adversarial proof provider labels alias the same adapter boundary and are not independent.");
+        return this.prepared(context, authority, { kind: "proof", evidence: context.evidence, claims: proofClaims(context.evidence), requiredBackends: providerEffects.map((effect) => effect.provider), independentBackendRequired: true, providerEffects });
+      }
       case "option_provider": {
         if (request.intent.kind !== "decision") throw new WorkflowArtifactError("Normal Option Provider requires only the user's question and bounded context; the provider generates the options.");
         const decision = { id: `decision:${sha256(stableJson({ question: request.intent.question, context: request.intent.context })).slice(0, 32)}`, question: text(request.intent.question, "decision question"), context: text(request.intent.context, "decision context") };
@@ -656,8 +747,9 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
           if (!recipient?.targetSnapshotId || !recipient.workspaceRoot) throw new WorkflowArtifactError("Authority broadcast recipient is not an exact current managed session.");
           const recipientContext = await this.contexts.current(id, recipient.targetSnapshotId);
           if (!recipientContext || !sameRepositoryRoot(recipientContext.repositoryRoot, recipient.workspaceRoot)) throw new WorkflowArtifactError("Authority broadcast recipient lacks protected individualized context.");
-          const recipientAuthority = await this.requireAuthorityScope(recipientContext, recipient);
-          packets.push(this.authorityPacket(recipientContext, recipient, recipientAuthority));
+          const recipientAuthority = await this.requireAuthority(recipientContext, recipient, "authority_broadcast");
+          const providerEffect = this.providerEffect(recipientContext, recipient, recipientAuthority, "authority_recipient");
+          packets.push(this.authorityPacket(recipientContext, recipient, recipientAuthority, providerEffect));
         }
         return this.prepared(context, authority, { kind: "authority", mode: "broadcast", packets, acknowledgementRequired: true });
       }
@@ -696,10 +788,25 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
     return recipient;
   }
 
-  private authorityPacket(context: WorkflowCoordinatorContext, session: ManagedSession, authority: AuthorityGrant): AuthorityReplayPacket {
+  private providerEffect(context: WorkflowCoordinatorContext, session: ManagedSession, authority: AuthorityGrant, role: WorkflowProviderEffectRole): WorkflowProviderEffectBinding {
+    const provenance = context.provenance;
+    if (!provenance || (session.provider !== "claude" && session.provider !== "codex") || provenance.provider !== session.provider || provenance.adapterVersion !== session.adapterVersion) {
+      throw new WorkflowArtifactError("Provider effect preparation requires current protected adapter provenance for the exact managed session.");
+    }
+    const normalizedSession = normalizeEffectSession({ ...session, metadata: {} }, session.provider);
+    const normalizedAuthority = normalizeEffectAuthority(authority, normalizedSession);
+    const material = {
+      role, provider: session.provider, session: normalizedSession, authority: normalizedAuthority,
+      adapterId: identifier(provenance.adapterId, "provider adapter id"), adapterVersion: identifier(provenance.adapterVersion, "provider adapter version"),
+      moduleSha256: digest(provenance.moduleSha256, "provider adapter module"), providerContextDigest: digest(provenance.providerContextDigest, "provider context digest")
+    };
+    return normalizeProviderEffect({ ...material, bindingDigest: sha256(stableJson(material)) }, role);
+  }
+
+  private authorityPacket(context: WorkflowCoordinatorContext, session: ManagedSession, authority: AuthorityGrant, providerEffect?: WorkflowProviderEffectBinding): AuthorityReplayPacket {
     if (!context.pendingRequest || context.pendingRequest.targetSnapshotId !== session.targetSnapshotId || context.pendingRequest.planRevision !== session.planRevision || context.pendingRequest.planDigest !== context.evidence.plan.digest) throw new WorkflowArtifactError("Authority Refresh stopped because the protected pending request does not exactly match target, plan revision, and plan digest.");
     if (!authority.allowedActions.includes(context.pendingRequest.action) || authority.prohibitedActions.includes(context.pendingRequest.action)) throw new WorkflowArtifactError("Authority Refresh stopped because the existing protected grant cannot replay the exact pending action.");
-    const material = { recipientSessionId: session.id, grantId: authority.id, actions: authority.allowedActions.map(commandAction), prohibitions: authority.prohibitedActions.map(commandAction), expiresAt: authority.expiresAt, pendingRequest: context.pendingRequest };
+    const material = { recipientSessionId: session.id, grantId: authority.id, actions: authority.allowedActions.map(commandAction), prohibitions: authority.prohibitedActions.map(commandAction), expiresAt: authority.expiresAt, pendingRequest: context.pendingRequest, ...(providerEffect ? { providerEffect } : {}) };
     return { ...material, matchDigest: sha256(stableJson(material)) };
   }
 }
@@ -731,6 +838,44 @@ export function parseWorkflowProviderResponse(value: unknown, artifact: Workflow
     ...(value.externalId ? { externalId: value.externalId } : {}),
     result
   };
+}
+
+/** Strict closed parser for one independently named provider/recipient child effect. */
+export function parseWorkflowChildProviderResponse(value: unknown, artifact: WorkflowArtifact, effect: WorkflowProviderEffectBinding, childOperationId: string, role: WorkflowProviderEffectRole): WorkflowChildProviderResponse {
+  if (!record(value)) throw new WorkflowArtifactError("The provider workflow child result is not a record.");
+  const optional = value.externalId === undefined ? [] : ["externalId"];
+  if (!exact(value, ["schema", "version", "artifactId", "artifactDigest", "parentOperationId", "childOperationId", "action", "role", "bindingDigest", "provider", "adapterId", "moduleSha256", "status", "effectDisposition", "summary", "result", ...optional])
+    || value.schema !== "sxsy-b122.workflow-child-result" || value.version !== 1
+    || value.artifactId !== artifact.id || value.artifactDigest !== artifact.digest || value.parentOperationId !== artifact.operationId
+    || value.childOperationId !== identifier(childOperationId, "workflow child operation") || value.action !== artifact.action
+    || value.role !== role || value.role !== effect.role || value.bindingDigest !== effect.bindingDigest
+    || value.provider !== effect.provider || value.adapterId !== effect.adapterId || value.moduleSha256 !== effect.moduleSha256) {
+    throw new WorkflowArtifactError("The provider workflow child result changed its exact parent, child, provider, profile, or effect binding.");
+  }
+  const status = value.status;
+  if (status !== "completed" && status !== "failed" && status !== "unavailable") throw new WorkflowArtifactError("The provider workflow child result is not terminal.");
+  if (!disposition(value.effectDisposition) || !bounded(value.summary, 1_024) || (value.externalId !== undefined && !bounded(value.externalId, 256))) throw new WorkflowArtifactError("The provider workflow child result has invalid terminal metadata.");
+  if (status === "completed" && (value.effectDisposition !== "committed" || !value.externalId)) throw new WorkflowArtifactError("A completed provider child effect requires a committed disposition and stable external acknowledgement.");
+  if (status !== "completed" && value.effectDisposition === "committed") throw new WorkflowArtifactError("A non-completed provider child cannot claim an unqualified committed result.");
+  const result = normalizeWorkflowChildResult(value.result, artifact, effect, role, status);
+  return {
+    schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest,
+    parentOperationId: artifact.operationId!, childOperationId, action: artifact.action, role, bindingDigest: effect.bindingDigest,
+    provider: effect.provider, adapterId: effect.adapterId, moduleSha256: effect.moduleSha256, status,
+    effectDisposition: value.effectDisposition, summary: redactText((value.summary as string).trim()),
+    ...(value.externalId ? { externalId: value.externalId as string } : {}), result
+  };
+}
+
+/** Finds one immutable child effect; ambiguity and cross-role reuse fail closed. */
+export function workflowProviderEffect(payload: WorkflowArtifactPayload, role: WorkflowProviderEffectRole, bindingDigest: string): WorkflowProviderEffectBinding {
+  const matches = payload.kind === "proof" && role === "proof_backend"
+    ? (payload.providerEffects ?? []).filter((effect) => effect.bindingDigest === bindingDigest)
+    : payload.kind === "authority" && role === "authority_recipient"
+      ? payload.packets.map((packet) => packet.providerEffect).filter((effect): effect is WorkflowProviderEffectBinding => effect?.bindingDigest === bindingDigest)
+      : [];
+  if (matches.length !== 1 || matches[0]!.role !== role) throw new WorkflowArtifactError("The workflow child binding is missing, ambiguous, or belongs to another role.");
+  return matches[0]!;
 }
 
 function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }): WorkflowArtifactImmutable {
@@ -772,7 +917,14 @@ function normalizePayload(payload: WorkflowArtifactPayload, action: WorkflowArti
       const requiredBackends = list(payload.requiredBackends, "proof backend");
       if (action === "proof_adversarial" && (requiredBackends.length < 2 || payload.independentBackendRequired !== true)) throw new WorkflowArtifactError("Adversarial proof requires at least two explicitly named backends and an independent review boundary.");
       if (action === "proof" && payload.independentBackendRequired !== false) throw new WorkflowArtifactError("Normal Proof must not claim an independent backend requirement.");
-      return { kind: "proof", evidence: normalizeEvidence(payload.evidence), claims: list(payload.claims, "proof claim"), requiredBackends, independentBackendRequired: payload.independentBackendRequired };
+      const providerEffects = payload.providerEffects?.map((effect) => normalizeProviderEffect(effect, "proof_backend"));
+      if (providerEffects) {
+        if (new Set(providerEffects.map((effect) => effect.bindingDigest)).size !== providerEffects.length || new Set(providerEffects.map((effect) => effect.provider)).size !== providerEffects.length) throw new WorkflowArtifactError("Proof provider effects must be unique exact provider bindings.");
+        if (requiredBackends.length !== providerEffects.length || requiredBackends.some((backend) => !providerEffects.some((effect) => effect.provider === backend))) throw new WorkflowArtifactError("Proof provider effects must cover every exact required backend once.");
+        if (providerEffects.length > 1 && (new Set(providerEffects.map((effect) => effect.adapterId)).size !== providerEffects.length || new Set(providerEffects.map((effect) => effect.moduleSha256)).size !== providerEffects.length)) throw new WorkflowArtifactError("Adversarial proof provider labels alias the same adapter boundary and are not independent.");
+      }
+      if (action === "proof_adversarial" && providerEffects !== undefined && providerEffects.length !== 2) throw new WorkflowArtifactError("Adversarial proof requires exactly two independent provider effects.");
+      return { kind: "proof", evidence: normalizeEvidence(payload.evidence), claims: list(payload.claims, "proof claim"), requiredBackends, independentBackendRequired: payload.independentBackendRequired, ...(providerEffects ? { providerEffects } : {}) };
     }
     case "decision": {
       const mode = payload.mode === "one" || payload.mode === "packet" ? payload.mode : invalid("decision mode");
@@ -811,6 +963,7 @@ function normalizePayload(payload: WorkflowArtifactPayload, action: WorkflowArti
       if ((action === "authority_refresh" && (mode !== "refresh" || payload.packets.length !== 1)) || (action === "authority_broadcast" && (mode !== "broadcast" || payload.packets.length < 1))) throw new WorkflowArtifactError("Authority replay mode does not match its command action.");
       const packets = payload.packets.map(normalizeAuthorityPacket);
       if (new Set(packets.map((packet) => packet.recipientSessionId)).size !== packets.length) throw new WorkflowArtifactError("Authority replay recipients must be unique.");
+      if (mode === "broadcast" && packets.some((packet) => !packet.providerEffect)) throw new WorkflowArtifactError("Authority broadcast requires one exact provider effect for every recipient.");
       return { kind: "authority", mode, packets, acknowledgementRequired: true };
     }
     case "voice_binding": return { kind: "voice_binding", voiceSessionId: text(payload.voiceSessionId, "voice session id"), provider: voiceProvider(payload.provider), contextPackageId: text(payload.contextPackageId, "voice context package id"), consentId: text(payload.consentId, "voice consent id") };
@@ -884,6 +1037,21 @@ function normalizeProviderResult(value: unknown, artifact: WorkflowArtifact): Wo
   throw new WorkflowArtifactError("The provider workflow result is invalid for its action.");
 }
 
+function normalizeWorkflowChildResult(value: unknown, artifact: WorkflowArtifact, effect: WorkflowProviderEffectBinding, role: WorkflowProviderEffectRole, status: WorkflowChildProviderResponse["status"]): WorkflowChildProviderResult {
+  if (!record(value) || value.kind !== role) throw new WorkflowArtifactError("The provider workflow child result has the wrong role schema.");
+  if (role === "proof_backend") {
+    if (!exact(value, ["kind", "backend", "status", "verifiedClaims", "evidenceReferences"]) || value.backend !== effect.provider
+      || !Array.isArray(value.verifiedClaims) || !Array.isArray(value.evidenceReferences)
+      || (value.status !== "passed" && value.status !== "failed" && value.status !== "unavailable")) throw new WorkflowArtifactError("The independent proof child result is invalid.");
+    if ((status === "completed") !== (value.status === "passed")) throw new WorkflowArtifactError("The proof child terminal status conflicts with its backend result.");
+    return { kind: "proof_backend", backend: effect.provider, status: value.status, verifiedClaims: list(value.verifiedClaims, "verified claim", true), evidenceReferences: list(value.evidenceReferences, "verified evidence", true) };
+  }
+  if (artifact.payload.kind !== "authority" || !exact(value, ["kind", "recipientSessionId", "grantId", "matchDigest", "acknowledged"]) || value.acknowledged !== true || status !== "completed") throw new WorkflowArtifactError("The authority recipient child acknowledgement is invalid.");
+  const packet = artifact.payload.packets.find((candidate) => candidate.providerEffect?.bindingDigest === effect.bindingDigest);
+  if (!packet || value.recipientSessionId !== packet.recipientSessionId || value.grantId !== packet.grantId || value.matchDigest !== packet.matchDigest) throw new WorkflowArtifactError("The authority recipient acknowledgement changed its exact packet binding.");
+  return { kind: "authority_recipient", recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true };
+}
+
 function normalizeEvidence(value: CoordinatorEvidenceBundle): CoordinatorEvidenceBundle {
   if (!record(value)) throw new WorkflowArtifactError("Coordinator evidence is missing.");
   const plan = normalizePlan(value.plan);
@@ -934,6 +1102,59 @@ function normalizePlan(value: ExistingPlanBinding): ExistingPlanBinding {
   return normalized;
 }
 
+function normalizeProviderEffect(value: WorkflowProviderEffectBinding, role: WorkflowProviderEffectRole): WorkflowProviderEffectBinding {
+  if (!record(value) || value.role !== role || !record(value.session) || !record(value.authority)) throw new WorkflowArtifactError("The workflow provider effect binding is invalid.");
+  const provider = value.provider === "claude" || value.provider === "codex" ? value.provider : invalid("workflow effect provider");
+  const session = normalizeEffectSession(value.session, provider);
+  const authority = normalizeEffectAuthority(value.authority, session);
+  const material = {
+    role,
+    provider,
+    session,
+    authority,
+    adapterId: identifier(value.adapterId, "provider adapter id"),
+    adapterVersion: identifier(value.adapterVersion, "provider adapter version"),
+    moduleSha256: digest(value.moduleSha256, "provider adapter module"),
+    providerContextDigest: digest(value.providerContextDigest, "provider context digest")
+  };
+  const bindingDigest = digest(value.bindingDigest, "provider effect binding");
+  if (bindingDigest !== sha256(stableJson(material))) throw new WorkflowArtifactError("The workflow provider effect digest does not match its exact session, authority, and adapter profile.");
+  return { ...material, bindingDigest };
+}
+
+function normalizeEffectSession(value: ManagedSession, provider: "claude" | "codex"): ManagedSession {
+  if (value.provider !== provider || !value.workspaceRoot || !value.targetSnapshotId || !value.taskId || !value.planRevision || !Array.isArray(value.capabilities) || !Array.isArray(value.plannedFiles)) throw new WorkflowArtifactError("The provider effect session lacks an exact task, target, and provider binding.");
+  const capabilities = [...new Set(value.capabilities.map(workflowCapability))];
+  if (!capabilities.includes("registered") || !capabilities.includes("observable") || value.status === "stale" || value.status === "unreachable") throw new WorkflowArtifactError("The provider effect session is not current and observable.");
+  const status = managedSessionStatus(value.status);
+  const surface = managedSessionSurface(value.surface);
+  return {
+    id: identifier(value.id, "provider effect session"), provider, surface, capabilities, status,
+    workspaceRoot: text(value.workspaceRoot, "provider effect repository"), targetSnapshotId: digest(value.targetSnapshotId, "provider effect target"),
+    taskId: identifier(value.taskId, "provider effect task"), planRevision: identifier(value.planRevision, "provider effect plan"),
+    plannedFiles: value.plannedFiles.map(safeOwnedFile), lastHeartbeat: timestamp(value.lastHeartbeat, "provider effect heartbeat"),
+    adapterVersion: identifier(value.adapterVersion, "provider effect adapter version"), metadata: {}
+  };
+}
+
+function normalizeEffectAuthority(value: AuthorityGrant, session: ManagedSession): AuthorityGrant {
+  if (!Array.isArray(value.allowedActions) || !Array.isArray(value.prohibitedActions)) throw new WorkflowArtifactError("The provider effect authority action scope is invalid.");
+  const authority: AuthorityGrant = {
+    id: identifier(value.id, "provider effect authority"), repositoryRoot: text(value.repositoryRoot, "provider effect authority repository"),
+    ...(value.sessionId ? { sessionId: identifier(value.sessionId, "provider effect authority session") } : {}),
+    ...(value.taskId ? { taskId: identifier(value.taskId, "provider effect authority task") } : {}),
+    ...(value.planRevision ? { planRevision: identifier(value.planRevision, "provider effect authority plan") } : {}),
+    allowedActions: [...new Set(value.allowedActions.map(commandAction))], prohibitedActions: [...new Set(value.prohibitedActions.map(commandAction))],
+    expiresAt: timestamp(value.expiresAt, "provider effect authority expiry"), ...(value.revokedAt ? { revokedAt: timestamp(value.revokedAt, "provider effect authority revocation") } : {}),
+    issuedAt: timestamp(value.issuedAt, "provider effect authority issue"), issuedBy: text(value.issuedBy, "provider effect authority issuer")
+  };
+  if (!sameRepositoryRoot(authority.repositoryRoot, session.workspaceRoot!) || (authority.sessionId && authority.sessionId !== session.id)
+    || (authority.taskId && authority.taskId !== session.taskId) || (authority.planRevision && authority.planRevision !== session.planRevision) || authority.revokedAt) {
+    throw new WorkflowArtifactError("The provider effect authority does not exactly match its session scope.");
+  }
+  return authority;
+}
+
 function normalizeAuthorityPacket(value: AuthorityReplayPacket): AuthorityReplayPacket {
   if (!record(value) || !record(value.pendingRequest)) throw new WorkflowArtifactError("Authority replay packet is invalid.");
   const pendingRequest = {
@@ -943,6 +1164,7 @@ function normalizeAuthorityPacket(value: AuthorityReplayPacket): AuthorityReplay
     planDigest: digest(value.pendingRequest.planDigest, "pending request plan digest"),
     action: commandAction(value.pendingRequest.action)
   };
+  const providerEffect = value.providerEffect ? normalizeProviderEffect(value.providerEffect, "authority_recipient") : undefined;
   const packet = {
     recipientSessionId: identifier(value.recipientSessionId, "authority recipient"),
     grantId: identifier(value.grantId, "authority grant"),
@@ -950,11 +1172,13 @@ function normalizeAuthorityPacket(value: AuthorityReplayPacket): AuthorityReplay
     prohibitions: [...new Set(value.prohibitions.map(commandAction))],
     expiresAt: timestamp(value.expiresAt, "authority expiry"),
     pendingRequest,
-    matchDigest: digest(value.matchDigest, "authority match digest")
+    matchDigest: digest(value.matchDigest, "authority match digest"),
+    ...(providerEffect ? { providerEffect } : {})
   };
-  const expected = sha256(stableJson({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, actions: packet.actions, prohibitions: packet.prohibitions, expiresAt: packet.expiresAt, pendingRequest }));
+  const expected = sha256(stableJson({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, actions: packet.actions, prohibitions: packet.prohibitions, expiresAt: packet.expiresAt, pendingRequest, ...(providerEffect ? { providerEffect } : {}) }));
   if (packet.matchDigest !== expected) throw new WorkflowArtifactError("Authority replay packet does not match its protected pending request and grant scope.");
   if (!packet.actions.includes(pendingRequest.action) || packet.prohibitions.includes(pendingRequest.action)) throw new WorkflowArtifactError("Pending request action is not exactly authorized by the replay packet.");
+  if (providerEffect && (providerEffect.session.id !== packet.recipientSessionId || providerEffect.authority.id !== packet.grantId)) throw new WorkflowArtifactError("Authority broadcast provider effect changed its recipient or grant binding.");
   return packet;
 }
 
@@ -1081,7 +1305,17 @@ function artifactMap(entries: readonly JournalEntry<unknown>[]): Map<string, Wor
         providerEffectDisposition: raw.providerEffectDisposition
       };
     }
-    result.set(raw.id, clone({ ...raw, ...immutable, ...providerFields }));
+    let childResults: readonly WorkflowChildProviderResponse[] | undefined;
+    if (raw.childResults !== undefined) {
+      if (!Array.isArray(raw.childResults) || raw.childResults.length > 64 || !raw.operationId) throw new WorkflowArtifactError("Protected workflow child results are malformed or unbounded.");
+      const parent: WorkflowArtifact = { ...raw, ...immutable, ...providerFields };
+      childResults = raw.childResults.map((entry) => {
+        const effect = workflowProviderEffect(immutable.payload, entry.role, entry.bindingDigest);
+        return parseWorkflowChildProviderResponse(entry, parent, effect, entry.childOperationId, entry.role);
+      });
+      if (new Set(childResults.map((entry) => entry.bindingDigest)).size !== childResults.length || new Set(childResults.map((entry) => entry.childOperationId)).size !== childResults.length) throw new WorkflowArtifactError("Protected workflow child results contain duplicate bindings or operations.");
+    }
+    result.set(raw.id, clone({ ...raw, ...immutable, ...providerFields, ...(childResults ? { childResults } : {}) }));
   }
   return result;
 }
@@ -1102,6 +1336,9 @@ function workflowAction(value: unknown): WorkflowArtifactAction { if (typeof val
 function commandAction(value: unknown): CommandAction { if (typeof value === "string" && (commandActionIds as readonly string[]).includes(value)) return value as CommandAction; return invalid("authority action"); }
 function voiceProvider(value: unknown): VoiceProvider { if (value === "claude" || value === "chatgpt" || value === "system") return value; return invalid("voice provider"); }
 function planStepStatus(value: unknown): PlanStepArtifact["status"] { if (value === "proposed" || value === "approved" || value === "completed" || value === "blocked") return value; return invalid("plan step status"); }
+function workflowCapability(value: unknown): ManagedSession["capabilities"][number] { if (value === "registered" || value === "observable" || value === "controllable" || value === "mediated") return value; return invalid("provider effect capability"); }
+function managedSessionStatus(value: unknown): ManagedSession["status"] { if (value === "running" || value === "verified_blocked" || value === "verified_finished" || value === "unreachable" || value === "stale" || value === "unknown") return value; return invalid("provider effect session status"); }
+function managedSessionSurface(value: unknown): ManagedSession["surface"] { if (value === "vscode_terminal" || value === "vscode_window" || value === "desktop" || value === "browser" || value === "bridge") return value; return invalid("provider effect session surface"); }
 function workflowStatus(value: unknown): value is WorkflowArtifactStatus { return value === "prepared" || value === "submitted" || value === "cancelling" || value === "acknowledged" || value === "rejected" || value === "cancelled"; }
 function providerStatus(value: unknown): value is WorkflowProviderResponse["status"] { return typeof value === "string" && ["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value); }
 function disposition(value: unknown): value is EffectDisposition { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }

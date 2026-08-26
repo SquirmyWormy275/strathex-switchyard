@@ -2,6 +2,7 @@ import type { Capability, EffectDisposition, SessionStatus } from "../../../pack
 import { commandActionIds, commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import {
+  parseWorkflowChildProviderResponse,
   parseWorkflowProviderResponse,
   type AuthorityPendingRequest,
   type CoordinatorEvidenceBundle,
@@ -9,6 +10,7 @@ import {
   type PendingDecision,
   type PlanStepArtifact,
   type WorkflowArtifact,
+  type WorkflowChildProviderResponse,
   type WorkflowEvidenceReference,
   type WorkflowProviderResult,
   type WorkflowTestEvidence
@@ -145,8 +147,11 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
     const after = await this.port.observeSession(exactSession, signal);
     requireExecutionSession(after, exactSession, this.mediationAttestedForTests, requiredCapabilities, "after");
     if (before.adapterVersion !== after.adapterVersion) throw new Error("The provider adapter identity changed during execution.");
-    validateCommandResponse(request, response);
-    return response;
+    const hostBoundResponse = request.kind === "workflow" && request.child
+      ? { ...(response as WorkflowChildProviderResponse), adapterId: this.dispatchIdentity.adapterId, moduleSha256: this.dispatchIdentity.moduleSha256 }
+      : response;
+    validateCommandResponse(request, hostBoundResponse);
+    return hostBoundResponse;
   }
 
   async observeSession(request: ProviderGatewaySessionObservationRequest, signal: AbortSignal): Promise<ProviderGatewaySessionObservation> {
@@ -370,7 +375,9 @@ export class FixtureProviderRuntimePort implements ProviderRuntimePort {
     this.nextStatus = "completed";
     const disposition: EffectDisposition = status === "completed" ? "committed" : status === "running" ? "ambiguous" : "not_started";
     const response: ProviderGatewayCommandResult = request.kind === "workflow"
-      ? {
+      ? request.child
+        ? fixtureWorkflowChildResult(request, status, disposition)
+        : {
           schema: "sxsy-b122.workflow-result", version: 1, artifactId: request.artifact.id,
           artifactDigest: request.artifact.digest, operationId: request.operationId, action: request.action,
           status: workflowStatus(status), effectDisposition: disposition,
@@ -716,15 +723,40 @@ function validateCommandResponse(request: ProviderGatewayCommand, response: Prov
     const artifact: WorkflowArtifact = {
       id: request.artifact.id, digest: request.artifact.digest, action: request.action,
       repositoryRoot: request.repositoryRoot, targetSnapshotId: request.targetSnapshotId,
-      sessionId: request.sessionId, ...(request.artifact.taskId ? { taskId: request.artifact.taskId } : {}),
+      sessionId: request.artifact.sessionId ?? request.sessionId, ...(request.artifact.taskId ? { taskId: request.artifact.taskId } : {}),
       ...(request.artifact.planRevision ? { planRevision: request.artifact.planRevision } : {}),
-      payload: request.artifact.payload, status: "submitted", operationId: request.operationId,
+      ...(request.artifact.authorityId ? { authorityId: request.artifact.authorityId } : {}),
+      payload: request.artifact.payload, status: "submitted", operationId: request.child?.parentOperationId ?? request.operationId,
       executionAuthorized: false, createdAt: now, updatedAt: now
     };
-    parseWorkflowProviderResponse(response, artifact);
+    if (request.child) parseWorkflowChildProviderResponse(response, artifact, request.child.effect, request.operationId, request.child.role);
+    else parseWorkflowProviderResponse(response, artifact);
     return;
   }
   parseAutomationProviderResult(response, request.action, request.externalId);
+}
+
+function fixtureWorkflowChildResult(request: Extract<ProviderGatewayCommand, { kind: "workflow" }>, status: ProviderGatewayRemoteResult["status"], disposition: EffectDisposition): WorkflowChildProviderResponse {
+  const child = request.child!;
+  const terminalStatus: WorkflowChildProviderResponse["status"] = status === "completed" ? "completed" : status === "unavailable" ? "unavailable" : "failed";
+  if (child.role === "proof_backend") return {
+    schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: request.artifact.id, artifactDigest: request.artifact.digest,
+    parentOperationId: child.parentOperationId, childOperationId: request.operationId, action: request.action, role: child.role,
+    bindingDigest: child.bindingDigest, provider: request.provider, adapterId: child.effect.adapterId, moduleSha256: child.effect.moduleSha256,
+    status: terminalStatus, effectDisposition: status === "completed" ? "committed" : disposition === "committed" ? "ambiguous" : disposition,
+    summary: `Fixture ${request.provider} independent proof ${status}.`, ...(status === "completed" ? { externalId: request.externalId } : {}),
+    result: { kind: "proof_backend", backend: request.provider, status: status === "completed" ? "passed" : status === "unavailable" ? "unavailable" : "failed", verifiedClaims: status === "completed" && request.artifact.payload.kind === "proof" ? request.artifact.payload.claims : [], evidenceReferences: request.artifact.payload.kind === "proof" ? request.artifact.payload.evidence.tests.map((entry) => `${entry.id}:${entry.digest}:${entry.status}`) : [] }
+  };
+  if (status !== "completed" || request.artifact.payload.kind !== "authority") throw new Error("The fixture authority recipient did not acknowledge its exact packet.");
+  const packet = request.artifact.payload.packets.find((candidate) => candidate.providerEffect?.bindingDigest === child.bindingDigest);
+  if (!packet) throw new Error("The fixture authority recipient packet binding is missing.");
+  return {
+    schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: request.artifact.id, artifactDigest: request.artifact.digest,
+    parentOperationId: child.parentOperationId, childOperationId: request.operationId, action: request.action, role: child.role,
+    bindingDigest: child.bindingDigest, provider: request.provider, adapterId: child.effect.adapterId, moduleSha256: child.effect.moduleSha256,
+    status: "completed", effectDisposition: "committed", summary: `Fixture ${request.provider} recipient acknowledged its exact packet.`, externalId: request.externalId,
+    result: { kind: "authority_recipient", recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true }
+  };
 }
 
 function fixtureWorkflowResult(request: Extract<ProviderGatewayCommand, { kind: "workflow" }>): WorkflowProviderResult {

@@ -117,6 +117,30 @@ function workflowBody(operationId = "operation-proof-1", digestOverride?: string
   });
 }
 
+function adversarialChildBody(setup: Awaited<ReturnType<typeof fixture>>, operationId: string, expectedAdapterId = setup.codex.dispatchIdentity.adapterId): string {
+  const source = providerSession("codex");
+  const independent = providerSession("claude");
+  const effect = (session: ManagedSession, authorityId: string, identity: Readonly<{ adapterId: string; moduleSha256: string }>) => {
+    const authority = { id: authorityId, repositoryRoot: "C:\\repo", sessionId: session.id, taskId: "task-1", planRevision: "plan-1", allowedActions: ["proof_adversarial"], prohibitedActions: [] as string[], expiresAt: "2099-08-24T00:00:00.000Z", issuedAt: "2026-08-24T00:00:00.000Z", issuedBy: "test" };
+    const normalizedSession = { ...session, metadata: {} };
+    const material = { role: "proof_backend" as const, provider: session.provider as "claude" | "codex", session: normalizedSession, authority, adapterId: identity.adapterId, adapterVersion: session.adapterVersion, moduleSha256: identity.moduleSha256, providerContextDigest: sha256(`context-${session.provider}`) };
+    return { ...material, bindingDigest: sha256(stableJson(material)) };
+  };
+  const sourceEffect = effect(source, "authority-proof-codex", { ...setup.codex.dispatchIdentity, adapterId: expectedAdapterId });
+  const independentEffect = effect(independent, "authority-proof-claude", setup.claude.dispatchIdentity);
+  const original = JSON.parse(workflowBody()) as { artifact: { payload: { evidence: unknown } } };
+  const payload = { kind: "proof" as const, evidence: original.artifact.payload.evidence, claims: ["claim"], requiredBackends: ["codex", "claude"], independentBackendRequired: true, providerEffects: [sourceEffect, independentEffect] };
+  const artifact = canonicalWorkflowArtifact({ id: "artifact-proof-adversarial", action: "proof_adversarial", repositoryRoot: "C:\\repo", targetSnapshotId: targetId, sessionId: source.id, taskId: "task-1", planRevision: "plan-1", authorityId: sourceEffect.authority.id, coordinatorContextDigest: "f".repeat(64), coordinatorContextRevision: 7, payload: payload as never });
+  return JSON.stringify({
+    schema: "sxsy-b122.workflow-command", version: 1, action: "proof_adversarial", operationId,
+    authorityId: sourceEffect.authority.id,
+    target: { id: targetId, repositoryRoot: "C:\\repo", policyVersion: "policy-v1", trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64) },
+    session: { id: source.id, provider: source.provider, surface: source.surface, capabilities: source.capabilities, taskId: source.taskId, planRevision: source.planRevision, plannedFiles: source.plannedFiles },
+    child: { role: sourceEffect.role, bindingDigest: sourceEffect.bindingDigest },
+    artifact: { id: artifact.immutable.id, digest: artifact.digest, sessionId: source.id, operationId: "parent-proof-adversarial", taskId: "task-1", planRevision: "plan-1", authorityId: sourceEffect.authority.id, coordinatorContextDigest: "f".repeat(64), coordinatorContextRevision: 7, payload, executionAuthorized: false }
+  });
+}
+
 function planApprovalBody(operationId = "operation-plan-1", includeAuthorization = true): string {
   const value = JSON.parse(workflowBody(operationId)) as Record<string, unknown>;
   const artifact = value.artifact as Record<string, unknown>;
@@ -181,6 +205,23 @@ test("workflow commands are exact-target and idempotent across duplicate deliver
   const stale = await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale-target") });
   assert.equal(stale.outcome, "blocked");
   assert.equal(setup.codex.commandCalls, 1);
+});
+
+test("workflow child commands enforce the immutable provider profile and return one singleton child result", async (context) => {
+  const setup = await fixture(context);
+  await setup.sessions.upsert(providerSession("codex"));
+  const accepted = await setup.client.request({ routeId: "provider.proof_adversarial", repositoryRoot: "C:\\repo", body: adversarialChildBody(setup, "child-proof-codex-1") });
+  assert.equal(accepted.outcome, "passed");
+  const response = JSON.parse(Buffer.from(accepted.body!).toString("utf8")) as Record<string, unknown>;
+  assert.equal(response.schema, "sxsy-b122.workflow-child-result");
+  assert.equal(response.childOperationId, "child-proof-codex-1");
+  assert.equal(response.parentOperationId, "parent-proof-adversarial");
+  assert.equal(response.adapterId, setup.codex.dispatchIdentity.adapterId);
+  assert.equal((response.result as { kind: string }).kind, "proof_backend");
+
+  const aliased = await setup.client.request({ routeId: "provider.proof_adversarial", repositoryRoot: "C:\\repo", body: adversarialChildBody(setup, "child-proof-codex-alias", "untrusted-alias") });
+  assert.notEqual(aliased.outcome, "passed", "a provider label cannot alias a different host adapter profile");
+  assert.equal(setup.codex.commandCalls, 1, "profile aliases must be rejected before any backend effect");
 });
 
 test("Plan Approval gateway rejects missing or mismatched execution authorization and durably acknowledges one exact execution", async (context) => {

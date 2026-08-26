@@ -12,6 +12,7 @@ import {
   planApprovalReviewScopeDigest,
   WorkflowArtifactStore,
   WorkflowCoordinatorContextStore,
+  parseWorkflowChildProviderResponse,
   parseWorkflowProviderResponse,
   type CoordinatorEvidenceBundle,
   type ExistingPlanBinding,
@@ -199,6 +200,52 @@ test("Re-anchor and Proof carry coordinator-owned plan, docs, diff, files and cl
   assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submitted, { kind: "proof", verifiedClaims: [], evidenceReferences: [], backendResults: [{ backend: "codex", status: "passed" }] }), submitted), /required backend/i);
 });
 
+test("Shift Proof prepares two exact non-aliased provider effects and durably records each child result", async (context) => {
+  const journal = await store(context);
+  const contexts = new WorkflowCoordinatorContextStore(journal, { clock: () => "2026-08-24T12:00:00.000Z" });
+  const source = { ...managedSession("session-1", "running"), adapterVersion: "codex-v1" };
+  const independent = { ...managedSession("session-claude", "running"), provider: "claude" as const, adapterVersion: "claude-v1" };
+  const sourceAuthority = authorityGrant("authority-proof-codex", source.id, ["proof_adversarial"]);
+  const independentAuthority = authorityGrant("authority-proof-claude", independent.id, ["proof_adversarial"]);
+  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, provenance: providerProvenance("codex", "codex"), evidence: evidence(), pendingDecisions: [] });
+  await contexts.record({ sessionId: independent.id, repositoryRoot: independent.workspaceRoot!, targetSnapshotId: independent.targetSnapshotId!, authorityId: independentAuthority.id, sourceRevision: 1, provenance: providerProvenance("claude", "claude"), evidence: evidence(), pendingDecisions: [] });
+  const sessions = new Map([source, independent].map((session) => [session.id, session]));
+  const authorities = new Map([sourceAuthority, independentAuthority].map((authority) => [authority.id, authority]));
+  const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => authorities.get(id) });
+  const prepared = await coordinator.prepare({ action: "proof_adversarial", session: source, authorityId: sourceAuthority.id, intent: { kind: "none" } });
+  assert.equal(prepared.payload.kind, "proof");
+  if (prepared.payload.kind !== "proof") throw new Error("expected proof payload");
+  assert.deepEqual(prepared.payload.providerEffects?.map((effect) => effect.provider), ["codex", "claude"]);
+  assert.equal(new Set(prepared.payload.providerEffects?.map((effect) => effect.bindingDigest)).size, 2);
+
+  const artifacts = new WorkflowArtifactStore(journal);
+  const created = await artifacts.create({ ...base("proof_adversarial", prepared.payload), authorityId: prepared.authorityId, coordinatorContextDigest: prepared.coordinatorContextDigest, coordinatorContextRevision: prepared.coordinatorContextRevision });
+  const submitted = await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-adversarial-children", authorityId: sourceAuthority.id });
+  assert.ok(submitted);
+  const effect = prepared.payload.providerEffects![0]!;
+  const child = parseWorkflowChildProviderResponse({
+    schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: submitted.id, artifactDigest: submitted.digest,
+    parentOperationId: submitted.operationId, childOperationId: "child-proof-codex", action: submitted.action,
+    role: "proof_backend", bindingDigest: effect.bindingDigest, provider: effect.provider,
+    adapterId: effect.adapterId, moduleSha256: effect.moduleSha256, status: "completed", effectDisposition: "committed",
+    summary: "Codex independently inspected the exact evidence.", externalId: "provider-proof-codex-1",
+    result: { kind: "proof_backend", backend: "codex", status: "passed", verifiedClaims: ["claim"], evidenceReferences: ["receipt:codex"] }
+  }, submitted, effect, "child-proof-codex", "proof_backend");
+  const recorded = await artifacts.recordChildResult(child);
+  assert.equal(recorded.childResults?.length, 1);
+  assert.deepEqual((await new WorkflowArtifactStore(journal).get(submitted.id))?.childResults, [child]);
+  assert.equal((await artifacts.recordChildResult(child)).childResults?.length, 1, "an exact retry must not duplicate the durable child receipt");
+  await assert.rejects(() => artifacts.recordChildResult({ ...child, externalId: "confused-replay" }), /conflict|binding/i);
+
+  const aliasJournal = await store(context);
+  const aliasContexts = new WorkflowCoordinatorContextStore(aliasJournal, { clock: () => "2026-08-24T12:00:00.000Z" });
+  const aliasedModule = sha256("aliased-module");
+  await aliasContexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, provenance: { ...providerProvenance("codex", "alias-codex", source.adapterVersion), adapterId: "aliased-adapter", moduleSha256: aliasedModule }, evidence: evidence(), pendingDecisions: [] });
+  await aliasContexts.record({ sessionId: independent.id, repositoryRoot: independent.workspaceRoot!, targetSnapshotId: independent.targetSnapshotId!, authorityId: independentAuthority.id, sourceRevision: 1, provenance: { ...providerProvenance("claude", "alias-claude", independent.adapterVersion), adapterId: "aliased-adapter", moduleSha256: aliasedModule }, evidence: evidence(), pendingDecisions: [] });
+  const aliasCoordinator = new DurableWorkflowPreparationCoordinator(aliasContexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => authorities.get(id) });
+  await assert.rejects(() => aliasCoordinator.prepare({ action: "proof_adversarial", session: source, authorityId: sourceAuthority.id, intent: { kind: "none" } }), /independent|alias/i);
+});
+
 test("durable coordinator generates option requests, cycles verified queues, and replays only an exactly matching pending authority request", async (context) => {
   const journal = await store(context);
   const contexts = new WorkflowCoordinatorContextStore(journal, { clock: () => "2026-08-24T12:00:00.000Z" });
@@ -233,13 +280,13 @@ test("Authority broadcast uses each recipient's protected pending request and re
   const source = managedSession("session-1", "running");
   const recipients = [managedSession("recipient-1", "running"), managedSession("recipient-2", "verified_blocked")];
   const sourceAuthority = authorityGrant("authority-broadcast", source.id, ["authority_broadcast"]);
-  const recipientAuthorities = recipients.map((recipient, index) => authorityGrant(`authority-recipient-${index + 1}`, recipient.id, ["proof"]));
-  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, evidence: evidence(), pendingDecisions: [] });
+  const recipientAuthorities = recipients.map((recipient, index) => authorityGrant(`authority-recipient-${index + 1}`, recipient.id, ["proof", "authority_broadcast"]));
+  await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, provenance: providerProvenance("codex", "source", source.adapterVersion), evidence: evidence(), pendingDecisions: [] });
   for (let index = 0; index < recipients.length; index += 1) {
     const recipient = recipients[index]!;
     const authority = recipientAuthorities[index]!;
     await contexts.record({
-      sessionId: recipient.id, repositoryRoot: recipient.workspaceRoot!, targetSnapshotId: recipient.targetSnapshotId!, authorityId: authority.id, sourceRevision: 1, evidence: evidence(), pendingDecisions: [],
+      sessionId: recipient.id, repositoryRoot: recipient.workspaceRoot!, targetSnapshotId: recipient.targetSnapshotId!, authorityId: authority.id, sourceRevision: 1, provenance: providerProvenance("codex", `recipient-${index + 1}`, recipient.adapterVersion), evidence: evidence(), pendingDecisions: [],
       pendingRequest: { requestId: `pending-${index + 1}`, targetSnapshotId: recipient.targetSnapshotId!, planRevision: "plan-7", planDigest: existingPlan().digest, action: "proof" }
     });
   }
@@ -251,6 +298,8 @@ test("Authority broadcast uses each recipient's protected pending request and re
     { recipient: "recipient-1", grant: "authority-recipient-1", action: "proof" },
     { recipient: "recipient-2", grant: "authority-recipient-2", action: "proof" }
   ]);
+  assert.equal(payload.packets.every((packet) => packet.providerEffect?.session.id === packet.recipientSessionId && packet.providerEffect.authority.id === packet.grantId), true);
+  assert.equal(new Set(payload.packets.map((packet) => packet.providerEffect?.bindingDigest)).size, 2);
 
   const artifacts = new WorkflowArtifactStore(journal);
   const created = await artifacts.create(base("authority_broadcast", payload));
@@ -309,4 +358,12 @@ function managedSession(id: string, status: ManagedSession["status"]): ManagedSe
 
 function authorityGrant(id: string, sessionId: string, actions: readonly string[]): AuthorityGrant {
   return { id, repositoryRoot: "C:\\repo", sessionId, taskId: "task-1", planRevision: "plan-7", allowedActions: actions, prohibitedActions: [], issuedAt: "2026-08-24T00:00:00.000Z", expiresAt: "2099-08-24T00:00:00.000Z", issuedBy: "test" };
+}
+
+function providerProvenance(provider: "claude" | "codex", marker: string, adapterVersion = `${marker}-v1`) {
+  return {
+    provider, contextId: `context-${marker}`, observedAt: "2026-08-24T12:00:00.000Z",
+    adapterId: `adapter-${marker}`, adapterVersion, moduleSha256: sha256(`module-${marker}`),
+    providerContextDigest: sha256(`provider-context-${marker}`), envelopeDigest: sha256(`envelope-${marker}`)
+  };
 }

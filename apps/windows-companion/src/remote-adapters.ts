@@ -4,7 +4,8 @@ import { commandForAction, type CommandAction } from "../../../packages/control-
 import type { AuthorityGrant, Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
-import { parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { parseWorkflowChildProviderResponse, parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowChildProviderResponse, type WorkflowProviderEffectBinding, type WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type NetworkContainmentFence } from "./configured-network.ts";
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
@@ -166,6 +167,7 @@ export interface WorkflowArtifactDispatchPort {
   claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId: string }>): Promise<WorkflowArtifact | undefined>;
   assertDispatchBinding(input: Readonly<{ artifactId: string; artifactDigest: string; action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId: string }>): Promise<WorkflowArtifact>;
   acknowledge(response: WorkflowProviderResponse): Promise<WorkflowArtifact>;
+  recordChildResult?(response: WorkflowChildProviderResponse): Promise<WorkflowArtifact>;
 }
 
 export class ConfiguredProviderCommandAdapter implements CommandAdapter {
@@ -197,6 +199,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       if (artifact.status === "acknowledged") return { status: "completed", summary: "The durable provider workflow was already acknowledged and was not replayed.", effectDisposition: "committed", data: { artifactId: artifact.id, artifactDigest: artifact.digest, ...(artifact.providerExternalId ? { providerExternalId: artifact.providerExternalId } : {}) } };
       if (artifact.status !== "submitted") return { status: "blocked", summary: "The durable provider workflow is not in a dispatchable submitted state.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
       if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before network dispatch.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
+      if (action === "proof_adversarial" || action === "authority_broadcast") return await this.executeIndependentChildren(request as AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>, artifact, control.signal);
       const routeId = `provider.${request.definition.action}`;
       const recoveryExternalId = this.network.recoveryExternalId?.({ routeId, operationId: request.operationId, provider: request.session.provider });
       const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest, ...(recoveryExternalId ? { externalId: recoveryExternalId } : {}) } }) : undefined;
@@ -280,6 +283,165 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       return finish({ status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
     } finally { control.dispose(); }
   }
+
+  private async executeIndependentChildren(request: AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>, initialArtifact: WorkflowArtifact, signal: AbortSignal): Promise<AdapterOutcome> {
+    if (!request.childSaga || !this.artifacts?.recordChildResult) return { status: "unavailable", summary: "Independent provider workflows require durable child operations and protected child-result storage.", effectDisposition: "not_started", data: { artifactId: initialArtifact.id, artifactDigest: initialArtifact.digest } };
+    const effects = compositeEffects(initialArtifact);
+    if (!effects) return { status: "blocked", summary: "The composite workflow artifact lacks exact independent provider or recipient effect bindings.", effectDisposition: "not_started", data: { artifactId: initialArtifact.id, artifactDigest: initialArtifact.digest } };
+    let artifact = initialArtifact;
+    const results = new Map((artifact.childResults ?? []).map((response) => [response.bindingDigest, response]));
+    const routeId = `provider.${request.definition.action}`;
+    for (const effect of effects) {
+      const idempotencyScope = `${artifact.id}:${effect.role}:${effect.bindingDigest}`;
+      const lease = await request.childSaga.begin({
+        action: `${routeId}.${effect.provider}`,
+        idempotencyScope,
+        details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest, bindingDigest: effect.bindingDigest, provider: effect.provider }
+      });
+      const durable = results.get(effect.bindingDigest);
+      if (durable) {
+        if (!lease.existing && lease.mayExecute) {
+          await request.childSaga.markExecuting(lease);
+          if (durable.effectDisposition === "committed") await request.childSaga.markExternalCommitted(lease, compositeChildDetails(artifact, routeId, idempotencyScope, durable));
+          await request.childSaga.settle(lease, durable.effectDisposition === "committed" ? "completed" : "failed", compositeChildDetails(artifact, routeId, idempotencyScope, durable));
+        } else if (lease.state !== "recorded" && lease.state !== "failed") {
+          return compositeIncomplete(artifact, results, "A durable provider child result exists but its prior saga is not terminal; reconciliation is required.", "ambiguous");
+        }
+        continue;
+      }
+      if (!lease.mayExecute) return compositeIncomplete(artifact, results, "A prior provider child may have executed without a durable typed result and was not replayed.", "ambiguous");
+      await request.childSaga.markExecuting(lease);
+      const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority });
+      if (!current.allowed || signal.aborted) {
+        await request.childSaga.settle(lease, "failed", { bindingDigest: effect.bindingDigest, idempotencyScope, reason: current.reason });
+        return { status: signal.aborted ? "cancelled" : "blocked", summary: current.reason, effectDisposition: "not_started", data: compositeData(artifact, results) };
+      }
+      try {
+        await this.artifacts.assertDispatchBinding({ artifactId: artifact.id, artifactDigest: artifact.digest, action: artifact.action, targetSnapshotId: request.target.id, sessionId: request.session.id, operationId: request.operationId, authorityId: request.authority.id });
+      } catch {
+        await request.childSaga.settle(lease, "failed", { bindingDigest: effect.bindingDigest, idempotencyScope, reason: "stale-artifact" });
+        return { status: "blocked", summary: "The protected composite workflow artifact changed at a child effect boundary.", effectDisposition: "not_started", data: compositeData(artifact, results) };
+      }
+      let networkResult: ConfiguredNetworkResult;
+      try {
+        networkResult = await this.network.request({
+          routeId, repositoryRoot: request.target.repositoryRoot, signal,
+          body: JSON.stringify(providerChildDocument(request, artifact, effect, lease.operationId)),
+          trustedDispatch: trustedProviderDispatch(request.definition.action, lease.operationId, request.target, effect.session, effect.authority, {
+            id: artifact.id, digest: artifact.digest, coordinatorContextDigest: artifact.coordinatorContextDigest ?? null, coordinatorContextRevision: artifact.coordinatorContextRevision ?? null
+          }, request.confirmation, request.effectGuard)
+        });
+      } catch {
+        await request.childSaga.settle(lease, "ambiguous", { bindingDigest: effect.bindingDigest, idempotencyScope });
+        return compositeIncomplete(artifact, results, "An independent provider child transport failed after dispatch may have begun; it was not replayed.", "ambiguous");
+      }
+      if (networkResult.outcome !== "passed" || !networkResult.body) {
+        const fallback = adapterOutcome(networkResult);
+        await request.childSaga.settle(lease, fallback.effectDisposition === "not_started" ? "failed" : "ambiguous", { bindingDigest: effect.bindingDigest, idempotencyScope });
+        return { ...fallback, data: compositeData(artifact, results) };
+      }
+      let response: WorkflowChildProviderResponse;
+      try {
+        const value = JSON.parse(Buffer.from(networkResult.body).toString("utf8"));
+        response = parseWorkflowChildProviderResponse(value, artifact, effect, lease.operationId, effect.role);
+      } catch {
+        await request.childSaga.settle(lease, "ambiguous", { bindingDigest: effect.bindingDigest, idempotencyScope });
+        return compositeIncomplete(artifact, results, "An independent provider child returned a malformed, aliased, or cross-boundary result; it was not replayed.", "ambiguous");
+      }
+      let after;
+      try { after = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority }); }
+      catch { after = { allowed: false, reason: "The exact child provider target could not be revalidated after the effect." }; }
+      if (response.effectDisposition === "committed") await request.childSaga.markExternalCommitted(lease, compositeChildDetails(artifact, routeId, idempotencyScope, response));
+      try {
+        artifact = await this.artifacts.recordChildResult(response);
+        results.set(response.bindingDigest, response);
+      } catch {
+        await request.childSaga.settle(lease, "ambiguous", compositeChildDetails(artifact, routeId, idempotencyScope, response));
+        return compositeIncomplete(artifact, results, "The provider child result could not be durably recorded; reconciliation is required.", "ambiguous");
+      }
+      if (!after.allowed || signal.aborted) {
+        await request.childSaga.settle(lease, "ambiguous", compositeChildDetails(artifact, routeId, idempotencyScope, response));
+        return compositeIncomplete(artifact, results, `${after.reason} The committed child truth was retained but not aggregated.`);
+      }
+      await request.childSaga.settle(lease, response.effectDisposition === "committed" ? "completed" : "failed", compositeChildDetails(artifact, routeId, idempotencyScope, response));
+    }
+    const response = aggregateCompositeResponse(artifact, effects, results);
+    if (!response) return compositeIncomplete(artifact, results, "Every broadcast recipient must provide an exact terminal acknowledgement before aggregation.");
+    try { await this.artifacts.acknowledge(response); }
+    catch { return { status: "failed", summary: "All independent child effects are durably recorded, but aggregate acknowledgement was interrupted; retry will not replay them.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }; }
+    return { status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) };
+  }
+}
+
+function compositeEffects(artifact: WorkflowArtifact): readonly WorkflowProviderEffectBinding[] | undefined {
+  if (artifact.action === "proof_adversarial" && artifact.payload.kind === "proof" && artifact.payload.providerEffects?.length === 2) {
+    const effects = artifact.payload.providerEffects;
+    if (effects.every((effect) => effect.role === "proof_backend") && new Set(effects.map((effect) => effect.provider)).size === 2
+      && new Set(effects.map((effect) => effect.adapterId)).size === 2 && new Set(effects.map((effect) => effect.moduleSha256)).size === 2) return effects;
+  }
+  if (artifact.action === "authority_broadcast" && artifact.payload.kind === "authority" && artifact.payload.mode === "broadcast") {
+    const effects = artifact.payload.packets.map((packet) => packet.providerEffect);
+    if (effects.every((effect): effect is WorkflowProviderEffectBinding => !!effect && effect.role === "authority_recipient")
+      && new Set(effects.map((effect) => effect.bindingDigest)).size === effects.length) return effects;
+  }
+  return undefined;
+}
+
+function providerChildDocument(request: AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority">>, artifact: WorkflowArtifact, effect: WorkflowProviderEffectBinding, childOperationId: string) {
+  return {
+    schema: "sxsy-b122.workflow-command", version: 1, action: request.definition.action, operationId: childOperationId,
+    target: targetDocument(request.target), session: sessionDocument(effect.session), authorityId: effect.authority.id,
+    child: { role: effect.role, bindingDigest: effect.bindingDigest },
+    artifact: {
+      id: artifact.id, digest: artifact.digest, sessionId: artifact.sessionId, operationId: artifact.operationId,
+      taskId: artifact.taskId, planRevision: artifact.planRevision, authorityId: artifact.authorityId,
+      coordinatorContextDigest: artifact.coordinatorContextDigest, coordinatorContextRevision: artifact.coordinatorContextRevision,
+      payload: artifact.payload, executionAuthorized: false
+    }
+  };
+}
+
+function compositeChildDetails(artifact: WorkflowArtifact, routeId: string, idempotencyScope: string, response: WorkflowChildProviderResponse): Readonly<Record<string, string>> {
+  return { artifactId: artifact.id, routeId, idempotencyScope, bindingDigest: response.bindingDigest, provider: response.provider, ...(response.externalId ? { externalId: response.externalId } : {}) };
+}
+
+function compositeData(artifact: WorkflowArtifact, results: ReadonlyMap<string, WorkflowChildProviderResponse>): Readonly<Record<string, unknown>> {
+  return redactRecord({ artifactId: artifact.id, artifactDigest: artifact.digest, childResults: [...results.values()] });
+}
+
+function compositeIncomplete(artifact: WorkflowArtifact, results: ReadonlyMap<string, WorkflowChildProviderResponse>, summary: string, forcedDisposition?: "not_started" | "ambiguous"): AdapterOutcome {
+  const committed = [...results.values()].some((result) => result.effectDisposition === "committed");
+  return { status: "failed", summary, effectDisposition: forcedDisposition ?? (committed ? "ambiguous" : "not_started"), data: compositeData(artifact, results) };
+}
+
+function aggregateCompositeResponse(artifact: WorkflowArtifact, effects: readonly WorkflowProviderEffectBinding[], results: ReadonlyMap<string, WorkflowChildProviderResponse>): WorkflowProviderResponse | undefined {
+  const ordered = effects.map((effect) => results.get(effect.bindingDigest));
+  if (ordered.some((entry) => !entry)) return undefined;
+  const children = ordered as readonly WorkflowChildProviderResponse[];
+  const externalId = `aggregate:${sha256(stableJson(children.map((child) => ({ bindingDigest: child.bindingDigest, externalId: child.externalId ?? null, status: child.status, effectDisposition: child.effectDisposition }))))}`;
+  if (artifact.payload.kind === "proof") {
+    const proof = children.map((child) => child.result).filter((result): result is Extract<WorkflowChildProviderResponse["result"], { kind: "proof_backend" }> => result.kind === "proof_backend");
+    if (proof.length !== effects.length) return undefined;
+    const allPassed = proof.every((result) => result.status === "passed");
+    const verifiedClaims = proof[0]?.verifiedClaims.filter((claim) => proof.every((result) => result.verifiedClaims.includes(claim))) ?? [];
+    return {
+      schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId!, action: artifact.action,
+      status: allPassed ? "completed" : "failed", effectDisposition: allPassed ? "committed" : children.some((child) => child.effectDisposition === "committed") ? "ambiguous" : "not_started",
+      summary: allPassed ? "Two independently mediated provider effects completed adversarial proof." : "Independent provider proof effects reached terminal disagreement or failure.",
+      externalId,
+      result: { kind: "proof", verifiedClaims, evidenceReferences: [...new Set(proof.flatMap((result) => result.evidenceReferences))], backendResults: proof.map((result) => ({ backend: result.backend, status: result.status })) }
+    };
+  }
+  if (artifact.payload.kind === "authority") {
+    const acknowledgements = children.map((child) => child.result).filter((result): result is Extract<WorkflowChildProviderResponse["result"], { kind: "authority_recipient" }> => result.kind === "authority_recipient");
+    if (acknowledgements.length !== effects.length) return undefined;
+    return {
+      schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId!, action: artifact.action,
+      status: "completed", effectDisposition: "committed", summary: "Every exact authority recipient durably acknowledged its individualized packet.", externalId,
+      result: { kind: "authority", acknowledgements }
+    };
+  }
+  return undefined;
 }
 
 export function createConfiguredAutomationBroker(policy: PermitVerifier, containment: ContainmentGuard, network: ProviderCommandTransport): AutomationBroker {

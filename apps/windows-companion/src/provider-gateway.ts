@@ -15,10 +15,16 @@ import {
 } from "../../../packages/control-plane/src/store.ts";
 import {
   canonicalWorkflowArtifact,
+  parseWorkflowChildProviderResponse,
   planApprovalReviewScopeDigest,
+  workflowProviderEffect,
+  type WorkflowArtifact,
   type WorkflowArtifactImmutable,
   type WorkflowArtifactAction,
   type WorkflowArtifactPayload,
+  type WorkflowChildProviderResponse,
+  type WorkflowProviderEffectBinding,
+  type WorkflowProviderEffectRole,
   type WorkflowProviderResponse,
   type WorkflowProviderResult
 } from "../../../packages/control-plane/src/workflow-artifacts.ts";
@@ -98,12 +104,20 @@ export interface ProviderGatewayWorkflowCommand {
   readonly artifact: Readonly<{
     id: string;
     digest: string;
+    sessionId?: string;
+    operationId?: string;
     taskId?: string;
     planRevision?: string;
     authorityId?: string;
     coordinatorContextDigest?: string;
     coordinatorContextRevision?: number;
     payload: WorkflowArtifactPayload;
+  }>;
+  readonly child?: Readonly<{
+    role: WorkflowProviderEffectRole;
+    bindingDigest: string;
+    effect: WorkflowProviderEffectBinding;
+    parentOperationId: string;
   }>;
   readonly executionAuthorization?: Readonly<{
     executionAuthorized: true;
@@ -140,7 +154,7 @@ export type ProviderGatewayCommand = ProviderGatewayWorkflowCommand | ProviderGa
 
 export type ProviderGatewayRemoteResult = AutomationProviderResult;
 
-export type ProviderGatewayCommandResult = WorkflowProviderResponse | ProviderGatewayRemoteResult;
+export type ProviderGatewayCommandResult = WorkflowProviderResponse | WorkflowChildProviderResponse | ProviderGatewayRemoteResult;
 export type ProviderGatewayOperationOutcome = "committed" | "failed" | "cancelled" | "unresolved";
 
 export interface ProviderGatewayOperationObservationRequest {
@@ -176,6 +190,7 @@ export interface ProviderGatewayCancellationAcknowledgement {
 export interface ProviderGatewayBackend {
   readonly provider: ProviderGatewayProvider;
   readonly boundary: ProviderGatewayBoundary;
+  readonly dispatchIdentity: Readonly<{ adapterId: string; moduleSha256: string }>;
   handshake(request: ProviderGatewayHandshakeRequest, signal: AbortSignal): Promise<ProviderGatewayHandshakeResult>;
   execute(request: ProviderGatewayCommand, signal: AbortSignal): Promise<ProviderGatewayCommandResult>;
   observeSession(request: ProviderGatewaySessionObservationRequest, signal: AbortSignal): Promise<ProviderGatewaySessionObservation>;
@@ -469,6 +484,9 @@ export class LocalProviderCommandGateway {
   private async executeCommand(input: ProviderGatewayRouteRequest, command: ProviderGatewayCommand): Promise<ConfiguredNetworkResult> {
     const backend = this.backends.get(command.provider);
     if (!backend) return unavailable(input.routeId, `No exact local ${command.provider} provider gateway backend is installed.`);
+    if (command.kind === "workflow" && command.child && (command.child.effect.adapterId !== backend.dispatchIdentity.adapterId || command.child.effect.moduleSha256 !== backend.dispatchIdentity.moduleSha256)) {
+      return blocked(input.routeId, "The immutable workflow child provider profile does not match the installed host-owned backend identity.");
+    }
     const session = await this.sessions.get(command.sessionId);
     if (!session || !canExecuteProviderCommand(session, command, this.now(), this.automaticRefreshIntervalMs)) {
       return blocked(input.routeId, "The exact provider session is not current, running, bound to this TargetSnapshot, and at the catalog-derived capability floor.");
@@ -671,6 +689,7 @@ export class ProviderGatewayRouteRouter implements ProviderGatewayFallbackTransp
 export class DeterministicProviderGatewayBackend implements ProviderGatewayBackend {
   readonly provider: ProviderGatewayProvider;
   readonly boundary: ProviderGatewayBoundary;
+  readonly dispatchIdentity: Readonly<{ adapterId: string; moduleSha256: string }>;
   commandCalls = 0;
   cancelCalls = 0;
   sessionObservationCalls = 0;
@@ -683,6 +702,7 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
   constructor(provider: ProviderGatewayProvider, options: { readonly boundary?: ProviderGatewayBoundary } = {}) {
     this.provider = provider;
     this.boundary = options.boundary ?? "local-only";
+    this.dispatchIdentity = Object.freeze({ adapterId: `sxsy-b122.deterministic.${provider}`, moduleSha256: sha256(`sxsy-b122.deterministic.${provider}.v1`) });
   }
 
   setUnavailable(value: boolean): void { this.unavailableState = value; }
@@ -715,7 +735,9 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
     this.nextStatus = "completed";
     const disposition: EffectDisposition = status === "completed" ? "committed" : status === "running" ? "ambiguous" : "not_started";
     const response: ProviderGatewayCommandResult = request.kind === "workflow"
-      ? {
+      ? request.child
+        ? deterministicWorkflowChildResult(request, status, disposition, this.dispatchIdentity)
+        : {
           schema: "sxsy-b122.workflow-result",
           version: 1,
           artifactId: request.artifact.id,
@@ -806,10 +828,11 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
   const target = object(value.target, "target");
   const session = object(value.session, "session");
   const artifact = object(value.artifact, "artifact");
-  if (!exact(value, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "artifact", ...(action === "plan_approval" ? ["executionAuthorization"] : [])])) throw new Error("The workflow gateway request contains unknown or missing fields.");
+  const hasChild = value.child !== undefined;
+  if (!exact(value, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "artifact", ...(hasChild ? ["child"] : []), ...(action === "plan_approval" ? ["executionAuthorization"] : [])])) throw new Error("The workflow gateway request contains unknown or missing fields.");
   if (!allowedExact(target, ["id", "repositoryRoot", "policyVersion", "trackedManifest", "untrackedManifest"], ["branch", "head"])) throw new Error("The workflow target binding is malformed.");
   if (!allowedExact(session, ["id", "provider", "surface", "capabilities", "plannedFiles"], ["taskId", "planRevision"])) throw new Error("The workflow session binding is malformed.");
-  if (!allowedExact(artifact, ["id", "digest", "authorityId", "payload", "executionAuthorized"], ["taskId", "planRevision", "coordinatorContextDigest", "coordinatorContextRevision"])) throw new Error("The workflow artifact binding is malformed.");
+  if (!allowedExact(artifact, ["id", "digest", "authorityId", "payload", "executionAuthorized"], ["sessionId", "operationId", "taskId", "planRevision", "coordinatorContextDigest", "coordinatorContextRevision"])) throw new Error("The workflow artifact binding is malformed.");
   if (artifact.executionAuthorized !== false) throw new Error("Provider workflow artifacts never authorize execution.");
   const operationId = safeIdentifier(value.operationId, "operation ID");
   const targetSnapshotId = digest(target.id, "target snapshot");
@@ -819,7 +842,10 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
   const artifactId = safeIdentifier(artifact.id, "artifact ID");
   const artifactDigest = digest(artifact.digest, "artifact digest");
   const artifactAuthorityId = safeIdentifier(artifact.authorityId, "artifact authority ID");
-  if (artifactAuthorityId !== authorityId) throw new Error("The workflow artifact authority differs from the exact mediated dispatch authority.");
+  if (!hasChild && artifactAuthorityId !== authorityId) throw new Error("The workflow artifact authority differs from the exact mediated dispatch authority.");
+  if (hasChild !== (artifact.sessionId !== undefined && artifact.operationId !== undefined)) throw new Error("A workflow child command requires the exact immutable parent session and operation binding.");
+  const artifactSessionId = hasChild ? safeIdentifier(artifact.sessionId, "artifact session ID") : sessionId;
+  const parentOperationId = hasChild ? safeIdentifier(artifact.operationId, "parent operation ID") : operationId;
   const hasCoordinatorDigest = artifact.coordinatorContextDigest !== undefined;
   const hasCoordinatorRevision = artifact.coordinatorContextRevision !== undefined;
   if (hasCoordinatorDigest !== hasCoordinatorRevision
@@ -831,7 +857,7 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
     action,
     repositoryRoot: exactRepositoryRoot,
     targetSnapshotId,
-    sessionId,
+    sessionId: artifactSessionId,
     ...(artifact.taskId === undefined ? {} : { taskId: safeIdentifier(artifact.taskId, "task ID") }),
     ...(artifact.planRevision === undefined ? {} : { planRevision: safeIdentifier(artifact.planRevision, "plan revision") }),
     authorityId: artifactAuthorityId,
@@ -844,6 +870,21 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
   if (canonical.digest !== artifactDigest) throw new Error("The workflow artifact digest does not match its exact canonical immutable content.");
   const immutable: WorkflowArtifactImmutable = canonical.immutable;
   const payload = immutable.payload;
+  let child: ProviderGatewayWorkflowCommand["child"];
+  if (hasChild) {
+    const childValue = object(value.child, "workflow child");
+    if (!exact(childValue, ["role", "bindingDigest"])) throw new Error("The workflow child binding contains unknown or missing fields.");
+    const role = childValue.role === "proof_backend" || childValue.role === "authority_recipient" ? childValue.role : (() => { throw new Error("The workflow child role is invalid."); })();
+    const bindingDigest = digest(childValue.bindingDigest, "workflow child binding");
+    const effect = workflowProviderEffect(payload, role, bindingDigest);
+    if (effect.session.id !== sessionId || effect.authority.id !== authorityId || effect.provider !== providerIdentity(session.provider)
+      || session.surface !== effect.session.surface || stableJson(session.capabilities) !== stableJson(effect.session.capabilities)
+      || stableJson(session.plannedFiles) !== stableJson(effect.session.plannedFiles)
+      || session.taskId !== effect.session.taskId || session.planRevision !== effect.session.planRevision) {
+      throw new Error("The workflow child transport session or authority differs from its immutable provider effect.");
+    }
+    child = { role, bindingDigest, effect, parentOperationId };
+  }
   let executionAuthorization: ProviderGatewayWorkflowCommand["executionAuthorization"];
   if (action === "plan_approval") {
     const authorization = object(value.executionAuthorization, "plan execution authorization");
@@ -908,6 +949,7 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
     artifact: {
       id: immutable.id,
       digest: artifactDigest,
+      ...(hasChild ? { sessionId: artifactSessionId, operationId: parentOperationId } : {}),
       ...(immutable.taskId === undefined ? {} : { taskId: immutable.taskId }),
       ...(immutable.planRevision === undefined ? {} : { planRevision: immutable.planRevision }),
       ...(immutable.authorityId === undefined ? {} : { authorityId: immutable.authorityId }),
@@ -915,6 +957,7 @@ function parseWorkflowCommand(value: Record<string, unknown>, repositoryRoot: st
       ...(immutable.coordinatorContextRevision === undefined ? {} : { coordinatorContextRevision: immutable.coordinatorContextRevision }),
       payload
     },
+    ...(child ? { child } : {}),
     ...(executionAuthorization ? { executionAuthorization } : {})
   };
 }
@@ -982,9 +1025,24 @@ function requireCommandResponse(command: ProviderGatewayCommand, response: Provi
   boundedJson(response);
   if (response.externalId !== command.externalId || response.status === undefined || response.effectDisposition === undefined || !safeSummary(response.summary)) throw new Error("The provider response is not exact or bounded.");
   if (command.kind === "workflow") {
-    const workflowResponse = response as WorkflowProviderResponse;
-    if (workflowResponse.schema !== "sxsy-b122.workflow-result" || workflowResponse.version !== 1 || workflowResponse.operationId !== command.operationId || workflowResponse.action !== command.action || workflowResponse.artifactId !== command.artifact.id || workflowResponse.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
+    if (command.child) {
+      parseWorkflowChildProviderResponse(response, workflowArtifactForCommand(command), command.child.effect, command.operationId, command.child.role);
+    } else {
+      const workflowResponse = response as WorkflowProviderResponse;
+      if (workflowResponse.schema !== "sxsy-b122.workflow-result" || workflowResponse.version !== 1 || workflowResponse.operationId !== command.operationId || workflowResponse.action !== command.action || workflowResponse.artifactId !== command.artifact.id || workflowResponse.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
+    }
   } else parseAutomationProviderResult(response, command.action, command.externalId);
+}
+
+function workflowArtifactForCommand(command: ProviderGatewayWorkflowCommand): WorkflowArtifact {
+  const now = new Date(0).toISOString();
+  return {
+    id: command.artifact.id, digest: command.artifact.digest, action: command.action, repositoryRoot: command.repositoryRoot,
+    targetSnapshotId: command.targetSnapshotId, sessionId: command.artifact.sessionId ?? command.sessionId,
+    ...(command.artifact.taskId ? { taskId: command.artifact.taskId } : {}), ...(command.artifact.planRevision ? { planRevision: command.artifact.planRevision } : {}),
+    ...(command.artifact.authorityId ? { authorityId: command.artifact.authorityId } : {}), payload: command.artifact.payload,
+    status: "submitted", operationId: command.child?.parentOperationId ?? command.operationId, executionAuthorized: false, createdAt: now, updatedAt: now
+  };
 }
 
 function validateHandshakeResult(value: ProviderGatewayHandshakeResult): void {
@@ -1030,6 +1088,31 @@ function maximumRecordedClock(entries: readonly JournalEntry<unknown>[]): number
     maximum = Math.max(maximum, Date.parse(at));
   }
   return maximum;
+}
+
+function deterministicWorkflowChildResult(request: ProviderGatewayWorkflowCommand, status: ProviderGatewayRemoteResult["status"], disposition: EffectDisposition, identity: Readonly<{ adapterId: string; moduleSha256: string }>): WorkflowChildProviderResponse {
+  const child = request.child!;
+  const terminalStatus: WorkflowChildProviderResponse["status"] = status === "completed" ? "completed" : status === "unavailable" ? "unavailable" : "failed";
+  if (child.role === "proof_backend") {
+    return {
+      schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: request.artifact.id, artifactDigest: request.artifact.digest,
+      parentOperationId: child.parentOperationId, childOperationId: request.operationId, action: request.action, role: child.role,
+      bindingDigest: child.bindingDigest, provider: request.provider, adapterId: identity.adapterId, moduleSha256: identity.moduleSha256,
+      status: terminalStatus, effectDisposition: status === "completed" ? "committed" : disposition === "committed" ? "ambiguous" : disposition,
+      summary: `Deterministic ${request.provider} independent proof ${status}.`, ...(status === "completed" ? { externalId: request.externalId } : {}),
+      result: { kind: "proof_backend", backend: request.provider, status: status === "completed" ? "passed" : status === "unavailable" ? "unavailable" : "failed", verifiedClaims: status === "completed" && request.artifact.payload.kind === "proof" ? request.artifact.payload.claims : [], evidenceReferences: request.artifact.payload.kind === "proof" ? workflowEvidenceReferences(request.artifact.payload.evidence) : [] }
+    };
+  }
+  if (status !== "completed" || request.artifact.payload.kind !== "authority") throw new Error("The deterministic authority recipient did not produce a terminal acknowledgement.");
+  const packet = request.artifact.payload.packets.find((candidate) => candidate.providerEffect?.bindingDigest === child.bindingDigest);
+  if (!packet) throw new Error("The deterministic authority recipient packet binding is missing.");
+  return {
+    schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: request.artifact.id, artifactDigest: request.artifact.digest,
+    parentOperationId: child.parentOperationId, childOperationId: request.operationId, action: request.action, role: child.role,
+    bindingDigest: child.bindingDigest, provider: request.provider, adapterId: identity.adapterId, moduleSha256: identity.moduleSha256,
+    status: "completed", effectDisposition: "committed", summary: `Deterministic ${request.provider} recipient acknowledged its exact packet.`, externalId: request.externalId,
+    result: { kind: "authority_recipient", recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true }
+  };
 }
 
 function deterministicWorkflowResult(request: ProviderGatewayWorkflowCommand): WorkflowProviderResult {

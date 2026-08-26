@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowChildProviderResponse, WorkflowProviderEffectBinding, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { automationRequestSchema, automationResultSchema } from "../../../packages/control-plane/src/automation-protocol.ts";
@@ -21,6 +21,30 @@ function proofArtifact(): WorkflowArtifact {
     payload: { kind: "proof", evidence: proofEvidence(), claims: ["claim"], requiredBackends: ["local"], independentBackendRequired: false },
     digest: "b".repeat(64), status: "submitted", operationId: "operation-1", executionAuthorized: false,
     createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z"
+  };
+}
+
+function providerEffect(role: WorkflowProviderEffectBinding["role"], provider: "claude" | "codex", sessionId: string, authorityId: string, marker: string): WorkflowProviderEffectBinding {
+  const session = { id: sessionId, provider, surface: "vscode_terminal" as const, capabilities: ["registered", "observable", "controllable", "mediated"] as const, status: "running" as const, workspaceRoot: "C:\\repo", targetSnapshotId: providerTargetId, taskId: "task-1", planRevision: "plan-1", plannedFiles: [] as string[], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: `${marker}-v1`, metadata: {} };
+  const authority = { id: authorityId, repositoryRoot: "C:\\repo", sessionId, taskId: "task-1", planRevision: "plan-1", allowedActions: role === "proof_backend" ? ["proof_adversarial"] : ["authority_broadcast"], prohibitedActions: [] as string[], expiresAt: "2099-08-24T00:00:00.000Z", issuedAt: "2026-08-24T00:00:00.000Z", issuedBy: "test" };
+  const material = { role, provider, session, authority, adapterId: `adapter-${marker}`, adapterVersion: `${marker}-v1`, moduleSha256: sha256(`module-${marker}`), providerContextDigest: sha256(`context-${marker}`) };
+  return { ...material, bindingDigest: sha256(stableJson(material)) };
+}
+
+function adversarialArtifact(): WorkflowArtifact {
+  const effects = [providerEffect("proof_backend", "codex", "session-1", "authority-proof", "codex"), providerEffect("proof_backend", "claude", "session-claude", "authority-claude", "claude")];
+  return {
+    ...proofArtifact(), id: "artifact-proof-adversarial", action: "proof_adversarial", operationId: "operation-proof-adversarial", authorityId: "authority-proof",
+    payload: { kind: "proof", evidence: proofEvidence(), claims: ["claim"], requiredBackends: ["codex", "claude"], independentBackendRequired: true, providerEffects: effects }
+  };
+}
+
+function broadcastArtifact(): WorkflowArtifact {
+  const effects = [providerEffect("authority_recipient", "codex", "recipient-1", "grant-1", "recipient-1"), providerEffect("authority_recipient", "codex", "recipient-2", "grant-2", "recipient-2")];
+  const packets = effects.map((effect, index) => ({ recipientSessionId: effect.session.id, grantId: effect.authority.id, actions: ["proof" as const, "authority_broadcast" as const], prohibitions: [] as const, expiresAt: effect.authority.expiresAt, pendingRequest: { requestId: `request-${index + 1}`, targetSnapshotId: providerTargetId, planRevision: "plan-1", planDigest: proofEvidence().plan.digest, action: "proof" as const }, matchDigest: sha256(`recipient-match-${index + 1}`), providerEffect: effect }));
+  return {
+    ...proofArtifact(), id: "artifact-authority-broadcast", action: "authority_broadcast", operationId: "operation-authority-broadcast", authorityId: "authority-proof",
+    payload: { kind: "authority", mode: "broadcast", packets, acknowledgementRequired: true }
   };
 }
 function planApprovalArtifact(): WorkflowArtifact {
@@ -89,6 +113,107 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   assert.deepEqual(started.details, { repositoryRoot: "C:\\repo", routeId: "provider.proof", targetSnapshotId: providerTargetId, artifactId: artifact.id, artifactDigest: artifact.digest });
   assert.deepEqual(childEvents.find(([kind]) => kind === "external")?.[1], { artifactId: artifact.id, routeId: "provider.proof", externalId: "provider-proof-1" });
   assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
+});
+
+test("Shift Proof dispatches two independent durable provider children and retries aggregation without replay", async () => {
+  let artifact = adversarialArtifact();
+  const requests: Array<{ body: string; trustedDispatch: { session: { provider: string } } }> = [];
+  const childStates = new Map<string, "recorded">();
+  let failFirstAggregate = true;
+  let acknowledged: WorkflowProviderResponse | undefined;
+  const artifacts = {
+    async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; },
+    async recordChildResult(response: WorkflowChildProviderResponse) {
+      const existing = artifact.childResults ?? [];
+      if (!existing.some((entry) => entry.bindingDigest === response.bindingDigest)) artifact = { ...artifact, childResults: [...existing, response] };
+      return artifact;
+    },
+    async acknowledge(response: WorkflowProviderResponse) {
+      if (failFirstAggregate) { failFirstAggregate = false; throw new Error("simulated aggregate journal interruption"); }
+      acknowledged = response; return { ...artifact, status: "acknowledged" as const };
+    }
+  };
+  const saga = {
+    async begin(input: { idempotencyScope: string }) {
+      const prior = childStates.has(input.idempotencyScope);
+      return { operationId: `child:${input.idempotencyScope.slice(-16)}`, parentOperationId: artifact.operationId!, action: "provider.proof_adversarial", targetSnapshotId: providerTargetId, existing: prior, state: prior ? "recorded" as const : "prepared" as const, mayExecute: !prior };
+    },
+    async markExecuting() {}, async markExternalCommitted() {}, async markCancelling() {}, async markCompensating() {},
+    async settle(_lease: unknown, state: string, details: { bindingDigest?: string }) { if (state === "completed" && details.bindingDigest) childStates.set(details.bindingDigest, "recorded"); }
+  };
+  // Key the test double by the exact idempotency scope used by the adapter.
+  saga.settle = async (_lease: unknown, state: string, details: { idempotencyScope?: string; bindingDigest?: string }) => { if (state === "completed" && details.idempotencyScope) childStates.set(details.idempotencyScope, "recorded"); };
+  const network = {
+    async request(input: { body: string; trustedDispatch: { session: { provider: "claude" | "codex" } } }) {
+      requests.push(input);
+      const document = JSON.parse(input.body) as { operationId: string; child: { role: "proof_backend"; bindingDigest: string }; artifact: { operationId: string } };
+      const effect = (artifact.payload.kind === "proof" ? artifact.payload.providerEffects : [])!.find((candidate) => candidate.bindingDigest === document.child.bindingDigest)!;
+      return { outcome: "passed" as const, routeId: "provider.proof_adversarial", detail: "ok", effectDisposition: "ambiguous" as const, body: Buffer.from(JSON.stringify({
+        schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest,
+        parentOperationId: artifact.operationId, childOperationId: document.operationId, action: artifact.action,
+        role: "proof_backend", bindingDigest: effect.bindingDigest, provider: effect.provider, adapterId: effect.adapterId, moduleSha256: effect.moduleSha256,
+        status: "completed", effectDisposition: "committed", summary: `${effect.provider} completed an independent proof.`, externalId: `external-${effect.provider}`,
+        result: { kind: "proof_backend", backend: effect.provider, status: "passed", verifiedClaims: ["claim"], evidenceReferences: [`receipt:${effect.provider}`] }
+      })) };
+    }
+  };
+  const request = { ...(providerRequest(undefined, saga) as unknown as Record<string, unknown>), definition: { action: "proof_adversarial" }, operationId: artifact.operationId, confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "proof_adversarial", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-proof" } } as unknown as AdapterRequest;
+  const first = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(request);
+  assert.equal(first.status, "failed", "the interrupted aggregate acknowledgement must not erase two committed child truths");
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests.map((entry) => entry.trustedDispatch.session.provider).sort(), ["claude", "codex"]);
+  assert.equal(new Set(requests.map((entry) => JSON.parse(entry.body).operationId)).size, 2);
+  const beforeRetry = requests.length;
+  const second = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(request);
+  assert.equal(second.status, "completed");
+  assert.equal(requests.length, beforeRetry, "durably recorded provider children must never be replayed to repair aggregation");
+  assert.deepEqual(acknowledged?.result.kind === "proof" ? acknowledged.result.backendResults : [], [{ backend: "codex", status: "passed" }, { backend: "claude", status: "passed" }]);
+});
+
+test("Authority Broadcast creates one durable child per exact recipient and rejects a cross-recipient acknowledgement", async () => {
+  let artifact = broadcastArtifact();
+  const requests: Array<{ body: string; trustedDispatch: { session: { id: string }; authority: { id: string } } }> = [];
+  let acknowledgements = 0;
+  const begun = new Map<string, number>();
+  const saga = {
+    async begin(input: { idempotencyScope: string }) { begun.set(input.idempotencyScope, (begun.get(input.idempotencyScope) ?? 0) + 1); return { operationId: `child-broadcast-${begun.size}`, parentOperationId: artifact.operationId!, action: "provider.authority_broadcast.codex", targetSnapshotId: providerTargetId, existing: false, state: "prepared" as const, mayExecute: true }; },
+    async markExecuting() {}, async markExternalCommitted() {}, async markCancelling() {}, async markCompensating() {}, async settle() {}
+  };
+  let corruptRecipient = false;
+  const network = {
+    async request(input: { body: string; trustedDispatch: { session: { id: string }; authority: { id: string } } }) {
+      requests.push(input);
+      const document = JSON.parse(input.body) as { operationId: string; child: { bindingDigest: string } };
+      const packet = artifact.payload.kind === "authority" ? artifact.payload.packets.find((candidate) => candidate.providerEffect?.bindingDigest === document.child.bindingDigest)! : undefined;
+      const effect = packet!.providerEffect!;
+      return { outcome: "passed" as const, routeId: "provider.authority_broadcast", detail: "ok", effectDisposition: "ambiguous" as const, body: Buffer.from(JSON.stringify({
+        schema: "sxsy-b122.workflow-child-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest,
+        parentOperationId: artifact.operationId, childOperationId: document.operationId, action: artifact.action,
+        role: "authority_recipient", bindingDigest: effect.bindingDigest, provider: effect.provider, adapterId: effect.adapterId, moduleSha256: effect.moduleSha256,
+        status: "completed", effectDisposition: "committed", summary: "Recipient acknowledged its exact packet.", externalId: `ack-${packet!.recipientSessionId}`,
+        result: { kind: "authority_recipient", recipientSessionId: packet!.recipientSessionId, grantId: corruptRecipient && packet!.recipientSessionId === "recipient-2" ? "grant-1" : packet!.grantId, matchDigest: packet!.matchDigest, acknowledged: true }
+      })) };
+    }
+  };
+  const artifacts = {
+    async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; },
+    async recordChildResult(response: WorkflowChildProviderResponse) { artifact = { ...artifact, childResults: [...(artifact.childResults ?? []), response] }; return artifact; },
+    async acknowledge() { acknowledgements += 1; return { ...artifact, status: "acknowledged" as const }; }
+  };
+  const request = { ...(providerRequest(undefined, saga) as unknown as Record<string, unknown>), definition: { action: "authority_broadcast" }, operationId: artifact.operationId, confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "authority_broadcast", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-proof" } } as unknown as AdapterRequest;
+  const completed = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(request);
+  assert.equal(completed.status, "completed");
+  assert.equal(acknowledgements, 1);
+  assert.deepEqual(requests.map((entry) => [entry.trustedDispatch.session.id, entry.trustedDispatch.authority.id]), [["recipient-1", "grant-1"], ["recipient-2", "grant-2"]]);
+
+  artifact = { ...broadcastArtifact(), id: "artifact-authority-broadcast-corrupt", digest: "c".repeat(64), operationId: "operation-authority-broadcast-corrupt" };
+  corruptRecipient = true; acknowledgements = 0; requests.length = 0; begun.clear();
+  const corruptRequest = { ...(request as unknown as Record<string, unknown>), operationId: artifact.operationId } as unknown as AdapterRequest;
+  const refused = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(corruptRequest);
+  assert.equal(refused.status, "failed");
+  assert.equal(refused.effectDisposition, "ambiguous");
+  assert.equal(acknowledgements, 0);
+  assert.equal(artifact.childResults?.length, 1, "the first recipient truth remains durable while the wrong second acknowledgement is rejected");
 });
 
 test("configured provider adapter never acknowledges malformed provider output", async () => {
