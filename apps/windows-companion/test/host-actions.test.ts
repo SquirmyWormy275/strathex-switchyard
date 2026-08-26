@@ -74,6 +74,79 @@ test("Voice Center queues only the native host action and never a browser fallba
   assert.equal(result.data?.hostActionUrl, undefined);
 });
 
+test("Voice Center claims are durable, single-consumer, and never replayed after an ambiguous or expired lease", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-voice-claim-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  let now = new Date("2026-08-25T12:00:00.000Z");
+  let token = 0;
+  const options = {
+    now: () => now,
+    claimLifetimeMs: 1_000,
+    claimTokenFactory: () => `voice-claim-token-${++token}`,
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact extension claim remains current" }; } }
+  } as const;
+  const queue = new DurableHostActionQueue(store, options);
+  const intent = await queue.enqueue({ definition: commandForAction("open_voice"), operationId: "operation-voice-claim" }, { hostAction: "show_voice_center" });
+  const first = await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
+  assert.ok(first);
+  assert.equal(first.hostActionId, intent.id);
+  assert.equal(first.hostActionKind, "show_voice_center");
+  assert.equal(first.claimToken, "voice-claim-token-1");
+
+  assert.equal(await queue.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined);
+  assert.equal(await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a lost claim response must not be replayed even to the same window");
+
+  const restarted = new DurableHostActionQueue(store, options);
+  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a queued claim remains single-consumer across restart");
+  now = new Date("2026-08-25T12:00:01.001Z");
+  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "an expired claim is reconciliation work, not replay authority");
+  await assert.rejects(restarted.authorize({
+    hostActionId: first.hostActionId,
+    adapterVersion: first.adapterVersion,
+    claimId: first.claimId,
+    claimToken: first.claimToken,
+    windowSessionId: first.windowSessionId
+  }), /claim.*expired|lease.*expired/i);
+  assert.deepEqual((await restarted.listPending()).map((candidate) => candidate.id), [intent.id]);
+});
+
+test("a claimed Voice Center action authorizes and settles only through its exact extension lease", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-voice-settle-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }), {
+    now: () => new Date("2026-08-25T12:00:00.000Z"),
+    claimTokenFactory: () => "exact-voice-claim-token",
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "current" }; } }
+  });
+  await queue.enqueue({ definition: commandForAction("open_voice"), operationId: "operation-voice-settle" }, { hostAction: "show_voice_center" });
+  const claim = await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
+  assert.ok(claim);
+  await assert.rejects(queue.authorize({ hostActionId: claim.hostActionId, adapterVersion: claim.adapterVersion }), /claim/i);
+  await assert.rejects(queue.authorize({ ...claim, hostActionId: claim.hostActionId, claimToken: "substituted-token" }), /claim/i);
+  const authorization = await queue.authorize({
+    hostActionId: claim.hostActionId,
+    adapterVersion: claim.adapterVersion,
+    claimId: claim.claimId,
+    claimToken: claim.claimToken,
+    windowSessionId: claim.windowSessionId
+  });
+  await assert.rejects(queue.settle({ hostActionId: claim.hostActionId, succeeded: true, summary: "opened", adapterVersion: claim.adapterVersion, authorizationToken: authorization.authorizationToken }), /claim/i);
+  const settled = await queue.settle({
+    hostActionId: claim.hostActionId,
+    succeeded: true,
+    effectDisposition: "committed",
+    summary: "Opened the real native Voice Center.",
+    adapterVersion: claim.adapterVersion,
+    authorizationToken: authorization.authorizationToken,
+    claimId: claim.claimId,
+    claimToken: claim.claimToken,
+    windowSessionId: claim.windowSessionId
+  });
+  assert.equal(settled.status, "completed");
+  assert.deepEqual(await queue.listPending(), []);
+});
+
 test("ambiguous GitHub identities queue a bounded picker and authorize only the selected exact candidate", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-picker-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });

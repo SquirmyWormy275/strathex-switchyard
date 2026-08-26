@@ -187,6 +187,79 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("host-action claims require the exact Registered extension window version and closed Voice Center capability", async () => {
+  const claims: unknown[] = [];
+  const authorizations: unknown[] = [];
+  const service = new CompanionService({
+    hostActions: {
+      async claim(payload) {
+        claims.push(payload);
+        return {
+          version: 1,
+          claimId: `host-action-claim:${"a".repeat(64)}`,
+          claimToken: "service-voice-claim-token",
+          hostActionId: `host-action:${"b".repeat(64)}`,
+          operationId: "operation-voice",
+          commandAction: "open_voice",
+          hostActionKind: "show_voice_center",
+          windowSessionId: payload.windowSessionId,
+          adapterVersion: payload.adapterVersion,
+          capabilities: ["show_voice_center"],
+          claimedAt: "2026-08-25T12:00:00.000Z",
+          expiresAt: "2026-08-25T12:00:05.000Z",
+          actionExpiresAt: "2026-08-25T12:00:30.000Z"
+        };
+      },
+      async authorize(payload) {
+        authorizations.push(payload);
+        return { hostActionId: payload.hostActionId, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2026-08-25T12:00:05.000Z" };
+      },
+      async settle() { throw new Error("not used"); }
+    }
+  });
+  const extension = {
+    ...session("voice-window"),
+    status: "unknown" as const,
+    metadata: {
+      "sxsy-b122.kind": "window",
+      "sxsy-b122.extensionVersion": "1.2.3",
+      "sxsy-b122.hostActionCapabilities": JSON.stringify(["show_voice_center"])
+    }
+  };
+  assert.equal((await service.handle(request("register-voice-window", "session.register", { session: extension }))).ok, true);
+  const accepted = await service.handle(request("claim-voice", "host-action.claim", {
+    windowSessionId: extension.id,
+    adapterVersion: "1.2.3",
+    capabilities: ["show_voice_center"],
+    focused: true
+  }));
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(claims, [{ windowSessionId: extension.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }]);
+
+  const wrongVersion = await service.handle(request("claim-wrong-version", "host-action.claim", {
+    windowSessionId: extension.id, adapterVersion: "1.2.4", capabilities: ["show_voice_center"], focused: true
+  }));
+  assert.equal(wrongVersion.ok, false);
+  assert.equal(wrongVersion.error?.code, "capability_denied");
+  const broadened = await service.handle(request("claim-broadened", "host-action.claim", {
+    windowSessionId: extension.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center", "open_external_url"], focused: true
+  }));
+  assert.equal(broadened.ok, false);
+  assert.equal(broadened.error?.code, "invalid_request");
+
+  assert.equal((await service.handle(request("stale-voice-window", "session.status", { sessionId: extension.id, status: "stale" }))).ok, true);
+  const staleAuthorization = await service.handle(request("authorize-stale-voice", "host-action.authorize", {
+    hostActionId: `host-action:${"b".repeat(64)}`,
+    adapterVersion: "1.2.3",
+    claimId: `host-action-claim:${"a".repeat(64)}`,
+    claimToken: "service-voice-claim-token",
+    windowSessionId: extension.id
+  }));
+  assert.equal(staleAuthorization.ok, false);
+  assert.equal(staleAuthorization.error?.code, "capability_denied");
+  assert.deepEqual(authorizations, [], "a stale window must be rejected before the durable final-effect authorizer runs");
+});
+
 test("Council recommendation approval crosses only a distinct exact-digest mediator hook", async () => {
   const approvals: unknown[] = [];
   const executor = {

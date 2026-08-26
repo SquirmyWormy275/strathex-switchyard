@@ -147,6 +147,72 @@ test("a firmware simulator reaches companion-owned dispatch with no VS Code wind
   assert.equal(focusedClaim?.control, "SHIELD");
 });
 
+test("a physical Voice signal stays claimed until the exact extension-settled host operation is durable", async (context) => {
+  const { inbox, store } = await fixture(context);
+  await inbox.accept(deviceId, { type: "signal", connectionEpoch: 7, bootNonce: 8, counter: 1, control: "VOICE", modifier: "normal", assigned: true });
+  let operationState: "executing" | "recorded" = "executing";
+  let requests = 0;
+  const executor: HardwareSignalCommandExecutor = {
+    operations: {
+      async get(operationId) {
+        assert.equal(operationId, "operation-physical-voice");
+        return { id: operationId, state: operationState };
+      }
+    },
+    async execute() {
+      requests += 1;
+      const entries = await store.readEntries();
+      assert.equal(entries.some((entry) => entry.kind === "b122.hardware-signal.dispatched.v1"), true);
+      return {
+        status: "running",
+        summary: "Voice Center awaits the installed extension.",
+        operationId: "operation-physical-voice",
+        data: {
+          hostActionId: `host-action:${"a".repeat(64)}`,
+          hostActionKind: "show_voice_center",
+          hostActionExpiresAt: new Date(Date.now() + 5_000).toISOString()
+        }
+      };
+    }
+  };
+  const dispatcher = new CompanionHardwareSignalDispatcher(inbox, executor, { pollIntervalMs: 10, hostActionSettlementPollIntervalMs: 10 });
+  await dispatcher.start();
+  await waitFor(async () => requests === 1, "Voice host-action dispatch");
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 1, completed: 0, needsReconciliation: 0 }, "a Running host action must never be marked handled");
+
+  operationState = "recorded";
+  await waitFor(async () => (await inbox.status()).completed === 1, "extension-settled Voice completion");
+  await dispatcher.stop();
+  assert.equal(requests, 1, "waiting for the extension must not replay the physical command");
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 0, completed: 1, needsReconciliation: 0 });
+});
+
+test("a physical Voice action without a compatible extension settles only as reconciliation-required", async (context) => {
+  const { inbox } = await fixture(context);
+  await inbox.accept(deviceId, { type: "signal", connectionEpoch: 7, bootNonce: 8, counter: 2, control: "VOICE", modifier: "normal", assigned: true });
+  const executor: HardwareSignalCommandExecutor = {
+    operations: { async get(operationId) { return { id: operationId, state: "executing" }; } },
+    async execute() {
+      return {
+        status: "running",
+        summary: "No compatible extension has claimed Voice Center.",
+        operationId: "operation-unclaimed-voice",
+        data: {
+          hostActionId: `host-action:${"b".repeat(64)}`,
+          hostActionKind: "show_voice_center",
+          hostActionExpiresAt: new Date(Date.now() + 40).toISOString()
+        }
+      };
+    }
+  };
+  const dispatcher = new CompanionHardwareSignalDispatcher(inbox, executor, { pollIntervalMs: 10, hostActionSettlementPollIntervalMs: 10 });
+  await dispatcher.start();
+  await waitFor(async () => (await inbox.status()).needsReconciliation === 1, "unclaimed Voice reconciliation");
+  await dispatcher.stop();
+  assert.deepEqual(await inbox.status(), { pending: 0, claimed: 0, completed: 0, needsReconciliation: 1 });
+});
+
 test("focused VS Code claims cannot steal companion-owned signals even when they arrived first", async (context) => {
   const { inbox } = await fixture(context);
   await inbox.accept(deviceId, { type: "signal", connectionEpoch: 1, bootNonce: 2, counter: 1, control: "CLAUDE", modifier: "normal", assigned: true });
@@ -285,7 +351,7 @@ test("standalone startup waits for durable recovery before enabling background h
   }), /recovery failure/i);
 });
 
-test("bootstrap wires the real durable executor into background dispatch without a VS Code session", async (context) => {
+test("bootstrap queues a host-owned hardware action but never marks it handled without exact host settlement", async (context) => {
   const { folder, store } = await fixture(context);
   const companion = createDurableWindowsCompanion({
     store,
@@ -299,10 +365,10 @@ test("bootstrap wires the real durable executor into background dispatch without
     control: "VSCODE", modifier: "normal", assigned: true
   });
   await companion.hardwareSignalDispatcher.start();
-  await waitFor(async () => (await companion.hardwareSignals.status()).completed === 1, "bootstrap background dispatch");
+  await waitFor(async () => (await companion.hardwareSignals.status()).needsReconciliation === 1, "bootstrap host-action reconciliation");
   await companion.hardwareSignalDispatcher.stop();
 
-  assert.deepEqual(await companion.hardwareSignals.status(), { pending: 0, claimed: 0, completed: 1, needsReconciliation: 0 });
+  assert.deepEqual(await companion.hardwareSignals.status(), { pending: 0, claimed: 0, completed: 0, needsReconciliation: 1 });
   const hostAction = (await store.readEntries<{ event?: string; intent?: { hostAction?: string } }>())
     .find((entry) => entry.kind === "host_action" && entry.payload.event === "queued")?.payload.intent;
   assert.equal(hostAction?.hostAction, "focus_vscode");

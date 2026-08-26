@@ -78,6 +78,7 @@ export type CompanionMethod =
   | "hardware-signal.prepare"
   | "hardware-signal.dispatch"
   | "hardware-signal.complete"
+  | "host-action.claim"
   | "host-action.authorize"
   | "host-action.complete"
   | "handoff.create"
@@ -236,12 +237,27 @@ export interface HostActionCompletionPayload {
   readonly summary: string;
   readonly adapterVersion: string;
   readonly authorizationToken?: string;
+  /** Present only for a durable extension-owned claim. */
+  readonly claimId?: string;
+  readonly claimToken?: string;
+  readonly windowSessionId?: string;
+}
+
+export interface HostActionClaimPayload {
+  readonly windowSessionId: string;
+  readonly adapterVersion: string;
+  readonly capabilities: readonly string[];
+  readonly focused: true;
 }
 
 export interface HostActionAuthorizationPayload {
   readonly hostActionId: string;
   readonly adapterVersion: string;
   readonly selectionId?: string;
+  /** Present only for a durable extension-owned claim. */
+  readonly claimId?: string;
+  readonly claimToken?: string;
+  readonly windowSessionId?: string;
 }
 
 export interface GitReviewPayload {
@@ -369,7 +385,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
     "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
     "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider-host.profile.install", "provider-host.profile.current", "provider.handshake", "containment.inspect", "containment.release",
-    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.authorize", "host-action.complete",
+    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.claim", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.cancel", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"
   ].includes(value);

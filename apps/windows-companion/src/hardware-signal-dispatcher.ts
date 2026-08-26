@@ -8,10 +8,15 @@ import {
 
 export interface HardwareSignalCommandExecutor {
   execute(request: CommandRequest): Promise<CommandResult>;
+  /** Durable operation observation; present on the real mediated executor. */
+  readonly operations?: Readonly<{
+    get(operationId: string): Promise<Readonly<{ id: string; state: string }> | undefined>;
+  }>;
 }
 
 export interface CompanionHardwareSignalDispatcherOptions {
   readonly pollIntervalMs?: number;
+  readonly hostActionSettlementPollIntervalMs?: number;
 }
 
 /**
@@ -24,6 +29,7 @@ export class CompanionHardwareSignalDispatcher {
   private readonly inbox: DurableHardwareSignalInbox;
   private readonly executor: HardwareSignalCommandExecutor;
   private readonly pollIntervalMs: number;
+  private readonly hostActionSettlementPollIntervalMs: number;
   private running = false;
   private timer: NodeJS.Timeout | undefined;
   private active: Promise<void> | undefined;
@@ -37,8 +43,12 @@ export class CompanionHardwareSignalDispatcher {
     this.inbox = inbox;
     this.executor = executor;
     this.pollIntervalMs = options.pollIntervalMs ?? 100;
+    this.hostActionSettlementPollIntervalMs = options.hostActionSettlementPollIntervalMs ?? 50;
     if (!Number.isSafeInteger(this.pollIntervalMs) || this.pollIntervalMs < 10 || this.pollIntervalMs > 60_000) {
       throw new Error("The companion hardware dispatch polling interval is outside safe bounds.");
+    }
+    if (!Number.isSafeInteger(this.hostActionSettlementPollIntervalMs) || this.hostActionSettlementPollIntervalMs < 10 || this.hostActionSettlementPollIntervalMs > 1_000) {
+      throw new Error("The host-action settlement polling interval is outside safe bounds.");
     }
   }
 
@@ -132,6 +142,12 @@ export class CompanionHardwareSignalDispatcher {
       return true;
     }
 
+    const hostActionSettlement = await this.awaitHostActionSettlement(result);
+    if (hostActionSettlement === "unresolved") {
+      await this.markAmbiguous(claim, dispatchReceiptId, "The targetless command returned a running host action without an exact durable extension settlement; the physical signal will not be replayed.");
+      return true;
+    }
+
     const ambiguous = result.status === "incomplete" || result.effectDisposition === "ambiguous";
     try {
       await this.inbox.complete({
@@ -142,6 +158,8 @@ export class CompanionHardwareSignalDispatcher {
         outcome: ambiguous ? "needs_reconciliation" : "handled",
         summary: ambiguous
           ? "The targetless command returned an ambiguous effect result; the hardware signal will not be replayed."
+          : hostActionSettlement === "settled"
+            ? "The physical host action received an exact durable extension settlement before the signal was handled."
           : `The companion durably dispatched the canonical targetless command and received status ${result.status}.`,
         dispatchReceiptId
       });
@@ -151,6 +169,32 @@ export class CompanionHardwareSignalDispatcher {
       // second effect.
     }
     return true;
+  }
+
+  private async awaitHostActionSettlement(result: CommandResult): Promise<"not_applicable" | "settled" | "unresolved"> {
+    if (result.status !== "running") return "not_applicable";
+    const data = result.data;
+    const hostActionId = data?.hostActionId;
+    const hostActionKind = data?.hostActionKind;
+    const expiresAt = data?.hostActionExpiresAt;
+    if (typeof hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(hostActionId)
+      || hostActionKind !== "show_voice_center" || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
+      || typeof result.operationId !== "string" || !result.operationId.trim() || result.operationId.length > 512 || !this.executor.operations) {
+      return "unresolved";
+    }
+    const deadline = Date.parse(expiresAt);
+    while (this.running && Date.now() < deadline) {
+      let operation: Readonly<{ id: string; state: string }> | undefined;
+      try { operation = await this.executor.operations.get(result.operationId); }
+      catch { return "unresolved"; }
+      if (!operation || operation.id !== result.operationId) return "unresolved";
+      if (operation.state === "recorded" || operation.state === "failed" || operation.state === "cancelled") return "settled";
+      if (!["prepared", "executing", "external_committed", "cancelling", "compensating"].includes(operation.state)) return "unresolved";
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(this.hostActionSettlementPollIntervalMs, remaining)));
+    }
+    return "unresolved";
   }
 
   private async requeueBeforeDispatch(claim: HardwareSignalClaim): Promise<void> {

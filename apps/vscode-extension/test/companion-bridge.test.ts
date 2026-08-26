@@ -426,6 +426,58 @@ test("provider administration and managed-terminal host effects preserve only ex
   if (substituted.ok) assert.equal(forwardedHostAction(substituted.value), undefined);
 });
 
+test("Voice Center claim transport is closed, exact, and carries one durable lease through authorization and settlement", async () => {
+  const seen: Array<{ method: string; payload?: Record<string, unknown> }> = [];
+  let corrupt = false;
+  const binding = { windowSessionId: session.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true } as const;
+  const claim = {
+    version: 1,
+    claimId: `host-action-claim:${"a".repeat(64)}`,
+    claimToken: "extension-voice-claim-token",
+    hostActionId: `host-action:${"b".repeat(64)}`,
+    operationId: "operation-voice-center",
+    commandAction: "open_voice",
+    hostActionKind: "show_voice_center",
+    windowSessionId: session.id,
+    adapterVersion: "1.2.3",
+    capabilities: ["show_voice_center"],
+    claimedAt: "2026-08-25T12:00:00.000Z",
+    expiresAt: "2026-08-25T12:00:05.000Z",
+    actionExpiresAt: "2026-08-25T12:00:30.000Z"
+  } as const;
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string; method: string; payload?: Record<string, unknown> };
+    seen.push({ method: request.method, ...(request.payload ? { payload: request.payload } : {}) });
+    const result = request.method === "host-action.claim"
+      ? { claim: corrupt ? { ...claim, capabilities: ["show_voice_center", "open_external_url"] } : claim }
+      : request.method === "host-action.authorize"
+        ? { authorization: { hostActionId: claim.hostActionId, authorizationToken: `host-action-auth:${"c".repeat(64)}`, expiresAt: claim.expiresAt } }
+        : { command: { status: "completed", summary: "Voice Center settled.", operationId: claim.operationId } };
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+  } }, "voice-bridge");
+
+  const claimed = await bridge.claimHostAction(binding);
+  assert.ok(claimed.ok && claimed.value);
+  if (!claimed.ok || !claimed.value) return;
+  const reference = { claimId: claimed.value.claimId, claimToken: claimed.value.claimToken, windowSessionId: claimed.value.windowSessionId };
+  const authorization = await bridge.authorizeHostAction(claim.hostActionId, binding.adapterVersion, undefined, undefined, reference);
+  assert.equal(authorization.ok, true);
+  const completed = await bridge.completeHostAction(claim.hostActionId, true, "Opened the real Voice Center.", binding.adapterVersion, authorization.ok ? authorization.value.authorizationToken : undefined, "committed", reference);
+  assert.equal(completed.ok, true);
+  assert.deepEqual(seen.map((entry) => entry.method), ["host-action.claim", "host-action.authorize", "host-action.complete"]);
+  assert.deepEqual(seen[0]?.payload, binding);
+  for (const payload of [seen[1]?.payload, seen[2]?.payload]) {
+    assert.equal(payload?.claimId, claim.claimId);
+    assert.equal(payload?.claimToken, claim.claimToken);
+    assert.equal(payload?.windowSessionId, claim.windowSessionId);
+  }
+
+  corrupt = true;
+  const broadened = await bridge.claimHostAction(binding);
+  assert.equal(broadened.ok, false);
+  if (!broadened.ok) assert.equal(broadened.code, "invalid_response");
+});
+
 test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
   const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
   const signalId = `hardware-signal:${"a".repeat(64)}`;

@@ -17,6 +17,7 @@ import type { AttestedContainmentReleaseCoordinator } from "./containment-releas
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import type { HostActionClaim } from "./host-actions.ts";
 import type { GateEvidence } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import type { WorkflowContextReview } from "../../../packages/control-plane/src/runtime.ts";
 import type { CouncilRecommendation } from "../../../packages/control-plane/src/council.ts";
@@ -42,6 +43,7 @@ import {
   type CommandPreparationPayload,
   type ConfirmationRequestPayload,
   type HostActionAuthorizationPayload,
+  type HostActionClaimPayload,
   type HostActionCompletionPayload,
   type GitReviewPayload,
   type GitReviewInspectPayload,
@@ -144,6 +146,7 @@ export interface VoiceRuntimeCoordinator {
 export interface DirectRequestOptions { readonly signal?: AbortSignal; }
 
 export interface HostActionCoordinator {
+  claim(payload: HostActionClaimPayload): Promise<HostActionClaim | undefined>;
   authorize(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string; selectionId?: string; url?: string }>>;
   settle(payload: HostActionCompletionPayload): Promise<HostActionCompletionRecord>;
 }
@@ -365,6 +368,8 @@ export class CompanionService {
           return this.success(request.id, await this.dispatchHardwareSignal(this.requireHardwareSignalDispatch(request.payload)));
         case "hardware-signal.complete":
           return this.success(request.id, { completion: await this.completeHardwareSignal(this.requireHardwareSignalCompletion(request.payload)) });
+        case "host-action.claim":
+          return this.success(request.id, { claim: await this.claimHostAction(this.requireHostActionClaim(request.payload)) });
         case "host-action.authorize":
           return this.success(request.id, { authorization: await this.authorizeHostAction(this.requireHostActionAuthorization(request.payload)) });
         case "host-action.complete":
@@ -585,6 +590,13 @@ export class CompanionService {
     const result = await this.executor.completeExternalOperation(record);
     this.record("host-action.complete", result.status, result.summary, undefined, result.operationId);
     return result;
+  }
+
+  private async claimHostAction(payload: HostActionClaimPayload): Promise<HostActionClaim | undefined> {
+    if (!this.hostActions) throw new CompanionServiceError("companion_unavailable", "No durable extension host-action claim boundary is attached.");
+    const claim = await this.hostActions.claim(payload);
+    if (claim) this.record("host-action.claim", "completed", "Assigned one exact extension-owned host action to one Registered VS Code window.", payload.windowSessionId, claim.hostActionId);
+    return claim;
   }
 
   private async authorizeHostAction(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string; selectionId?: string; url?: string }>> {
@@ -1259,14 +1271,26 @@ export class CompanionService {
       || (payload.succeeded === false && payload.effectDisposition === "committed")
       || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
       || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
-      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "effectDisposition", "summary", "adapterVersion", "authorizationToken"].includes(key))) {
+      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "effectDisposition", "summary", "adapterVersion", "authorizationToken", "claimId", "claimToken", "windowSessionId"].includes(key))) {
       throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
     }
     if (payload.authorizationToken !== undefined && (typeof payload.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(payload.authorizationToken))) {
       throw new CompanionServiceError("invalid_request", "The host-action completion authorization token is malformed.");
     }
+    const claim = parseHostActionClaimReference(payload);
+    if (claim.windowSessionId) this.requireCurrentHostActionWindowBinding(claim.windowSessionId, payload.adapterVersion);
     const effectDisposition = (payload.effectDisposition ?? (payload.succeeded ? "committed" : "not_started")) as "not_started" | "committed" | "ambiguous";
-    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, effectDisposition, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}) };
+    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, effectDisposition, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}), ...claim };
+  }
+
+  private requireHostActionClaim(payload: unknown): HostActionClaimPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "adapterVersion", "capabilities", "focused"])
+      || !boundedReferenceValue(payload.windowSessionId) || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || payload.focused !== true || !Array.isArray(payload.capabilities) || payload.capabilities.length !== 1 || payload.capabilities[0] !== "show_voice_center") {
+      throw new CompanionServiceError("invalid_request", "A host-action claim requires one focused extension window, exact adapter version, and the closed Voice Center capability.");
+    }
+    this.requireCurrentHostActionWindowBinding(payload.windowSessionId, payload.adapterVersion);
+    return { windowSessionId: payload.windowSessionId, adapterVersion: payload.adapterVersion, capabilities: ["show_voice_center"], focused: true };
   }
 
   private requireHostActionAuthorization(payload: unknown): HostActionAuthorizationPayload {
@@ -1274,10 +1298,28 @@ export class CompanionService {
       || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
       || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
       || (payload.selectionId !== undefined && (typeof payload.selectionId !== "string" || !/^(?:pull|run):[A-Za-z0-9._:-]{1,128}$/.test(payload.selectionId)))
-      || Object.keys(payload).some((key) => key !== "hostActionId" && key !== "adapterVersion" && key !== "selectionId")) {
+      || Object.keys(payload).some((key) => !["hostActionId", "adapterVersion", "selectionId", "claimId", "claimToken", "windowSessionId"].includes(key))) {
       throw new CompanionServiceError("invalid_request", "Host-action authorization requires an exact durable ID and adapter version.");
     }
-    return { hostActionId: payload.hostActionId, adapterVersion: payload.adapterVersion, ...(typeof payload.selectionId === "string" ? { selectionId: payload.selectionId } : {}) };
+    const claim = parseHostActionClaimReference(payload);
+    if (claim.windowSessionId) this.requireCurrentHostActionWindowBinding(claim.windowSessionId, payload.adapterVersion);
+    return { hostActionId: payload.hostActionId, adapterVersion: payload.adapterVersion, ...(typeof payload.selectionId === "string" ? { selectionId: payload.selectionId } : {}), ...claim };
+  }
+
+  private requireCurrentHostActionWindowBinding(windowSessionId: string, adapterVersion: string): void {
+    const session = this.requireSession(windowSessionId);
+    if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !session.capabilities.includes("registered")
+      || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "Host actions require a current Registered VS Code window session at every claim and settlement boundary.");
+    }
+    if (session.metadata["sxsy-b122.extensionVersion"] !== adapterVersion) {
+      throw new CompanionServiceError("capability_denied", "The host-action adapter version does not match the Registered extension window.");
+    }
+    let registeredCapabilities: unknown;
+    try { registeredCapabilities = JSON.parse(session.metadata["sxsy-b122.hostActionCapabilities"] ?? "null"); } catch { registeredCapabilities = undefined; }
+    if (!Array.isArray(registeredCapabilities) || registeredCapabilities.length !== 1 || registeredCapabilities[0] !== "show_voice_center") {
+      throw new CompanionServiceError("capability_denied", "The Registered extension window has no exact Voice Center delivery capability.");
+    }
   }
 
   private requireGitReview(payload: unknown): GitReviewPayload {
@@ -1617,6 +1659,17 @@ function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {
 function boundedWorkflowText(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 16_384 && !/\0/.test(value); }
 function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
 function hardwareCompletionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
+
+function parseHostActionClaimReference(value: Record<string, unknown>): Readonly<{ claimId?: string; claimToken?: string; windowSessionId?: string }> {
+  const present = [value.claimId, value.claimToken, value.windowSessionId].filter((item) => item !== undefined).length;
+  if (present === 0) return {};
+  if (present !== 3 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || !boundedReferenceValue(value.windowSessionId)) {
+    throw new CompanionServiceError("invalid_request", "The extension host-action claim reference is incomplete or malformed.");
+  }
+  return { claimId: value.claimId, claimToken: value.claimToken, windowSessionId: value.windowSessionId };
+}
 
 function normalizeHostPath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
 

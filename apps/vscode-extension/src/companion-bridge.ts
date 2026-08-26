@@ -70,6 +70,25 @@ export interface ForwardedHostActionAuthorization {
   readonly url?: string;
 }
 
+export interface HostActionClaimReference {
+  readonly claimId: string;
+  readonly claimToken: string;
+  readonly windowSessionId: string;
+}
+
+export interface ExtensionHostActionClaim extends HostActionClaimReference {
+  readonly version: 1;
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly commandAction: "open_voice";
+  readonly hostActionKind: "show_voice_center";
+  readonly adapterVersion: string;
+  readonly capabilities: readonly ["show_voice_center"];
+  readonly claimedAt: string;
+  readonly expiresAt: string;
+  readonly actionExpiresAt: string;
+}
+
 export interface PreparedCommand {
   readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
   readonly summary: string;
@@ -310,6 +329,7 @@ export interface ExtensionCompanionBridge {
   prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
   dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
   completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
+  claimHostAction(binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>>;
   createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>>;
   listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>>;
   acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
@@ -331,8 +351,8 @@ export interface ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
-  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
-  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>>;
+  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string, claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
+  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous", claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
 /** A line round-trip owned by a deliberately started local companion process. */
@@ -583,6 +603,15 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.completion };
   }
 
+  async claimHostAction(binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
+    const result = await this.call<unknown>("host-action.claim", binding);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["claim"])) return invalidResponse();
+    if (result.value.claim === undefined) return { ok: true, value: undefined };
+    if (!isExtensionHostActionClaim(result.value.claim, binding)) return invalidResponse();
+    return { ok: true, value: result.value.claim };
+  }
+
   async createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>> {
     return this.handoffResult("handoff.create", input);
   }
@@ -653,8 +682,8 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
   endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
   deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
 
-  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
-    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion, ...(selectionId ? { selectionId } : {}) });
+  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string, claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
+    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion, ...(selectionId ? { selectionId } : {}), ...(claim ? exactHostActionClaimReference(claim) : {}) });
     if (!result.ok) return result;
     const authorization = isRecord(result.value) ? result.value.authorization : undefined;
     if (!isRecord(authorization) || !allowedExactKeys(authorization, ["hostActionId", "authorizationToken", "expiresAt"], ["selectionId", "url"])
@@ -669,8 +698,8 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}), ...(selectionId === undefined && expectedUrl !== undefined ? { url: authorization.url as string } : {}) } };
   }
 
-  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>> {
-    const result = await this.call<unknown>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}), ...(effectDisposition ? { effectDisposition } : {}) });
+  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous", claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<unknown>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}), ...(effectDisposition ? { effectDisposition } : {}), ...(claim ? exactHostActionClaimReference(claim) : {}) });
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
     return { ok: true, value: result.value.command };
@@ -802,6 +831,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   prepareHardwareSignal(): Promise<BridgeResult<HardwareSignalPreparationResult>> { return this.unavailable(); }
   dispatchHardwareSignal(): Promise<BridgeResult<HardwareSignalDispatchResult>> { return this.unavailable(); }
   completeHardwareSignal(): Promise<BridgeResult<HardwareSignalCompletionResult>> { return this.unavailable(); }
+  claimHostAction(): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> { return this.unavailable(); }
   createHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
   listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> { return this.unavailable(); }
   acknowledgeHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
@@ -833,6 +863,42 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
 
 export function localHostAction(result: ForwardedCommandResult): LocalHostAction | undefined {
   return forwardedHostAction(result)?.kind;
+}
+
+function exactHostActionClaimReference(value: HostActionClaimReference): HostActionClaimReference {
+  if (!value || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || typeof value.windowSessionId !== "string" || !boundedText(value.windowSessionId, 512)) {
+    throw new Error("The extension host-action claim reference is malformed.");
+  }
+  return { claimId: value.claimId, claimToken: value.claimToken, windowSessionId: value.windowSessionId };
+}
+
+function isExtensionHostActionClaim(
+  value: unknown,
+  binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>
+): value is ExtensionHostActionClaim {
+  if (!isRecord(value) || !exactKeys(value, [
+    "version", "claimId", "claimToken", "hostActionId", "operationId", "commandAction", "hostActionKind",
+    "windowSessionId", "adapterVersion", "capabilities", "claimedAt", "expiresAt", "actionExpiresAt"
+  ]) || value.version !== 1 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || typeof value.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(value.hostActionId)
+    || typeof value.operationId !== "string" || !boundedText(value.operationId, 512)
+    || value.commandAction !== "open_voice" || value.hostActionKind !== "show_voice_center"
+    || value.windowSessionId !== binding.windowSessionId || value.adapterVersion !== binding.adapterVersion
+    || !Array.isArray(value.capabilities) || value.capabilities.length !== 1 || value.capabilities[0] !== "show_voice_center"
+    || !exactTimestampOrder(value.claimedAt, value.expiresAt, value.actionExpiresAt)) return false;
+  return true;
+}
+
+function exactTimestampOrder(claimedAt: unknown, expiresAt: unknown, actionExpiresAt: unknown): boolean {
+  if (typeof claimedAt !== "string" || typeof expiresAt !== "string" || typeof actionExpiresAt !== "string") return false;
+  const claimed = Date.parse(claimedAt);
+  const expires = Date.parse(expiresAt);
+  const actionExpires = Date.parse(actionExpiresAt);
+  return Number.isFinite(claimed) && Number.isFinite(expires) && Number.isFinite(actionExpires)
+    && claimed < expires && expires <= actionExpires;
 }
 
 export function forwardedWorkflowOutcome(result: ForwardedCommandResult): ForwardedWorkflowOutcome | undefined {

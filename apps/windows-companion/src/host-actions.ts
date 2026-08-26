@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
-import type { HostActionAuthorizationPayload, HostActionCompletionPayload } from "./bridge.ts";
+import type { HostActionAuthorizationPayload, HostActionClaimPayload, HostActionCompletionPayload } from "./bridge.ts";
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
 import type { GitHubNavigationCandidate, GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
 import type { ManagedTerminalProfile } from "./provider-desktop.ts";
@@ -17,6 +17,10 @@ export const localHostActionKinds = [
 ] as const;
 
 export type LocalHostActionKind = (typeof localHostActionKinds)[number];
+
+/** Actions that can only be delivered by the installed VS Code UI host. */
+export const extensionClaimableHostActionKinds = ["show_voice_center"] as const satisfies readonly LocalHostActionKind[];
+export type ExtensionClaimableHostActionKind = (typeof extensionClaimableHostActionKinds)[number];
 
 export interface HostActionIntent {
   readonly version: 1;
@@ -48,6 +52,24 @@ export interface HostActionAuthorization {
   readonly expiresAt: string;
   readonly selectionId?: string;
   readonly url?: string;
+  readonly claimId?: string;
+  readonly windowSessionId?: string;
+}
+
+export interface HostActionClaim {
+  readonly version: 1;
+  readonly claimId: string;
+  readonly claimToken: string;
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly commandAction: CommandAction;
+  readonly hostActionKind: ExtensionClaimableHostActionKind;
+  readonly windowSessionId: string;
+  readonly adapterVersion: string;
+  readonly capabilities: readonly ExtensionClaimableHostActionKind[];
+  readonly claimedAt: string;
+  readonly expiresAt: string;
+  readonly actionExpiresAt: string;
 }
 
 export interface HostActionPlan {
@@ -67,6 +89,7 @@ export interface HostActionFinalAuthorizer {
 
 type HostActionEvent =
   | { readonly version: 1; readonly event: "queued"; readonly intent: HostActionIntent }
+  | { readonly version: 1; readonly event: "claimed"; readonly claim: HostActionClaim }
   | { readonly version: 1; readonly event: "authorized"; readonly authorization: HostActionAuthorization }
   | { readonly version: 1; readonly event: "settled"; readonly record: HostActionCompletionRecord }
   | { readonly version: 1; readonly event: "cancelled"; readonly hostActionId: string; readonly operationId: string; readonly reason: string; readonly at: string };
@@ -75,6 +98,8 @@ export interface DurableHostActionQueueOptions {
   readonly now?: () => Date;
   readonly lifetimeMs?: number;
   readonly authorizationLifetimeMs?: number;
+  readonly claimLifetimeMs?: number;
+  readonly claimTokenFactory?: () => string;
   readonly finalAuthorizer?: HostActionFinalAuthorizer;
 }
 
@@ -88,6 +113,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   private readonly now: () => Date;
   private readonly lifetimeMs: number;
   private readonly authorizationLifetimeMs: number;
+  private readonly claimLifetimeMs: number;
+  private readonly claimTokenFactory: () => string;
   private readonly finalAuthorizer?: HostActionFinalAuthorizer;
 
   constructor(store: ProtectedJsonStore, options: DurableHostActionQueueOptions = {}) {
@@ -95,12 +122,17 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     this.now = options.now ?? (() => new Date());
     this.lifetimeMs = options.lifetimeMs ?? 30_000;
     this.authorizationLifetimeMs = options.authorizationLifetimeMs ?? 5_000;
+    this.claimLifetimeMs = options.claimLifetimeMs ?? 5_000;
+    this.claimTokenFactory = options.claimTokenFactory ?? (() => randomBytes(32).toString("base64url"));
     this.finalAuthorizer = options.finalAuthorizer;
     if (!Number.isSafeInteger(this.lifetimeMs) || this.lifetimeMs < 1_000 || this.lifetimeMs > 5 * 60_000) {
       throw new Error("The host-action acknowledgement lifetime is outside safe bounds.");
     }
     if (!Number.isSafeInteger(this.authorizationLifetimeMs) || this.authorizationLifetimeMs < 500 || this.authorizationLifetimeMs > this.lifetimeMs) {
       throw new Error("The host-action authorization lifetime is outside safe bounds.");
+    }
+    if (!Number.isSafeInteger(this.claimLifetimeMs) || this.claimLifetimeMs < 500 || this.claimLifetimeMs > this.lifetimeMs) {
+      throw new Error("The host-action claim lifetime is outside safe bounds.");
     }
   }
 
@@ -154,6 +186,50 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   }
 
   /**
+   * Atomically assigns one extension-owned UI action to one exact registered
+   * window binding. A durable claim is never reissued, even after lease expiry:
+   * losing the response is ambiguous and therefore reconciliation-only.
+   */
+  async claim(payload: HostActionClaimPayload): Promise<HostActionClaim | undefined> {
+    const binding = exactClaimBinding(payload);
+    const now = this.now();
+    return this.store.transaction(async (transaction) => {
+      const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
+      const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
+      const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+      const claimed = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "claimed" }> => event.event === "claimed").map((event) => event.claim.hostActionId));
+      const authorized = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized").map((event) => event.authorization.hostActionId));
+      const intent = events
+        .filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued")
+        .map((event) => event.intent)
+        .filter((candidate) => isExtensionClaimable(candidate.hostAction) && binding.capabilities.includes(candidate.hostAction)
+          && Date.parse(candidate.expiresAt) > now.getTime() && !settled.has(candidate.id) && !cancelled.has(candidate.id)
+          && !claimed.has(candidate.id) && !authorized.has(candidate.id))
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))[0];
+      if (!intent) return undefined;
+      if (!isExtensionClaimable(intent.hostAction)) throw new Error("The selected extension host action changed its closed capability mapping.");
+      const claimedAt = now.toISOString();
+      const claim: HostActionClaim = {
+        version: 1,
+        claimId: `host-action-claim:${digest(`${intent.id}:${binding.windowSessionId}:${binding.adapterVersion}:${binding.capabilities.join(",")}`)}`,
+        claimToken: boundedClaimToken(this.claimTokenFactory()),
+        hostActionId: intent.id,
+        operationId: intent.operationId,
+        commandAction: intent.commandAction,
+        hostActionKind: intent.hostAction,
+        windowSessionId: binding.windowSessionId,
+        adapterVersion: binding.adapterVersion,
+        capabilities: [...binding.capabilities],
+        claimedAt,
+        expiresAt: new Date(Math.min(Date.parse(intent.expiresAt), now.getTime() + this.claimLifetimeMs)).toISOString(),
+        actionExpiresAt: intent.expiresAt
+      };
+      await transaction.append<HostActionEvent>("host_action", { version: 1, event: "claimed", claim });
+      return claim;
+    });
+  }
+
+  /**
    * Issues one short-lived, single-effect authorization only after the trusted
    * host revalidates the exact queued target immediately before the VS Code
    * effect. An authorization is never reissued after an ambiguous response.
@@ -164,6 +240,8 @@ export class DurableHostActionQueue implements HostActionCoordinator {
     const hostActionId = exactHostActionId(payload.hostActionId);
     const events = await this.events();
     const intent = pendingIntent(events, hostActionId, this.now());
+    const claim = claimFor(events, hostActionId);
+    assertClaimReference(payload, claim, this.now());
     const selected = selectGitHubCandidate(intent, payload.selectionId);
     if (events.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === hostActionId)) {
       throw new Error("The host action was already authorized; its outcome requires reconciliation and cannot be replayed.");
@@ -183,12 +261,14 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         ? { selectionId: selected.id, url: selected.url }
         : intent.hostAction === "open_external_url"
           ? { url: exactAuthorizedUrl(intent.url) }
-          : {})
+          : {}),
+      ...(claim ? { claimId: claim.claimId, windowSessionId: claim.windowSessionId } : {})
     };
     return this.store.transaction(async (transaction) => {
       const current = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
       const exactIntent = pendingIntent(current, hostActionId, this.now());
       if (!sameIntent(exactIntent, intent)) throw new Error("The durable host-action intent changed during final authorization.");
+      assertClaimReference(payload, claimFor(current, hostActionId), this.now());
       if (current.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === hostActionId)) {
         throw new Error("The host action was already authorized; its outcome requires reconciliation and cannot be replayed.");
       }
@@ -206,12 +286,17 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         throw new Error("A cancelled host action cannot be acknowledged as completed.");
       }
       const authorization = events.find((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === payload.hostActionId)?.authorization;
+      const claim = claimFor(events, payload.hostActionId);
+      assertClaimReference(payload, claim);
       if (payload.succeeded && !authorization) throw new Error("A successful host action requires a trusted final-effect authorization.");
       if (payload.authorizationToken !== undefined) {
         if (!authorization || authorization.authorizationToken !== payload.authorizationToken || authorization.adapterVersion !== boundedVersion(payload.adapterVersion)) {
           throw new Error("The host-action completion does not match its exact final-effect authorization.");
         }
       } else if (payload.succeeded) throw new Error("A successful host action is missing its one-time authorization token.");
+      if (authorization && (authorization.claimId !== claim?.claimId || authorization.windowSessionId !== claim?.windowSessionId)) {
+        throw new Error("The host-action authorization changed its exact extension claim binding.");
+      }
       const priorEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === payload.hostActionId)?.record;
       const prior = priorEvent ? safeCompletion(priorEvent, queued) : undefined;
       if (priorEvent && !prior) throw new Error("The protected host-action completion does not match its exact durable intent.");
@@ -497,6 +582,52 @@ function exactAuthorizedUrl(value: string | undefined): string {
 function exactHostActionId(value: string): string {
   if (!/^host-action:[a-f0-9]{64}$/.test(value)) throw new Error("The host-action authorization requires an exact durable ID.");
   return value;
+}
+
+function exactClaimBinding(payload: HostActionClaimPayload): Readonly<{
+  windowSessionId: string;
+  adapterVersion: string;
+  capabilities: readonly ExtensionClaimableHostActionKind[];
+}> {
+  if (!payload || payload.focused !== true) throw new Error("A host-action claim requires one explicitly focused extension window.");
+  const windowSessionId = boundedReference(payload.windowSessionId, "host-action extension window session ID");
+  const adapterVersion = boundedVersion(payload.adapterVersion);
+  if (!Array.isArray(payload.capabilities) || payload.capabilities.length !== 1 || payload.capabilities[0] !== "show_voice_center") {
+    throw new Error("The extension host-action capability set is malformed or outside the closed Voice Center boundary.");
+  }
+  return { windowSessionId, adapterVersion, capabilities: ["show_voice_center"] };
+}
+
+function isExtensionClaimable(value: LocalHostActionKind): value is ExtensionClaimableHostActionKind {
+  return (extensionClaimableHostActionKinds as readonly string[]).includes(value);
+}
+
+function boundedClaimToken(value: string): string {
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(value)) throw new Error("The host-action claim token is invalid.");
+  return value;
+}
+
+function claimFor(events: readonly HostActionEvent[], hostActionId: string): HostActionClaim | undefined {
+  const claims = events.filter((event): event is Extract<HostActionEvent, { event: "claimed" }> => event.event === "claimed" && event.claim.hostActionId === hostActionId).map((event) => event.claim);
+  if (claims.length > 1) throw new Error("The protected host-action journal contains conflicting extension claims.");
+  return claims[0];
+}
+
+function assertClaimReference(
+  payload: Readonly<{ claimId?: string; claimToken?: string; windowSessionId?: string; adapterVersion: string }>,
+  claim: HostActionClaim | undefined,
+  now?: Date
+): void {
+  const supplied = payload.claimId !== undefined || payload.claimToken !== undefined || payload.windowSessionId !== undefined;
+  if (!claim) {
+    if (supplied) throw new Error("The host-action request supplied an extension claim for an unclaimed action.");
+    return;
+  }
+  if (!supplied || payload.claimId !== claim.claimId || payload.claimToken !== claim.claimToken
+    || payload.windowSessionId !== claim.windowSessionId || boundedVersion(payload.adapterVersion) !== claim.adapterVersion) {
+    throw new Error("The host-action request does not match its exact durable extension claim.");
+  }
+  if (now && Date.parse(claim.expiresAt) <= now.getTime()) throw new Error("The host-action extension claim lease expired; reconciliation is required and the action cannot be replayed.");
 }
 
 function pendingIntent(events: readonly HostActionEvent[], hostActionId: string, now: Date): HostActionIntent {

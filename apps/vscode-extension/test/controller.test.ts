@@ -44,6 +44,8 @@ import {
   type ExtensionVoiceProvider,
   type ExtensionVoiceConsent,
   type ExtensionVoiceBinding,
+  type ExtensionHostActionClaim,
+  type HostActionClaimReference,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
 import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, workflowResultPresentation } from "../src/controller.ts";
@@ -256,8 +258,10 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly adopted: Array<{ sessionId: string; adoptionKey: string; provider: Exclude<ExtensionProvider, "voice"> }> = [];
   readonly statuses: Array<{ sessionId: string; status: ExtensionSessionStatus }> = [];
   readonly dispatched: ForwardedCommand[] = [];
-  readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string; effectDisposition?: "not_started" | "committed" | "ambiguous" }> = [];
-  readonly authorizedHostActions: Array<{ id: string; adapterVersion: string; selectionId?: string }> = [];
+  readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string; effectDisposition?: "not_started" | "committed" | "ambiguous"; claimId?: string }> = [];
+  readonly authorizedHostActions: Array<{ id: string; adapterVersion: string; selectionId?: string; claimId?: string }> = [];
+  readonly hostActionClaims: ExtensionHostActionClaim[] = [];
+  readonly hostActionClaimBindings: Array<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }> = [];
   readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string; reviewScopeDigest?: string }> = [];
   readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
   readonly hardwarePrepared: HardwareSignalClaim[] = [];
@@ -421,6 +425,10 @@ class FakeBridge implements ExtensionCompanionBridge {
     this.hardwareCompleted.push({ claim, outcome: completion.outcome, ...(completion.dispatchReceiptId ? { dispatchReceiptId: completion.dispatchReceiptId } : {}) });
     return { ok: true, value: { signalId: claim.signalId, outcome: completion.outcome } };
   }
+  async claimHostAction(binding: { windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
+    this.hostActionClaimBindings.push(binding);
+    return { ok: true, value: this.hostActionClaims.shift() };
+  }
   async createHandoff(input: { sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate" }): Promise<BridgeResult<ExtensionHandoffPackage>> {
     const session = this.registered.find((value) => value.id === input.sessionId);
     if (!session?.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision) return { ok: false, code: "not_found", message: "missing" };
@@ -485,14 +493,14 @@ class FakeBridge implements ExtensionCompanionBridge {
   async listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return { ok: true, value: this.listedProviderDesktops ?? [] }; }
   async revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> { this.providerRevokeRequests.push(provider); return { ok: true, value: fakeProviderInstallation(provider, "revoked") }; }
   private async voiceState(bindingId: string, status: ExtensionVoiceBinding["status"]): Promise<BridgeResult<ExtensionVoiceBinding>> { this.currentVoiceValue = { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status }; return { ok: true, value: this.currentVoiceValue }; }
-  async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string, expectedUrl?: string) {
-    this.authorizedHostActions.push({ id, adapterVersion, ...(selectionId ? { selectionId } : {}) });
+  async authorizeHostAction(id: string, adapterVersion: string, selectionId?: string, expectedUrl?: string, claim?: HostActionClaimReference) {
+    this.authorizedHostActions.push({ id, adapterVersion, ...(selectionId ? { selectionId } : {}), ...(claim ? { claimId: claim.claimId } : {}) });
     await this.authorizeGate;
     const url = selectionId ? `https://github.com/acme/project/pull/${selectionId.split(":")[1]}` : this.authorizationUrlOverride ?? expectedUrl;
     return { ok: true, value: { hostActionId: id, authorizationToken: `host-action-auth:${"f".repeat(64)}`, expiresAt: "2099-01-01T00:00:00.000Z", ...(selectionId ? { selectionId } : {}), ...(url ? { url } : {}) } } as const;
   }
-  async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string, _authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous"): Promise<BridgeResult<ForwardedCommandResult>> {
-    this.completedHostActions.push({ id, succeeded, summary, adapterVersion, ...(effectDisposition ? { effectDisposition } : {}) });
+  async completeHostAction(id: string, succeeded: boolean, summary: string, adapterVersion: string, _authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous", claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedCommandResult>> {
+    this.completedHostActions.push({ id, succeeded, summary, adapterVersion, ...(effectDisposition ? { effectDisposition } : {}), ...(claim ? { claimId: claim.claimId } : {}) });
     if (this.completeHostActionFailure) {
       const message = this.completeHostActionFailure;
       this.completeHostActionFailure = undefined;
@@ -1628,6 +1636,60 @@ test("a disconnected or malicious companion cannot cause a host action", async (
   await vscode.invoke("sxsy-b122.chord.chatgpt.shift");
   assert.deepEqual(opened, []);
   assert.match(vscode.warnings.at(-1) ?? "", /unexpected local host action/i);
+});
+
+test("a targetless physical Voice claim opens the real Voice Center and settles through the exact extension lease", async () => {
+  const vscode = new FakeVscode([], []);
+  const bridge = new FakeBridge();
+  bridge.currentVoiceValue = {
+    id: "voice-binding-physical",
+    consentId: "voice-consent-physical",
+    voiceSessionId: "voice-session-physical",
+    repositoryRoot: "C:\\repo",
+    targetSnapshotId: "snapshot-physical",
+    contextPackageId: "handoff-physical",
+    contextDigest: "c".repeat(64),
+    provider: "claude",
+    transcript: "off",
+    retentionMinutes: 0,
+    status: "active"
+  };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-25T12:00:00.100Z",
+    idFactory: sequenceFactory(),
+    extensionVersion: "1.2.3",
+    hostActionPollIntervalMs: 10
+  });
+  await controller.start();
+  const window = controller.listKnownSessions().find((candidate) => candidate.metadata["sxsy-b122.kind"] === "window")!;
+  assert.equal(window.metadata["sxsy-b122.extensionVersion"], "1.2.3");
+  assert.equal(window.metadata["sxsy-b122.hostActionCapabilities"], JSON.stringify(["show_voice_center"]));
+  bridge.hostActionClaims.push({
+    version: 1,
+    claimId: `host-action-claim:${"a".repeat(64)}`,
+    claimToken: "controller-voice-claim-token",
+    hostActionId: `host-action:${"b".repeat(64)}`,
+    operationId: "operation-physical-voice",
+    commandAction: "open_voice",
+    hostActionKind: "show_voice_center",
+    windowSessionId: window.id,
+    adapterVersion: "1.2.3",
+    capabilities: ["show_voice_center"],
+    claimedAt: "2026-08-25T12:00:00.000Z",
+    expiresAt: "2026-08-25T12:00:05.000Z",
+    actionExpiresAt: "2026-08-25T12:00:30.000Z"
+  });
+  vscode.choose("Mute voice conversation");
+  for (let attempt = 0; attempt < 50 && bridge.completedHostActions.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(bridge.hostActionClaimBindings.some((binding) => binding.windowSessionId === window.id && binding.adapterVersion === "1.2.3"), true);
+  assert.deepEqual(bridge.voiceMutes, ["voice-binding-physical"]);
+  assert.deepEqual(bridge.authorizedHostActions.at(-1), { id: `host-action:${"b".repeat(64)}`, adapterVersion: "1.2.3", claimId: `host-action-claim:${"a".repeat(64)}` });
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+  assert.equal(bridge.completedHostActions.at(-1)?.effectDisposition, "committed");
+  assert.equal(bridge.completedHostActions.at(-1)?.claimId, `host-action-claim:${"a".repeat(64)}`);
+  assert.equal(bridge.dispatched.length, 0, "the extension must not fabricate a second command dispatch for a companion-queued physical Voice action");
+  await controller.stop();
 });
 
 test("public hardware dispatch traverses canonical prepare, authority, dispatch, and receipt completion without a client-selected chord", async () => {

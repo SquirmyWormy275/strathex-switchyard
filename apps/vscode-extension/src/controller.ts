@@ -18,6 +18,8 @@ import {
   type ExtensionWorkflowProviderResult,
   type ExtensionVoiceBinding,
   type ExtensionVoiceProvider,
+  type ExtensionHostActionClaim,
+  type HostActionClaimReference,
   type CredentialProvisionScope,
   type HardwareSignalClaim,
   type ForwardedCommand,
@@ -77,6 +79,7 @@ const pipelineFailureCursorStateKey = "sxsy-b122.pipelineFailureCursor";
 const debugBindingStateKey = "sxsy-b122.debugBindings.v1";
 const highConsequenceActions = ["council_automatic", "pr_merge", "direct_main", "lfg", "repair_mission", "emergency_containment", "full_sandbox", "rebuild_full_sandbox", "quarantine", "containment_release"] as const;
 const providerDesktopIds = ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"] as const satisfies readonly ProviderDesktopId[];
+const extensionHostActionCapabilities = ["show_voice_center"] as const;
 
 interface StoredWindowState {
   readonly id: string;
@@ -142,6 +145,8 @@ export interface ManagedSessionControllerOptions {
   readonly repeatWindowMs?: number;
   /** Bound for observing the exact VS Code debug start/termination event. */
   readonly debugLifecycleTimeoutMs?: number;
+  /** Bounded poll for extension-owned durable host actions such as Voice Center. */
+  readonly hostActionPollIntervalMs?: number;
 }
 
 export interface ManagedTerminalLaunchReceipt {
@@ -186,6 +191,7 @@ export class ManagedSessionController {
   private readonly managedTerminalReceiptFactory: ManagedTerminalReceiptFactory;
   private readonly repeatWindowMs: number;
   private readonly debugLifecycleTimeoutMs: number;
+  private readonly hostActionPollIntervalMs: number;
   private readonly terminalRecords = new WeakMap<TerminalLike, TrackedTerminal>();
   private readonly closedTerminals = new WeakSet<TerminalLike>();
   private readonly terminalBySessionId = new Map<string, TrackedTerminal>();
@@ -204,6 +210,9 @@ export class ManagedSessionController {
   private hardwareSignalTimer?: ReturnType<typeof setTimeout>;
   private hardwareSignalInFlight = false;
   private hardwareSignalTask?: Promise<void>;
+  private hostActionTimer?: ReturnType<typeof setTimeout>;
+  private hostActionInFlight = false;
+  private hostActionTask?: Promise<void>;
   private sessionHeartbeatTimer?: ReturnType<typeof setTimeout>;
   private sessionHeartbeatInFlight = false;
   private sessionHeartbeatTask?: Promise<void>;
@@ -240,6 +249,7 @@ export class ManagedSessionController {
     this.managedTerminalReceiptFactory = options.managedTerminalReceiptFactory ?? reserveManagedTerminalReceipt;
     this.repeatWindowMs = boundedRepeatWindow(options.repeatWindowMs ?? 1_500);
     this.debugLifecycleTimeoutMs = boundedDebugLifecycleTimeout(options.debugLifecycleTimeoutMs ?? 5_000);
+    this.hostActionPollIntervalMs = boundedHostActionPollInterval(options.hostActionPollIntervalMs ?? 250);
   }
 
   /** Allows a reviewed local transport to be attached after activation. */
@@ -261,10 +271,12 @@ export class ManagedSessionController {
     this.sessionHeartbeatTimer = undefined;
     if (this.hardwareSignalTimer) clearTimeout(this.hardwareSignalTimer);
     this.hardwareSignalTimer = undefined;
+    if (this.hostActionTimer) clearTimeout(this.hostActionTimer);
+    this.hostActionTimer = undefined;
     for (const pending of this.pendingDebugStarts.values()) pending.reject(new Error("VS Code deactivated before the exact debug start event settled."));
     for (const pending of this.pendingDebugStops.values()) pending.reject(new Error("VS Code deactivated before the exact debug termination event settled."));
     const tasks: Promise<unknown>[] = [];
-    for (const task of [this.startTask, this.reconnectTask, this.sessionHeartbeatTask, this.hardwareSignalTask, ...this.admittedTasks]) if (task) tasks.push(task);
+    for (const task of [this.startTask, this.reconnectTask, this.sessionHeartbeatTask, this.hardwareSignalTask, this.hostActionTask, ...this.admittedTasks]) if (task) tasks.push(task);
     await Promise.allSettled(tasks);
   }
 
@@ -283,8 +295,11 @@ export class ManagedSessionController {
       this.vscode.debug.onDidTerminateDebugSession((session) => this.scheduleLifecycleEvent((admittedGeneration) => this.markDebugSessionEnded(session, admittedGeneration))),
       this.vscode.window.onDidChangeWindowState((state) => {
         if (!this.started || !this.acceptingAdmissions) return;
-        if (state.focused) this.scheduleHardwareSignalPoll(0);
-        else if (this.hardwareSignalTimer) { clearTimeout(this.hardwareSignalTimer); this.hardwareSignalTimer = undefined; }
+        if (state.focused) { this.scheduleHardwareSignalPoll(0); this.scheduleHostActionPoll(0); }
+        else {
+          if (this.hardwareSignalTimer) { clearTimeout(this.hardwareSignalTimer); this.hardwareSignalTimer = undefined; }
+          if (this.hostActionTimer) { clearTimeout(this.hostActionTimer); this.hostActionTimer = undefined; }
+        }
       })
     );
 
@@ -310,6 +325,7 @@ export class ManagedSessionController {
     if (!this.isActiveGeneration(generation)) return;
     this.scheduleSessionHeartbeat();
     this.scheduleHardwareSignalPoll(0);
+    this.scheduleHostActionPoll(0);
   }
 
   private isActiveGeneration(generation: number): boolean {
@@ -890,6 +906,8 @@ export class ManagedSessionController {
     this.windowSessionId = sessionId;
     const session = this.makeSession(sessionId, "generic", "vscode_window", "unknown", {
       "sxsy-b122.kind": "window",
+      "sxsy-b122.extensionVersion": this.extensionVersion,
+      "sxsy-b122.hostActionCapabilities": JSON.stringify(extensionHostActionCapabilities),
       "sxsy-b122.workspaceRoots": JSON.stringify(this.workspaceRoots()),
       "sxsy-b122.gitRootCount": String(this.gitRoots.length),
       "sxsy-b122.gitRoots": this.gitRoots.length ? "registered separately" : "unavailable"
@@ -1399,6 +1417,91 @@ export class ManagedSessionController {
       this.sessionHeartbeatInFlight = false;
       if (this.started && generation === this.lifecycleGeneration) this.scheduleSessionHeartbeat();
     }
+  }
+
+  private scheduleHostActionPoll(delayMs = this.hostActionPollIntervalMs): void {
+    if (!this.started || !this.vscode.window.state.focused || this.hostActionTimer || this.hostActionInFlight || !this.windowSessionId) return;
+    this.hostActionTimer = setTimeout(() => {
+      this.hostActionTimer = undefined;
+      const task = this.pollHostAction();
+      this.hostActionTask = task;
+      const clear = () => { if (this.hostActionTask === task) this.hostActionTask = undefined; };
+      void task.then(clear, clear);
+    }, delayMs);
+    this.hostActionTimer.unref?.();
+  }
+
+  private async pollHostAction(): Promise<void> {
+    if (!this.started || !this.vscode.window.state.focused || this.hostActionInFlight || !this.windowSessionId) return;
+    const generation = this.lifecycleGeneration;
+    const windowSessionId = this.windowSessionId;
+    this.hostActionInFlight = true;
+    try {
+      const claimed = await this.bridge.claimHostAction({
+        windowSessionId,
+        adapterVersion: this.extensionVersion,
+        capabilities: extensionHostActionCapabilities,
+        focused: true
+      });
+      if (!claimed.ok || !claimed.value) return;
+      const claim = claimed.value;
+      if (claim.windowSessionId !== windowSessionId || claim.adapterVersion !== this.extensionVersion || claim.hostActionKind !== "show_voice_center"
+        || claim.commandAction !== "open_voice" || claim.capabilities.length !== 1 || claim.capabilities[0] !== "show_voice_center") {
+        await this.vscode.window.showWarningMessage("SXSY-B122 rejected a host-action claim that changed its exact Registered Voice Center binding.");
+        return;
+      }
+      await this.runInGeneration(generation, () => this.deliverClaimedVoiceCenter(claim, generation));
+    } finally {
+      this.hostActionInFlight = false;
+      if (this.started && generation === this.lifecycleGeneration) this.scheduleHostActionPoll();
+    }
+  }
+
+  private async deliverClaimedVoiceCenter(claim: ExtensionHostActionClaim, generation: number): Promise<void> {
+    const reference: HostActionClaimReference = { claimId: claim.claimId, claimToken: claim.claimToken, windowSessionId: claim.windowSessionId };
+    const action: ForwardedHostAction = { id: claim.hostActionId, kind: "show_voice_center", expiresAt: claim.actionExpiresAt };
+    const command = chordFor("VOICE", "normal");
+    if (!command) throw new Error("The canonical Voice Center chord is unavailable.");
+    let succeeded = false;
+    let effectDisposition: "not_started" | "committed" | "ambiguous" = "not_started";
+    let summary = "The extension stopped before opening the native Voice Center.";
+    let authorizationToken: string | undefined;
+    try {
+      const now = Date.parse(this.now());
+      if (!Number.isFinite(now) || Date.parse(claim.expiresAt) <= now || Date.parse(claim.actionExpiresAt) <= now) throw new Error("The durable Voice Center claim expired before final authorization.");
+      if (!this.isActiveGeneration(generation) || !this.vscode.window.state.focused || this.windowSessionId !== claim.windowSessionId) throw new Error("The exact claimed VS Code window is no longer active and focused.");
+      const authorization = await this.bridge.authorizeHostAction(claim.hostActionId, this.extensionVersion, undefined, undefined, reference);
+      if (!authorization.ok) throw new Error(`The companion refused the claimed Voice Center effect: ${authorization.message}`);
+      if (authorization.value.hostActionId !== claim.hostActionId || Date.parse(authorization.value.expiresAt) <= Date.parse(this.now())) throw new Error("The claimed Voice Center authorization is mismatched or expired.");
+      authorizationToken = authorization.value.authorizationToken;
+      if (!this.isActiveGeneration(generation) || !this.vscode.window.state.focused || this.windowSessionId !== claim.windowSessionId) throw new Error("The claimed VS Code window changed at the final Voice Center effect boundary.");
+      summary = await this.executeLocalHostAction(action, command, authorization.value, {
+        status: "running",
+        summary: "The physical Voice chord is awaiting exact extension settlement.",
+        operationId: claim.operationId
+      });
+      succeeded = true;
+      effectDisposition = "committed";
+    } catch (error) {
+      summary = error instanceof Error && error.message ? error.message : summary;
+      effectDisposition = authorizationToken ? "ambiguous" : "not_started";
+    }
+    const completionBridge = this.started && generation === this.lifecycleGeneration ? this.bridge : this.rawBridge;
+    const completion = await completionBridge.completeHostAction(
+      claim.hostActionId,
+      succeeded,
+      summary.slice(0, 512),
+      this.extensionVersion,
+      authorizationToken,
+      effectDisposition,
+      reference
+    );
+    if (!completion.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 claimed Voice Center requires reconciliation: ${completion.message}`);
+      return;
+    }
+    const show = completion.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
+    await show(`SXSY-B122 ${completion.value.status}: ${completion.value.summary}`);
   }
 
   private scheduleHardwareSignalPoll(delayMs = 250): void {
@@ -2644,6 +2747,10 @@ function boundedRepeatWindow(value: number): number {
 }
 function boundedDebugLifecycleTimeout(value: number): number {
   if (!Number.isSafeInteger(value) || value < 50 || value > 30_000) throw new Error("The VS Code debug lifecycle timeout is invalid.");
+  return value;
+}
+function boundedHostActionPollInterval(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 10 || value > 60_000) throw new Error("The extension host-action polling interval is invalid.");
   return value;
 }
 function exactDebugReference(value: unknown, label: string): string {
