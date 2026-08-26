@@ -153,7 +153,7 @@ function evaluatorOptions(fixture: Fixture, git: ContainmentRemoteEvaluatorGitRu
   };
 }
 
-test("host-issued challenge produces exact signed two-pass namespace evidence with path-only findings", async (context) => {
+test("host-issued challenge produces exact signed three-pass namespace evidence with path-only findings", async (context) => {
   const fixture = await setup(context);
   const origin = fixture.challenge.configuredRemotes[0]!.canonicalIdentity;
   const upstream = fixture.challenge.configuredRemotes[1]!.canonicalIdentity;
