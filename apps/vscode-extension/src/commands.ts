@@ -30,7 +30,7 @@ const definitions: readonly ChordDefinition[] = [
   ["FIND_BLOCKED_AGENT", "normal", "Find Blocked Agent"], ["FIND_BLOCKED_AGENT", "shift", "Blocker Queue"],
   ["FIND_FINISHED_AGENT", "normal", "Find Finished Agent"], ["FIND_FINISHED_AGENT", "shift", "Done Queue"],
   ["AUTHORITY_REFRESH", "normal", "Authority Refresh"], ["AUTHORITY_REFRESH", "shift", "Authority Refresh Broadcast"],
-  ["COUNCIL", "normal", "Council Conflict Report"], ["COUNCIL", "shift", "Council Guarded Automatic"], ["COUNCIL", "alt", "Council Recommend and Approve"],
+  ["COUNCIL", "normal", "Council Conflict Report"], ["COUNCIL", "shift", "Council Guarded Automatic"], ["COUNCIL", "alt", "Council Recommendation Review"],
 
   ["CLAUDE", "normal", "Claude"], ["CLAUDE", "shift", "Fresh Claude"], ["CLAUDE", "alt", "Managed Claude Code Terminal"],
   ["CHATGPT", "normal", "ChatGPT"], ["CHATGPT", "shift", "Fresh ChatGPT"], ["CHATGPT", "alt", "Managed Codex Terminal"],

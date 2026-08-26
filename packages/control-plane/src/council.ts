@@ -34,6 +34,13 @@ export interface CouncilReport {
   readonly collectedAt: string;
 }
 
+/** Immutable, bounded report content persisted for exact operator review. */
+export interface CouncilReportArtifact extends CouncilReport {
+  readonly id: string;
+  readonly digest: string;
+  readonly executionAuthorized: false;
+}
+
 export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "awaiting_resume_acknowledgements" | "active" | "completion_pending" | "abort_pending" | "aborted" | "completed";
 
 export interface CouncilAssignment {
@@ -68,7 +75,11 @@ export interface CouncilRecommendation {
   readonly targetSnapshotId: string;
   readonly participantSessionIds: readonly string[];
   readonly assignments: Readonly<Record<string, CouncilAssignment>>;
+  readonly reportId: string;
   readonly reportDigest: string;
+  /** Stable report content excluding heartbeat/collection time, rechecked at approval. */
+  readonly reviewScopeDigest: string;
+  readonly preparationOperationId: string;
   readonly digest: string;
   readonly ready: boolean;
   readonly status: CouncilRecommendationStatus;
@@ -80,6 +91,7 @@ export interface CouncilRecommendation {
 }
 
 interface CouncilEpochSavedEvent { readonly epoch: CouncilEpoch; }
+interface CouncilReportSavedEvent { readonly report: CouncilReportArtifact; }
 interface CouncilRecommendationSavedEvent { readonly recommendation: CouncilRecommendation; }
 
 export class CouncilError extends Error {
@@ -99,6 +111,13 @@ function nonEmpty(value: string, field: string): string {
 
 function unique(values: readonly string[], field: string): readonly string[] {
   return [...new Set(values.map((value) => nonEmpty(value, field)))].sort();
+}
+
+function boundedUnique(values: readonly string[], field: string): readonly string[] {
+  if (!Array.isArray(values) || values.length > 128) throw new CouncilError(`Council ${field} declarations exceed the 128-item review bound.`);
+  const normalized = values.map((value) => nonEmpty(value, field));
+  if (normalized.some((value) => value.length > 256 || /[\r\n\0]/u.test(value))) throw new CouncilError(`Council ${field} declarations contain an unbounded or unsafe value.`);
+  return [...new Set(normalized)].sort();
 }
 
 function cloneParticipant(participant: CouncilParticipant): CouncilParticipant {
@@ -135,6 +154,21 @@ function cloneRecommendation(value: CouncilRecommendation): CouncilRecommendatio
   };
 }
 
+function cloneReport(value: CouncilReportArtifact): CouncilReportArtifact {
+  return {
+    ...value,
+    participants: value.participants.map(cloneParticipant),
+    pathConflicts: value.pathConflicts.map(cloneConflict),
+    resourceConflicts: value.resourceConflicts.map(cloneConflict),
+    dependencyConflicts: value.dependencyConflicts.map(cloneConflict),
+    executionAuthorized: false
+  };
+}
+
+function cloneConflict(value: CouncilConflict): CouncilConflict {
+  return { resource: value.resource, participants: [...value.participants] };
+}
+
 function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilEpoch> {
   const result = new Map<string, CouncilEpoch>();
   for (const entry of entries) {
@@ -150,12 +184,29 @@ function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilE
 
 function recommendations(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilRecommendation> {
   const result = new Map<string, CouncilRecommendation>();
+  const durableReports = reports(entries);
   for (const entry of entries) {
     if (entry.kind !== "council.recommendation.saved") continue;
     const value = (entry.payload as CouncilRecommendationSavedEvent | undefined)?.recommendation;
-    if (!value || value.executionAuthorized !== false || !["prepared", "approved", "rejected"].includes(value.status)) throw new CouncilError("Protected Council recommendation is malformed.");
+    if (!value || value.executionAuthorized !== false || !["prepared", "approved", "rejected"].includes(value.status)
+      || typeof value.reportId !== "string" || typeof value.reviewScopeDigest !== "string" || typeof value.preparationOperationId !== "string") throw new CouncilError("Protected Council recommendation is malformed.");
     if (recommendationDigest(value) !== value.digest) throw new CouncilError("Protected Council recommendation digest is invalid.");
+    if (durableReports.get(value.reportId)?.digest !== value.reportDigest) throw new CouncilError("Protected Council recommendation is not bound to its durable report artifact.");
     result.set(value.id, cloneRecommendation(value));
+  }
+  return result;
+}
+
+function reports(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilReportArtifact> {
+  const result = new Map<string, CouncilReportArtifact>();
+  for (const entry of entries) {
+    if (entry.kind !== "council.report.saved") continue;
+    const value = (entry.payload as CouncilReportSavedEvent | undefined)?.report;
+    if (!value || value.executionAuthorized !== false || value.id !== `council-report:${value.digest}` || councilReportDigest(value) !== value.digest) {
+      throw new CouncilError("Protected Council report is malformed or has an invalid digest.");
+    }
+    assertBoundedReport(value);
+    result.set(value.id, cloneReport(value));
   }
   return result;
 }
@@ -172,9 +223,9 @@ function normalizedParticipant(input: CouncilParticipant): CouncilParticipant {
     status: input.status,
     capabilities: [...new Set(input.capabilities)],
     lastHeartbeat: input.lastHeartbeat,
-    plannedFiles: unique(input.plannedFiles, "planned file"),
-    resources: unique(input.resources, "resource"),
-    dependencies: unique(input.dependencies, "dependency"),
+    plannedFiles: boundedUnique(input.plannedFiles, "planned file"),
+    resources: boundedUnique(input.resources, "resource"),
+    dependencies: boundedUnique(input.dependencies, "dependency"),
     diffDigest: nonEmpty(input.diffDigest, "diffDigest")
   };
 }
@@ -233,10 +284,11 @@ export class CouncilCoordinator {
   }
 
   async report(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReport> {
+    if (!Array.isArray(input.participants) || input.participants.length > 64) throw new CouncilError("Council reports are bounded to 64 exact participants.");
     const participants = input.participants.map(normalizedParticipant);
     if (participants.length === 0) throw new CouncilError("Council needs at least one verified participant.");
     if (new Set(participants.map((participant) => participant.id)).size !== participants.length) throw new CouncilError("Council participant IDs must be unique.");
-    return {
+    const report: CouncilReport = {
       repositoryRoot: nonEmpty(input.repositoryRoot, "repositoryRoot"),
       targetSnapshotId: nonEmpty(input.targetSnapshotId, "targetSnapshotId"),
       participants: participants.map(cloneParticipant),
@@ -248,6 +300,30 @@ export class CouncilCoordinator {
         && necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))),
       collectedAt: this.clock()
     };
+    assertBoundedReport(report);
+    return report;
+  }
+
+  async createReport(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReportArtifact> {
+    const report = await this.report(input);
+    const digest = councilReportDigest(report);
+    const artifact: CouncilReportArtifact = {
+      id: `council-report:${digest}`,
+      digest,
+      ...report,
+      executionAuthorized: false
+    };
+    return this.store.transaction(async (transaction) => {
+      const existing = reports(await transaction.readEntries()).get(artifact.id);
+      if (existing) return cloneReport(existing);
+      await transaction.append<CouncilReportSavedEvent>("council.report.saved", { report: artifact });
+      return cloneReport(artifact);
+    });
+  }
+
+  async getReport(id: string): Promise<CouncilReportArtifact | undefined> {
+    const found = reports(await this.store.readEntries()).get(nonEmpty(id, "Council report id"));
+    return found ? cloneReport(found) : undefined;
   }
 
   async beginAutomatic(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilEpoch> {
@@ -355,15 +431,16 @@ export class CouncilCoordinator {
       .map(cloneEpoch);
   }
 
-  async prepareRecommendation(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilRecommendation> {
-    const report = await this.report(input);
+  async prepareRecommendation(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }, preparationOperationId: string): Promise<CouncilRecommendation> {
+    const report = await this.createReport(input);
     const ready = report.atomic && report.pathConflicts.length === 0 && report.resourceConflicts.length === 0 && report.dependencyConflicts.length === 0;
     const assignments = ready ? Object.fromEntries(report.participants.map((participant) => [participant.id, { sessionId: participant.id, paths: participant.plannedFiles, resources: participant.resources }])) : {};
     const now = this.clock();
     const base = {
       id: nonEmpty(this.idFactory(), "Council recommendation id"), repositoryRoot: report.repositoryRoot, targetSnapshotId: report.targetSnapshotId,
       participantSessionIds: report.participants.map((participant) => participant.id).sort(), assignments,
-      reportDigest: sha256(stableJson(report)), ready, createdAt: now
+      reportId: report.id, reportDigest: report.digest, reviewScopeDigest: councilReviewScopeDigest(report),
+      preparationOperationId: nonEmpty(preparationOperationId, "preparation operation id"), ready, createdAt: now
     };
     const recommendation: CouncilRecommendation = { ...base, digest: recommendationDigest(base), status: "prepared", executionAuthorized: false, updatedAt: now };
     return this.store.transaction(async (transaction) => {
@@ -378,12 +455,25 @@ export class CouncilCoordinator {
     return found ? cloneRecommendation(found) : undefined;
   }
 
-  async approveRecommendation(id: string, operationId: string): Promise<CouncilRecommendation> {
-    return this.mutateRecommendation(id, (value) => {
-      if (value.status === "approved" && value.approvalOperationId === operationId) return value;
-      if (value.status !== "prepared") throw new CouncilError(`Council recommendation is already ${value.status}.`);
+  async approveRecommendation(input: Readonly<{
+    recommendationId: string;
+    recommendationDigest: string;
+    approvalOperationId: string;
+    repositoryRoot: string;
+    targetSnapshotId: string;
+    participants: readonly CouncilParticipant[];
+  }>): Promise<CouncilRecommendation> {
+    const currentReport = await this.report({ repositoryRoot: input.repositoryRoot, targetSnapshotId: input.targetSnapshotId, participants: input.participants });
+    return this.mutateRecommendation(input.recommendationId, (value) => {
+      if (input.recommendationDigest !== value.digest) throw new CouncilError("Council recommendation approval digest does not match the exact prepared artifact.");
+      const approvalOperationId = nonEmpty(input.approvalOperationId, "approval operation id");
+      if (approvalOperationId === value.preparationOperationId) throw new CouncilError("Council recommendation approval must be a distinct second operation.");
       if (!value.ready) throw new CouncilError("Council recommendation cannot be approved while participant, target, path, resource, or dependency conflicts remain.");
-      return { ...value, status: "approved", approvalOperationId: nonEmpty(operationId, "approval operation id"), executionAuthorized: false };
+      if (value.repositoryRoot !== currentReport.repositoryRoot || value.targetSnapshotId !== currentReport.targetSnapshotId
+        || value.reviewScopeDigest !== councilReviewScopeDigest(currentReport)) throw new CouncilError("Council recommendation participants, target, conflicts, or declared work changed after preparation.");
+      if (value.status === "approved" && value.approvalOperationId === approvalOperationId) return value;
+      if (value.status !== "prepared") throw new CouncilError(`Council recommendation is already ${value.status}.`);
+      return { ...value, status: "approved", approvalOperationId, executionAuthorized: false };
     });
   }
 
@@ -525,8 +615,64 @@ export class CouncilCoordinator {
   }
 }
 
-function recommendationDigest(value: Pick<CouncilRecommendation, "id" | "repositoryRoot" | "targetSnapshotId" | "participantSessionIds" | "assignments" | "reportDigest" | "ready" | "createdAt">): string {
-  return sha256(stableJson({ id: value.id, repositoryRoot: value.repositoryRoot, targetSnapshotId: value.targetSnapshotId, participantSessionIds: value.participantSessionIds, assignments: value.assignments, reportDigest: value.reportDigest, ready: value.ready, createdAt: value.createdAt }));
+function recommendationDigest(value: Pick<CouncilRecommendation, "id" | "repositoryRoot" | "targetSnapshotId" | "participantSessionIds" | "assignments" | "reportId" | "reportDigest" | "reviewScopeDigest" | "preparationOperationId" | "ready" | "createdAt">): string {
+  return sha256(stableJson({
+    id: value.id,
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participantSessionIds: value.participantSessionIds,
+    assignments: value.assignments,
+    reportId: value.reportId,
+    reportDigest: value.reportDigest,
+    reviewScopeDigest: value.reviewScopeDigest,
+    preparationOperationId: value.preparationOperationId,
+    ready: value.ready,
+    createdAt: value.createdAt
+  }));
+}
+
+function councilReportDigest(value: CouncilReport): string {
+  return sha256(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants: value.participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic,
+    collectedAt: value.collectedAt
+  }));
+}
+
+function councilReviewScopeDigest(value: CouncilReport): string {
+  const participants = value.participants.map(({ lastHeartbeat: _lastHeartbeat, ...participant }) => participant);
+  return sha256(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic
+  }));
+}
+
+function assertBoundedReport(value: CouncilReport): void {
+  if (value.participants.length > 64) throw new CouncilError("Council reports are bounded to 64 exact participants.");
+  for (const conflicts of [value.pathConflicts, value.resourceConflicts, value.dependencyConflicts]) {
+    if (conflicts.length > 512) throw new CouncilError("Council report conflicts exceed the 512-item exact-review bound.");
+    if (conflicts.some((conflict) => conflict.resource.length > 256 || conflict.participants.length > 64)) throw new CouncilError("Council report conflict detail exceeds its exact-review bound.");
+  }
+  if (Buffer.byteLength(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants: value.participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic,
+    collectedAt: value.collectedAt
+  }), "utf8") > 262_144) throw new CouncilError("Council report detail exceeds the 256 KiB exact-review bound.");
 }
 
 function providerIdentity(value: CouncilParticipant["provider"]): CouncilParticipant["provider"] {

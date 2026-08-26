@@ -1282,13 +1282,16 @@ export class ManagedSessionController {
     const pipelineStatusPresented = command.control === "PIPELINE" && command.modifier === "normal"
       ? await this.presentPipelineStatus(result, selectedSession)
       : false;
+    const councilResultPresented = result.status === "completed" && command.control === "COUNCIL" && (command.modifier === "normal" || command.modifier === "alt")
+      ? await this.presentCouncilResult(command.modifier, result, selectedSession)
+      : false;
     let workflowResultPresented = false;
     if (result.status === "blocked" || result.status === "unavailable" || result.status === "incomplete" || result.status === "failed") {
       if (workflowOutcome) {
         try { await this.presentWorkflowResult(workflowOutcome.workflowResult); workflowResultPresented = true; }
         catch { await this.vscode.window.showWarningMessage("SXSY-B122 received a protected workflow result, but VS Code could not open its bounded read-only result view."); }
       }
-      if (!pipelineStatusPresented) await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.status}: ${result.summary}`);
+      if (!pipelineStatusPresented && !councilResultPresented) await this.vscode.window.showWarningMessage(`SXSY-B122 ${result.status}: ${result.summary}`);
       if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
       return;
     }
@@ -1358,7 +1361,7 @@ export class ManagedSessionController {
         return;
       }
     }
-    if (!pipelineStatusPresented && !workflowResultPresented) await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.summary}`);
+    if (!pipelineStatusPresented && !councilResultPresented && !workflowResultPresented) await this.vscode.window.showInformationMessage(`SXSY-B122: ${result.summary}`);
     if (hardwareClaim) await this.finishHardwareSignal(hardwareClaim, "handled", `Canonical dispatch returned ${result.status}: ${result.summary}`.slice(0, 512), dispatchReceiptId, selectedSession);
   }
 
@@ -1600,6 +1603,79 @@ export class ManagedSessionController {
     if (selected?.label === approveLabel) return review.scopeDigest;
     await this.vscode.window.showInformationMessage(`SXSY-B122 did not approve protected plan scope ${review.scopeDigest}; no confirmation or dispatch was requested.`);
     return undefined;
+  }
+
+  private async presentCouncilResult(modifier: "normal" | "alt", result: ForwardedCommandResult, selectedSessionId: string | undefined): Promise<boolean> {
+    const selected = selectedSessionId ? this.sessions.get(selectedSessionId) : undefined;
+    if (modifier === "normal") {
+      const report = councilReportView(result.data);
+      if (!report || !selected?.workspaceRoot || report.targetSnapshotId !== selected.targetSnapshotId || !samePath(report.repositoryRoot, selected.workspaceRoot)) {
+        await this.vscode.window.showWarningMessage("SXSY-B122 rejected a malformed or target-substituted durable Council report.");
+        return true;
+      }
+      const items: QuickPickItemLike[] = [
+        {
+          label: `Report ${report.reportId}`,
+          description: `${report.atomic ? "Atomic-capable" : "Advisory only"} • collected ${report.collectedAt}`,
+          detail: `Digest ${report.reportDigest}; target ${report.targetSnapshotId}; execution authority: none.`
+        },
+        ...report.participantDetails.map((participant) => ({
+          label: `Participant ${participant.id} • ${participant.provider} • ${participant.status}`,
+          description: `Capabilities: ${participant.capabilities.join(" | ")}`,
+          detail: `Files: ${councilList(participant.plannedFiles)}. Resources: ${councilList(participant.resources)}. Dependencies: ${councilList(participant.dependencies)}. Diff: ${participant.diffDigest}.`
+        })),
+        ...councilConflictItems("Path conflict", report.pathConflicts),
+        ...councilConflictItems("Resource conflict", report.resourceConflicts),
+        ...councilConflictItems("Dependency conflict", report.dependencyConflicts)
+      ];
+      if (!report.pathConflicts.length && !report.resourceConflicts.length && !report.dependencyConflicts.length) {
+        items.push({ label: "Conflicts", description: "None in the exact collected declarations", detail: "No path, resource, or dependency overlap was present in this immutable report." });
+      }
+      await this.vscode.window.showQuickPick(items, { placeHolder: `Exact read-only Council report ${report.reportDigest}; selecting an item does not approve or execute it` });
+      return true;
+    }
+
+    const recommendation = councilRecommendationView(result.data);
+    if (!recommendation || !selected?.workspaceRoot || recommendation.targetSnapshotId !== selected.targetSnapshotId || !samePath(recommendation.repositoryRoot, selected.workspaceRoot)) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 rejected a malformed or target-substituted Council recommendation artifact.");
+      return true;
+    }
+    const approveLabel = `Approve exact recommendation ${recommendation.recommendationDigest}`;
+    const cancelLabel = "Leave recommendation prepared without approval";
+    const items: QuickPickItemLike[] = [
+      {
+        label: `Recommendation ${recommendation.recommendationId}`,
+        description: `${recommendation.ready ? "Ready for acknowledgement" : "Not ready"} • ${recommendation.participantSessionIds.length} participants`,
+        detail: `Recommendation ${recommendation.recommendationDigest}; report ${recommendation.reportId} / ${recommendation.reportDigest}; target ${recommendation.targetSnapshotId}.`
+      },
+      ...Object.values(recommendation.assignments).map((assignment) => ({
+        label: `Assignment ${assignment.sessionId}`,
+        description: `Files: ${councilList(assignment.paths)}`,
+        detail: `Resources: ${councilList(assignment.resources)}. This recommendation grants no execution authority.`
+      })),
+      ...(recommendation.ready ? [{ label: approveLabel, description: "Distinct second exact-digest acknowledgement", detail: "A separate authenticated companion call will reobserve the target and participants. It cannot execute the recommendation." }] : []),
+      { label: cancelLabel, description: "No approval call", detail: "The immutable recommendation remains prepared and non-executing." }
+    ];
+    const picked = await this.vscode.window.showQuickPick(items, { placeHolder: `Separate exact-digest Council review for ${recommendation.recommendationDigest}; preparation alone never approves or executes` });
+    if (!recommendation.ready || picked?.label !== approveLabel) {
+      await this.vscode.window.showInformationMessage(`SXSY-B122 left Council recommendation ${recommendation.recommendationId} prepared without approval or execution authority.`);
+      return true;
+    }
+    const approvalOperationId = `council-review:${this.idFactory()}`;
+    const approved = await this.bridge.approveCouncilRecommendation({
+      recommendationId: recommendation.recommendationId,
+      recommendationDigest: recommendation.recommendationDigest,
+      approvalOperationId,
+      repositoryRoot: recommendation.repositoryRoot,
+      targetSnapshotId: recommendation.targetSnapshotId,
+      ...(selectedSessionId ? { sessionId: selectedSessionId } : {})
+    });
+    if (!approved.ok) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Council recommendation approval stopped: ${approved.message}`);
+      return true;
+    }
+    await this.vscode.window.showInformationMessage(`SXSY-B122 approved exact Council recommendation ${approved.value.id}; it carries no execution authority.`);
+    return true;
   }
 
   private async prepareWorkflowForCommand(command: ChordCommand, sessionId: string | undefined, authorityId: string | undefined, confirmationToken: string | undefined, confirmationScopeDigest: string | undefined): Promise<true | ExtensionWorkflowArtifact | false> {
@@ -2777,6 +2853,109 @@ function expectedWorkflowResultKind(action: ExtensionWorkflowAction): ExtensionW
   if (action === "focus_blocked_agent" || action === "focus_finished_agent") return "focus";
   if (action === "authority_refresh" || action === "authority_broadcast") return "authority";
   return "voice_binding";
+}
+
+interface CouncilConflictView { readonly resource: string; readonly participants: readonly string[]; }
+interface CouncilParticipantView {
+  readonly id: string;
+  readonly provider: "claude" | "codex" | "generic" | "voice";
+  readonly targetSnapshotId: string;
+  readonly status: ExtensionManagedSession["status"];
+  readonly capabilities: ExtensionManagedSession["capabilities"];
+  readonly lastHeartbeat: string;
+  readonly plannedFiles: readonly string[];
+  readonly resources: readonly string[];
+  readonly dependencies: readonly string[];
+  readonly diffDigest: string;
+}
+interface CouncilReportView {
+  readonly reportId: string;
+  readonly reportDigest: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly collectedAt: string;
+  readonly participantDetails: readonly CouncilParticipantView[];
+  readonly atomic: boolean;
+  readonly pathConflicts: readonly CouncilConflictView[];
+  readonly resourceConflicts: readonly CouncilConflictView[];
+  readonly dependencyConflicts: readonly CouncilConflictView[];
+}
+interface CouncilRecommendationView {
+  readonly recommendationId: string;
+  readonly recommendationDigest: string;
+  readonly reportId: string;
+  readonly reportDigest: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participantSessionIds: readonly string[];
+  readonly assignments: Readonly<Record<string, Readonly<{ sessionId: string; paths: readonly string[]; resources: readonly string[] }>>>;
+  readonly ready: boolean;
+  readonly createdAt: string;
+}
+
+function councilReportView(value: unknown): CouncilReportView | undefined {
+  if (!isRecord(value) || !exactCouncilKeys(value, ["reportId", "reportDigest", "repositoryRoot", "targetSnapshotId", "collectedAt", "participants", "participantDetails", "atomic", "pathConflicts", "resourceConflicts", "dependencyConflicts", "executionAuthorized"])
+    || typeof value.reportDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.reportDigest) || value.reportId !== `council-report:${value.reportDigest}`
+    || !councilPath(value.repositoryRoot) || !councilReference(value.targetSnapshotId) || !councilTime(value.collectedAt)
+    || !Number.isSafeInteger(value.participants) || Number(value.participants) < 1 || Number(value.participants) > 64
+    || !Array.isArray(value.participantDetails) || value.participantDetails.length !== value.participants || !value.participantDetails.every(isCouncilParticipant)
+    || !value.participantDetails.every((participant) => participant.targetSnapshotId === value.targetSnapshotId)
+    || typeof value.atomic !== "boolean" || value.executionAuthorized !== false
+    || !isCouncilConflicts(value.pathConflicts, value.participantDetails) || !isCouncilConflicts(value.resourceConflicts, value.participantDetails) || !isCouncilConflicts(value.dependencyConflicts, value.participantDetails)) return undefined;
+  return value as unknown as CouncilReportView;
+}
+
+function councilRecommendationView(value: unknown): CouncilRecommendationView | undefined {
+  if (!isRecord(value) || !exactCouncilKeys(value, ["recommendationId", "recommendationDigest", "reportId", "reportDigest", "repositoryRoot", "targetSnapshotId", "participantSessionIds", "assignments", "ready", "status", "createdAt", "executionAuthorized"])
+    || !councilReference(value.recommendationId) || typeof value.recommendationDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.recommendationDigest)
+    || typeof value.reportDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.reportDigest) || value.reportId !== `council-report:${value.reportDigest}`
+    || !councilPath(value.repositoryRoot) || !councilReference(value.targetSnapshotId)
+    || !Array.isArray(value.participantSessionIds) || value.participantSessionIds.length < 1 || value.participantSessionIds.length > 64
+    || !value.participantSessionIds.every(councilReference) || new Set(value.participantSessionIds).size !== value.participantSessionIds.length
+    || !isRecord(value.assignments) || Object.keys(value.assignments).length > 64
+    || !Object.entries(value.assignments).every(([id, assignment]) => Array.isArray(value.participantSessionIds) && value.participantSessionIds.includes(id) && isCouncilAssignmentView(assignment, id))
+    || typeof value.ready !== "boolean" || value.ready !== (Object.keys(value.assignments).length === value.participantSessionIds.length)
+    || value.status !== "prepared" || !councilTime(value.createdAt) || value.executionAuthorized !== false) return undefined;
+  return value as unknown as CouncilRecommendationView;
+}
+
+function isCouncilParticipant(value: unknown): value is CouncilParticipantView {
+  return isRecord(value) && exactCouncilKeys(value, ["id", "provider", "targetSnapshotId", "status", "capabilities", "lastHeartbeat", "plannedFiles", "resources", "dependencies", "diffDigest"])
+    && councilReference(value.id) && ["claude", "codex", "generic", "voice"].includes(String(value.provider)) && councilReference(value.targetSnapshotId)
+    && ["running", "verified_blocked", "verified_finished", "unreachable", "stale", "unknown"].includes(String(value.status))
+    && Array.isArray(value.capabilities) && value.capabilities.length >= 2 && value.capabilities.length <= 4
+    && value.capabilities.includes("registered") && value.capabilities.includes("observable") && new Set(value.capabilities).size === value.capabilities.length
+    && value.capabilities.every((capability) => ["registered", "observable", "controllable", "mediated"].includes(String(capability)))
+    && councilTime(value.lastHeartbeat) && isCouncilDetailList(value.plannedFiles) && isCouncilDetailList(value.resources) && isCouncilDetailList(value.dependencies)
+    && councilReference(value.diffDigest);
+}
+
+function isCouncilConflicts(value: unknown, participants: readonly CouncilParticipantView[]): value is readonly CouncilConflictView[] {
+  const participantIds = new Set(participants.map((participant) => participant.id));
+  return Array.isArray(value) && value.length <= 512 && value.every((conflict) => isRecord(conflict)
+    && exactCouncilKeys(conflict, ["resource", "participants"]) && councilDetailText(conflict.resource)
+    && Array.isArray(conflict.participants) && conflict.participants.length >= 2 && conflict.participants.length <= 64
+    && conflict.participants.every((participant) => councilReference(participant) && participantIds.has(participant))
+    && new Set(conflict.participants).size === conflict.participants.length);
+}
+
+function isCouncilAssignmentView(value: unknown, id: string): boolean {
+  return isRecord(value) && exactCouncilKeys(value, ["sessionId", "paths", "resources"]) && value.sessionId === id
+    && councilReference(value.sessionId) && isCouncilDetailList(value.paths) && isCouncilDetailList(value.resources);
+}
+
+function exactCouncilKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => key in value);
+}
+function isCouncilDetailList(value: unknown): value is readonly string[] { return Array.isArray(value) && value.length <= 128 && value.every(councilDetailText); }
+function councilDetailText(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\r\n\0]/.test(value); }
+function councilReference(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function councilPath(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value); }
+function councilTime(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
+function councilList(value: readonly string[]): string { return value.length ? value.map((item) => safeOverlayText(item, 256)).join(" | ") : "(none)"; }
+function councilConflictItems(label: string, conflicts: readonly CouncilConflictView[]): readonly QuickPickItemLike[] {
+  return conflicts.map((conflict) => ({ label: `${label}: ${safeOverlayText(conflict.resource, 256)}`, description: conflict.participants.join(" | "), detail: `Exact overlapping declaration shared by: ${conflict.participants.join(" | ")}.` }));
 }
 
 interface PipelineFailureView { readonly name: string; readonly outcome: string; readonly summary?: string; }

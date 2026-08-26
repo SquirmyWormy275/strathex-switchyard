@@ -187,6 +187,37 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("Council recommendation approval crosses only a distinct exact-digest mediator hook", async () => {
+  const approvals: unknown[] = [];
+  const executor = {
+    execute: (): { status: "unavailable"; summary: string } => ({ status: "unavailable", summary: "not used" }),
+    async approveCouncilRecommendation(input: unknown) {
+      approvals.push(input);
+      return {
+        id: "recommendation-1", digest: "a".repeat(64), reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
+        repositoryRoot: "C:\\safe\\repo", targetSnapshotId: "c".repeat(64), participantSessionIds: ["session-1"], assignments: {},
+        reviewScopeDigest: "d".repeat(64), preparationOperationId: "operation-prepare", ready: true, status: "approved",
+        approvalOperationId: "council-review:operation-approve", executionAuthorized: false, createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T00:01:00.000Z"
+      } as const;
+    }
+  };
+  const service = new CompanionService({ executor });
+  const payload = {
+    recommendationId: "recommendation-1", recommendationDigest: "a".repeat(64), approvalOperationId: "council-review:operation-approve",
+    targetSnapshotId: "c".repeat(64), repositoryRoot: "C:\\safe\\repo", sessionId: "session-1"
+  };
+  const approved = await service.handle(request("council-approve", "council.recommendation.approve", payload));
+  assert.equal(approved.ok, true);
+  assert.deepEqual(approvals, [payload]);
+  assert.equal((approved.result as { recommendation: { status: string; executionAuthorized: boolean } }).recommendation.status, "approved");
+  assert.equal((approved.result as { recommendation: { status: string; executionAuthorized: boolean } }).recommendation.executionAuthorized, false);
+
+  const forged = await service.handle(request("council-forged", "council.recommendation.approve", { ...payload, executionAuthorized: true }));
+  assert.equal(forged.ok, false);
+  assert.equal(forged.error?.code, "invalid_request");
+  assert.equal(approvals.length, 1);
+});
+
 test("provider-observed sessions reject extension status and heartbeat forgery while local heartbeat stays monotonic", async () => {
   const now = "2026-08-24T00:02:00.000Z";
   const service = new CompanionService({ now: () => now });

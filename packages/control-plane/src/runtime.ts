@@ -25,6 +25,7 @@ import { SessionRegistry } from "./session-registry.ts";
 import { TargetSnapshotLedger } from "./snapshot-ledger.ts";
 import { ProtectedJsonStore, sha256 } from "./store.ts";
 import type { ExistingPlanBinding } from "./workflow-artifacts.ts";
+import type { CouncilRecommendation } from "./council.ts";
 
 export interface TargetResolver {
   /** Resolve a target only from trusted host/session identity; never from command input. */
@@ -78,6 +79,15 @@ export interface ConfirmationAttestationRequest {
   /** Host-created review material; never copied from a generic client reason. */
   readonly reviewedScopeDigest?: string;
   readonly reviewedScopeSummary?: string;
+}
+
+export interface CouncilRecommendationApprovalRequest {
+  readonly recommendationId: string;
+  readonly recommendationDigest: string;
+  readonly approvalOperationId: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId?: string;
 }
 
 /**
@@ -439,6 +449,41 @@ export class DurableMediatedExecutor {
     } catch {
       return { status: "cancelling", summary: "Cancellation intent is durable, but the host adapter did not confirm delivery; reconciliation is required.", operationId };
     }
+  }
+
+  /**
+   * Resolves fresh protected target/session state for a second Council review
+   * call. This can acknowledge an immutable recommendation, never execute it.
+   */
+  async approveCouncilRecommendation(request: CouncilRecommendationApprovalRequest): Promise<CouncilRecommendation> {
+    const definition = commandForAction("council_recommend");
+    const session = request.sessionId ? await this.sessions.get(request.sessionId) : undefined;
+    if (request.sessionId && !session) throw new Error("The Council review session is absent from the protected managed-session registry.");
+    const resolved = await this.resolveTarget(definition, session);
+    if (!resolved) throw new Error("The trusted target resolver could not identify the Council recommendation target.");
+    const target = await this.snapshots.record(resolved);
+    if (target.completeness !== "complete" || target.id !== request.targetSnapshotId || target.repositoryRoot !== request.repositoryRoot) {
+      throw new Error("The Council recommendation target changed or does not match the exact reviewed artifact.");
+    }
+    const policy = await this.createPolicy(target);
+    const context: RuntimeDispatcherContext = {
+      policy,
+      sessions: this.sessions,
+      authorities: this.authorities,
+      operationCoordinator: this.operationCoordinator,
+      receiptEvidence: this.options.receiptEvidence
+    };
+    const council = this.options.dependencies?.(context).council;
+    if (!council?.approveRecommendation) throw new Error("No durable Council recommendation review boundary is configured.");
+    const recommendation = await council.approveRecommendation({
+      recommendationId: request.recommendationId,
+      recommendationDigest: request.recommendationDigest,
+      approvalOperationId: request.approvalOperationId,
+      target,
+      ...(session ? { session } : {})
+    });
+    if (recommendation.executionAuthorized !== false) throw new Error("Council recommendation review cannot return execution authority.");
+    return recommendation;
   }
 
   /**

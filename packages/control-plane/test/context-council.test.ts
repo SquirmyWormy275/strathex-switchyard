@@ -256,36 +256,70 @@ test("Council can durably require cleanup for an interrupted epoch before any as
 test("Council normal is truthful for an Observable-only participant instead of pretending it can pause or isolate", async () => {
   await withStore(async (store) => {
     const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z" });
-    const report = await council.report({
+    const report = await council.createReport({
       repositoryRoot: "C:/repos/safe",
       targetSnapshotId: "snapshot-1",
       participants: [{
         ...session("observer", ["docs/notes.md"]),
+        resources: ["port:4100"],
+        dependencies: ["package:typescript"],
         capabilities: ["registered", "observable"],
         status: "verified_blocked"
       }]
     });
     assert.equal(report.atomic, false);
+    assert.match(report.id, /^council-report:[a-f0-9]{64}$/);
+    assert.match(report.digest, /^[a-f0-9]{64}$/);
+    assert.deepEqual(report.participants[0]?.plannedFiles, ["docs/notes.md"]);
+    assert.deepEqual(report.participants[0]?.resources, ["port:4100"]);
+    assert.deepEqual(report.participants[0]?.dependencies, ["package:typescript"]);
+    assert.equal(report.executionAuthorized, false);
+    const reloaded = new CouncilCoordinator(store);
+    assert.deepEqual(await reloaded.getReport(report.id), report);
     await assert.rejects(council.beginAutomatic({
       repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: report.participants
     }), /cooperative pause/i);
   });
 });
 
-test("Council recommendations are immutable durable artifacts and never authorize execution", async () => {
+test("Council recommendations require a distinct exact-digest approval and reject restart forgery or participant churn", async () => {
   await withStore(async (store) => {
     const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "recommendation-1" });
-    const prepared = await council.prepareRecommendation({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants: [
-      session("agent-a", ["src/a.ts"], ["port:4100"]), session("agent-b", ["src/b.ts"], ["port:4200"])
-    ] });
+    const participants = [session("agent-a", ["src/a.ts"], ["port:4100"]), session("agent-b", ["src/b.ts"], ["port:4200"])] as const;
+    const prepared = await council.prepareRecommendation({ repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants }, "operation-prepare-1");
     assert.equal(prepared.status, "prepared");
     assert.equal(prepared.ready, true);
     assert.equal(prepared.executionAuthorized, false);
-    const approved = await council.approveRecommendation(prepared.id, "operation-confirmed-1");
+    assert.equal(prepared.preparationOperationId, "operation-prepare-1");
+    assert.match(prepared.reportId, /^council-report:[a-f0-9]{64}$/);
+    await assert.rejects(council.approveRecommendation({
+      recommendationId: prepared.id, recommendationDigest: "0".repeat(64), approvalOperationId: "operation-confirmed-1",
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants
+    }), /digest/i);
+    await assert.rejects(council.approveRecommendation({
+      recommendationId: prepared.id, recommendationDigest: prepared.digest, approvalOperationId: "operation-prepare-1",
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1", participants
+    }), /distinct/i);
+    await assert.rejects(council.approveRecommendation({
+      recommendationId: prepared.id, recommendationDigest: prepared.digest, approvalOperationId: "operation-churned-1",
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1",
+      participants: [{ ...participants[0], diffDigest: "changed-diff" }, participants[1]]
+    }), /changed/i);
+
+    const reloaded = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:01:00.000Z" });
+    const approved = await reloaded.approveRecommendation({
+      recommendationId: prepared.id, recommendationDigest: prepared.digest, approvalOperationId: "operation-confirmed-1",
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1",
+      participants: participants.map((participant) => ({ ...participant, lastHeartbeat: "2026-08-23T10:01:00.000Z" }))
+    });
     assert.equal(approved.status, "approved");
     assert.equal(approved.approvalOperationId, "operation-confirmed-1");
     assert.equal(approved.executionAuthorized, false);
-    const reloaded = new CouncilCoordinator(store);
     assert.equal((await reloaded.getRecommendation(prepared.id))?.digest, prepared.digest);
+    await assert.rejects(reloaded.approveRecommendation({
+      recommendationId: prepared.id, recommendationDigest: prepared.digest, approvalOperationId: "operation-confirmed-1",
+      repositoryRoot: "C:/repos/safe", targetSnapshotId: "snapshot-1",
+      participants: [{ ...participants[0], diffDigest: "changed-after-approval" }, participants[1]]
+    }), /changed/i);
   });
 });

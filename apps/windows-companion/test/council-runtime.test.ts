@@ -52,13 +52,22 @@ test("durable Council reports every fresh exact-target observable session", asyn
   try {
     const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
     const sessions = new SessionRegistry(store, { clock: () => at });
-    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
-    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const sharedDeclarations = { "sxsy-b122.resources": JSON.stringify(["port:45100"]), "sxsy-b122.dependencies": JSON.stringify(["task:shared-prerequisite"]) };
+    await sessions.upsert({ ...session("one", "codex", ["src/shared.ts"]), metadata: { ...session("one", "codex", []).metadata, ...sharedDeclarations } });
+    await sessions.upsert({ ...session("two", "claude", ["src/shared.ts"]), metadata: { ...session("two", "claude", []).metadata, ...sharedDeclarations } });
     const executor = new DurableConfiguredCouncilExecutor(new CouncilCoordinator(store, { clock: () => at }), sessions, undefined, () => Date.parse(at));
     const result = await executor.execute({ action: "council_report", operationId: "operation-report", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "completed");
     assert.equal(result.data?.participants, 2);
     assert.equal(result.data?.atomic, true);
+    assert.match(String(result.data?.reportId), /^council-report:[a-f0-9]{64}$/);
+    assert.match(String(result.data?.reportDigest), /^[a-f0-9]{64}$/);
+    assert.deepEqual(result.data?.pathConflicts, [{ resource: "src/shared.ts", participants: ["one", "two"] }]);
+    assert.deepEqual(result.data?.resourceConflicts, [{ resource: "port:45100", participants: ["one", "two"] }]);
+    assert.deepEqual(result.data?.dependencyConflicts, [{ resource: "task:shared-prerequisite", participants: ["one", "two"] }]);
+    assert.deepEqual((result.data?.participantDetails as readonly { id: string; plannedFiles: readonly string[] }[]).map((participant) => ({ id: participant.id, plannedFiles: participant.plannedFiles })), [
+      { id: "one", plannedFiles: ["src/shared.ts"] }, { id: "two", plannedFiles: ["src/shared.ts"] }
+    ]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -494,7 +503,7 @@ test("automatic Council gate requires every exact-target acceptance record and r
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test("confirmed Council recommendation persists an approved non-executing artifact", async () => {
+test("Council recommendation dispatch only prepares; a distinct exact review call approves without execution authority", async () => {
   const directory = await mkdtemp(join(tmpdir(), "b122-council-recommend-"));
   try {
     const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
@@ -502,11 +511,21 @@ test("confirmed Council recommendation persists an approved non-executing artifa
     await sessions.upsert(session("one", "codex", ["src/one.ts"]));
     await sessions.upsert(session("two", "claude", ["src/two.ts"]));
     const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "recommendation-1" });
-    const result = await new DurableConfiguredCouncilExecutor(council, sessions, undefined, () => Date.parse(at)).execute({ action: "council_recommend", operationId: "operation-recommend", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, undefined, () => Date.parse(at));
+    const result = await executor.execute({ action: "council_recommend", operationId: "operation-recommend", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
     assert.equal(result.status, "completed");
     assert.equal(result.data?.recommendationId, "recommendation-1");
+    assert.match(String(result.data?.recommendationDigest), /^[a-f0-9]{64}$/);
     const stored = await council.getRecommendation("recommendation-1");
-    assert.equal(stored?.status, "approved");
+    assert.equal(stored?.status, "prepared");
     assert.equal(stored?.executionAuthorized, false);
+    const approved = await executor.approveRecommendation({
+      recommendationId: stored!.id,
+      recommendationDigest: stored!.digest,
+      approvalOperationId: "operation-review-1",
+      target
+    });
+    assert.equal(approved.status, "approved");
+    assert.equal(approved.executionAuthorized, false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

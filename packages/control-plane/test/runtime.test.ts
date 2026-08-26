@@ -151,6 +151,47 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
   });
 });
 
+test("durable runtime resolves the current protected target before a separate Council recommendation approval", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const selected = await sessions.register({
+      id: "session-council-review", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, plannedFiles: ["src/safe.ts"],
+      adapterVersion: "trusted-adapter", metadata: {}
+    });
+    const calls: unknown[] = [];
+    const council = {
+      async execute() { return { status: "unavailable" as const, summary: "not used" }; },
+      async approveRecommendation(input: Readonly<Record<string, unknown>>) {
+        calls.push(input);
+        return {
+          id: "recommendation-1", digest: "a".repeat(64), reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
+          repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, participantSessionIds: [selected.id], assignments: {},
+          reviewScopeDigest: "d".repeat(64), preparationOperationId: "operation-prepare", ready: true, status: "approved" as const,
+          approvalOperationId: "council-review:approve-1", executionAuthorized: false as const, createdAt: now, updatedAt: now
+        };
+      }
+    };
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      dependencies: () => ({ council })
+    });
+    const approved = await runtime.approveCouncilRecommendation({
+      recommendationId: "recommendation-1", recommendationDigest: "a".repeat(64), approvalOperationId: "council-review:approve-1",
+      repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: selected.id
+    });
+    assert.equal(approved.status, "approved");
+    assert.equal(approved.executionAuthorized, false);
+    assert.equal((calls[0] as { target: TargetSnapshot }).target.id, target.id);
+
+    await assert.rejects(runtime.approveCouncilRecommendation({
+      recommendationId: "recommendation-1", recommendationDigest: "a".repeat(64), approvalOperationId: "council-review:approve-forged",
+      repositoryRoot: target.repositoryRoot, targetSnapshotId: "forged-target", sessionId: selected.id
+    }), /target.*changed|does not match/i);
+    assert.equal(calls.length, 1);
+  });
+});
+
 test("installed preparation attests one Git-root session and binds exact authority and confirmation without enabling high consequence", async () => {
   await withStore(async (store) => {
     const sessions = new SessionRegistry(store, { clock: () => now });

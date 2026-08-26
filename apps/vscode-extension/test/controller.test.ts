@@ -275,6 +275,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly providerRevokeRequests: ProviderDesktopId[] = [];
   readonly credentialProvisionRequests: Array<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }> = [];
   readonly containmentReleaseRequests: Array<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }> = [];
+  readonly councilRecommendationApprovals: Array<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }> = [];
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
   readonly workflowCancelled: Array<{ artifactId: string; sessionId: string; authorityId: string }> = [];
@@ -386,6 +387,16 @@ class FakeBridge implements ExtensionCompanionBridge {
   async releaseContainment(input: { sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }): Promise<BridgeResult<ForwardedCommandResult>> {
     this.containmentReleaseRequests.push(input);
     return { ok: true, value: { status: "completed", summary: "Authenticated containment release recorded." } };
+  }
+  async approveCouncilRecommendation(input: { recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }) {
+    this.councilRecommendationApprovals.push(input);
+    return { ok: true as const, value: {
+      id: input.recommendationId, digest: input.recommendationDigest, reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
+      repositoryRoot: input.repositoryRoot, targetSnapshotId: input.targetSnapshotId, participantSessionIds: [input.sessionId ?? "session-one"],
+      assignments: { [input.sessionId ?? "session-one"]: { sessionId: input.sessionId ?? "session-one", paths: [], resources: [] } },
+      reviewScopeDigest: "d".repeat(64), preparationOperationId: "operation-prepare", ready: true, status: "approved" as const, approvalOperationId: input.approvalOperationId, executionAuthorized: false as const,
+      createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:01:00.000Z"
+    } };
   }
   async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
     this.rawHidInstallRequests.push(identity);
@@ -743,6 +754,64 @@ test("provider chords prepare one exact typed workflow artifact before durable d
     action: "proof", sessionId: target.id, authorityId: "authority-test", intent: { kind: "none" }
   });
   assert.equal(bridge.dispatched.length, 1);
+});
+
+test("Council Normal presents bounded exact participant and conflict detail instead of counts", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/council-report" }] });
+  await controller.start();
+  const selected = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  bridge.nextPreparation = { status: "prepared", summary: "Council report prepared.", session: { ...selected, targetSnapshotId: "a".repeat(64) } };
+  bridge.nextDispatch = { status: "completed", summary: "Council report persisted.", data: {
+    reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64), repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64),
+    collectedAt: "2026-08-25T00:00:00.000Z", participants: 2, atomic: false, executionAuthorized: false,
+    participantDetails: [
+      { id: "agent-one", provider: "codex", targetSnapshotId: "a".repeat(64), status: "running", capabilities: ["registered", "observable"], lastHeartbeat: "2026-08-25T00:00:00.000Z", plannedFiles: ["src/shared.ts"], resources: ["port:45100"], dependencies: ["task:prior"], diffDigest: "c".repeat(64) },
+      { id: "agent-two", provider: "claude", targetSnapshotId: "a".repeat(64), status: "verified_blocked", capabilities: ["registered", "observable"], lastHeartbeat: "2026-08-25T00:00:00.000Z", plannedFiles: ["src/shared.ts"], resources: ["port:45100"], dependencies: ["task:prior"], diffDigest: "d".repeat(64) }
+    ],
+    pathConflicts: [{ resource: "src/shared.ts", participants: ["agent-one", "agent-two"] }],
+    resourceConflicts: [{ resource: "port:45100", participants: ["agent-one", "agent-two"] }],
+    dependencyConflicts: [{ resource: "task:prior", participants: ["agent-one", "agent-two"] }]
+  } };
+
+  await vscode.invoke("sxsy-b122.chord.council.normal");
+  const surface = vscode.quickPickSurfaces.at(-1);
+  assert.match(surface?.placeHolder ?? "", /exact.*read-only Council report/i);
+  const rendered = JSON.stringify(surface?.items ?? []);
+  assert.match(rendered, /src\/shared\.ts/);
+  assert.match(rendered, /port:45100/);
+  assert.match(rendered, /task:prior/);
+  assert.match(rendered, /agent-one/);
+  assert.match(rendered, /agent-two/);
+  assert.equal(bridge.councilRecommendationApprovals.length, 0);
+});
+
+test("Council Alt prepares then requires a distinct exact-digest VS Code approval call with no execution authority", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/council-recommend" }] });
+  await controller.start();
+  const selected = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  bridge.nextPreparation = { status: "prepared", summary: "Council recommendation prepared.", confirmationToken: "confirmation-review", session: { ...selected, targetSnapshotId: "a".repeat(64) } };
+  bridge.nextDispatch = { status: "completed", summary: "Recommendation prepared for review.", data: {
+    recommendationId: "recommendation-1", recommendationDigest: "c".repeat(64), reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
+    repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), participantSessionIds: [selected.id],
+    assignments: { [selected.id]: { sessionId: selected.id, paths: ["src/safe.ts"], resources: ["port:45100"] } },
+    ready: true, status: "prepared", createdAt: "2026-08-25T00:00:00.000Z", executionAuthorized: false
+  } };
+  vscode.choose(`Approve exact recommendation ${"c".repeat(64)}`);
+
+  await vscode.invoke("sxsy-b122.chord.council.alt");
+
+  assert.equal(bridge.dispatched.length, 1);
+  assert.equal(bridge.councilRecommendationApprovals.length, 1);
+  assert.deepEqual(bridge.councilRecommendationApprovals[0], {
+    recommendationId: "recommendation-1", recommendationDigest: "c".repeat(64), approvalOperationId: "council-review:id-2",
+    repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), sessionId: selected.id
+  });
+  assert.match(vscode.quickPickSurfaces.at(-1)?.placeHolder ?? "", /separate.*exact-digest/i);
+  assert.match(vscode.information.at(-1) ?? "", /approved.*no execution authority/i);
 });
 
 test("completed provider workflows render the exact artifact-bound durable result and reject substituted artifacts", async () => {

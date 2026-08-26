@@ -176,6 +176,26 @@ export interface ContainmentInspectionSummary {
   readonly hookFailures: readonly string[];
   readonly uncontrolledPaths: readonly string[];
 }
+export interface ExtensionCouncilAssignment { readonly sessionId: string; readonly paths: readonly string[]; readonly resources: readonly string[]; }
+export interface ExtensionCouncilRecommendation {
+  readonly id: string;
+  readonly digest: string;
+  readonly reportId: string;
+  readonly reportDigest: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participantSessionIds: readonly string[];
+  readonly assignments: Readonly<Record<string, ExtensionCouncilAssignment>>;
+  readonly reviewScopeDigest: string;
+  readonly preparationOperationId: string;
+  readonly ready: boolean;
+  readonly status: "prepared" | "approved" | "rejected";
+  readonly approvalOperationId?: string;
+  readonly rejectionReason?: string;
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
 export interface HardwareSignalClaim { readonly signalId: string; readonly claimToken: string; readonly deviceId: string; readonly connectionEpoch: number; readonly bootNonce: number; readonly counter: number; readonly control: B122Control; readonly modifier: B122Modifier; readonly acceptedAt: string; readonly claimedAt: string; readonly attempt: number; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
 export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
 export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
@@ -281,6 +301,7 @@ export interface ExtensionCompanionBridge {
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
   inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>>;
   releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
+  approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>>;
   installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
@@ -379,6 +400,18 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
     return { ok: true, value: result.value.command };
+  }
+
+  async approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>> {
+    const result = await this.call<unknown>("council.recommendation.approve", input);
+    if (!result.ok) return result;
+    const recommendation = isRecord(result.value) && exactKeys(result.value, ["recommendation"]) ? result.value.recommendation : undefined;
+    if (!isExtensionCouncilRecommendation(recommendation)
+      || recommendation.id !== input.recommendationId || recommendation.digest !== input.recommendationDigest
+      || recommendation.repositoryRoot !== input.repositoryRoot || recommendation.targetSnapshotId !== input.targetSnapshotId
+      || recommendation.approvalOperationId !== input.approvalOperationId || recommendation.status !== "approved"
+      || recommendation.executionAuthorized !== false) return invalidResponse();
+    return { ok: true, value: recommendation };
   }
 
   async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<BridgeResult<PreparedCommand>> {
@@ -760,6 +793,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   inspectContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  approveCouncilRecommendation(): Promise<BridgeResult<ExtensionCouncilRecommendation>> { return this.unavailable(); }
   installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return this.unavailable(); }
@@ -879,6 +913,38 @@ function isContainmentInspection(value: unknown, expectedSessionId: string): val
     hookNames.add(hook.name);
   }
   return hookNames.has("credential_lease_revocation") && hookNames.has("queued_operation_cancellation");
+}
+
+function isExtensionCouncilRecommendation(value: unknown): value is ExtensionCouncilRecommendation {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["id", "digest", "reportId", "reportDigest", "repositoryRoot", "targetSnapshotId", "participantSessionIds", "assignments", "reviewScopeDigest", "preparationOperationId", "ready", "status", "executionAuthorized", "createdAt", "updatedAt"],
+    ["approvalOperationId", "rejectionReason"])
+    || !reference(value.id) || !digestText(value.digest) || value.reportId !== `council-report:${String(value.reportDigest)}` || !digestText(value.reportDigest)
+    || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId)
+    || !Array.isArray(value.participantSessionIds) || value.participantSessionIds.length < 1 || value.participantSessionIds.length > 64
+    || !value.participantSessionIds.every(reference) || new Set(value.participantSessionIds).size !== value.participantSessionIds.length
+    || !isRecord(value.assignments) || Object.keys(value.assignments).length > 64
+    || !Object.entries(value.assignments).every(([sessionId, assignment]) => Array.isArray(value.participantSessionIds) && value.participantSessionIds.includes(sessionId) && isCouncilAssignment(assignment, sessionId))
+    || !digestText(value.reviewScopeDigest) || !reference(value.preparationOperationId) || typeof value.ready !== "boolean"
+    || !["prepared", "approved", "rejected"].includes(value.status as string) || value.executionAuthorized !== false
+    || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || (value.approvalOperationId !== undefined && !reference(value.approvalOperationId))
+    || (value.rejectionReason !== undefined && !contentText(value.rejectionReason, 2_048))) return false;
+  if (value.ready !== (Object.keys(value.assignments).length === value.participantSessionIds.length)) return false;
+  if (value.status === "approved" && value.approvalOperationId === undefined) return false;
+  if (value.status !== "approved" && value.approvalOperationId !== undefined) return false;
+  return true;
+}
+
+function isCouncilAssignment(value: unknown, expectedSessionId: string): value is ExtensionCouncilAssignment {
+  return isRecord(value) && exactKeys(value, ["sessionId", "paths", "resources"])
+    && value.sessionId === expectedSessionId && reference(value.sessionId)
+    && Array.isArray(value.paths) && value.paths.length <= 128 && value.paths.every(councilDetail)
+    && Array.isArray(value.resources) && value.resources.length <= 128 && value.resources.every(councilDetail);
+}
+
+function councilDetail(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\r\n\0]/.test(value);
 }
 
 function isAcceptanceTrust(value: unknown): value is AcceptanceTrustSummary {

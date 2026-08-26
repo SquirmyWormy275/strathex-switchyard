@@ -19,6 +19,7 @@ import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./ra
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import type { GateEvidence } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import type { WorkflowContextReview } from "../../../packages/control-plane/src/runtime.ts";
+import type { CouncilRecommendation } from "../../../packages/control-plane/src/council.ts";
 import type { AcceptanceAdministration, HighConsequenceActivation, InstalledAcceptanceTrust } from "./acceptance-administration.ts";
 import type { InstalledScannerFixture, InstalledScannerFixtureTrust, ScannerFixtureAdministration } from "./scanner-fixtures.ts";
 import { providerIds, type AttestedProviderDesktopRegistry, type ProviderId, type ProviderInstallation } from "./provider-desktop.ts";
@@ -52,6 +53,7 @@ import {
   type NetworkPolicyInstallPayload,
   type CouncilPortProxyPayload,
   type CouncilCredentialNetworkPayload,
+  type CouncilRecommendationApprovalPayload,
   type AdministrationSourcePayload,
   type AcceptanceTrustRevokePayload,
   type AcceptanceEvidenceInvalidatePayload,
@@ -107,6 +109,10 @@ export interface ConfirmationCapableMediatedCommandExecutor extends MediatedComm
 
 export interface CommandPreparationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
   prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>>;
+}
+
+export interface CouncilReviewCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  approveCouncilRecommendation(input: CouncilRecommendationApprovalPayload): Promise<CouncilRecommendation>;
 }
 
 export interface HostActionCompletionRecord {
@@ -309,6 +315,8 @@ export class CompanionService {
           return this.success(request.id, { receipt: await this.direct(context, (signal) => this.activateCouncilPortProxy(this.requireCouncilPortProxy(request.payload), signal)) });
         case "council.credential-network.execute":
           return this.success(request.id, { receipt: await this.direct(context, (signal) => this.executeCouncilCredentialNetwork(this.requireCouncilCredentialNetwork(request.payload), signal)) });
+        case "council.recommendation.approve":
+          return this.success(request.id, { recommendation: await this.approveCouncilRecommendation(this.requireCouncilRecommendationApproval(request.payload)) });
         case "acceptance.trust.install": return this.success(request.id, { trust: await this.direct(context, (signal) => this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation"), signal)) });
         case "acceptance.trust.list": return this.success(request.id, { trust: await this.direct(context, (signal) => this.listAcceptanceTrust(request.payload, signal)) });
         case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.direct(context, (signal) => this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload), signal)) });
@@ -869,6 +877,38 @@ export class CompanionService {
       throw new CompanionServiceError("invalid_request", "Council credentialed network execution requires only exact bounded broker fields.");
     }
     return payload as unknown as CouncilCredentialNetworkPayload;
+  }
+
+  private requireCouncilRecommendationApproval(payload: unknown): CouncilRecommendationApprovalPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload,
+      ["recommendationId", "recommendationDigest", "approvalOperationId", "repositoryRoot", "targetSnapshotId"], ["sessionId"])
+      || !boundedReferenceValue(payload.recommendationId)
+      || typeof payload.recommendationDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.recommendationDigest)
+      || typeof payload.approvalOperationId !== "string" || !/^council-review:[A-Za-z0-9._:-]{1,192}$/.test(payload.approvalOperationId)
+      || !boundedHostPath(payload.repositoryRoot)
+      || !boundedReferenceValue(payload.targetSnapshotId)
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) {
+      throw new CompanionServiceError("invalid_request", "Council recommendation approval requires one exact bounded artifact, digest, distinct review operation, repository, target, and optional session binding.");
+    }
+    return {
+      recommendationId: payload.recommendationId,
+      recommendationDigest: payload.recommendationDigest,
+      approvalOperationId: payload.approvalOperationId,
+      repositoryRoot: payload.repositoryRoot,
+      targetSnapshotId: payload.targetSnapshotId,
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {})
+    };
+  }
+
+  private async approveCouncilRecommendation(payload: CouncilRecommendationApprovalPayload): Promise<CouncilRecommendation> {
+    const executor = this.executor as Partial<CouncilReviewCapableMediatedCommandExecutor> | undefined;
+    if (!executor?.approveCouncilRecommendation) throw new CompanionServiceError("capability_denied", "No durable Council recommendation review boundary is attached.");
+    const recommendation = await executor.approveCouncilRecommendation(payload);
+    if (recommendation.id !== payload.recommendationId || recommendation.digest !== payload.recommendationDigest
+      || recommendation.repositoryRoot !== payload.repositoryRoot || recommendation.targetSnapshotId !== payload.targetSnapshotId
+      || recommendation.status !== "approved" || recommendation.approvalOperationId !== payload.approvalOperationId
+      || recommendation.executionAuthorized !== false) throw new CompanionServiceError("capability_denied", "Council recommendation review returned a mismatched or authorizing artifact.");
+    return recommendation;
   }
   private async activateCouncilPortProxy(payload: CouncilPortProxyPayload, signal?: AbortSignal) {
     if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");

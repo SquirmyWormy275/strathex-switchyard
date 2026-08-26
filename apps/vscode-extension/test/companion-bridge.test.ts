@@ -184,6 +184,43 @@ test("containment IPC rejects a mismatched session, incomplete hook inventory, o
   }
 });
 
+test("Council recommendation approval exact-parses the immutable digest binding and rejects forged authority", async () => {
+  const input = {
+    recommendationId: "recommendation-1", recommendationDigest: "a".repeat(64), approvalOperationId: "council-review:vscode-1",
+    repositoryRoot: "C:/isolated/repo", targetSnapshotId: "c".repeat(64), sessionId: session.id
+  };
+  let corrupt: "none" | "authority" | "assignment" = "none";
+  const seen: unknown[] = [];
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      seen.push({ method: request.method, payload: request.payload });
+      const recommendation = {
+        id: input.recommendationId, digest: input.recommendationDigest, reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
+        repositoryRoot: input.repositoryRoot, targetSnapshotId: input.targetSnapshotId, participantSessionIds: [session.id],
+        assignments: corrupt === "assignment"
+          ? { substituted: { sessionId: "substituted", paths: ["src/safe.ts"], resources: ["port:45100"] } }
+          : { [session.id]: { sessionId: session.id, paths: ["src/safe.ts"], resources: ["port:45100"] } },
+        reviewScopeDigest: "d".repeat(64), preparationOperationId: "operation-prepare", ready: true, status: "approved",
+        approvalOperationId: input.approvalOperationId, executionAuthorized: corrupt === "authority", createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:01:00.000Z"
+      };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { recommendation } });
+    }
+  }, "council-review-vscode");
+
+  const approved = await bridge.approveCouncilRecommendation(input);
+  assert.ok(approved.ok && approved.value.status === "approved" && approved.value.executionAuthorized === false);
+  assert.deepEqual(seen[0], { method: "council.recommendation.approve", payload: input });
+  corrupt = "authority";
+  const forged = await bridge.approveCouncilRecommendation(input);
+  assert.equal(forged.ok, false);
+  if (!forged.ok) assert.equal(forged.code, "invalid_response");
+  corrupt = "assignment";
+  const crossParticipant = await bridge.approveCouncilRecommendation(input);
+  assert.equal(crossParticipant.ok, false);
+  if (!crossParticipant.ok) assert.equal(crossParticipant.code, "invalid_response");
+});
+
 test("credential IPC carries exact scope triples and rejects a broadened durable receipt", async () => {
   const scopes = [
     { repositoryRoot: "C:/isolated/repo", adapterId: "configured-network", purpose: "provider-api" },

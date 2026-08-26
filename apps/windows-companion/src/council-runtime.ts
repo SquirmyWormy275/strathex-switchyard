@@ -4,8 +4,8 @@ import type { BrokerOutcome } from "../../../packages/control-plane/src/brokers.
 import type { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CouncilExecutor } from "../../../packages/control-plane/src/dispatch.ts";
-import { CouncilCoordinator, type CouncilEpoch, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
-import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
+import { CouncilCoordinator, type CouncilEpoch, type CouncilParticipant, type CouncilRecommendation, type CouncilReportArtifact } from "../../../packages/control-plane/src/council.ts";
+import type { ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { ProviderCommandTransport } from "./remote-adapters.ts";
@@ -64,15 +64,20 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   async execute(request: CouncilRequest): Promise<BrokerOutcome> {
     const participants = await this.participants(request);
     if (!participants.length) return { status: "unavailable", summary: "Council found no fresh Observable session bound to the exact TargetSnapshot.", effectDisposition: "not_started" };
-    const report = await this.council.report({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
-    if (request.action === "council_report") return reportOutcome(report, "Collected a durable Council report from every fresh exact-target Observable session.");
+    if (request.action === "council_report") {
+      try {
+        const report = await this.council.createReport({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
+        return reportOutcome(report, "Collected a durable Council report from every fresh exact-target Observable session.");
+      } catch (error) {
+        return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council report detail could not be bounded and persisted."), effectDisposition: "not_started" };
+      }
+    }
     if (request.action === "council_recommend") {
       try {
-        const prepared = await this.council.prepareRecommendation({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants });
-        const approved = await this.council.approveRecommendation(prepared.id, request.operationId);
-        return { status: "completed", summary: "Durably prepared and approved one exact-target Council recommendation; no participant was resumed or mutated.", effectDisposition: "committed", data: { recommendationId: approved.id, recommendationDigest: approved.digest, status: approved.status, participants: approved.participantSessionIds.length, executionAuthorized: approved.executionAuthorized } };
+        const prepared = await this.council.prepareRecommendation({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants }, request.operationId);
+        return { status: "completed", summary: "Durably prepared one exact-target Council recommendation for a separate exact-digest operator review; no participant was resumed or mutated.", effectDisposition: "committed", data: recommendationOutcome(prepared) };
       } catch (error) {
-        return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council recommendation could not be approved."), effectDisposition: "not_started" };
+        return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council recommendation could not be prepared."), effectDisposition: "not_started" };
       }
     }
     if (!this.network) return { status: "unavailable", summary: "Automatic Council requires configured exact-route provider adapters.", effectDisposition: "not_started" };
@@ -145,6 +150,32 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       durableControl?.dispose();
       activeExecution?.finish();
     }
+  }
+
+  /** Separate read-review acknowledgement; it never dispatches or grants execution. */
+  async approveRecommendation(input: Readonly<{
+    recommendationId: string;
+    recommendationDigest: string;
+    approvalOperationId: string;
+    target: TargetSnapshot;
+    session?: ManagedSession;
+  }>): Promise<CouncilRecommendation> {
+    const participants = await this.participants({
+      action: "council_recommend",
+      operationId: input.approvalOperationId,
+      target: input.target,
+      ...(input.session ? { session: input.session } : {}),
+      permit: {} as CouncilRequest["permit"]
+    });
+    if (!participants.length) throw new Error("Council recommendation approval found no fresh exact-target Observable participant.");
+    return this.council.approveRecommendation({
+      recommendationId: input.recommendationId,
+      recommendationDigest: input.recommendationDigest,
+      approvalOperationId: input.approvalOperationId,
+      repositoryRoot: input.target.repositoryRoot,
+      targetSnapshotId: input.target.id,
+      participants
+    });
   }
 
   /** Aborts and joins only live transports for one repository, then fences its durable epochs for cleanup. */
@@ -305,7 +336,43 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   }
 }
 
-function reportOutcome(report: Awaited<ReturnType<CouncilCoordinator["report"]>>, summary: string): BrokerOutcome { return { status: "completed", summary, effectDisposition: "committed", data: { participants: report.participants.length, atomic: report.atomic, pathConflicts: report.pathConflicts.length, resourceConflicts: report.resourceConflicts.length, dependencyConflicts: report.dependencyConflicts.length } }; }
+function reportOutcome(report: CouncilReportArtifact, summary: string): BrokerOutcome {
+  return {
+    status: "completed",
+    summary,
+    effectDisposition: "committed",
+    data: {
+      reportId: report.id,
+      reportDigest: report.digest,
+      repositoryRoot: report.repositoryRoot,
+      targetSnapshotId: report.targetSnapshotId,
+      collectedAt: report.collectedAt,
+      participants: report.participants.length,
+      participantDetails: report.participants,
+      atomic: report.atomic,
+      pathConflicts: report.pathConflicts,
+      resourceConflicts: report.resourceConflicts,
+      dependencyConflicts: report.dependencyConflicts,
+      executionAuthorized: false
+    }
+  };
+}
+function recommendationOutcome(value: CouncilRecommendation): Readonly<Record<string, unknown>> {
+  return {
+    recommendationId: value.id,
+    recommendationDigest: value.digest,
+    reportId: value.reportId,
+    reportDigest: value.reportDigest,
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participantSessionIds: value.participantSessionIds,
+    assignments: value.assignments,
+    ready: value.ready,
+    status: value.status,
+    createdAt: value.createdAt,
+    executionAuthorized: false
+  };
+}
 function declarations(session: ManagedSession, key: string): readonly string[] { const raw = session.metadata[key]; if (!raw) return []; try { const value: unknown = JSON.parse(raw); return Array.isArray(value) && value.length <= 128 && value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 256 && !/[\r\n\0]/.test(item)) ? [...new Set(value)] : []; } catch { return []; } }
 function trustedDiff(session: ManagedSession): string | undefined { const value = session.metadata["sxsy-b122.diffDigest"]; return value && /^[a-f0-9]{64}$/i.test(value) ? value : undefined; }
 function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string; assignmentDigest?: string; resourceHostDigest?: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } const expectedKeys = expected.assignmentDigest ? 9 : 7; if (!record(value) || Object.keys(value).length !== expectedKeys || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true || (expected.assignmentDigest !== undefined && value.assignmentDigest !== expected.assignmentDigest) || (expected.resourceHostDigest !== undefined && value.resourceHostDigest !== expected.resourceHostDigest)) return false; return true; }

@@ -46,6 +46,7 @@ export type CompanionMethod =
   | "network-policy.revoke"
   | "council.port-proxy.activate"
   | "council.credential-network.execute"
+  | "council.recommendation.approve"
   | "acceptance.trust.install"
   | "acceptance.trust.list"
   | "acceptance.trust.revoke"
@@ -206,6 +207,15 @@ export interface CouncilCredentialNetworkPayload {
   readonly routeId: string;
 }
 
+export interface CouncilRecommendationApprovalPayload {
+  readonly recommendationId: string;
+  readonly recommendationDigest: string;
+  readonly approvalOperationId: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId?: string;
+}
+
 export interface CommandPreparationPayload {
   readonly control: Control;
   readonly modifier: Modifier;
@@ -350,7 +360,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
     "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke",
-    "council.port-proxy.activate", "council.credential-network.execute",
+    "council.port-proxy.activate", "council.credential-network.execute", "council.recommendation.approve",
     "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
     "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
     "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
