@@ -1,5 +1,5 @@
 import type { Capability, EffectDisposition, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
-import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { commandActionIds, commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import {
   parseWorkflowProviderResponse,
@@ -134,12 +134,15 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
   async execute(request: ProviderGatewayCommand, signal: AbortSignal): Promise<ProviderGatewayCommandResult> {
     this.exactProvider(request.provider);
     if (this.port.diagnosticOnly === true) throw new Error("The credential-free fixture is health/protocol diagnostic only.");
+    const requiredCapabilities = providerEffectCapabilityFloor(request.kind, request.action);
+    const expectedRoute = `${request.kind === "workflow" ? "provider" : "automation"}.${request.action}`;
+    if (request.routeId !== expectedRoute) throw new Error("The provider effect route does not match its exact catalog action.");
     const exactSession = sessionRequest(request);
     const before = await this.port.observeSession(exactSession, signal);
-    requireExecutionSession(before, exactSession, this.mediationAttestedForTests, "before");
+    requireExecutionSession(before, exactSession, this.mediationAttestedForTests, requiredCapabilities, "before");
     const response = await this.port.execute(request, signal);
     const after = await this.port.observeSession(exactSession, signal);
-    requireExecutionSession(after, exactSession, this.mediationAttestedForTests, "after");
+    requireExecutionSession(after, exactSession, this.mediationAttestedForTests, requiredCapabilities, "after");
     if (before.adapterVersion !== after.adapterVersion) throw new Error("The provider adapter identity changed during execution.");
     validateCommandResponse(request, response);
     return response;
@@ -233,6 +236,33 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
   private exactProvider(provider: ProviderGatewayProvider): void {
     if (provider !== this.provider) throw new Error("The provider runtime changed identity.");
   }
+}
+
+const capabilityOrder = ["registered", "observable", "controllable", "mediated"] as const satisfies readonly Capability[];
+
+/**
+ * Derive the provider-host capability floor from the closed 65-command
+ * catalog. Mediated is hierarchical and therefore requires all four host-
+ * truthful capabilities; advisory actions retain their smaller exact floor.
+ */
+export function providerEffectCapabilityFloor(kind: "workflow" | "automation", action: unknown): readonly Capability[] {
+  if (!commandAction(action)) throw new Error(`The provider ${kind} action is not in the closed command catalog.`);
+  const definition = commandForAction(action);
+  const expectedExecutor = kind === "workflow" ? "agent" : "automation";
+  if (definition.executor !== expectedExecutor) throw new Error(`The provider ${kind} action has the wrong catalog executor.`);
+
+  const required = new Set<Capability>(["registered"]);
+  for (const capability of definition.requiresCapabilities) {
+    required.add("registered");
+    if (capability === "observable") required.add("observable");
+    if (capability === "controllable") required.add("controllable");
+    if (capability === "mediated") {
+      required.add("observable");
+      required.add("controllable");
+      required.add("mediated");
+    }
+  }
+  return Object.freeze(capabilityOrder.filter((capability) => required.has(capability)));
 }
 
 export class ClaudeProviderAdapterBackend extends ExactProviderAdapterBackend {
@@ -483,13 +513,14 @@ function requireExecutionSession(
   observed: ProviderRuntimeSessionObservation,
   request: ProviderGatewaySessionObservationRequest,
   mediationAttested: boolean,
+  requiredCapabilities: readonly Capability[],
   when: "before" | "after"
 ): void {
   requireSessionBinding(observed, request);
   const capabilities = truthfulCapabilities(observed.capabilities, mediationAttested);
   if (observed.status !== "running" || !safeAdapterVersion(observed.adapterVersion)
-    || !["registered", "observable", "controllable", "mediated"].every((capability) => capabilities.includes(capability as Capability))) {
-    throw new Error(`Provider execution requires one fresh, running, Controllable, and Mediated exact session ${when} dispatch.`);
+    || !requiredCapabilities.every((capability) => capabilities.includes(capability))) {
+    throw new Error(`Provider execution requires one fresh, running exact session with ${requiredCapabilities.join(", ")} ${when} dispatch.`);
   }
 }
 

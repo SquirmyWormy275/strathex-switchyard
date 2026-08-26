@@ -11,8 +11,10 @@ import {
   ClaudeProviderAdapterBackend,
   CodexProviderAdapterBackend,
   FixtureProviderRuntimePort,
+  providerEffectCapabilityFloor,
   type ProviderRuntimePort
 } from "../src/backends.ts";
+import type { ProviderGatewayCommand } from "../../windows-companion/src/provider-gateway.ts";
 import { signProviderDispatchLease } from "../src/dispatch-lease.ts";
 import { ProviderAdapterHostService } from "../src/service.ts";
 import { createProviderHostStore } from "../src/state.ts";
@@ -270,6 +272,25 @@ function backendAutomationCommand(operationId: string) {
   };
 }
 
+function backendWorkflowCommand(action: "proof" | "plan_approval", operationId: string): ProviderGatewayCommand {
+  const body = action === "proof" ? workflow(operationId) : planApprovalWorkflow(operationId);
+  const executionAuthorization = "executionAuthorization" in body ? body.executionAuthorization : undefined;
+  return {
+    kind: "workflow",
+    routeId: `provider.${action}`,
+    operationId,
+    externalId: operationId,
+    action,
+    repositoryRoot: body.target.repositoryRoot,
+    targetSnapshotId: body.target.id,
+    sessionId: body.session.id,
+    provider: body.session.provider,
+    authorityId: body.authorityId,
+    artifact: body.artifact,
+    ...(executionAuthorization ? { executionAuthorization } : {})
+  } as ProviderGatewayCommand;
+}
+
 function councilResourceHost(fenceDigest = "8".repeat(64), epochId = "epoch-1") {
   const resource = { leaseId: "lease-1", kind: "port", fence: 1, declaration: "port:4100", bindingType: "loopback-listener", value: "4100", environmentName: "SXSY_COUNCIL_PORT_1" };
   const unsigned = {
@@ -359,8 +380,13 @@ test("effect routes require one exact single-use companion dispatch lease and cl
   assert.equal((await service.handle(exactRequest)).status, 200);
   assert.equal(codex.executeCalls, 1);
   const replay = await service.handle(exactRequest);
-  assert.equal(replay.status, 409);
-  assert.equal((replay.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(replay.status, 503);
+  assert.equal((replay.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(codex.executeCalls, 1);
+
+  const freshLeaseReplay = await service.handle(request("/v1/b122/automation/compound_capture", body));
+  assert.equal(freshLeaseReplay.status, 503);
+  assert.equal((freshLeaseReplay.body as { effectDisposition: string }).effectDisposition, "ambiguous");
   assert.equal(codex.executeCalls, 1);
 
   const crossBoundBody = automation("operation-cross-bound");
@@ -422,6 +448,22 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
   const connected = await service.handle(request("/v1/b122/handshake/codex", handshake()));
   assert.equal(connected.status, 200);
   assert.deepEqual((connected.body as { capabilities: string[] }).capabilities, ["registered", "observable", "controllable"]);
+
+  const controller = new AbortController();
+  const externalBackend = new CodexProviderAdapterBackend(dishonest, { adapterId: "test.module.codex", moduleSha256: "e".repeat(64) });
+  await externalBackend.handshake(handshake(), controller.signal);
+  const advisory = await externalBackend.execute(backendWorkflowCommand("proof", "operation-unattested-proof"), controller.signal);
+  assert.equal((advisory as { action: string }).action, "proof");
+  assert.equal(source.executeCalls, 1, "an Observable advisory action remains reachable through a digest-pinned module");
+  await assert.rejects(
+    externalBackend.execute(backendWorkflowCommand("plan_approval", "operation-unattested-plan"), controller.signal),
+    /Mediated|capabilit/i
+  );
+  await assert.rejects(
+    externalBackend.execute(backendAutomationCommand("operation-unattested-automation"), controller.signal),
+    /Mediated|capabilit/i
+  );
+  assert.equal(source.executeCalls, 1, "Mediated actions must not reach an externally attested module");
   const blockedCouncil = await service.handle(request("/v1/b122/council/codex", {
     schema: "sxsy-b122.council-phase", version: 1, epochId: "unattested", phase: "pause",
     sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo"
@@ -430,7 +472,23 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
   assert.deepEqual(source.councilPhases, []);
 });
 
-test("provider execution requires a fresh host-attested Mediated session before calling the module", async (context) => {
+test("provider execution enforces the exact host-derived capability floor before calling the module", async (context) => {
+  for (const action of ["handoff", "handoff_queue", "handoff_immediate", "bind_voice_session"] as const) {
+    assert.deepEqual(providerEffectCapabilityFloor("workflow", action), ["registered"], action);
+  }
+  for (const action of ["proof", "proof_adversarial", "focus_blocked_agent", "focus_finished_agent"] as const) {
+    assert.deepEqual(providerEffectCapabilityFloor("workflow", action), ["registered", "observable"], action);
+  }
+  for (const action of ["reanchor", "option_provider", "option_packet", "plan_expander", "authority_refresh", "authority_broadcast"] as const) {
+    assert.deepEqual(providerEffectCapabilityFloor("workflow", action), ["registered", "controllable"], action);
+  }
+  assert.deepEqual(providerEffectCapabilityFloor("workflow", "plan_approval"), ["registered", "observable", "controllable", "mediated"]);
+  for (const action of ["compound_capture", "compound_refresh", "lfg", "repair_mission"] as const) {
+    assert.deepEqual(providerEffectCapabilityFloor("automation", action), ["registered", "observable", "controllable", "mediated"], action);
+  }
+  assert.throws(() => providerEffectCapabilityFloor("workflow", "compound_capture"), /executor|workflow/i);
+  assert.throws(() => providerEffectCapabilityFloor("automation", "proof"), /executor|automation/i);
+
   const controller = new AbortController();
   const externalSource = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true });
   const externalModule = {
@@ -448,7 +506,7 @@ test("provider execution requires a fresh host-attested Mediated session before 
   await externalBackend.handshake(handshake(), controller.signal);
   await assert.rejects(
     externalBackend.execute(backendAutomationCommand("operation-external-module"), controller.signal),
-    /fresh, running, Controllable, and Mediated/
+    /fresh, running.*registered.*mediated/i
   );
   assert.equal(externalSource.executeCalls, 0);
 
@@ -460,7 +518,7 @@ test("provider execution requires a fresh host-attested Mediated session before 
       port.setSessionObservation("codex-session", { status });
       await assert.rejects(
         backend.execute(backendAutomationCommand(`operation-${status}`), controller.signal),
-        /fresh, running, Controllable, and Mediated/
+        /fresh, running.*registered.*mediated/i
       );
       assert.equal(port.executeCalls, 0);
     });
@@ -479,7 +537,7 @@ test("provider execution requires a fresh host-attested Mediated session before 
       port.setSessionObservation("codex-session", { capabilities });
       await assert.rejects(
         backend.execute(backendAutomationCommand(`operation-capability-${capabilities.length}-${capabilities[0]}`), controller.signal),
-        /fresh, running, Controllable, and Mediated/
+        /fresh, running.*registered.*mediated/i
       );
       assert.equal(port.executeCalls, 0);
     });
@@ -501,17 +559,19 @@ test("provider execution rechecks the exact session after the module returns", a
   await backend.handshake(handshake(), controller.signal);
   await assert.rejects(
     backend.execute(backendAutomationCommand("operation-post-execution-stale"), controller.signal),
-    /fresh, running, Controllable, and Mediated/
+    /fresh, running.*registered.*mediated/i
   );
   assert.equal(port.executeCalls, 1);
 });
 
-test("operation IDs are restart-durable, exact-request idempotent, and conflict-safe", async (context) => {
+test("operation IDs are restart-durable, single-dispatch, and conflict-safe", async (context) => {
   const setup = await fixture(context);
   await setup.service.handle(request("/v1/b122/handshake/codex", handshake()));
   const first = await setup.service.handle(request("/v1/b122/automation/compound_capture", automation()));
   const duplicate = await setup.service.handle(request("/v1/b122/automation/compound_capture", automation()));
-  assert.deepEqual(duplicate.body, first.body);
+  assert.equal(first.status, 200);
+  assert.equal(duplicate.status, 503);
+  assert.equal((duplicate.body as { effectDisposition: string }).effectDisposition, "ambiguous");
   assert.equal(setup.codex.executeCalls, 1);
 
   const conflicting = automation();
@@ -527,7 +587,15 @@ test("operation IDs are restart-durable, exact-request idempotent, and conflict-
     now: () => fixedNow
   });
   const afterRestart = await restarted.handle(request("/v1/b122/automation/compound_capture", automation()));
-  assert.deepEqual(afterRestart.body, first.body);
+  assert.equal(afterRestart.status, 503);
+  assert.equal((afterRestart.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  const observed = await restarted.handle(request("/v1/b122/observe/operation/codex", {
+    schema: "sxsy-b122.provider-operation-observe", version: 1, operationId: "operation-automation-1",
+    externalId: "operation-automation-1", routeId: "automation.compound_capture", sessionId: "codex-session",
+    targetSnapshotId: target, repositoryRoot: "C:\\repo"
+  }));
+  assert.equal(observed.status, 200);
+  assert.equal((observed.body as { outcome: string }).outcome, "committed");
   assert.equal(setup.codex.executeCalls, 1);
 });
 
@@ -552,8 +620,8 @@ test("Council phases are ordered, exact, durable, observable, and cancellable", 
   const base = { schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-1", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo" };
   const resourceHost = councilResourceHost();
   const early = await service.handle(request("/v1/b122/council/codex", { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: [], resourceHost }));
-  assert.equal(early.status, 503);
-  assert.equal((early.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(early.status, 409);
+  assert.equal((early.body as { effectDisposition: string }).effectDisposition, "not_started");
   const pause = await service.handle(request("/v1/b122/council/codex", { ...base, phase: "pause" }));
   assert.equal(pause.status, 200);
   const secretResourceHost = councilCredentialResourceHost("sk-live-secret");
@@ -573,8 +641,8 @@ test("Council phases are ordered, exact, durable, observable, and cancellable", 
   const staleResourceHost = councilResourceHost("9".repeat(64));
   const staleResume = { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: assignment.leases, resourceHost: staleResourceHost };
   const staleResumeResult = await service.handle(request("/v1/b122/council/codex", staleResume));
-  assert.equal(staleResumeResult.status, 503);
-  assert.equal((staleResumeResult.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(staleResumeResult.status, 409);
+  assert.equal((staleResumeResult.body as { effectDisposition: string }).effectDisposition, "not_started");
   const resume = { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: assignment.leases, resourceHost };
   assert.equal((await service.handle(request("/v1/b122/council/codex", resume))).status, 200);
   assert.deepEqual(codex.councilPhases, ["pause", "assignment", "resume"]);
@@ -726,7 +794,9 @@ test("an ambiguous Council acknowledgement reconciles after restart without repl
   });
   const receipt = await restarted.reconcile();
   assert.deepEqual(receipt, { operationsInspected: 0, operationsSettled: 0, councilsInspected: 1, councilsSettled: 1 });
-  assert.equal((await restarted.handle(request("/v1/b122/council/codex", pauseRequest))).status, 200);
+  const replay = await restarted.handle(request("/v1/b122/council/codex", pauseRequest));
+  assert.equal(replay.status, 503);
+  assert.equal((replay.body as { effectDisposition: string }).effectDisposition, "ambiguous");
   assert.deepEqual(setup.codex.councilPhases, ["pause"]);
 });
 

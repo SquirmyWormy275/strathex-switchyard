@@ -78,6 +78,26 @@ test("dispatch leases are exact, cross-bound, atomically single-use, and restart
     authenticationKey: leaseKey, store: createProviderHostStore(stateFile, "9".repeat(64)), host, now: () => now
   });
   await assert.rejects(() => restarted.consume(signed, expectation()), /consumed|replay/i);
+
+  const freshLeaseForConsumedOperation = signProviderDispatchLease({
+    ...unsigned("1".repeat(64)), leaseId: "lease-provider-proof-retry"
+  }, leaseKey);
+  await assert.rejects(
+    () => restarted.consume(freshLeaseForConsumedOperation, expectation()),
+    /operation|consumed|replay/i,
+    "a fresh lease must not replay an already-consumed provider, route, and operation identity after restart"
+  );
+
+  const distinctOperationUnsigned = {
+    ...unsigned("2".repeat(64)),
+    leaseId: "lease-provider-proof-distinct",
+    dispatch: { routeId: "provider.proof", action: "proof", operationId: "operation-proof-2" }
+  } as const;
+  const distinctOperation = await restarted.consume(
+    signProviderDispatchLease(distinctOperationUnsigned, leaseKey),
+    expectation({ operationId: "operation-proof-2" })
+  );
+  assert.equal(distinctOperation.dispatch.operationId, "operation-proof-2");
 });
 
 test("dispatch leases reject expiry, future issuance, host churn, target churn, and cross-module reuse before consumption", async (context) => {
@@ -103,11 +123,12 @@ test("concurrent consumers cannot both cross the durable single-use boundary", a
   context.after(async () => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
   const store = createProviderHostStore(join(root, "state.jsonl"), "9".repeat(64));
   const authority = new ProviderDispatchLeaseAuthority({ authenticationKey: leaseKey, store, host, now: () => now });
-  const signed = signProviderDispatchLease(unsigned("5".repeat(64)), leaseKey);
+  const first = signProviderDispatchLease({ ...unsigned("5".repeat(64)), leaseId: "lease-provider-proof-race-a" }, leaseKey);
+  const second = signProviderDispatchLease({ ...unsigned("6".repeat(64)), leaseId: "lease-provider-proof-race-b" }, leaseKey);
 
-  const results = await Promise.allSettled([authority.consume(signed, expectation()), authority.consume(signed, expectation())]);
+  const results = await Promise.allSettled([authority.consume(first, expectation()), authority.consume(second, expectation())]);
   assert.deepEqual(results.map((result) => result.status).sort(), ["fulfilled", "rejected"]);
-  assert.match(String((results.find((result) => result.status === "rejected") as PromiseRejectedResult).reason), /consumed|replay/i);
+  assert.match(String((results.find((result) => result.status === "rejected") as PromiseRejectedResult).reason), /operation|consumed|replay/i);
   assert.equal((await store.readEntries()).filter((entry) => entry.kind === "provider-host.dispatch-lease-consumed").length, 1);
 });
 

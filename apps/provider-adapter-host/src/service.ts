@@ -8,13 +8,15 @@ import {
   type AuthenticatedProviderGatewayClient,
   type ProviderGatewayProvider
 } from "../../windows-companion/src/provider-gateway.ts";
-import type {
-  ProviderAdapterBackend,
-  ProviderRuntimeWorkflowContextRequest,
-  ProviderWorkflowContextObservation
+import {
+  providerEffectCapabilityFloor,
+  type ProviderAdapterBackend,
+  type ProviderRuntimeWorkflowContextRequest,
+  type ProviderWorkflowContextObservation
 } from "./backends.ts";
 import {
   ProviderDispatchLeaseAuthority,
+  ProviderDispatchLeaseReplayError,
   type ProviderDispatchLeaseArtifactBinding,
   type ProviderDispatchLeaseExpectation,
   type ProviderDispatchLeaseHostIdentity,
@@ -298,9 +300,11 @@ export class ProviderAdapterHostService {
       || document.schema !== "sxsy-b122.remote-automation" || document.version !== 1)) {
       return errorResponse(400, "The provider automation command contains an unknown or missing field.");
     }
+    const effectKind = routeId.startsWith("provider.") ? "workflow" as const : "automation" as const;
+    const requiredCapabilities = providerEffectCapabilityFloor(effectKind, document.action);
     const current = await this.exactSession(session.id, session.provider, String(target.id), target.repositoryRoot);
-    if (!current || current.status !== "running" || !current.capabilities.includes("mediated") || !current.capabilities.includes("controllable")) {
-      return errorResponse(409, "The exact provider session is not current, running, Controllable, and Mediated.");
+    if (!current || current.status !== "running" || !requiredCapabilities.every((capability) => current.capabilities.includes(capability))) {
+      return errorResponse(409, `The exact provider session is not current, running, or missing its ${requiredCapabilities.join(", ")} capability floor.`);
     }
     const backend = this.backends.get(session.provider);
     if (!backend) return errorResponse(503, "The exact provider backend is unavailable.");
@@ -309,6 +313,7 @@ export class ProviderAdapterHostService {
     const expectation = gatewayLeaseExpectation(routeId, document, current, backend.dispatchIdentity);
     try { await this.dispatchLeases.consume(lease, expectation, { signal, onCommitStart: () => progress.markAmbiguous() }); }
     catch (error) {
+      if (error instanceof ProviderDispatchLeaseReplayError) progress.markAmbiguous();
       if (dispatchLeaseConflict(error)) throw new DispatchLeaseConflictError();
       throw error;
     }
@@ -451,8 +456,13 @@ export class ProviderAdapterHostService {
       authorityId, target: { id: request.targetSnapshotId, repositoryRoot: request.repositoryRoot },
       session: leaseSession(current, provider), artifact, confirmation: null, module: backend.dispatchIdentity
     };
+    // Reject prerequisites that prove the Council phase cannot start before
+    // consuming its one-shot effect identity. The transactional check below is
+    // repeated after lease consumption to close concurrent phase churn.
+    requireCouncilOrder(await readCouncilPhases(this.store), request);
     try { await this.dispatchLeases.consume(dispatchLease, expectation, { signal, onCommitStart: () => progress.markAmbiguous() }); }
     catch (error) {
+      if (error instanceof ProviderDispatchLeaseReplayError) progress.markAmbiguous();
       if (dispatchLeaseConflict(error)) throw new DispatchLeaseConflictError();
       throw error;
     }

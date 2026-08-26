@@ -110,6 +110,15 @@ export interface ProviderDispatchLeaseConsumeOptions {
 }
 
 /**
+ * The lease or its exact provider/route/operation effect identity has already
+ * crossed the durable consume boundary. Callers must treat this as ambiguous:
+ * the earlier effect may have started and must never be forwarded again.
+ */
+export class ProviderDispatchLeaseReplayError extends Error {
+  constructor() { super("The provider dispatch lease or its exact provider, route, and operation identity was already consumed; replay is forbidden."); }
+}
+
+/**
  * Host-side verifier and single-use durable consumer. The key is independent
  * from both the HTTP bearer and the journal authenticator.
  */
@@ -143,7 +152,10 @@ export class ProviderDispatchLeaseAuthority {
       for (const entry of await transaction.readEntries()) {
         if (entry.kind !== providerDispatchLeaseEventKind) continue;
         const saved = parseConsumption(entry.payload);
-        if (saved.leaseId === lease.leaseId || saved.nonce === lease.nonce) throw new Error("The provider dispatch lease was already consumed; replay is forbidden.");
+        if (saved.leaseId === lease.leaseId || saved.nonce === lease.nonce
+          || (saved.provider === expected.provider && saved.routeId === expected.routeId && saved.operationId === expected.operationId)) {
+          throw new ProviderDispatchLeaseReplayError();
+        }
       }
       if (options.signal?.aborted) throw new Error("Provider dispatch-lease consumption was cancelled before its durable decision.");
       options.onCommitStart?.();
@@ -320,12 +332,18 @@ function requireExactBinding(lease: ProviderDispatchLeaseUnsigned, expected: Pro
   if (!exact) throw new Error("The provider dispatch lease does not match the exact authority, target, session, route, artifact, confirmation, host, or module binding.");
 }
 
-function parseConsumption(value: unknown): Readonly<{ leaseId: string; nonce: string }> {
+function parseConsumption(value: unknown): Readonly<{
+  leaseId: string;
+  nonce: string;
+  provider: "claude" | "codex";
+  routeId: string;
+  operationId: string;
+}> {
   if (!record(value) || !exactKeys(value, ["schema", "version", "leaseId", "nonce", "leaseDigest", "provider", "routeId", "operationId", "consumedAt"])
     || value.schema !== "sxsy-b122.provider-dispatch-lease-consumption" || value.version !== 1 || !safeIdentifier(value.leaseId)
     || !digest(value.nonce) || !digest(value.leaseDigest) || (value.provider !== "claude" && value.provider !== "codex")
     || !safeRoute(value.routeId) || !safeIdentifier(value.operationId) || !timestamp(value.consumedAt)) throw new Error("The protected provider dispatch-lease journal is malformed.");
-  return { leaseId: value.leaseId, nonce: value.nonce };
+  return { leaseId: value.leaseId, nonce: value.nonce, provider: value.provider, routeId: value.routeId, operationId: value.operationId };
 }
 
 function unsignedLease(value: ProviderDispatchLease): ProviderDispatchLeaseUnsigned {
