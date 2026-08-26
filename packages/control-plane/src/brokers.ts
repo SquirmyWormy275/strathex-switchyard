@@ -18,6 +18,17 @@ export interface BrokerOutcome {
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
+/** Dispatcher-minted proof that one exact reviewed confirmation was consumed. */
+export interface BrokerConfirmation {
+  readonly currentUserConfirmed: true;
+  readonly confirmationDigest: string;
+  readonly confirmationScopeDigest?: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
+}
+
 export interface BrokerInvocation {
   readonly action: CommandAction;
   readonly operationId: string;
@@ -25,6 +36,7 @@ export interface BrokerInvocation {
   readonly session?: ManagedSession;
   readonly authority?: AuthorityGrant;
   readonly permit?: PolicyPermit;
+  readonly confirmation?: BrokerConfirmation;
   /** Cooperative deadline/cancellation; real adapters must observe it before each external effect. */
   readonly executionControl?: ExecutionControl;
   /** Present only for a scoped composite dispatch; broker handlers must settle or leave it ambiguous. */

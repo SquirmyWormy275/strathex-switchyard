@@ -18,6 +18,7 @@ import { commandFor, commandForAction, type CommandAction, type CommandDefinitio
 import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
 import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { ChildOperationLease, ChildOperationSaga } from "./operations.ts";
+import type { CouncilRecommendation } from "./council.ts";
 import { PolicyEngine, type PolicyDecision, type PolicyPermit } from "./policy.ts";
 import { untrustedSummary } from "./redaction.ts";
 import type { ExecutionControl } from "./execution-control.ts";
@@ -39,6 +40,13 @@ export interface GitMutationFactory {
 export interface RepositoryRecipeLookup { forTarget(target: TargetSnapshot): RepositoryRecipe | undefined; }
 export interface CouncilExecutor {
   execute(request: Readonly<{ action: "council_report" | "council_automatic" | "council_recommend"; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl; effectGuard?: EffectGuard; childSaga?: ChildOperationSaga }>): Promise<BrokerOutcome>;
+  approveRecommendation?(request: Readonly<{
+    recommendationId: string;
+    recommendationDigest: string;
+    approvalOperationId: string;
+    target: TargetSnapshot;
+    session?: ManagedSession;
+  }>): Promise<CouncilRecommendation>;
 }
 type MaybePromise<T> = T | Promise<T>;
 /** Both the in-memory harness and ProtectedJsonStore implementation satisfy this boundary. */
@@ -367,7 +375,7 @@ export class CommandDispatcher {
       ...(session ? { sessionId: session.id } : {}),
       ...(authority ? { authorityId: authority.id } : {})
     } : undefined;
-    const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}) } : undefined;
+    const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}) } : undefined;
     switch (definition.executor) {
       case "adapter":
         return adapterResult(

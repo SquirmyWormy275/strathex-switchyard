@@ -1,4 +1,5 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 
 import {
@@ -13,7 +14,13 @@ import { commandActionIds, commandForAction, type CommandAction } from "../../..
 import type { AuthorityGrant, Capability, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { sha256, stableJson, type JournalEntry, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
-import type { CredentialAdapterPort } from "./durable-credentials.ts";
+import type { CredentialAdapterPort, CredentialReferenceSummary } from "./durable-credentials.ts";
+import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
+import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import type { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
+import type { ProviderCommandTransport, ProviderCommandTransportRequest } from "./remote-adapters.ts";
+import type { EffectGuard } from "../../../packages/control-plane/src/brokers.ts";
 
 const profileInstalledKind = "provider-host.dispatch-profile-installed";
 const maximumLeaseTtlMs = 60_000;
@@ -102,6 +109,69 @@ export class DurableProviderDispatchProfileRegistry {
   }
 }
 
+export interface ProviderDispatchProfileCredentialDirectory {
+  listReferences(): Promise<readonly CredentialReferenceSummary[]>;
+}
+
+/**
+ * Installs a profile only after the independently attested repository policy,
+ * both opaque credential roles, and every provider-host route agree exactly.
+ * The source policy is re-digested and the installed copy is re-resolved at
+ * the final boundary, so a caller cannot pair a valid profile with another
+ * repository's route or a replaced provisioning file.
+ */
+export class AttestedProviderDispatchProfileCoordinator {
+  private readonly profiles: DurableProviderDispatchProfileRegistry;
+  private readonly networkPolicies: DurableNetworkPolicyRegistry;
+  private readonly credentials: ProviderDispatchProfileCredentialDirectory;
+  private readonly presence: WindowsUserPresenceRunner;
+
+  constructor(options: Readonly<{
+    profiles: DurableProviderDispatchProfileRegistry;
+    networkPolicies: DurableNetworkPolicyRegistry;
+    credentials: ProviderDispatchProfileCredentialDirectory;
+    presence: WindowsUserPresenceRunner;
+  }>) {
+    this.profiles = options.profiles;
+    this.networkPolicies = options.networkPolicies;
+    this.credentials = options.credentials;
+    this.presence = options.presence;
+  }
+
+  async install(value: ProviderDispatchLeaseProfile, networkPolicyPath: string, options: Readonly<{ signal?: AbortSignal }> = {}): Promise<ProviderDispatchLeaseProfile> {
+    aborted(options.signal);
+    const profile = parseProfile(value);
+    await this.assertProvisioningBinding(profile, networkPolicyPath, options.signal);
+    const approval = await this.presence.verify(`Install the exact provider-host dispatch profile for ${profile.repositoryRoot}.`);
+    if (!approval.verified || !approval.operator?.trim()) throw new Error("Current-user presence did not approve provider dispatch-profile installation.");
+    aborted(options.signal);
+    await this.assertProvisioningBinding(profile, networkPolicyPath, options.signal);
+    aborted(options.signal);
+    return this.profiles.install(profile);
+  }
+
+  current(repositoryRoot: string): Promise<ProviderDispatchLeaseProfile | undefined> {
+    return this.profiles.current(repositoryRoot);
+  }
+
+  private async assertProvisioningBinding(profile: ProviderDispatchLeaseProfile, networkPolicyPath: string, signal?: AbortSignal): Promise<void> {
+    aborted(signal);
+    if (!windowsAbsolute(networkPolicyPath)) throw new Error("Provider dispatch-profile installation requires one absolute network-policy source path.");
+    const current = await this.networkPolicies.current(profile.repositoryRoot);
+    if (!current || current.status !== "active" || !current.repositoryRoot || !sameRoot(current.repositoryRoot, profile.repositoryRoot)) {
+      throw new Error("No active exact-repository network policy exists for this provider dispatch profile.");
+    }
+    const sourceBytes = await readFile(canonicalWindowsPath(networkPolicyPath));
+    if (createHash("sha256").update(sourceBytes).digest("hex") !== current.sha256) throw new Error("The selected provider-host network policy does not match the current attested repository policy.");
+    const policy = await this.networkPolicies.resolve(profile.repositoryRoot);
+    requireProviderHostPolicy(profile, policy);
+    const references = await this.credentials.listReferences();
+    requireCredentialReference(references, profile.bearerCredentialReference, profile.repositoryRoot, "configured-network", "provider-api");
+    requireCredentialReference(references, profile.dispatchLeaseCredentialReference, profile.repositoryRoot, "provider-dispatch-lease-issuer", credentialPurpose);
+    aborted(signal);
+  }
+}
+
 /**
  * Combines an immutable, authenticated profile with the exact running host
  * lifecycle identity. A stale configuration, TLS identity, or process epoch
@@ -147,9 +217,37 @@ export class PinnedProviderDispatchLeaseProfileSource implements ProviderDispatc
   }
 }
 
+export class ConfiguredProviderHostLifecycleIdentitySource implements ProviderHostLifecycleIdentitySource {
+  private readonly network: ProviderCommandTransport;
+  private readonly policies: DurableNetworkPolicyRegistry;
+  constructor(network: ProviderCommandTransport, policies: DurableNetworkPolicyRegistry) { this.network = network; this.policies = policies; }
+
+  async current(input: Readonly<{ repositoryRoot: string; provider: "claude" | "codex"; configurationPath: string; signal?: AbortSignal }>): Promise<ProviderHostLifecycleIdentity> {
+    aborted(input.signal);
+    const policy = await this.policies.resolve(input.repositoryRoot);
+    const route = policy.routes.find((candidate) => candidate.id === "provider.health");
+    if (!route || route.boundary !== "provider-host-loopback" || !digest(route.tlsSpkiSha256)) throw new Error("The current repository policy has no exact pinned provider-host health route.");
+    const result = await this.network.request({ routeId: "provider.health", repositoryRoot: input.repositoryRoot, ...(input.signal ? { signal: input.signal } : {}) });
+    if (result.outcome !== "passed" || result.status !== 200 || !result.body) throw new Error("The pinned provider host did not return authenticated lifecycle health.");
+    let value: unknown;
+    try { value = JSON.parse(Buffer.from(result.body).toString("utf8")); }
+    catch { throw new Error("The pinned provider host returned malformed lifecycle health."); }
+    if (!record(value) || !exact(value, ["schema", "version", "status", "adapterVersion", "providers", "authenticatedState", "lifecycleNonceSha256", "processId", "configurationSha256"])
+      || value.schema !== "sxsy-b122.provider-host-health" || value.version !== 1 || value.status !== "ready" || value.authenticatedState !== true
+      || !Array.isArray(value.providers) || !value.providers.includes(input.provider) || !value.providers.every((provider) => provider === "claude" || provider === "codex")
+      || !Number.isSafeInteger(value.processId) || (value.processId as number) < 1 || !digest(value.lifecycleNonceSha256) || !digest(value.configurationSha256)) {
+      throw new Error("The pinned provider-host lifecycle health binding is invalid.");
+    }
+    aborted(input.signal);
+    return Object.freeze({ configurationPath: canonicalWindowsPath(input.configurationPath), configurationSha256: value.configurationSha256, lifecycleNonceSha256: value.lifecycleNonceSha256, tlsSpkiSha256: route.tlsSpkiSha256 });
+  }
+}
+
 export interface ProviderDispatchLeaseCurrentBinding {
   readonly action: string;
+  readonly guardAction: CommandAction;
   readonly operationId: string;
+  readonly guardOperationId: string;
   readonly routeId: string;
   readonly target: TargetSnapshot;
   readonly session: ManagedSession;
@@ -159,6 +257,8 @@ export interface ProviderDispatchLeaseCurrentBinding {
   readonly containment: ProviderDispatchLeaseUnsigned["containment"];
   readonly host: ProviderDispatchLeaseHostIdentity;
   readonly module: ProviderDispatchLeaseModuleIdentity;
+  readonly credentialReference: string;
+  readonly effectGuard: EffectGuard;
 }
 
 export interface ProviderDispatchLeaseFinalCurrent {
@@ -168,13 +268,16 @@ export interface ProviderDispatchLeaseFinalCurrent {
 export interface ProviderDispatchLeaseIssueRequest {
   readonly routeId: string;
   readonly action: string;
+  readonly guardAction: CommandAction;
   readonly operationId: string;
+  readonly guardOperationId: string;
   readonly target: TargetSnapshot;
   readonly session: ManagedSession;
   readonly authority: AuthorityGrant;
   readonly artifact: ProviderDispatchLeaseArtifactBinding | null;
   readonly confirmation: Readonly<{ digest: string; scopeDigest: string }> | null;
   readonly containment: ProviderDispatchLeaseUnsigned["containment"];
+  readonly effectGuard: EffectGuard;
   readonly signal?: AbortSignal;
 }
 
@@ -279,24 +382,165 @@ export class CredentialBackedProviderDispatchLeaseIssuer {
   }
 }
 
+export class DurableProviderDispatchContainmentSource {
+  private readonly containment: Pick<DurableContainmentManager, "get">;
+  constructor(containment: Pick<DurableContainmentManager, "get">) { this.containment = containment; }
+
+  async currentClear(repositoryRoot: string): Promise<ProviderDispatchLeaseUnsigned["containment"]> {
+    const record = await this.containment.get(repositoryRoot);
+    if (record?.active) throw new Error(`Containment fence ${record.fenceEpoch} blocks provider dispatch.`);
+    const fenceEpoch = record?.fenceEpoch ?? 0;
+    const material = { repositoryRoot: canonicalRoot(repositoryRoot), status: "clear", fenceEpoch, activationOperationId: null } as const;
+    return Object.freeze({ status: "clear", bindingDigest: sha256(stableJson(material)), fenceEpoch, activationOperationId: null });
+  }
+}
+
+export class InstalledProviderDispatchFinalCurrent implements ProviderDispatchLeaseFinalCurrent {
+  private readonly operations: Readonly<{ get(id: string): Promise<Readonly<{ action: string; targetSnapshotId: string; state: string }> | undefined> }>;
+  private readonly sessions: Readonly<{ get(id: string): Promise<ManagedSession | undefined> }>;
+  private readonly authorities: Readonly<{ get(id: string): Promise<AuthorityGrant | undefined> }>;
+  private readonly profiles: ProviderDispatchLeaseProfileSource;
+  private readonly containment: DurableProviderDispatchContainmentSource;
+
+  constructor(options: Readonly<{
+    operations: InstalledProviderDispatchFinalCurrent["operations"];
+    sessions: InstalledProviderDispatchFinalCurrent["sessions"];
+    authorities: InstalledProviderDispatchFinalCurrent["authorities"];
+    profiles: ProviderDispatchLeaseProfileSource;
+    containment: DurableProviderDispatchContainmentSource;
+  }>) {
+    this.operations = options.operations;
+    this.sessions = options.sessions;
+    this.authorities = options.authorities;
+    this.profiles = options.profiles;
+    this.containment = options.containment;
+  }
+
+  async assertCurrent(binding: ProviderDispatchLeaseCurrentBinding): Promise<Readonly<{ allowed: boolean; reason: string }>> {
+    try {
+      const operation = await this.operations.get(binding.guardOperationId);
+      if (!operation || operation.state !== "executing" || operation.action !== binding.guardAction || operation.targetSnapshotId !== binding.target.id) {
+        return { allowed: false, reason: "The durable provider operation is absent, changed, or no longer executing." };
+      }
+      const session = await this.sessions.get(binding.session.id);
+      if (!session || !sameProviderSession(session, binding.session, binding.target)) {
+        return { allowed: false, reason: "The exact managed provider session changed before dispatch." };
+      }
+      const authority = await this.authorities.get(binding.authority.id);
+      if (!authority || stableJson(authority) !== stableJson(binding.authority)) {
+        return { allowed: false, reason: "The exact provider authority changed before dispatch." };
+      }
+      const profile = await this.profiles.current({ repositoryRoot: binding.target.repositoryRoot, provider: binding.session.provider as "claude" | "codex" });
+      if (stableJson(profile.host) !== stableJson(binding.host) || stableJson(profile.module) !== stableJson(binding.module)
+        || profile.credentialReference !== binding.credentialReference) {
+        return { allowed: false, reason: "The provider-host lifecycle, module, or dispatch credential profile changed before dispatch." };
+      }
+      const containment = await this.containment.currentClear(binding.target.repositoryRoot);
+      if (stableJson(containment) !== stableJson(binding.containment)) {
+        return { allowed: false, reason: "The containment epoch changed before provider dispatch." };
+      }
+      const current = await binding.effectGuard.assertCurrent({
+        action: binding.guardAction,
+        operationId: binding.guardOperationId,
+        target: binding.target,
+        session: binding.session,
+        authority: binding.authority
+      });
+      return current.allowed ? { allowed: true, reason: "The exact provider dispatch binding remains current." } : current;
+    } catch {
+      return { allowed: false, reason: "The exact provider dispatch binding could not be revalidated." };
+    }
+  }
+}
+
+/** Adds a freshly minted lease to the exact typed JSON envelope at the last transport boundary. */
+export class LeaseInjectingProviderCommandTransport implements ProviderCommandTransport {
+  private readonly underlying: ProviderCommandTransport;
+  private readonly issuer: CredentialBackedProviderDispatchLeaseIssuer;
+  private readonly containment: DurableProviderDispatchContainmentSource;
+
+  constructor(underlying: ProviderCommandTransport, issuer: CredentialBackedProviderDispatchLeaseIssuer, containment: DurableProviderDispatchContainmentSource) {
+    this.underlying = underlying;
+    this.issuer = issuer;
+    this.containment = containment;
+  }
+
+  recoveryExternalId(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined {
+    return this.underlying.recoveryExternalId?.(input);
+  }
+
+  handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"]; repositoryRoot: string }>): Promise<readonly Capability[]> | readonly Capability[] {
+    return this.underlying.handshakeCapabilityCeiling?.(input) ?? ["registered"];
+  }
+
+  async request(input: ProviderCommandTransportRequest) {
+    const effectRoute = providerEffectRoute(input.routeId);
+    if (!effectRoute) {
+      if (input.trustedDispatch) throw new Error("A trusted provider dispatch binding was supplied to a non-effect route.");
+      return this.underlying.request(input);
+    }
+    const binding = input.trustedDispatch;
+    if (!binding) throw new Error("Provider-host effect routes require one trusted companion dispatch binding.");
+    if (!sameRoot(input.repositoryRoot, binding.target.repositoryRoot)) throw new Error("The provider transport repository does not match the trusted TargetSnapshot.");
+    const routeId = councilLeaseRoute(input.routeId, binding.session.provider, binding.action);
+    const containment = await this.containment.currentClear(binding.target.repositoryRoot);
+    const lease = await this.issuer.issue({
+      routeId,
+      action: binding.action,
+      guardAction: binding.guardAction,
+      operationId: binding.operationId,
+      guardOperationId: binding.guardOperationId,
+      target: binding.target,
+      session: binding.session,
+      authority: binding.authority,
+      artifact: binding.artifact,
+      confirmation: binding.confirmation,
+      containment,
+      effectGuard: binding.effectGuard,
+      ...(input.signal ? { signal: input.signal } : {})
+    });
+    const document = parseDispatchDocument(input.body);
+    if (Object.hasOwn(document, "dispatchLease")) throw new Error("The provider request body cannot supply its own dispatch lease.");
+    const final = await binding.effectGuard.assertCurrent({
+      action: binding.guardAction,
+      operationId: binding.guardOperationId,
+      target: binding.target,
+      session: binding.session,
+      authority: binding.authority
+    });
+    if (!final.allowed) throw new Error(safeReason(final.reason));
+    return this.underlying.request({
+      routeId: input.routeId,
+      repositoryRoot: input.repositoryRoot,
+      body: JSON.stringify({ ...document, dispatchLease: lease }),
+      ...(input.pathParameters ? { pathParameters: input.pathParameters } : {}),
+      ...(input.signal ? { signal: input.signal } : {})
+    });
+  }
+}
+
 function validateDispatchBinding(request: ProviderDispatchLeaseIssueRequest, now: Date): void {
   if (!Number.isFinite(now.getTime())) throw new Error("The provider dispatch-lease clock is invalid.");
   if (request.session.provider !== "claude" && request.session.provider !== "codex") throw new Error("Provider dispatch requires one exact Claude or Codex session.");
   if (request.target.completeness !== "complete" || targetSnapshotDigest(request.target) !== request.target.id) throw new Error("Provider dispatch requires one complete canonical TargetSnapshot.");
   if (!request.session.workspaceRoot || !sameRoot(request.session.workspaceRoot, request.target.repositoryRoot)
     || request.session.targetSnapshotId !== request.target.id) throw new Error("The provider session does not match the exact target.");
-  if (!sameRoot(request.authority.repositoryRoot, request.target.repositoryRoot)
-    || request.authority.sessionId !== request.session.id
-    || request.authority.taskId !== request.session.taskId
-    || request.authority.planRevision !== request.session.planRevision) {
-    throw new Error("The provider authority does not match the exact target, session, task, and plan.");
+  const authorityAction = requireDispatchProtocolBinding(request);
+  const authorityScopeMatches = authorityAction === "council_automatic"
+    ? request.authority.sessionId === undefined && request.authority.taskId === undefined && request.authority.planRevision === undefined
+    : request.authority.sessionId === request.session.id && request.authority.taskId === request.session.taskId && request.authority.planRevision === request.session.planRevision;
+  if (!sameRoot(request.authority.repositoryRoot, request.target.repositoryRoot) || !authorityScopeMatches) {
+    throw new Error(authorityAction === "council_automatic"
+      ? "Automatic Council provider phases require one exact repository-scoped authority independent of every participant session, task, and plan."
+      : "The provider authority does not match the exact target, session, task, and plan.");
   }
   const authorityIssuedAt = Date.parse(request.authority.issuedAt);
   const authorityExpiresAt = Date.parse(request.authority.expiresAt);
   if (request.authority.revokedAt || !Number.isFinite(authorityIssuedAt) || !Number.isFinite(authorityExpiresAt)
     || authorityIssuedAt > now.getTime() || authorityExpiresAt <= now.getTime()) throw new Error("The provider authority is revoked, future-issued, or expired.");
-  if (!identifier(request.routeId, 128) || !identifier(request.action) || !identifier(request.operationId)) throw new Error("The provider dispatch route, action, or operation ID is invalid.");
-  const authorityAction = requireDispatchProtocolBinding(request);
+  if (!identifier(request.routeId, 128) || !identifier(request.action) || !identifier(request.operationId) || !identifier(request.guardOperationId)) throw new Error("The provider dispatch route, action, or operation ID is invalid.");
+  if (request.guardAction !== authorityAction) throw new Error("The provider dispatch effect guard is not bound to the exact authority action.");
+  if (authorityAction !== "council_automatic" && request.guardOperationId !== request.operationId) throw new Error("A provider or automation dispatch cannot change its guarded operation identity.");
   if (!request.authority.allowedActions.includes(authorityAction) || request.authority.prohibitedActions.includes(authorityAction)) {
     throw new Error("The provider authority does not allow this exact action.");
   }
@@ -305,10 +549,45 @@ function validateDispatchBinding(request: ProviderDispatchLeaseIssueRequest, now
   }
 }
 
+function providerEffectRoute(routeId: string): boolean {
+  if (/^provider\.council\.(claude|codex)$/u.test(routeId)) return true;
+  for (const action of commandActionIds) {
+    const executor = commandForAction(action).executor;
+    if (executor === "agent" && routeId === `provider.${action}`) return true;
+    if (executor === "automation" && routeId === `automation.${action}`) return true;
+  }
+  return false;
+}
+function councilLeaseRoute(networkRouteId: string, provider: ManagedSession["provider"], action: string): string {
+  if (networkRouteId !== `provider.council.${provider}`) return networkRouteId;
+  if (provider !== "claude" && provider !== "codex" || !/^council_(pause|assignment|resume)$/u.test(action)) {
+    throw new Error("The automatic Council network route lacks one exact provider and phase binding.");
+  }
+  return `council.${provider}`;
+}
+function parseDispatchDocument(body: string | Uint8Array | undefined): Record<string, unknown> {
+  if (body === undefined) throw new Error("Provider-host effect dispatch requires one typed JSON request body.");
+  let value: unknown;
+  try { value = JSON.parse(typeof body === "string" ? body : Buffer.from(body).toString("utf8")); }
+  catch { throw new Error("Provider-host effect dispatch requires one valid JSON object body."); }
+  if (!record(value)) throw new Error("Provider-host effect dispatch requires one JSON object body.");
+  return value;
+}
+function sameProviderSession(current: ManagedSession, expected: ManagedSession, target: TargetSnapshot): boolean {
+  return current.status === "running"
+    && current.id === expected.id && current.provider === expected.provider && current.surface === expected.surface
+    && stableJson(current.capabilities) === stableJson(expected.capabilities)
+    && current.workspaceRoot !== undefined && sameRoot(current.workspaceRoot, target.repositoryRoot)
+    && current.targetSnapshotId === target.id && current.taskId === expected.taskId
+    && current.planRevision === expected.planRevision && current.adapterVersion === expected.adapterVersion;
+}
+
 function currentBinding(request: ProviderDispatchLeaseIssueRequest, resolved: ProviderDispatchLeaseResolvedProfile): ProviderDispatchLeaseCurrentBinding {
   return Object.freeze({
     action: request.action,
+    guardAction: request.guardAction,
     operationId: request.operationId,
+    guardOperationId: request.guardOperationId,
     routeId: request.routeId,
     target: request.target,
     session: request.session,
@@ -317,7 +596,9 @@ function currentBinding(request: ProviderDispatchLeaseIssueRequest, resolved: Pr
     confirmation: request.confirmation,
     containment: request.containment,
     host: resolved.host,
-    module: resolved.module
+    module: resolved.module,
+    credentialReference: resolved.credentialReference,
+    effectGuard: request.effectGuard
   });
 }
 
@@ -477,14 +758,17 @@ function requireDispatchProtocolBinding(request: ProviderDispatchLeaseIssueReque
       throw new Error("The provider workflow route requires one exact agent action and workflow artifact.");
     }
   } else if (request.routeId === `automation.${action}`) {
-    if (definition.executor !== "automation" || request.artifact !== null || request.confirmation !== null) {
-      throw new Error("The automation route requires one exact automation action without workflow artifact or confirmation bindings.");
+    if (definition.executor !== "automation" || request.artifact !== null) {
+      throw new Error("The automation route requires one exact automation action without a workflow artifact binding.");
     }
   } else {
     throw new Error("The provider dispatch route does not exactly match its host-owned action protocol.");
   }
   if (definition.requiresConfirmation && request.confirmation === null) {
     throw new Error("The provider workflow action requires an exact reviewed confirmation binding.");
+  }
+  if (!definition.requiresConfirmation && request.confirmation !== null) {
+    throw new Error("The provider dispatch action cannot carry an unrelated confirmation binding.");
   }
   requireCatalogCapabilityFloor(request.session, action);
   return action;
@@ -505,6 +789,43 @@ function requireCatalogCapabilityFloor(session: ManagedSession, action: CommandA
   const floor = ordered.filter((capability) => required.has(capability));
   if (session.status !== "running" || !floor.every((capability) => actual.has(capability))) {
     throw new Error(`Provider dispatch requires a running session at the exact ${floor.join(", ") || "catalog"} capability floor.`);
+  }
+}
+function requireProviderHostPolicy(profile: ProviderDispatchLeaseProfile, policy: ConfiguredNetworkPolicy): void {
+  const expected = new Set<string>(["provider.health", "provider.reconcile"]);
+  for (const action of commandActionIds) {
+    const executor = commandForAction(action).executor;
+    if (executor === "agent") expected.add(`provider.${action}`);
+    if (executor === "automation") expected.add(`automation.${action}`);
+  }
+  for (const entry of profile.providers) {
+    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "cancel"] as const) {
+      expected.add(`provider.${prefix}.${entry.provider}`);
+    }
+  }
+  const routes = new Map(policy.routes.map((route) => [route.id, route]));
+  for (const routeId of expected) {
+    const route = routes.get(routeId);
+    if (!route) throw new Error(`The attested provider-host network policy is missing exact route ${routeId}.`);
+    requireProviderHostRoute(profile, route);
+  }
+  for (const route of policy.routes) {
+    if (route.boundary === "provider-host-loopback") requireProviderHostRoute(profile, route);
+  }
+}
+function requireProviderHostRoute(profile: ProviderDispatchLeaseProfile, route: ConfiguredNetworkPolicy["routes"][number]): void {
+  if (route.boundary !== "provider-host-loopback" || route.tlsSpkiSha256 !== profile.tlsSpkiSha256
+    || route.credential?.reference !== profile.bearerCredentialReference || route.credential.purpose !== "provider-api"
+    || route.credential.header.toLowerCase() !== "authorization" || route.credential.prefix !== "Bearer ") {
+    throw new Error(`Provider-host route ${route.id} is not bound to the exact loopback TLS and bearer-credential profile.`);
+  }
+}
+function requireCredentialReference(references: readonly CredentialReferenceSummary[], reference: string, repositoryRoot: string, adapterId: string, purpose: string): void {
+  const current = references.find((entry) => entry.reference === reference);
+  if (!current || current.revokedAt || current.scopes.length !== 1) throw new Error("The provider dispatch profile requires one current exact-scope credential reference per key role.");
+  const scope = current.scopes[0]!;
+  if (!sameRoot(scope.repositoryRoot, repositoryRoot) || scope.adapterId !== adapterId || scope.purpose !== purpose) {
+    throw new Error("A provider dispatch-profile credential reference has the wrong repository, adapter, or purpose scope.");
   }
 }
 class IssuanceBoundary {

@@ -1,23 +1,31 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { ProviderDispatchLeaseAuthority } from "../../provider-adapter-host/src/dispatch-lease.ts";
+import { createLoopbackTlsFixture } from "../../provider-adapter-host/test/support/tls-fixture.ts";
+import { commandActionIds, commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { DurableCredentialReferenceVault, type CredentialAdapterPort, type CredentialLease, type CredentialLeaseRequest } from "../src/durable-credentials.ts";
 import {
   CredentialBackedProviderDispatchLeaseIssuer,
+  AttestedProviderDispatchProfileCoordinator,
+  DurableProviderDispatchContainmentSource,
   DurableProviderDispatchProfileRegistry,
+  InstalledProviderDispatchFinalCurrent,
+  LeaseInjectingProviderCommandTransport,
   PinnedProviderDispatchLeaseProfileSource,
   providerDispatchProfileIdentityDigest,
   type ProviderDispatchLeaseFinalCurrent,
   type ProviderDispatchLeaseProfile,
   type ProviderHostLifecycleIdentitySource
 } from "../src/provider-dispatch-lease.ts";
+import type { ProviderCommandTransportRequest } from "../src/remote-adapters.ts";
+import { DurableNetworkPolicyRegistry } from "../src/host-provisioning.ts";
 import { FakeUserSecretProtector } from "../src/windows-secret.ts";
 
 const key = "7".repeat(64);
@@ -90,13 +98,16 @@ test("credential-backed issuer signs one <=60s exact lease after two final-curre
   const lease = await issuer.issue({
     routeId: "provider.plan_approval",
     action: "plan_approval",
+    guardAction: "plan_approval",
     operationId: "operation-1",
+    guardOperationId: "operation-1",
     target,
     session,
     authority,
     artifact,
     confirmation,
-    containment: { status: "clear", bindingDigest: "9".repeat(64), fenceEpoch: 11, activationOperationId: null }
+    containment: { status: "clear", bindingDigest: "9".repeat(64), fenceEpoch: 11, activationOperationId: null },
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
   });
 
   assert.equal(credentials.redemptions, 1);
@@ -190,7 +201,9 @@ test("issuer derives the exact hierarchical capability floor from the host-owned
     ...baseIssue(),
     routeId: "provider.proof",
     action: "proof",
+    guardAction: "proof",
     operationId: "proof-operation",
+    guardOperationId: "proof-operation",
     session: advisorySession,
     authority: advisoryAuthority,
     confirmation: null
@@ -201,7 +214,9 @@ test("issuer derives the exact hierarchical capability floor from the host-owned
     ...baseIssue(),
     routeId: "provider.proof",
     action: "proof",
+    guardAction: "proof",
     operationId: "proof-bad-hierarchy",
+    guardOperationId: "proof-bad-hierarchy",
     session: { ...advisorySession, capabilities: ["observable"] },
     authority: advisoryAuthority,
     confirmation: null
@@ -223,12 +238,22 @@ test("issuer closes provider, automation, and automatic Council protocol routes 
     finalCurrent: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
     now: () => new Date(now)
   });
-  const councilAuthority = { ...authority, allowedActions: ["council_automatic"] };
+  const councilAuthority: AuthorityGrant = {
+    id: "authority-council-repository",
+    repositoryRoot,
+    allowedActions: ["council_automatic"],
+    prohibitedActions: [],
+    expiresAt: authority.expiresAt,
+    issuedAt: authority.issuedAt,
+    issuedBy: authority.issuedBy
+  };
   const councilLease = await issuer.issue({
     ...baseIssue(),
     routeId: "council.codex",
     action: "council_pause",
+    guardAction: "council_automatic",
     operationId: "council:epoch-1:pause",
+    guardOperationId: "council-parent-operation",
     authority: councilAuthority,
     artifact: null,
     confirmation: null
@@ -243,7 +268,9 @@ test("issuer closes provider, automation, and automatic Council protocol routes 
     ...baseIssue(),
     routeId: "council.codex",
     action: "council_assignment",
+    guardAction: "council_automatic",
     operationId: "council:epoch-1:assignment",
+    guardOperationId: "council-parent-operation",
     authority: councilAuthority,
     artifact: assignmentArtifact,
     confirmation: null
@@ -253,24 +280,41 @@ test("issuer closes provider, automation, and automatic Council protocol routes 
     ...baseIssue(),
     routeId: "automation.compound_capture",
     action: "compound_capture",
+    guardAction: "compound_capture",
     operationId: "automation-operation",
+    guardOperationId: "automation-operation",
     authority: { ...authority, allowedActions: ["compound_capture"] },
     artifact: null,
     confirmation: null
   });
   assert.equal(automationLease.dispatch.routeId, "automation.compound_capture");
-  assert.equal(credentials.redemptions, 3);
+  const confirmedAutomationLease = await issuer.issue({
+    ...baseIssue(),
+    routeId: "automation.lfg",
+    action: "lfg",
+    guardAction: "lfg",
+    operationId: "automation-lfg-operation",
+    guardOperationId: "automation-lfg-operation",
+    authority: { ...authority, allowedActions: ["lfg"] },
+    artifact: null,
+    confirmation
+  });
+  assert.equal(confirmedAutomationLease.dispatch.routeId, "automation.lfg");
+  assert.deepEqual(confirmedAutomationLease.confirmation, confirmation);
+  assert.equal(credentials.redemptions, 4);
 
   const rejected = [
     { ...baseIssue(), routeId: "automation.proof", action: "proof", authority: { ...authority, allowedActions: ["proof"] } },
     { ...baseIssue(), routeId: "provider.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: null, confirmation: null },
+    { ...baseIssue(), routeId: "automation.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: null },
     { ...baseIssue(), routeId: "council.claude", action: "council_pause", operationId: "council:epoch-1:pause", authority: councilAuthority, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_pause", operationId: "council:epoch-1:resume", authority: councilAuthority, artifact: null, confirmation: null },
+    { ...baseIssue(), routeId: "council.codex", action: "council_pause", guardAction: "council_automatic" as const, guardOperationId: "council-parent-operation", operationId: "council:epoch-1:pause", authority: { ...authority, allowedActions: ["council_automatic"] }, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_pause", operationId: "council:epoch-1:pause", authority: { ...authority, allowedActions: ["council_pause"] }, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_assignment", operationId: "council:epoch-1:assignment", authority: councilAuthority, artifact: null, confirmation: null }
   ];
-  for (const request of rejected) await assert.rejects(() => issuer.issue(request), /route|Council|authority|artifact|protocol/i);
-  assert.equal(credentials.redemptions, 3);
+  for (const request of rejected) await assert.rejects(() => issuer.issue(request), /route|Council|authority|artifact|protocol|confirmation|guard/i);
+  assert.equal(credentials.redemptions, 4);
 });
 
 test("issuer applies one bounded cancellation epoch and refuses late profile, lifecycle, final-current, or credential settlement", async (context) => {
@@ -371,6 +415,162 @@ test("issuer applies one bounded cancellation epoch and refuses late profile, li
   assert.equal(secondFinalChecks, 2);
   assert.equal(secondFinalCredentials.redemptions, 1);
   assert.equal(leaseIds, 0, "late second final-current settlement must not mint a lease");
+});
+
+test("last-boundary transport injects only a companion-minted lease and rechecks the effect guard", async () => {
+  const issued: unknown[] = [];
+  const forwarded: ProviderCommandTransportRequest[] = [];
+  const issuer = {
+    async issue(request: unknown) {
+      issued.push(request);
+      return { schema: "sxsy-b122.provider-dispatch-lease", version: 1, leaseId: "lease-from-companion" };
+    }
+  } as unknown as CredentialBackedProviderDispatchLeaseIssuer;
+  const transport = new LeaseInjectingProviderCommandTransport({
+    async request(input) {
+      forwarded.push(input);
+      return { outcome: "passed", routeId: input.routeId, detail: "fixture", effectDisposition: "ambiguous", body: Buffer.from("{}") };
+    }
+  }, issuer, new DurableProviderDispatchContainmentSource({ async get() { return undefined; } }));
+  let guardChecks = 0;
+  const trustedDispatch = {
+    action: "plan_approval",
+    guardAction: "plan_approval",
+    operationId: "operation-1",
+    guardOperationId: "operation-1",
+    target,
+    session,
+    authority,
+    artifact,
+    confirmation,
+    effectGuard: { async assertCurrent() { guardChecks += 1; return { allowed: true, reason: "current" }; } }
+  } as const;
+  await transport.request({
+    routeId: "provider.plan_approval",
+    repositoryRoot,
+    body: JSON.stringify({ schema: "fixture", version: 1 }),
+    trustedDispatch
+  });
+  assert.equal(issued.length, 1);
+  assert.equal(guardChecks, 1);
+  assert.equal(forwarded.length, 1);
+  assert.equal(forwarded[0]!.trustedDispatch, undefined);
+  assert.equal(JSON.parse(forwarded[0]!.body as string).dispatchLease.leaseId, "lease-from-companion");
+  await assert.rejects(() => transport.request({ routeId: "provider.plan_approval", repositoryRoot, body: "{}" }), /trusted companion dispatch/i);
+  await assert.rejects(() => transport.request({ routeId: "provider.plan_approval", repositoryRoot, body: JSON.stringify({ dispatchLease: {} }), trustedDispatch }), /own dispatch lease/i);
+  await assert.rejects(() => transport.request({ routeId: "provider.health", repositoryRoot, body: "{}", trustedDispatch }), /non-effect route/i);
+});
+
+test("installed final-current guard rejects operation, session, authority, profile, containment, or target churn", async () => {
+  let operation = { action: "plan_approval", targetSnapshotId: target.id, state: "executing" };
+  let currentSession = session;
+  let currentAuthority = authority;
+  let currentProfile = await immediateResolvedProfile().current();
+  let containmentRecord: Awaited<ReturnType<DurableProviderDispatchContainmentSource["currentClear"]>> | undefined;
+  const containment = new DurableProviderDispatchContainmentSource({ async get() { return containmentRecord ? { repositoryRoot, fenceEpoch: containmentRecord.fenceEpoch, active: true, activatedAt: now, activatedByOperationId: "containment-op", reason: "fixture", uncontrolledPaths: [] } : undefined; } });
+  const clear = await containment.currentClear(repositoryRoot);
+  const finalCurrent = new InstalledProviderDispatchFinalCurrent({
+    operations: { async get() { return operation; } },
+    sessions: { async get() { return currentSession; } },
+    authorities: { async get() { return currentAuthority; } },
+    profiles: { async current() { return currentProfile; } },
+    containment
+  });
+  let effectChecks = 0;
+  const binding = {
+    action: "plan_approval",
+    guardAction: "plan_approval" as const,
+    operationId: "operation-1",
+    guardOperationId: "operation-1",
+    routeId: "provider.plan_approval",
+    target,
+    session,
+    authority,
+    artifact,
+    confirmation,
+    containment: clear,
+    host: currentProfile.host,
+    module: currentProfile.module,
+    credentialReference: currentProfile.credentialReference,
+    effectGuard: { async assertCurrent() { effectChecks += 1; return { allowed: true, reason: "current" }; } }
+  };
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, true);
+  assert.equal(effectChecks, 1);
+  operation = { ...operation, state: "completed" };
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
+  operation = { ...operation, state: "executing" };
+  currentSession = { ...session, targetSnapshotId: "f".repeat(64) };
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
+  currentSession = session;
+  currentAuthority = { ...authority, revokedAt: now };
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
+  currentAuthority = authority;
+  currentProfile = { ...currentProfile, host: { ...currentProfile.host, lifecycleNonceSha256: "a".repeat(64) } };
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
+  currentProfile = await immediateResolvedProfile().current();
+  containmentRecord = clear;
+  assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
+});
+
+test("attested profile installation binds the exact scoped policy, TLS identity, and two credential roles", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "b122-provider-profile-install-"));
+  context.after(async () => { await rm(root, { recursive: true, force: true }); });
+  const repository = join(root, "repository");
+  const policyPath = join(root, "provider-network-policy.json");
+  const tls = createLoopbackTlsFixture();
+  const identity = {
+    ...profileIdentity,
+    repositoryRoot: repository,
+    configurationPath: join(root, "provider-host.json"),
+    tlsSpkiSha256: tls.tlsSpkiSha256
+  } as const;
+  const installProfile = { ...identity, profileDigest: providerDispatchProfileIdentityDigest(identity) } as const;
+  const routeIds = new Set<string>(["provider.health", "provider.reconcile"]);
+  for (const action of commandActionIds) {
+    const executor = commandForAction(action).executor;
+    if (executor === "agent") routeIds.add(`provider.${action}`);
+    if (executor === "automation") routeIds.add(`automation.${action}`);
+  }
+  for (const provider of ["claude", "codex"] as const) {
+    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "cancel"] as const) routeIds.add(`provider.${prefix}.${provider}`);
+  }
+  const policy = {
+    version: 1,
+    proxy: "direct",
+    routes: [...routeIds].sort().map((id, index) => ({
+      id,
+      method: id === "provider.health" ? "GET" : "POST",
+      url: `https://127.0.0.1:7443/v1/fixture/${index}`,
+      redirects: "deny",
+      boundary: "provider-host-loopback",
+      tlsSpkiSha256: tls.tlsSpkiSha256,
+      tlsCaCertificatePem: tls.certificatePem,
+      credential: { reference: bearerCredentialReference, purpose: "provider-api", header: "authorization", prefix: "Bearer " }
+    }))
+  };
+  await writeFile(policyPath, JSON.stringify(policy), "utf8");
+  const store = authenticatedStore(join(root, "journal.jsonl"));
+  const networkPolicies = new DurableNetworkPolicyRegistry(store, join(root, "installed-network-policy.json"), () => now);
+  await networkPolicies.install(repository, policyPath, now);
+  const vault = new DurableCredentialReferenceVault(store, new FakeUserSecretProtector(), { async check() { return { allowed: true, reason: "fixture" }; } });
+  await vault.provision({ reference: bearerCredentialReference, scopes: [{ repositoryRoot: repository, adapterId: "configured-network", purpose: "provider-api" }] }, Buffer.from("bearer"));
+  await vault.provision({ reference: dispatchCredentialReference, scopes: [{ repositoryRoot: repository, adapterId: "provider-dispatch-lease-issuer", purpose: "provider-dispatch-lease" }] }, Buffer.from(key));
+  let approvals = 0;
+  const profiles = new DurableProviderDispatchProfileRegistry(store);
+  const coordinator = new AttestedProviderDispatchProfileCoordinator({
+    profiles,
+    networkPolicies,
+    credentials: vault,
+    presence: { async verify() { approvals += 1; return { verified: true, operator: "operator" }; } }
+  });
+  const installed = await coordinator.install(installProfile, policyPath);
+  assert.equal(installed.profileDigest, installProfile.profileDigest);
+  assert.equal(approvals, 1);
+  assert.equal((await profiles.current(repository))?.configurationSha256, installProfile.configurationSha256);
+  const wrongPath = join(root, "wrong-network-policy.json");
+  await writeFile(wrongPath, JSON.stringify({ ...policy, routes: [] }), "utf8");
+  await assert.rejects(() => coordinator.install(installProfile, wrongPath), /does not match.*attested/i);
+  assert.equal(approvals, 1, "invalid source binding must fail before asking for presence");
 });
 
 test("authenticated profile generations support exact rotation and multiple repository-scoped credential references", async (context) => {
@@ -497,13 +697,16 @@ function baseIssue(signal?: AbortSignal) {
   return {
     routeId: "provider.plan_approval",
     action: "plan_approval",
+    guardAction: "plan_approval" as const,
     operationId: "operation-1",
+    guardOperationId: "operation-1",
     target,
     session,
     authority,
     artifact,
     confirmation,
     containment: { status: "clear" as const, bindingDigest: "9".repeat(64), fenceEpoch: 11, activationOperationId: null },
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
     ...(signal ? { signal } : {})
   };
 }

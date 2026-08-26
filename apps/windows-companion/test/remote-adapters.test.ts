@@ -4,6 +4,7 @@ import test from "node:test";
 import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { automationRequestSchema, automationResultSchema } from "../../../packages/control-plane/src/automation-protocol.ts";
 import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker } from "../src/remote-adapters.ts";
 
 const providerTargetId = "a".repeat(64);
@@ -291,20 +292,48 @@ test("configured automation creates one observable child saga and records the ga
     async request(input: { routeId: string; body?: string }) {
       assert.equal(input.routeId, "automation.repair_mission");
       const document = JSON.parse(input.body!) as Record<string, unknown>;
-      assert.equal(document.schema, "sxsy-b122.remote-automation");
+      assert.equal(document.schema, automationRequestSchema("repair_mission"));
+      assert.equal(document.action, "repair_mission");
+      assert.deepEqual(document.intent, {
+        kind: "repair_mission",
+        reproduceBeforeModify: true,
+        approvedScope: "exact_target_snapshot",
+        testEnvironment: { id: "repair-test-environment", egress: "deny", databaseName: "b122_repair_test" },
+        pushAuthorized: false,
+        mergeAuthorized: false,
+        deployAuthorized: false,
+        hostedRerunAuthorized: false,
+        productionDataAuthorized: false,
+        confirmation: { digest: "9".repeat(64), scopeDigest: "8".repeat(64) }
+      });
       return {
         outcome: "passed" as const,
         routeId: input.routeId,
         detail: "local gateway",
         effectDisposition: "ambiguous" as const,
         body: Buffer.from(JSON.stringify({
-          schema: "sxsy-b122.remote-result",
+          schema: automationResultSchema("repair_mission"),
           version: 1,
+          action: "repair_mission",
           status: "completed",
           summary: "Repair completed in the deterministic provider.",
           effectDisposition: "committed",
           externalId: "automation-operation-1",
-          data: { simulated: true }
+          result: {
+            kind: "repair_mission",
+            reproduction: { commandDigest: "1".repeat(64), status: "reproduced", logsDigest: "2".repeat(64) },
+            approvedScopeDigest: "3".repeat(64),
+            diffDigest: "4".repeat(64),
+            affectedChecks: ["test:affected"],
+            fullChecks: ["test:full"],
+            risks: [],
+            nextAction: "Review the bounded repair diff.",
+            pushAttempted: false,
+            mergeAttempted: false,
+            deployAttempted: false,
+            hostedRerunAttempted: false,
+            productionDataUsed: false
+          }
         }))
       };
     }
@@ -327,7 +356,10 @@ test("configured automation creates one observable child saga and records the ga
     operationId: "automation-operation-1",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    authority: { id: "authority-repair", sessionId: "session-1" } as never,
     permit: {} as never,
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "repair_mission", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-repair" },
+    testEnvironment: { id: "repair-test-environment", tempRoot: "C:\\b122-tests\\repair-test-environment", egress: "deny", databaseName: "b122_repair_test", environment: {} },
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
     childSaga: childSaga as never
   });
@@ -345,11 +377,12 @@ test("configured automation records a committed child but refuses success after 
   const broker = createConfiguredAutomationBroker(
     { verifyPermit() { return true; } },
     { check() { return { allowed: true, reason: "clear" }; } },
-    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.remote-result", version: 1, status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect-1" })) }; } }
+    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: automationResultSchema("compound_capture"), version: 1, action: "compound_capture", status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect", result: { kind: "compound_capture", captureId: "capture:automation-post-effect", learningDigest: "5".repeat(64), verifiedProblemDigest: "6".repeat(64), documents: ["docs/solutions/repair.md"] } })) }; } }
   );
   const outcome = await broker.execute({
     action: "compound_capture", operationId: "automation-post-effect", target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    authority: { id: "authority-capture", sessionId: "session-1" } as never,
     permit: {} as never,
     effectGuard: { async assertCurrent() { guardChecks += 1; return guardChecks < 4 ? { allowed: true, reason: "current" } : { allowed: false, reason: "target changed after automation effect" }; } },
     childSaga: {

@@ -231,11 +231,14 @@ test("Plan Approval gateway rejects missing or mismatched execution authorizatio
   assert.deepEqual({ mode: result.result.mode, executionStarted: result.result.executionStarted }, { mode: "execution_ack", executionStarted: true });
 });
 
-test("direct authenticated provider routes still require a fresh running fully mediated host session", async (context) => {
+test("direct authenticated provider routes derive the exact hierarchical capability floor from the catalog", async (context) => {
   const setup = await fixture(context);
   const original = providerSession();
-  await setup.sessions.upsert({ ...original, capabilities: ["registered", "observable", "controllable"] });
-  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-unmediated") })).outcome, "blocked");
+  await setup.sessions.upsert({ ...original, capabilities: ["registered", "observable"] });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-observable") })).outcome, "passed");
+
+  await setup.sessions.upsert({ ...original, capabilities: ["registered"] });
+  assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-under-capability") })).outcome, "blocked");
 
   await setup.sessions.upsert({ ...original, status: "stale" });
   assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale") })).outcome, "blocked");
@@ -245,7 +248,7 @@ test("direct authenticated provider routes still require a fresh running fully m
 
   await setup.sessions.upsert({ ...original, lastHeartbeat: "2026-08-24T11:00:00.000Z" });
   assert.equal((await setup.client.request({ routeId: "provider.proof", repositoryRoot: "C:\\repo", body: workflowBody("operation-stale-heartbeat") })).outcome, "blocked");
-  assert.equal(setup.codex.commandCalls, 0);
+  assert.equal(setup.codex.commandCalls, 1);
 });
 
 test("host-owned observations renew exact sessions and centrally downgrade churn or outage", async (context) => {

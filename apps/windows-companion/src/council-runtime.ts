@@ -8,7 +8,7 @@ import { CouncilCoordinator, type CouncilEpoch, type CouncilParticipant, type Co
 import type { ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
-import type { ProviderCommandTransport } from "./remote-adapters.ts";
+import type { ProviderCommandTransport, TrustedProviderDispatchBinding } from "./remote-adapters.ts";
 import type { CouncilIsolationEffectControl, CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "./council-workspace-isolation.ts";
 import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
@@ -83,6 +83,8 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     if (!this.network) return { status: "unavailable", summary: "Automatic Council requires configured exact-route provider adapters.", effectDisposition: "not_started" };
     if (!this.automaticGate || !await this.automaticGate.accepted(request)) return { status: "unavailable", summary: "Automatic Council is gate-disabled until independent worktree, resource-isolation, mediation, and failure-injection acceptance evidence is installed.", effectDisposition: "not_started" };
     if (!this.isolation) return { status: "unavailable", summary: "Automatic Council requires the installed durable worktree and resource-isolation host.", effectDisposition: "not_started" };
+    if (!request.authority || request.authority.sessionId !== undefined || request.authority.taskId !== undefined || request.authority.planRevision !== undefined) return { status: "blocked", summary: "Automatic Council requires one current repository-scoped authority that is not borrowed from any participant session, task, or plan.", effectDisposition: "not_started" };
+    if (!request.effectGuard) return { status: "blocked", summary: "Automatic Council requires the final admitted command/target effect guard before any provider phase.", effectDisposition: "not_started" };
     if (participants.length < 2) return { status: "blocked", summary: "Automatic Council requires at least two fresh mediated participants on the exact target.", effectDisposition: "not_started" };
     if (!participants.every((participant) => participant.capabilities.includes("mediated") && participant.capabilities.includes("controllable") && participant.status === "running")) return { status: "blocked", summary: "Automatic Council requires every participant to be fresh, running, Controllable, and Mediated.", effectDisposition: "not_started" };
     if (!request.target.head) return { status: "blocked", summary: "Automatic Council requires an exact Git HEAD in the verified TargetSnapshot.", effectDisposition: "not_started" };
@@ -240,7 +242,19 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
       await this.assertEffectCurrent(request, control, session);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
       effectMayHaveCommitted = true;
-      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal });
+      const trustedDispatch: TrustedProviderDispatchBinding = {
+        action: `council_${phase}`,
+        guardAction: "council_automatic",
+        operationId: `council:${epochId}:${phase}`,
+        guardOperationId: request.operationId,
+        target: request.target,
+        session,
+        authority: request.authority!,
+        artifact: binding ? { id: epochId, digest: binding.assignmentDigest, coordinatorContextDigest: null, coordinatorContextRevision: null } : null,
+        confirmation: null,
+        effectGuard: request.effectGuard!
+      };
+      const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal, trustedDispatch });
       if (child) await request.childSaga!.markExternalCommitted(child, { responseReceived: "true" });
       await this.assertEffectCurrent(request, control, session);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);

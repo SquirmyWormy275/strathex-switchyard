@@ -1025,7 +1025,10 @@ class DurableRuntimeGovernance implements DispatchGovernance {
         const expectedSessionId = input.session?.id;
         effectGuard = {
           assertCurrent: async (effect) => {
-            if (effect.action !== expectedDefinition.action || effect.target.id !== expectedTarget.id || effect.session?.id !== expectedSessionId) {
+            const sessionMatches = expectedDefinition.action === "council_automatic"
+              ? true
+              : effect.session?.id === expectedSessionId;
+            if (effect.action !== expectedDefinition.action || effect.target.id !== expectedTarget.id || !sessionMatches) {
               return { allowed: false, reason: "The broker effect does not match its admitted command, target, or selected session." };
             }
             try {

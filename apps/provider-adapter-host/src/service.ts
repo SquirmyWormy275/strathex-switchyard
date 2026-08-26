@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import type { Capability, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { sha256, stableJson, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { parseAutomationEnvelope } from "../../../packages/control-plane/src/automation-protocol.ts";
 import {
   LocalProviderCommandGateway,
   type AuthenticatedProviderGatewayClient,
@@ -296,9 +297,12 @@ export class ProviderAdapterHostService {
       || routeId !== `${routeId.startsWith("provider.") ? "provider" : "automation"}.${document.action}`) {
       return errorResponse(400, "The provider command lacks an exact dispatch identity.");
     }
-    if (routeId.startsWith("automation.") && (!exactKeys(document, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "dispatchLease"])
-      || document.schema !== "sxsy-b122.remote-automation" || document.version !== 1)) {
-      return errorResponse(400, "The provider automation command contains an unknown or missing field.");
+    const lease = document.dispatchLease;
+    if (lease === undefined) return errorResponse(400, "The provider effect requires one exact companion dispatch lease.");
+    const { dispatchLease: _dispatchLease, ...forwarded } = document;
+    if (routeId.startsWith("automation.")) {
+      try { parseAutomationEnvelope(forwarded); }
+      catch { return errorResponse(400, "The provider automation command contains an unknown, missing, or action-inconsistent field."); }
     }
     const effectKind = routeId.startsWith("provider.") ? "workflow" as const : "automation" as const;
     const requiredCapabilities = providerEffectCapabilityFloor(effectKind, document.action);
@@ -308,8 +312,6 @@ export class ProviderAdapterHostService {
     }
     const backend = this.backends.get(session.provider);
     if (!backend) return errorResponse(503, "The exact provider backend is unavailable.");
-    const lease = document.dispatchLease;
-    if (lease === undefined) return errorResponse(400, "The provider effect requires one exact companion dispatch lease.");
     const expectation = gatewayLeaseExpectation(routeId, document, current, backend.dispatchIdentity);
     try { await this.dispatchLeases.consume(lease, expectation, { signal, onCommitStart: () => progress.markAmbiguous() }); }
     catch (error) {
@@ -318,7 +320,6 @@ export class ProviderAdapterHostService {
       throw error;
     }
     progress.markAmbiguous();
-    const { dispatchLease: _dispatchLease, ...forwarded } = document;
     const mapped = mapGatewayResult(await this.gateway.request({ routeId, repositoryRoot: target.repositoryRoot, body: encode(forwarded), signal }));
     return mapped.status === 200 ? mapped : ambiguousResponse(mapped);
   }

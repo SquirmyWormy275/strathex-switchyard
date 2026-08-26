@@ -30,6 +30,16 @@ import { DurableContainmentManager } from "../../../packages/control-plane/src/c
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderCommandTransport, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import {
+  AttestedProviderDispatchProfileCoordinator,
+  ConfiguredProviderHostLifecycleIdentitySource,
+  CredentialBackedProviderDispatchLeaseIssuer,
+  DurableProviderDispatchContainmentSource,
+  DurableProviderDispatchProfileRegistry,
+  InstalledProviderDispatchFinalCurrent,
+  LeaseInjectingProviderCommandTransport,
+  PinnedProviderDispatchLeaseProfileSource
+} from "./provider-dispatch-lease.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
@@ -181,6 +191,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly credentialProvisioning?: AttestedCredentialProvisioningCoordinator;
   readonly networkPolicyRegistry: DurableNetworkPolicyRegistry;
   readonly networkPolicyProvisioning?: AttestedNetworkPolicyCoordinator;
+  readonly providerDispatchProfiles: DurableProviderDispatchProfileRegistry;
+  readonly providerDispatchProfileProvisioning?: AttestedProviderDispatchProfileCoordinator;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly providerGateway: AuthenticatedProviderGatewayClient;
   readonly hardwareSignals: DurableHardwareSignalInbox;
@@ -216,6 +228,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     throw new Error("The durable B122 companion requires a host-backed journal authenticator; unprotected hash-chain storage is rejected.");
   }
   const sessions = new SessionRegistry(store);
+  const runtimeAuthorities = options.runtime?.authorities ?? new AuthorityLedger(store, {
+    clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
+  });
+  let executor!: DurableMediatedExecutor;
   const sessionFreshness = new SessionFreshnessCoordinator(sessions);
   const providerGatewayToken = randomBytes(32).toString("hex");
   const providerGateway = new LocalProviderCommandGateway({
@@ -405,11 +421,40 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const councilResources = new InstalledCouncilResourceBroker(councilIsolation, councilResourceHost, networkPolicyRegistry, containmentManager);
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
+  const providerDispatchProfiles = new DurableProviderDispatchProfileRegistry(store);
+  const providerDispatchProfileProvisioning = options.runtimePinPresence ? new AttestedProviderDispatchProfileCoordinator({
+    profiles: providerDispatchProfiles,
+    networkPolicies: networkPolicyRegistry,
+    credentials: credentialVault,
+    presence: options.runtimePinPresence
+  }) : undefined;
   configuredNetwork = new DynamicConfiguredNetworkClient({
     registry: networkPolicyRegistry,
     containment: containmentManager,
     credentials: credentialVault.createAdapter("configured-network")
   });
+  const providerDispatchContainment = new DurableProviderDispatchContainmentSource(containmentManager);
+  const providerDispatchProfileSource = new PinnedProviderDispatchLeaseProfileSource(
+    providerDispatchProfiles,
+    new ConfiguredProviderHostLifecycleIdentitySource(configuredNetwork, networkPolicyRegistry)
+  );
+  const providerDispatchFinalCurrent = new InstalledProviderDispatchFinalCurrent({
+    operations: { get: (id) => executor.operations.get(id) },
+    sessions,
+    authorities: runtimeAuthorities,
+    profiles: providerDispatchProfileSource,
+    containment: providerDispatchContainment
+  });
+  const leasedConfiguredNetwork = new LeaseInjectingProviderCommandTransport(
+    configuredNetwork,
+    new CredentialBackedProviderDispatchLeaseIssuer({
+      credentials: credentialVault.createAdapter("provider-dispatch-lease-issuer"),
+      profiles: providerDispatchProfileSource,
+      finalCurrent: providerDispatchFinalCurrent,
+      ...(options.runtime?.now ? { now: options.runtime.now } : {})
+    }),
+    providerDispatchContainment
+  );
   const configuredProviderHost = new ConfiguredProviderHostClient(configuredNetwork);
   const configuredProviderControl = {
     managesSession(session: ManagedSession) { return (session.provider === "claude" || session.provider === "codex") && !providerGateway.supportsProvider(session.provider); },
@@ -423,7 +468,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     providerControl: configuredProviderControl
   });
   councilLifecycleCancellation = councilLifecycle;
-  const providerTransport = new ProviderGatewayRouteRouter(providerGateway, configuredNetwork);
+  const providerTransport = new ProviderGatewayRouteRouter(providerGateway, leasedConfiguredNetwork);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
     : undefined;
@@ -478,9 +523,6 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         options.runtimePinPresence
       )
     : undefined;
-  const runtimeAuthorities = options.runtime?.authorities ?? new AuthorityLedger(store, {
-    clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
-  });
   const installedWorkflowContextPreparation = new InstalledWorkflowContextPreparationCoordinator({
     provider: configuredProviderHost,
     contexts: workflowContexts,
@@ -545,7 +587,6 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ?? (options.providerDesktopHelperPath && options.providerDesktopHelperSha256
       ? new WindowsProviderDesktopProcessPort({ helperPath: options.providerDesktopHelperPath, helperSha256: options.providerDesktopHelperSha256 })
       : undefined);
-  let executor!: DurableMediatedExecutor;
   const providerDesktopAdapter = providerDesktopRegistry && providerDesktopProcesses
       ? new InstalledProviderDesktopCommandAdapter((request) => new InstalledProviderDesktopLifecycle({
         registry: providerDesktopRegistry!,
@@ -653,7 +694,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     }
   });
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerDispatchProfileProvisioning ? { providerDispatchProfiles: providerDispatchProfileProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
@@ -680,6 +721,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     repositoryRuntimes,
     credentialVault,
     networkPolicyRegistry,
+    providerDispatchProfiles,
     providerGateway,
     hardwareSignals,
     hardwareSignalDispatcher,
@@ -706,6 +748,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...(sandboxInstallations ? { sandboxInstallations } : {}),
     ...(credentialProvisioning ? { credentialProvisioning } : {}),
     ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}),
+    ...(providerDispatchProfileProvisioning ? { providerDispatchProfileProvisioning } : {}),
     ...(providerHandshakes ? { providerHandshakes } : {}),
     ...(rawHidInstallationRegistry ? { rawHidInstallationRegistry } : {}),
     ...(rawHidInstallations ? { rawHidInstallations } : {}),

@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { automationRequestSchema, automationResultSchema, createAutomationIntent } from "../../../packages/control-plane/src/automation-protocol.ts";
 import { canonicalWorkflowArtifact, planApprovalReviewScopeDigest } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
   ClaudeProviderAdapterBackend,
@@ -120,9 +121,9 @@ function handshake(provider: "claude" | "codex" = "codex", snapshot = target) {
 
 function automation(operationId = "operation-automation-1", snapshot = target) {
   return {
-    schema: "sxsy-b122.remote-automation",
+    schema: automationRequestSchema("compound_capture"),
     version: 1,
-    action: "compound_capture",
+    action: "compound_capture" as const,
     operationId,
     target: {
       id: snapshot,
@@ -142,7 +143,8 @@ function automation(operationId = "operation-automation-1", snapshot = target) {
       planRevision: "plan-1",
       plannedFiles: ["src/example.ts"]
     },
-    authorityId: "authority-provider-host"
+    authorityId: "authority-provider-host",
+    intent: createAutomationIntent("compound_capture")
   };
 }
 
@@ -264,11 +266,12 @@ function backendAutomationCommand(operationId: string) {
     routeId: "automation.compound_capture",
     operationId,
     externalId: operationId,
-    action: "compound_capture",
+    action: "compound_capture" as const,
     repositoryRoot: "C:\\repo",
     targetSnapshotId: target,
     sessionId: "codex-session",
-    provider: "codex" as const
+    provider: "codex" as const,
+    intent: createAutomationIntent("compound_capture")
   };
 }
 
@@ -350,7 +353,7 @@ test("authenticated health, handshake, workflow, and automation routes use exact
 
   const automated = await service.handle(request("/v1/b122/automation/compound_capture", automation()));
   assert.equal(automated.status, 200);
-  assert.equal((automated.body as { schema: string }).schema, "sxsy-b122.remote-result");
+  assert.equal((automated.body as { schema: string }).schema, automationResultSchema("compound_capture"));
   assert.equal(codex.executeCalls, 3);
 });
 

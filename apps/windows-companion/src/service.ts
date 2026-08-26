@@ -23,6 +23,7 @@ import type { CouncilRecommendation } from "../../../packages/control-plane/src/
 import type { AcceptanceAdministration, HighConsequenceActivation, InstalledAcceptanceTrust } from "./acceptance-administration.ts";
 import type { InstalledScannerFixture, InstalledScannerFixtureTrust, ScannerFixtureAdministration } from "./scanner-fixtures.ts";
 import { providerIds, type AttestedProviderDesktopRegistry, type ProviderId, type ProviderInstallation } from "./provider-desktop.ts";
+import type { AttestedProviderDispatchProfileCoordinator, ProviderDispatchLeaseProfile } from "./provider-dispatch-lease.ts";
 import type {
   AuditEvent,
   Capability,
@@ -62,6 +63,8 @@ import {
   type ScannerTrustRevokePayload,
   type ScannerFixtureRevokePayload,
   type ProviderDesktopReferencePayload,
+  type ProviderHostProfileInstallPayload,
+  type ProviderHostProfileScopePayload,
   type ProviderHandshakePayload,
   type ContainmentInspectionPayload,
   type ContainmentReleasePayload,
@@ -168,6 +171,7 @@ export interface CompanionServiceOptions {
   readonly acceptanceAdministration?: Pick<AcceptanceAdministration, "installTrustPolicy" | "listTrust" | "revokeTrust" | "importEvidence" | "listEvidence" | "invalidateEvidence" | "activate" | "listActivations" | "revokeActivation">;
   readonly scannerAdministration?: ScannerFixtureAdministration;
   readonly providerDesktopRegistry?: Pick<AttestedProviderDesktopRegistry, "install" | "list" | "revoke">;
+  readonly providerDispatchProfiles?: Pick<AttestedProviderDispatchProfileCoordinator, "install" | "current">;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
@@ -210,6 +214,7 @@ export class CompanionService {
   private readonly acceptanceAdministration?: CompanionServiceOptions["acceptanceAdministration"];
   private readonly scannerAdministration?: ScannerFixtureAdministration;
   private readonly providerDesktopRegistry?: CompanionServiceOptions["providerDesktopRegistry"];
+  private readonly providerDispatchProfiles?: CompanionServiceOptions["providerDispatchProfiles"];
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
   private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
@@ -238,6 +243,7 @@ export class CompanionService {
     this.acceptanceAdministration = options.acceptanceAdministration;
     this.scannerAdministration = options.scannerAdministration;
     this.providerDesktopRegistry = options.providerDesktopRegistry;
+    this.providerDispatchProfiles = options.providerDispatchProfiles;
     this.providerHandshakes = options.providerHandshakes;
     this.containmentRelease = options.containmentRelease;
     this.rawHidInstallations = options.rawHidInstallations;
@@ -335,6 +341,8 @@ export class CompanionService {
         case "provider-desktop.install": return this.success(request.id, { installation: await this.direct(context, (signal) => this.installProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
         case "provider-desktop.list": return this.success(request.id, { installations: await this.direct(context, (signal) => this.listProviderDesktops(request.payload, signal)) });
         case "provider-desktop.revoke": return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
+        case "provider-host.profile.install": return this.success(request.id, { profile: await this.direct(context, (signal) => this.installProviderHostProfile(this.requireProviderHostProfileInstall(request.payload), signal)) });
+        case "provider-host.profile.current": return this.success(request.id, { profile: await this.direct(context, (signal) => this.currentProviderHostProfile(this.requireProviderHostProfileScope(request.payload), signal)) });
         case "provider.handshake":
           return this.success(request.id, await this.direct(context, (signal) => this.providerHandshake(this.requireProviderHandshake(request.payload), signal)));
         case "containment.inspect":
@@ -816,6 +824,16 @@ export class CompanionService {
   private async installProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "install", [payload.provider], signal); this.record("provider-desktop.install", "completed", "Installed one current-user-approved fixed provider executable identity."); return value; }
   private async listProviderDesktops(payload: unknown, signal?: AbortSignal): Promise<readonly ProviderInstallation[]> { requireEmptyPayload(payload, "Provider desktop listing"); return callDirect(this.providerDesktopAdmin(), "list", [], signal); }
   private async revokeProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "revoke", [payload.provider], signal); this.record("provider-desktop.revoke", "completed", "Revoked one fixed provider executable identity."); return value; }
+  private async installProviderHostProfile(payload: ProviderHostProfileInstallPayload, signal?: AbortSignal): Promise<ProviderDispatchLeaseProfile> {
+    if (!this.providerDispatchProfiles) throw new CompanionServiceError("capability_denied", "No trusted provider-host profile provisioning boundary is attached.");
+    const profile = await callDirect<ProviderDispatchLeaseProfile>(this.providerDispatchProfiles, "install", [payload.profile as unknown as ProviderDispatchLeaseProfile, payload.networkPolicyPath], signal);
+    this.record("provider-host.profile.install", "completed", "Installed one exact repository-scoped provider-host dispatch profile.");
+    return profile;
+  }
+  private async currentProviderHostProfile(payload: ProviderHostProfileScopePayload, signal?: AbortSignal): Promise<ProviderDispatchLeaseProfile | undefined> {
+    if (!this.providerDispatchProfiles) throw new CompanionServiceError("capability_denied", "No trusted provider-host profile provisioning boundary is attached.");
+    return callDirect(this.providerDispatchProfiles, "current", [payload.repositoryRoot], signal);
+  }
 
   private async providerHandshake(payload: ProviderHandshakePayload, signal?: AbortSignal): Promise<ManagedSession> {
     if (!this.providerHandshakes) throw new CompanionServiceError("capability_denied", "No configured provider handshake boundary is attached.");
@@ -926,6 +944,14 @@ export class CompanionService {
   private requireScannerTrustRevoke(payload: unknown): ScannerTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
   private requireScannerFixtureRevoke(payload: unknown): ScannerFixtureRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["fixtureId", "reason"]) || !boundedIdentifier(payload.fixtureId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner fixture revocation requires one exact fixture ID and bounded reason."); return { fixtureId: payload.fixtureId, reason: payload.reason }; }
   private requireProviderDesktopReference(payload: unknown): ProviderDesktopReferencePayload { if (!isRecord(payload) || !exactKeys(payload, ["provider"]) || typeof payload.provider !== "string" || !(providerIds as readonly string[]).includes(payload.provider)) throw new CompanionServiceError("invalid_request", "Provider installation administration accepts only one compiled provider identity."); return { provider: payload.provider as ProviderId }; }
+  private requireProviderHostProfileInstall(payload: unknown): ProviderHostProfileInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["profile", "networkPolicyPath"]) || !isRecord(payload.profile) || !boundedHostPath(payload.networkPolicyPath)) throw new CompanionServiceError("invalid_request", "Provider-host profile installation requires one closed profile record and absolute network-policy source path.");
+    return { profile: payload.profile, networkPolicyPath: payload.networkPolicyPath };
+  }
+  private requireProviderHostProfileScope(payload: unknown): ProviderHostProfileScopePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider-host profile lookup requires one absolute repository root.");
+    return { repositoryRoot: payload.repositoryRoot };
+  }
   private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
   private requireContainmentInspection(payload: unknown): ContainmentInspectionPayload {
     if (!isRecord(payload) || !exactKeys(payload, ["sessionId"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim()

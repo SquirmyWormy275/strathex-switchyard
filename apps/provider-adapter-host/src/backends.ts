@@ -14,6 +14,7 @@ import {
   type WorkflowTestEvidence
 } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { automationResultSchema, parseAutomationProviderResult, type AutomationProviderResultPayload } from "../../../packages/control-plane/src/automation-protocol.ts";
 import type {
   ProviderGatewayBackend,
   ProviderGatewayCancellationAcknowledgement,
@@ -377,9 +378,9 @@ export class FixtureProviderRuntimePort implements ProviderRuntimePort {
           result: fixtureWorkflowResult(request)
         }
       : {
-          schema: "sxsy-b122.remote-result", version: 1, status, effectDisposition: disposition,
+          schema: automationResultSchema(request.action), version: 1, action: request.action, status, effectDisposition: disposition,
           summary: `Fixture ${this.provider} automation ${status}.`, externalId: request.externalId,
-          data: { fixture: true, provider: this.provider }
+          result: fixtureAutomationResult(request)
         };
     this.operations.set(request.externalId, {
       operationId: request.operationId, externalId: request.externalId, routeId: request.routeId,
@@ -723,10 +724,7 @@ function validateCommandResponse(request: ProviderGatewayCommand, response: Prov
     parseWorkflowProviderResponse(response, artifact);
     return;
   }
-  if (response.schema !== "sxsy-b122.remote-result" || response.version !== 1 || !remoteStatus(response.status)
-    || !effectDisposition(response.effectDisposition) || typeof response.summary !== "string" || response.summary.length < 1 || response.summary.length > 512) {
-    throw new Error("The automation provider response is malformed.");
-  }
+  parseAutomationProviderResult(response, request.action, request.externalId);
 }
 
 function fixtureWorkflowResult(request: Extract<ProviderGatewayCommand, { kind: "workflow" }>): WorkflowProviderResult {
@@ -742,6 +740,65 @@ function fixtureWorkflowResult(request: Extract<ProviderGatewayCommand, { kind: 
     case "focus": return { kind: "focus", selectedSessionId: payload.selectedSessionId, status: payload.expectedStatus, queueCycleId: payload.queueCycleId, resultDelivered: true };
     case "authority": return { kind: "authority", acknowledgements: payload.packets.map((packet) => ({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true })) };
     case "voice_binding": return { kind: "voice_binding", bindingId: `fixture:${request.artifact.id}`, active: true };
+  }
+}
+
+function fixtureAutomationResult(request: Extract<ProviderGatewayCommand, { kind: "automation" }>): AutomationProviderResultPayload {
+  const evidence = (label: string): string => sha256(stableJson({
+    label,
+    operationId: request.operationId,
+    targetSnapshotId: request.targetSnapshotId,
+    provider: request.provider
+  }));
+  switch (request.action) {
+    case "compound_capture":
+      return {
+        kind: request.action,
+        captureId: `capture:${request.operationId}`,
+        learningDigest: evidence("learning"),
+        verifiedProblemDigest: evidence("verified-problem"),
+        documents: ["docs/solutions/provider-fixture-learning.md"]
+      };
+    case "compound_refresh":
+      return {
+        kind: request.action,
+        previewDigest: evidence("refresh-preview"),
+        affectedPaths: [],
+        creates: 0,
+        updates: 0,
+        deletes: 0,
+        mutationApplied: false
+      };
+    case "lfg":
+      return {
+        kind: request.action,
+        runId: `lfg:${request.operationId}`,
+        stages: request.intent.kind === "lfg"
+          ? request.intent.lifecycle.map((name) => ({ name, status: "passed" as const, evidenceDigest: evidence(name) }))
+          : [],
+        pullRequestUrl: null,
+        deploymentAttempted: false
+      };
+    case "repair_mission":
+      return {
+        kind: request.action,
+        reproduction: {
+          commandDigest: evidence("reproduction-command"),
+          status: "not_reproduced",
+          logsDigest: evidence("reproduction-logs")
+        },
+        approvedScopeDigest: evidence("approved-scope"),
+        diffDigest: evidence("diff"),
+        affectedChecks: [],
+        fullChecks: [],
+        risks: [],
+        nextAction: "No repository mutation is needed for the deterministic fixture.",
+        pushAttempted: false,
+        mergeAttempted: false,
+        deployAttempted: false,
+        hostedRerunAttempted: false,
+        productionDataUsed: false
+      };
   }
 }
 

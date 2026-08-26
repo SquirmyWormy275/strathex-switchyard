@@ -1,7 +1,7 @@
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import { InMemoryAutomationBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type ContainmentGuard, type PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
+import { InMemoryAutomationBroker, type AutomationBroker, type AutomationRequest, type BrokerConfirmation, type BrokerOutcome, type ContainmentGuard, type EffectGuard, type PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import type { Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import type { AuthorityGrant, Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
 import { parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
@@ -10,6 +10,8 @@ import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
+import type { ProviderDispatchLeaseArtifactBinding } from "../../provider-adapter-host/src/dispatch-lease.ts";
+import { automationRequestSchema, createAutomationIntent, parseAutomationProviderResult, type AutomationAction, type AutomationConfirmationBinding } from "../../../packages/control-plane/src/automation-protocol.ts";
 
 export interface DynamicConfiguredNetworkOptions {
   readonly registry: DurableNetworkPolicyRegistry;
@@ -17,8 +19,31 @@ export interface DynamicConfiguredNetworkOptions {
   readonly credentials: CredentialAdapterPort;
 }
 
+export interface TrustedProviderDispatchBinding {
+  readonly action: string;
+  readonly guardAction: CommandAction;
+  readonly operationId: string;
+  readonly guardOperationId: string;
+  readonly target: TargetSnapshot;
+  readonly session: ManagedSession;
+  readonly authority: AuthorityGrant;
+  readonly artifact: ProviderDispatchLeaseArtifactBinding | null;
+  readonly confirmation: Readonly<{ digest: string; scopeDigest: string }> | null;
+  readonly effectGuard: EffectGuard;
+}
+
+export interface ProviderCommandTransportRequest {
+  readonly routeId: string;
+  readonly repositoryRoot: string;
+  readonly body?: string | Uint8Array;
+  readonly pathParameters?: Readonly<Record<string, string>>;
+  readonly signal?: AbortSignal;
+  /** Host-owned dispatch material; never parsed from request.body. */
+  readonly trustedDispatch?: TrustedProviderDispatchBinding;
+}
+
 export interface ProviderCommandTransport {
-  request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult>;
+  request(input: ProviderCommandTransportRequest): Promise<ConfiguredNetworkResult>;
   /** A host-known idempotency identity available before the provider effect. */
   recoveryExternalId?(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined;
   /** Host-derived ceiling; provider response content can never raise it. */
@@ -29,7 +54,8 @@ export interface ProviderCommandTransport {
 export class DynamicConfiguredNetworkClient implements ProviderCommandTransport {
   private readonly options: DynamicConfiguredNetworkOptions;
   constructor(options: DynamicConfiguredNetworkOptions) { this.options = options; }
-  async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
+  async request(input: ProviderCommandTransportRequest): Promise<ConfiguredNetworkResult> {
+    if (input.trustedDispatch) throw new Error("A raw configured-network client cannot consume a trusted provider dispatch binding.");
     const policy = await this.options.registry.resolve(input.repositoryRoot);
     return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
   }
@@ -212,7 +238,20 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         return finish({ status: "blocked", summary: "The protected workflow artifact or coordinator context changed at the final dispatch boundary.", effectDisposition: "not_started", data: { artifactId: artifact.id, artifactDigest: artifact.digest } });
       }
       let result: ConfiguredNetworkResult;
-      try { result = await this.network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body, signal: control.signal }); }
+      try {
+        result = await this.network.request({
+          routeId,
+          repositoryRoot: request.target.repositoryRoot,
+          body,
+          signal: control.signal,
+          trustedDispatch: trustedProviderDispatch(request.definition.action, request.operationId, request.target, request.session, request.authority, {
+            id: artifact.id,
+            digest: artifact.digest,
+            coordinatorContextDigest: artifact.coordinatorContextDigest ?? null,
+            coordinatorContextRevision: artifact.coordinatorContextRevision ?? null
+          }, request.confirmation, request.effectGuard)
+        });
+      }
       catch { return finish({ status: "failed", summary: "The configured provider transport failed after dispatch may have begun; reconciliation is required.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
       if (result.outcome !== "passed" || !result.body) return finish(adapterOutcome(result));
       let value: unknown;
@@ -285,23 +324,60 @@ async function remoteAutomation(request: AutomationRequest, network: ProviderCom
       return outcome;
     };
     if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled before dispatch.", effectDisposition: "not_started" });
+    const action = request.action as AutomationAction;
+    const confirmationBinding: AutomationConfirmationBinding | undefined = request.confirmation ? {
+      digest: request.confirmation.confirmationDigest,
+      scopeDigest: request.confirmation.confirmationScopeDigest ?? ""
+    } : undefined;
+    let intent;
+    try {
+      intent = createAutomationIntent(action, confirmationBinding, request.testEnvironment ? { id: request.testEnvironment.id, egress: request.testEnvironment.egress, databaseName: request.testEnvironment.databaseName } : undefined);
+    } catch {
+      return finish({ status: "blocked", summary: "The action-specific automation intent lacks its exact confirmation or isolated-environment binding.", effectDisposition: "not_started" });
+    }
     const document = {
-      schema: "sxsy-b122.remote-automation",
+      schema: automationRequestSchema(action),
       version: 1,
-      action: request.action,
+      action,
       operationId: request.operationId,
       target: targetDocument(request.target),
       session: request.session ? sessionDocument(request.session) : undefined,
       authorityId: request.authority?.id,
-      testEnvironment: request.testEnvironment ? { id: request.testEnvironment.id, egress: request.testEnvironment.egress, databaseName: request.testEnvironment.databaseName } : undefined
+      intent
     };
     const final = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
     if (!final.allowed) return finish({ status: "blocked", summary: final.reason, effectDisposition: "not_started" });
     if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled immediately before dispatch.", effectDisposition: "not_started" });
     let result: ConfiguredNetworkResult;
-    try { result = await network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal }); }
+    try {
+      if (!request.session || !request.authority) return finish({ status: "blocked", summary: "Configured provider automation requires one exact managed session and scoped authority.", effectDisposition: "not_started" });
+      result = await network.request({
+        routeId,
+        repositoryRoot: request.target.repositoryRoot,
+        body: JSON.stringify(document),
+        signal: control.signal,
+        trustedDispatch: trustedProviderDispatch(request.action, request.operationId, request.target, request.session, request.authority, null, request.confirmation, request.effectGuard)
+      });
+    }
     catch { return finish({ status: "failed", summary: "The provider automation result was lost; exact observation is required.", effectDisposition: "ambiguous" }); }
-    const outcome = adapterOutcome(result);
+    let outcome: BrokerOutcome;
+    if (result.outcome !== "passed" || !result.body) {
+      const fallback = adapterOutcome(result);
+      outcome = { status: fallback.status === "awaiting_input" || fallback.status === "awaiting_confirmation" ? "incomplete" : fallback.status, summary: fallback.summary, effectDisposition: fallback.effectDisposition, ...(fallback.data ? { data: fallback.data } : {}) };
+    }
+    else {
+      try {
+        const parsed = parseAutomationProviderResult(JSON.parse(Buffer.from(result.body).toString("utf8")), action, request.operationId);
+        outcome = {
+          status: parsed.status === "awaiting_input" || parsed.status === "awaiting_confirmation" ? "incomplete" : parsed.status,
+          summary: untrustedSummary(parsed.summary),
+          effectDisposition: parsed.effectDisposition,
+          data: redactRecord({ externalId: parsed.externalId, action: parsed.action, result: parsed.result })
+        };
+      } catch {
+        outcome = { status: "failed", summary: "The configured automation provider returned a malformed or cross-action result; exact reconciliation is required.", effectDisposition: "ambiguous" };
+      }
+    }
     let postEffectDenial: string | undefined;
     try {
       if (control.signal.aborted) postEffectDenial = "The durable automation operation was cancelled after the external effect boundary.";
@@ -317,13 +393,22 @@ async function remoteAutomation(request: AutomationRequest, network: ProviderCom
       effectDisposition: outcome.effectDisposition,
       ...(outcome.data ? { data: outcome.data } : {})
     });
-    return finish({ status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, ...(outcome.data ? { data: outcome.data } : {}) });
+    return finish(outcome);
   } finally { control.dispose(); }
 }
 
 function externalIdDetails(data: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, string>> {
   const value = data?.externalId;
   return typeof value === "string" && value.length <= 256 && !/[\0\r\n]/.test(value) ? { externalId: value } : {};
+}
+
+function trustedProviderDispatch(action: CommandAction, operationId: string, target: TargetSnapshot, session: ManagedSession, authority: AuthorityGrant, artifact: ProviderDispatchLeaseArtifactBinding | null, confirmation: BrokerConfirmation | undefined, effectGuard: EffectGuard): TrustedProviderDispatchBinding {
+  let confirmationBinding: TrustedProviderDispatchBinding["confirmation"] = null;
+  if (confirmation) {
+    if (!confirmation.confirmationScopeDigest) throw new Error("Provider dispatch requires the exact host-reviewed confirmation scope digest.");
+    confirmationBinding = Object.freeze({ digest: confirmation.confirmationDigest, scopeDigest: confirmation.confirmationScopeDigest });
+  }
+  return Object.freeze({ action, guardAction: action, operationId, guardOperationId: operationId, target, session, authority, artifact, confirmation: confirmationBinding, effectGuard });
 }
 
 function providerDocument(request: AdapterRequest, artifact: WorkflowArtifact) {

@@ -23,6 +23,8 @@ import {
   type WorkflowProviderResult
 } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { ConfiguredNetworkResult } from "./configured-network.ts";
+import { commandActionIds, commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { automationResultSchema, parseAutomationEnvelope, parseAutomationProviderResult, type AutomationAction, type AutomationIntent, type AutomationProviderResult, type AutomationProviderResultPayload } from "../../../packages/control-plane/src/automation-protocol.ts";
 
 const maximumBodyBytes = 64 * 1024;
 const maximumText = 4_096;
@@ -126,24 +128,17 @@ export interface ProviderGatewayAutomationCommand {
   readonly routeId: string;
   readonly operationId: string;
   readonly externalId: string;
-  readonly action: string;
+  readonly action: AutomationAction;
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
   readonly sessionId: string;
   readonly provider: ProviderGatewayProvider;
+  readonly intent: AutomationIntent;
 }
 
 export type ProviderGatewayCommand = ProviderGatewayWorkflowCommand | ProviderGatewayAutomationCommand;
 
-export interface ProviderGatewayRemoteResult {
-  readonly schema: "sxsy-b122.remote-result";
-  readonly version: 1;
-  readonly status: "completed" | "unavailable" | "blocked" | "failed" | "awaiting_input" | "awaiting_confirmation" | "running" | "cancelled" | "timed_out";
-  readonly summary: string;
-  readonly effectDisposition: EffectDisposition;
-  readonly externalId: string;
-  readonly data?: Readonly<Record<string, unknown>>;
-}
+export type ProviderGatewayRemoteResult = AutomationProviderResult;
 
 export type ProviderGatewayCommandResult = WorkflowProviderResponse | ProviderGatewayRemoteResult;
 export type ProviderGatewayOperationOutcome = "committed" | "failed" | "cancelled" | "unresolved";
@@ -476,7 +471,7 @@ export class LocalProviderCommandGateway {
     if (!backend) return unavailable(input.routeId, `No exact local ${command.provider} provider gateway backend is installed.`);
     const session = await this.sessions.get(command.sessionId);
     if (!session || !canExecuteProviderCommand(session, command, this.now(), this.automaticRefreshIntervalMs)) {
-      return blocked(input.routeId, "The exact provider session is not current, fully mediated, running, and bound to this TargetSnapshot.");
+      return blocked(input.routeId, "The exact provider session is not current, running, bound to this TargetSnapshot, and at the catalog-derived capability floor.");
     }
     const requestDigest = sha256(stableJson(command));
     const active = this.inFlightCommands.get(command.operationId);
@@ -518,7 +513,7 @@ export class LocalProviderCommandGateway {
     const currentBeforeEffect = await this.sessions.get(command.sessionId);
     if (!currentBeforeEffect || !canExecuteProviderCommand(currentBeforeEffect, command, this.now(), this.automaticRefreshIntervalMs)) {
       await this.saveOperation({ ...submitted, state: "failed", updatedAt: await this.monotonicHostTime() });
-      return blocked(input.routeId, "The fully mediated provider session changed before the final execution boundary.");
+      return blocked(input.routeId, "The provider session or its catalog-derived capability floor changed before the final execution boundary.");
     }
     try {
       const response = await backend.execute(command, signalFor(input));
@@ -734,13 +729,14 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
           result: deterministicWorkflowResult(request)
         }
       : {
-          schema: "sxsy-b122.remote-result",
+          schema: automationResultSchema(request.action),
           version: 1,
+          action: request.action,
           status,
           effectDisposition: disposition,
           summary: `Deterministic ${this.provider} automation ${status}.`,
           externalId: request.externalId,
-          data: { simulated: true, provider: this.provider }
+          result: deterministicAutomationResult(request)
         };
     this.responses.set(request.externalId, response);
     this.operations.set(request.externalId, {
@@ -929,22 +925,23 @@ function approvalPayload(payload: WorkflowArtifactPayload): Extract<WorkflowArti
 }
 
 function parseAutomationCommand(value: Record<string, unknown>, repositoryRoot: string, routeId: string): ProviderGatewayAutomationCommand {
-  if (value.schema !== "sxsy-b122.remote-automation" || value.version !== 1 || !routeId.startsWith("automation.")) throw new Error("The automation gateway request is invalid.");
-  const action = safeIdentifier(value.action, "automation action");
-  if (routeId !== `automation.${action}`) throw new Error("The automation route and action differ.");
-  const target = object(value.target, "target");
-  const session = object(value.session, "session");
+  if (!routeId.startsWith("automation.")) throw new Error("The automation gateway request is invalid.");
+  const parsed = parseAutomationEnvelope(value);
+  if (routeId !== `automation.${parsed.action}`) throw new Error("The automation route and action differ.");
+  const target = object(parsed.target, "target");
+  const session = object(parsed.session, "session");
   boundedJson(value);
   return {
     kind: "automation",
     routeId,
-    operationId: safeIdentifier(value.operationId, "operation ID"),
-    externalId: safeIdentifier(value.operationId, "operation ID"),
-    action,
+    operationId: safeIdentifier(parsed.operationId, "operation ID"),
+    externalId: safeIdentifier(parsed.operationId, "operation ID"),
+    action: parsed.action,
     repositoryRoot: exactRoot(target.repositoryRoot, repositoryRoot),
     targetSnapshotId: digest(target.id, "target snapshot"),
     sessionId: safeIdentifier(session.id, "session ID"),
-    provider: providerIdentity(session.provider)
+    provider: providerIdentity(session.provider),
+    intent: parsed.intent
   };
 }
 
@@ -985,8 +982,9 @@ function requireCommandResponse(command: ProviderGatewayCommand, response: Provi
   boundedJson(response);
   if (response.externalId !== command.externalId || response.status === undefined || response.effectDisposition === undefined || !safeSummary(response.summary)) throw new Error("The provider response is not exact or bounded.");
   if (command.kind === "workflow") {
-    if (response.schema !== "sxsy-b122.workflow-result" || response.version !== 1 || response.operationId !== command.operationId || response.action !== command.action || response.artifactId !== command.artifact.id || response.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
-  } else if (response.schema !== "sxsy-b122.remote-result" || response.version !== 1) throw new Error("The automation provider response is invalid.");
+    const workflowResponse = response as WorkflowProviderResponse;
+    if (workflowResponse.schema !== "sxsy-b122.workflow-result" || workflowResponse.version !== 1 || workflowResponse.operationId !== command.operationId || workflowResponse.action !== command.action || workflowResponse.artifactId !== command.artifact.id || workflowResponse.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
+  } else parseAutomationProviderResult(response, command.action, command.externalId);
 }
 
 function validateHandshakeResult(value: ProviderGatewayHandshakeResult): void {
@@ -1059,6 +1057,16 @@ function deterministicWorkflowResult(request: ProviderGatewayWorkflowCommand): W
   }
 }
 
+function deterministicAutomationResult(request: ProviderGatewayAutomationCommand): AutomationProviderResultPayload {
+  const evidence = (label: string): string => sha256(stableJson({ label, operationId: request.operationId, targetSnapshotId: request.targetSnapshotId }));
+  switch (request.action) {
+    case "compound_capture": return { kind: request.action, captureId: `capture:${request.operationId}`, learningDigest: evidence("learning"), verifiedProblemDigest: evidence("verified-problem"), documents: ["docs/solutions/deterministic-learning.md"] };
+    case "compound_refresh": return { kind: request.action, previewDigest: evidence("refresh-preview"), affectedPaths: [], creates: 0, updates: 0, deletes: 0, mutationApplied: false };
+    case "lfg": return { kind: request.action, runId: `lfg:${request.operationId}`, stages: request.intent.kind === "lfg" ? request.intent.lifecycle.map((name) => ({ name, status: "passed" as const, evidenceDigest: evidence(name) })) : [], pullRequestUrl: null, deploymentAttempted: false };
+    case "repair_mission": return { kind: request.action, reproduction: { commandDigest: evidence("reproduction-command"), status: "not_reproduced", logsDigest: evidence("reproduction-logs") }, approvedScopeDigest: evidence("approved-scope"), diffDigest: sha256(""), affectedChecks: [], fullChecks: [], risks: ["Deterministic diagnostics do not modify the repository."], nextAction: "Review the diagnostic receipt before authorizing any repair.", pushAttempted: false, mergeAttempted: false, deployAttempted: false, hostedRerunAttempted: false, productionDataUsed: false };
+  }
+}
+
 function workflowEvidenceReferences(evidence: Extract<WorkflowArtifactPayload, { kind: "proof" }>["evidence"]): readonly string[] {
   return [
     ...evidence.instructions.map((entry) => `${entry.id}:${entry.digest}`),
@@ -1091,7 +1099,17 @@ function canExecuteProviderCommand(session: ManagedSession, command: ProviderGat
   const observedAt = Date.parse(session.lastHeartbeat);
   const current = Date.parse(now);
   const freshnessMs = Math.max(60_000, refreshIntervalMs * 2);
-  const requiredCapabilities: readonly Capability[] = ["registered", "observable", "controllable", "mediated"];
+  if (!(commandActionIds as readonly string[]).includes(command.action)) return false;
+  const actual = new Set(session.capabilities);
+  if (actual.size !== session.capabilities.length
+    || (actual.has("observable") && !actual.has("registered"))
+    || (actual.has("controllable") && !actual.has("registered"))
+    || (actual.has("mediated") && (!actual.has("registered") || !actual.has("observable") || !actual.has("controllable")))) return false;
+  const declared = commandForAction(command.action as CommandAction).requiresCapabilities;
+  const required = new Set<Capability>(declared);
+  if (required.has("observable") || required.has("controllable") || required.has("mediated")) required.add("registered");
+  if (required.has("mediated")) { required.add("observable"); required.add("controllable"); }
+  const requiredCapabilities: readonly Capability[] = ["registered", "observable", "controllable", "mediated"].filter((capability): capability is Capability => required.has(capability as Capability));
   return hasGatewayProof(session)
     && session.provider === command.provider
     && session.status === "running"

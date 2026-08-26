@@ -328,6 +328,49 @@ test("provider administration accepts only compiled provider identifiers and del
   assert.equal(unavailable.error?.code, "capability_denied");
 });
 
+test("provider-host profile administration delegates one closed profile and exact policy path to the attested coordinator", async () => {
+  const calls: unknown[][] = [];
+  const profile = {
+    schema: "sxsy-b122.provider-host-dispatch-profile" as const,
+    version: 1 as const,
+    generation: 1,
+    expectedPriorConfigurationSha256: null,
+    expectedPriorProfileDigest: null,
+    repositoryRoot: "C:\\safe\\repo",
+    configurationPath: "C:\\safe\\provider-host.json",
+    configurationSha256: "1".repeat(64),
+    tlsSpkiSha256: "2".repeat(64),
+    bearerCredentialReference: "provider-bearer",
+    dispatchLeaseCredentialReference: "provider-dispatch-lease",
+    profileDigest: "3".repeat(64),
+    providers: [{ provider: "codex" as const, adapterId: "sxsy-b122.codex", moduleSha256: "4".repeat(64) }]
+  };
+  const service = new CompanionService({
+    providerDispatchProfiles: {
+      async install(value, networkPolicyPath) { calls.push(["install", value, networkPolicyPath]); return value; },
+      async current(repositoryRoot) { calls.push(["current", repositoryRoot]); return profile; }
+    }
+  });
+  const installed = await service.handle(request("provider-profile-install", "provider-host.profile.install", {
+    profile,
+    networkPolicyPath: "C:\\safe\\network-policy.json"
+  }));
+  const current = await service.handle(request("provider-profile-current", "provider-host.profile.current", { repositoryRoot: "C:\\safe\\repo" }));
+  assert.equal(installed.ok, true);
+  assert.equal(current.ok, true);
+  assert.deepEqual(calls, [["install", profile, "C:\\safe\\network-policy.json"], ["current", "C:\\safe\\repo"]]);
+
+  const injected = await service.handle(request("provider-profile-extra", "provider-host.profile.install", { profile, networkPolicyPath: "C:\\safe\\network-policy.json", command: "calc.exe" }));
+  const relative = await service.handle(request("provider-profile-relative", "provider-host.profile.install", { profile, networkPolicyPath: "network-policy.json" }));
+  assert.equal(injected.ok, false);
+  assert.equal(relative.ok, false);
+  assert.equal(calls.length, 2);
+
+  const unavailable = await new CompanionService().handle(request("provider-profile-unavailable", "provider-host.profile.current", { repositoryRoot: "C:\\safe\\repo" }));
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error?.code, "capability_denied");
+});
+
 test("acceptance and scanner administration cross only installed user-presence-backed ports", async () => {
   const calls: string[] = [];
   const keyId = "a".repeat(64);
