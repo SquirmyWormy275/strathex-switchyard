@@ -35,6 +35,40 @@ test("append-only records are sequence-numbered and hash chained", async () => {
   });
 });
 
+test("a multi-record protected transaction commits all records or none", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-atomic-store-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  let seals = 0;
+  let failSecondSeal = true;
+  const authenticator: JournalAuthenticator = {
+    provider: "isolated-failing-host-key",
+    async seal(hash) {
+      seals += 1;
+      if (failSecondSeal && seals === 2) throw new Error("simulated second-record seal failure");
+      return `isolated-secret:${hash}`;
+    },
+    async verify(hash, tag) { return tag === `isolated-secret:${hash}`; }
+  };
+  const path = join(directory, "protected.jsonl");
+  const store = new ProtectedJsonStore({ filePath: path, authenticator, requireAuthenticatedProtection: true });
+
+  await assert.rejects(store.transaction(async (transaction) => {
+    await transaction.append("test.first", { message: "must roll back" });
+    await transaction.append("test.second", { message: "seal fails" });
+  }), /authenticator/i);
+
+  assert.deepEqual(await store.readEntries(), []);
+  seals = 0;
+  failSecondSeal = false;
+  await store.transaction(async (transaction) => {
+    await transaction.append("test.first", { message: "one" });
+    await transaction.append("test.second", { message: "two" });
+  });
+  const committed = await store.readEntries();
+  assert.equal(committed.length, 2);
+  assert.equal(committed[1]?.previousHash, committed[0]?.hash);
+});
+
 test("tampering with a protected journal fails closed", async () => {
   await withStore(async (store) => {
     await store.append("test.first", { message: "one" });
