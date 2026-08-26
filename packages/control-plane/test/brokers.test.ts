@@ -165,11 +165,17 @@ test("active containment prevents a test-environment allocation before any dispo
   assert.equal(blocked.status, "blocked");
   assert.equal(blocked.environment, undefined);
 
-  const released = containment.release({ repositoryRoot: target.repositoryRoot, reason: "isolated test release", reauthenticated: true, incidentStatus: "not_required", expectedFenceEpoch: 1, expectedActivationOperationId: "containment" });
-  assert.equal(released.status, "released");
-  const afterRelease = await testEnvironment.prepare(request);
-  assert.equal(afterRelease.status, "completed");
-  assert.equal(afterRelease.environment?.id, "test-1");
+  const released = containment.release({
+    repositoryRoot: target.repositoryRoot,
+    reason: "isolated test release",
+    reauthenticated: true,
+    expectedFenceEpoch: 1,
+    expectedActivationOperationId: "containment",
+    expectedIncidentId: containment.exportState().records[0]!.incidentId!,
+    expectedIncidentDigest: "0".repeat(64)
+  });
+  assert.equal(released.status, "blocked");
+  assert.equal((await testEnvironment.prepare(request)).status, "blocked");
 });
 
 test("unavailable high-risk adapters fail closed instead of pretending to isolate or automate", async () => {

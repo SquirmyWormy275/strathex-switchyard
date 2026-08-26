@@ -5,7 +5,9 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  containmentIncidentReviewDigest,
   DurableContainmentIncidentCoordinator,
+  releaseContainmentIncidentInTransaction,
   type ContainmentAssessmentEffectPort,
   type ContainmentAssessmentRequest,
   type ContainmentAssessmentResult
@@ -99,9 +101,10 @@ test("remote unknown and missing credential remediation keep release unavailable
 test("remediation permits are exact, one-time, no-egress, and invalid across fence generations", async (context) => {
   let now = Date.parse("2026-08-25T12:00:00.000Z");
   const { coordinator, incident } = await fixture(context, { now: () => new Date(now).toISOString() });
-  await coordinator.assess(incident.id, new AssessmentPort());
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
   const permit = await coordinator.issueRemediationPermit({
     incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
     action: "remove_exposed_value",
     relativePaths: ["config/local.env"],
     expiresAt: "2026-08-25T12:05:00.000Z",
@@ -117,7 +120,7 @@ test("remediation permits are exact, one-time, no-egress, and invalid across fen
     remediatedFindingIds: ["finding-worktree-token"],
     evidenceDigest: sha256("receipt")
   }), /path/i);
-  await coordinator.recordRemediation({
+  const remediated = await coordinator.recordRemediation({
     permitId: permit.id,
     incidentId: incident.id,
     action: permit.action,
@@ -136,6 +139,7 @@ test("remediation permits are exact, one-time, no-egress, and invalid across fen
 
   await coordinator.recordRotationReview({
     incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(remediated),
     disposition: "complete",
     evidenceReference: "credential-rotation-ticket-17",
     evidenceDigest: sha256("rotation evidence")
@@ -153,6 +157,7 @@ test("remediation permits are exact, one-time, no-egress, and invalid across fen
   now += 10 * 60_000;
   await assert.rejects(coordinator.issueRemediationPermit({
     incidentId: replacement.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(replacement),
     action: "remove_exposed_value",
     relativePaths: ["config/local.env"],
     expiresAt: "2026-08-25T12:05:00.000Z",
@@ -162,14 +167,72 @@ test("remediation permits are exact, one-time, no-egress, and invalid across fen
 
 test("release readiness requires exact finding receipts and credential-rotation evidence", async (context) => {
   const { coordinator, incident } = await fixture(context);
-  await coordinator.assess(incident.id, new AssessmentPort());
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
   await coordinator.recordRotationReview({
     incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
     disposition: "complete",
     evidenceReference: "credential-rotation-ticket-18",
     evidenceDigest: sha256("rotation evidence")
   });
   await assert.rejects(coordinator.assertReadyForRelease(incident.id), /finding.*remediation/i);
+});
+
+test("release is bound to one exact ready incident image and published in the caller transaction", async (context) => {
+  const { store, coordinator, incident } = await fixture(context);
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0];
+  assert.ok(finding);
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  const remediated = await coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("remediation evidence")
+  });
+  let ready = await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(remediated),
+    disposition: "complete",
+    evidenceReference: "rotation-ticket-atomic",
+    evidenceDigest: sha256("rotation evidence one")
+  });
+  const staleDigest = containmentIncidentReviewDigest(ready);
+  ready = await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(ready),
+    disposition: "complete",
+    evidenceReference: "rotation-ticket-atomic-updated",
+    evidenceDigest: sha256("rotation evidence two")
+  });
+
+  await assert.rejects(store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+    incidentId: ready.id,
+    incidentDigest: staleDigest,
+    repositoryRoot: ready.repositoryRoot,
+    fenceEpoch: ready.fenceEpoch,
+    activationOperationId: ready.activationOperationId
+  }, "2026-08-25T13:00:00.000Z")), /changed after review/i);
+  assert.equal((await coordinator.get(ready.id))?.status, "ready_for_release");
+
+  const released = await store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+    incidentId: ready.id,
+    incidentDigest: containmentIncidentReviewDigest(ready),
+    repositoryRoot: ready.repositoryRoot,
+    fenceEpoch: ready.fenceEpoch,
+    activationOperationId: ready.activationOperationId
+  }, "2026-08-25T13:00:00.000Z"));
+  assert.equal(released.status, "released");
+  assert.equal((await coordinator.get(ready.id))?.releasedAt, "2026-08-25T13:00:00.000Z");
 });
 
 test("durable containment atomically opens and automatically resumes the incident assessment", async (context) => {
@@ -192,6 +255,7 @@ test("durable containment atomically opens and automatically resumes the inciden
   assert.ok(finding);
   const permit = await manager.incidents.issueRemediationPermit({
     incidentId: incident!.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(incident!),
     action: "remove_exposed_value",
     relativePaths: [finding.relativePath],
     expiresAt: "2099-01-01T00:00:00.000Z",

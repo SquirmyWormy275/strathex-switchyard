@@ -15,7 +15,7 @@ import type {
   EffectGuard
 } from "./brokers.ts";
 import { commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
-import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
+import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult } from "./containment.ts";
 import type { ContainmentRemediationBinding } from "./containment-incidents.ts";
 import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { ChildOperationLease, ChildOperationSaga } from "./operations.ts";
@@ -180,9 +180,10 @@ export interface ContainmentReleaseCommandRequest {
   readonly review: Readonly<{
     reauthenticated: boolean;
     reason: string;
-    incidentStatus: IncidentStatus;
     expectedFenceEpoch: number;
     expectedActivationOperationId: string;
+    expectedIncidentId: string;
+    expectedIncidentDigest: string;
   }>;
 }
 

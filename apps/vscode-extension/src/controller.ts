@@ -869,28 +869,65 @@ export class ManagedSessionController {
     const hookSummary = containment.hookStates.map((hook) => `${hook.name}=${hook.status} (attempts ${hook.attempts})`).join("; ");
     const exposureSummary = containment.uncontrolledPaths.length ? containment.uncontrolledPaths.join(", ") : "none declared";
     const failureSummary = containment.hookFailures.length ? containment.hookFailures.join("; ") : "none";
-    await this.vscode.window.showInformationMessage(`SXSY-B122 containment inspection: active fence ${containment.fenceEpoch}, activation ${containment.activatedByOperationId}; hooks ${hookSummary}; hook failures ${failureSummary}; uncontrolled exposure ${exposureSummary}.`);
+    const assessmentSummary = containment.incident.steps.map((step) => `${step.name}=${step.result?.status ?? step.status}`).join("; ");
+    const findingSummary = containment.incident.steps.flatMap((step) => step.result?.findings ?? []).map((finding) => `${finding.id} (${finding.relativePath})`).join(", ") || "none";
+    await this.vscode.window.showInformationMessage(`SXSY-B122 containment inspection: active fence ${containment.fenceEpoch}, activation ${containment.activatedByOperationId}, incident ${containment.incident.status}; assessment ${assessmentSummary}; findings ${findingSummary}; hooks ${hookSummary}; hook failures ${failureSummary}; uncontrolled exposure ${exposureSummary}.`);
     if (containment.hookStates.some((hook) => hook.status !== "completed") || containment.hookFailures.length) {
       await this.vscode.window.showWarningMessage("SXSY-B122 containment release is unavailable until every exact revocation/cancellation hook is complete without a retained failure.");
       return;
     }
+    if (containment.incident.status === "assessing" || containment.incident.status === "assessment_incomplete") {
+      const choice = await this.vscode.window.showQuickPick([{ label: `Reassess exact incident ${containment.incident.id}`, description: "Read-only local Git assessment; network and secret-value output remain disabled" }], { placeHolder: "Containment assessment is incomplete; explicitly retry only this exact durable incident" });
+      if (!choice || choice.label !== `Reassess exact incident ${containment.incident.id}`) return;
+      const reassessed = await this.bridge.reassessContainment({ sessionId: session.id, expectedIncidentId: containment.incident.id, expectedIncidentDigest: containment.incidentDigest });
+      if (!reassessed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment reassessment unavailable: ${reassessed.message}`); return; }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 containment reassessment is now ${reassessed.value.incident.status}; review the exact incident again before any next step.`);
+      return;
+    }
+    if (containment.incident.status === "remediation_required") {
+      const remediated = new Set(containment.incident.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
+      const pendingFindings = containment.incident.steps.flatMap((step) => step.result?.findings ?? []).filter((finding) => !remediated.has(finding.id));
+      if (pendingFindings.length) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 containment still requires exact local remediation commits for: ${pendingFindings.map((finding) => `${finding.id} (${finding.relativePath})`).join(", ")}. Use the local-commit chord; it will request a one-time no-egress permit for only those findings.`);
+        return;
+      }
+      const credentialFinding = containment.incident.steps.some((step) => step.result?.findings.some((finding) => finding.credentialRelated));
+      const dispositionChoice = await this.vscode.window.showQuickPick(credentialFinding
+        ? [{ label: "Credential rotation completed", description: "Credential-related findings cannot be marked not-required" }]
+        : [{ label: "Credential rotation completed", description: "Record externally completed rotation evidence" }, { label: "Credential rotation not required", description: "Valid only because no credential-related finding exists" }],
+      { placeHolder: "Record the exact credential-rotation disposition for this incident" });
+      if (!dispositionChoice) return;
+      const disposition = dispositionChoice.label === "Credential rotation completed" ? "complete" as const : "not_required" as const;
+      const evidenceReference = await this.vscode.window.showInputBox?.({ prompt: "Enter the bounded ticket, receipt, or review reference for this rotation disposition", validateInput: (value) => value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value) ? undefined : "Enter one non-empty line of at most 512 characters." });
+      if (!evidenceReference) return;
+      const evidenceDigest = createHash("sha256").update(JSON.stringify({ disposition, evidenceReference: evidenceReference.trim(), incidentId: containment.incident.id }), "utf8").digest("hex");
+      const review = await this.vscode.window.showQuickPick([{ label: `Record rotation review for ${containment.incident.id}`, description: disposition, detail: `Evidence digest ${evidenceDigest}` }], { placeHolder: "Final exact incident evidence review" });
+      if (!review || review.label !== `Record rotation review for ${containment.incident.id}`) return;
+      const recorded = await this.bridge.recordContainmentRotation({ sessionId: session.id, expectedIncidentId: containment.incident.id, expectedIncidentDigest: containment.incidentDigest, disposition, evidenceReference: evidenceReference.trim(), evidenceDigest });
+      if (!recorded.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment rotation review unavailable: ${recorded.message}`); return; }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 recorded the exact incident rotation review; durable incident status is now ${recorded.value.incident.status}.`);
+      return;
+    }
+    if (containment.incident.status !== "ready_for_release") {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 containment release is unavailable: durable incident ${containment.incident.id} is ${containment.incident.status}.`);
+      return;
+    }
     const reason = await this.vscode.window.showInputBox?.({ prompt: "Record the incident review and why containment may be released", validateInput: (value) => value.trim() && value.length <= 2_048 && !/\0/.test(value) ? undefined : "Enter a bounded non-empty incident-review reason." });
     if (!reason) return;
-    const rotation = await this.vscode.window.showQuickPick(["Credential rotation complete", "Credential rotation not required"] as const, { placeHolder: "Confirm credential-rotation disposition before Windows reauthentication" });
-    if (!rotation) return;
     const finalLabel = `Release exact containment fence ${containment.fenceEpoch}`;
     const finalConfirmation = await this.vscode.window.showQuickPick([{
       label: finalLabel,
       description: `Activation ${containment.activatedByOperationId}`,
-      detail: `Hooks: ${hookSummary}. Rotation: ${rotation}. Uncontrolled exposure: ${exposureSummary}.`
+      detail: `Incident ${containment.incident.id}; digest ${containment.incidentDigest}; hooks ${hookSummary}; uncontrolled exposure ${exposureSummary}.`
     }], { placeHolder: "Final review before the one-time current-user containment-release confirmation" });
     if (!finalConfirmation || finalConfirmation.label !== finalLabel) return;
     const result = await this.bridge.releaseContainment({
       sessionId: session.id,
       reason,
-      incidentStatus: rotation === "Credential rotation complete" ? "rotation_complete" : "not_required",
       expectedFenceEpoch: containment.fenceEpoch,
-      expectedActivationOperationId: containment.activatedByOperationId
+      expectedActivationOperationId: containment.activatedByOperationId,
+      expectedIncidentId: containment.incident.id,
+      expectedIncidentDigest: containment.incidentDigest
     });
     if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release unavailable: ${result.message}`); return; }
     const show = result.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
@@ -1585,6 +1622,7 @@ export class ManagedSessionController {
     const git = inspected.value;
     let mutation: ReviewedGitMutation | undefined;
     if (action === "local_commit") {
+      let containmentRemediation: Extract<ReviewedGitMutation, { kind: "local_commit" }>["containmentRemediation"];
       const available = [...new Set(git.changedPaths)].filter((path) => path && !path.includes(","));
       if (!available.length) {
         await this.vscode.window.showWarningMessage("SXSY-B122 found no structured changed-file list for a local commit; it will not infer paths from terminal text.");
@@ -1601,6 +1639,48 @@ export class ManagedSessionController {
       if (!selection) return false;
       const paths = splitReviewedPaths(selection);
       if (!paths.length || paths.some((path) => !available.includes(path))) return false;
+      const containment = await this.bridge.inspectContainment(sessionId);
+      if (containment.ok) {
+        if (containment.value.incident.status !== "remediation_required") {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 local commit remains fenced while containment incident ${containment.value.incident.id} is ${containment.value.incident.status}; inspect the incident workflow first.`);
+          return false;
+        }
+        const remediated = new Set(containment.value.incident.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
+        const pendingByPath = containment.value.incident.steps.flatMap((step) => (step.result?.findings ?? []).map((finding) => ({ step: step.name, finding })))
+          .filter(({ finding }) => !remediated.has(finding.id));
+        const selected = pendingByPath.filter(({ finding }) => paths.some((path) => samePath(path, finding.relativePath)));
+        if (!selected.length || paths.some((path) => !selected.some(({ finding }) => samePath(path, finding.relativePath)))) {
+          await this.vscode.window.showWarningMessage("SXSY-B122 containment remediation commits may include only exact currently unremediated finding paths.");
+          return false;
+        }
+        if (selected.some(({ step }) => step !== "working_tree")) {
+          await this.vscode.window.showWarningMessage("SXSY-B122 local commit cannot claim a history or remote-tracking rewrite; use the dedicated containment history-remediation workflow.");
+          return false;
+        }
+        const actionChoice = await this.vscode.window.showQuickPick([
+          { label: "Remove exposed value", description: "Commit the reviewed redacted-value removal on only these finding paths" },
+          { label: "Add ignore rule", description: "Commit the reviewed ignore-rule remediation on only these finding paths" }
+        ], { placeHolder: `Issue one five-minute no-egress permit for ${selected.length} exact finding(s)` });
+        if (!actionChoice) return false;
+        const remediationAction = actionChoice.label === "Remove exposed value" ? "remove_exposed_value" as const : "add_ignore_rule" as const;
+        const expiresAt = new Date(Date.parse(this.now()) + 5 * 60_000).toISOString();
+        const issued = await this.bridge.issueContainmentPermit({
+          sessionId,
+          expectedIncidentId: containment.value.incident.id,
+          expectedIncidentDigest: containment.value.incidentDigest,
+          action: remediationAction,
+          relativePaths: paths,
+          expiresAt
+        });
+        if (!issued.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment remediation permit unavailable: ${issued.message}`); return false; }
+        containmentRemediation = {
+          permitId: issued.value.permit.id,
+          incidentId: issued.value.permit.incidentId,
+          fenceEpoch: issued.value.permit.fenceEpoch,
+          action: issued.value.permit.action,
+          remediatedFindingIds: selected.map(({ finding }) => finding.id)
+        };
+      }
       const message = await input({ prompt: "Enter the exact local commit message", validateInput: (value) => value.trim() && value.length <= 120 && !/[\r\n\0]/.test(value) ? undefined : "Use one non-empty line of at most 120 characters." });
       if (!message) return false;
       let featureBranch: string | undefined;
@@ -1608,7 +1688,7 @@ export class ManagedSessionController {
         featureBranch = await input({ prompt: "Review the new feature branch (this press creates it, then a fresh press commits against the new target)", validateInput: (value) => validBranchInput(value) ?? (git.defaultBranch === value ? "Choose a non-default feature branch." : undefined) });
         if (!featureBranch) return false;
       }
-      mutation = { kind: "local_commit", paths, message, ...(featureBranch ? { featureBranch } : {}) };
+      mutation = { kind: "local_commit", paths, message, ...(featureBranch ? { featureBranch } : {}), ...(containmentRemediation ? { containmentRemediation } : {}) };
     } else if (action === "pr_upsert") {
       if (!git.branch) return false;
       const baseBranch = await input({ prompt: "Review the pull request base branch", ...(git.defaultBranch ? { value: git.defaultBranch } : {}), validateInput: validBranchInput });

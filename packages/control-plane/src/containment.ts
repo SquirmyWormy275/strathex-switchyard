@@ -3,6 +3,7 @@ import { redactText } from "./redaction.ts";
 import {
   activateContainmentIncidentInTransaction,
   DurableContainmentIncidentCoordinator,
+  releaseContainmentIncidentInTransaction,
   type ContainmentAssessmentEffectPort,
   type ContainmentRemediationBinding
 } from "./containment-incidents.ts";
@@ -77,11 +78,13 @@ export interface ContainmentReleaseRequest {
   readonly reason: string;
   /** Must be asserted only by the authenticated companion-UI reauth flow. */
   readonly reauthenticated: boolean;
-  readonly incidentStatus: IncidentStatus;
   /** Exact active fence reviewed by the current-user release UI. */
   readonly expectedFenceEpoch: number;
   /** Exact activation operation reviewed by the current-user release UI. */
   readonly expectedActivationOperationId: string;
+  /** Exact durable incident image reviewed by the current-user release UI. */
+  readonly expectedIncidentId: string;
+  readonly expectedIncidentDigest: string;
 }
 
 export interface ContainmentReleaseResult {
@@ -99,18 +102,23 @@ export interface DurableContainmentHooks {
   readonly cancelQueuedOperations?: (input: Readonly<{ repositoryRoot: string; fenceEpoch: number }>) => Promise<void>;
 }
 
-export type ContainmentReleaseBinding = Pick<ContainmentReleaseRequest, "expectedFenceEpoch" | "expectedActivationOperationId">;
+export type ContainmentReleaseBinding = Pick<ContainmentReleaseRequest,
+  "expectedFenceEpoch" | "expectedActivationOperationId" | "expectedIncidentId" | "expectedIncidentDigest">;
 
 /** Hashes only the immutable reviewed fence identity; hook progress may safely advance before release. */
 export function containmentReleaseScopeDigest(binding: ContainmentReleaseBinding): string {
   if (!Number.isSafeInteger(binding.expectedFenceEpoch) || binding.expectedFenceEpoch < 1
     || !binding.expectedActivationOperationId.trim() || binding.expectedActivationOperationId.length > 256
-    || /[\r\n\0]/.test(binding.expectedActivationOperationId)) {
-    throw new Error("Containment release binding must name one exact positive fence epoch and bounded activation operation.");
+    || /[\r\n\0]/.test(binding.expectedActivationOperationId)
+    || !/^containment-incident:[a-f0-9]{64}$/.test(binding.expectedIncidentId)
+    || !/^[a-f0-9]{64}$/.test(binding.expectedIncidentDigest)) {
+    throw new Error("Containment release binding must name one exact fence and reviewed durable incident image.");
   }
   return sha256(stableJson({
     expectedActivationOperationId: binding.expectedActivationOperationId,
-    expectedFenceEpoch: binding.expectedFenceEpoch
+    expectedFenceEpoch: binding.expectedFenceEpoch,
+    expectedIncidentDigest: binding.expectedIncidentDigest,
+    expectedIncidentId: binding.expectedIncidentId
   }));
 }
 
@@ -230,19 +238,7 @@ export class InMemoryContainmentManager {
     if (!current.active) return { status: "blocked", reason: "Containment is already released; a keyboard press cannot change the historical record.", record: current };
     if (!request.reauthenticated) return { status: "blocked", reason: "Containment release requires companion-UI reauthentication." };
     if (!request.reason.trim()) return { status: "blocked", reason: "Containment release requires an incident review reason." };
-    if (request.incidentStatus === "rotation_pending") return { status: "blocked", reason: "Containment release requires credential rotation completion or an explicit not-required finding." };
-    if (!Number.isSafeInteger(request.expectedFenceEpoch) || request.expectedFenceEpoch < 1 || request.expectedFenceEpoch !== current.fenceEpoch
-      || !request.expectedActivationOperationId.trim() || request.expectedActivationOperationId !== current.activatedByOperationId) {
-      return { status: "blocked", reason: "Containment changed after review; inspect the exact active fence again before release.", record: current };
-    }
-    const record: ContainmentRecord = {
-      ...current,
-      active: false,
-      releasedAt: new Date().toISOString(),
-      releaseReason: request.reason
-    };
-    this.records.set(request.repositoryRoot, record);
-    return { status: "released", reason: "Authenticated containment release recorded.", record };
+    return { status: "blocked", reason: "The in-memory containment harness cannot validate or atomically release a durable incident.", record: current };
   }
 
   addFenceListener(listener: FenceListener): () => void {
@@ -344,6 +340,13 @@ export class DurableContainmentManager {
     return reconciled;
   }
 
+  /** Re-runs only the installed read-only/no-egress assessor for one exact reviewed incident image. */
+  async assessIncident(incidentId: string, expectedIncidentDigest: string) {
+    await this.ensureStartupRecovery();
+    if (!this.incidentAssessmentPort) throw new Error("No installed containment assessment port is configured.");
+    return this.incidents.assess(incidentId, this.incidentAssessmentPort, expectedIncidentDigest);
+  }
+
   async check(repositoryRoot: string, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): Promise<ContainmentCheck> {
     await this.ensureStartupRecovery(repositoryRoot);
     const record = durableRecords(await this.store.readEntries()).get(containmentKey(repositoryRoot));
@@ -393,7 +396,6 @@ export class DurableContainmentManager {
     await this.ensureStartupRecovery(request.repositoryRoot);
     if (!request.reauthenticated) return { status: "blocked", reason: "Containment release requires companion-UI reauthentication." };
     if (!request.reason.trim()) return { status: "blocked", reason: "Containment release requires an incident review reason." };
-    if (request.incidentStatus === "rotation_pending") return { status: "blocked", reason: "Containment release requires credential rotation completion or an explicit not-required finding." };
     return this.store.transaction(async (transaction) => {
       const records = durableRecords(await transaction.readEntries());
       const current = records.get(containmentKey(request.repositoryRoot));
@@ -405,6 +407,20 @@ export class DurableContainmentManager {
       }
       if (!current.hookStates || current.hookStates.length !== containmentHookNames.length || current.hookStates.some((state) => state.status !== "completed")) {
         return { status: "blocked", reason: "Containment release requires every durable revocation/cancellation hook to reconcile successfully.", record: cloneRecord(current) };
+      }
+      if (!current.incidentId || current.incidentId !== request.expectedIncidentId) {
+        return { status: "blocked", reason: "Containment changed after review; inspect the exact active incident again before release.", record: cloneRecord(current) };
+      }
+      try {
+        await releaseContainmentIncidentInTransaction(transaction, {
+          incidentId: request.expectedIncidentId,
+          incidentDigest: request.expectedIncidentDigest,
+          repositoryRoot: current.repositoryRoot,
+          fenceEpoch: current.fenceEpoch,
+          activationOperationId: current.activatedByOperationId
+        }, this.clock());
+      } catch {
+        return { status: "blocked", reason: "The exact durable containment incident is stale, incomplete, or not ready for release.", record: cloneRecord(current) };
       }
       const next: ContainmentRecord = {
         ...current,

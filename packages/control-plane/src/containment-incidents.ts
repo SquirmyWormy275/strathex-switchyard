@@ -129,6 +129,14 @@ export interface ContainmentIncidentActivation {
   readonly reason: string;
 }
 
+export interface ContainmentIncidentReleaseBinding {
+  readonly incidentId: string;
+  readonly incidentDigest: string;
+  readonly repositoryRoot: string;
+  readonly fenceEpoch: number;
+  readonly activationOperationId: string;
+}
+
 export type ContainmentIncidentLifecyclePhase = "assessment_claimed" | "assessment_effect_returned" | "assessment_persisted";
 
 export interface DurableContainmentIncidentCoordinatorOptions {
@@ -185,6 +193,45 @@ export async function activateContainmentIncidentInTransaction(
   return cloneIncident(record);
 }
 
+/** Exact protected incident image presented by the trusted release UI. */
+export function containmentIncidentReviewDigest(record: ContainmentIncidentRecord): string {
+  return sha256(stableJson(validateIncident(deriveStatus(record))));
+}
+
+/**
+ * Marks the exact reviewed, ready incident released inside the caller's
+ * existing protected-store transaction.  The fence and incident records can
+ * therefore be published as one journal replacement with no stale-review gap.
+ */
+export async function releaseContainmentIncidentInTransaction(
+  transaction: JsonStoreTransaction,
+  input: ContainmentIncidentReleaseBinding,
+  timestamp: string
+): Promise<ContainmentIncidentRecord> {
+  const incidentId = exactIncidentId(input.incidentId);
+  const expectedDigest = exactDigest(input.incidentDigest, "containment incident review");
+  const repositoryRoot = exactRepositoryRoot(input.repositoryRoot);
+  const fenceEpoch = positiveInteger(input.fenceEpoch, "containment incident release fence epoch");
+  const activationOperationId = boundedIdentifier(input.activationOperationId, "containment activation operation");
+  const incidents = incidentsFrom(await transaction.readEntries());
+  const current = requireCurrentIncident(incidents, incidentId);
+  requireLatestFence(incidents.values(), current);
+  const derived = deriveStatus(current);
+  if (containmentKey(derived.repositoryRoot) !== containmentKey(repositoryRoot)
+    || derived.fenceEpoch !== fenceEpoch
+    || derived.activationOperationId !== activationOperationId) {
+    throw new Error("The containment incident does not match the exact active fence reviewed for release.");
+  }
+  if (containmentIncidentReviewDigest(derived) !== expectedDigest) {
+    throw new Error("The containment incident changed after review; inspect it again before release.");
+  }
+  if (derived.status !== "ready_for_release") throw new Error("The containment incident is not ready for release.");
+  const releasedAt = exactTimestamp(timestamp);
+  const next = validateIncident({ ...derived, status: "released", releasedAt, updatedAt: releasedAt });
+  await transaction.append<SavedIncidentEvent>(eventKind, { record: next });
+  return cloneIncident(next);
+}
+
 export class DurableContainmentIncidentCoordinator {
   private readonly store: ProtectedJsonStore;
   private readonly now: () => string;
@@ -213,8 +260,15 @@ export class DurableContainmentIncidentCoordinator {
     return match ? cloneIncident(match) : undefined;
   }
 
-  async assess(incidentId: string, port: ContainmentAssessmentEffectPort): Promise<ContainmentIncidentRecord> {
+  async assess(incidentId: string, port: ContainmentAssessmentEffectPort, expectedIncidentDigest?: string): Promise<ContainmentIncidentRecord> {
     const exactId = exactIncidentId(incidentId);
+    if (expectedIncidentDigest !== undefined) {
+      const expected = exactDigest(expectedIncidentDigest, "containment incident review");
+      const incidents = incidentsFrom(await this.store.readEntries());
+      const reviewed = requireCurrentIncident(incidents, exactId);
+      requireLatestFence(incidents.values(), reviewed);
+      if (containmentIncidentReviewDigest(reviewed) !== expected) throw new Error("The containment incident changed after assessment review.");
+    }
     for (const stepName of assessmentSteps) {
       let current = await this.requireCurrent(exactId);
       let step = requireStep(current, stepName);
@@ -275,12 +329,14 @@ export class DurableContainmentIncidentCoordinator {
 
   async issueRemediationPermit(input: Readonly<{
     incidentId: string;
+    expectedIncidentDigest: string;
     action: ContainmentRemediationAction;
     relativePaths: readonly string[];
     expiresAt: string;
     reviewedBy: string;
   }>): Promise<ContainmentRemediationPermit> {
     const exactId = exactIncidentId(input.incidentId);
+    const expectedIncidentDigest = exactDigest(input.expectedIncidentDigest, "containment incident review");
     const action = remediationAction(input.action);
     const paths = exactRelativePaths(input.relativePaths);
     const reviewedBy = boundedText(input.reviewedBy, "remediation reviewer", 256);
@@ -291,6 +347,7 @@ export class DurableContainmentIncidentCoordinator {
       const incidents = incidentsFrom(await transaction.readEntries());
       const current = requireCurrentIncident(incidents, exactId);
       requireLatestFence(incidents.values(), current);
+      if (containmentIncidentReviewDigest(current) !== expectedIncidentDigest) throw new Error("The containment incident changed after remediation review.");
       if (!current.steps.every((step) => step.status === "completed")) throw new Error("Containment assessment must be terminal before remediation is authorized.");
       const allowedPaths = new Set(allFindings(current).map((finding) => finding.relativePath.toLowerCase()));
       if (!paths.every((path) => allowedPaths.has(path.toLowerCase()))) throw new Error("The containment remediation permit names a path outside the exact findings.");
@@ -390,16 +447,19 @@ export class DurableContainmentIncidentCoordinator {
 
   async recordRotationReview(input: Readonly<{
     incidentId: string;
+    expectedIncidentDigest: string;
     disposition: "complete" | "not_required";
     evidenceReference: string;
     evidenceDigest: string;
   }>): Promise<ContainmentIncidentRecord> {
     const exactId = exactIncidentId(input.incidentId);
+    const expectedIncidentDigest = exactDigest(input.expectedIncidentDigest, "containment incident review");
     const evidenceReference = boundedText(input.evidenceReference, "rotation evidence reference", 512);
     const evidenceDigest = exactDigest(input.evidenceDigest, "rotation evidence");
     if (input.disposition !== "complete" && input.disposition !== "not_required") throw new Error("The containment rotation disposition is invalid.");
     return this.update(exactId, (current, incidents) => {
       requireLatestFence(incidents.values(), current);
+      if (containmentIncidentReviewDigest(current) !== expectedIncidentDigest) throw new Error("The containment incident changed after credential-rotation review.");
       if (input.disposition === "not_required" && allFindings(current).some((finding) => finding.credentialRelated)) {
         throw new Error("Credential-related findings require completed rotation evidence.");
       }
@@ -429,12 +489,14 @@ export class DurableContainmentIncidentCoordinator {
   }
 
   async markReleased(incidentId: string): Promise<ContainmentIncidentRecord> {
-    await this.assertReadyForRelease(incidentId);
-    return this.update(exactIncidentId(incidentId), (current, incidents) => {
-      requireLatestFence(incidents.values(), current);
-      const at = exactTimestamp(this.now());
-      return { ...current, status: "released", releasedAt: at, updatedAt: at };
-    });
+    const current = await this.assertReadyForRelease(incidentId);
+    return this.store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+      incidentId: current.id,
+      incidentDigest: containmentIncidentReviewDigest(current),
+      repositoryRoot: current.repositoryRoot,
+      fenceEpoch: current.fenceEpoch,
+      activationOperationId: current.activationOperationId
+    }, exactTimestamp(this.now())));
   }
 
   private async requireCurrent(incidentId: string): Promise<ContainmentIncidentRecord> {
@@ -450,6 +512,7 @@ export class DurableContainmentIncidentCoordinator {
     return this.store.transaction(async (transaction) => {
       const incidents = incidentsFrom(await transaction.readEntries());
       const current = requireCurrentIncident(incidents, incidentId);
+      requireLatestFence(incidents.values(), current);
       const next = validateIncident(deriveStatus(mutate(cloneIncident(current), incidents)));
       await transaction.append<SavedIncidentEvent>(eventKind, { record: next });
       return cloneIncident(next);

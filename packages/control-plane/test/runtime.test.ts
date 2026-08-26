@@ -12,6 +12,7 @@ import { AuthorityLedger } from "../src/authority.ts";
 import { AllowlistedEvidenceAuthorizer, GateEvidenceLedger } from "../src/acceptance-evidence.ts";
 import { DurableBudgetManager } from "../src/budgets.ts";
 import { containmentReleaseScopeDigest, DurableContainmentManager } from "../src/containment.ts";
+import { containmentIncidentReviewDigest } from "../src/containment-incidents.ts";
 import { DurableMediatedExecutor } from "../src/runtime.ts";
 import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
@@ -361,14 +362,33 @@ test("containment release consumes a confirmation bound to the exact reviewed fe
       revokeCredentialLeases: async () => undefined,
       cancelQueuedOperations: async () => undefined
     }, { clock: () => now });
-    await containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment-op-7", reason: "isolated incident" });
+    const fence = await containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment-op-7", reason: "isolated incident" });
+    const assessed = await containment.incidents.assess(fence.incidentId!, {
+      async execute(request) {
+        return {
+          schema: "sxsy-b122.containment-assessment-result", version: 1, incidentId: request.incidentId,
+          repositoryRoot: request.repositoryRoot, fenceEpoch: request.fenceEpoch, step: request.step,
+          operationId: request.operationId, externalId: request.externalId, effectDisposition: "committed",
+          status: "passed", exposure: "none", summary: "No exposure found.", findings: []
+        };
+      },
+      async observe() { return undefined; }
+    });
+    const incident = await containment.incidents.recordRotationReview({
+      incidentId: fence.incidentId!, expectedIncidentDigest: containmentIncidentReviewDigest(assessed), disposition: "not_required", evidenceReference: "isolated incident review", evidenceDigest: "c".repeat(64)
+    });
     const runtime = new DurableMediatedExecutor({
       store, sessions, gateEvidence: gates, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
       enabledHighConsequenceActions: ["containment_release"],
       confirmationAttestor: { attest: async () => ({ reauthenticated: true, operator: "windows-user-presence" }) },
       dependencies: () => ({ containment })
     });
-    const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "containment-op-7" } as const;
+    const binding = {
+      expectedFenceEpoch: 1,
+      expectedActivationOperationId: "containment-op-7",
+      expectedIncidentId: incident.id,
+      expectedIncidentDigest: containmentIncidentReviewDigest(incident)
+    } as const;
     const prepared = await runtime.prepareCommand({
       action: "containment_release", sessionId: session.id, reason: "review exact fence",
       confirmationScopeDigest: containmentReleaseScopeDigest(binding)
@@ -379,14 +399,14 @@ test("containment release consumes a confirmation bound to the exact reviewed fe
 
     const stale = await runtime.releaseContainment({
       sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "stale",
-      incidentStatus: "rotation_complete", expectedFenceEpoch: 2, expectedActivationOperationId: "containment-op-7"
+      ...binding, expectedFenceEpoch: 2
     });
     assert.equal(stale.status, "blocked");
     assert.equal((await containment.get(target.repositoryRoot))?.active, true);
 
     const released = await runtime.releaseContainment({
       sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "incident resolved",
-      incidentStatus: "rotation_complete", ...binding
+      ...binding
     });
     assert.equal(released.status, "completed", JSON.stringify(released));
     assert.equal((await containment.get(target.repositoryRoot))?.active, false);

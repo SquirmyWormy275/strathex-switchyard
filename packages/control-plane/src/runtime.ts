@@ -15,7 +15,7 @@ import {
   type DispatchGovernanceRequest,
   type DispatchReceiptEvidenceFactory
 } from "./dispatch.ts";
-import { containmentReleaseScopeDigest, type IncidentStatus } from "./containment.ts";
+import { containmentReleaseScopeDigest } from "./containment.ts";
 import { DurableOperationCoordinator, NoReplayOperationRecovery, OperationSagaStore, type OperationReconciler, type ReconciliationResult } from "./operations.ts";
 import { ExecutionControlRegistry, type ExecutionControl, type OperationControlAdapter } from "./execution-control.ts";
 import type { EffectGuard } from "./brokers.ts";
@@ -155,9 +155,10 @@ export interface RuntimeContainmentReleaseRequest {
   readonly authorityId: string;
   readonly confirmationToken: string;
   readonly reason: string;
-  readonly incidentStatus: IncidentStatus;
   readonly expectedFenceEpoch: number;
   readonly expectedActivationOperationId: string;
+  readonly expectedIncidentId: string;
+  readonly expectedIncidentDigest: string;
 }
 
 export interface RuntimeCommandPreparationRequest {
@@ -832,9 +833,10 @@ export class DurableMediatedExecutor {
       review: {
         reauthenticated: true,
         reason: request.reason,
-        incidentStatus: request.incidentStatus,
         expectedFenceEpoch: request.expectedFenceEpoch,
-        expectedActivationOperationId: request.expectedActivationOperationId
+        expectedActivationOperationId: request.expectedActivationOperationId,
+        expectedIncidentId: request.expectedIncidentId,
+        expectedIncidentDigest: request.expectedIncidentDigest
       }
     };
     return dispatcher.dispatchContainmentRelease(release);

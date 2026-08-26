@@ -27,6 +27,7 @@ import { AttestedRuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegistry, InstalledWindowsSandboxIsolationRuntime } from "./sandbox-installation.ts";
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
+import { containmentIncidentReviewDigest } from "../../../packages/control-plane/src/containment-incidents.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
 import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderCommandTransport, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
@@ -685,15 +686,47 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     receiptEvidence: options.receiptEvidence
   });
   const hardwareSignalDispatcher = new CompanionHardwareSignalDispatcher(hardwareSignals, executor);
-  const containmentRelease = new AttestedContainmentReleaseCoordinator(executor, {
-    inspect: async (sessionId) => {
+  const inspectContainmentSession = async (sessionId: string) => {
       const session = await sessions.get(sessionId);
       if (!session) return undefined;
       let target;
       try { target = await targetResolver.resolve({ definition: commandForAction("containment_release"), session }); }
       catch { return undefined; }
       if (!target || target.completeness !== "complete") return undefined;
-      return containmentManager.get(target.repositoryRoot);
+      const fence = await containmentManager.get(target.repositoryRoot);
+      if (!fence?.incidentId) return undefined;
+      const incident = await containmentManager.incidents.get(fence.incidentId);
+      return incident ? { fence, incident } : undefined;
+  };
+  const containmentRelease = new AttestedContainmentReleaseCoordinator(executor, {
+    inspect: inspectContainmentSession,
+    assess: async (input) => {
+      const current = await inspectContainmentSession(input.sessionId);
+      if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after assessment review.");
+      await containmentManager.assessIncident(input.incidentId, input.expectedIncidentDigest);
+    },
+    issuePermit: async (input) => {
+      const current = await inspectContainmentSession(input.sessionId);
+      if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after remediation review.");
+      return containmentManager.incidents.issueRemediationPermit({
+        incidentId: input.incidentId,
+        expectedIncidentDigest: input.expectedIncidentDigest,
+        action: input.action,
+        relativePaths: input.relativePaths,
+        expiresAt: input.expiresAt,
+        reviewedBy: "authenticated-vscode-current-user"
+      });
+    },
+    recordRotation: async (input) => {
+      const current = await inspectContainmentSession(input.sessionId);
+      if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after credential-rotation review.");
+      await containmentManager.incidents.recordRotationReview({
+        incidentId: input.incidentId,
+        expectedIncidentDigest: input.expectedIncidentDigest,
+        disposition: input.disposition,
+        evidenceReference: input.evidenceReference,
+        evidenceDigest: input.evidenceDigest
+      });
     }
   });
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);

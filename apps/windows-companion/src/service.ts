@@ -69,6 +69,9 @@ import {
   type ProviderHostProfileScopePayload,
   type ProviderHandshakePayload,
   type ContainmentInspectionPayload,
+  type ContainmentIncidentBindingPayload,
+  type ContainmentPermitIssuePayload,
+  type ContainmentRotationRecordPayload,
   type ContainmentReleasePayload,
   type RawHidInstallPayload,
   type HardwareSignalBindingPayload,
@@ -350,6 +353,12 @@ export class CompanionService {
           return this.success(request.id, await this.direct(context, (signal) => this.providerHandshake(this.requireProviderHandshake(request.payload), signal)));
         case "containment.inspect":
           return this.success(request.id, { containment: await this.inspectContainment(this.requireContainmentInspection(request.payload)) });
+        case "containment.assess":
+          return this.success(request.id, { containment: await this.assessContainment(this.requireContainmentIncidentBinding(request.payload)) });
+        case "containment.permit.issue":
+          return this.success(request.id, await this.issueContainmentPermit(this.requireContainmentPermitIssue(request.payload)));
+        case "containment.rotation.record":
+          return this.success(request.id, { containment: await this.recordContainmentRotation(this.requireContainmentRotationRecord(request.payload)) });
         case "containment.release":
           return this.success(request.id, { command: await this.releaseContainment(this.requireContainmentRelease(request.payload)) });
         case "raw-hid.install":
@@ -871,6 +880,39 @@ export class CompanionService {
     return result;
   }
 
+  private async assessContainment(payload: ContainmentIncidentBindingPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment assessment boundary is attached.");
+    try {
+      const result = await this.containmentRelease.reassess(payload);
+      this.record("containment.assess", "completed", "Reconciled the exact durable containment assessment without egress.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment assessment is unavailable, stale, or incomplete.");
+    }
+  }
+
+  private async issueContainmentPermit(payload: ContainmentPermitIssuePayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment remediation-review boundary is attached.");
+    try {
+      const result = await this.containmentRelease.issueRemediationPermit(payload);
+      this.record("containment.permit.issue", "completed", "Issued one exact no-egress, no-credential remediation permit.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment remediation permit was refused because its incident, findings, paths, or review changed.");
+    }
+  }
+
+  private async recordContainmentRotation(payload: ContainmentRotationRecordPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment credential-rotation review boundary is attached.");
+    try {
+      const result = await this.containmentRelease.recordRotationReview(payload);
+      this.record("containment.rotation.record", "completed", "Recorded the exact credential-rotation evidence disposition for the durable incident.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment credential-rotation review was refused because the incident or evidence binding changed.");
+    }
+  }
+
   private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
     if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "scopes", "sealedSecret"], ["replaceExisting"])
       || !credentialIdentifier(payload.reference) || !Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 16
@@ -973,22 +1015,68 @@ export class CompanionService {
     return { sessionId: payload.sessionId.trim() };
   }
 
+  private requireContainmentIncidentBinding(payload: unknown): ContainmentIncidentBindingPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment incident administration requires one exact session and reviewed durable incident image.");
+    }
+    return { sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest };
+  }
+
+  private requireContainmentPermitIssue(payload: unknown): ContainmentPermitIssuePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "action", "relativePaths", "expiresAt"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(payload.action))
+      || !Array.isArray(payload.relativePaths) || !payload.relativePaths.length || payload.relativePaths.length > 256
+      || !payload.relativePaths.every((path) => safeContainmentRelativePath(path))
+      || new Set(payload.relativePaths.map((path) => String(path).toLowerCase())).size !== payload.relativePaths.length
+      || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt)) || new Date(payload.expiresAt).toISOString() !== payload.expiresAt) {
+      throw new CompanionServiceError("invalid_request", "Containment remediation review requires one exact incident, closed action, bounded unique finding paths, and ISO expiry.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      action: payload.action as ContainmentPermitIssuePayload["action"], relativePaths: payload.relativePaths as string[], expiresAt: payload.expiresAt
+    };
+  }
+
+  private requireContainmentRotationRecord(payload: unknown): ContainmentRotationRecordPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "disposition", "evidenceReference", "evidenceDigest"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || (payload.disposition !== "complete" && payload.disposition !== "not_required")
+      || typeof payload.evidenceReference !== "string" || !payload.evidenceReference.trim() || payload.evidenceReference.length > 512 || /[\r\n\0]/.test(payload.evidenceReference)
+      || typeof payload.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.evidenceDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment credential-rotation review requires one exact incident, closed disposition, and bounded evidence reference and digest.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      disposition: payload.disposition, evidenceReference: payload.evidenceReference.trim(), evidenceDigest: payload.evidenceDigest
+    };
+  }
+
   private requireContainmentRelease(payload: unknown): ContainmentReleasePayload {
-    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "incidentStatus", "expectedFenceEpoch", "expectedActivationOperationId"])
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "expectedFenceEpoch", "expectedActivationOperationId", "expectedIncidentId", "expectedIncidentDigest"])
       || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /[\0]/.test(payload.reason)
-      || (payload.incidentStatus !== "rotation_complete" && payload.incidentStatus !== "not_required")
       || !Number.isSafeInteger(payload.expectedFenceEpoch) || Number(payload.expectedFenceEpoch) < 1
       || typeof payload.expectedActivationOperationId !== "string" || !payload.expectedActivationOperationId.trim()
-      || payload.expectedActivationOperationId.length > 256 || /[\r\n\0]/.test(payload.expectedActivationOperationId)) {
-      throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, reviewed fence epoch and activation operation, bounded incident reason, and completed-or-not-required credential rotation status.");
+      || payload.expectedActivationOperationId.length > 256 || /[\r\n\0]/.test(payload.expectedActivationOperationId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, reviewed fence and durable incident image, and bounded incident reason.");
     }
     return {
       sessionId: payload.sessionId.trim(),
       reason: payload.reason.trim(),
-      incidentStatus: payload.incidentStatus,
       expectedFenceEpoch: Number(payload.expectedFenceEpoch),
-      expectedActivationOperationId: payload.expectedActivationOperationId.trim()
+      expectedActivationOperationId: payload.expectedActivationOperationId.trim(),
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
     };
   }
 
@@ -1563,11 +1651,16 @@ function parseGitMutation(value: unknown): GitMutation {
   if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Git review requires a typed mutation record.");
   switch (value.kind) {
     case "local_commit":
-      exactMutationKeys(value, ["kind", "paths", "message", ...(value.featureBranch === undefined ? [] : ["featureBranch"])]);
+      exactMutationKeys(value, ["kind", "paths", "message", ...(value.featureBranch === undefined ? [] : ["featureBranch"]), ...(value.containmentRemediation === undefined ? [] : ["containmentRemediation"])]);
       if (!Array.isArray(value.paths) || !value.paths.length || value.paths.length > 256 || !value.paths.every((path) => typeof path === "string" && path.length <= 512)
         || typeof value.message !== "string" || !value.message.trim() || value.message.length > 120
-        || (value.featureBranch !== undefined && typeof value.featureBranch !== "string")) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths, message, and optional feature branch.");
-      return { kind: "local_commit", paths: value.paths, message: value.message, ...(typeof value.featureBranch === "string" ? { featureBranch: value.featureBranch } : {}) };
+        || (value.featureBranch !== undefined && typeof value.featureBranch !== "string")
+        || (value.containmentRemediation !== undefined && !isContainmentGitRemediation(value.containmentRemediation))) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths, message, optional feature branch, and an exact closed containment permit binding.");
+      return {
+        kind: "local_commit", paths: value.paths, message: value.message,
+        ...(typeof value.featureBranch === "string" ? { featureBranch: value.featureBranch } : {}),
+        ...(isContainmentGitRemediation(value.containmentRemediation) ? { containmentRemediation: value.containmentRemediation } : {})
+      };
     case "pr_upsert":
       exactMutationKeys(value, ["kind", "headBranch", "baseBranch", "title", "body"]);
       if (typeof value.headBranch !== "string" || typeof value.baseBranch !== "string"
@@ -1587,6 +1680,24 @@ function parseGitMutation(value: unknown): GitMutation {
     default:
       throw new CompanionServiceError("invalid_request", "Git review mutation kind is unknown.");
   }
+}
+
+function safeContainmentRelativePath(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 2_048 || /[\r\n\0]/.test(value)) return false;
+  const normalized = value.replaceAll("\\", "/");
+  return !normalized.startsWith("/") && !/^[A-Za-z]:/.test(normalized)
+    && normalized.split("/").every((part) => !!part && part !== "." && part !== ".." && part.toLowerCase() !== ".git");
+}
+
+function isContainmentGitRemediation(value: unknown): value is NonNullable<Extract<GitMutation, { kind: "local_commit" }>["containmentRemediation"]> {
+  return isRecord(value) && exactKeys(value, ["permitId", "incidentId", "fenceEpoch", "action", "remediatedFindingIds"])
+    && typeof value.permitId === "string" && /^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    && typeof value.incidentId === "string" && /^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    && Number.isSafeInteger(value.fenceEpoch) && Number(value.fenceEpoch) > 0
+    && ["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    && Array.isArray(value.remediatedFindingIds) && value.remediatedFindingIds.length > 0 && value.remediatedFindingIds.length <= 1_024
+    && value.remediatedFindingIds.every((id) => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id))
+    && new Set(value.remediatedFindingIds).size === value.remediatedFindingIds.length;
 }
 
 function exactMutationKeys(value: Record<string, unknown>, expected: readonly string[]): void {

@@ -18,13 +18,12 @@ test("containment is idempotent, fences brokered egress, and requires a durable 
 
 test("containment survives an in-memory restart snapshot and cannot be released by a toggle", () => {
   const original = new InMemoryContainmentManager();
-  original.activate({ repositoryRoot: "C:/work/example", operationId: "op-1", reason: "incident" });
+  const active = original.activate({ repositoryRoot: "C:/work/example", operationId: "op-1", reason: "incident" });
   const restored = InMemoryContainmentManager.restore(original.exportState());
 
   assert.equal(restored.check("C:/work/example", "git").allowed, false);
-  const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "op-1" } as const;
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: false, incidentStatus: "rotation_complete", ...binding }).status, "blocked");
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: true, incidentStatus: "rotation_pending", ...binding }).status, "blocked");
-  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "rotation complete", reauthenticated: true, incidentStatus: "rotation_complete", ...binding }).status, "released");
-  assert.equal(restored.check("C:/work/example", "git").allowed, true);
+  const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "op-1", expectedIncidentId: active.incidentId!, expectedIncidentDigest: "0".repeat(64) } as const;
+  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: false, ...binding }).status, "blocked");
+  assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: true, ...binding }).status, "blocked");
+  assert.equal(restored.check("C:/work/example", "git").allowed, false);
 });

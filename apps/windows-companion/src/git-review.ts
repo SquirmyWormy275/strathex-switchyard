@@ -176,6 +176,7 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
         if (requiresFeatureBranch !== (mutation.featureBranch !== undefined)) return blocked("A default-branch or detached-HEAD local commit requires one exact new feature branch, while a current feature branch must not carry one.");
         if (mutation.featureBranch !== undefined && (!validBranch(mutation.featureBranch) || mutation.featureBranch === target.defaultBranch || mutation.featureBranch === target.branch)) return blocked("Local commit review contains an invalid or default feature branch.");
         if (!mutation.paths.length || mutation.paths.length > 256 || !validCommitMessage(mutation.message)) return blocked("Local commit review requires bounded task-owned paths and a safe message.");
+        if (mutation.containmentRemediation && !validContainmentRemediation(mutation.containmentRemediation)) return blocked("Local commit review contains an invalid containment remediation permit or finding binding.");
         const normalized = mutation.paths.map(canonicalRepositoryPath);
         if (normalized.some((path) => !path) || new Set(normalized).size !== normalized.length) return blocked("Local commit review contains an unsafe or duplicate path.");
         let changed: readonly string[];
@@ -249,4 +250,13 @@ function key(action: string, targetSnapshotId: string, sessionId: string): strin
 function samePath(left: string, right: string): boolean { const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase(); return normalize(left) === normalize(right); }
 function validCommitMessage(value: string): boolean { return !!value.trim() && value.length <= 120 && !/[\0\r\n]/.test(value); }
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/"); }
+function validContainmentRemediation(value: NonNullable<Extract<GitMutation, { kind: "local_commit" }>["containmentRemediation"]>): boolean {
+  return /^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    && /^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    && Number.isSafeInteger(value.fenceEpoch) && value.fenceEpoch > 0
+    && ["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(value.action)
+    && value.remediatedFindingIds.length > 0 && value.remediatedFindingIds.length <= 1_024
+    && value.remediatedFindingIds.every((id) => /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id))
+    && new Set(value.remediatedFindingIds).size === value.remediatedFindingIds.length;
+}
 function cloneMutation<T extends GitMutation>(mutation: T): T { return JSON.parse(JSON.stringify(mutation)) as T; }

@@ -125,7 +125,7 @@ export interface PlanApprovalWorkflowReview {
 }
 
 export type ReviewedGitMutation =
-  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string }
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string; readonly containmentRemediation?: Readonly<{ readonly permitId: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly remediatedFindingIds: readonly string[] }> }
   | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
   | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
   | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
@@ -185,6 +185,14 @@ export interface RawHidRuntimeStatus { readonly supervisor: { readonly state: "u
 export type ContainmentHookName = "credential_lease_revocation" | "queued_operation_cancellation";
 export type ContainmentHookStatus = "pending" | "running" | "completed" | "failed" | "unavailable";
 export interface ContainmentHookInspection { readonly name: ContainmentHookName; readonly status: ContainmentHookStatus; readonly attempts: number; readonly updatedAt: string; readonly failure?: string; }
+export type ContainmentIncidentStatus = "assessing" | "assessment_incomplete" | "remediation_required" | "ready_for_release" | "released";
+export type ContainmentRemediationAction = "remove_exposed_value" | "rewrite_local_history" | "add_ignore_rule";
+export interface ContainmentRemediationPermitSummary { readonly id: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly relativePaths: readonly string[]; readonly reviewedBy: string; readonly issuedAt: string; readonly expiresAt: string; readonly networkAllowed: false; readonly credentialAccessAllowed: false; readonly consumedAt?: string; }
+export interface ContainmentRemediationReceiptSummary { readonly id: string; readonly permitId: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly relativePaths: readonly string[]; readonly remediatedFindingIds: readonly string[]; readonly evidenceDigest: string; readonly recordedAt: string; }
+export interface ContainmentIncidentFinding { readonly id: string; readonly relativePath: string; readonly credentialRelated: boolean; }
+export interface ContainmentIncidentAssessmentResult { readonly schema: "sxsy-b122.containment-assessment-result"; readonly version: 1; readonly incidentId: string; readonly repositoryRoot: string; readonly fenceEpoch: number; readonly step: "working_tree" | "history" | "remote"; readonly operationId: string; readonly externalId: string; readonly effectDisposition: "committed" | "not_started" | "ambiguous"; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly exposure: "none" | "found" | "unknown"; readonly summary: string; readonly findings: readonly ContainmentIncidentFinding[]; }
+export interface ContainmentIncidentStep { readonly name: "working_tree" | "history" | "remote"; readonly operationId: string; readonly externalId: string; readonly status: "pending" | "executing" | "ambiguous" | "completed"; readonly attempts: number; readonly updatedAt: string; readonly result?: ContainmentIncidentAssessmentResult; }
+export interface ContainmentIncidentInspection { readonly version: 1; readonly id: string; readonly repositoryRoot: string; readonly fenceEpoch: number; readonly activationOperationId: string; readonly reason: string; readonly createdAt: string; readonly updatedAt: string; readonly status: ContainmentIncidentStatus; readonly steps: readonly ContainmentIncidentStep[]; readonly permits: readonly ContainmentRemediationPermitSummary[]; readonly receipts: readonly ContainmentRemediationReceiptSummary[]; readonly rotation?: Readonly<{ readonly disposition: "complete" | "not_required"; readonly evidenceReference: string; readonly evidenceDigest: string; readonly reviewedAt: string }>; readonly releasedAt?: string; }
 export interface ContainmentInspectionSummary {
   readonly sessionId: string;
   readonly repositoryRoot: string;
@@ -194,6 +202,8 @@ export interface ContainmentInspectionSummary {
   readonly hookStates: readonly ContainmentHookInspection[];
   readonly hookFailures: readonly string[];
   readonly uncontrolledPaths: readonly string[];
+  readonly incident: ContainmentIncidentInspection;
+  readonly incidentDigest: string;
 }
 export interface ExtensionCouncilAssignment { readonly sessionId: string; readonly paths: readonly string[]; readonly resources: readonly string[]; }
 export interface ExtensionCouncilRecommendation {
@@ -319,7 +329,10 @@ export interface ExtensionCompanionBridge {
   revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
   providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
   inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>>;
-  releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
+  reassessContainment(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>>;
+  recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
   approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>>;
   installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
@@ -415,7 +428,31 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.containment };
   }
 
-  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; incidentStatus: "rotation_complete" | "not_required"; expectedFenceEpoch: number; expectedActivationOperationId: string }>): Promise<BridgeResult<ForwardedCommandResult>> {
+  async reassessContainment(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.assess", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, input.sessionId)) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> {
+    const result = await this.call<unknown>("containment.permit.issue", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["permit", "containment"])
+      || !isContainmentPermit(result.value.permit, input) || !isContainmentInspection(result.value.containment, input.sessionId)
+      || result.value.containment.incident.id !== input.expectedIncidentId) return invalidResponse();
+    return { ok: true, value: { permit: result.value.permit, containment: result.value.containment } };
+  }
+
+  async recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.rotation.record", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, input.sessionId)
+      || result.value.containment.incident.id !== input.expectedIncidentId) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> {
     const result = await this.call<unknown>("containment.release", input);
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
@@ -821,7 +858,10 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   revokeProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
   providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   inspectContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
-  releaseContainment(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  reassessContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  issueContainmentPermit(): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> { return this.unavailable(); }
+  recordContainmentRotation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  releaseContainment(_input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   approveCouncilRecommendation(): Promise<BridgeResult<ExtensionCouncilRecommendation>> { return this.unavailable(); }
   installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
   listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
@@ -962,12 +1002,13 @@ function isGitHubCandidates(value: unknown): value is readonly GitHubNavigationC
 }
 
 function isContainmentInspection(value: unknown, expectedSessionId: string): value is ContainmentInspectionSummary {
-  if (!isRecord(value) || !exactKeys(value, ["sessionId", "repositoryRoot", "active", "fenceEpoch", "activatedByOperationId", "hookStates", "hookFailures", "uncontrolledPaths"])
+  if (!isRecord(value) || !exactKeys(value, ["sessionId", "repositoryRoot", "active", "fenceEpoch", "activatedByOperationId", "hookStates", "hookFailures", "uncontrolledPaths", "incident", "incidentDigest"])
     || value.sessionId !== expectedSessionId || !reference(value.sessionId) || !pathText(value.repositoryRoot) || value.active !== true
     || !Number.isSafeInteger(value.fenceEpoch) || Number(value.fenceEpoch) < 1 || !reference(value.activatedByOperationId)
     || !Array.isArray(value.hookStates) || value.hookStates.length !== 2
     || !Array.isArray(value.hookFailures) || value.hookFailures.length > 16 || !value.hookFailures.every((failure) => contentText(failure, 2_048))
     || !Array.isArray(value.uncontrolledPaths) || value.uncontrolledPaths.length > 256 || !value.uncontrolledPaths.every(pathText)
+    || !digestText(value.incidentDigest) || !isContainmentIncident(value.incident, value.repositoryRoot, Number(value.fenceEpoch), value.activatedByOperationId)
     || new Set(value.uncontrolledPaths).size !== value.uncontrolledPaths.length) return false;
   const hookNames = new Set<string>();
   for (const hook of value.hookStates) {
@@ -979,6 +1020,85 @@ function isContainmentInspection(value: unknown, expectedSessionId: string): val
     hookNames.add(hook.name);
   }
   return hookNames.has("credential_lease_revocation") && hookNames.has("queued_operation_cancellation");
+}
+
+function isContainmentIncident(value: unknown, repositoryRoot: string, fenceEpoch: number, activationOperationId: string): value is ContainmentIncidentInspection {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["version", "id", "repositoryRoot", "fenceEpoch", "activationOperationId", "reason", "createdAt", "updatedAt", "status", "steps", "permits", "receipts"],
+    ["rotation", "releasedAt"])
+    || value.version !== 1 || typeof value.id !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(value.id)
+    || value.repositoryRoot !== repositoryRoot || value.fenceEpoch !== fenceEpoch || value.activationOperationId !== activationOperationId
+    || !contentText(value.reason, 2_048) || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || !["assessing", "assessment_incomplete", "remediation_required", "ready_for_release", "released"].includes(String(value.status))
+    || !Array.isArray(value.steps) || value.steps.length !== 3 || !Array.isArray(value.permits) || value.permits.length > 1_024
+    || !Array.isArray(value.receipts) || value.receipts.length > 1_024
+    || !value.permits.every((permit) => isContainmentPermitRecord(permit, value.id as string, fenceEpoch))
+    || !value.receipts.every((receipt) => isContainmentReceiptRecord(receipt, value.id as string, fenceEpoch))
+    || (value.releasedAt !== undefined && !timeText(value.releasedAt))) return false;
+  const names = new Set<string>();
+  for (const step of value.steps) {
+    if (!isRecord(step) || !allowedExactKeys(step, ["name", "operationId", "externalId", "status", "attempts", "updatedAt"], ["result"])
+      || !["working_tree", "history", "remote"].includes(String(step.name)) || names.has(String(step.name))
+      || !reference(step.operationId) || !reference(step.externalId)
+      || !["pending", "executing", "ambiguous", "completed"].includes(String(step.status))
+      || !Number.isSafeInteger(step.attempts) || Number(step.attempts) < 0 || !timeText(step.updatedAt)
+      || (step.result !== undefined && !isContainmentAssessmentResult(step.result, value.id, repositoryRoot, fenceEpoch, String(step.name), step.operationId, step.externalId))) return false;
+    names.add(String(step.name));
+  }
+  if (!["working_tree", "history", "remote"].every((name) => names.has(name))) return false;
+  if (value.rotation !== undefined && (!isRecord(value.rotation) || !exactKeys(value.rotation, ["disposition", "evidenceReference", "evidenceDigest", "reviewedAt"])
+    || (value.rotation.disposition !== "complete" && value.rotation.disposition !== "not_required")
+    || !contentText(value.rotation.evidenceReference, 512) || !digestText(value.rotation.evidenceDigest) || !timeText(value.rotation.reviewedAt))) return false;
+  return (value.status === "released") === (value.releasedAt !== undefined);
+}
+
+function isContainmentAssessmentResult(value: unknown, incidentId: string, repositoryRoot: string, fenceEpoch: number, step: string, operationId: unknown, externalId: unknown): value is ContainmentIncidentAssessmentResult {
+  if (!isRecord(value) || !exactKeys(value, ["schema", "version", "incidentId", "repositoryRoot", "fenceEpoch", "step", "operationId", "externalId", "effectDisposition", "status", "exposure", "summary", "findings"])
+    || value.schema !== "sxsy-b122.containment-assessment-result" || value.version !== 1 || value.incidentId !== incidentId
+    || value.repositoryRoot !== repositoryRoot || value.fenceEpoch !== fenceEpoch || value.step !== step || value.operationId !== operationId || value.externalId !== externalId
+    || !["committed", "not_started", "ambiguous"].includes(String(value.effectDisposition))
+    || !["passed", "failed", "unavailable", "incomplete"].includes(String(value.status))
+    || !["none", "found", "unknown"].includes(String(value.exposure)) || !contentText(value.summary, 1_024)
+    || !Array.isArray(value.findings) || value.findings.length > 1_024) return false;
+  return value.findings.every((finding) => isRecord(finding) && exactKeys(finding, ["id", "relativePath", "credentialRelated"])
+    && reference(finding.id) && pathText(finding.relativePath) && typeof finding.credentialRelated === "boolean");
+}
+
+function isContainmentPermit(value: unknown, expected: Readonly<{ expectedIncidentId: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): value is ContainmentRemediationPermitSummary {
+  if (!isContainmentPermitRecord(value, expected.expectedIncidentId)
+    || value.action !== expected.action
+    || value.relativePaths.length !== expected.relativePaths.length
+    || !expected.relativePaths.every((path) => value.relativePaths.some((candidate) => candidate.toLowerCase() === path.toLowerCase()))
+    || value.expiresAt !== expected.expiresAt) return false;
+  return true;
+}
+
+function isContainmentPermitRecord(value: unknown, incidentId: string, fenceEpoch?: number): value is ContainmentRemediationPermitSummary {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["id", "incidentId", "fenceEpoch", "action", "relativePaths", "reviewedBy", "issuedAt", "expiresAt", "networkAllowed", "credentialAccessAllowed"],
+    ["consumedAt"])
+    || typeof value.id !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(value.id)
+    || value.incidentId !== incidentId || (fenceEpoch !== undefined && value.fenceEpoch !== fenceEpoch)
+    || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    || !Number.isSafeInteger(value.fenceEpoch) || Number(value.fenceEpoch) < 1
+    || !Array.isArray(value.relativePaths) || value.relativePaths.length < 1 || value.relativePaths.length > 1_024
+    || !value.relativePaths.every(pathText) || new Set(value.relativePaths.map((path) => String(path).toLowerCase())).size !== value.relativePaths.length
+    || !contentText(value.reviewedBy, 256) || !timeText(value.issuedAt) || !timeText(value.expiresAt)
+    || value.networkAllowed !== false || value.credentialAccessAllowed !== false
+    || (value.consumedAt !== undefined && !timeText(value.consumedAt))) return false;
+  return true;
+}
+
+function isContainmentReceiptRecord(value: unknown, incidentId: string, fenceEpoch: number): value is ContainmentRemediationReceiptSummary {
+  if (!isRecord(value) || !exactKeys(value, ["id", "permitId", "incidentId", "fenceEpoch", "action", "relativePaths", "remediatedFindingIds", "evidenceDigest", "recordedAt"])
+    || typeof value.id !== "string" || !/^containment-remediation-receipt:[a-f0-9]{64}$/.test(value.id)
+    || typeof value.permitId !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    || value.incidentId !== incidentId || value.fenceEpoch !== fenceEpoch
+    || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    || !Array.isArray(value.relativePaths) || !value.relativePaths.length || value.relativePaths.length > 1_024 || !value.relativePaths.every(pathText)
+    || !Array.isArray(value.remediatedFindingIds) || !value.remediatedFindingIds.length || value.remediatedFindingIds.length > 1_024 || !value.remediatedFindingIds.every(reference)
+    || !digestText(value.evidenceDigest) || !timeText(value.recordedAt)) return false;
+  return true;
 }
 
 function isExtensionCouncilRecommendation(value: unknown): value is ExtensionCouncilRecommendation {

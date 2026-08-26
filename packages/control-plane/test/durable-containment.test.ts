@@ -3,8 +3,47 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { DurableContainmentManager } from "../src/containment.ts";
+import { DurableContainmentManager, type ContainmentReleaseBinding } from "../src/containment.ts";
+import { containmentIncidentReviewDigest, type ContainmentAssessmentEffectPort } from "../src/containment-incidents.ts";
 import { ProtectedJsonStore } from "../src/store.ts";
+
+const noExposureAssessment: ContainmentAssessmentEffectPort = {
+  async execute(request) {
+    return {
+      schema: "sxsy-b122.containment-assessment-result",
+      version: 1,
+      incidentId: request.incidentId,
+      repositoryRoot: request.repositoryRoot,
+      fenceEpoch: request.fenceEpoch,
+      step: request.step,
+      operationId: request.operationId,
+      externalId: request.externalId,
+      effectDisposition: "committed",
+      status: "passed",
+      exposure: "none",
+      summary: "No exposure found.",
+      findings: []
+    };
+  },
+  async observe() { return undefined; }
+};
+
+async function readyReleaseBinding(manager: DurableContainmentManager, incidentId: string): Promise<ContainmentReleaseBinding> {
+  const assessed = await manager.incidents.assess(incidentId, noExposureAssessment);
+  const incident = await manager.incidents.recordRotationReview({
+    incidentId,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    disposition: "not_required",
+    evidenceReference: "reviewed-no-credential-finding",
+    evidenceDigest: "a".repeat(64)
+  });
+  return {
+    expectedFenceEpoch: incident.fenceEpoch,
+    expectedActivationOperationId: incident.activationOperationId,
+    expectedIncidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(incident)
+  };
+}
 
 test("durable containment persists its fence and invokes revocation/cancellation hooks after recording it", async (context) => {
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-containment-"));
@@ -26,24 +65,24 @@ test("durable containment persists its fence and invokes revocation/cancellation
 
   const restarted = new DurableContainmentManager(store);
   assert.equal((await restarted.check("C:/work/example", "network")).allowed, false);
+  const binding = await readyReleaseBinding(restarted, record.incidentId!);
   assert.equal((await restarted.release({
     repositoryRoot: "C:/work/example",
     reason: "stale inspection",
     reauthenticated: true,
-    incidentStatus: "rotation_complete",
-    expectedFenceEpoch: 2,
-    expectedActivationOperationId: "op-1"
+    ...binding,
+    expectedFenceEpoch: 2
   })).status, "blocked");
   assert.equal((await restarted.release({
     repositoryRoot: "C:/work/example",
     reason: "wrong activation",
     reauthenticated: true,
-    incidentStatus: "rotation_complete",
-    expectedFenceEpoch: 1,
+    ...binding,
     expectedActivationOperationId: "op-other"
   })).status, "blocked");
-  const release = await restarted.release({ repositoryRoot: "C:/work/example", reason: "reviewed", reauthenticated: true, incidentStatus: "rotation_complete", expectedFenceEpoch: 1, expectedActivationOperationId: "op-1" });
+  const release = await restarted.release({ repositoryRoot: "C:/work/example", reason: "reviewed", reauthenticated: true, ...binding });
   assert.equal(release.status, "released");
+  assert.equal((await restarted.incidents.get(binding.expectedIncidentId))?.status, "released");
   assert.equal((await restarted.check("C:/work/example", "git")).allowed, true);
 });
 
@@ -57,7 +96,8 @@ test("durable containment stays active when a revocation hook fails and records 
   assert.equal(record.active, true);
   assert.match(record.hookFailures?.[0] ?? "", /adapter unavailable/);
   assert.equal((await manager.check("C:/work/example", "credential")).allowed, false);
-  assert.equal((await manager.release({ repositoryRoot: "C:/work/example", reason: "unsafe", reauthenticated: true, incidentStatus: "rotation_complete", expectedFenceEpoch: 1, expectedActivationOperationId: "op-1" })).status, "blocked");
+  const binding = await readyReleaseBinding(manager, record.incidentId!);
+  assert.equal((await manager.release({ repositoryRoot: "C:/work/example", reason: "unsafe", reauthenticated: true, ...binding })).status, "blocked");
 
   const recoveredCalls: string[] = [];
   const recovered = new DurableContainmentManager(store, {
@@ -74,7 +114,7 @@ test("durable containment stays active when a revocation hook fails and records 
     { name: "credential_lease_revocation", status: "completed" },
     { name: "queued_operation_cancellation", status: "completed" }
   ]);
-  assert.equal((await recovered.release({ repositoryRoot: "C:/work/example", reason: "reconciled", reauthenticated: true, incidentStatus: "rotation_complete", expectedFenceEpoch: 1, expectedActivationOperationId: "op-1" })).status, "released");
+  assert.equal((await recovered.release({ repositoryRoot: "C:/work/example", reason: "reconciled", reauthenticated: true, ...binding })).status, "released");
 });
 
 test("durable containment resumes exact idempotent hooks after every crash boundary", async (context) => {
@@ -152,13 +192,12 @@ test("durable containment bounds an unacknowledged hook without blocking another
     })
   ]).finally(() => clearTimeout(secondDeadline));
   assert.equal(second?.hookStates?.every((state) => state.status === "completed"), true);
+  const secondBinding = await readyReleaseBinding(restarted, second!.incidentId!);
   assert.equal((await restarted.release({
     repositoryRoot: secondRepository,
     reason: "reconciled",
     reauthenticated: true,
-    incidentStatus: "rotation_complete",
-    expectedFenceEpoch: 1,
-    expectedActivationOperationId: "op-second"
+    ...secondBinding
   })).status, "released");
 
   const first = await restarted.get(firstRepository);
@@ -166,13 +205,12 @@ test("durable containment bounds an unacknowledged hook without blocking another
   assert.equal(revocation?.status, "failed");
   assert.match(revocation?.failure ?? "", /timed out before a durable acknowledgement/);
   assert.equal(first?.hookStates?.find((state) => state.name === "queued_operation_cancellation")?.status, "completed");
+  const firstBinding = await readyReleaseBinding(restarted, first!.incidentId!);
   assert.equal((await restarted.release({
     repositoryRoot: firstRepository,
     reason: "unsafe",
     reauthenticated: true,
-    incidentStatus: "rotation_complete",
-    expectedFenceEpoch: 1,
-    expectedActivationOperationId: "op-first"
+    ...firstBinding
   })).status, "blocked");
   assert.deepEqual(calls, [
     `revoke:${firstRepository}:1`,

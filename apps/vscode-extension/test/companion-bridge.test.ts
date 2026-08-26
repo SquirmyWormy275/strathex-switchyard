@@ -22,6 +22,21 @@ const session: ExtensionManagedSession = {
   metadata: {}
 };
 
+function readyContainmentIncident(repositoryRoot: string, fenceEpoch: number, activationOperationId: string) {
+  const id = `containment-incident:${"a".repeat(64)}`;
+  return {
+    version: 1 as const, id, repositoryRoot, fenceEpoch, activationOperationId, reason: "reviewed incident",
+    createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:02.000Z", status: "ready_for_release" as const,
+    steps: (["working_tree", "history", "remote"] as const).map((step) => ({
+      name: step, operationId: `assessment-${step}`, externalId: `external-${step}`, status: "completed" as const,
+      attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z",
+      result: { schema: "sxsy-b122.containment-assessment-result" as const, version: 1 as const, incidentId: id, repositoryRoot, fenceEpoch, step, operationId: `assessment-${step}`, externalId: `external-${step}`, effectDisposition: "committed" as const, status: "passed" as const, exposure: "none" as const, summary: "No exposure found.", findings: [] }
+    })),
+    permits: [], receipts: [],
+    rotation: { disposition: "not_required" as const, evidenceReference: "reviewed", evidenceDigest: "b".repeat(64), reviewedAt: "2026-08-25T00:00:02.000Z" }
+  };
+}
+
 test("the VS Code JSON-lines client sends bounded companion methods and preserves matching responses", async () => {
   const seen: Array<{ id: string; method: string; payload: unknown }> = [];
   const transport: JsonLineTransport = {
@@ -110,6 +125,7 @@ test("Plan Approval preparation exact-parses the protected review packet and ech
 
 test("containment IPC exact-parses the active fence inspection and carries both expected release bindings", async () => {
   const seen: Array<{ method: string; payload: unknown }> = [];
+  const incident = readyContainmentIncident(session.workspaceRoot!, 9, "operation-containment-9");
   const containment = {
     sessionId: session.id,
     repositoryRoot: session.workspaceRoot!,
@@ -121,7 +137,9 @@ test("containment IPC exact-parses the active fence inspection and carries both 
       { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
     ],
     hookFailures: [],
-    uncontrolledPaths: ["unmediated-local-user-processes"]
+    uncontrolledPaths: ["unmediated-local-user-processes"],
+    incident,
+    incidentDigest: "c".repeat(64)
   } as const;
   const bridge = new JsonLineCompanionBridge({
     async request(line) {
@@ -140,9 +158,10 @@ test("containment IPC exact-parses the active fence inspection and carries both 
   const request = {
     sessionId: session.id,
     reason: "Reviewed exact active containment generation.",
-    incidentStatus: "rotation_complete" as const,
     expectedFenceEpoch: 9,
-    expectedActivationOperationId: "operation-containment-9"
+    expectedActivationOperationId: "operation-containment-9",
+    expectedIncidentId: incident.id,
+    expectedIncidentDigest: containment.incidentDigest
   };
   const released = await bridge.releaseContainment(request);
   assert.equal(released.ok, true);
@@ -153,6 +172,7 @@ test("containment IPC exact-parses the active fence inspection and carries both 
 });
 
 test("containment IPC rejects a mismatched session, incomplete hook inventory, or response extras", async () => {
+  const incident = readyContainmentIncident(session.workspaceRoot!, 3, "operation-containment-3");
   const valid = {
     sessionId: session.id,
     repositoryRoot: session.workspaceRoot!,
@@ -164,7 +184,9 @@ test("containment IPC rejects a mismatched session, incomplete hook inventory, o
       { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
     ],
     hookFailures: [],
-    uncontrolledPaths: []
+    uncontrolledPaths: [],
+    incident,
+    incidentDigest: "c".repeat(64)
   };
   const invalid = [
     { ...valid, sessionId: "different-session" },
