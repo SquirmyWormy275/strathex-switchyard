@@ -1,6 +1,8 @@
 import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { EffectGuard } from "./brokers.ts";
 import type { ConfirmationConsumeRequest, ConfirmationDecision, DurableConfirmationRecord } from "./confirmations.ts";
+import { untrustedSummary } from "./redaction.ts";
+import { sessionBindingDigest, type SessionTargetRebindResult } from "./session-registry.ts";
 import { targetSnapshotDigest } from "./snapshot.ts";
 import { jsonClone, sha256, stableJson, type JournalEntry, ProtectedJsonStore } from "./store.ts";
 
@@ -10,6 +12,7 @@ export type ReanchorState =
   | "confirmed"
   | "executing"
   | "external_committed"
+  | "session_rebound"
   | "ambiguous"
   | "rejected"
   | "recorded";
@@ -18,6 +21,8 @@ export type ReanchorLifecyclePhase =
   | "executing_persisted"
   | "external_effect_returned"
   | "external_committed_persisted"
+  | "session_compare_and_swap_returned"
+  | "session_rebound_persisted"
   | "receipt_persisted";
 
 export interface ReanchorRequestInput {
@@ -73,8 +78,37 @@ export interface ReanchorExternalEffect {
   readonly requestId: string;
   readonly operationId: string;
   readonly externalEffectId: string;
+  readonly acknowledgementDigest: string;
   readonly summary: string;
   readonly committedAt: string;
+}
+
+export interface ReanchorProviderAcknowledgement {
+  readonly schema: "sxsy-b122.reanchor-acknowledgement";
+  readonly version: 1;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly externalEffectId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly cooperativeStopAcknowledged: true;
+  readonly resumed: false;
+  readonly summary: string;
+}
+
+export interface ReanchorSessionRebind {
+  readonly version: 1;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly sessionId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly outcome: "rebound" | "already_rebound";
+  readonly resultingBindingDigest: string;
+  readonly resumed: false;
+  readonly reboundAt: string;
 }
 
 export interface ReanchorReceipt {
@@ -89,6 +123,10 @@ export interface ReanchorReceipt {
   readonly previewDigest: string;
   readonly confirmationDigest: string;
   readonly externalEffectId: string;
+  readonly acknowledgementDigest: string;
+  readonly sessionRebindOutcome: "rebound" | "already_rebound";
+  readonly resultingBindingDigest: string;
+  readonly resumed: false;
   readonly evidenceDigest: string;
   readonly result: "reanchored";
   readonly createdAt: string;
@@ -100,6 +138,7 @@ export interface ReanchorLifecycle {
   readonly preview?: ReanchorPreview;
   readonly confirmation?: ReanchorConfirmation;
   readonly externalEffect?: ReanchorExternalEffect;
+  readonly sessionRebind?: ReanchorSessionRebind;
   readonly receipt?: ReanchorReceipt;
   readonly summary?: string;
 }
@@ -135,7 +174,7 @@ export interface ReanchorApplyRequest {
 }
 
 export type ReanchorApplyOutcome =
-  | Readonly<{ disposition: "committed"; externalEffectId: string; summary: string }>
+  | Readonly<{ disposition: "committed"; acknowledgement: ReanchorProviderAcknowledgement }>
   | Readonly<{ disposition: "not_started"; summary: string }>
   | Readonly<{ disposition: "ambiguous"; summary: string }>;
 
@@ -144,9 +183,18 @@ export interface ReanchorApplyPort {
 }
 
 export interface ReanchorCoordinatorDependencies {
-  readonly sessions: Readonly<{ get(sessionId: string): Promise<ManagedSession | undefined> }>;
+  readonly sessions: Readonly<{
+    get(sessionId: string): Promise<ManagedSession | undefined>;
+    compareAndSwapTarget(input: Readonly<{
+      sessionId: string;
+      expectedBindingDigest: string;
+      oldTargetSnapshotId: string;
+      newTargetSnapshotId: string;
+      operationId: string;
+    }>): Promise<SessionTargetRebindResult>;
+  }>;
   readonly authorities: Readonly<{ get(authorityId: string): Promise<AuthorityGrant | undefined> }>;
-  readonly snapshots: Readonly<{ isCurrent(target: TargetSnapshot): Promise<boolean> }>;
+  readonly snapshots: Readonly<{ isCurrent(target: TargetSnapshot, session: ManagedSession): Promise<boolean> }>;
   readonly containment: Readonly<{
     inspect(repositoryRoot: string): Promise<Readonly<{ allowed: boolean; fenceEpoch: number; reason: string }>>;
   }>;
@@ -179,9 +227,12 @@ type ReanchorEvent =
   | Readonly<{ event: "confirmed"; requestId: string; confirmation: ReanchorConfirmation }>
   | Readonly<{ event: "executing"; requestId: string; operationId: string; attemptId: string; startedAt: string }>
   | Readonly<{ event: "external_committed"; requestId: string; effect: ReanchorExternalEffect }>
+  | Readonly<{ event: "session_rebound"; requestId: string; rebind: ReanchorSessionRebind }>
   | Readonly<{ event: "ambiguous"; requestId: string; summary: string; at: string }>
   | Readonly<{ event: "rejected"; requestId: string; summary: string; at: string }>
   | Readonly<{ event: "recorded"; requestId: string; receipt: ReanchorReceipt }>;
+
+const legacyAmbiguitySummary = "Legacy Re-anchor provider evidence lacks the exact dual-target acknowledgement and protected session rebind; manual reconciliation is required.";
 
 export class ReanchorLifecycleError extends Error {
   constructor(message: string) {
@@ -223,13 +274,13 @@ export class DurableReanchorCoordinator {
     const exact = exactRequestInput(input);
     const createdAt = this.now();
     const authorityDigest = sha256(stableJson(exact.authority));
-    const sessionBindingDigest = digestSessionBinding(exact.session);
+    const exactSessionBindingDigest = sessionBindingDigest(exact.session);
     const material = {
       authorityDigest,
       newTarget: exact.newTarget,
       oldTarget: exact.oldTarget,
       reason: exact.reason,
-      sessionBindingDigest
+      sessionBindingDigest: exactSessionBindingDigest
     };
     const id = `reanchor:${sha256(stableJson(material))}`;
     const request: ReanchorRequestRecord = {
@@ -237,7 +288,7 @@ export class DurableReanchorCoordinator {
       id,
       operationId: `reanchor-operation:${sha256(id)}`,
       ...exact,
-      sessionBindingDigest,
+      sessionBindingDigest: exactSessionBindingDigest,
       authorityDigest,
       createdAt,
       expiresAt: new Date(Math.min(Date.parse(exact.authority.expiresAt), Date.parse(createdAt) + this.requestLifetimeMs)).toISOString()
@@ -368,7 +419,8 @@ export class DurableReanchorCoordinator {
     const exactId = exactRequestId(requestId);
     const claimed = await this.claimApply(exactId);
     if (!claimed.execute) {
-      if (claimed.lifecycle.state === "external_committed") return this.finalizeReceipt(exactId);
+      if (claimed.lifecycle.state === "external_committed") return this.finalizeSessionRebind(exactId);
+      if (claimed.lifecycle.state === "session_rebound") return this.finalizeReceipt(exactId);
       return claimed.lifecycle;
     }
     const lifecycle = claimed.lifecycle;
@@ -384,7 +436,7 @@ export class DurableReanchorCoordinator {
 
     let outcome: ReanchorApplyOutcome;
     try {
-      outcome = exactApplyOutcome(await this.dependencies.applier.apply({
+      const applyRequest: ReanchorApplyRequest = {
         version: 1,
         requestId: lifecycle.request.id,
         operationId: lifecycle.request.operationId,
@@ -397,7 +449,8 @@ export class DurableReanchorCoordinator {
         confirmationDigest: lifecycle.confirmation!.confirmationTokenDigest,
         cooperativeStopRequested: true,
         resumeAuthorized: false
-      }));
+      };
+      outcome = exactApplyOutcome(await this.dependencies.applier.apply(applyRequest), applyRequest);
     } catch {
       return this.markAmbiguous(exactId, "The re-anchor apply boundary threw without a trustworthy effect disposition; reconciliation is required and the effect will not be replayed.");
     }
@@ -409,8 +462,9 @@ export class DurableReanchorCoordinator {
       version: 1,
       requestId: lifecycle.request.id,
       operationId: lifecycle.request.operationId,
-      externalEffectId: outcome.externalEffectId,
-      summary: outcome.summary,
+      externalEffectId: outcome.acknowledgement.externalEffectId,
+      acknowledgementDigest: sha256(stableJson(outcome.acknowledgement)),
+      summary: outcome.acknowledgement.summary,
       committedAt: this.now()
     };
     await this.store.transaction(async (transaction) => {
@@ -421,7 +475,7 @@ export class DurableReanchorCoordinator {
       await transaction.append<ReanchorEvent>("reanchor.external_committed", { event: "external_committed", requestId: exactId, effect });
     });
     await this.probe("external_committed_persisted");
-    return this.finalizeReceipt(exactId);
+    return this.finalizeSessionRebind(exactId);
   }
 
   async get(requestId: string): Promise<ReanchorLifecycle | undefined> {
@@ -445,12 +499,14 @@ export class DurableReanchorCoordinator {
             summary: "Recovery found an executing re-anchor boundary; an external effect may have committed, so automatic replay is forbidden.",
             at: this.now()
           });
-        } else if (lifecycle.state === "external_committed" && lifecycle.externalEffect && lifecycle.preview && lifecycle.confirmation) {
-          const receipt = buildReceipt(lifecycle);
-          await transaction.append<ReanchorEvent>("reanchor.recorded", { event: "recorded", requestId: lifecycle.request.id, receipt });
         }
       }
     });
+    const pending = [...lifecycleMap(await this.store.readEntries()).values()];
+    for (const lifecycle of pending) {
+      if (lifecycle.state === "external_committed") await this.finalizeSessionRebind(lifecycle.request.id);
+      else if (lifecycle.state === "session_rebound") await this.finalizeReceipt(lifecycle.request.id);
+    }
     return [...lifecycleMap(await this.store.readEntries()).values()].map(cloneLifecycle);
   }
 
@@ -458,7 +514,7 @@ export class DurableReanchorCoordinator {
     return this.store.transaction(async (transaction) => {
       const current = lifecycleMap(await transaction.readEntries()).get(requestId);
       if (!current) throw new ReanchorLifecycleError("The re-anchor apply request names an unknown durable request.");
-      if (["recorded", "rejected", "ambiguous", "executing", "external_committed"].includes(current.state)) {
+      if (["recorded", "rejected", "ambiguous", "executing", "external_committed", "session_rebound"].includes(current.state)) {
         return { execute: false, lifecycle: cloneLifecycle(current) };
       }
       if (current.state !== "confirmed" || !current.preview || !current.confirmation) {
@@ -478,8 +534,8 @@ export class DurableReanchorCoordinator {
 
   private async readOnlyPreflight(request: ReanchorRequestRecord): Promise<Readonly<{ fenceEpoch: number }>> {
     await this.assertCurrentAuthority(request);
-    await this.assertCurrentSession(request);
-    if (!await this.dependencies.snapshots.isCurrent(cloneSnapshot(request.newTarget))) {
+    const currentSession = await this.assertCurrentSession(request);
+    if (!await this.dependencies.snapshots.isCurrent(cloneSnapshot(request.newTarget), currentSession)) {
       throw new ReanchorLifecycleError("The proposed new TargetSnapshot is stale or incomplete; no re-anchor preview was accepted.");
     }
     const containment = exactContainmentInspection(await this.dependencies.containment.inspect(request.newTarget.repositoryRoot));
@@ -494,7 +550,7 @@ export class DurableReanchorCoordinator {
     if (Date.parse(lifecycle.confirmation.expiresAt) <= Date.parse(now)) throw new ReanchorLifecycleError("The human re-anchor confirmation expired before the final effect boundary.");
     await this.assertCurrentAuthority(lifecycle.request);
     const currentSession = await this.assertCurrentSession(lifecycle.request);
-    if (!await this.dependencies.snapshots.isCurrent(cloneSnapshot(lifecycle.request.newTarget))) {
+    if (!await this.dependencies.snapshots.isCurrent(cloneSnapshot(lifecycle.request.newTarget), currentSession)) {
       throw new ReanchorLifecycleError("The proposed new TargetSnapshot changed before the final re-anchor effect boundary.");
     }
     const containment = exactContainmentInspection(await this.dependencies.containment.inspect(lifecycle.request.newTarget.repositoryRoot));
@@ -511,6 +567,27 @@ export class DurableReanchorCoordinator {
     if (!guard.allowed) throw new ReanchorLifecycleError(`The final effect guard rejected re-anchor: ${boundedText(guard.reason, "effect-guard reason", 512)}`);
   }
 
+  private async finalPostEffectChecks(lifecycle: ReanchorLifecycle): Promise<void> {
+    if (!lifecycle.preview || !lifecycle.externalEffect) throw new ReanchorLifecycleError("The committed re-anchor lifecycle lost its reviewed target or provider acknowledgement.");
+    await this.assertCurrentAuthority(lifecycle.request);
+    const currentSession = await this.assertCurrentOrExactlyReboundSession(lifecycle.request);
+    if (!await this.dependencies.snapshots.isCurrent(cloneSnapshot(lifecycle.request.newTarget), currentSession)) {
+      throw new ReanchorLifecycleError("The proposed new TargetSnapshot changed after provider acknowledgement; the session binding remains unknown.");
+    }
+    const containment = exactContainmentInspection(await this.dependencies.containment.inspect(lifecycle.request.newTarget.repositoryRoot));
+    if (!containment.allowed || containment.fenceEpoch !== lifecycle.preview.observedFenceEpoch) {
+      throw new ReanchorLifecycleError("The containment fence changed after provider acknowledgement; the session binding remains unknown.");
+    }
+    const guard = await this.dependencies.effectGuard.assertCurrent({
+      action: "reanchor",
+      operationId: lifecycle.request.operationId,
+      target: cloneSnapshot(lifecycle.request.newTarget),
+      session: currentSession,
+      authority: cloneAuthority(lifecycle.request.authority)
+    });
+    if (!guard.allowed) throw new ReanchorLifecycleError(`The post-effect guard could not prove the re-anchor binding current: ${boundedText(guard.reason, "effect-guard reason", 512)}`);
+  }
+
   private async assertCurrentAuthority(request: ReanchorRequestRecord): Promise<AuthorityGrant> {
     const current = await this.dependencies.authorities.get(request.authority.id);
     if (!current || sha256(stableJson(exactAuthority(current))) !== request.authorityDigest) {
@@ -522,12 +599,26 @@ export class DurableReanchorCoordinator {
 
   private async assertCurrentSession(request: ReanchorRequestRecord): Promise<ManagedSession> {
     const current = await this.dependencies.sessions.get(request.session.id);
-    if (!current || digestSessionBinding(exactSession(current)) !== request.sessionBindingDigest
+    if (!current || sessionBindingDigest(exactSession(current)) !== request.sessionBindingDigest
       || current.targetSnapshotId !== request.oldTarget.id || current.status === "stale" || current.status === "unreachable"
       || !current.capabilities.includes("controllable")) {
       throw new ReanchorLifecycleError("The managed session changed its exact task, adapter, authority anchor, or controllable status.");
     }
     return cloneSession(current);
+  }
+
+  private async assertCurrentOrExactlyReboundSession(request: ReanchorRequestRecord): Promise<ManagedSession> {
+    const current = await this.dependencies.sessions.get(request.session.id);
+    if (!current) throw new ReanchorLifecycleError("The managed session disappeared after the provider Re-anchor acknowledgement.");
+    const exact = exactSession(current);
+    if (exact.targetSnapshotId === request.oldTarget.id && sessionBindingDigest(exact) === request.sessionBindingDigest
+      && exact.status !== "stale" && exact.status !== "unreachable" && exact.capabilities.includes("controllable")) return cloneSession(exact);
+    const expectedRebound = expectedReboundSession(request);
+    if (exact.targetSnapshotId !== request.newTarget.id || exact.status !== "unknown"
+      || sessionBindingDigest(exact) !== sessionBindingDigest(expectedRebound)) {
+      throw new ReanchorLifecycleError("The managed session is neither at the exact old binding nor at the exact no-resume Re-anchor binding.");
+    }
+    return cloneSession(exact);
   }
 
   private async reject(requestId: string, summary: string): Promise<ReanchorLifecycle> {
@@ -545,10 +636,69 @@ export class DurableReanchorCoordinator {
       const current = lifecycleMap(await transaction.readEntries()).get(requestId);
       if (!current) throw new ReanchorLifecycleError("The re-anchor operation disappeared before terminal recording.");
       if (current.state === state) return cloneLifecycle(current);
-      if (current.state !== "executing") throw new ReanchorLifecycleError("The re-anchor operation changed before terminal recording.");
+      if (current.state !== "executing" && !(state === "ambiguous" && current.state === "external_committed")) throw new ReanchorLifecycleError("The re-anchor operation changed before terminal recording.");
       await transaction.append<ReanchorEvent>(`reanchor.${state}`, { event: state, requestId, summary, at: this.now() });
       return cloneLifecycle({ ...current, state, summary });
     });
+  }
+
+  private async finalizeSessionRebind(requestId: string): Promise<ReanchorLifecycle> {
+    const current = await this.get(requestId);
+    if (!current) throw new ReanchorLifecycleError("The re-anchor request disappeared before its protected session rebind.");
+    if (current.state === "session_rebound") return this.finalizeReceipt(requestId);
+    if (current.state === "recorded" || current.state === "ambiguous") return current;
+    if (current.state !== "external_committed" || !current.externalEffect) throw new ReanchorLifecycleError("A protected session rebind requires one durable exact provider acknowledgement.");
+    try {
+      await this.finalPostEffectChecks(current);
+    } catch (error) {
+      return this.markAmbiguous(requestId, safeFailure(error, "Post-effect Re-anchor guards could not prove the exact target; the session binding remains unknown."));
+    }
+    let result: SessionTargetRebindResult;
+    try {
+      result = await this.dependencies.sessions.compareAndSwapTarget({
+        sessionId: current.request.session.id,
+        expectedBindingDigest: current.request.sessionBindingDigest,
+        oldTargetSnapshotId: current.request.oldTarget.id,
+        newTargetSnapshotId: current.request.newTarget.id,
+        operationId: current.request.operationId
+      });
+    } catch {
+      return this.markAmbiguous(requestId, "The protected session compare-and-swap returned no trustworthy disposition; the session binding remains unknown.");
+    }
+    await this.probe("session_compare_and_swap_returned");
+    if ((result.outcome !== "rebound" && result.outcome !== "already_rebound") || !result.session) {
+      return this.markAmbiguous(requestId, `The protected session compare-and-swap did not prove an exact rebind: ${boundedText(result.reason, "session rebind reason", 512)}`);
+    }
+    const reboundSession = exactSession(result.session);
+    if (reboundSession.id !== current.request.session.id || reboundSession.targetSnapshotId !== current.request.newTarget.id || reboundSession.status !== "unknown"
+      || reboundSession.metadata["sxsy-b122.reanchor.operationId"] !== current.request.operationId
+      || reboundSession.metadata["sxsy-b122.reanchor.oldTargetSnapshotId"] !== current.request.oldTarget.id
+      || reboundSession.metadata["sxsy-b122.reanchor.newTargetSnapshotId"] !== current.request.newTarget.id
+      || reboundSession.metadata["sxsy-b122.reanchor.resumeAuthorized"] !== "false"
+      || sessionBindingDigest(reboundSession) !== sessionBindingDigest(expectedReboundSession(current.request))) {
+      return this.markAmbiguous(requestId, "The protected session compare-and-swap returned a mismatched binding; the session remains unknown.");
+    }
+    const rebind: ReanchorSessionRebind = {
+      version: 1,
+      requestId,
+      operationId: current.request.operationId,
+      sessionId: current.request.session.id,
+      oldTargetSnapshotId: current.request.oldTarget.id,
+      newTargetSnapshotId: current.request.newTarget.id,
+      outcome: result.outcome,
+      resultingBindingDigest: sessionBindingDigest(reboundSession),
+      resumed: false,
+      reboundAt: this.now()
+    };
+    await this.store.transaction(async (transaction) => {
+      const durable = lifecycleMap(await transaction.readEntries()).get(requestId);
+      if (!durable) throw new ReanchorLifecycleError("The re-anchor request disappeared while recording its session rebind.");
+      if (durable.state === "session_rebound" || durable.state === "recorded") return;
+      if (durable.state !== "external_committed") throw new ReanchorLifecycleError("The re-anchor lifecycle changed while recording its session rebind.");
+      await transaction.append<ReanchorEvent>("reanchor.session_rebound", { event: "session_rebound", requestId, rebind });
+    });
+    await this.probe("session_rebound_persisted");
+    return this.finalizeReceipt(requestId);
   }
 
   private async finalizeReceipt(requestId: string): Promise<ReanchorLifecycle> {
@@ -556,8 +706,8 @@ export class DurableReanchorCoordinator {
       const current = lifecycleMap(await transaction.readEntries()).get(requestId);
       if (!current) throw new ReanchorLifecycleError("The re-anchor request disappeared before receipt recording.");
       if (current.state === "recorded") return cloneLifecycle(current);
-      if (current.state !== "external_committed" || !current.externalEffect || !current.preview || !current.confirmation) {
-        throw new ReanchorLifecycleError("A re-anchor receipt requires one exact durable external commit, preview, and confirmation.");
+      if (current.state !== "session_rebound" || !current.externalEffect || !current.sessionRebind || !current.preview || !current.confirmation) {
+        throw new ReanchorLifecycleError("A re-anchor receipt requires an exact external acknowledgement and protected session rebind.");
       }
       const receipt = buildReceipt(current);
       await transaction.append<ReanchorEvent>("reanchor.recorded", { event: "recorded", requestId, receipt });
@@ -584,6 +734,21 @@ export class DurableReanchorCoordinator {
   private async probe(phase: ReanchorLifecyclePhase): Promise<void> {
     await this.lifecycleProbe?.(phase);
   }
+}
+
+function expectedReboundSession(request: ReanchorRequestRecord): ManagedSession {
+  return {
+    ...request.session,
+    targetSnapshotId: request.newTarget.id,
+    status: "unknown",
+    metadata: {
+      ...request.session.metadata,
+      "sxsy-b122.reanchor.operationId": request.operationId,
+      "sxsy-b122.reanchor.oldTargetSnapshotId": request.oldTarget.id,
+      "sxsy-b122.reanchor.newTargetSnapshotId": request.newTarget.id,
+      "sxsy-b122.reanchor.resumeAuthorized": "false"
+    }
+  };
 }
 
 function lifecycleMap(entries: readonly JournalEntry<unknown>[]): Map<string, ReanchorLifecycle> {
@@ -622,21 +787,35 @@ function lifecycleMap(entries: readonly JournalEntry<unknown>[]): Map<string, Re
         break;
       case "reanchor.external_committed": {
         if (payload.event !== "external_committed" || current.state !== "executing" || !("effect" in payload)) throw invalidTransition();
+        if (isLegacyStoredEffect(payload.effect, current.request)) {
+          result.set(requestId, { ...current, state: "ambiguous", summary: legacyAmbiguitySummary });
+          break;
+        }
         const externalEffect = exactStoredEffect(payload.effect, current.request);
         result.set(requestId, { ...current, state: "external_committed", externalEffect, summary: externalEffect.summary });
+        break;
+      }
+      case "reanchor.session_rebound": {
+        if (payload.event !== "session_rebound" || current.state !== "external_committed" || !("rebind" in payload)) throw invalidTransition();
+        const sessionRebind = exactStoredSessionRebind(payload.rebind, current.request);
+        result.set(requestId, { ...current, state: "session_rebound", sessionRebind, summary: "reanchored_without_resume" });
         break;
       }
       case "reanchor.ambiguous":
       case "reanchor.rejected": {
         const state = entry.kind === "reanchor.ambiguous" ? "ambiguous" : "rejected";
-        const validSource = state === "ambiguous" ? current.state === "executing" : current.state === "executing" || current.state === "confirmed";
+        const validSource = state === "ambiguous" ? current.state === "executing" || current.state === "external_committed" : current.state === "executing" || current.state === "confirmed";
         if (payload.event !== state || !validSource || !("summary" in payload) || typeof payload.summary !== "string"
           || !("at" in payload) || typeof payload.at !== "string" || !Number.isFinite(Date.parse(payload.at))) throw invalidTransition();
         result.set(requestId, { ...current, state, summary: boundedText(payload.summary, `stored ${state} summary`, 512) });
         break;
       }
       case "reanchor.recorded": {
-        if (payload.event !== "recorded" || current.state !== "external_committed" || !("receipt" in payload)) throw invalidTransition();
+        if (payload.event === "recorded" && current.state === "ambiguous" && current.summary === legacyAmbiguitySummary && "receipt" in payload) {
+          exactLegacyStoredReceipt(payload.receipt, current);
+          break;
+        }
+        if (payload.event !== "recorded" || current.state !== "session_rebound" || !("receipt" in payload)) throw invalidTransition();
         const receipt = exactStoredReceipt(payload.receipt, current);
         result.set(requestId, { ...current, state: "recorded", receipt, summary: receipt.result });
         break;
@@ -679,7 +858,7 @@ function exactStoredRequest(value: unknown): ReanchorRequestRecord {
   }
   const input = exactRequestInput({ oldTarget: value.oldTarget, newTarget: value.newTarget, reason: value.reason, session: value.session, authority: value.authority } as ReanchorRequestInput);
   if (!/^reanchor:[a-f0-9]{64}$/.test(value.id) || value.operationId !== `reanchor-operation:${sha256(value.id)}`
-    || value.sessionBindingDigest !== digestSessionBinding(input.session) || value.authorityDigest !== sha256(stableJson(input.authority))
+    || value.sessionBindingDigest !== sessionBindingDigest(input.session) || value.authorityDigest !== sha256(stableJson(input.authority))
     || !Number.isFinite(Date.parse(value.createdAt)) || !Number.isFinite(Date.parse(value.expiresAt)) || Date.parse(value.createdAt) >= Date.parse(value.expiresAt)
     || Date.parse(value.expiresAt) > Date.parse(input.authority.expiresAt)) {
     throw new ReanchorLifecycleError("The protected re-anchor request binding is invalid.");
@@ -763,29 +942,13 @@ function assertAuthorityActive(authority: AuthorityGrant, input: Pick<ReanchorRe
   }
 }
 
-function digestSessionBinding(session: ManagedSession): string {
-  return sha256(stableJson({
-    adapterVersion: session.adapterVersion,
-    capabilities: session.capabilities,
-    id: session.id,
-    metadata: session.metadata,
-    planRevision: session.planRevision ?? null,
-    plannedFiles: session.plannedFiles,
-    provider: session.provider,
-    surface: session.surface,
-    targetSnapshotId: session.targetSnapshotId ?? null,
-    taskId: session.taskId ?? null,
-    workspaceRoot: session.workspaceRoot ?? null
-  }));
-}
-
 function exactPreviewContent(value: unknown): ReanchorPreviewContent {
   if (!isRecord(value) || !exactKeys(value, ["summary", "discrepancies", "risks", "questions"])) throw new ReanchorLifecycleError("The read-only re-anchor preview returned an open or malformed payload.");
   return {
-    summary: boundedText(value.summary, "re-anchor preview summary", 512),
-    discrepancies: boundedList(value.discrepancies, "re-anchor discrepancy"),
-    risks: boundedList(value.risks, "re-anchor risk"),
-    questions: boundedList(value.questions, "re-anchor question")
+    summary: redactProviderSummary(boundedText(value.summary, "re-anchor preview summary", 512)),
+    discrepancies: boundedList(value.discrepancies, "re-anchor discrepancy").map(redactProviderSummary),
+    risks: boundedList(value.risks, "re-anchor risk").map(redactProviderSummary),
+    questions: boundedList(value.questions, "re-anchor question").map(redactProviderSummary)
   };
 }
 
@@ -870,17 +1033,64 @@ function exactConsumedConfirmation(decision: ConfirmationDecision, input: Reanch
 }
 
 function exactStoredEffect(value: unknown, request: ReanchorRequestRecord): ReanchorExternalEffect {
-  if (!isRecord(value) || !exactKeys(value, ["version", "requestId", "operationId", "externalEffectId", "summary", "committedAt"])
+  if (!isRecord(value) || !exactKeys(value, ["version", "requestId", "operationId", "externalEffectId", "acknowledgementDigest", "summary", "committedAt"])
     || value.version !== 1 || value.requestId !== request.id || value.operationId !== request.operationId
     || typeof value.externalEffectId !== "string" || !bounded(value.externalEffectId, 512)
+    || typeof value.acknowledgementDigest !== "string" || !digest(value.acknowledgementDigest)
     || typeof value.summary !== "string" || !bounded(value.summary, 512)
     || typeof value.committedAt !== "string" || !Number.isFinite(Date.parse(value.committedAt))) throw new ReanchorLifecycleError("The protected re-anchor external effect marker is malformed.");
-  return jsonClone(value) as unknown as ReanchorExternalEffect;
+  const effect = jsonClone(value) as unknown as ReanchorExternalEffect;
+  if (effect.acknowledgementDigest !== sha256(stableJson(acknowledgementFromEffect(request, effect)))) {
+    throw new ReanchorLifecycleError("The protected re-anchor acknowledgement digest does not match its exact dual-target evidence.");
+  }
+  return effect;
+}
+
+function isLegacyStoredEffect(value: unknown, request: ReanchorRequestRecord): boolean {
+  if (!isRecord(value) || !exactKeys(value, ["version", "requestId", "operationId", "externalEffectId", "summary", "committedAt"])) return false;
+  if (value.version !== 1 || value.requestId !== request.id || value.operationId !== request.operationId
+    || typeof value.externalEffectId !== "string" || !bounded(value.externalEffectId, 512)
+    || typeof value.summary !== "string" || !bounded(value.summary, 512)
+    || typeof value.committedAt !== "string" || !Number.isFinite(Date.parse(value.committedAt))) {
+    throw new ReanchorLifecycleError("The legacy protected Re-anchor external effect marker is malformed or mismatched.");
+  }
+  return true;
+}
+
+function exactLegacyStoredReceipt(value: unknown, lifecycle: ReanchorLifecycle): void {
+  if (!lifecycle.preview || !lifecycle.confirmation || !isRecord(value) || !exactKeys(value, [
+    "version", "id", "requestId", "operationId", "oldTargetSnapshotId", "newTargetSnapshotId", "sessionId", "authorityId",
+    "previewDigest", "confirmationDigest", "externalEffectId", "evidenceDigest", "result", "createdAt"
+  ]) || value.version !== 1 || value.id !== `reanchor-receipt:${sha256(lifecycle.request.id)}`
+    || value.requestId !== lifecycle.request.id || value.operationId !== lifecycle.request.operationId
+    || value.oldTargetSnapshotId !== lifecycle.request.oldTarget.id || value.newTargetSnapshotId !== lifecycle.request.newTarget.id
+    || value.sessionId !== lifecycle.request.session.id || value.authorityId !== lifecycle.request.authority.id
+    || value.previewDigest !== lifecycle.preview.previewDigest || value.confirmationDigest !== lifecycle.confirmation.confirmationTokenDigest
+    || typeof value.externalEffectId !== "string" || !bounded(value.externalEffectId, 512)
+    || typeof value.evidenceDigest !== "string" || !digest(value.evidenceDigest) || value.result !== "reanchored"
+    || typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
+    throw new ReanchorLifecycleError("The legacy protected Re-anchor receipt is malformed or mismatched.");
+  }
+}
+
+function exactStoredSessionRebind(value: unknown, request: ReanchorRequestRecord): ReanchorSessionRebind {
+  if (!isRecord(value) || !exactKeys(value, [
+    "version", "requestId", "operationId", "sessionId", "oldTargetSnapshotId", "newTargetSnapshotId", "outcome",
+    "resultingBindingDigest", "resumed", "reboundAt"
+  ]) || value.version !== 1 || value.requestId !== request.id || value.operationId !== request.operationId
+    || value.sessionId !== request.session.id || value.oldTargetSnapshotId !== request.oldTarget.id || value.newTargetSnapshotId !== request.newTarget.id
+    || (value.outcome !== "rebound" && value.outcome !== "already_rebound")
+    || typeof value.resultingBindingDigest !== "string" || !digest(value.resultingBindingDigest) || value.resumed !== false
+    || typeof value.reboundAt !== "string" || !Number.isFinite(Date.parse(value.reboundAt))) {
+    throw new ReanchorLifecycleError("The protected Re-anchor session rebind marker is malformed or mismatched.");
+  }
+  return jsonClone(value) as unknown as ReanchorSessionRebind;
 }
 
 function buildReceipt(lifecycle: ReanchorLifecycle): ReanchorReceipt {
-  if (!lifecycle.preview || !lifecycle.confirmation || !lifecycle.externalEffect) throw new ReanchorLifecycleError("A deterministic re-anchor receipt requires preview, confirmation, and external effect evidence.");
+  if (!lifecycle.preview || !lifecycle.confirmation || !lifecycle.externalEffect || !lifecycle.sessionRebind) throw new ReanchorLifecycleError("A deterministic re-anchor receipt requires preview, confirmation, provider acknowledgement, and session rebind evidence.");
   const material = {
+    acknowledgementDigest: lifecycle.externalEffect.acknowledgementDigest,
     authorityId: lifecycle.request.authority.id,
     confirmationDigest: lifecycle.confirmation.confirmationTokenDigest,
     externalEffectId: lifecycle.externalEffect.externalEffectId,
@@ -889,7 +1099,10 @@ function buildReceipt(lifecycle: ReanchorLifecycle): ReanchorReceipt {
     operationId: lifecycle.request.operationId,
     previewDigest: lifecycle.preview.previewDigest,
     requestId: lifecycle.request.id,
-    sessionId: lifecycle.request.session.id
+    resultingBindingDigest: lifecycle.sessionRebind.resultingBindingDigest,
+    resumed: false,
+    sessionId: lifecycle.request.session.id,
+    sessionRebindOutcome: lifecycle.sessionRebind.outcome
   };
   return {
     version: 1,
@@ -903,6 +1116,10 @@ function buildReceipt(lifecycle: ReanchorLifecycle): ReanchorReceipt {
     previewDigest: lifecycle.preview.previewDigest,
     confirmationDigest: lifecycle.confirmation.confirmationTokenDigest,
     externalEffectId: lifecycle.externalEffect.externalEffectId,
+    acknowledgementDigest: lifecycle.externalEffect.acknowledgementDigest,
+    sessionRebindOutcome: lifecycle.sessionRebind.outcome,
+    resultingBindingDigest: lifecycle.sessionRebind.resultingBindingDigest,
+    resumed: false,
     evidenceDigest: sha256(stableJson(material)),
     result: "reanchored",
     createdAt: timestamp(lifecycle.externalEffect.committedAt, "re-anchor receipt timestamp")
@@ -912,7 +1129,8 @@ function buildReceipt(lifecycle: ReanchorLifecycle): ReanchorReceipt {
 function exactStoredReceipt(value: unknown, lifecycle: ReanchorLifecycle): ReanchorReceipt {
   if (!isRecord(value) || !exactKeys(value, [
     "version", "id", "requestId", "operationId", "oldTargetSnapshotId", "newTargetSnapshotId", "sessionId", "authorityId",
-    "previewDigest", "confirmationDigest", "externalEffectId", "evidenceDigest", "result", "createdAt"
+    "previewDigest", "confirmationDigest", "externalEffectId", "acknowledgementDigest", "sessionRebindOutcome", "resultingBindingDigest",
+    "resumed", "evidenceDigest", "result", "createdAt"
   ]) || value.version !== 1 || typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) throw new ReanchorLifecycleError("The protected re-anchor receipt is malformed.");
   const expected = buildReceipt(lifecycle);
   if (stableJson(value) !== stableJson(expected)) throw new ReanchorLifecycleError("The protected re-anchor receipt does not match its exact deterministic evidence.");
@@ -936,14 +1154,45 @@ function exactContainmentInspection(value: unknown): Readonly<{ allowed: boolean
   return { allowed: value.allowed, fenceEpoch: value.fenceEpoch as number, reason: boundedText(value.reason, "containment reason", 512) };
 }
 
-function exactApplyOutcome(value: unknown): ReanchorApplyOutcome {
-  if (!isRecord(value) || typeof value.disposition !== "string" || typeof value.summary !== "string") throw new ReanchorLifecycleError("The re-anchor apply adapter returned a malformed effect disposition.");
-  const summary = boundedText(value.summary, "re-anchor apply summary", 512);
-  if (value.disposition === "committed" && exactKeys(value, ["disposition", "externalEffectId", "summary"]) && typeof value.externalEffectId === "string" && bounded(value.externalEffectId, 512)) {
-    return { disposition: "committed", externalEffectId: value.externalEffectId, summary };
+function exactApplyOutcome(value: unknown, request: ReanchorApplyRequest): ReanchorApplyOutcome {
+  if (!isRecord(value) || typeof value.disposition !== "string") throw new ReanchorLifecycleError("The re-anchor apply adapter returned a malformed effect disposition.");
+  if (value.disposition === "committed" && exactKeys(value, ["disposition", "acknowledgement"]) && isRecord(value.acknowledgement)) {
+    const acknowledgement = value.acknowledgement;
+    if (!exactKeys(acknowledgement, [
+      "schema", "version", "requestId", "operationId", "externalEffectId", "sessionId", "authorityId",
+      "oldTargetSnapshotId", "newTargetSnapshotId", "cooperativeStopAcknowledged", "resumed", "summary"
+    ]) || acknowledgement.schema !== "sxsy-b122.reanchor-acknowledgement" || acknowledgement.version !== 1
+      || acknowledgement.requestId !== request.requestId || acknowledgement.operationId !== request.operationId
+      || acknowledgement.sessionId !== request.sessionId || acknowledgement.authorityId !== request.authorityId
+      || acknowledgement.oldTargetSnapshotId !== request.oldTargetSnapshotId || acknowledgement.newTargetSnapshotId !== request.newTargetSnapshotId
+      || acknowledgement.cooperativeStopAcknowledged !== true || acknowledgement.resumed !== false
+      || typeof acknowledgement.externalEffectId !== "string" || !bounded(acknowledgement.externalEffectId, 512)) {
+      throw new ReanchorLifecycleError("The provider Re-anchor acknowledgement did not echo the exact old/new target, session, authority, stop, and no-resume binding.");
+    }
+    return { disposition: "committed", acknowledgement: {
+      schema: "sxsy-b122.reanchor-acknowledgement", version: 1, requestId: request.requestId, operationId: request.operationId,
+      externalEffectId: acknowledgement.externalEffectId, sessionId: request.sessionId, authorityId: request.authorityId,
+      oldTargetSnapshotId: request.oldTargetSnapshotId, newTargetSnapshotId: request.newTargetSnapshotId,
+      cooperativeStopAcknowledged: true, resumed: false, summary: redactProviderSummary(boundedText(acknowledgement.summary, "Re-anchor acknowledgement summary", 512))
+    } };
   }
-  if ((value.disposition === "not_started" || value.disposition === "ambiguous") && exactKeys(value, ["disposition", "summary"])) return { disposition: value.disposition, summary };
+  if ((value.disposition === "not_started" || value.disposition === "ambiguous") && exactKeys(value, ["disposition", "summary"])) {
+    return { disposition: value.disposition, summary: redactProviderSummary(boundedText(value.summary, "re-anchor apply summary", 512)) };
+  }
   throw new ReanchorLifecycleError("The re-anchor apply adapter returned an open or inconsistent effect disposition.");
+}
+
+function acknowledgementFromEffect(request: ReanchorRequestRecord, effect: ReanchorExternalEffect): ReanchorProviderAcknowledgement {
+  return {
+    schema: "sxsy-b122.reanchor-acknowledgement", version: 1, requestId: request.id, operationId: request.operationId,
+    externalEffectId: effect.externalEffectId, sessionId: request.session.id, authorityId: request.authority.id,
+    oldTargetSnapshotId: request.oldTarget.id, newTargetSnapshotId: request.newTarget.id,
+    cooperativeStopAcknowledged: true, resumed: false, summary: effect.summary
+  };
+}
+
+function redactProviderSummary(value: string): string {
+  return untrustedSummary(value, 512).replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED]");
 }
 
 function cloneLifecycle(value: ReanchorLifecycle): ReanchorLifecycle { return jsonClone(value); }

@@ -94,7 +94,7 @@ const confirmed = { ...consequential, requiresConfirmation: true } as const;
 
 /** The complete, closed catalog for the 65 interview-settled chord assignments. */
 export const commandCatalog: readonly CommandDefinition[] = [
-  definition("reanchor", "REANCHOR", "normal", "Re-anchor", "agent", { ...providerScoped, requiresCapabilities: controllable }),
+  definition("reanchor", "REANCHOR", "normal", "Re-anchor", "agent", { ...providerScoped, requiresCapabilities: controllable, requiresConfirmation: true }),
   definition("proof", "PROOF", "normal", "Evidence-based proof", "agent", { ...providerScoped, requiresCapabilities: observable }),
   definition("proof_adversarial", "PROOF", "shift", "Cross-backend adversarial proof", "agent", { ...providerScoped, requiresCapabilities: observable, requiresConfirmation: true }),
   definition("option_provider", "OPTION_PROVIDER", "normal", "Five-option decision packet", "agent", { ...providerScoped, requiresCapabilities: controllable }),

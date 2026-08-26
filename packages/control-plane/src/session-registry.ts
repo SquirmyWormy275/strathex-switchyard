@@ -1,5 +1,5 @@
 import type { Capability, ManagedSession, SessionStatus } from "./contracts.ts";
-import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
+import { jsonClone, sha256, stableJson, type JournalEntry, ProtectedJsonStore } from "./store.ts";
 
 export interface SessionRegistration extends Omit<ManagedSession, "lastHeartbeat" | "status"> {
   readonly lastHeartbeat?: string;
@@ -13,6 +13,20 @@ export interface SessionBindingUpdate {
   readonly planRevision?: string;
   readonly plannedFiles?: readonly string[];
   readonly metadata?: Readonly<Record<string, string>>;
+}
+
+export interface SessionTargetRebindRequest {
+  readonly sessionId: string;
+  readonly expectedBindingDigest: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly operationId: string;
+}
+
+export interface SessionTargetRebindResult {
+  readonly outcome: "rebound" | "already_rebound" | "unknown";
+  readonly reason: string;
+  readonly session?: ManagedSession;
 }
 
 export interface CapabilityDecision {
@@ -68,6 +82,27 @@ function cloneSession(session: ManagedSession): ManagedSession {
   };
 }
 
+/**
+ * Digest of the privilege- and task-bearing portion of a managed session.
+ * Heartbeat and lifecycle status are deliberately excluded: provider pause
+ * may change those while the immutable task/adapter binding remains exact.
+ */
+export function sessionBindingDigest(session: ManagedSession): string {
+  return sha256(stableJson({
+    adapterVersion: session.adapterVersion,
+    capabilities: session.capabilities,
+    id: session.id,
+    metadata: session.metadata,
+    planRevision: session.planRevision ?? null,
+    plannedFiles: session.plannedFiles,
+    provider: session.provider,
+    surface: session.surface,
+    targetSnapshotId: session.targetSnapshotId ?? null,
+    taskId: session.taskId ?? null,
+    workspaceRoot: session.workspaceRoot ?? null
+  }));
+}
+
 function sessionMap(entries: readonly JournalEntry<unknown>[]): Map<string, ManagedSession> {
   const sessions = new Map<string, ManagedSession>();
   for (const entry of entries) {
@@ -79,6 +114,32 @@ function sessionMap(entries: readonly JournalEntry<unknown>[]): Map<string, Mana
     sessions.set(payload.session.id, cloneSession(payload.session));
   }
   return sessions;
+}
+
+function historicalSessionForRebind(entries: readonly JournalEntry<unknown>[], input: SessionTargetRebindRequest): ManagedSession | undefined {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index]!;
+    if (entry.kind !== "session.registered" && entry.kind !== "session.updated") continue;
+    const candidate = (entry.payload as SessionSavedEvent | undefined)?.session;
+    if (!candidate || candidate.id !== input.sessionId || candidate.targetSnapshotId !== input.oldTargetSnapshotId) continue;
+    if (sessionBindingDigest(candidate) === input.expectedBindingDigest) return cloneSession(candidate);
+  }
+  return undefined;
+}
+
+function reboundSession(source: ManagedSession, input: SessionTargetRebindRequest): ManagedSession {
+  return {
+    ...source,
+    targetSnapshotId: input.newTargetSnapshotId,
+    status: "unknown",
+    metadata: {
+      ...source.metadata,
+      "sxsy-b122.reanchor.operationId": input.operationId,
+      "sxsy-b122.reanchor.oldTargetSnapshotId": input.oldTargetSnapshotId,
+      "sxsy-b122.reanchor.newTargetSnapshotId": input.newTargetSnapshotId,
+      "sxsy-b122.reanchor.resumeAuthorized": "false"
+    }
+  };
 }
 
 /**
@@ -172,6 +233,38 @@ export class SessionRegistry {
     }));
   }
 
+  /**
+   * Atomically moves one exact protected session binding to a reviewed target.
+   * Any mismatch is reported as unknown rather than guessed or overwritten.
+   * The resulting status is unknown because Re-anchor never authorizes resume.
+   */
+  async compareAndSwapTarget(input: SessionTargetRebindRequest): Promise<SessionTargetRebindResult> {
+    const exact = exactTargetRebind(input);
+    return this.store.transaction(async (transaction) => {
+      const entries = await transaction.readEntries();
+      const sessions = sessionMap(entries);
+      const existing = sessions.get(exact.sessionId);
+      if (!existing) return { outcome: "unknown", reason: "The managed session disappeared before its target could be rebound." };
+      const priorOperation = existing.metadata["sxsy-b122.reanchor.operationId"];
+      const historical = historicalSessionForRebind(entries, exact);
+      const exactReplay = priorOperation === exact.operationId
+        && existing.metadata["sxsy-b122.reanchor.oldTargetSnapshotId"] === exact.oldTargetSnapshotId
+        && existing.metadata["sxsy-b122.reanchor.newTargetSnapshotId"] === exact.newTargetSnapshotId
+        && existing.metadata["sxsy-b122.reanchor.resumeAuthorized"] === "false"
+        && existing.targetSnapshotId === exact.newTargetSnapshotId
+        && existing.status === "unknown"
+        && !!historical
+        && sessionBindingDigest(existing) === sessionBindingDigest(reboundSession(historical, exact));
+      if (exactReplay) return { outcome: "already_rebound", reason: "The exact re-anchor operation already owns this protected session binding.", session: cloneSession(existing) };
+      if (existing.targetSnapshotId !== exact.oldTargetSnapshotId || sessionBindingDigest(existing) !== exact.expectedBindingDigest) {
+        return { outcome: "unknown", reason: "The managed session binding changed before the target compare-and-swap.", session: cloneSession(existing) };
+      }
+      const rebound = reboundSession(existing, exact);
+      await transaction.append<SessionSavedEvent>("session.updated", { session: rebound });
+      return { outcome: "rebound", reason: "The exact protected session target was rebound without authorizing resume.", session: cloneSession(rebound) };
+    });
+  }
+
   async markUnreachable(id: string): Promise<ManagedSession> {
     return this.setStatus(id, "unreachable");
   }
@@ -238,4 +331,29 @@ export class SessionRegistry {
       throw new SessionCapabilityError(`${status} requires an adapter-proven observable capability.`);
     }
   }
+}
+
+function exactTargetRebind(value: SessionTargetRebindRequest): SessionTargetRebindRequest {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).length !== 5
+    || !Object.prototype.hasOwnProperty.call(value, "sessionId")
+    || !Object.prototype.hasOwnProperty.call(value, "expectedBindingDigest")
+    || !Object.prototype.hasOwnProperty.call(value, "oldTargetSnapshotId")
+    || !Object.prototype.hasOwnProperty.call(value, "newTargetSnapshotId")
+    || !Object.prototype.hasOwnProperty.call(value, "operationId")) {
+    throw new SessionRegistryError("A target compare-and-swap requires one closed exact session/re-anchor binding.");
+  }
+  const digest = (input: string, field: string): string => {
+    if (typeof input !== "string" || !/^[a-f0-9]{64}$/.test(input)) throw new SessionRegistryError(`${field} must be an exact SHA-256 digest.`);
+    return input;
+  };
+  const operationId = nonEmpty(value.operationId, "operationId");
+  if (!/^reanchor-operation:[a-f0-9]{64}$/.test(operationId)) throw new SessionRegistryError("operationId must be an exact durable Re-anchor operation identity.");
+  return {
+    sessionId: nonEmpty(value.sessionId, "sessionId"),
+    expectedBindingDigest: digest(value.expectedBindingDigest, "expectedBindingDigest"),
+    oldTargetSnapshotId: digest(value.oldTargetSnapshotId, "oldTargetSnapshotId"),
+    newTargetSnapshotId: digest(value.newTargetSnapshotId, "newTargetSnapshotId"),
+    operationId
+  };
 }

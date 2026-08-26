@@ -36,6 +36,7 @@ test("containment release exists as a separately gated administrative action, no
 });
 
 test("workflow navigation and Plan Approval declare the authority and confirmation needed by their durable coordinators", () => {
+  assert.equal(commandForAction("reanchor").requiresConfirmation, true, "Re-anchor must obtain host-owned current-user presence for the reviewed old/new target scope");
   assert.equal(commandForAction("plan_approval").requiresConfirmation, true);
   for (const action of ["handoff_immediate", "focus_blocked_agent", "focus_finished_agent"] as const) {
     assert.equal(commandForAction(action).requiresAuthority, true, `${action} must receive exact scoped authority before workflow preparation`);

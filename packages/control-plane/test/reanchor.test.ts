@@ -8,9 +8,12 @@ import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../src/cont
 import { DurableConfirmationLedger } from "../src/confirmations.ts";
 import {
   DurableReanchorCoordinator,
+  type ReanchorApplyOutcome,
+  type ReanchorApplyRequest,
   type ReanchorCoordinatorDependencies,
   type ReanchorLifecyclePhase
 } from "../src/reanchor.ts";
+import { sessionBindingDigest, type SessionTargetRebindRequest, type SessionTargetRebindResult } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
 import { ProtectedJsonStore, sha256 } from "../src/store.ts";
 
@@ -75,6 +78,26 @@ const request = () => ({
   authority
 });
 
+function committed(input: ReanchorApplyRequest, externalEffectId: string, summary: string): Extract<ReanchorApplyOutcome, { readonly disposition: "committed" }> {
+  return {
+    disposition: "committed",
+    acknowledgement: {
+      schema: "sxsy-b122.reanchor-acknowledgement",
+      version: 1,
+      requestId: input.requestId,
+      operationId: input.operationId,
+      externalEffectId,
+      sessionId: input.sessionId,
+      authorityId: input.authorityId,
+      oldTargetSnapshotId: input.oldTargetSnapshotId,
+      newTargetSnapshotId: input.newTargetSnapshotId,
+      cooperativeStopAcknowledged: true,
+      resumed: false,
+      summary
+    }
+  };
+}
+
 async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-reanchor-test-"));
   try {
@@ -85,10 +108,37 @@ async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Pro
 }
 
 function dependencies(overrides: Partial<ReanchorCoordinatorDependencies> = {}): ReanchorCoordinatorDependencies {
+  let currentSession = session;
   return {
-    sessions: { async get() { return session; } },
+    sessions: {
+      async get() { return currentSession; },
+      async compareAndSwapTarget(input: SessionTargetRebindRequest): Promise<SessionTargetRebindResult> {
+        if (currentSession.targetSnapshotId === input.newTargetSnapshotId && currentSession.status === "unknown"
+          && currentSession.metadata["sxsy-b122.reanchor.operationId"] === input.operationId
+          && currentSession.metadata["sxsy-b122.reanchor.oldTargetSnapshotId"] === input.oldTargetSnapshotId
+          && currentSession.metadata["sxsy-b122.reanchor.newTargetSnapshotId"] === input.newTargetSnapshotId
+          && currentSession.metadata["sxsy-b122.reanchor.resumeAuthorized"] === "false") {
+          return { outcome: "already_rebound", reason: "The exact session operation already owns this binding.", session: currentSession };
+        }
+        if (input.sessionId !== currentSession.id || input.expectedBindingDigest !== sessionBindingDigest(currentSession)
+          || input.oldTargetSnapshotId !== currentSession.targetSnapshotId) return { outcome: "unknown", reason: "The exact session binding changed." };
+        currentSession = {
+          ...currentSession,
+          targetSnapshotId: input.newTargetSnapshotId,
+          status: "unknown",
+          metadata: {
+            ...currentSession.metadata,
+            "sxsy-b122.reanchor.operationId": input.operationId,
+            "sxsy-b122.reanchor.oldTargetSnapshotId": input.oldTargetSnapshotId,
+            "sxsy-b122.reanchor.newTargetSnapshotId": input.newTargetSnapshotId,
+            "sxsy-b122.reanchor.resumeAuthorized": "false"
+          }
+        };
+        return { outcome: "rebound", reason: "The exact protected session binding was re-anchored.", session: currentSession };
+      }
+    },
     authorities: { async get() { return authority; } },
-    snapshots: { async isCurrent(target) { return target.id === newTarget.id; } },
+    snapshots: { async isCurrent(target, expectedSession) { return target.id === newTarget.id && expectedSession.id === session.id; } },
     containment: { async inspect() { return { allowed: true, fenceEpoch: 7, reason: "No active containment fence." }; } },
     effectGuard: { async assertCurrent() { return { allowed: true, reason: "Exact target remains current." }; } },
     confirmations: {
@@ -145,7 +195,7 @@ test("re-anchor is preview-only until exact human confirmation and records one d
           assert.equal(input.resumeAuthorized, false);
           assert.equal(input.credentials, undefined);
           assert.equal(input.network, undefined);
-          return { disposition: "committed", externalEffectId: "provider-reanchor-effect-1", summary: "Provider accepted the exact re-anchor packet." };
+          return committed(input, "provider-reanchor-effect-1", "Provider accepted the exact re-anchor packet.");
         }
       }
     }), { clock: () => baseNow });
@@ -176,6 +226,8 @@ test("re-anchor is preview-only until exact human confirmation and records one d
     assert.match(completed.receipt?.id ?? "", /^reanchor-receipt:[a-f0-9]{64}$/);
     assert.equal(completed.receipt?.oldTargetSnapshotId, oldTarget.id);
     assert.equal(completed.receipt?.newTargetSnapshotId, newTarget.id);
+    assert.equal(completed.receipt?.sessionRebindOutcome, "rebound");
+    assert.equal(completed.receipt?.resumed, false);
     const repeated = await coordinator.apply(created.request.id);
     assert.equal(repeated.receipt?.id, completed.receipt?.id);
     assert.equal(effects, 1, "an idempotent repeat must never replay the provider effect");
@@ -190,10 +242,10 @@ test("restart preserves pending work and two consumers cannot both execute it", 
     const effectGate = new Promise<void>((resolve) => { releaseEffect = resolve; });
     const shared = dependencies({
       applier: {
-        async apply() {
+        async apply(input) {
           effects += 1;
           await effectGate;
-          return { disposition: "committed", externalEffectId: "single-consumer-effect", summary: "Committed once." };
+          return committed(input, "single-consumer-effect", "Committed once.");
         }
       }
     });
@@ -218,7 +270,7 @@ test("a crash after an externally committed effect recovers as ambiguous and nev
   await withStore(async (store) => {
     let effects = 0;
     const crashing = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "possibly-committed-effect", summary: "Provider replied committed." }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "possibly-committed-effect", "Provider replied committed."); } }
     }), {
       clock: () => baseNow,
       lifecycleProbe(phase: ReanchorLifecyclePhase) { if (phase === "external_effect_returned") throw new Error("simulated process loss"); }
@@ -229,7 +281,7 @@ test("a crash after an externally committed effect recovers as ambiguous and nev
     assert.equal((await crashing.get(created.request.id))?.state, "executing");
 
     const restarted = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "replayed", summary: "must not run" }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "replayed", "must not run"); } }
     }), { clock: () => "2026-08-25T12:00:30.000Z" });
     const recovered = await restarted.recover();
     assert.equal(recovered.find((item) => item.request.id === created.request.id)?.state, "ambiguous");
@@ -242,7 +294,7 @@ test("a durable external-commit marker is finalized after restart without execut
   await withStore(async (store) => {
     let effects = 0;
     const crashing = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "durable-provider-effect", summary: "Committed." }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "durable-provider-effect", "Committed."); } }
     }), {
       clock: () => baseNow,
       lifecycleProbe(phase) { if (phase === "external_committed_persisted") throw new Error("crash before receipt"); }
@@ -253,7 +305,7 @@ test("a durable external-commit marker is finalized after restart without execut
     assert.equal((await crashing.get(created.request.id))?.state, "external_committed");
 
     const restarted = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "replayed", summary: "must not run" }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "replayed", "must not run"); } }
     }), { clock: () => "2026-08-25T12:00:30.000Z" });
     const recovered = await restarted.recover();
     const completed = recovered.find((item) => item.request.id === created.request.id);
@@ -264,18 +316,117 @@ test("a durable external-commit marker is finalized after restart without execut
   });
 });
 
+test("a crash after the session CAS recovers the exact rebind without replaying the provider effect", async () => {
+  await withStore(async (store) => {
+    let effects = 0;
+    const shared = dependencies({
+      applier: { async apply(input) { effects += 1; return committed(input, "provider-effect-before-cas-crash", "Committed exactly once."); } }
+    });
+    const crashing = new DurableReanchorCoordinator(store, shared, {
+      clock: () => baseNow,
+      lifecycleProbe(phase) { if (phase === "session_compare_and_swap_returned") throw new Error("crash after session CAS"); }
+    });
+    const created = await crashing.request(request());
+    await reviewAndConfirm(crashing, created.request.id);
+    await assert.rejects(() => crashing.apply(created.request.id), /crash after session CAS/);
+    assert.equal((await crashing.get(created.request.id))?.state, "external_committed");
+
+    const restarted = new DurableReanchorCoordinator(store, shared, { clock: () => "2026-08-25T12:00:30.000Z" });
+    const recovered = (await restarted.recover()).find((item) => item.request.id === created.request.id);
+    assert.equal(recovered?.state, "recorded");
+    assert.equal(recovered?.receipt?.sessionRebindOutcome, "already_rebound");
+    assert.equal(recovered?.receipt?.resumed, false);
+    assert.equal(effects, 1);
+  });
+});
+
+test("legacy committed journals become visible ambiguity and never replay or invent a protected rebind", async () => {
+  await withStore(async (store) => {
+    let effects = 0;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      applier: { async apply(input) { effects += 1; return committed(input, "must-not-run", "must not run"); } }
+    }), {
+      clock: () => baseNow,
+      lifecycleProbe(phase) { if (phase === "executing_persisted") throw new Error("legacy journal seam"); }
+    });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    await assert.rejects(() => coordinator.apply(created.request.id), /legacy journal seam/);
+    await store.append("reanchor.external_committed", {
+      event: "external_committed",
+      requestId: created.request.id,
+      effect: {
+        version: 1,
+        requestId: created.request.id,
+        operationId: created.request.operationId,
+        externalEffectId: "legacy-provider-effect",
+        summary: "Legacy provider reported a commit.",
+        committedAt: baseNow
+      }
+    });
+    await store.append("reanchor.recorded", {
+      event: "recorded",
+      requestId: created.request.id,
+      receipt: {
+        version: 1,
+        id: `reanchor-receipt:${sha256(created.request.id)}`,
+        requestId: created.request.id,
+        operationId: created.request.operationId,
+        oldTargetSnapshotId: oldTarget.id,
+        newTargetSnapshotId: newTarget.id,
+        sessionId: session.id,
+        authorityId: authority.id,
+        previewDigest: (await coordinator.get(created.request.id))?.preview?.previewDigest,
+        confirmationDigest: (await coordinator.get(created.request.id))?.confirmation?.confirmationTokenDigest,
+        externalEffectId: "legacy-provider-effect",
+        evidenceDigest: "0".repeat(64),
+        result: "reanchored",
+        createdAt: baseNow
+      }
+    });
+
+    const restarted = new DurableReanchorCoordinator(store, dependencies({
+      applier: { async apply(input) { effects += 1; return committed(input, "replayed", "must not run"); } }
+    }), { clock: () => "2026-08-25T12:00:30.000Z" });
+    const recovered = (await restarted.recover()).find((item) => item.request.id === created.request.id);
+    assert.equal(recovered?.state, "ambiguous");
+    assert.match(recovered?.summary ?? "", /legacy|manual reconciliation/i);
+    assert.equal(recovered?.receipt, undefined);
+    assert.equal(effects, 0);
+  });
+});
+
+test("provider acknowledgement summaries are redacted before durable persistence", async () => {
+  await withStore(async (store) => {
+    const secret = "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD";
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      applier: { async apply(input) { return committed(input, "redacted-provider-effect", `Provider echoed ${secret} for person@example.com`); } }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const completed = await coordinator.apply(created.request.id);
+    assert.equal(completed.state, "recorded");
+    assert.doesNotMatch(JSON.stringify(await store.readEntries()), new RegExp(secret));
+    assert.doesNotMatch(completed.externalEffect?.summary ?? "", /person@example\.com/);
+    assert.match(completed.externalEffect?.summary ?? "", /REDACTED/);
+  });
+});
+
 test("stale target, authority, session anchor, containment epoch, or effect guard rejects before apply", async () => {
   const cases: readonly [string, Partial<ReanchorCoordinatorDependencies>][] = [
     ["snapshot", { snapshots: { async isCurrent() { return false; } } }],
     ["authority", { authorities: { async get() { return { ...authority, revokedAt: baseNow }; } } }],
-    ["session", { sessions: { async get() { return { ...session, targetSnapshotId: newTarget.id }; } } }],
+    ["session", { sessions: {
+      async get() { return { ...session, targetSnapshotId: newTarget.id }; },
+      async compareAndSwapTarget() { return { outcome: "unknown", reason: "The session binding changed." }; }
+    } }],
     ["fence", { containment: { async inspect() { return { allowed: true, fenceEpoch: 8, reason: "Fence generation changed." }; } } }],
     ["effect guard", { effectGuard: { async assertCurrent() { return { allowed: false, reason: "Final target changed." }; } } }]
   ];
   for (const [label, override] of cases) {
     await withStore(async (store) => {
       let effects = 0;
-      const stable = dependencies({ applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "must-not-run", summary: "must not run" }; } } });
+      const stable = dependencies({ applier: { async apply(input) { effects += 1; return committed(input, "must-not-run", "must not run"); } } });
       const coordinator = new DurableReanchorCoordinator(store, stable, { clock: () => baseNow });
       const created = await coordinator.request(request());
       await reviewAndConfirm(coordinator, created.request.id);
@@ -309,7 +460,7 @@ test("expired human confirmation cannot cross the effect boundary and the determ
     let now = baseNow;
     let effects = 0;
     const coordinator = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "must-not-run", summary: "must not run" }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "must-not-run", "must not run"); } }
     }), { clock: () => now, confirmationLifetimeMs: 1_000 });
     const created = await coordinator.request(request());
     await reviewAndConfirm(coordinator, created.request.id);
@@ -347,7 +498,7 @@ test("a client assertion without a protected reauthenticated confirmation cannot
           };
         }
       },
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "must-not-run", summary: "must not run" }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "must-not-run", "must not run"); } }
     }), { clock: () => baseNow });
     const created = await coordinator.request(request());
     const preview = await coordinator.preview(created.request.id);
@@ -373,7 +524,7 @@ test("the real durable confirmation ledger is consumed once for the exact review
     });
     const coordinator = new DurableReanchorCoordinator(store, dependencies({
       confirmations,
-      applier: { async apply() { effects += 1; return { disposition: "committed", externalEffectId: "real-confirmed-effect", summary: "Applied once." }; } }
+      applier: { async apply(input) { effects += 1; return committed(input, "real-confirmed-effect", "Applied once."); } }
     }), { clock: () => baseNow });
     const created = await coordinator.request(request());
     const preview = await coordinator.preview(created.request.id);
@@ -397,5 +548,170 @@ test("the real durable confirmation ledger is consumed once for the exact review
     const consumed = await confirmations.get(issued.record.id);
     assert.equal(consumed?.consumedAt, baseNow);
     assert.equal(consumed?.scopeDigest, preview.confirmationScopeDigest);
+  });
+});
+
+test("a provider acknowledgement must echo both exact targets and cannot claim automatic resume", async () => {
+  await withStore(async (store) => {
+    let rebinds = 0;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      sessions: {
+        async get() { return session; },
+        async compareAndSwapTarget() { rebinds += 1; return { outcome: "rebound", reason: "must not run", session: { ...session, targetSnapshotId: newTarget.id, status: "unknown" } }; }
+      },
+      applier: {
+        async apply(input) {
+          const accepted = committed(input, "malformed-provider-ack", "Provider claimed success.");
+          return {
+            ...accepted,
+            acknowledgement: {
+              ...accepted.acknowledgement,
+              newTargetSnapshotId: "0".repeat(64),
+              resumed: true
+            }
+          } as never;
+        }
+      }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const result = await coordinator.apply(created.request.id);
+    assert.equal(result.state, "ambiguous", "a response after dispatch that changes either target or resume state cannot be trusted");
+    assert.equal(rebinds, 0);
+    assert.equal(result.receipt, undefined);
+  });
+});
+
+test("an uncertain session compare-and-swap records ambiguity after provider commit and never reports re-anchored", async () => {
+  await withStore(async (store) => {
+    let effects = 0;
+    let rebinds = 0;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      sessions: {
+        async get() { return session; },
+        async compareAndSwapTarget() { rebinds += 1; return { outcome: "unknown", reason: "The protected binding changed before CAS." }; }
+      },
+      applier: { async apply(input) { effects += 1; return committed(input, "provider-effect-before-cas", "Provider acknowledged the exact report."); } }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const result = await coordinator.apply(created.request.id);
+    assert.equal(result.state, "ambiguous");
+    assert.equal(result.receipt, undefined);
+    assert.equal(effects, 1);
+    assert.equal(rebinds, 1);
+    assert.equal((await coordinator.apply(created.request.id)).state, "ambiguous");
+    assert.equal(effects, 1, "CAS uncertainty is reconciliation-only and cannot replay the provider effect");
+  });
+});
+
+test("post-effect target churn prevents session rebinding and leaves reconciliation-visible ambiguity", async () => {
+  await withStore(async (store) => {
+    let current = true;
+    let effects = 0;
+    let rebinds = 0;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      snapshots: { async isCurrent() { return current; } },
+      sessions: {
+        async get() { return session; },
+        async compareAndSwapTarget() { rebinds += 1; return { outcome: "unknown", reason: "must not run" }; }
+      },
+      applier: {
+        async apply(input) {
+          effects += 1;
+          current = false;
+          return committed(input, "provider-effect-before-target-churn", "Provider stopped and reported before the target changed.");
+        }
+      }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const result = await coordinator.apply(created.request.id);
+    assert.equal(result.state, "ambiguous");
+    assert.equal(effects, 1);
+    assert.equal(rebinds, 0, "a post-effect final-target failure must not rebind the protected session");
+    assert.equal(result.receipt, undefined);
+    assert.equal((await coordinator.apply(created.request.id)).state, "ambiguous");
+    assert.equal(effects, 1);
+  });
+});
+
+test("a CAS replay with correct markers but changed task binding cannot produce a Re-anchor receipt", async () => {
+  await withStore(async (store) => {
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      sessions: {
+        async get() { return session; },
+        async compareAndSwapTarget(input) {
+          return {
+            outcome: "already_rebound",
+            reason: "A changed binding attempted to reuse the operation markers.",
+            session: {
+              ...session,
+              taskId: "substituted-task",
+              targetSnapshotId: input.newTargetSnapshotId,
+              status: "unknown",
+              metadata: {
+                ...session.metadata,
+                "sxsy-b122.reanchor.operationId": input.operationId,
+                "sxsy-b122.reanchor.oldTargetSnapshotId": input.oldTargetSnapshotId,
+                "sxsy-b122.reanchor.newTargetSnapshotId": input.newTargetSnapshotId,
+                "sxsy-b122.reanchor.resumeAuthorized": "false"
+              }
+            }
+          };
+        }
+      },
+      applier: { async apply(input) { return committed(input, "provider-effect-before-binding-substitution", "Provider acknowledged the exact report."); } }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const result = await coordinator.apply(created.request.id);
+    assert.equal(result.state, "ambiguous");
+    assert.equal(result.receipt, undefined);
+    assert.match(result.summary ?? "", /mismatched binding|unknown/i);
+  });
+});
+
+test("provider not-started and ambiguous summaries are redacted before terminal journal persistence", async () => {
+  for (const disposition of ["not_started", "ambiguous"] as const) {
+    await withStore(async (store) => {
+      const secret = `ghp_${disposition}1234567890abcdefghijklmnopqrstuvwxyz`;
+      const coordinator = new DurableReanchorCoordinator(store, dependencies({
+        applier: { async apply() { return { disposition, summary: `Provider leaked ${secret} and person@example.com` }; } }
+      }), { clock: () => baseNow });
+      const created = await coordinator.request(request());
+      await reviewAndConfirm(coordinator, created.request.id);
+      const result = await coordinator.apply(created.request.id);
+      assert.equal(result.state, disposition === "not_started" ? "rejected" : "ambiguous");
+      const journal = JSON.stringify(await store.readEntries());
+      assert.doesNotMatch(journal, new RegExp(secret));
+      assert.doesNotMatch(journal, /person@example\.com/);
+      assert.match(result.summary ?? "", /REDACTED/);
+    });
+  }
+});
+
+test("untrusted read-only preview text is redacted before it enters the protected journal", async () => {
+  await withStore(async (store) => {
+    const secret = "ghp_preview1234567890abcdefghijklmnopqrstuvwxyz";
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      previewer: {
+        async preview() {
+          return {
+            summary: `Preview echoed ${secret}`,
+            discrepancies: ["Contact person@example.com"],
+            risks: [`token=${secret}`],
+            questions: ["Proceed without exposing the value?"]
+          };
+        }
+      }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    const preview = await coordinator.preview(created.request.id);
+    const journal = JSON.stringify(await store.readEntries());
+    assert.doesNotMatch(journal, new RegExp(secret));
+    assert.doesNotMatch(journal, /person@example\.com/);
+    assert.match(preview.summary, /REDACTED/);
+    assert.match(preview.discrepancies[0] ?? "", /REDACTED/);
   });
 });
