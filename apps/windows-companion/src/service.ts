@@ -85,6 +85,7 @@ import {
   type SessionRegistrationPayload,
   type SessionStatusPayload
 } from "./bridge.ts";
+import type { CompanionRequestContext } from "./stdio.ts";
 
 /**
  * A mediator can be attached after it has a verified execution boundary.  The
@@ -121,15 +122,17 @@ export interface HostActionCompletionRecord {
 }
 
 export interface VoiceRuntimeCoordinator {
-  open(bindingId: string): Promise<void>;
-  switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>): Promise<VoiceBinding>;
-  bindManagedSession(bindingId: string, managedSessionId: string): Promise<VoiceBinding>;
-  mute(bindingId: string): Promise<VoiceBinding>;
-  resume(bindingId: string): Promise<VoiceBinding>;
-  interrupt(bindingId: string, reason: string): Promise<VoiceBinding>;
-  end(bindingId: string): Promise<VoiceBinding>;
-  deleteTranscript(bindingId: string): Promise<VoiceBinding>;
+  open(bindingId: string, options?: DirectRequestOptions): Promise<unknown>;
+  switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  bindManagedSession(bindingId: string, managedSessionId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  mute(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  resume(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  interrupt(bindingId: string, reason: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  end(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  deleteTranscript(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
 }
+
+export interface DirectRequestOptions { readonly signal?: AbortSignal; }
 
 export interface HostActionCoordinator {
   authorize(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string; selectionId?: string; url?: string }>>;
@@ -244,7 +247,7 @@ export class CompanionService {
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
-  async handle(request: CompanionRequest): Promise<CompanionResponse> {
+  async handle(request: CompanionRequest, context?: CompanionRequestContext): Promise<CompanionResponse> {
     if (request.version !== companionBridgeVersion) {
       return this.failure(request.id, "unsupported_version", "Unsupported SXSY-B122 companion protocol version.");
     }
@@ -279,65 +282,65 @@ export class CompanionService {
         case "git.review.inspect":
           return this.success(request.id, { workspace: await this.inspectGitReview(this.requireGitReviewInspect(request.payload)) });
         case "runtime.pin.install":
-          return this.success(request.id, { pin: await this.installRuntimePin(this.requireRuntimePinInstall(request.payload)) });
+          return this.success(request.id, { pin: await this.direct(context, (signal) => this.installRuntimePin(this.requireRuntimePinInstall(request.payload), signal)) });
         case "runtime.pin.list":
-          return this.success(request.id, { pins: await this.listRuntimePins(request.payload) });
+          return this.success(request.id, { pins: await this.direct(context, (signal) => this.listRuntimePins(request.payload, signal)) });
         case "runtime.pin.revoke":
-          return this.success(request.id, { pin: await this.revokeRuntimePin(this.requireRuntimePinRevoke(request.payload)) });
+          return this.success(request.id, { pin: await this.direct(context, (signal) => this.revokeRuntimePin(this.requireRuntimePinRevoke(request.payload), signal)) });
         case "sandbox.install":
-          return this.success(request.id, { installation: await this.installSandbox(this.requireSandboxInstall(request.payload)) });
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.installSandbox(this.requireSandboxInstall(request.payload), signal)) });
         case "sandbox.list":
-          return this.success(request.id, { installations: await this.listSandboxes(request.payload) });
+          return this.success(request.id, { installations: await this.direct(context, (signal) => this.listSandboxes(request.payload, signal)) });
         case "sandbox.revoke":
-          return this.success(request.id, { installation: await this.revokeSandbox(this.requireSandboxRevoke(request.payload)) });
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeSandbox(this.requireSandboxRevoke(request.payload), signal)) });
         case "credential.provision":
-          return this.success(request.id, { credential: await this.provisionCredential(this.requireCredentialProvision(request.payload)) });
+          return this.success(request.id, { credential: await this.direct(context, (signal) => this.provisionCredential(this.requireCredentialProvision(request.payload), signal)) });
         case "credential.list":
-          return this.success(request.id, { credentials: await this.listCredentials(request.payload) });
+          return this.success(request.id, { credentials: await this.direct(context, (signal) => this.listCredentials(request.payload, signal)) });
         case "credential.revoke":
-          return this.success(request.id, { revoked: await this.revokeCredential(this.requireCredentialRevoke(request.payload)) });
+          return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeCredential(this.requireCredentialRevoke(request.payload), signal)) });
         case "network-policy.install":
-          return this.success(request.id, { policy: await this.installNetworkPolicy(this.requireNetworkPolicyInstall(request.payload)) });
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.installNetworkPolicy(this.requireNetworkPolicyInstall(request.payload), signal)) });
         case "network-policy.current":
-          return this.success(request.id, { policy: await this.currentNetworkPolicy(request.payload) });
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.currentNetworkPolicy(request.payload, signal)) });
         case "network-policy.revoke":
-          return this.success(request.id, { policy: await this.revokeNetworkPolicy(request.payload) });
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.revokeNetworkPolicy(request.payload, signal)) });
         case "council.port-proxy.activate":
-          return this.success(request.id, { receipt: await this.activateCouncilPortProxy(this.requireCouncilPortProxy(request.payload)) });
+          return this.success(request.id, { receipt: await this.direct(context, (signal) => this.activateCouncilPortProxy(this.requireCouncilPortProxy(request.payload), signal)) });
         case "council.credential-network.execute":
-          return this.success(request.id, { receipt: await this.executeCouncilCredentialNetwork(this.requireCouncilCredentialNetwork(request.payload)) });
-        case "acceptance.trust.install": return this.success(request.id, { trust: await this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation")) });
-        case "acceptance.trust.list": return this.success(request.id, { trust: await this.listAcceptanceTrust(request.payload) });
-        case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload)) });
-        case "acceptance.evidence.import": return this.success(request.id, { evidence: await this.importAcceptanceEvidence(this.requireAdministrationSource(request.payload, "Acceptance evidence import")) });
-        case "acceptance.evidence.list": return this.success(request.id, { evidence: await this.listAcceptanceEvidence(request.payload) });
-        case "acceptance.evidence.invalidate": return this.success(request.id, { invalidated: await this.invalidateAcceptanceEvidence(this.requireAcceptanceEvidenceInvalidate(request.payload)) });
-        case "acceptance.activation.activate": return this.success(request.id, { activation: await this.activateHighConsequence(this.requireAcceptanceActivation(request.payload)) });
-        case "acceptance.activation.list": return this.success(request.id, { activations: await this.listHighConsequenceActivations(request.payload) });
-        case "acceptance.activation.revoke": return this.success(request.id, { revoked: await this.revokeHighConsequenceActivation(this.requireAcceptanceActivationRevoke(request.payload)) });
-        case "scanner.trust.install": return this.success(request.id, { trust: await this.installScannerTrust(this.requireAdministrationSource(request.payload, "Scanner trust installation")) });
-        case "scanner.trust.list": return this.success(request.id, { trust: await this.listScannerTrust(request.payload) });
-        case "scanner.trust.revoke": return this.success(request.id, { revoked: await this.revokeScannerTrust(this.requireScannerTrustRevoke(request.payload)) });
-        case "scanner.fixture.install": return this.success(request.id, { fixture: await this.installScannerFixture(this.requireAdministrationSource(request.payload, "Scanner fixture installation")) });
-        case "scanner.fixture.list": return this.success(request.id, { fixtures: await this.listScannerFixtures(request.payload) });
-        case "scanner.fixture.revoke": return this.success(request.id, { revoked: await this.revokeScannerFixture(this.requireScannerFixtureRevoke(request.payload)) });
-        case "provider-desktop.install": return this.success(request.id, { installation: await this.installProviderDesktop(this.requireProviderDesktopReference(request.payload)) });
-        case "provider-desktop.list": return this.success(request.id, { installations: await this.listProviderDesktops(request.payload) });
-        case "provider-desktop.revoke": return this.success(request.id, { installation: await this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload)) });
+          return this.success(request.id, { receipt: await this.direct(context, (signal) => this.executeCouncilCredentialNetwork(this.requireCouncilCredentialNetwork(request.payload), signal)) });
+        case "acceptance.trust.install": return this.success(request.id, { trust: await this.direct(context, (signal) => this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation"), signal)) });
+        case "acceptance.trust.list": return this.success(request.id, { trust: await this.direct(context, (signal) => this.listAcceptanceTrust(request.payload, signal)) });
+        case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.direct(context, (signal) => this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload), signal)) });
+        case "acceptance.evidence.import": return this.success(request.id, { evidence: await this.direct(context, (signal) => this.importAcceptanceEvidence(this.requireAdministrationSource(request.payload, "Acceptance evidence import"), signal)) });
+        case "acceptance.evidence.list": return this.success(request.id, { evidence: await this.direct(context, (signal) => this.listAcceptanceEvidence(request.payload, signal)) });
+        case "acceptance.evidence.invalidate": return this.success(request.id, { invalidated: await this.direct(context, (signal) => this.invalidateAcceptanceEvidence(this.requireAcceptanceEvidenceInvalidate(request.payload), signal)) });
+        case "acceptance.activation.activate": return this.success(request.id, { activation: await this.direct(context, (signal) => this.activateHighConsequence(this.requireAcceptanceActivation(request.payload), signal)) });
+        case "acceptance.activation.list": return this.success(request.id, { activations: await this.direct(context, (signal) => this.listHighConsequenceActivations(request.payload, signal)) });
+        case "acceptance.activation.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeHighConsequenceActivation(this.requireAcceptanceActivationRevoke(request.payload), signal)) });
+        case "scanner.trust.install": return this.success(request.id, { trust: await this.direct(context, (signal) => this.installScannerTrust(this.requireAdministrationSource(request.payload, "Scanner trust installation"), signal)) });
+        case "scanner.trust.list": return this.success(request.id, { trust: await this.direct(context, (signal) => this.listScannerTrust(request.payload, signal)) });
+        case "scanner.trust.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeScannerTrust(this.requireScannerTrustRevoke(request.payload), signal)) });
+        case "scanner.fixture.install": return this.success(request.id, { fixture: await this.direct(context, (signal) => this.installScannerFixture(this.requireAdministrationSource(request.payload, "Scanner fixture installation"), signal)) });
+        case "scanner.fixture.list": return this.success(request.id, { fixtures: await this.direct(context, (signal) => this.listScannerFixtures(request.payload, signal)) });
+        case "scanner.fixture.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeScannerFixture(this.requireScannerFixtureRevoke(request.payload), signal)) });
+        case "provider-desktop.install": return this.success(request.id, { installation: await this.direct(context, (signal) => this.installProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
+        case "provider-desktop.list": return this.success(request.id, { installations: await this.direct(context, (signal) => this.listProviderDesktops(request.payload, signal)) });
+        case "provider-desktop.revoke": return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
         case "provider.handshake":
-          return this.success(request.id, await this.providerHandshake(this.requireProviderHandshake(request.payload)));
+          return this.success(request.id, await this.direct(context, (signal) => this.providerHandshake(this.requireProviderHandshake(request.payload), signal)));
         case "containment.inspect":
           return this.success(request.id, { containment: await this.inspectContainment(this.requireContainmentInspection(request.payload)) });
         case "containment.release":
           return this.success(request.id, { command: await this.releaseContainment(this.requireContainmentRelease(request.payload)) });
         case "raw-hid.install":
-          return this.success(request.id, await this.installRawHid(this.requireRawHidInstall(request.payload)));
+          return this.success(request.id, await this.direct(context, (signal) => this.installRawHid(this.requireRawHidInstall(request.payload), signal)));
         case "raw-hid.list":
-          return this.success(request.id, { installations: await this.listRawHid(request.payload) });
+          return this.success(request.id, { installations: await this.direct(context, (signal) => this.listRawHid(request.payload, signal)) });
         case "raw-hid.revoke":
-          return this.success(request.id, { installation: await this.revokeRawHid(request.payload) });
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeRawHid(request.payload, signal)) });
         case "raw-hid.status":
-          return this.success(request.id, await this.rawHidStatus(request.payload));
+          return this.success(request.id, await this.direct(context, (signal) => this.rawHidStatus(request.payload, signal)));
         case "hardware-signal.claim":
           return this.success(request.id, { claim: await this.claimHardwareSignal(this.requireHardwareSignalClaim(request.payload)) });
         case "hardware-signal.prepare":
@@ -360,16 +363,16 @@ export class CompanionService {
         case "workflow.prepare": return this.success(request.id, { artifact: await this.prepareWorkflowArtifact(this.requireWorkflowPrepare(request.payload)) });
         case "workflow.cancel": return this.success(request.id, { artifact: await this.cancelWorkflowArtifact(this.requireWorkflowCancel(request.payload)) });
         case "workflow.list": return this.success(request.id, { artifacts: await this.listWorkflowArtifacts(request.payload) });
-        case "voice.consent": return this.success(request.id, { consent: await this.grantVoiceConsent(this.requireVoiceConsent(request.payload)) });
-        case "voice.start": return this.success(request.id, { binding: await this.startVoice(this.requireVoiceStart(request.payload)) });
-        case "voice.current": return this.success(request.id, { binding: await this.currentVoice(request.payload) });
-        case "voice.switch": return this.success(request.id, { binding: await this.switchVoice(this.requireVoiceSwitch(request.payload)) });
-        case "voice.bind": return this.success(request.id, { binding: await this.bindVoice(this.requireVoiceBinding(request.payload)) });
-        case "voice.mute": return this.success(request.id, { binding: await this.muteVoice(this.requireVoiceReference(request.payload, false)) });
-        case "voice.resume": return this.success(request.id, { binding: await this.resumeVoice(this.requireVoiceReference(request.payload, false)) });
-        case "voice.interrupt": return this.success(request.id, { binding: await this.interruptVoice(this.requireVoiceReference(request.payload, true)) });
-        case "voice.end": return this.success(request.id, { binding: await this.endVoice(this.requireVoiceReference(request.payload, false)) });
-        case "voice.transcript.delete": return this.success(request.id, { binding: await this.deleteVoiceTranscript(this.requireVoiceReference(request.payload, false)) });
+        case "voice.consent": return this.success(request.id, { consent: await this.direct(context, (signal) => this.grantVoiceConsent(this.requireVoiceConsent(request.payload), signal)) });
+        case "voice.start": return this.success(request.id, { binding: await this.direct(context, (signal) => this.startVoice(this.requireVoiceStart(request.payload), signal)) });
+        case "voice.current": return this.success(request.id, { binding: await this.direct(context, (signal) => this.currentVoice(request.payload, signal)) });
+        case "voice.switch": return this.success(request.id, { binding: await this.direct(context, (signal) => this.switchVoice(this.requireVoiceSwitch(request.payload), signal)) });
+        case "voice.bind": return this.success(request.id, { binding: await this.direct(context, (signal) => this.bindVoice(this.requireVoiceBinding(request.payload), signal)) });
+        case "voice.mute": return this.success(request.id, { binding: await this.direct(context, (signal) => this.muteVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.resume": return this.success(request.id, { binding: await this.direct(context, (signal) => this.resumeVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.interrupt": return this.success(request.id, { binding: await this.direct(context, (signal) => this.interruptVoice(this.requireVoiceReference(request.payload, true), signal)) });
+        case "voice.end": return this.success(request.id, { binding: await this.direct(context, (signal) => this.endVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.transcript.delete": return this.success(request.id, { binding: await this.direct(context, (signal) => this.deleteVoiceTranscript(this.requireVoiceReference(request.payload, false), signal)) });
         default:
           return this.failure(request.id, "unknown_method", "Unknown SXSY-B122 companion method.");
       }
@@ -544,6 +547,10 @@ export class CompanionService {
     return this.executor.requestConfirmation(payload);
   }
 
+  private direct<T>(context: CompanionRequestContext | undefined, operation: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
+    return waitForDirectOperation(operation, context?.signal);
+  }
+
   private async prepareCommand(payload: CommandPreparationPayload): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>> {
     if (!isCommandPreparationExecutor(this.executor)) return { status: "unavailable", summary: "No durable command-preparation boundary is attached." };
     const definition = commandFor(payload.control, payload.modifier);
@@ -645,58 +652,58 @@ export class CompanionService {
   private async listWorkflowArtifacts(payload: unknown): Promise<readonly WorkflowArtifact[]> { requireEmptyPayload(payload, "Workflow artifact listing"); if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); return this.workflowArtifacts.list(); }
   private async cancelWorkflowArtifact(payload: WorkflowCancelPayload): Promise<WorkflowArtifact> { if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); this.requireSession(payload.sessionId); return this.workflowArtifacts.cancelPrepared(payload); }
 
-  private async grantVoiceConsent(payload: VoiceConsentPayload): Promise<VoiceConsent> {
+  private async grantVoiceConsent(payload: VoiceConsentPayload, signal?: AbortSignal): Promise<VoiceConsent> {
     if (!this.voice || !this.voicePresence || !this.handoffs) throw new CompanionServiceError("capability_denied", "Voice requires durable context, privacy state, and current-user presence.");
-    const handoff = await this.handoffs.get(payload.handoffId);
+    const handoff = await callDirect<HandoffPackage | undefined>(this.handoffs, "get", [payload.handoffId], signal);
     if (!handoff || handoff.status === "cancelled" || handoff.status === "archived") throw new CompanionServiceError("not_found", "Voice consent requires a current immutable Handoff context package.");
-    const presence = await this.voicePresence.verify(`Start or switch SXSY-B122 voice for ${payload.provider} using context ${handoff.id} with transcripts ${payload.transcript}.`);
+    const presence = await callDirect<Awaited<ReturnType<WindowsUserPresenceRunner["verify"]>>>(this.voicePresence, "verify", [`Start or switch SXSY-B122 voice for ${payload.provider} using context ${handoff.id} with transcripts ${payload.transcript}.`], signal);
     if (!presence.verified || !presence.operator) throw new CompanionServiceError("capability_denied", "Current-user presence did not approve voice access.");
     const expiresAt = new Date(Date.parse(this.now()) + payload.expiresInMinutes * 60_000).toISOString();
-    return this.voice.grantConsent({ repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest, provider: payload.provider, operatorPresenceId: presence.operator, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes, expiresAt });
+    return callDirect<VoiceConsent>(this.voice, "grantConsent", [{ repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest, provider: payload.provider, operatorPresenceId: presence.operator, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes, expiresAt }], signal);
   }
 
-  private async startVoice(payload: VoiceStartPayload): Promise<VoiceBinding> {
+  private async startVoice(payload: VoiceStartPayload, signal?: AbortSignal): Promise<VoiceBinding> {
     if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached.");
-    const consent = await this.voice.getConsent(payload.consentId);
+    const consent = await callDirect<VoiceConsent | undefined>(this.voice, "getConsent", [payload.consentId], signal);
     if (!consent) throw new CompanionServiceError("not_found", "Voice consent was not found.");
     if (this.voiceRuntime && !payload.managedSessionId) throw new CompanionServiceError("capability_denied", "The installed two-way voice runtime requires one explicitly selected exact managed session.");
     if (payload.managedSessionId) this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), consent.repositoryRoot, consent.targetSnapshotId);
-    const binding = await this.voice.start(payload);
+    const binding = await callDirect<VoiceBinding>(this.voice, "start", [payload], signal);
     if (payload.managedSessionId && this.voiceRuntime) {
-      try { await this.voiceRuntime.open(binding.id); }
+      try { await callDirect(this.voiceRuntime, "open", [binding.id], signal); }
       catch (error) { await this.voice.end(binding.id).catch(() => undefined); throw voiceServiceFailure(error); }
     }
-    return (await this.voice.getBinding(binding.id)) ?? binding;
+    return (await callDirect<VoiceBinding | undefined>(this.voice, "getBinding", [binding.id], signal)) ?? binding;
   }
-  private async currentVoice(payload: unknown): Promise<VoiceBinding | undefined> { requireEmptyPayload(payload, "Voice current binding"); if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return this.voice.active(); }
-  private async switchVoice(payload: VoiceSwitchPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }) : await this.voice.switchProvider(payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }); } catch (error) { throw voiceServiceFailure(error); } }
-  private async bindVoice(payload: VoiceBindingPayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await this.voice.getBinding(payload.bindingId); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); try { return this.voiceRuntime ? await this.voiceRuntime.bindManagedSession(payload.bindingId, payload.managedSessionId) : await this.voice.bindManagedSession(payload.bindingId, payload.managedSessionId); } catch (error) { throw voiceServiceFailure(error); } }
-  private async muteVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.mute(payload.bindingId) : await this.voice.mute(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
-  private async resumeVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.resume(payload.bindingId) : await this.voice.resume(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
-  private async interruptVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); try { return this.voiceRuntime ? await this.voiceRuntime.interrupt(payload.bindingId, payload.reason) : await this.voice.interrupt(payload.bindingId, payload.reason); } catch (error) { throw voiceServiceFailure(error); } }
-  private async endVoice(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.end(payload.bindingId) : await this.voice.end(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
-  private async deleteVoiceTranscript(payload: VoiceReferencePayload): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return this.voiceRuntime ? await this.voiceRuntime.deleteTranscript(payload.bindingId) : await this.voice.deleteTranscript(payload.bindingId); } catch (error) { throw voiceServiceFailure(error); } }
+  private async currentVoice(payload: unknown, signal?: AbortSignal): Promise<VoiceBinding | undefined> { requireEmptyPayload(payload, "Voice current binding"); if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return callDirect(this.voice, "active", [], signal); }
+  private async switchVoice(payload: VoiceSwitchPayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { const target = this.voiceRuntime ?? this.voice; return await callDirect(target, "switchProvider", [payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async bindVoice(payload: VoiceBindingPayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await callDirect<VoiceBinding | undefined>(this.voice, "getBinding", [payload.bindingId], signal); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); try { const target = this.voiceRuntime ?? this.voice; return await callDirect(target, "bindManagedSession", [payload.bindingId, payload.managedSessionId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async muteVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "mute", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async resumeVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "resume", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async interruptVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); try { return await callDirect(this.voiceRuntime ?? this.voice, "interrupt", [payload.bindingId, payload.reason], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async endVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "end", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async deleteVoiceTranscript(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "deleteTranscript", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
 
   private assertVoiceSessionScope(session: ManagedSession, repositoryRoot: string, targetSnapshotId: string): void {
     if (session.targetSnapshotId !== targetSnapshotId || normalizeHostPath(session.workspaceRoot ?? "") !== normalizeHostPath(repositoryRoot)) throw new CompanionServiceError("capability_denied", "Voice can bind only to a managed session on the exact consent target.");
   }
 
-  private async installRuntimePin(payload: RuntimePinInstallPayload) {
+  private async installRuntimePin(payload: RuntimePinInstallPayload, signal?: AbortSignal) {
     if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
-    const pin = await this.runtimePins.install(payload);
+    const pin = await callDirect(this.runtimePins, "install", [payload], signal);
     this.record("runtime.pin.install", "completed", "Installed one current-user-attested repository runtime digest.");
     return pin;
   }
 
-  private async listRuntimePins(payload: unknown) {
+  private async listRuntimePins(payload: unknown, signal?: AbortSignal) {
     if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Runtime pin listing accepts no client options.");
     if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
-    return this.runtimePins.list();
+    return callDirect(this.runtimePins, "list", [], signal);
   }
 
-  private async revokeRuntimePin(payload: RuntimePinRevokePayload) {
+  private async revokeRuntimePin(payload: RuntimePinRevokePayload, signal?: AbortSignal) {
     if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
-    const pin = await this.runtimePins.revoke(payload.repositoryRoot);
+    const pin = await callDirect(this.runtimePins, "revoke", [payload.repositoryRoot], signal);
     this.record("runtime.pin.revoke", "completed", "Revoked one current-user-attested repository runtime digest.");
     return pin;
   }
@@ -716,22 +723,22 @@ export class CompanionService {
     return { repositoryRoot: payload.repositoryRoot };
   }
 
-  private async installSandbox(payload: SandboxInstallPayload) {
+  private async installSandbox(payload: SandboxInstallPayload, signal?: AbortSignal) {
     if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
-    const installation = await this.sandboxInstallations.install(payload);
+    const installation = await callDirect(this.sandboxInstallations, "install", [payload], signal);
     this.record("sandbox.install", "completed", "Installed one current-user-attested Windows Sandbox catalog and helper pin.");
     return installation;
   }
 
-  private async listSandboxes(payload: unknown) {
+  private async listSandboxes(payload: unknown, signal?: AbortSignal) {
     if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Windows Sandbox listing accepts no client options.");
     if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
-    return this.sandboxInstallations.list();
+    return callDirect(this.sandboxInstallations, "list", [], signal);
   }
 
-  private async revokeSandbox(payload: SandboxRevokePayload) {
+  private async revokeSandbox(payload: SandboxRevokePayload, signal?: AbortSignal) {
     if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
-    const installation = await this.sandboxInstallations.revoke(payload.repositoryRoot);
+    const installation = await callDirect(this.sandboxInstallations, "revoke", [payload.repositoryRoot], signal);
     this.record("sandbox.revoke", "completed", "Revoked one current-user-attested Windows Sandbox installation.");
     return installation;
   }
@@ -748,65 +755,65 @@ export class CompanionService {
     return { repositoryRoot: payload.repositoryRoot };
   }
 
-  private async provisionCredential(payload: CredentialProvisionPayload) {
+  private async provisionCredential(payload: CredentialProvisionPayload, signal?: AbortSignal) {
     if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
-    const credential = await this.credentialProvisioning.provision(payload);
+    const credential = await callDirect<Awaited<ReturnType<CredentialProvisioningCoordinator["provision"]>>>(this.credentialProvisioning, "provision", [payload], signal);
     const exactScopes = credential.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ");
     this.record("credential.provision", "completed", `Provisioned one DPAPI-sealed credential reference for exact scopes: ${exactScopes}.`);
     return credential;
   }
 
-  private async listCredentials(payload: unknown) {
+  private async listCredentials(payload: unknown, signal?: AbortSignal) {
     requireEmptyPayload(payload, "Credential listing");
     if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
-    return this.credentialProvisioning.list();
+    return callDirect(this.credentialProvisioning, "list", [], signal);
   }
 
-  private async revokeCredential(payload: CredentialRevokePayload): Promise<boolean> {
+  private async revokeCredential(payload: CredentialRevokePayload, signal?: AbortSignal): Promise<boolean> {
     if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
-    const revoked = await this.credentialProvisioning.revoke(payload.reference, payload.reason);
+    const revoked = await callDirect<boolean>(this.credentialProvisioning, "revoke", [payload.reference, payload.reason], signal);
     this.record("credential.revoke", revoked ? "completed" : "unavailable", revoked ? "Revoked the selected credential reference." : "The selected live credential reference was not found.");
     return revoked;
   }
 
-  private async installNetworkPolicy(payload: NetworkPolicyInstallPayload) {
+  private async installNetworkPolicy(payload: NetworkPolicyInstallPayload, signal?: AbortSignal) {
     if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached.");
-    const policy = await this.networkPolicyProvisioning.install(payload.sourcePath);
+    const policy = await callDirect(this.networkPolicyProvisioning, "install", [payload.sourcePath], signal);
     this.record("network-policy.install", "completed", "Installed one current-user-attested exact-route HTTPS policy.");
     return policy;
   }
 
-  private async currentNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy inspection"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return this.networkPolicyProvisioning.current(); }
-  private async revokeNetworkPolicy(payload: unknown) { requireEmptyPayload(payload, "Network policy revocation"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await this.networkPolicyProvisioning.revoke(); this.record("network-policy.revoke", "completed", "Revoked the active exact-route HTTPS policy."); return policy; }
+  private async currentNetworkPolicy(payload: unknown, signal?: AbortSignal) { requireEmptyPayload(payload, "Network policy inspection"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return callDirect(this.networkPolicyProvisioning, "current", [], signal); }
+  private async revokeNetworkPolicy(payload: unknown, signal?: AbortSignal) { requireEmptyPayload(payload, "Network policy revocation"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await callDirect(this.networkPolicyProvisioning, "revoke", [], signal); this.record("network-policy.revoke", "completed", "Revoked the active exact-route HTTPS policy."); return policy; }
 
   private acceptanceAdmin() { if (!this.acceptanceAdministration) throw new CompanionServiceError("capability_denied", "No current-user acceptance-evidence administration boundary is installed."); return this.acceptanceAdministration; }
   private scannerAdmin() { if (!this.scannerAdministration) throw new CompanionServiceError("capability_denied", "No current-user signed scanner-fixture administration boundary is installed."); return this.scannerAdministration; }
-  private async installAcceptanceTrust(payload: AdministrationSourcePayload): Promise<InstalledAcceptanceTrust> { const value = await this.acceptanceAdmin().installTrustPolicy(payload.sourcePath); this.record("acceptance.trust.install", "completed", "Installed one current-user-approved acceptance authority."); return value; }
-  private async listAcceptanceTrust(payload: unknown): Promise<readonly InstalledAcceptanceTrust[]> { requireEmptyPayload(payload, "Acceptance trust listing"); return this.acceptanceAdmin().listTrust(); }
-  private async revokeAcceptanceTrust(payload: AcceptanceTrustRevokePayload): Promise<InstalledAcceptanceTrust> { const value = await this.acceptanceAdmin().revokeTrust(payload.authorityId, payload.keyId, payload.reason); this.record("acceptance.trust.revoke", "completed", "Revoked one current-user-approved acceptance authority."); return value; }
-  private async importAcceptanceEvidence(payload: AdministrationSourcePayload): Promise<GateEvidence> { const value = await this.acceptanceAdmin().importEvidence(payload.sourcePath); this.record("acceptance.evidence.import", "completed", "Imported one independently signed acceptance-evidence package."); return value; }
-  private async listAcceptanceEvidence(payload: unknown): Promise<readonly GateEvidence[]> { requireEmptyPayload(payload, "Acceptance evidence listing"); return this.acceptanceAdmin().listEvidence(); }
-  private async invalidateAcceptanceEvidence(payload: AcceptanceEvidenceInvalidatePayload): Promise<true> { await this.acceptanceAdmin().invalidateEvidence(payload.evidenceId, payload.reason); this.record("acceptance.evidence.invalidate", "completed", "Invalidated one selected acceptance-evidence record."); return true; }
-  private async activateHighConsequence(payload: AcceptanceActivationPayload): Promise<HighConsequenceActivation> { const value = await this.acceptanceAdmin().activate(payload.action, payload.targetSnapshotId, payload.expiresAt); this.record("acceptance.activation.activate", "completed", "Activated one high-consequence action for one exact target and expiry."); return value; }
-  private async listHighConsequenceActivations(payload: unknown): Promise<readonly HighConsequenceActivation[]> { requireEmptyPayload(payload, "High-consequence activation listing"); return this.acceptanceAdmin().listActivations(); }
-  private async revokeHighConsequenceActivation(payload: AcceptanceActivationRevokePayload): Promise<true> { await this.acceptanceAdmin().revokeActivation(payload.activationId, payload.reason); this.record("acceptance.activation.revoke", "completed", "Revoked one selected high-consequence activation."); return true; }
-  private async installScannerTrust(payload: AdministrationSourcePayload): Promise<InstalledScannerFixtureTrust> { const value = await this.scannerAdmin().installTrust(payload.sourcePath); this.record("scanner.trust.install", "completed", "Installed one current-user-approved scanner-fixture authority."); return value; }
-  private async listScannerTrust(payload: unknown): Promise<readonly InstalledScannerFixtureTrust[]> { requireEmptyPayload(payload, "Scanner trust listing"); return this.scannerAdmin().listTrust(); }
-  private async revokeScannerTrust(payload: ScannerTrustRevokePayload): Promise<true> { await this.scannerAdmin().revokeTrust(payload.authorityId, payload.keyId, payload.reason); this.record("scanner.trust.revoke", "completed", "Revoked one selected scanner-fixture authority."); return true; }
-  private async installScannerFixture(payload: AdministrationSourcePayload): Promise<InstalledScannerFixture> { const value = await this.scannerAdmin().installFixture(payload.sourcePath); this.record("scanner.fixture.install", "completed", "Installed one current-user-approved signed scanner/advisory fixture."); return value; }
-  private async listScannerFixtures(payload: unknown): Promise<readonly InstalledScannerFixture[]> { requireEmptyPayload(payload, "Scanner fixture listing"); return this.scannerAdmin().listFixtures(); }
-  private async revokeScannerFixture(payload: ScannerFixtureRevokePayload): Promise<true> { await this.scannerAdmin().revokeFixture(payload.fixtureId, payload.reason); this.record("scanner.fixture.revoke", "completed", "Revoked one selected scanner/advisory fixture."); return true; }
+  private async installAcceptanceTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledAcceptanceTrust> { const value = await callDirect<InstalledAcceptanceTrust>(this.acceptanceAdmin(), "installTrustPolicy", [payload.sourcePath], signal); this.record("acceptance.trust.install", "completed", "Installed one current-user-approved acceptance authority."); return value; }
+  private async listAcceptanceTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledAcceptanceTrust[]> { requireEmptyPayload(payload, "Acceptance trust listing"); return callDirect(this.acceptanceAdmin(), "listTrust", [], signal); }
+  private async revokeAcceptanceTrust(payload: AcceptanceTrustRevokePayload, signal?: AbortSignal): Promise<InstalledAcceptanceTrust> { const value = await callDirect<InstalledAcceptanceTrust>(this.acceptanceAdmin(), "revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal); this.record("acceptance.trust.revoke", "completed", "Revoked one current-user-approved acceptance authority."); return value; }
+  private async importAcceptanceEvidence(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<GateEvidence> { const value = await callDirect<GateEvidence>(this.acceptanceAdmin(), "importEvidence", [payload.sourcePath], signal); this.record("acceptance.evidence.import", "completed", "Imported one independently signed acceptance-evidence package."); return value; }
+  private async listAcceptanceEvidence(payload: unknown, signal?: AbortSignal): Promise<readonly GateEvidence[]> { requireEmptyPayload(payload, "Acceptance evidence listing"); return callDirect(this.acceptanceAdmin(), "listEvidence", [], signal); }
+  private async invalidateAcceptanceEvidence(payload: AcceptanceEvidenceInvalidatePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.acceptanceAdmin(), "invalidateEvidence", [payload.evidenceId, payload.reason], signal); this.record("acceptance.evidence.invalidate", "completed", "Invalidated one selected acceptance-evidence record."); return true; }
+  private async activateHighConsequence(payload: AcceptanceActivationPayload, signal?: AbortSignal): Promise<HighConsequenceActivation> { const value = await callDirect<HighConsequenceActivation>(this.acceptanceAdmin(), "activate", [payload.action, payload.targetSnapshotId, payload.expiresAt], signal); this.record("acceptance.activation.activate", "completed", "Activated one high-consequence action for one exact target and expiry."); return value; }
+  private async listHighConsequenceActivations(payload: unknown, signal?: AbortSignal): Promise<readonly HighConsequenceActivation[]> { requireEmptyPayload(payload, "High-consequence activation listing"); return callDirect(this.acceptanceAdmin(), "listActivations", [], signal); }
+  private async revokeHighConsequenceActivation(payload: AcceptanceActivationRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.acceptanceAdmin(), "revokeActivation", [payload.activationId, payload.reason], signal); this.record("acceptance.activation.revoke", "completed", "Revoked one selected high-consequence activation."); return true; }
+  private async installScannerTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledScannerFixtureTrust> { const value = await callDirect<InstalledScannerFixtureTrust>(this.scannerAdmin(), "installTrust", [payload.sourcePath], signal); this.record("scanner.trust.install", "completed", "Installed one current-user-approved scanner-fixture authority."); return value; }
+  private async listScannerTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledScannerFixtureTrust[]> { requireEmptyPayload(payload, "Scanner trust listing"); return callDirect(this.scannerAdmin(), "listTrust", [], signal); }
+  private async revokeScannerTrust(payload: ScannerTrustRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.scannerAdmin(), "revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal); this.record("scanner.trust.revoke", "completed", "Revoked one selected scanner-fixture authority."); return true; }
+  private async installScannerFixture(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledScannerFixture> { const value = await callDirect<InstalledScannerFixture>(this.scannerAdmin(), "installFixture", [payload.sourcePath], signal); this.record("scanner.fixture.install", "completed", "Installed one current-user-approved signed scanner/advisory fixture."); return value; }
+  private async listScannerFixtures(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledScannerFixture[]> { requireEmptyPayload(payload, "Scanner fixture listing"); return callDirect(this.scannerAdmin(), "listFixtures", [], signal); }
+  private async revokeScannerFixture(payload: ScannerFixtureRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.scannerAdmin(), "revokeFixture", [payload.fixtureId, payload.reason], signal); this.record("scanner.fixture.revoke", "completed", "Revoked one selected scanner/advisory fixture."); return true; }
 
   private providerDesktopAdmin() { if (!this.providerDesktopRegistry) throw new CompanionServiceError("capability_denied", "No fixed-path current-user provider installation registry is attached."); return this.providerDesktopRegistry; }
-  private async installProviderDesktop(payload: ProviderDesktopReferencePayload): Promise<ProviderInstallation> { const value = await this.providerDesktopAdmin().install(payload.provider); this.record("provider-desktop.install", "completed", "Installed one current-user-approved fixed provider executable identity."); return value; }
-  private async listProviderDesktops(payload: unknown): Promise<readonly ProviderInstallation[]> { requireEmptyPayload(payload, "Provider desktop listing"); return this.providerDesktopAdmin().list(); }
-  private async revokeProviderDesktop(payload: ProviderDesktopReferencePayload): Promise<ProviderInstallation> { const value = await this.providerDesktopAdmin().revoke(payload.provider); this.record("provider-desktop.revoke", "completed", "Revoked one fixed provider executable identity."); return value; }
+  private async installProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "install", [payload.provider], signal); this.record("provider-desktop.install", "completed", "Installed one current-user-approved fixed provider executable identity."); return value; }
+  private async listProviderDesktops(payload: unknown, signal?: AbortSignal): Promise<readonly ProviderInstallation[]> { requireEmptyPayload(payload, "Provider desktop listing"); return callDirect(this.providerDesktopAdmin(), "list", [], signal); }
+  private async revokeProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "revoke", [payload.provider], signal); this.record("provider-desktop.revoke", "completed", "Revoked one fixed provider executable identity."); return value; }
 
-  private async providerHandshake(payload: ProviderHandshakePayload): Promise<ManagedSession> {
+  private async providerHandshake(payload: ProviderHandshakePayload, signal?: AbortSignal): Promise<ManagedSession> {
     if (!this.providerHandshakes) throw new CompanionServiceError("capability_denied", "No configured provider handshake boundary is attached.");
     const session = this.requireSession(payload.sessionId);
     if (session.workspaceRoot && normalizeHostPath(session.workspaceRoot) !== normalizeHostPath(payload.repositoryRoot)) throw new CompanionServiceError("capability_denied", "The selected provider session is bound to a different repository root.");
-    const trusted = await this.providerHandshakes.handshake({ session, repositoryRoot: payload.repositoryRoot });
+    const trusted = await callDirect<ManagedSession>(this.providerHandshakes, "handshake", [{ session, repositoryRoot: payload.repositoryRoot }], signal);
     this.installTrustedSession(trusted);
     this.record("provider.handshake", "completed", "Installed exact-target adapter-proven session capabilities.", trusted.id);
     return cloneSession(trusted);
@@ -862,13 +869,13 @@ export class CompanionService {
     }
     return payload as unknown as CouncilCredentialNetworkPayload;
   }
-  private async activateCouncilPortProxy(payload: CouncilPortProxyPayload) {
+  private async activateCouncilPortProxy(payload: CouncilPortProxyPayload, signal?: AbortSignal) {
     if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
-    return this.councilResources.activatePortProxy(payload);
+    return callDirect(this.councilResources, "activatePortProxy", [payload], signal);
   }
-  private async executeCouncilCredentialNetwork(payload: CouncilCredentialNetworkPayload) {
+  private async executeCouncilCredentialNetwork(payload: CouncilCredentialNetworkPayload, signal?: AbortSignal) {
     if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
-    return this.councilResources.credentialNetwork(payload);
+    return callDirect(this.councilResources, "credentialNetwork", [payload], signal);
   }
   private requireAdministrationSource(payload: unknown, label: string): AdministrationSourcePayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", `${label} requires one bounded absolute source path.`); return { sourcePath: payload.sourcePath }; }
   private requireAcceptanceTrustRevoke(payload: unknown): AcceptanceTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
@@ -906,36 +913,40 @@ export class CompanionService {
     };
   }
 
-  private async installRawHid(payload: RawHidInstallPayload) {
+  private async installRawHid(payload: RawHidInstallPayload, signal?: AbortSignal) {
     if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
     // A changed tuple or helper pin is never made durable while the prior
     // generation can still emit signals under the old installation identity.
-    await this.rawHidSupervisor.stop();
-    const installation = await this.rawHidInstallations.install(payload);
-    const supervisor = await this.rawHidSupervisor.startConfigured();
+    await callDirect(this.rawHidSupervisor, "stop", [], signal);
+    const installation = await callDirect(this.rawHidInstallations, "install", [payload], signal);
+    const supervisor = await callDirect(this.rawHidSupervisor, "startConfigured", [], signal);
     this.record("raw-hid.install", "completed", "Installed one current-user-attested exact B122 Raw-HID tuple and fixed helper pin.");
     return { installation, supervisor };
   }
 
-  private async listRawHid(payload: unknown) {
+  private async listRawHid(payload: unknown, signal?: AbortSignal) {
     requireEmptyPayload(payload, "Raw-HID installation listing");
     if (!this.rawHidInstallations) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
-    return this.rawHidInstallations.list();
+    return callDirect(this.rawHidInstallations, "list", [], signal);
   }
 
-  private async revokeRawHid(payload: unknown) {
+  private async revokeRawHid(payload: unknown, signal?: AbortSignal) {
     requireEmptyPayload(payload, "Raw-HID revocation");
     if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
-    await this.rawHidSupervisor.stop();
-    const installation = await this.rawHidInstallations.revoke();
+    await callDirect(this.rawHidSupervisor, "stop", [], signal);
+    const installation = await callDirect(this.rawHidInstallations, "revoke", [], signal);
     this.record("raw-hid.revoke", "completed", "Revoked the current-user-attested B122 Raw-HID tuple and stopped its helper generation.");
     return installation;
   }
 
-  private async rawHidStatus(payload: unknown) {
+  private async rawHidStatus(payload: unknown, signal?: AbortSignal) {
     requireEmptyPayload(payload, "Raw-HID status");
     if (!this.rawHidInstallations || !this.rawHidSupervisor || !this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No complete trusted Raw-HID runtime boundary is attached.");
-    return { supervisor: this.rawHidSupervisor.status(), inbox: await this.hardwareSignals.status(), installations: await this.rawHidInstallations.list() };
+    return {
+      supervisor: await callDirect(this.rawHidSupervisor, "status", [], signal),
+      inbox: await callDirect(this.hardwareSignals, "status", [], signal),
+      installations: await callDirect(this.rawHidInstallations, "list", [], signal)
+    };
   }
 
   private async claimHardwareSignal(payload: HardwareSignalClaimPayload): Promise<HardwareSignalClaim | undefined> {
@@ -1290,6 +1301,45 @@ class CompanionServiceError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+function waitForDirectOperation<T>(operation: (signal: AbortSignal | undefined) => Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal?.aborted) return Promise.reject(directRequestCancelled());
+  const pending = Promise.resolve().then(() => operation(signal));
+  return waitForDirectPromise(pending, signal);
+}
+
+function waitForDirectPromise<T>(pending: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return pending;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (work: () => void): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", aborted);
+      work();
+    };
+    const aborted = (): void => finish(() => reject(directRequestCancelled()));
+    signal.addEventListener("abort", aborted, { once: true });
+    pending.then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error))
+    );
+    if (signal.aborted) aborted();
+  });
+}
+
+function callDirect<T>(target: object, methodName: string, args: readonly unknown[], signal: AbortSignal | undefined): Promise<T> {
+  if (signal?.aborted) return Promise.reject(directRequestCancelled());
+  const method = (target as Record<string, unknown>)[methodName];
+  if (typeof method !== "function") return Promise.reject(new Error(`The direct ${methodName} boundary is unavailable.`));
+  const invocationArgs = signal ? [...args, { signal } satisfies DirectRequestOptions] : [...args];
+  const pending = Promise.resolve(Reflect.apply(method, target, invocationArgs) as T | PromiseLike<T>);
+  return waitForDirectPromise(pending, signal);
+}
+
+function directRequestCancelled(): CompanionServiceError {
+  return new CompanionServiceError("companion_unavailable", "The authenticated companion request ended before the direct operation completed; completion was not inferred.");
 }
 
 const statusValues = ["running", "verified_blocked", "verified_finished", "unreachable", "stale", "unknown"] as const;

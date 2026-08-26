@@ -112,7 +112,7 @@ async function closeResourceWithinBound(resource: StandaloneCloseResource, timeo
 export function createLifecycleAwareHandler(delegate: CompanionRequestHandler, requestStop: () => Promise<void>): CompanionRequestHandler {
   let stopping = false;
   return {
-    async handle(request: CompanionRequest): Promise<CompanionResponse> {
+    async handle(request: CompanionRequest, context): Promise<CompanionResponse> {
       if (request.method === "ping" && exactShutdownPayload(request.payload)) {
         if (!stopping) {
           // Fence ordinary effects synchronously, before acknowledging shutdown.
@@ -124,7 +124,7 @@ export function createLifecycleAwareHandler(delegate: CompanionRequestHandler, r
         return { version: 1, id: request.id, ok: true, result: { state: "stopping" } };
       }
       if (stopping) return { version: 1, id: request.id, ok: false, error: { code: "companion_unavailable", message: "The companion is stopping and refuses new effects." } };
-      return delegate.handle(request);
+      return delegate.handle(request, context);
     }
   };
 }

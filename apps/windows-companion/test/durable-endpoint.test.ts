@@ -10,6 +10,25 @@ import { companionBridgeVersion, type CompanionRequest } from "../src/bridge.ts"
 import { DurableCompanionEndpoint, DurableCompanionEndpointError } from "../src/durable-endpoint.ts";
 import { CompanionService } from "../src/service.ts";
 
+test("durable endpoint preserves the exact transport request context", async () => {
+  await withRegistry(async (registry) => {
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    const service = {
+      installTrustedSession() {},
+      listSessions() { return []; },
+      async handle(candidate: CompanionRequest, context?: { readonly signal?: AbortSignal }) {
+        received = context?.signal;
+        return { version: companionBridgeVersion, id: candidate.id, ok: true as const, result: [] };
+      }
+    } as unknown as CompanionService;
+    const endpoint = new DurableCompanionEndpoint(service, registry);
+    const response = await endpoint.handle(request("context", "session.list"), { signal: controller.signal });
+    assert.equal(response.ok, true);
+    assert.equal(received, controller.signal);
+  });
+});
+
 async function withRegistry(run: (registry: SessionRegistry) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-durable-endpoint-"));
   try {

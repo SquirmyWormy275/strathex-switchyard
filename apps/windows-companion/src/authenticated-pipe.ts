@@ -4,7 +4,7 @@ import { createServer, connect, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join } from "node:path";
 
 import { companionBridgeVersion, isCompanionRequest, type CompanionRequest, type CompanionResponse } from "./bridge.ts";
-import type { CompanionRequestHandler } from "./stdio.ts";
+import type { CompanionRequestContext, CompanionRequestHandler } from "./stdio.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { createSealedRandomToken } from "./windows-secret.ts";
 
@@ -110,6 +110,7 @@ export class AuthenticatedPipeServer {
   private token?: Buffer;
   private readonly sockets = new Set<Socket>();
   private readonly activeHandlers = new Set<Promise<void>>();
+  private readonly activeRequestControllers = new Set<AbortController>();
   private stopping = false;
   private stopPromise?: Promise<void>;
 
@@ -161,6 +162,7 @@ export class AuthenticatedPipeServer {
   private async stopInternal(): Promise<void> {
     const server = this.server;
     this.server = undefined;
+    for (const controller of this.activeRequestControllers) controller.abort();
     for (const socket of this.sockets) socket.destroy();
     this.sockets.clear();
     const failures: Error[] = [];
@@ -254,6 +256,9 @@ export class AuthenticatedPipeServer {
   private async respond(socket: Socket, line: string, clientNonce: string, serverNonce: string): Promise<void> {
     const fallback = invalidPipeResponse("invalid", "The companion rejected an unauthenticated local request.");
     let response = fallback;
+    let controller: AbortController | undefined;
+    let requestAborted = false;
+    const abortRequest = (): void => { controller?.abort(); };
     try {
       if (this.stopping) throw new Error("stopping");
       const envelope: unknown = JSON.parse(line);
@@ -261,10 +266,23 @@ export class AuthenticatedPipeServer {
         || !constantTimeTextMatches(envelope.proof, pipeProof(this.token, "client", clientNonce, serverNonce, JSON.stringify(envelope.request)))) {
         throw new Error("unauthenticated");
       }
-      response = await this.handler.handle(envelope.request);
+      controller = new AbortController();
+      this.activeRequestControllers.add(controller);
+      socket.once("close", abortRequest);
+      socket.once("error", abortRequest);
+      response = await waitForRequest(this.handler.handle(envelope.request, { signal: controller.signal } satisfies CompanionRequestContext), controller.signal);
     } catch {
       // Do not reveal whether a pipe, token, method, or request ID was valid.
+    } finally {
+      if (controller) {
+        requestAborted = controller.signal.aborted;
+        socket.off("close", abortRequest);
+        socket.off("error", abortRequest);
+        this.activeRequestControllers.delete(controller);
+        controller.abort();
+      }
     }
+    if (requestAborted || socket.destroyed || this.stopping) return;
     const responseJson = JSON.stringify(response);
     const serialized = JSON.stringify({ version: 2, response, proof: pipeProof(this.token ?? Buffer.alloc(0), "response", clientNonce, serverNonce, responseJson) } satisfies AuthenticatedResponseEnvelope);
     if (Buffer.byteLength(serialized, "utf8") > this.maxFrameBytes) {
@@ -397,3 +415,22 @@ function pipeProof(token: Buffer, role: "server" | "client" | "response", client
 function isNonce(value: unknown): value is string { if (typeof value !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return false; try { return Buffer.from(value, "base64").length === 32; } catch { return false; } }
 function isProof(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(value) && Buffer.from(value, "base64").length === 32; }
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
+
+function waitForRequest<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (work: () => void): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", aborted);
+      work();
+    };
+    const aborted = (): void => finish(() => reject(new Error("The authenticated companion request was aborted.")));
+    signal.addEventListener("abort", aborted, { once: true });
+    operation.then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error))
+    );
+    if (signal.aborted) aborted();
+  });
+}

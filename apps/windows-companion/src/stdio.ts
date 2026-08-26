@@ -6,8 +6,12 @@ import { CompanionService } from "./service.ts";
 const maxJsonLineBytes = 64 * 1024;
 
 /** Both the simple service and durable endpoint share this local-only boundary. */
+export interface CompanionRequestContext {
+  readonly signal?: AbortSignal;
+}
+
 export interface CompanionRequestHandler {
-  handle(request: CompanionRequest): Promise<CompanionResponse>;
+  handle(request: CompanionRequest, context?: CompanionRequestContext): Promise<CompanionResponse>;
 }
 
 /**
@@ -28,7 +32,7 @@ export async function serveJsonLines(
 }
 
 /** Pure line handler retained for deterministic tests and embedding hosts. */
-export async function handleJsonLine(line: string, service: CompanionRequestHandler): Promise<CompanionResponse | undefined> {
+export async function handleJsonLine(line: string, service: CompanionRequestHandler, context?: CompanionRequestContext): Promise<CompanionResponse | undefined> {
   if (!line.trim()) return undefined;
   if (Buffer.byteLength(line, "utf8") > maxJsonLineBytes) {
     return invalidResponse("invalid", "The companion rejected an oversized JSON-lines request.");
@@ -51,7 +55,7 @@ export async function handleJsonLine(line: string, service: CompanionRequestHand
     method: parsed.method,
     payload: parsed.payload
   };
-  return service.handle(request);
+  return service.handle(request, context);
 }
 
 export function invalidResponse(id: string, message: string): CompanionResponse {

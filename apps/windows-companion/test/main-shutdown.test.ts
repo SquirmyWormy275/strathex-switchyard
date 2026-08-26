@@ -139,12 +139,15 @@ test("process-identity failure releases the acquired companion lease before star
 test("authenticated lifecycle request synchronously fences later effects and schedules one graceful stop", async () => {
   let delegated = 0;
   let stopped = 0;
+  let delegatedSignal: AbortSignal | undefined;
   const handler = createLifecycleAwareHandler({
-    async handle(request) { delegated += 1; return { version: 1, id: request.id, ok: true, result: { state: "ready" } }; }
+    async handle(request, context) { delegated += 1; delegatedSignal = context?.signal; return { version: 1, id: request.id, ok: true, result: { state: "ready" } }; }
   }, async () => { stopped += 1; });
-  const ping = await handler.handle({ version: 1, id: "ping", method: "ping" });
+  const controller = new AbortController();
+  const ping = await handler.handle({ version: 1, id: "ping", method: "ping" }, { signal: controller.signal });
   assert.equal(ping.ok, true);
   assert.equal(delegated, 1);
+  assert.equal(delegatedSignal, controller.signal);
   const shutdown = await handler.handle({ version: 1, id: "shutdown", method: "ping", payload: { lifecycle: "shutdown" } });
   assert.deepEqual(shutdown, { version: 1, id: "shutdown", ok: true, result: { state: "stopping" } });
   const fenced = await handler.handle({ version: 1, id: "effect-after-shutdown", method: "ping" });

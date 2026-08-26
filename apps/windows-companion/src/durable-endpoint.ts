@@ -2,6 +2,7 @@ import type { Capability, ManagedSession, SessionStatus } from "../../../package
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { companionBridgeVersion, type CompanionRequest, type CompanionResponse } from "./bridge.ts";
 import { CompanionService } from "./service.ts";
+import type { CompanionRequestContext } from "./stdio.ts";
 
 const sessionMutationMethods = new Set([
   "session.register",
@@ -53,7 +54,7 @@ export class DurableCompanionEndpoint {
    * mutation is synchronously appended to the protected registry before its
    * successful response is returned to the caller.
    */
-  async handle(request: CompanionRequest): Promise<CompanionResponse> {
+  async handle(request: CompanionRequest, context?: CompanionRequestContext): Promise<CompanionResponse> {
     await this.initialized;
     if (this.initializationFailed || this.persistenceFailed) return this.failClosed(request);
     if (this.refreshSessions) {
@@ -63,7 +64,7 @@ export class DurableCompanionEndpoint {
 
     let response: CompanionResponse;
     try {
-      response = await this.service.handle(request);
+      response = await this.service.handle(request, context);
     } catch {
       return this.failClosed(request);
     }

@@ -225,35 +225,97 @@ test("authenticated pipe shutdown destroys idle clients instead of waiting indef
   assert.equal(idle.destroyed, true);
 });
 
-test("authenticated pipe shutdown fences new work and drains an already admitted handler", async (context) => {
+test("authenticated pipe disconnect aborts the exact admitted request and consumes late rejection", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-disconnect-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `disconnect-${Date.now()}`);
+  let admit!: () => void;
+  const admitted = new Promise<void>((resolve) => { admit = resolve; });
+  let rejectLate!: (error: Error) => void;
+  const late = new Promise<CompanionResponse>((_resolve, reject) => { rejectLate = reject; });
+  let requestSignal: AbortSignal | undefined;
+  const server = new AuthenticatedPipeServer(configuration, protector, {
+    async handle(_candidate, requestContext?: { readonly signal?: AbortSignal }): Promise<CompanionResponse> {
+      requestSignal = requestContext?.signal;
+      admit();
+      return late;
+    }
+  });
+  await server.start();
+  context.after(async () => { rejectLate(new Error("late fixture rejection")); await server.stop().catch(() => undefined); });
+  const token = Buffer.from(configuration.sealedToken.slice("fake:".length), "base64");
+  const clientNonce = randomBytes(32).toString("base64");
+  const connection = await openRawChallenge(configuration.pipePath, clientNonce);
+  const envelope = authenticatedRequestEnvelope(token, clientNonce, connection.challenge.serverNonce, request);
+  connection.socket.write(`${JSON.stringify(envelope)}\n`, "utf8");
+  await admitted;
+  assert.ok(requestSignal, "the admitted request must own an abort signal");
+  const aborted = new Promise<void>((resolve) => requestSignal!.addEventListener("abort", () => resolve(), { once: true }));
+  connection.socket.destroy();
+  await Promise.race([aborted, new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("disconnect did not abort the request")), 1_000))]);
+  rejectLate(new Error("late fixture rejection"));
+  await server.stop();
+  token.fill(0);
+});
+
+test("authenticated pipe timeout aborts the exact admitted request", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-timeout-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `timeout-${Date.now()}`);
+  let admit!: () => void;
+  const admitted = new Promise<void>((resolve) => { admit = resolve; });
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  let requestSignal: AbortSignal | undefined;
+  const server = new AuthenticatedPipeServer(configuration, protector, {
+    async handle(candidate, requestContext?: { readonly signal?: AbortSignal }): Promise<CompanionResponse> {
+      requestSignal = requestContext?.signal;
+      admit();
+      await blocked;
+      return { version: 1, id: candidate.id, ok: true };
+    }
+  }, { timeoutMs: 100 });
+  await server.start();
+  context.after(async () => { release(); await server.stop().catch(() => undefined); });
+  const clientOutcome = new AuthenticatedPipeClient(configuration, protector, { timeoutMs: 2_000 }).request(request).then(() => "resolved", () => "rejected");
+  await admitted;
+  assert.ok(requestSignal, "the timed request must own an abort signal");
+  await Promise.race([
+    new Promise<void>((resolve) => requestSignal!.addEventListener("abort", () => resolve(), { once: true })),
+    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("pipe timeout did not abort the request")), 1_000))
+  ]);
+  assert.equal(await clientOutcome, "rejected");
+  release();
+  await server.stop();
+});
+
+test("authenticated pipe shutdown aborts and drains a never-settling admitted handler", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-pipe-drain-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const protector = new FakeUserSecretProtector();
   const configuration = await createPipeConfiguration(directory, protector, `drain-${Date.now()}`);
   let admit!: () => void;
   const admitted = new Promise<void>((resolve) => { admit = resolve; });
-  let release!: () => void;
-  const blocked = new Promise<void>((resolve) => { release = resolve; });
-  let completed = false;
+  let requestSignal: AbortSignal | undefined;
   const server = new AuthenticatedPipeServer(configuration, protector, {
-    async handle(candidate): Promise<CompanionResponse> {
+    async handle(_candidate, requestContext?: { readonly signal?: AbortSignal }): Promise<CompanionResponse> {
+      requestSignal = requestContext?.signal;
       admit();
-      await blocked;
-      completed = true;
-      return { version: 1, id: candidate.id, ok: true };
+      return new Promise<CompanionResponse>(() => undefined);
     }
-  }, { drainTimeoutMs: 2_000 });
+  }, { timeoutMs: 30_000, drainTimeoutMs: 200 });
   await server.start();
-  context.after(async () => { release(); await server.stop().catch(() => undefined); });
+  context.after(async () => { await server.stop().catch(() => undefined); });
   const clientOutcome = new AuthenticatedPipeClient(configuration, protector).request(request).then(() => "resolved", () => "rejected");
   await admitted;
-  let stopped = false;
-  const stopping = server.stop().then(() => { stopped = true; });
-  await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
-  assert.equal(stopped, false);
-  release();
-  await stopping;
-  assert.equal(completed, true);
+  assert.ok(requestSignal, "the admitted request must own an abort signal");
+  await Promise.race([
+    server.stop(),
+    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("server shutdown did not abort and drain the request")), 1_000))
+  ]);
+  assert.equal(requestSignal.aborted, true);
   assert.equal(await clientOutcome, "rejected");
   await assert.rejects(() => new AuthenticatedPipeClient(configuration, protector).request({ ...request, id: "after-stop" }), /unavailable/i);
 });
