@@ -22,7 +22,7 @@ export interface ProviderCommandTransport {
   /** A host-known idempotency identity available before the provider effect. */
   recoveryExternalId?(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined;
   /** Host-derived ceiling; provider response content can never raise it. */
-  handshakeCapabilityCeiling?(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> | readonly Capability[];
+  handshakeCapabilityCeiling?(input: Readonly<{ routeId: string; provider: ManagedSession["provider"]; repositoryRoot: string }>): Promise<readonly Capability[]> | readonly Capability[];
 }
 
 /** Re-resolves and digest-checks the attested policy immediately before each route. */
@@ -30,11 +30,11 @@ export class DynamicConfiguredNetworkClient implements ProviderCommandTransport 
   private readonly options: DynamicConfiguredNetworkOptions;
   constructor(options: DynamicConfiguredNetworkOptions) { this.options = options; }
   async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
-    const policy = await this.options.registry.resolve();
+    const policy = await this.options.registry.resolve(input.repositoryRoot);
     return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
   }
-  async handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> {
-    const route = (await this.options.registry.resolve()).routes.find((candidate) => candidate.id === input.routeId);
+  async handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"]; repositoryRoot: string }>): Promise<readonly Capability[]> {
+    const route = (await this.options.registry.resolve(input.repositoryRoot)).routes.find((candidate) => candidate.id === input.routeId);
     if (!route || input.routeId !== `provider.handshake.${input.provider}`) return ["registered"];
     return route.boundary === "provider-host-loopback"
       ? ["registered", "observable", "controllable", "mediated"]
@@ -80,7 +80,7 @@ export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCo
     const requestedAt = this.now();
     const routeId = `provider.handshake.${input.session.provider}`;
     const capabilityCeiling = this.network.handshakeCapabilityCeiling
-      ? await this.network.handshakeCapabilityCeiling({ routeId, provider: input.session.provider })
+      ? await this.network.handshakeCapabilityCeiling({ routeId, provider: input.session.provider, repositoryRoot: before.repositoryRoot })
       : ["registered"] as const;
     const result = await this.network.request({
       routeId,

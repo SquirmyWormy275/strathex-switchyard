@@ -502,7 +502,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   assert.equal((await bridge.createHandoff({ sessionId: session.id, recipientSessionId: "recipient-1", plan: handoff.plan, decisions: handoff.decisions, documentation: handoff.documentation, references: handoff.references, constraints: handoff.constraints, openQuestions: handoff.openQuestions, nextActions: handoff.nextActions })).ok, true);
   assert.equal((await bridge.listHandoffs()).ok, true);
   assert.deepEqual(await bridge.handoffRouting(), { ok: true, value: "queue" });
-  assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } })).ok, true);
+  assert.equal((await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "default" } })).ok, true);
   assert.equal((await bridge.listWorkflows()).ok, true);
   const cancelled = await bridge.cancelWorkflow({ artifactId: artifact.id, sessionId: session.id, authorityId: "authority-1" });
   assert.equal(cancelled.ok, true);
@@ -514,7 +514,7 @@ test("Handoff, typed workflow, and private voice replies are strictly validated 
   assert.equal(methods.includes("voice.bind"), true);
 
   corrupt = true;
-  const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "immediate" } });
+  const forgedAuthority = await bridge.prepareWorkflow({ action: "handoff", sessionId: session.id, authorityId: "authority-1", intent: { kind: "handoff", recipientSessionId: "recipient-1", route: "default" } });
   assert.equal(forgedAuthority.ok, false);
   if (!forgedAuthority.ok) assert.equal(forgedAuthority.code, "invalid_response");
   const substitutedCancellation = await bridge.cancelWorkflow({ artifactId: artifact.id, sessionId: session.id, authorityId: "authority-1" });

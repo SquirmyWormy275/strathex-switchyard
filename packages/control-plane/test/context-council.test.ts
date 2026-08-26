@@ -43,6 +43,17 @@ test("handoff packages persist only context, never create authority or execution
 
     await handoffs.setRoutingDefault("immediate");
     assert.equal(await handoffs.routingDefault(), "immediate");
+    const routedHandoffs = new HandoffPackageStore(store, { clock: () => "2026-08-23T10:00:00.000Z", idFactory: () => "handoff-2" });
+    const defaulted = await routedHandoffs.create({
+      repositoryRoot: "C:/repos/safe",
+      targetSnapshotId: "snapshot-2",
+      taskId: "task-8",
+      planRevision: "plan-4",
+      plan: "Use the durable routing default.",
+      decisions: [], documentation: [], references: [], constraints: [], openQuestions: [], nextActions: ["Focus the exact recipient."],
+      recipientSessionId: "coder-2"
+    });
+    assert.equal(defaulted.status, "immediate_focus_requested");
     await handoffs.acknowledge(packet.id, "coder-1");
     const reloaded = new HandoffPackageStore(store);
     assert.equal((await reloaded.get(packet.id))?.status, "acknowledged");

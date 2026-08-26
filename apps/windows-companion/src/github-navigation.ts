@@ -23,7 +23,7 @@ export interface GitHubNavigationResolver {
 }
 
 export interface GitHubNavigationHostResolver {
-  resolve(): Promise<ConfiguredGitHostIdentity>;
+  resolve(repositoryRoot: string): Promise<ConfiguredGitHostIdentity>;
 }
 
 interface PullCandidate {
@@ -56,7 +56,7 @@ export class ConfiguredGitHubNavigationResolver implements GitHubNavigationResol
       return { kind: "unavailable", summary: "GitHub navigation requires an exact durable operation, canonical remote, branch, HEAD, and final target guard." };
     }
     let host: ConfiguredGitHostIdentity;
-    try { host = await this.hosts.resolve(); }
+    try { host = await this.hosts.resolve(request.target.repositoryRoot); }
     catch { return { kind: "unavailable", summary: "GitHub navigation requires one exact installed GitHub or GitHub Enterprise route set." }; }
     const headRepository = configuredGitRepository(request.target.canonicalRemote, host);
     if (!headRepository || headRepository.owner.toLowerCase() !== host.headOwner.toLowerCase() || headRepository.name.toLowerCase() !== host.headName.toLowerCase()) {

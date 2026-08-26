@@ -247,7 +247,7 @@ export interface WorkflowCoordinatorContext extends WorkflowCoordinatorContextIn
 export type WorkflowPreparationIntent =
   | { readonly kind: "none" }
   | { readonly kind: "decision"; readonly question: string; readonly context: string }
-  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "queue" | "immediate" }
+  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "default" | "queue" | "immediate" }
   | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
   | { readonly kind: "plan_approval"; readonly confirmationToken: string; readonly confirmationScopeDigest: string };
 
@@ -620,7 +620,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
       case "handoff_queue":
       case "handoff_immediate":
         if (request.intent.kind !== "handoff") throw new WorkflowArtifactError("Handoff requires one exact coordinator-created package and recipient.");
-        if (((request.action === "handoff" || request.action === "handoff_immediate") && request.intent.route !== "immediate") || (request.action === "handoff_queue" && request.intent.route !== "queue")) throw new WorkflowArtifactError("Handoff route does not match its exact chord semantics.");
+        if ((request.action === "handoff" && request.intent.route !== "default") || (request.action === "handoff_immediate" && request.intent.route !== "immediate") || (request.action === "handoff_queue" && request.intent.route !== "queue")) throw new WorkflowArtifactError("Handoff route does not match its exact chord semantics.");
         await this.requireRecipient(session, request.intent.recipientSessionId);
         if (!this.handoffs) throw new WorkflowArtifactError("The durable coordinator Handoff store is unavailable.");
         const handoff = await this.handoffs.create({
@@ -630,7 +630,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
           planRevision: context.evidence.plan.revision,
           authorityId: authority.id,
           recipientSessionId: request.intent.recipientSessionId,
-          routing: request.intent.route,
+          ...(request.intent.route === "default" ? {} : { routing: request.intent.route }),
           plan: stableJson(context.evidence.plan),
           decisions: context.evidence.plan.decisions,
           documentation: context.evidence.documentation.map((entry) => `${entry.id}:${entry.digest}`),
@@ -639,7 +639,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
           openQuestions: context.pendingDecisions.map((decision) => decision.question),
           nextActions: ["Acknowledge this exact immutable package before using its context."]
         });
-        return this.prepared(context, authority, { kind: "handoff", packageId: handoff.id, route: request.intent.route, sourceSessionId: session.id, recipientSessionId: request.intent.recipientSessionId, authorityId: authority.id });
+        return this.prepared(context, authority, { kind: "handoff", packageId: handoff.id, route: handoff.status === "immediate_focus_requested" ? "immediate" : "queue", sourceSessionId: session.id, recipientSessionId: request.intent.recipientSessionId, authorityId: authority.id });
       case "focus_blocked_agent":
       case "focus_finished_agent":
         requireIntent(request.intent, "none");

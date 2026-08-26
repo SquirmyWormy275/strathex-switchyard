@@ -87,7 +87,7 @@ test("every direct administration family receives transport cancellation", async
   for (const family of families) {
     await context.test(family.name, async () => {
       const call = cancellableDirectCall();
-      await assertDirectCancellation(family.service(call), request(`administration-${family.name}`, family.method), call);
+      await assertDirectCancellation(family.service(call), request(`administration-${family.name}`, family.method, family.name === "network policy" ? { repositoryRoot: "C:\\repo" } : undefined), call);
     });
   }
 });

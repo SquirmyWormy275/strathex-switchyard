@@ -787,16 +787,18 @@ export class ManagedSessionController {
   }
 
   private async installNetworkPolicy(): Promise<void> {
+    const root = await this.chooseGitRoot("Choose the exact Git root for this HTTPS route policy");
+    if (!root) return;
     const selected = await this.vscode.window.showOpenDialog?.({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, openLabel: "Review HTTPS Route Policy", filters: { "SXSY-B122 network policy": ["json"] } });
     const sourcePath = selected?.length === 1 ? selected[0]?.fsPath : undefined;
     if (!sourcePath) return;
-    const result = await this.bridge.installNetworkPolicy(sourcePath);
+    const result = await this.bridge.installNetworkPolicy(root.gitRoot, sourcePath);
     if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not installed: ${result.message}`);
-    else await this.vscode.window.showInformationMessage(`SXSY-B122 installed the attested exact-route HTTPS policy ${result.value.sha256.slice(0, 12)}….`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 installed the attested exact-route HTTPS policy ${result.value.sha256.slice(0, 12)}… for ${root.gitRoot}.`);
   }
 
-  private async showNetworkPolicy(): Promise<void> { const result = await this.bridge.currentNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy registry unavailable: ${result.message}`); else await this.vscode.window.showInformationMessage(`SXSY-B122 network policy: ${result.value?.status === "active" ? `active ${result.value.sha256.slice(0, 12)}…` : "no active policy"}`); }
-  private async revokeNetworkPolicy(): Promise<void> { const result = await this.bridge.revokeNetworkPolicy(); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not revoked: ${result.message}`); else await this.vscode.window.showInformationMessage("SXSY-B122 revoked the active exact-route HTTPS policy."); }
+  private async showNetworkPolicy(): Promise<void> { const root = await this.chooseGitRoot("Choose the exact Git root whose HTTPS route policy should be shown"); if (!root) return; const result = await this.bridge.currentNetworkPolicy(root.gitRoot); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy registry unavailable: ${result.message}`); else await this.vscode.window.showInformationMessage(`SXSY-B122 network policy for ${root.gitRoot}: ${result.value?.status === "active" ? `active ${result.value.sha256.slice(0, 12)}…` : "no active policy"}`); }
+  private async revokeNetworkPolicy(): Promise<void> { const root = await this.chooseGitRoot("Choose the exact Git root whose HTTPS route policy should be revoked"); if (!root) return; const result = await this.bridge.revokeNetworkPolicy(root.gitRoot); if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 network policy was not revoked: ${result.message}`); else await this.vscode.window.showInformationMessage(`SXSY-B122 revoked the exact-route HTTPS policy for ${root.gitRoot}.`); }
 
   private async installRawHid(): Promise<void> {
     const input = this.vscode.window.showInputBox;
@@ -1713,7 +1715,7 @@ export class ManagedSessionController {
       if (!session.taskId || !session.planRevision) { await this.vscode.window.showWarningMessage("Handoff requires the selected session to carry an exact task and plan revision."); return undefined; }
       const recipient = await this.showSessionQueue("all", "Choose the exact Handoff recipient", (candidate) => candidate.id !== session.id && candidate.workspaceRoot !== undefined && samePath(candidate.workspaceRoot, session.workspaceRoot!) && candidate.targetSnapshotId === session.targetSnapshotId);
       if (!recipient) return undefined;
-      const route = action === "handoff_queue" ? "queue" : "immediate";
+      const route = action === "handoff" ? "default" : action === "handoff_queue" ? "queue" : "immediate";
       return { kind: "handoff", recipientSessionId: recipient.id, route };
     }
     if (action === "authority_broadcast") {

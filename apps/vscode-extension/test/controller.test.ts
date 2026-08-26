@@ -368,9 +368,9 @@ class FakeBridge implements ExtensionCompanionBridge {
   async provisionCredential(input: { reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }): Promise<BridgeResult<CredentialReferenceSummary>> { this.credentialProvisionRequests.push(input); return { ok: true, value: { reference: input.reference, protectorProvider: "fake", generation: 1, createdAt: "2026-08-24T00:00:00.000Z", updatedAt: "2026-08-24T00:00:00.000Z", scopes: input.scopes } }; }
   async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { return { ok: true, value: [] }; }
   async revokeCredential(): Promise<BridgeResult<boolean>> { return { ok: true, value: true }; }
-  async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: sourcePath, sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" } }; }
-  async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return { ok: true, value: undefined }; }
-  async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { filePath: "C:\\state\\network-policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } }; }
+  async installNetworkPolicy(repositoryRoot: string, sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { repositoryRoot, filePath: sourcePath, sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "active" } }; }
+  async currentNetworkPolicy(_repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return { ok: true, value: undefined }; }
+  async revokeNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy>> { return { ok: true, value: { repositoryRoot, filePath: "C:\\state\\network-policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", status: "revoked" } }; }
   async providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> {
     const existing = this.registered.find((session) => session.id === sessionId);
     if (!existing) return { ok: false, code: "not_found", message: "missing" };
@@ -980,7 +980,7 @@ test("multiple legacy prepared workflows present exact identities and cancel onl
   assert.equal(selection?.items.some((item) => typeof item !== "string" && item.description?.includes("2".repeat(64)) && item.detail?.includes(bound.targetSnapshotId!)), true);
 });
 
-test("Handoff normal and Alt deliver the same immutable packet to the exact immediate recipient", async () => {
+test("Handoff normal delegates to the durable routing default while Alt remains explicitly immediate", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/handoff" }] });
@@ -992,25 +992,24 @@ test("Handoff normal and Alt deliver the same immutable packet to the exact imme
   bridge.nextPreparation = { status: "prepared", summary: "Exact Handoff prepared.", authorityId: "authority-handoff", session: source };
   bridge.nextWorkflowArtifact = {
     id: "workflow-handoff", digest: "d".repeat(64), action: "handoff", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId!,
-    sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: "handoff-same", route: "immediate", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
+    sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: "handoff-default", route: "queue", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
     status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
   };
 
   vscode.choose(`codex: ${recipient.id}`);
   await vscode.invoke("sxsy-b122.chord.handoff.normal");
-  bridge.nextWorkflowArtifact = { ...bridge.nextWorkflowArtifact, action: "handoff_immediate" };
+  bridge.nextWorkflowArtifact = { ...bridge.nextWorkflowArtifact, action: "handoff_immediate", payload: { ...bridge.nextWorkflowArtifact.payload, packageId: "handoff-immediate", route: "immediate" } as never };
   vscode.choose(`codex: ${recipient.id}`);
   await vscode.invoke("sxsy-b122.chord.handoff.alt");
 
   assert.deepEqual(bridge.workflowPrepared.map(({ action, intent }) => ({ action, intent })), [
-    { action: "handoff", intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } },
+    { action: "handoff", intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } },
     { action: "handoff_immediate", intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } }
   ]);
   assert.deepEqual(bridge.acknowledgedHandoffs, [
-    { handoffId: "handoff-same", recipientSessionId: recipient.id },
-    { handoffId: "handoff-same", recipientSessionId: recipient.id }
+    { handoffId: "handoff-immediate", recipientSessionId: recipient.id }
   ]);
-  assert.equal(vscode.executedCommands.filter((command) => command === "workbench.action.focusActiveEditorGroup").length, 2);
+  assert.equal(vscode.executedCommands.filter((command) => command === "workbench.action.focusActiveEditorGroup").length, 1);
 });
 
 test("Find Blocked delivers the protected result and repeated presses focus the next exact session", async () => {

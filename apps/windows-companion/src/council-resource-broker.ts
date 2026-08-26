@@ -137,7 +137,7 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
     if (!credentialResource || credentialResource.value !== input.capabilityId) throw new CouncilResourceHostError("Council credential request changed its exact opaque capability identity.");
     const lease = binding.leases.find((candidate) => candidate.id === input.leaseId && candidate.kind === "credential_scope");
     const scope = exactCredentialRoute(input.routeId, lease?.declaration);
-    const policy = await this.networkPolicies.resolve();
+    const policy = await this.networkPolicies.resolve(plan.repositoryRoot);
     const route = policy.routes.find((candidate) => candidate.id === scope.routeId);
     if (!route || route.method !== "GET" || route.pathParameter || route.redirects !== "deny" || !route.credential
       || route.credential.reference !== scope.reference || route.credential.purpose !== "provider-api") {

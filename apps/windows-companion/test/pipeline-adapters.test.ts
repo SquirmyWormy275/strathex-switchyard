@@ -6,7 +6,7 @@ import test from "node:test";
 
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor } from "../src/pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter } from "../src/pipeline-adapters.ts";
 import { configuredGitHostFromPolicy } from "../src/remote-git.ts";
 import type { DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
@@ -271,4 +271,33 @@ test("composite pipeline status never lets hosted success overwrite a local insp
   assert.equal(outcome.status, "failed");
   assert.equal((outcome.data?.local as { status: string }).status, "failed");
   assert.equal((outcome.data?.hosted as { status: string }).status, "completed");
+});
+
+test("failure evidence is durably queued for the VS Code presentation host instead of being silently returned", async () => {
+  const evidence = {
+    head: target.head,
+    selectedIndex: 0,
+    failureCount: 1,
+    repeatAvailable: false,
+    selectedFailure: { kind: "check", name: "unit", state: "COMPLETED", conclusion: "FAILURE" },
+    logExcerpt: "AssertionError: expected 2 but received 3",
+    logSource: "check-output",
+    diagnosis: "The bounded output indicates a test assertion failure."
+  };
+  const queued: string[] = [];
+  const adapter = new PipelineFailurePresentationAdapter(
+    { id: "evidence", kind: "generic", async execute() { return { status: "completed", summary: "Observed one exact-head failure.", effectDisposition: "committed" as const, data: evidence }; } },
+    { async enqueue(input, plan) { queued.push(`${input.operationId}:${plan.hostAction}`); return { id: `host-action:${"a".repeat(64)}`, hostAction: plan.hostAction, expiresAt: "2026-08-24T00:05:00.000Z", workspaceRoot: input.target?.repositoryRoot }; } }
+  );
+  const outcome = await adapter.execute(request("pipeline_failure_trace"));
+  assert.equal(outcome.status, "running");
+  assert.equal(outcome.data?.head, target.head);
+  assert.equal(outcome.data?.hostActionKind, "show_pipeline_failure_trace");
+  assert.deepEqual(queued, ["operation-pipeline_failure_trace:show_pipeline_failure_trace"]);
+
+  const malformed = new PipelineFailurePresentationAdapter(
+    { id: "bad", kind: "generic", async execute() { return { status: "completed", summary: "bad", data: { ...evidence, head: "wrong" } }; } },
+    { async enqueue() { throw new Error("must not queue malformed evidence"); } }
+  );
+  assert.equal((await malformed.execute(request("pipeline_failure_trace"))).status, "failed");
 });

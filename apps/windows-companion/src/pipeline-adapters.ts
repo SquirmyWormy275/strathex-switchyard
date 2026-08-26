@@ -8,7 +8,7 @@ import type { ProtectedJsonStore } from "../../../packages/control-plane/src/sto
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
 import { configuredGitRepository, type ConfiguredGitHostIdentity } from "./remote-git.ts";
 
-export interface PipelineGitHostResolver { resolve(): Promise<ConfiguredGitHostIdentity>; }
+export interface PipelineGitHostResolver { resolve(repositoryRoot: string): Promise<ConfiguredGitHostIdentity>; }
 
 export interface PipelineReceiptReader { list(): Promise<readonly ProtectedReceipt[]>; }
 
@@ -59,6 +59,50 @@ interface PipelineObservation {
 
 export interface PipelineFailureCursor { select(targetSnapshotId: string, orderedFailureFingerprints: readonly string[]): Promise<number>; }
 
+export interface PipelineFailurePresentationQueue {
+  enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: "show_pipeline_failure_trace" }>): Promise<Readonly<{
+    id: string;
+    hostAction: "show_pipeline_failure_trace";
+    expiresAt: string;
+    workspaceRoot?: string;
+  }>>;
+}
+
+/**
+ * Couples exact-head failure evidence to the durable VS Code acknowledgement
+ * boundary. Returning the evidence alone is not presentation: the installed
+ * extension must receive, render, and settle this exact host action.
+ */
+export class PipelineFailurePresentationAdapter implements CommandAdapter {
+  readonly id = "pipeline-failure-presentation-v1";
+  readonly kind = "vscode" as const;
+  constructor(private readonly evidence: CommandAdapter, private readonly queue: PipelineFailurePresentationQueue) {}
+
+  async execute(request: AdapterRequest): Promise<AdapterOutcome> {
+    if (request.definition.action !== "pipeline_failure_trace") return { status: "unavailable", summary: "The failure presentation adapter handles only the exact Pipeline Alt action.", effectDisposition: "not_started" };
+    const observed = await this.evidence.execute(request);
+    if (observed.status !== "completed") return observed;
+    if (!validFailurePresentation(observed.data, request.target?.head)) {
+      return { status: "failed", summary: "The hosted pipeline adapter returned malformed exact-head failure evidence; no presentation was queued.", effectDisposition: observed.effectDisposition ?? "ambiguous" };
+    }
+    let intent;
+    try { intent = await this.queue.enqueue(request, { hostAction: "show_pipeline_failure_trace" }); }
+    catch { return { status: "failed", summary: "The exact failure evidence could not be durably queued for presentation.", effectDisposition: "ambiguous" }; }
+    return {
+      status: "running",
+      summary: "The exact-head failure evidence is awaiting an authenticated VS Code presentation acknowledgement.",
+      effectDisposition: observed.effectDisposition,
+      data: {
+        ...observed.data,
+        hostActionId: intent.id,
+        hostActionKind: intent.hostAction,
+        hostActionExpiresAt: intent.expiresAt,
+        ...(intent.workspaceRoot ? { hostActionWorkspaceRoot: intent.workspaceRoot } : {})
+      }
+    };
+  }
+}
+
 interface PipelineFailureCursorEvent { readonly version: 1; readonly targetSnapshotId: string; readonly seriesDigest: string; readonly index: number; readonly selectedAt: string; }
 
 /** Protected restart-durable repeat cursor. A changed failure set starts again at the first item. */
@@ -95,7 +139,7 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
       return { status: "unavailable", summary: "Hosted pipeline inspection requires an exact durable operation, target HEAD, and canonical remote.", effectDisposition: "not_started" };
     }
     let host: ConfiguredGitHostIdentity;
-    try { host = await this.hosts.resolve(); exactHost(host.host); }
+    try { host = await this.hosts.resolve(request.target.repositoryRoot); exactHost(host.host); }
     catch { return { status: "unavailable", summary: "Hosted pipeline inspection requires one exact configured GitHub host.", effectDisposition: "not_started" }; }
     const repository = configuredGitRepository(request.target.canonicalRemote, host);
     if (!repository || repository.owner.toLowerCase() !== host.headOwner.toLowerCase() || repository.name.toLowerCase() !== host.headName.toLowerCase()) return { status: "blocked", summary: "Hosted pipeline inspection requires the canonical remote to match the exact configured GitHub head repository.", effectDisposition: "not_started" };
@@ -243,6 +287,19 @@ function diagnoseFailure(value: PipelineContext, excerpt: string): string {
   return "The provider confirms a failed exact-head context, but the bounded output is insufficient for a narrower diagnosis.";
 }
 function validCursorEvent(value: PipelineFailureCursorEvent): boolean { return value?.version === 1 && typeof value.targetSnapshotId === "string" && value.targetSnapshotId.length <= 512 && /^[a-f0-9]{64}$/.test(value.seriesDigest) && Number.isSafeInteger(value.index) && value.index >= 0 && validTimestamp(value.selectedAt); }
+function validFailurePresentation(value: Readonly<Record<string, unknown>> | undefined, expectedHead: string | undefined): boolean {
+  if (!value || !expectedHead || value.head !== expectedHead || typeof value.selectedIndex !== "number" || !Number.isSafeInteger(value.selectedIndex) || value.selectedIndex < 0
+    || typeof value.failureCount !== "number" || !Number.isSafeInteger(value.failureCount) || value.failureCount < 1 || value.failureCount > 50 || value.selectedIndex >= value.failureCount
+    || typeof value.repeatAvailable !== "boolean" || value.repeatAvailable !== (value.failureCount > 1)
+    || !record(value.selectedFailure) || !["check", "status"].includes(String(value.selectedFailure.kind))
+    || typeof value.selectedFailure.name !== "string" || !bounded(value.selectedFailure.name, 256)
+    || typeof value.selectedFailure.state !== "string" || !bounded(value.selectedFailure.state, 64)
+    || (value.selectedFailure.conclusion !== undefined && (typeof value.selectedFailure.conclusion !== "string" || !bounded(value.selectedFailure.conclusion, 64)))
+    || typeof value.logExcerpt !== "string" || !value.logExcerpt.trim() || value.logExcerpt.length > 64 * 1024 || value.logExcerpt.includes("\0")
+    || !["actions-job-log", "check-output"].includes(String(value.logSource))
+    || typeof value.diagnosis !== "string" || !value.diagnosis.trim() || value.diagnosis.length > 512 || value.diagnosis.includes("\0")) return false;
+  return true;
+}
 function digest(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 function exactHost(value: string): string { const host = value.toLowerCase(); if (host.startsWith(".") || host.endsWith(".") || !host.includes(".") || host.split(".").some((label) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label))) throw new Error("invalid GitHub host"); return host; }
 function cancellationOutcome(control: DurableAbortControl, summary: string, effectDisposition: NonNullable<AdapterOutcome["effectDisposition"]>): AdapterOutcome | undefined {

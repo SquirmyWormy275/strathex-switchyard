@@ -778,13 +778,13 @@ export class CompanionService {
 
   private async installNetworkPolicy(payload: NetworkPolicyInstallPayload, signal?: AbortSignal) {
     if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached.");
-    const policy = await callDirect(this.networkPolicyProvisioning, "install", [payload.sourcePath], signal);
+    const policy = await callDirect(this.networkPolicyProvisioning, "install", [payload.repositoryRoot, payload.sourcePath], signal);
     this.record("network-policy.install", "completed", "Installed one current-user-attested exact-route HTTPS policy.");
     return policy;
   }
 
-  private async currentNetworkPolicy(payload: unknown, signal?: AbortSignal) { requireEmptyPayload(payload, "Network policy inspection"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return callDirect(this.networkPolicyProvisioning, "current", [], signal); }
-  private async revokeNetworkPolicy(payload: unknown, signal?: AbortSignal) { requireEmptyPayload(payload, "Network policy revocation"); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await callDirect(this.networkPolicyProvisioning, "revoke", [], signal); this.record("network-policy.revoke", "completed", "Revoked the active exact-route HTTPS policy."); return policy; }
+  private async currentNetworkPolicy(payload: unknown, signal?: AbortSignal) { const scope = this.requireNetworkPolicyScope(payload); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return callDirect(this.networkPolicyProvisioning, "current", [scope.repositoryRoot], signal); }
+  private async revokeNetworkPolicy(payload: unknown, signal?: AbortSignal) { const scope = this.requireNetworkPolicyScope(payload); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await callDirect(this.networkPolicyProvisioning, "revoke", [scope.repositoryRoot], signal); this.record("network-policy.revoke", "completed", "Revoked the selected repository's exact-route HTTPS policy."); return policy; }
 
   private acceptanceAdmin() { if (!this.acceptanceAdministration) throw new CompanionServiceError("capability_denied", "No current-user acceptance-evidence administration boundary is installed."); return this.acceptanceAdministration; }
   private scannerAdmin() { if (!this.scannerAdministration) throw new CompanionServiceError("capability_denied", "No current-user signed scanner-fixture administration boundary is installed."); return this.scannerAdministration; }
@@ -853,7 +853,8 @@ export class CompanionService {
   }
 
   private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
-  private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute source path."); return { sourcePath: payload.sourcePath }; }
+  private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "sourcePath"]) || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute repository root and source path."); return { repositoryRoot: payload.repositoryRoot, sourcePath: payload.sourcePath }; }
+  private requireNetworkPolicyScope(payload: unknown): Readonly<{ repositoryRoot: string }> { if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Network policy operations require one bounded absolute repository root."); return { repositoryRoot: payload.repositoryRoot }; }
   private requireCouncilPortProxy(payload: unknown): CouncilPortProxyPayload {
     const keys = ["epochId", "sessionId", "targetSnapshotId", "leaseId", "operationId", "fenceDigest", "resourceHostDigest", "expectedPort", "backendPipePath", "backendProof"];
     if (!isRecord(payload) || !exactKeys(payload, keys) || !keys.every((key) => typeof payload[key] === "string" && (payload[key] as string).length > 0 && (payload[key] as string).length <= 512 && !/[\r\n\0]/.test(payload[key] as string))) {
@@ -1157,14 +1158,14 @@ export class CompanionService {
   }
 
   private requireCancellation(payload: unknown): OperationCancellationPayload {
-    if (!isRecord(payload) || typeof payload.operationId !== "string" || typeof payload.reason !== "string" || !payload.operationId.trim() || !payload.reason.trim() || payload.operationId.length > 256 || payload.reason.length > 512) {
+    if (!isRecord(payload) || !exactKeys(payload, ["operationId", "reason"]) || typeof payload.operationId !== "string" || typeof payload.reason !== "string" || !payload.operationId.trim() || !payload.reason.trim() || payload.operationId.length > 256 || payload.reason.length > 512) {
       throw new CompanionServiceError("invalid_request", "An operation cancellation requires bounded operation ID and reason values.");
     }
     return { operationId: payload.operationId, reason: payload.reason };
   }
 
   private requireConfirmation(payload: unknown): ConfirmationRequestPayload {
-    if (!isRecord(payload) || typeof payload.action !== "string" || !(commandActionIds as readonly string[]).includes(payload.action)
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["action", "reason"], ["sessionId", "authorityId"]) || typeof payload.action !== "string" || !(commandActionIds as readonly string[]).includes(payload.action)
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
       || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")
       || (payload.authorityId !== undefined && typeof payload.authorityId !== "string")) {
@@ -1539,7 +1540,7 @@ function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {
   if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Workflow intent must be one exact bounded record.");
   if (value.kind === "none" && exactKeys(value, ["kind"])) return { kind: "none" };
   if (value.kind === "decision" && exactKeys(value, ["kind", "question", "context"]) && boundedWorkflowText(value.question) && boundedWorkflowText(value.context)) return { kind: "decision", question: value.question, context: value.context };
-  if (value.kind === "handoff" && exactKeys(value, ["kind", "recipientSessionId", "route"]) && boundedReferenceValue(value.recipientSessionId) && (value.route === "queue" || value.route === "immediate")) return { kind: "handoff", recipientSessionId: value.recipientSessionId, route: value.route };
+  if (value.kind === "handoff" && exactKeys(value, ["kind", "recipientSessionId", "route"]) && boundedReferenceValue(value.recipientSessionId) && (value.route === "default" || value.route === "queue" || value.route === "immediate")) return { kind: "handoff", recipientSessionId: value.recipientSessionId, route: value.route };
   if (value.kind === "authority_broadcast" && exactKeys(value, ["kind", "recipientSessionIds"]) && Array.isArray(value.recipientSessionIds) && value.recipientSessionIds.length >= 1 && value.recipientSessionIds.length <= 64 && value.recipientSessionIds.every(boundedReferenceValue)) return { kind: "authority_broadcast", recipientSessionIds: [...new Set(value.recipientSessionIds as string[])] };
   if (value.kind === "plan_approval" && exactKeys(value, ["kind", "confirmationToken", "confirmationScopeDigest"])
     && boundedReferenceValue(value.confirmationToken) && typeof value.confirmationScopeDigest === "string" && /^[a-f0-9]{64}$/.test(value.confirmationScopeDigest)) {

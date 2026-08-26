@@ -272,12 +272,14 @@ test("Handoff packages are coordinator-assembled and preserve exact source, reci
   const sessions = new Map([source, recipient].map((session) => [session.id, session]));
   const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => id === authority.id ? authority : undefined }, handoffs);
 
-  const normal = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const normalQueued = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  await handoffs.setRoutingDefault("immediate");
+  const normalImmediate = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
   const immediate = (await coordinator.prepare({ action: "handoff_immediate", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
   const queued = (await coordinator.prepare({ action: "handoff_queue", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "queue" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
 
-  assert.deepEqual([normal.route, immediate.route, queued.route], ["immediate", "immediate", "queue"]);
-  for (const payload of [normal, immediate, queued]) {
+  assert.deepEqual([normalQueued.route, normalImmediate.route, immediate.route, queued.route], ["queue", "immediate", "immediate", "queue"]);
+  for (const payload of [normalQueued, normalImmediate, immediate, queued]) {
     assert.deepEqual({ source: payload.sourceSessionId, recipient: payload.recipientSessionId, authority: payload.authorityId }, { source: source.id, recipient: recipient.id, authority: authority.id });
     const packet = await handoffs.get(payload.packageId);
     assert.ok(packet);
@@ -286,7 +288,7 @@ test("Handoff packages are coordinator-assembled and preserve exact source, reci
     assert.equal(packet.references.some((reference) => reference.includes(evidence().diff.digest)), true);
   }
   sessions.set(recipient.id, { ...recipient, status: "stale" });
-  await assert.rejects(() => coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } }), /current registered session/i);
+  await assert.rejects(() => coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } }), /current registered session/i);
 });
 
 test("provider response remains exact, external-ID bound, and cancellation is durable", async (context) => {

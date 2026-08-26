@@ -149,7 +149,7 @@ export interface SandboxInstallationPin {
 
 export interface CredentialProvisionScope { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string; }
 export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly CredentialProvisionScope[]; readonly revokedAt?: string; readonly revocationReason?: string; }
-export interface InstalledNetworkPolicy { readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface InstalledNetworkPolicy { readonly repositoryRoot?: string; readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
 export interface AcceptanceTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedGates: readonly number[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
 export interface AcceptanceEvidenceSummary { readonly id: string; readonly gate: number; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly targetSnapshotId?: string; readonly operationId?: string; readonly evidenceDigest: string; readonly policyVersion: string; readonly evaluatedBy: string; readonly evaluatedAt: string; readonly expiresAt?: string; readonly rationale: string; readonly invalidatedAt?: string; readonly invalidatedReason?: string; }
 export interface HighConsequenceActivationSummary { readonly id: string; readonly action: string; readonly targetSnapshotId: string; readonly policyVersion: string; readonly gateEvidenceIds: readonly string[]; readonly activatedAt: string; readonly expiresAt: string; readonly activatedBy: string; readonly status: "active" | "revoked"; }
@@ -185,7 +185,7 @@ export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial"
 export type ExtensionWorkflowPreparationIntent =
   | { readonly kind: "none" }
   | { readonly kind: "decision"; readonly question: string; readonly context: string }
-  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "queue" | "immediate" }
+  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "default" | "queue" | "immediate" }
   | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
   | { readonly kind: "plan_approval"; readonly confirmationToken: string; readonly confirmationScopeDigest: string };
 export interface ExtensionWorkflowArtifact {
@@ -257,9 +257,9 @@ export interface ExtensionCompanionBridge {
   provisionCredential(input: Readonly<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>>;
   listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>>;
   revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>>;
-  installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
-  currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
-  revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  installNetworkPolicy(repositoryRoot: string, sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  currentNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
+  revokeNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
   installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
   listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>>;
   revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
@@ -452,9 +452,9 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return Array.isArray(credentials) && credentials.length <= 1_024 && credentials.every(isCredentialReferenceSummary) ? { ok: true, value: credentials } : invalidResponse();
   }
   async revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>> { const result = await this.call<{ revoked: boolean }>("credential.revoke", { reference, reason }); return result.ok ? { ok: true, value: result.value.revoked } : result; }
-  async installNetworkPolicy(sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
-  async currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
-  async revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", undefined); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async installNetworkPolicy(repositoryRoot: string, sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { repositoryRoot, sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async currentNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", { repositoryRoot }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async revokeNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", { repositoryRoot }); return result.ok ? { ok: true, value: result.value.policy } : result; }
   installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.install", { sourcePath }, "trust", isAcceptanceTrust); }
   listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return this.adminList("acceptance.trust.list", "trust", isAcceptanceTrust); }
   revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.revoke", { authorityId, keyId, reason }, "trust", isAcceptanceTrust); }

@@ -259,7 +259,8 @@ export interface SandboxRevokePayload { readonly repositoryRoot: string; }
 export interface CredentialProvisionScopePayload { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string; }
 export interface CredentialProvisionPayload { readonly reference: string; readonly scopes: readonly CredentialProvisionScopePayload[]; readonly sealedSecret: string; readonly replaceExisting?: boolean; }
 export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
-export interface NetworkPolicyInstallPayload { readonly sourcePath: string; }
+export interface NetworkPolicyInstallPayload { readonly repositoryRoot: string; readonly sourcePath: string; }
+export interface NetworkPolicyScopePayload { readonly repositoryRoot: string; }
 export interface AdministrationSourcePayload { readonly sourcePath: string; }
 export interface AcceptanceTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
 export interface AcceptanceEvidenceInvalidatePayload { readonly evidenceId: string; readonly reason: string; }

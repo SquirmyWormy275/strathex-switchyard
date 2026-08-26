@@ -157,19 +157,30 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.deepEqual(cancelled, [{ operationId: "operation-1", reason: "Operator stopped the isolated run." }]);
 
   const confirmationResponse = await service.handle(request("confirm", "confirmation.request", {
-    action: "proof_adversarial", reason: "Review isolated proof evidence.", reauthenticated: true
+    action: "proof_adversarial", reason: "Review isolated proof evidence."
   }));
   assert.equal(confirmationResponse.ok, true);
   assert.equal((confirmationResponse.result as { confirmation: { status: string } }).confirmation.status, "issued");
   assert.equal("reauthenticated" in (confirmationRequests[0] ?? {}), false, "bridge payload cannot self-attest reauthentication");
 
   const preparationResponse = await service.handle(request("prepare", "command.prepare", {
-    control: "COMMIT", modifier: "normal", sessionId: "session-1", reason: "Review exact local commit.", reauthenticated: true
+    control: "COMMIT", modifier: "normal", sessionId: "session-1", reason: "Review exact local commit."
   }));
   assert.equal(preparationResponse.ok, true);
   assert.equal((preparationResponse.result as { preparation: { status: string; authorityId: string } }).preparation.authorityId, "authority-1");
   assert.deepEqual(preparationRequests, [{ action: "local_commit", sessionId: "session-1", reason: "Review exact local commit." }]);
   assert.equal("reauthenticated" in (preparationRequests[0] ?? {}), false, "bridge payload cannot self-attest current-user presence");
+
+  const forgedConfirmation = await service.handle(request("forged-confirm", "confirmation.request", {
+    action: "proof_adversarial", reason: "Review isolated proof evidence.", reauthenticated: true
+  }));
+  const forgedPreparation = await service.handle(request("forged-prepare", "command.prepare", {
+    control: "COMMIT", modifier: "normal", sessionId: "session-1", reason: "Review exact local commit.", reauthenticated: true
+  }));
+  assert.equal(forgedConfirmation.ok, false);
+  assert.equal(forgedPreparation.ok, false);
+  assert.equal(confirmationRequests.length, 1);
+  assert.equal(preparationRequests.length, 1);
 
   const malformed = await service.handle(request("bad-cancel", "operation.cancel", { operationId: "", reason: "" }));
   assert.equal(malformed.ok, false);

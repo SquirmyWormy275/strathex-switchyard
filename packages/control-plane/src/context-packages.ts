@@ -144,16 +144,18 @@ export class HandoffPackageStore {
       nextActions: list(input.nextActions, "next action"),
       ...(input.recipientSessionId ? { recipientSessionId: nonEmpty(input.recipientSessionId, "recipientSessionId") } : {})
     };
-    const packet: HandoffPackage = {
-      ...immutable,
-      digest: sha256(stableJson(immutable)),
-      status: input.routing === "immediate" ? "immediate_focus_requested" : "queued",
-      executionAuthorized: false,
-      createdAt: now,
-      updatedAt: now
-    };
     return this.store.transaction(async (transaction) => {
-      const existing = packets(await transaction.readEntries());
+      const entries = await transaction.readEntries();
+      const existing = packets(entries);
+      const resolvedRouting = input.routing ?? routing(entries);
+      const packet: HandoffPackage = {
+        ...immutable,
+        digest: sha256(stableJson(immutable)),
+        status: resolvedRouting === "immediate" ? "immediate_focus_requested" : "queued",
+        executionAuthorized: false,
+        createdAt: now,
+        updatedAt: now
+      };
       if (existing.has(packet.id)) throw new HandoffPackageError(`Handoff package already exists: ${packet.id}`);
       await transaction.append<HandoffSavedEvent>("handoff.saved", { packet });
       return clonePacket(packet);

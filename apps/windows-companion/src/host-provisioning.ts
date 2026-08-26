@@ -11,6 +11,8 @@ import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
 const networkInstallKind = "b122.network-policy.install.v1";
 const networkRevokeKind = "b122.network-policy.revoke.v1";
+const scopedNetworkInstallKind = "b122.network-policy.install.v2";
+const scopedNetworkRevokeKind = "b122.network-policy.revoke.v2";
 const maximumPolicyBytes = 1024 * 1024;
 
 export interface CredentialProvisioningCoordinator {
@@ -63,6 +65,8 @@ export class AttestedCredentialProvisioningCoordinator implements CredentialProv
 }
 
 export interface InstalledNetworkPolicy {
+  /** Present for every repository-scoped policy. Absent only for a migrated v1 global record. */
+  readonly repositoryRoot?: string;
   readonly filePath: string;
   readonly sha256: string;
   readonly installedAt: string;
@@ -71,8 +75,11 @@ export interface InstalledNetworkPolicy {
 
 export interface NetworkPolicyCoordinator {
   install(sourcePath: string): Promise<InstalledNetworkPolicy>;
+  install(repositoryRoot: string, sourcePath: string): Promise<InstalledNetworkPolicy>;
   current(): Promise<InstalledNetworkPolicy | undefined>;
+  current(repositoryRoot: string): Promise<InstalledNetworkPolicy | undefined>;
   revoke(): Promise<InstalledNetworkPolicy>;
+  revoke(repositoryRoot: string): Promise<InstalledNetworkPolicy>;
 }
 
 export class DurableNetworkPolicyRegistry {
@@ -84,7 +91,13 @@ export class DurableNetworkPolicyRegistry {
     this.store = store; this.installedPath = installedPath; this.now = now;
   }
 
-  async install(sourcePath: string, attestedAt: string): Promise<InstalledNetworkPolicy> {
+  async install(sourcePath: string, attestedAt: string): Promise<InstalledNetworkPolicy>;
+  async install(repositoryRoot: string, sourcePath: string, attestedAt: string): Promise<InstalledNetworkPolicy>;
+  async install(repositoryRootOrSource: string, sourceOrAttestedAt: string, maybeAttestedAt?: string): Promise<InstalledNetworkPolicy> {
+    const scoped = maybeAttestedAt !== undefined;
+    const repositoryRoot = scoped ? canonicalRepositoryRoot(repositoryRootOrSource) : undefined;
+    const sourcePath = scoped ? sourceOrAttestedAt : repositoryRootOrSource;
+    const attestedAt = scoped ? maybeAttestedAt : sourceOrAttestedAt;
     this.assertAttestation(attestedAt);
     if (!boundedAbsolute(sourcePath)) throw new Error("The selected network policy path must be absolute.");
     const source = resolve(sourcePath);
@@ -93,38 +106,61 @@ export class DurableNetworkPolicyRegistry {
     await loadConfiguredNetworkPolicy(source);
     const bytes = await readFile(source);
     const sha256 = digest(bytes);
-    await mkdir(dirname(this.installedPath), { recursive: true });
-    const temporary = `${this.installedPath}.${randomUUID()}.tmp`;
+    const destination = repositoryRoot ? scopedInstalledPath(this.installedPath, repositoryRoot) : this.installedPath;
+    await mkdir(dirname(destination), { recursive: true });
+    const temporary = `${destination}.${randomUUID()}.tmp`;
     await writeFile(temporary, bytes, { mode: 0o600 });
-    await rename(temporary, this.installedPath);
-    const entry = await this.store.append(networkInstallKind, { filePath: this.installedPath, sha256, attestedAt });
-    return { filePath: this.installedPath, sha256, installedAt: entry.at, status: "active" };
+    await rename(temporary, destination);
+    const entry = repositoryRoot
+      ? await this.store.append(scopedNetworkInstallKind, { repositoryRoot, filePath: destination, sha256, attestedAt })
+      : await this.store.append(networkInstallKind, { filePath: destination, sha256, attestedAt });
+    return { ...(repositoryRoot ? { repositoryRoot } : {}), filePath: destination, sha256, installedAt: entry.at, status: "active" };
   }
 
-  async resolve(): Promise<ConfiguredNetworkPolicy> {
-    const current = await this.current();
+  async resolve(repositoryRoot?: string): Promise<ConfiguredNetworkPolicy> {
+    const current = await this.current(repositoryRoot);
     if (!current || current.status !== "active") return { version: 1, proxy: "direct", routes: [] };
     const bytes = await readFile(current.filePath);
     if (digest(bytes) !== current.sha256) throw new Error("The installed network policy changed after current-user attestation.");
     return loadConfiguredNetworkPolicy(current.filePath);
   }
 
-  async current(): Promise<InstalledNetworkPolicy | undefined> {
-    let value: InstalledNetworkPolicy | undefined;
+  async current(repositoryRoot?: string): Promise<InstalledNetworkPolicy | undefined> {
+    const states = new Map<string, InstalledNetworkPolicy>();
     for (const entry of await this.store.readEntries<JsonValue>()) {
       if (entry.kind === networkInstallKind) {
         const payload = parseInstall(entry.payload);
-        value = { filePath: payload.filePath, sha256: payload.sha256, installedAt: entry.at, status: "active" };
-      } else if (entry.kind === networkRevokeKind && value) value = { ...value, installedAt: entry.at, status: "revoked" };
+        states.set("", { filePath: payload.filePath, sha256: payload.sha256, installedAt: entry.at, status: "active" });
+      } else if (entry.kind === networkRevokeKind) {
+        const value = states.get("");
+        if (value) states.set("", { ...value, installedAt: entry.at, status: "revoked" });
+      } else if (entry.kind === scopedNetworkInstallKind) {
+        const payload = parseScopedInstall(entry.payload);
+        states.set(repositoryIdentity(payload.repositoryRoot), { repositoryRoot: payload.repositoryRoot, filePath: payload.filePath, sha256: payload.sha256, installedAt: entry.at, status: "active" });
+      } else if (entry.kind === scopedNetworkRevokeKind) {
+        const payload = parseScopedInstall(entry.payload);
+        const key = repositoryIdentity(payload.repositoryRoot);
+        const value = states.get(key);
+        if (!value || value.filePath !== payload.filePath || value.sha256 !== payload.sha256) throw new Error("The protected scoped network-policy revocation journal is inconsistent.");
+        states.set(key, { ...value, installedAt: entry.at, status: "revoked" });
+      }
     }
-    return value;
+    if (repositoryRoot !== undefined) return states.get(repositoryIdentity(canonicalRepositoryRoot(repositoryRoot)));
+    if (states.size > 1) throw new Error("A repository root is required when multiple configured network policies exist.");
+    return states.values().next().value as InstalledNetworkPolicy | undefined;
   }
 
-  async revoke(attestedAt: string): Promise<InstalledNetworkPolicy> {
+  async revoke(attestedAt: string): Promise<InstalledNetworkPolicy>;
+  async revoke(repositoryRoot: string, attestedAt: string): Promise<InstalledNetworkPolicy>;
+  async revoke(repositoryRootOrAttestedAt: string, maybeAttestedAt?: string): Promise<InstalledNetworkPolicy> {
+    const repositoryRoot = maybeAttestedAt === undefined ? undefined : canonicalRepositoryRoot(repositoryRootOrAttestedAt);
+    const attestedAt = maybeAttestedAt ?? repositoryRootOrAttestedAt;
     this.assertAttestation(attestedAt);
-    const current = await this.current();
+    const current = await this.current(repositoryRoot);
     if (!current || current.status !== "active") throw new Error("No active configured network policy is installed.");
-    const entry = await this.store.append(networkRevokeKind, { filePath: current.filePath, sha256: current.sha256, attestedAt });
+    const entry = repositoryRoot
+      ? await this.store.append(scopedNetworkRevokeKind, { repositoryRoot, filePath: current.filePath, sha256: current.sha256, attestedAt })
+      : await this.store.append(networkRevokeKind, { filePath: current.filePath, sha256: current.sha256, attestedAt });
     return { ...current, installedAt: entry.at, status: "revoked" };
   }
 
@@ -136,17 +172,24 @@ export class AttestedNetworkPolicyCoordinator implements NetworkPolicyCoordinato
   private readonly presence: WindowsUserPresenceRunner;
   private readonly now: () => Date;
   constructor(registry: DurableNetworkPolicyRegistry, presence: WindowsUserPresenceRunner, now: () => Date = () => new Date()) { this.registry = registry; this.presence = presence; this.now = now; }
-  async install(sourcePath: string): Promise<InstalledNetworkPolicy> { const approved = await this.presence.verify("Approve this exact SXSY-B122 configured HTTPS route policy. It can enable only the fixed routes and credential purposes shown in the selected file."); if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve network policy installation."); return this.registry.install(sourcePath, this.now().toISOString()); }
-  current(): Promise<InstalledNetworkPolicy | undefined> { return this.registry.current(); }
-  async revoke(): Promise<InstalledNetworkPolicy> { const approved = await this.presence.verify("Revoke the active SXSY-B122 configured HTTPS route policy."); if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve network policy revocation."); return this.registry.revoke(this.now().toISOString()); }
+  async install(sourcePath: string): Promise<InstalledNetworkPolicy>;
+  async install(repositoryRoot: string, sourcePath: string): Promise<InstalledNetworkPolicy>;
+  async install(repositoryRootOrSource: string, maybeSource?: string): Promise<InstalledNetworkPolicy> { const approved = await this.presence.verify("Approve this exact SXSY-B122 configured HTTPS route policy. It can enable only the fixed routes and credential purposes shown in the selected file."); if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve network policy installation."); return maybeSource === undefined ? this.registry.install(repositoryRootOrSource, this.now().toISOString()) : this.registry.install(repositoryRootOrSource, maybeSource, this.now().toISOString()); }
+  current(repositoryRoot?: string): Promise<InstalledNetworkPolicy | undefined> { return this.registry.current(repositoryRoot); }
+  async revoke(repositoryRoot?: string): Promise<InstalledNetworkPolicy> { const approved = await this.presence.verify("Revoke the active SXSY-B122 configured HTTPS route policy."); if (!approved.verified || !approved.operator?.trim()) throw new Error("Current-user presence did not approve network policy revocation."); return repositoryRoot === undefined ? this.registry.revoke(this.now().toISOString()) : this.registry.revoke(repositoryRoot, this.now().toISOString()); }
 }
 
 interface NetworkInstallPayload extends Record<string, JsonValue> { readonly filePath: string; readonly sha256: string; readonly attestedAt: string; }
 function parseInstall(value: JsonValue): NetworkInstallPayload { if (!record(value) || typeof value.filePath !== "string" || typeof value.sha256 !== "string" || typeof value.attestedAt !== "string" || !/^[a-f0-9]{64}$/i.test(value.sha256)) throw new Error("The protected network policy journal is malformed."); return value as unknown as NetworkInstallPayload; }
+interface ScopedNetworkInstallPayload extends NetworkInstallPayload { readonly repositoryRoot: string; }
+function parseScopedInstall(value: JsonValue): ScopedNetworkInstallPayload { const payload = parseInstall(value); if (!record(value) || typeof value.repositoryRoot !== "string" || !boundedAbsolute(value.repositoryRoot)) throw new Error("The protected scoped network-policy journal is malformed."); return payload as ScopedNetworkInstallPayload; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function identifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
 function boundedAbsolute(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value) && isAbsolute(value); }
 function digest(value: Uint8Array): string { return createHash("sha256").update(value).digest("hex"); }
+function canonicalRepositoryRoot(value: string): string { if (!boundedAbsolute(value)) throw new Error("The network policy repository root must be fixed and absolute."); return resolve(value); }
+function repositoryIdentity(value: string): string { const normalized = resolve(value).replaceAll("\\", "/").replace(/\/+$/, ""); return process.platform === "win32" ? normalized.toLowerCase() : normalized; }
+function scopedInstalledPath(basePath: string, repositoryRoot: string): string { const identity = createHash("sha256").update(repositoryIdentity(repositoryRoot), "utf8").digest("hex"); const name = basePath.toLowerCase().endsWith(".json") ? basePath.slice(0, -5) : basePath; return `${name}.${identity}.json`; }
 
 function exactCredentialScopes(value: readonly CredentialScope[]): readonly CredentialScope[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > 16) throw new Error("Credential provisioning requires 1-16 explicit scope triples.");

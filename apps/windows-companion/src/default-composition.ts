@@ -27,7 +27,7 @@ import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, creat
 import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor, type CouncilAssignmentResourceVerifier, type CouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
 import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor } from "./pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter } from "./pipeline-adapters.ts";
 import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
 import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
 
@@ -120,14 +120,14 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     for (const action of providerCommandActions) adapters.register(action, provider);
   }
   const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
-  const configuredGitHost = options.networkPolicyRegistry ? { resolve: async () => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve()) } : undefined;
+  const configuredGitHost = options.networkPolicyRegistry ? { resolve: async (repositoryRoot: string) => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve(repositoryRoot)) } : undefined;
   const hostActionAdapter = new DurableHostActionAdapter(hostActions, dynamicNetwork && configuredGitHost ? new ConfiguredGitHubNavigationResolver(dynamicNetwork, configuredGitHost) : undefined);
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   if (options.providerDesktopAdapter) for (const action of installedProviderDesktopActions) adapters.register(action, options.providerDesktopAdapter);
   if (dynamicNetwork) {
     const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), configuredGitHost!, new DurablePipelineFailureCursor(store));
     adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));
-    adapters.register("pipeline_failure_trace", pipeline);
+    adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(pipeline, hostActions));
   }
   const git = new InMemoryGitBroker(context.policy, containment);
   if (options.localGitStateDirectory) {
@@ -151,7 +151,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
       } };
     const executeRemoteGit = async (request: GitRequest) => {
       try {
-        const host = configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve());
+        const host = configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve(request.target.repositoryRoot));
         return new ConfiguredRemoteGitHandler(
           new ConfiguredGitSmartHttpPusher(dynamicNetwork, host),
           new ConfiguredGitHubGraphqlPort(dynamicNetwork, host),

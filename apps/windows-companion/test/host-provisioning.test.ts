@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { ProtectedJsonStore, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
@@ -179,6 +179,58 @@ test("network policy installation is atomic, attested, and digest-rechecked on e
   assert.equal((await registry.resolve()).routes[0]?.id, "github.graphql");
   await writeFile(installed, JSON.stringify({ ...policy, routes: [] }), "utf8");
   await assert.rejects(() => registry.resolve(), /changed/i);
+});
+
+test("network policies coexist per canonical repository and revoke independently across restart", async () => {
+  const root = await mkdtemp(join(tmpdir(), "b122-network-multi-repo-"));
+  const repositoryA = join(root, "repo-a");
+  const repositoryB = join(root, "repo-b");
+  const sourceA = join(root, "source-a.json");
+  const sourceB = join(root, "source-b.json");
+  const installed = join(root, "installed", "network-policy.json");
+  const policyA = { version: 1, proxy: "direct", routes: [{ id: "provider.health", method: "GET", url: "https://127.0.0.1:9443/v1/b122/health/a", redirects: "deny", boundary: "provider-host-loopback", tlsSpkiSha256: "a".repeat(64), tlsCaCertificatePem: "-----BEGIN CERTIFICATE-----\nQQ==\n-----END CERTIFICATE-----\n" }] };
+  const policyB = { version: 1, proxy: "direct", routes: [{ id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" }] };
+  await writeFile(sourceA, JSON.stringify(policyA), "utf8");
+  await writeFile(sourceB, JSON.stringify(policyB), "utf8");
+  const now = "2026-08-24T12:00:00.000Z";
+  const store = new ProtectedJsonStore({ filePath: join(root, "journal.jsonl") });
+  const registry = new DurableNetworkPolicyRegistry(store, installed, () => now);
+
+  const installedA = await registry.install(repositoryA, sourceA, now);
+  const installedB = await registry.install(repositoryB, sourceB, now);
+  assert.notEqual(installedA.filePath, installedB.filePath);
+  assert.equal(installedA.repositoryRoot, resolve(repositoryA));
+  assert.equal(installedB.repositoryRoot, resolve(repositoryB));
+  assert.equal((await registry.resolve(repositoryA)).routes[0]?.id, "provider.health");
+  assert.equal((await registry.resolve(repositoryB)).routes[0]?.id, "github.graphql");
+
+  const restarted = new DurableNetworkPolicyRegistry(store, installed, () => now);
+  assert.equal((await restarted.resolve(repositoryA)).routes[0]?.id, "provider.health");
+  assert.equal((await restarted.resolve(repositoryB)).routes[0]?.id, "github.graphql");
+  await restarted.revoke(repositoryA, now);
+  assert.deepEqual((await restarted.resolve(repositoryA)).routes, []);
+  assert.equal((await restarted.resolve(repositoryB)).routes[0]?.id, "github.graphql");
+  await assert.rejects(() => restarted.resolve(), /repository.*required|ambiguous/i);
+});
+
+test("companion network-policy administration requires and forwards one exact repository scope", async () => {
+  const calls: string[] = [];
+  const policy = { repositoryRoot: "C:\\repo-a", filePath: "C:\\state\\policy.json", sha256: "a".repeat(64), installedAt: "2026-08-24T12:00:00.000Z", status: "active" as const };
+  const service = new CompanionService({
+    networkPolicyProvisioning: {
+      async install(repositoryRoot: string, sourcePath: string) { calls.push(`install:${repositoryRoot}:${sourcePath}`); return policy; },
+      async current(repositoryRoot: string) { calls.push(`current:${repositoryRoot}`); return policy; },
+      async revoke(repositoryRoot: string) { calls.push(`revoke:${repositoryRoot}`); return { ...policy, status: "revoked" as const }; }
+    } as never
+  });
+  const send = (id: string, method: "network-policy.install" | "network-policy.current" | "network-policy.revoke", payload: unknown) => service.handle({ version: companionBridgeVersion, id, method, payload });
+  assert.equal((await send("install", "network-policy.install", { repositoryRoot: "C:\\repo-a", sourcePath: "C:\\review\\policy.json" })).ok, true);
+  assert.equal((await send("current", "network-policy.current", { repositoryRoot: "C:\\repo-a" })).ok, true);
+  assert.equal((await send("revoke", "network-policy.revoke", { repositoryRoot: "C:\\repo-a" })).ok, true);
+  assert.deepEqual(calls, ["install:C:\\repo-a:C:\\review\\policy.json", "current:C:\\repo-a", "revoke:C:\\repo-a"]);
+  assert.equal((await send("missing", "network-policy.current", undefined)).ok, false);
+  assert.equal((await send("extra", "network-policy.revoke", { repositoryRoot: "C:\\repo-a", allRepositories: true })).ok, false);
+  assert.deepEqual(calls, ["install:C:\\repo-a:C:\\review\\policy.json", "current:C:\\repo-a", "revoke:C:\\repo-a"]);
 });
 
 function councilPlan(request: CouncilResourceHostRequest, resourceHost: CouncilResourceHostBinding): CouncilIsolationPlan {
