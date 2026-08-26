@@ -45,6 +45,10 @@ test("native route administration keeps secrets off argv and persists only curre
   assert.match(source, /WriteProtectedAtomic/);
   assert.match(source, /authorizationReference/);
   assert.match(source, /MaximumSecretChars/);
+  assert.match(source, /FileAttributes\.ReparsePoint/);
+  assert.match(source, /AssertProtectedDirectory/);
+  assert.match(source, /AssertProtectedFile/);
+  assert.match(source, /MaximumProtectedStateBytes/);
   assert.doesNotMatch(source, /args\[[0-9]+\].*(?:secret|token|credential)/i);
 });
 

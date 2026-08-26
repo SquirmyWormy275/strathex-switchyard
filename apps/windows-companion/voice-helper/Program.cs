@@ -19,6 +19,7 @@ internal static class Program
     private const string ProviderResponseSchema = "sxsy-b122.voice-provider-response";
     private const int MaximumProtocolChars = 2 * 1024 * 1024;
     private const int MaximumProviderResponseBytes = 256 * 1024;
+    private const int MaximumProtectedStateBytes = 2 * 1024 * 1024;
     private const int MaximumSecretChars = 16 * 1024;
     private const int MaximumTextChars = 4096;
     private static readonly byte[] DpapiEntropy = Encoding.UTF8.GetBytes("SXSY-B122/voice-helper/v1");
@@ -305,7 +306,7 @@ internal static class Program
         _ = RequiredIdentifier(root, "operatorPresenceId");
         string authorizationReference = RequiredAuthorizationReference(root, "authorizationReference");
         string path = RoutePath(authorizationReference);
-        if (File.Exists(path)) File.Delete(path);
+        DeleteProtectedFile(path);
         Write(new { schema = "sxsy-b122.voice-route-admin", version = 1, status = "removed", authorizationReference });
         return 0;
     }
@@ -388,7 +389,7 @@ internal static class Program
     private static void DeleteState(string bindingId, string component)
     {
         string path = StatePath(bindingId, component);
-        if (File.Exists(path)) File.Delete(path);
+        DeleteProtectedFile(path);
     }
 
     private static string StatePath(string bindingId, string component) => Path.Combine(StateDirectory(), $"{StateStem(bindingId, component)}.state");
@@ -401,14 +402,22 @@ internal static class Program
     {
         string basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
         if (string.IsNullOrWhiteSpace(basePath)) throw new ProtocolException("local_app_data_unavailable");
-        string path = Path.Combine(basePath, "STRATHEX", "switchyard", "voice-helper", leaf);
-        Directory.CreateDirectory(path);
+        string path = Path.GetFullPath(basePath);
+        foreach (string segment in new[] { "STRATHEX", "switchyard", "voice-helper", leaf })
+        {
+            path = Path.GetFullPath(Path.Combine(path, segment));
+            Directory.CreateDirectory(path);
+            AssertProtectedDirectory(path);
+        }
         return path;
     }
 
     private static void WriteProtectedAtomic<T>(string path, T value)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        string directory = Path.GetDirectoryName(Path.GetFullPath(path)) ?? throw new ProtocolException("protected_state_path_invalid");
+        Directory.CreateDirectory(directory);
+        AssertProtectedDirectory(directory);
+        if (File.Exists(path)) AssertProtectedFile(path);
         byte[] plaintext = JsonSerializer.SerializeToUtf8Bytes(value);
         byte[] ciphertext = Dpapi.Protect(plaintext, DpapiEntropy);
         CryptographicOperations.ZeroMemory(plaintext);
@@ -431,6 +440,7 @@ internal static class Program
 
     private static T? ReadProtected<T>(string path)
     {
+        AssertProtectedFile(path);
         byte[] ciphertext = File.ReadAllBytes(path);
         byte[] plaintext = Dpapi.Unprotect(ciphertext, DpapiEntropy);
         try { return JsonSerializer.Deserialize<T>(plaintext); }
@@ -439,6 +449,27 @@ internal static class Program
             CryptographicOperations.ZeroMemory(ciphertext);
             CryptographicOperations.ZeroMemory(plaintext);
         }
+    }
+
+    private static void DeleteProtectedFile(string path)
+    {
+        if (!File.Exists(path)) return;
+        AssertProtectedFile(path);
+        File.Delete(path);
+    }
+
+    private static void AssertProtectedDirectory(string path)
+    {
+        FileAttributes attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.Directory) == 0 || (attributes & FileAttributes.ReparsePoint) != 0)
+            throw new ProtocolException("protected_state_directory_unsafe");
+    }
+
+    private static void AssertProtectedFile(string path)
+    {
+        var item = new FileInfo(path);
+        if (!item.Exists || (item.Attributes & FileAttributes.ReparsePoint) != 0 || item.Length is < 1 or > MaximumProtectedStateBytes)
+            throw new ProtocolException("protected_state_file_unsafe");
     }
 
     private static Uri ValidateEndpoint(string value) => ValidateEndpoint(new Uri(value, UriKind.Absolute));

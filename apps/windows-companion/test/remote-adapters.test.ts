@@ -102,6 +102,41 @@ test("configured provider adapter never acknowledges malformed provider output",
   assert.equal(acknowledgements, 0);
 });
 
+test("configured provider preserves a committed child but refuses acknowledgement after post-effect target churn", async () => {
+  const artifact = proofArtifact();
+  const childEvents: string[] = [];
+  let guardChecks = 0;
+  let acknowledgements = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({
+    async request() {
+      return { outcome: "passed", routeId: "provider.proof", detail: "ok", effectDisposition: "committed", body: Buffer.from(JSON.stringify({
+        schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest,
+        operationId: artifact.operationId, action: "proof", status: "completed", effectDisposition: "committed",
+        summary: "The provider committed the exact proof.", externalId: "provider-post-effect-1",
+        result: { kind: "proof", verifiedClaims: ["claim"], evidenceReferences: ["receipt:1"], backendResults: [{ backend: "local", status: "passed" }] }
+      })) };
+    }
+  } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; },
+    async acknowledge() { acknowledgements += 1; return artifact; }
+  });
+  const outcome = await adapter.execute({
+    ...(providerRequest() as unknown as Record<string, unknown>),
+    effectGuard: { async assertCurrent() { guardChecks += 1; return guardChecks < 3 ? { allowed: true, reason: "current" } : { allowed: false, reason: "target changed after provider effect" }; } },
+    childSaga: {
+      async begin() { return { id: "child-post-effect", mayExecute: true }; },
+      async markExecuting() { childEvents.push("executing"); },
+      async markExternalCommitted() { childEvents.push("external"); },
+      async markCompensating() { childEvents.push("compensating"); },
+      async settle(_child: unknown, state: string) { childEvents.push(state); }
+    }
+  } as unknown as AdapterRequest);
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.effectDisposition, "committed");
+  assert.equal(acknowledgements, 0);
+  assert.deepEqual(childEvents, ["executing", "external", "ambiguous"]);
+});
+
 test("configured provider adapter revalidates the exact artifact and protected context at the final network boundary", async () => {
   const artifact = proofArtifact();
   let requests = 0;
@@ -172,6 +207,17 @@ test("configured provider adapter does not call the network without one prepared
   assert.equal(requests, 0);
 });
 
+test("configured provider adapter refuses a direct call without the final host effect guard", async () => {
+  let requests = 0;
+  const adapter = new ConfiguredProviderCommandAdapter({ async request() { requests += 1; throw new Error("must not dispatch"); } } as unknown as DynamicConfiguredNetworkClient, {
+    async claimForDispatch() { throw new Error("must not claim"); }, async assertDispatchBinding() { throw new Error("must not revalidate"); }, async acknowledge() { throw new Error("must not acknowledge"); }
+  });
+  const outcome = await adapter.execute({ ...(providerRequest() as unknown as Record<string, unknown>), effectGuard: undefined } as unknown as AdapterRequest);
+  assert.equal(outcome.status, "unavailable");
+  assert.equal(outcome.effectDisposition, "not_started");
+  assert.equal(requests, 0);
+});
+
 test("configured provider adapter never replays cancelled, cancelling, rejected, or acknowledged queue state", async () => {
   let requests = 0;
   const network = { async request() { requests += 1; throw new Error("must not dispatch"); } } as unknown as DynamicConfiguredNetworkClient;
@@ -198,7 +244,7 @@ test("provider handshake elevates only an exact current target after user presen
   const target = { id: targetId, repositoryRoot: "C:\\repo", branch: "feat/test", head: "b".repeat(40), trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete", reasons: [] } as const;
   let resolutions = 0;
   const coordinator = new AttestedProviderHandshakeCoordinator(
-    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "codex-adapter-1", taskId: "task-1", planRevision: "plan-1", plannedFiles: ["src/index.ts"], resources: ["port:4100"], dependencies: [], diffDigest: "f".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
+    { handshakeCapabilityCeiling() { return ["registered", "observable", "controllable", "mediated"] as const; }, async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "codex-adapter-1", taskId: "task-1", planRevision: "plan-1", plannedFiles: ["src/index.ts"], resources: ["port:4100"], dependencies: [], diffDigest: "f".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
     { async resolve() { resolutions += 1; return target; } },
     { async verify() { return { verified: true, operator: "DOMAIN\\operator" }; } },
     () => "2026-08-24T00:00:01.000Z"
@@ -214,11 +260,25 @@ test("provider handshake refuses capability installation when target churns", as
   const ids = ["a".repeat(64), "f".repeat(64)];
   let index = 0;
   const coordinator = new AttestedProviderHandshakeCoordinator(
-    { async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: ids[0], repositoryRoot: "C:\\repo", capabilities: ["registered", "observable"], status: "running", adapterVersion: "adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "e".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
+    { handshakeCapabilityCeiling() { return ["registered", "observable", "controllable", "mediated"] as const; }, async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: ids[0], repositoryRoot: "C:\\repo", capabilities: ["registered", "observable"], status: "running", adapterVersion: "adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "e".repeat(64) })) }; } } as unknown as DynamicConfiguredNetworkClient,
     { async resolve() { const id = ids[Math.min(index++, 1)]!; return { id, repositoryRoot: "C:\\repo", trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete" as const, reasons: [] }; } },
     { async verify() { return { verified: true, operator: "operator" }; } }
   );
   await assert.rejects(() => coordinator.handshake({ repositoryRoot: "C:\\repo", session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "vscode", metadata: {} } }), /changed during provider handshake/);
+});
+
+test("provider handshake cannot self-assert Mediated beyond its host-derived route ceiling", async () => {
+  const targetId = "a".repeat(64);
+  const target = { id: targetId, repositoryRoot: "C:\\repo", branch: "feat/test", head: "b".repeat(40), trackedManifest: "c".repeat(64), untrackedManifest: "d".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "e".repeat(64), capturedAt: "2026-08-24T00:00:00.000Z", completeness: "complete", reasons: [] } as const;
+  const coordinator = new AttestedProviderHandshakeCoordinator(
+    {
+      handshakeCapabilityCeiling() { return ["registered", "observable", "controllable"] as const; },
+      async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "untrusted external claim", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "external-adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "f".repeat(64) })) }; }
+    },
+    { async resolve() { return target; } },
+    { async verify() { return { verified: true, operator: "operator" }; } }
+  );
+  await assert.rejects(() => coordinator.handshake({ repositoryRoot: "C:\\repo", session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "vscode", metadata: {} } }), /host-derived transport boundary/i);
 });
 
 test("configured automation creates one observable child saga and records the gateway recovery identity", async () => {
@@ -277,6 +337,33 @@ test("configured automation creates one observable child saga and records the ga
   assert.equal(begun.details.externalId, "automation-operation-1");
   assert.equal(childEvents.some(([kind]) => kind === "external"), true);
   assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
+});
+
+test("configured automation records a committed child but refuses success after post-effect target churn", async () => {
+  const childEvents: string[] = [];
+  let guardChecks = 0;
+  const broker = createConfiguredAutomationBroker(
+    { verifyPermit() { return true; } },
+    { check() { return { allowed: true, reason: "clear" }; } },
+    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "committed", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.remote-result", version: 1, status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect-1" })) }; } }
+  );
+  const outcome = await broker.execute({
+    action: "compound_capture", operationId: "automation-post-effect", target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
+    session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
+    permit: {} as never,
+    effectGuard: { async assertCurrent() { guardChecks += 1; return guardChecks < 4 ? { allowed: true, reason: "current" } : { allowed: false, reason: "target changed after automation effect" }; } },
+    childSaga: {
+      async begin() { return { operationId: "child-automation-post-effect", mayExecute: true }; },
+      async markExecuting() { childEvents.push("executing"); },
+      async markExternalCommitted() { childEvents.push("external"); },
+      async markCancelling() { childEvents.push("cancelling"); },
+      async markCompensating() { childEvents.push("compensating"); },
+      async settle(_child: unknown, state: string) { childEvents.push(state); }
+    } as never
+  });
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.effectDisposition, "committed");
+  assert.deepEqual(childEvents, ["executing", "external", "ambiguous"]);
 });
 
 test("configured provider routing aborts when durable cancellation polling fails", async () => {

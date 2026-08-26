@@ -222,6 +222,7 @@ export interface ProviderGatewayRecoveryObservation {
 export interface AuthenticatedProviderGatewayClient {
   request(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult>;
   supportsProvider(provider: ManagedSession["provider"]): provider is ProviderGatewayProvider;
+  handshakeCapabilityCeiling(provider: ManagedSession["provider"]): readonly Capability[];
   recoveryExternalId(input: ProviderGatewayRecoveryIdentityRequest): string | undefined;
   refreshSessions(force?: boolean): Promise<readonly ManagedSession[]>;
   observeSession(sessionId: string): Promise<ManagedSession>;
@@ -234,6 +235,7 @@ export interface AuthenticatedProviderGatewayClient {
 export interface ProviderGatewayFallbackTransport {
   request(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult>;
   recoveryExternalId?(input: ProviderGatewayRecoveryIdentityRequest): string | undefined;
+  handshakeCapabilityCeiling?(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> | readonly Capability[];
 }
 
 /**
@@ -278,6 +280,15 @@ export class LocalProviderCommandGateway {
   supportsProvider(authenticationToken: string, provider: ManagedSession["provider"]): provider is ProviderGatewayProvider {
     this.authenticate(authenticationToken);
     return (provider === "claude" || provider === "codex") && this.backends.has(provider);
+  }
+
+  handshakeCapabilityCeiling(authenticationToken: string, provider: ManagedSession["provider"]): readonly Capability[] {
+    this.authenticate(authenticationToken);
+    const backend = provider === "claude" || provider === "codex" ? this.backends.get(provider) : undefined;
+    if (!backend) return ["registered"];
+    return backend.boundary === "local-only"
+      ? ["registered", "observable", "controllable", "mediated"]
+      : ["registered", "observable", "controllable"];
   }
 
   async request(authenticationToken: string, input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> {
@@ -621,6 +632,7 @@ class GatewayClient implements AuthenticatedProviderGatewayClient {
   constructor(private readonly gateway: LocalProviderCommandGateway, private readonly token: string) {}
   request(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> { return this.gateway.request(this.token, input); }
   supportsProvider(provider: ManagedSession["provider"]): provider is ProviderGatewayProvider { return this.gateway.supportsProvider(this.token, provider); }
+  handshakeCapabilityCeiling(provider: ManagedSession["provider"]): readonly Capability[] { return this.gateway.handshakeCapabilityCeiling(this.token, provider); }
   recoveryExternalId(input: ProviderGatewayRecoveryIdentityRequest): string | undefined { return this.gateway.recoveryExternalId(this.token, input); }
   refreshSessions(force = false): Promise<readonly ManagedSession[]> { return this.gateway.refreshSessions(this.token, force); }
   observeSession(sessionId: string): Promise<ManagedSession> { return this.gateway.observeSession(this.token, sessionId); }
@@ -649,6 +661,11 @@ export class ProviderGatewayRouteRouter implements ProviderGatewayFallbackTransp
     return this.gateway.supportsProvider(input.provider)
       ? this.gateway.recoveryExternalId(input)
       : this.fallback.recoveryExternalId?.(input);
+  }
+
+  async handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> {
+    if (this.gateway.supportsProvider(input.provider)) return this.gateway.handshakeCapabilityCeiling(input.provider);
+    return this.fallback.handshakeCapabilityCeiling ? this.fallback.handshakeCapabilityCeiling(input) : ["registered"];
   }
 }
 

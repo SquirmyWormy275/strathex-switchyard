@@ -21,6 +21,8 @@ export interface ProviderCommandTransport {
   request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult>;
   /** A host-known idempotency identity available before the provider effect. */
   recoveryExternalId?(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined;
+  /** Host-derived ceiling; provider response content can never raise it. */
+  handshakeCapabilityCeiling?(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> | readonly Capability[];
 }
 
 /** Re-resolves and digest-checks the attested policy immediately before each route. */
@@ -30,6 +32,13 @@ export class DynamicConfiguredNetworkClient implements ProviderCommandTransport 
   async request(input: Readonly<{ routeId: string; repositoryRoot: string; body?: string | Uint8Array; pathParameters?: Readonly<Record<string, string>>; signal?: AbortSignal }>): Promise<ConfiguredNetworkResult> {
     const policy = await this.options.registry.resolve();
     return createDirectConfiguredNetworkBroker(policy, this.options.containment, this.options.credentials).request(input);
+  }
+  async handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"] }>): Promise<readonly Capability[]> {
+    const route = (await this.options.registry.resolve()).routes.find((candidate) => candidate.id === input.routeId);
+    if (!route || input.routeId !== `provider.handshake.${input.provider}`) return ["registered"];
+    return route.boundary === "provider-host-loopback"
+      ? ["registered", "observable", "controllable", "mediated"]
+      : ["registered", "observable", "controllable"];
   }
 }
 
@@ -69,8 +78,12 @@ export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCo
     const approval = await this.presence.verify(`Connect the selected ${input.session.provider} adapter to this exact SXSY-B122 managed session and Git target.`);
     if (!approval.verified || !approval.operator?.trim()) throw new Error("Current-user presence did not approve the provider handshake.");
     const requestedAt = this.now();
+    const routeId = `provider.handshake.${input.session.provider}`;
+    const capabilityCeiling = this.network.handshakeCapabilityCeiling
+      ? await this.network.handshakeCapabilityCeiling({ routeId, provider: input.session.provider })
+      : ["registered"] as const;
     const result = await this.network.request({
-      routeId: `provider.handshake.${input.session.provider}`,
+      routeId,
       repositoryRoot: before.repositoryRoot,
       body: JSON.stringify({
         schema: "sxsy-b122.provider-handshake-request",
@@ -90,6 +103,7 @@ export class AttestedProviderHandshakeCoordinator implements ProviderHandshakeCo
     requireHandshakeTarget(after, input.repositoryRoot);
     if (after.id !== before.id) throw new Error("The target changed during provider handshake; no capability was installed.");
     const capabilities = normalizeHandshakeCapabilities(response.capabilities);
+    if (capabilities.some((capability) => !capabilityCeiling.includes(capability))) throw new Error("The provider handshake asserted a capability beyond its host-derived transport boundary.");
     if ((response.status === "verified_blocked" || response.status === "verified_finished") && !capabilities.includes("observable")) throw new Error("The provider status requires an Observable capability.");
     return {
       ...input.session,
@@ -137,7 +151,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const action = providerWorkflowAction(request.definition.action);
-    if (!request.operationId || !request.target || !request.session || !request.authority || !action || !this.artifacts) return { status: "unavailable", summary: "Configured provider routing requires a typed artifact store, durable operation, managed session, scoped authority, and exact target.", effectDisposition: "not_started" };
+    if (!request.operationId || !request.target || !request.session || !request.authority || !request.effectGuard || !action || !this.artifacts) return { status: "unavailable", summary: "Configured provider routing requires a typed artifact store, durable operation, managed session, scoped authority, exact target, and final effect guard.", effectDisposition: "not_started" };
     const control = await operationAbort(request.executionControl);
     try {
       if (control.signal.aborted) return { status: "cancelled", summary: "Configured provider routing was cancelled before dispatch.", effectDisposition: "not_started" };
@@ -169,6 +183,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         else if (disposition === "committed") {
           await request.childSaga.markExternalCommitted(child, { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
           if (outcome.status === "completed") await request.childSaga.settle(child, "completed", { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
+          else await request.childSaga.settle(child, "ambiguous", { artifactId: artifact.id, routeId, ...(response?.externalId ? { externalId: response.externalId } : {}) });
         } else if (disposition === "compensated") {
           await request.childSaga.markCompensating(child);
           await request.childSaga.settle(child, "cancelled", { artifactId: artifact.id, routeId });
@@ -206,6 +221,21 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       let response: WorkflowProviderResponse;
       try { response = parseWorkflowProviderResponse(value, artifact); }
       catch { return finish({ status: "failed", summary: "The configured provider returned a result that did not match the exact typed artifact; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
+      let postEffectDenial: string | undefined;
+      try {
+        if (control.signal.aborted) postEffectDenial = "The durable provider operation was cancelled after the external effect boundary.";
+        else {
+          const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, session: request.session, authority: request.authority });
+          if (!current.allowed) postEffectDenial = current.reason;
+          else if (control.signal.aborted) postEffectDenial = "The durable provider operation was cancelled during its post-effect target check.";
+        }
+      } catch { postEffectDenial = "The exact provider target could not be revalidated after the external effect boundary."; }
+      if (postEffectDenial) return finish({
+        status: "failed",
+        summary: `${postEffectDenial} The provider result was not acknowledged and exact reconciliation is required.`,
+        effectDisposition: response.effectDisposition,
+        data: workflowOutcomeData(artifact, response)
+      }, response);
       try { await this.artifacts.acknowledge(response); }
       catch { return finish({ status: "failed", summary: "The provider result was valid but could not be durably acknowledged; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response); }
       return finish({ status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
@@ -272,6 +302,21 @@ async function remoteAutomation(request: AutomationRequest, network: ProviderCom
     try { result = await network.request({ routeId, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify(document), signal: control.signal }); }
     catch { return finish({ status: "failed", summary: "The provider automation result was lost; exact observation is required.", effectDisposition: "ambiguous" }); }
     const outcome = adapterOutcome(result);
+    let postEffectDenial: string | undefined;
+    try {
+      if (control.signal.aborted) postEffectDenial = "The durable automation operation was cancelled after the external effect boundary.";
+      else {
+        const currentAfter = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+        if (!currentAfter.allowed) postEffectDenial = currentAfter.reason;
+        else if (control.signal.aborted) postEffectDenial = "The durable automation operation was cancelled during its post-effect target check.";
+      }
+    } catch { postEffectDenial = "The exact automation target could not be revalidated after the external effect boundary."; }
+    if (postEffectDenial) return finish({
+      status: "failed",
+      summary: `${postEffectDenial} Exact reconciliation is required.`,
+      effectDisposition: outcome.effectDisposition,
+      ...(outcome.data ? { data: outcome.data } : {})
+    });
     return finish({ status: outcome.status === "awaiting_input" || outcome.status === "awaiting_confirmation" ? "incomplete" : outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, ...(outcome.data ? { data: outcome.data } : {}) });
   } finally { control.dispose(); }
 }
