@@ -111,6 +111,45 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   assert.equal((await workflowArtifacts.get("provider-artifact"))?.status, "cancelling");
 });
 
+test("installed containment aborts durable Council work for only the exact repository", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-bootstrap-council-containment-"));
+  const companion = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    targetResolver: { resolve: async () => target }
+  });
+  context.after(async () => {
+    await companion.councilLifecycle.dispose();
+    await rm(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  });
+  const session = await companion.registerTrustedSession({
+    id: "council-containment-session", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task", planRevision: "plan",
+    plannedFiles: [], lastHeartbeat: new Date().toISOString(), adapterVersion: "bootstrap-test", metadata: {}
+  });
+  const authority = await companion.executor.authorities.issue({
+    repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["proof"], prohibitedActions: [],
+    expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user"
+  });
+  await companion.endpoint.handle({
+    version: companionBridgeVersion,
+    id: "initialize-default-composition",
+    method: "command.dispatch",
+    payload: { control: "PROOF", modifier: "normal", sessionId: session.id, authorityId: authority.id }
+  });
+  const council = companion.localComponents?.council;
+  assert.ok(council, "the installed default Council dependency must be initialized");
+  const participants = (snapshotId: string) => [
+    { id: "council-one", provider: "codex" as const, targetSnapshotId: snapshotId, status: "running" as const, capabilities: ["registered", "observable", "controllable", "mediated"] as const, lastHeartbeat: new Date().toISOString(), plannedFiles: ["src/one.ts"], resources: ["port:45100"], dependencies: [], diffDigest: "1".repeat(64) },
+    { id: "council-two", provider: "claude" as const, targetSnapshotId: snapshotId, status: "running" as const, capabilities: ["registered", "observable", "controllable", "mediated"] as const, lastHeartbeat: new Date().toISOString(), plannedFiles: ["src/two.ts"], resources: ["port:45101"], dependencies: [], diffDigest: "2".repeat(64) }
+  ];
+  const exact = await council.beginAutomatic({ repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, participants: participants(target.id) });
+  const other = await council.beginAutomatic({ repositoryRoot: "C:/safe/other", targetSnapshotId: "f".repeat(64), participants: participants("f".repeat(64)) });
+  await companion.localComponents!.containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "contain-council-exact-root", reason: "test exact Council containment" });
+  assert.ok(["abort_pending", "aborted"].includes((await council.get(exact.id))?.status ?? ""));
+  assert.equal((await council.get(other.id))?.status, "awaiting_pause_acknowledgements");
+});
+
 test("installed bootstrap routes an authorized workflow through the authenticated local provider gateway", async (context) => {
   const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-provider-bootstrap-"));
   context.after(async () => { await rm(folder, { recursive: true, force: true }); });
@@ -129,13 +168,14 @@ test("installed bootstrap routes an authorized workflow through the authenticate
       "sxsy-b122.providerHandshakeTarget": target.id
     }
   });
-  await companion.workflowArtifacts.create({
-    id: "gateway-proof-artifact", action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: session.id,
-    taskId: "task", planRevision: "plan", payload: proofPayload("gateway-session", "task", "plan", "local")
-  });
   const authority = await companion.executor.authorities.issue({
     repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: "task", planRevision: "plan", allowedActions: ["proof"], prohibitedActions: [],
     expiresAt: "2099-01-01T00:00:00.000Z", issuedBy: "isolated-user"
+  });
+  await companion.workflowArtifacts.create({
+    id: "gateway-proof-artifact", action: "proof", repositoryRoot: target.repositoryRoot, targetSnapshotId: target.id, sessionId: session.id,
+    taskId: "task", planRevision: "plan", authorityId: authority.id,
+    payload: proofPayload("gateway-session", "task", "plan", "local")
   });
   const response = await companion.endpoint.handle({
     version: companionBridgeVersion, id: "gateway-proof", method: "command.dispatch",

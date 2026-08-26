@@ -36,6 +36,24 @@ test("containment hook cancels exact repository queues and managed trees without
   assert.deepEqual(processes.calls, ["process:repository:C:\\repo:Containment fence 4 cancelled exact repository-bound queued work."]);
 });
 
+test("containment also cancels registered direct repository effects such as an active voice loop", async () => {
+  const calls: string[] = [];
+  const control = new InstalledOperationControl({
+    repositoryEffects: [{
+      async cancelRepository(repositoryRoot, reason) {
+        calls.push(`${repositoryRoot}:${reason}`);
+        return 1;
+      }
+    }]
+  });
+  assert.deepEqual(await control.cancelQueuedOperations({ repositoryRoot: "C:\\repo", fenceEpoch: 7 }), {
+    queued: 0,
+    managedProcesses: 0,
+    repositoryEffects: 1
+  });
+  assert.deepEqual(calls, ["C:\\repo:Containment fence 7 cancelled exact repository-bound queued work."]);
+});
+
 test("reconciliation observes every exact controller and leaves uncertainty unsettled", async () => {
   const settled = new Queue("settled", 1); const unresolved = new Queue("unresolved", 0); const processes = new Processes();
   const control = new InstalledOperationControl({ queues: [settled, unresolved], processes });

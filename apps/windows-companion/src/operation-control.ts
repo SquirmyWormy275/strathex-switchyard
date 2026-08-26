@@ -75,6 +75,12 @@ export class UnavailableInstalledRepositoryProcessSupervisor implements Reposito
 export interface InstalledOperationControlOptions {
   readonly queues?: readonly ExactOperationQueueControl[];
   readonly processes?: ManagedProcessOperationControl;
+  readonly repositoryEffects?: readonly RepositoryEffectControl[];
+}
+
+/** Exact direct effects that are not represented by the durable command queue. */
+export interface RepositoryEffectControl {
+  cancelRepository(repositoryRoot: string, reason: string): Promise<number>;
 }
 
 /**
@@ -84,10 +90,12 @@ export interface InstalledOperationControlOptions {
 export class InstalledOperationControl implements OperationControlAdapter {
   private readonly queues: readonly ExactOperationQueueControl[];
   private readonly processes?: ManagedProcessOperationControl;
+  private readonly repositoryEffects: readonly RepositoryEffectControl[];
 
   constructor(options: InstalledOperationControlOptions = {}) {
     this.queues = [...(options.queues ?? [])];
     this.processes = options.processes;
+    this.repositoryEffects = [...(options.repositoryEffects ?? [])];
   }
 
   async cancel(request: OperationCancellationRequest): Promise<OperationCancellationOutcome> {
@@ -120,15 +128,16 @@ export class InstalledOperationControl implements OperationControlAdapter {
   }
 
   /** Direct DurableContainmentManager hook. */
-  async cancelQueuedOperations(input: Readonly<{ repositoryRoot: string; fenceEpoch: number }>): Promise<Readonly<{ queued: number; managedProcesses: number }>> {
+  async cancelQueuedOperations(input: Readonly<{ repositoryRoot: string; fenceEpoch: number }>): Promise<Readonly<{ queued: number; managedProcesses: number; repositoryEffects?: number }>> {
     const repositoryRoot = bounded(input.repositoryRoot, "repository root");
     if (!Number.isSafeInteger(input.fenceEpoch) || input.fenceEpoch < 1) throw new Error("Containment fence epoch is invalid.");
     const reason = `Containment fence ${input.fenceEpoch} cancelled exact repository-bound queued work.`;
-    const [queued, managedProcesses] = await Promise.all([
+    const [queued, managedProcesses, repositoryEffects] = await Promise.all([
       Promise.all(this.queues.map((queue) => queue.cancelQueuedForRepository(repositoryRoot, reason))).then(sum),
-      this.processes?.cancelRepository(repositoryRoot, reason) ?? Promise.resolve(0)
+      this.processes?.cancelRepository(repositoryRoot, reason) ?? Promise.resolve(0),
+      Promise.all(this.repositoryEffects.map((effect) => effect.cancelRepository(repositoryRoot, reason))).then(sum)
     ]);
-    return { queued, managedProcesses };
+    return { queued, managedProcesses, ...(this.repositoryEffects.length ? { repositoryEffects } : {}) };
   }
 }
 

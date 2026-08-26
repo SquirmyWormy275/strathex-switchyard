@@ -32,7 +32,7 @@ const controlPlaneTests = [
 const companionTests = [
   "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-release", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "durable-credentials", "main-shutdown",
-  "durable-endpoint", "git-review", "hardware-signal-queue",
+  "direct-request-cancellation", "durable-endpoint", "git-review", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
   "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
   "operation-recovery", "packaged-runtime", "pipeline-adapters",

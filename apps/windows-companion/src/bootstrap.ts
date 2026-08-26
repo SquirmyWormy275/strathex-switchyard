@@ -29,7 +29,7 @@ import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegis
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
-import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderCommandTransport, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
@@ -88,6 +88,7 @@ import { InstalledProviderDesktopCommandAdapter, installedProviderDesktopActions
 import { DurableProviderDesktopEffectLedger } from "./provider-desktop-effects.ts";
 import { WindowsProviderDesktopProcessPort } from "./windows-provider-process.ts";
 import { HybridVoiceGateway, type VoiceAudioPort, type VoiceProviderPort } from "./voice-gateway.ts";
+import { ConfiguredVoiceProviderPort } from "./configured-voice-provider.ts";
 import {
   SafeUnavailableVoiceAudioPort,
   SafeUnavailableVoiceProviderPort,
@@ -151,6 +152,10 @@ export interface DurableWindowsCompanionOptions {
   /** Isolated tests may replace the voice ports, never production IPC callers. */
   readonly voiceAudioPort?: VoiceAudioPort;
   readonly voiceProviderPorts?: readonly VoiceProviderPort[];
+}
+
+interface CouncilRepositoryCancellationControl {
+  cancelRepository(repositoryRoot: string, reason: string): Promise<readonly Readonly<{ id: string }>[] >;
 }
 
 /**
@@ -231,6 +236,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const hardwareSignals = new DurableHardwareSignalInbox(store);
   let targetResolver!: TargetResolver;
   let containmentManager!: DurableContainmentManager;
+  let configuredNetwork!: DynamicConfiguredNetworkClient;
   let providerDesktopRegistry: AttestedProviderDesktopRegistry | undefined;
   const hostActions = new DurableHostActionQueue(store, {
     finalAuthorizer: {
@@ -284,15 +290,28 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
         routeId: "audio.winmm.current-user"
       })
     : new SafeUnavailableVoiceAudioPort("The fixed packaged Windows microphone helper is unavailable."));
+  const voiceNetwork: ProviderCommandTransport = { request: (input) => configuredNetwork.request(input) };
   const voiceProviders = options.voiceProviderPorts ?? (options.voiceHelperPath && options.voiceHelperSha256
     ? [
-        new WindowsVoiceProviderPort({ helperPath: options.voiceHelperPath, helperSha256: options.voiceHelperSha256, routeId: "provider.claude.voice", provider: "claude", authorizationReference: "credential-ref:claude-current-user" }),
-        new WindowsVoiceProviderPort({ helperPath: options.voiceHelperPath, helperSha256: options.voiceHelperSha256, routeId: "provider.chatgpt.voice", provider: "chatgpt", authorizationReference: "credential-ref:chatgpt-current-user" }),
+        new WindowsVoiceProviderPort({
+          helperPath: options.voiceHelperPath,
+          helperSha256: options.voiceHelperSha256,
+          provider: "claude",
+          routeId: "provider.claude.voice",
+          authorizationReference: "credential-ref:claude-current-user"
+        }),
+        new WindowsVoiceProviderPort({
+          helperPath: options.voiceHelperPath,
+          helperSha256: options.voiceHelperSha256,
+          provider: "chatgpt",
+          routeId: "provider.chatgpt.voice",
+          authorizationReference: "credential-ref:chatgpt-current-user"
+        }),
         new SafeUnavailableVoiceProviderPort("system", "No system voice-provider route is installed.")
       ]
     : [
-        new SafeUnavailableVoiceProviderPort("claude", "The fixed packaged Claude voice route is unavailable."),
-        new SafeUnavailableVoiceProviderPort("chatgpt", "The fixed packaged ChatGPT voice route is unavailable."),
+        new ConfiguredVoiceProviderPort("claude", voiceNetwork),
+        new ConfiguredVoiceProviderPort("chatgpt", voiceNetwork),
         new SafeUnavailableVoiceProviderPort("system", "No system voice-provider route is installed.")
       ]);
   const voiceGateway = new HybridVoiceGateway({
@@ -309,12 +328,61 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           throw new Error("The managed voice session is absent, stale, or changed from its exact context binding.");
         }
       }
+    },
+    effectGuard: {
+      async assertAllowed({ scope, effect, remediation }) {
+        if (remediation) {
+          const cleanup = await containmentManager.check(scope.repositoryRoot, "local_remediation");
+          if (!cleanup.allowed) throw new Error(cleanup.reason);
+          return;
+        }
+        const session = await sessions.get(scope.managedSessionId);
+        if (!session || !session.workspaceRoot || resolve(session.workspaceRoot).toLowerCase() !== resolve(scope.repositoryRoot).toLowerCase()
+          || session.targetSnapshotId !== scope.targetSnapshotId || !session.capabilities.includes("registered")
+          || ["unknown", "stale", "unreachable"].includes(session.status)) {
+          throw new Error("The exact managed voice session changed before the direct effect.");
+        }
+        const target = await targetResolver.resolve({ definition: commandForAction("voice_session_picker"), session });
+        if (!target || target.completeness !== "complete" || target.id !== scope.targetSnapshotId
+          || resolve(target.repositoryRoot).toLowerCase() !== resolve(scope.repositoryRoot).toLowerCase()) {
+          throw new Error("The exact voice TargetSnapshot changed before the direct effect.");
+        }
+        const finalSession = await sessions.get(scope.managedSessionId);
+        if (!finalSession || !finalSession.workspaceRoot || resolve(finalSession.workspaceRoot).toLowerCase() !== resolve(scope.repositoryRoot).toLowerCase()
+          || finalSession.targetSnapshotId !== scope.targetSnapshotId || !finalSession.capabilities.includes("registered")
+          || ["unknown", "stale", "unreachable"].includes(finalSession.status)) {
+          throw new Error("The exact managed voice session changed at the final effect boundary.");
+        }
+        const containment = await containmentManager.check(scope.repositoryRoot, "adapter");
+        if (!containment.allowed) throw new Error(containment.reason);
+        if (effect.startsWith("provider_")) {
+          const credential = await containmentManager.check(scope.repositoryRoot, "credential");
+          if (!credential.allowed) throw new Error(credential.reason);
+          const network = await containmentManager.check(scope.repositoryRoot, "network");
+          if (!network.allowed) throw new Error(network.reason);
+        }
+      }
     }
   });
   const voiceRuntime = new InstalledVoiceConversationRuntime({ gateway: voiceGateway });
+  let councilExecutorCancellation: CouncilRepositoryCancellationControl | undefined;
+  let councilLifecycleCancellation: CouncilRepositoryCancellationControl | undefined;
   const operationControl = new InstalledOperationControl({
     queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals, providerGateway],
-    processes: repositoryRuntimes
+    processes: repositoryRuntimes,
+    repositoryEffects: [
+      { cancelRepository: (repositoryRoot, reason) => voiceRuntime.cancelRepository(repositoryRoot, reason) },
+      {
+        async cancelRepository(repositoryRoot, reason) {
+          const cancelled = new Set<string>();
+          for (const controller of [councilExecutorCancellation, councilLifecycleCancellation]) {
+            if (!controller) continue;
+            for (const epoch of await controller.cancelRepository(repositoryRoot, reason)) cancelled.add(epoch.id);
+          }
+          return cancelled.size;
+        }
+      }
+    ]
   });
   let credentialVault!: DurableCredentialReferenceVault;
   containmentManager = new DurableContainmentManager(store, {
@@ -335,7 +403,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const councilResources = new InstalledCouncilResourceBroker(councilIsolation, councilResourceHost, networkPolicyRegistry, containmentManager);
   const credentialProvisioning = options.runtimePinPresence ? new AttestedCredentialProvisioningCoordinator(credentialVault, credentialProtector, options.runtimePinPresence) : undefined;
   const networkPolicyProvisioning = options.runtimePinPresence ? new AttestedNetworkPolicyCoordinator(networkPolicyRegistry, options.runtimePinPresence) : undefined;
-  const configuredNetwork = new DynamicConfiguredNetworkClient({
+  configuredNetwork = new DynamicConfiguredNetworkClient({
     registry: networkPolicyRegistry,
     containment: containmentManager,
     credentials: credentialVault.createAdapter("configured-network")
@@ -352,6 +420,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     resources: councilResources,
     providerControl: configuredProviderControl
   });
+  councilLifecycleCancellation = councilLifecycle;
   const providerTransport = new ProviderGatewayRouteRouter(providerGateway, configuredNetwork);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
@@ -546,6 +615,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       );
       localComponents = composed.components;
       defaultDependencies = composed.dependencies;
+      const configuredCouncil = composed.dependencies.council as Partial<CouncilRepositoryCancellationControl> | undefined;
+      if (typeof configuredCouncil?.cancelRepository === "function") councilExecutorCancellation = configuredCouncil as CouncilRepositoryCancellationControl;
     }
     return defaultDependencies;
   });

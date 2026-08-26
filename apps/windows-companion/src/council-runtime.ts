@@ -8,7 +8,7 @@ import { CouncilCoordinator, type CouncilEpoch, type CouncilParticipant } from "
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
-import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
+import type { ProviderCommandTransport } from "./remote-adapters.ts";
 import type { CouncilIsolationEffectControl, CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "./council-workspace-isolation.ts";
 import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
@@ -53,13 +53,13 @@ export interface DurableConfiguredCouncilOptions {
 export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   private readonly council: CouncilCoordinator;
   private readonly sessions: SessionRegistry;
-  private readonly network?: DynamicConfiguredNetworkClient;
+  private readonly network?: ProviderCommandTransport;
   private readonly now: () => number;
   private readonly isolation?: CouncilWorkspaceIsolator;
   private readonly automaticGate?: CouncilAutomaticAcceptanceGate;
   private readonly resources?: CouncilAssignmentResourceVerifier;
   private readonly activeExecutions = new Map<string, Set<ActiveCouncilExecution>>();
-  constructor(council: CouncilCoordinator, sessions: SessionRegistry, network?: DynamicConfiguredNetworkClient, now: () => number = Date.now, options: DurableConfiguredCouncilOptions = {}) { this.council = council; this.sessions = sessions; this.network = network; this.now = now; this.isolation = options.isolation; this.automaticGate = options.automaticGate; this.resources = options.resources; }
+  constructor(council: CouncilCoordinator, sessions: SessionRegistry, network?: ProviderCommandTransport, now: () => number = Date.now, options: DurableConfiguredCouncilOptions = {}) { this.council = council; this.sessions = sessions; this.network = network; this.now = now; this.isolation = options.isolation; this.automaticGate = options.automaticGate; this.resources = options.resources; }
 
   async execute(request: CouncilRequest): Promise<BrokerOutcome> {
     const participants = await this.participants(request);

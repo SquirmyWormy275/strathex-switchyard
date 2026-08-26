@@ -24,6 +24,7 @@ export type VoiceGatewayErrorCode =
   | "consent_invalid"
   | "deletion_incomplete"
   | "deadline"
+  | "effect_blocked"
   | "no_input"
   | "no_binding"
   | "provider_invalid"
@@ -46,6 +47,16 @@ export interface VoiceContextSource {
 
 export interface VoiceSessionScopeVerifier {
   assertCurrent(scope: VoiceBindingScope, context: CanonicalVoiceContext): Promise<void>;
+}
+
+export type VoiceEffect =
+  | "audio_open" | "audio_capture" | "audio_speak" | "audio_mute" | "audio_resume"
+  | "audio_interrupt" | "audio_close" | "audio_delete" | "audio_observe"
+  | "provider_open" | "provider_respond" | "provider_interrupt" | "provider_close"
+  | "provider_delete" | "provider_observe";
+
+export interface VoiceEffectGuard {
+  assertAllowed(input: Readonly<{ scope: VoiceBindingScope; effect: VoiceEffect; remediation: boolean }>): Promise<void>;
 }
 
 /** Canonical, non-authorizing context injected on every provider turn. */
@@ -144,6 +155,7 @@ export interface HybridVoiceGatewayOptions {
   readonly audio: VoiceAudioPort;
   readonly providers: readonly VoiceProviderPort[];
   readonly sessionScopeVerifier?: VoiceSessionScopeVerifier;
+  readonly effectGuard?: VoiceEffectGuard;
   readonly now?: () => string;
   readonly defaultDeadlineMs?: number;
 }
@@ -176,6 +188,7 @@ export class HybridVoiceGateway {
   private readonly audio: VoiceAudioPort;
   private readonly providers = new Map<VoiceProvider, VoiceProviderPort>();
   private readonly sessionScopeVerifier?: VoiceSessionScopeVerifier;
+  private readonly effectGuard?: VoiceEffectGuard;
   private readonly now: () => string;
   private readonly defaultDeadlineMs: number;
   private runtime?: RuntimeBinding;
@@ -188,6 +201,7 @@ export class HybridVoiceGateway {
     this.now = options.now ?? (() => new Date().toISOString());
     this.defaultDeadlineMs = deadline(options.defaultDeadlineMs ?? 30_000);
     this.sessionScopeVerifier = options.sessionScopeVerifier;
+    this.effectGuard = options.effectGuard;
     for (const provider of options.providers) {
       if (this.providers.has(provider.provider)) {
         throw new VoiceGatewayError("provider_invalid", `Duplicate voice provider route: ${provider.provider}`);
@@ -208,8 +222,10 @@ export class HybridVoiceGateway {
     let audioOpened = false;
     try {
       if (controller.signal.aborted) throw abortError(controller);
+      await this.assertEffectAllowed(exact.scope, "audio_open");
       await raced(this.audio.open(exact.scope, controller.signal), controller);
       audioOpened = true;
+      await this.assertEffectAllowed(exact.scope, "provider_open");
       const externalSessionId = boundedIdentifier(
         await raced(providerPort.open(exact.scope, exact.context, controller.signal), controller),
         "provider voice session"
@@ -221,8 +237,8 @@ export class HybridVoiceGateway {
       this.runtime = { ...final, providerPort, externalSessionId };
       return cloneContext(final.context);
     } catch (error) {
-      if (audioOpened) await this.audio.close(exact.scope).catch(() => undefined);
-      await providerPort.close(exact.scope).catch(() => undefined);
+      if (audioOpened) await this.remediate(exact.scope, "audio_close", () => this.audio.close(exact.scope));
+      await this.remediate(exact.scope, "provider_close", () => providerPort.close(exact.scope));
       throw normalizeAbort(error, controller);
     } finally {
       controller.dispose();
@@ -239,11 +255,13 @@ export class HybridVoiceGateway {
     try {
       const runtime = await this.freshRuntime(bindingId, "active");
       if (controller.signal.aborted) throw abortError(controller);
+      await this.assertEffectAllowed(runtime.scope, "audio_capture");
       const captured = await raced(this.audio.capture(runtime.scope, controller.signal), controller);
       if (captured.length === 0) throw new VoiceGatewayError("no_input", "No bounded voice activity was captured.");
       const frames = validateFrames(captured);
       const beforeProvider = await this.freshRuntime(bindingId, "active");
       if (controller.signal.aborted) throw abortError(controller);
+      await this.assertEffectAllowed(beforeProvider.scope, "provider_respond");
       const response = validateResponse(await raced(
         runtime.providerPort.respond(beforeProvider.scope, beforeProvider.context, frames, controller.signal),
         controller
@@ -258,6 +276,7 @@ export class HybridVoiceGateway {
         // synthesize the redacted responseText on the trusted local boundary.
         spokenAudio: []
       };
+      await this.assertEffectAllowed(final.scope, "audio_speak");
       await raced(this.audio.speak(final.scope, routed, controller.signal), controller);
       await this.freshRuntime(bindingId, "active");
       if (controller.signal.aborted) throw abortError(controller);
@@ -270,8 +289,8 @@ export class HybridVoiceGateway {
       const runtime = this.runtime;
       if (!(error instanceof VoiceGatewayError && error.code === "no_input") && runtime?.scope.bindingId === bindingId) {
         await Promise.allSettled([
-          runtime.providerPort.interrupt(runtime.scope),
-          this.audio.interrupt(runtime.scope)
+          this.remediate(runtime.scope, "provider_interrupt", () => runtime.providerPort.interrupt(runtime.scope)),
+          this.remediate(runtime.scope, "audio_interrupt", () => this.audio.interrupt(runtime.scope))
         ]);
       }
       throw normalizeAbort(error, controller);
@@ -291,6 +310,8 @@ export class HybridVoiceGateway {
     const next = await this.voice.switchProvider(bindingId, input);
     const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
     try {
+      await this.assertEffectAllowed(runtime.scope, "provider_close", true);
+      await this.assertEffectAllowed(runtime.scope, "audio_close", true);
       await raced(Promise.all([
         runtime.providerPort.close(runtime.scope, controller.signal),
         this.audio.close(runtime.scope, controller.signal)
@@ -321,6 +342,8 @@ export class HybridVoiceGateway {
     const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
     try {
       if (prior) {
+        await this.assertEffectAllowed(prior.scope, "provider_close", true);
+        await this.assertEffectAllowed(prior.scope, "audio_close", true);
         await raced(Promise.all([
           prior.providerPort.close(prior.scope, controller.signal),
           this.audio.close(prior.scope, controller.signal)
@@ -346,6 +369,7 @@ export class HybridVoiceGateway {
       const runtime = await this.freshRuntime(bindingId, "active");
       if (controller.signal.aborted) throw abortError(controller);
       const binding = await this.voice.mute(bindingId);
+      await this.assertEffectAllowed(runtime.scope, "audio_mute");
       await raced(this.audio.setMuted(runtime.scope, true, controller.signal), controller);
       return binding;
     } catch (error) {
@@ -361,6 +385,7 @@ export class HybridVoiceGateway {
       const runtime = await this.freshRuntime(bindingId, "muted_or_interrupted");
       if (controller.signal.aborted) throw abortError(controller);
       const binding = await this.voice.resume(bindingId);
+      await this.assertEffectAllowed(runtime.scope, "audio_resume");
       await raced(this.audio.setMuted(runtime.scope, false, controller.signal), controller);
       this.runtime = { ...runtime, binding, scope: scope(binding, runtime.consent) };
       return binding;
@@ -377,6 +402,8 @@ export class HybridVoiceGateway {
     const binding = await this.voice.interrupt(bindingId, reason);
     const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
     try {
+      await this.assertEffectAllowed(runtime.scope, "provider_interrupt", true);
+      await this.assertEffectAllowed(runtime.scope, "audio_interrupt", true);
       await raced(Promise.all([
         runtime.providerPort.interrupt(runtime.scope, controller.signal),
         this.audio.interrupt(runtime.scope, controller.signal)
@@ -397,6 +424,8 @@ export class HybridVoiceGateway {
     if (runtime) {
       const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
       try {
+        await this.assertEffectAllowed(runtime.scope, "provider_close", true);
+        await this.assertEffectAllowed(runtime.scope, "audio_close", true);
         await raced(Promise.all([
           runtime.providerPort.close(runtime.scope, controller.signal),
           this.audio.close(runtime.scope, controller.signal)
@@ -424,6 +453,10 @@ export class HybridVoiceGateway {
     try {
       let external: readonly PromiseSettledResult<void>[];
       try {
+        for (const exact of exactHistory) {
+          await this.assertEffectAllowed(exact.scope, "provider_delete", true);
+          await this.assertEffectAllowed(exact.scope, "audio_delete", true);
+        }
         external = await raced(Promise.allSettled([
           ...exactHistory.map((exact) => this.exactProvider(exact.scope.provider).deleteTranscript(exact.scope, controller.signal)),
           ...exactHistory.map((exact) => this.audio.deleteTranscript(exact.scope, controller.signal))
@@ -464,6 +497,8 @@ export class HybridVoiceGateway {
     }
     const controller = linkedController(options.signal, options.deadlineMs ?? this.defaultDeadlineMs);
     try {
+      await this.assertEffectAllowed(exact.scope, "audio_observe");
+      await this.assertEffectAllowed(exact.scope, "provider_observe");
       const [audio, provider] = await raced(Promise.all([
         this.audio.observe(exact.scope, controller.signal),
         providerPort.observe(exact.scope, controller.signal)
@@ -475,22 +510,54 @@ export class HybridVoiceGateway {
         return active.status === "active" ? cloneScope(exact.scope) : undefined;
       }
       await Promise.allSettled([
-        providerPort.close(exact.scope),
-        this.audio.close(exact.scope)
+        this.remediate(exact.scope, "provider_close", () => providerPort.close(exact.scope)),
+        this.remediate(exact.scope, "audio_close", () => this.audio.close(exact.scope))
       ]);
       await this.voice.end(active.id);
       this.runtime = undefined;
       return undefined;
     } catch (error) {
       await Promise.allSettled([
-        providerPort.close(exact.scope),
-        this.audio.close(exact.scope)
+        this.remediate(exact.scope, "provider_close", () => providerPort.close(exact.scope)),
+        this.remediate(exact.scope, "audio_close", () => this.audio.close(exact.scope))
       ]);
       await this.voice.end(active.id).catch(() => undefined);
       this.runtime = undefined;
       throw normalizeAbort(error, controller);
     } finally {
       controller.dispose();
+    }
+  }
+
+  async containRepository(repositoryRoot: string, reason: string, options: Readonly<{ deadlineMs?: number }> = {}): Promise<number> {
+    const runtime = this.runtime;
+    if (!runtime || !sameRoot(runtime.scope.repositoryRoot, repositoryRoot)) return 0;
+    if (this.activeTurn?.bindingId === runtime.scope.bindingId) this.activeTurn.controller.abort(new Error(reason));
+    await this.end(runtime.scope.bindingId, { deadlineMs: options.deadlineMs ?? this.defaultDeadlineMs }).catch(async () => {
+      await this.voice.end(runtime.scope.bindingId).catch(() => undefined);
+      this.runtime = undefined;
+    });
+    return 1;
+  }
+
+  private async assertEffectAllowed(scopeValue: VoiceBindingScope, effect: VoiceEffect, remediation = false): Promise<void> {
+    if (!this.effectGuard) throw new VoiceGatewayError("effect_blocked", "The voice route has no final host effect guard.");
+    try {
+      await this.effectGuard.assertAllowed({ scope: cloneScope(scopeValue), effect, remediation });
+    } catch {
+      throw new VoiceGatewayError("effect_blocked", remediation
+        ? "The exact voice remediation route is unavailable."
+        : "The exact voice effect is blocked by the current target or containment fence.");
+    }
+  }
+
+  private async remediate(scopeValue: VoiceBindingScope, effect: VoiceEffect, action: () => Promise<void>): Promise<void> {
+    try {
+      await this.assertEffectAllowed(scopeValue, effect, true);
+      await action();
+    } catch {
+      // Cleanup is best-effort after local state has been fenced. The caller
+      // records ambiguity; it never reopens or replays a blocked voice route.
     }
   }
 

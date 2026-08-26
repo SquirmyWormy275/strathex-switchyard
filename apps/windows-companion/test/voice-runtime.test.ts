@@ -27,6 +27,7 @@ class FakeGateway implements VoiceConversationGateway {
   turns = 0;
   failTurn?: Error;
   switchBarrier?: Promise<void>;
+  activeRepositoryRoot = "C:\\repo";
 
   async open(id: string): Promise<Record<string, never>> { this.calls.push(`open:${id}`); return {}; }
   async runTurn(id: string, options?: { signal?: AbortSignal }): Promise<Record<string, never>> {
@@ -49,6 +50,13 @@ class FakeGateway implements VoiceConversationGateway {
   async end(id: string): Promise<VoiceBinding> { this.calls.push(`end:${id}`); return binding(id, "ended"); }
   async deleteTranscript(id: string): Promise<VoiceBinding> { this.calls.push(`delete:${id}`); return { ...binding(id, "ended"), transcriptDeletedAt: "2026-08-24T12:01:00.000Z" }; }
   async reconcile(): Promise<VoiceBindingScope | undefined> { return undefined; }
+  async containRepository(repositoryRoot: string, reason: string): Promise<number> {
+    this.calls.push(`contain:${repositoryRoot}:${reason}`);
+    if (repositoryRoot.toLowerCase() !== this.activeRepositoryRoot.toLowerCase()) return 0;
+    const active = [...this.calls].reverse().find((call) => call.startsWith("turn:"))?.slice("turn:".length);
+    if (!active) return 0;
+    return 1;
+  }
 }
 
 test("installed voice runtime runs one bounded conversation loop and stops it before mute, switch, and end", async () => {
@@ -104,6 +112,18 @@ test("concurrent lifecycle requests are serialized so an older transition cannot
     "end:voice-2"
   ]);
   assert.equal(runtime.activeBindingId, undefined);
+});
+
+test("containment cancels and joins only the active exact-repository voice loop", async () => {
+  const gateway = new FakeGateway();
+  const runtime = new InstalledVoiceConversationRuntime({ gateway, silenceBackoffMs: 1 });
+  await runtime.open("voice-1");
+  await waitFor(() => gateway.turns >= 1);
+  assert.equal(await runtime.cancelRepository("C:\\other", "fence 1"), 0);
+  assert.equal(runtime.activeBindingId, "voice-1");
+  assert.equal(await runtime.cancelRepository("C:\\repo", "fence 2"), 1);
+  assert.equal(runtime.activeBindingId, undefined);
+  assert.equal(gateway.calls.includes("contain:C:\\repo:fence 2"), true);
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {

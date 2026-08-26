@@ -17,6 +17,8 @@ export interface VoiceConversationGateway {
   end(bindingId: string, options?: Readonly<{ signal?: AbortSignal; deadlineMs?: number }>): Promise<VoiceBinding>;
   deleteTranscript(bindingId: string, options?: Readonly<{ signal?: AbortSignal; deadlineMs?: number }>): Promise<VoiceBinding>;
   reconcile(options?: Readonly<{ signal?: AbortSignal; deadlineMs?: number }>): Promise<VoiceBindingScope | undefined>;
+  /** Stops only the active exact-repository route after a durable containment fence. */
+  containRepository?(repositoryRoot: string, reason: string, options?: Readonly<{ deadlineMs?: number }>): Promise<number>;
 }
 
 export interface InstalledVoiceConversationRuntimeOptions {
@@ -128,6 +130,16 @@ export class InstalledVoiceConversationRuntime {
       if (!bindingId) return;
       await this.stopLoop(bindingId);
       await this.gateway.end(bindingId, { deadlineMs: this.turnDeadlineMs }).catch(() => undefined);
+    });
+  }
+
+  async cancelRepository(repositoryRoot: string, reason: string): Promise<number> {
+    return this.exclusive(async () => {
+      const affected = await this.gateway.containRepository?.(repositoryRoot, reason, { deadlineMs: this.turnDeadlineMs }) ?? 0;
+      if (affected < 1) return 0;
+      const bindingId = this.loop?.bindingId;
+      if (bindingId) await this.stopLoop(bindingId);
+      return affected;
     });
   }
 

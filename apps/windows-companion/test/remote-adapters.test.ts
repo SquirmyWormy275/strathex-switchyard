@@ -273,7 +273,7 @@ test("provider handshake cannot self-assert Mediated beyond its host-derived rou
   const coordinator = new AttestedProviderHandshakeCoordinator(
     {
       handshakeCapabilityCeiling() { return ["registered", "observable", "controllable"] as const; },
-      async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "untrusted external claim", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "external-adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "f".repeat(64) })) }; }
+      async request() { return { outcome: "passed", routeId: "provider.handshake.codex", detail: "untrusted external claim", effectDisposition: "not_started" as const, body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-handshake", version: 1, sessionId: "session-1", provider: "codex", targetSnapshotId: targetId, repositoryRoot: "C:\\repo", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", adapterVersion: "external-adapter", plannedFiles: [], resources: [], dependencies: [], diffDigest: "f".repeat(64) })) }; }
     },
     { async resolve() { return target; } },
     { async verify() { return { verified: true, operator: "operator" }; } }
@@ -345,7 +345,7 @@ test("configured automation records a committed child but refuses success after 
   const broker = createConfiguredAutomationBroker(
     { verifyPermit() { return true; } },
     { check() { return { allowed: true, reason: "clear" }; } },
-    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "committed", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.remote-result", version: 1, status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect-1" })) }; } }
+    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.remote-result", version: 1, status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect-1" })) }; } }
   );
   const outcome = await broker.execute({
     action: "compound_capture", operationId: "automation-post-effect", target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,

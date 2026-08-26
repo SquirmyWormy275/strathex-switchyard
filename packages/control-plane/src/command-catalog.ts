@@ -87,28 +87,30 @@ const observable = ["registered", "observable"] as const;
 const controllable = ["registered", "controllable"] as const;
 const coordinated = ["registered", "observable", "controllable", "mediated"] as const;
 const scoped = { requiresAuthority: true, requiresTarget: true } as const;
+/** Every provider-backed command crosses an external effect boundary. */
+const providerScoped = { ...scoped, requiresCompleteTargetSnapshot: true } as const;
 const consequential = { ...scoped, requiresCapabilities: mediated, requiresCompleteTargetSnapshot: true } as const;
 const confirmed = { ...consequential, requiresConfirmation: true } as const;
 
 /** The complete, closed catalog for the 65 interview-settled chord assignments. */
 export const commandCatalog: readonly CommandDefinition[] = [
-  definition("reanchor", "REANCHOR", "normal", "Re-anchor", "agent", { ...scoped, requiresCapabilities: controllable }),
-  definition("proof", "PROOF", "normal", "Evidence-based proof", "agent", { ...scoped, requiresCapabilities: observable }),
-  definition("proof_adversarial", "PROOF", "shift", "Cross-backend adversarial proof", "agent", { ...scoped, requiresCapabilities: observable, requiresConfirmation: true }),
-  definition("option_provider", "OPTION_PROVIDER", "normal", "Five-option decision packet", "agent", { ...scoped, requiresCapabilities: controllable }),
-  definition("option_packet", "OPTION_PROVIDER", "shift", "Pending decision packet", "agent", { ...scoped, requiresCapabilities: controllable }),
-  definition("plan_expander", "PLAN_EXPANDER", "normal", "Ranked plan expansion", "agent", { ...scoped, requiresCapabilities: controllable }),
+  definition("reanchor", "REANCHOR", "normal", "Re-anchor", "agent", { ...providerScoped, requiresCapabilities: controllable }),
+  definition("proof", "PROOF", "normal", "Evidence-based proof", "agent", { ...providerScoped, requiresCapabilities: observable }),
+  definition("proof_adversarial", "PROOF", "shift", "Cross-backend adversarial proof", "agent", { ...providerScoped, requiresCapabilities: observable, requiresConfirmation: true }),
+  definition("option_provider", "OPTION_PROVIDER", "normal", "Five-option decision packet", "agent", { ...providerScoped, requiresCapabilities: controllable }),
+  definition("option_packet", "OPTION_PROVIDER", "shift", "Pending decision packet", "agent", { ...providerScoped, requiresCapabilities: controllable }),
+  definition("plan_expander", "PLAN_EXPANDER", "normal", "Ranked plan expansion", "agent", { ...providerScoped, requiresCapabilities: controllable }),
   definition("plan_approval", "PLAN_APPROVAL", "normal", "Execute approved plan", "agent", confirmed),
-  definition("handoff", "HANDOFF", "normal", "Planner-to-coder handoff", "agent", { ...scoped, requiresCapabilities: ["registered"] }),
-  definition("handoff_queue", "HANDOFF", "shift", "Queue a planning packet", "agent", { ...scoped, requiresCapabilities: ["registered"] }),
-  definition("handoff_immediate", "HANDOFF", "alt", "Focus planner with packet", "agent", { ...scoped, requiresCapabilities: ["registered"] }),
+  definition("handoff", "HANDOFF", "normal", "Planner-to-coder handoff", "agent", { ...providerScoped, requiresCapabilities: ["registered"] }),
+  definition("handoff_queue", "HANDOFF", "shift", "Queue a planning packet", "agent", { ...providerScoped, requiresCapabilities: ["registered"] }),
+  definition("handoff_immediate", "HANDOFF", "alt", "Focus planner with packet", "agent", { ...providerScoped, requiresCapabilities: ["registered"] }),
   definition("handoff_routing_default", "HANDOFF", "shift_alt", "Toggle handoff routing default", "adapter", { requiresTarget: true, requiresConfirmation: true }),
-  definition("focus_blocked_agent", "FIND_BLOCKED_AGENT", "normal", "Focus verified blocked agent", "agent", { ...scoped, requiresCapabilities: observable }),
+  definition("focus_blocked_agent", "FIND_BLOCKED_AGENT", "normal", "Focus verified blocked agent", "agent", { ...providerScoped, requiresCapabilities: observable }),
   definition("blocker_queue", "FIND_BLOCKED_AGENT", "shift", "Open blocker queue", "adapter", { requiresTarget: true }),
-  definition("focus_finished_agent", "FIND_FINISHED_AGENT", "normal", "Focus verified finished agent", "agent", { ...scoped, requiresCapabilities: observable }),
+  definition("focus_finished_agent", "FIND_FINISHED_AGENT", "normal", "Focus verified finished agent", "agent", { ...providerScoped, requiresCapabilities: observable }),
   definition("done_queue", "FIND_FINISHED_AGENT", "shift", "Open done queue", "adapter", { requiresTarget: true }),
-  definition("authority_refresh", "AUTHORITY_REFRESH", "normal", "Replay scoped authority", "agent", { ...scoped, requiresCapabilities: controllable }),
-  definition("authority_broadcast", "AUTHORITY_REFRESH", "shift", "Reviewed authority broadcast", "agent", { ...scoped, requiresCapabilities: controllable, requiresConfirmation: true }),
+  definition("authority_refresh", "AUTHORITY_REFRESH", "normal", "Replay scoped authority", "agent", { ...providerScoped, requiresCapabilities: controllable }),
+  definition("authority_broadcast", "AUTHORITY_REFRESH", "shift", "Reviewed authority broadcast", "agent", { ...providerScoped, requiresCapabilities: controllable, requiresConfirmation: true }),
   definition("council_report", "COUNCIL", "normal", "Council conflict report", "council", { requiresTarget: true, requiresCapabilities: observable }),
   definition("council_automatic", "COUNCIL", "shift", "Guarded automatic Council", "council", { ...confirmed, requiresCapabilities: coordinated, highConsequence: true, acceptanceGates: gates.councilAutomatic }),
   definition("council_recommend", "COUNCIL", "alt", "Council coordinated recommendation", "council", { requiresTarget: true, requiresCapabilities: observable, requiresConfirmation: true }),
@@ -144,7 +146,7 @@ export const commandCatalog: readonly CommandDefinition[] = [
   definition("launch_web_app", "RUN", "shift_alt", "Launch declared web app", "execution", { ...consequential, requiresConfirmation: true }),
   definition("open_voice", "VOICE", "normal", "Open voice center", "adapter", {}),
   definition("switch_voice_provider", "VOICE", "shift", "Switch voice provider", "adapter", { requiresConfirmation: true }),
-  definition("bind_voice_session", "VOICE", "alt", "Bind voice session", "agent", { ...scoped, requiresCapabilities: ["registered"], requiresConfirmation: true }),
+  definition("bind_voice_session", "VOICE", "alt", "Bind voice session", "agent", { ...providerScoped, requiresCapabilities: ["registered"], requiresConfirmation: true }),
   definition("voice_session_picker", "VOICE", "shift_alt", "Voice session picker", "adapter", { requiresTarget: true }),
   definition("pipeline_status", "PIPELINE", "normal", "Pipeline status", "adapter", { requiresTarget: true }),
   definition("pipeline_local_gate", "PIPELINE", "shift", "Isolated local gate", "test_environment", consequential),

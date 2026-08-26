@@ -10,8 +10,11 @@ import {
   type VoiceProviderTurnResult
 } from "./voice-gateway.ts";
 
-const schema = "sxsy-b122.voice-provider-request" as const;
-const responseSchema = "sxsy-b122.voice-provider-response" as const;
+// This is deliberately distinct from the native helper's provider-module
+// protocol: the configured-network adapter carries the complete protected
+// scope, while the helper resolves its own sealed route and model first.
+const schema = "sxsy-b122.configured-voice-provider-request" as const;
+const responseSchema = "sxsy-b122.configured-voice-provider-response" as const;
 const maximumBodyBytes = 2 * 1024 * 1024;
 const maximumFrames = 256;
 const maximumFrameBytes = 64 * 1024;

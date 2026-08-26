@@ -42,3 +42,15 @@ test("workflow navigation and Plan Approval declare the authority and confirmati
   }
   assert.equal(commandForAction("handoff_immediate").executor, "agent");
 });
+
+test("every provider-backed agent command receives a final complete-target effect guard", () => {
+  for (const action of [
+    "reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval",
+    "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent",
+    "authority_refresh", "authority_broadcast", "bind_voice_session"
+  ] as const) {
+    const definition = commandForAction(action);
+    assert.equal(definition.executor, "agent", `${action} must remain provider-backed`);
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${action} must receive a final effect guard`);
+  }
+});

@@ -26,7 +26,7 @@ class Network {
     if (this.fail) return { outcome: "blocked", routeId: input.routeId, detail: "contained", effectDisposition: "not_started" };
     const action = input.routeId.split(".").at(-1)!;
     const base: Record<string, unknown> = {
-      schema: "sxsy-b122.voice-provider-response", version: 1, action, provider: "claude", bindingId: scope.bindingId,
+      schema: "sxsy-b122.configured-voice-provider-response", version: 1, action, provider: "claude", bindingId: scope.bindingId,
       voiceSessionId: scope.voiceSessionId, managedSessionId: scope.managedSessionId, targetSnapshotId: scope.targetSnapshotId, status: "ok"
     };
     if (action === "open") base.externalSessionId = scope.voiceSessionId;

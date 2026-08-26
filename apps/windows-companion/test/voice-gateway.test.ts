@@ -14,12 +14,14 @@ import {
   type VoiceAudioFrame,
   type VoiceAudioPort,
   type VoiceBindingScope,
+  type VoiceEffect,
   type VoiceProviderPort,
   type VoiceProviderTurnResult
 } from "../src/voice-gateway.ts";
 
 const at = "2026-08-24T12:00:00.000Z";
 const expiresAt = "2026-08-24T12:15:00.000Z";
+const allowEffects = { async assertAllowed() {} };
 
 class FakeAudioPort implements VoiceAudioPort {
   readonly calls: string[] = [];
@@ -96,6 +98,7 @@ async function fixture(
   route: FakeProviderPort;
   alternate: FakeProviderPort;
   sessionScope: { current: boolean };
+  effectScope: { blocked?: VoiceEffect; calls: VoiceEffect[] };
   gateway: HybridVoiceGateway;
 }> {
   const directory = await mkdtemp(join(tmpdir(), "b122-voice-gateway-"));
@@ -135,16 +138,23 @@ async function fixture(
   const route = new FakeProviderPort(provider);
   const alternate = new FakeProviderPort(provider === "claude" ? "chatgpt" : "claude");
   const sessionScope = { current: true };
+  const effectScope: { blocked?: VoiceEffect; calls: VoiceEffect[] } = { calls: [] };
   const gateway = new HybridVoiceGateway({
     voice,
     contexts: handoffs,
     audio,
     providers: [route, alternate],
     sessionScopeVerifier: { async assertCurrent() { if (!sessionScope.current) throw new Error("managed session changed"); } },
+    effectGuard: {
+      async assertAllowed(input) {
+        effectScope.calls.push(input.effect);
+        if (effectScope.blocked === input.effect && !input.remediation) throw new Error("contained");
+      }
+    },
     now: () => at,
     defaultDeadlineMs: 1_000
   });
-  return { voice, handoff, bindingId: binding.id, audio, route, alternate, sessionScope, gateway };
+  return { voice, handoff, bindingId: binding.id, audio, route, alternate, sessionScope, effectScope, gateway };
 }
 
 test("hybrid gateway injects the exact canonical context, bounds audio, speaks the exact response, and stores only redacted text", async (context) => {
@@ -174,6 +184,7 @@ test("provider selection is exact and never falls back when the consented route 
     contexts: { get: async () => setup.handoff },
     audio: setup.audio,
     providers: [wrong],
+    effectGuard: allowEffects,
     now: () => at
   });
   await assert.rejects(gateway.open(setup.bindingId), (error: unknown) => error instanceof VoiceGatewayError && error.code === "provider_unavailable");
@@ -233,6 +244,7 @@ test("mute, interruption, end, deletion, and deterministic restart reconciliatio
     contexts: { get: async () => setup.handoff },
     audio: setup.audio,
     providers: [setup.route],
+    effectGuard: allowEffects,
     now: () => at
   });
   assert.equal((await restarted.reconcile())?.bindingId, setup.bindingId);
@@ -283,6 +295,22 @@ test("live managed-session churn interrupts routing before speech or transcript 
   assert.deepEqual(await setup.voice.transcript(setup.bindingId), []);
 });
 
+test("voice effects recheck the host guard immediately before provider and speech boundaries", async (context) => {
+  const setup = await fixture(context);
+  await setup.gateway.open(setup.bindingId);
+  setup.effectScope.blocked = "provider_respond";
+  await assert.rejects(
+    setup.gateway.runTurn(setup.bindingId),
+    (error: unknown) => error instanceof VoiceGatewayError && error.code === "effect_blocked"
+  );
+  assert.equal(setup.route.calls.some((call) => call.startsWith("respond:")), false);
+  assert.equal(setup.audio.calls.some((call) => call.startsWith("speak:")), false);
+  assert.equal(setup.effectScope.calls.includes("provider_respond"), true);
+  await setup.gateway.end(setup.bindingId);
+  assert.equal(setup.effectScope.calls.includes("provider_close"), true);
+  assert.equal(setup.effectScope.calls.includes("audio_close"), true);
+});
+
 test("restart recovery preserves muted state without starting a turn loop", async (context) => {
   const setup = await fixture(context);
   await setup.gateway.open(setup.bindingId);
@@ -292,6 +320,7 @@ test("restart recovery preserves muted state without starting a turn loop", asyn
     contexts: { get: async () => setup.handoff },
     audio: setup.audio,
     providers: [setup.route],
+    effectGuard: allowEffects,
     sessionScopeVerifier: { async assertCurrent() {} },
     now: () => at
   });
