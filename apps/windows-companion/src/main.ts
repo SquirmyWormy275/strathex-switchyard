@@ -12,6 +12,7 @@ import { loadConfiguredNetworkPolicy, type ConfiguredNetworkPolicy } from "./con
 import { PowerShellWindowsUserPresenceRunner, WindowsHelloConfirmationAttestor } from "./windows-user-presence.ts";
 import { acquireCompanionInstance, type CompanionInstanceRecord } from "./instance-lifecycle.ts";
 import type { InstalledRawHidSupervisor } from "./raw-hid-installation.ts";
+import type { CompanionHardwareSignalDispatcher } from "./hardware-signal-dispatcher.ts";
 import { loadOrCreateHostReceiptEvidenceFactory } from "./receipt-evidence.ts";
 import { WindowsJobObjectProcessSupervisor } from "./windows-job-supervisor.ts";
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
@@ -28,6 +29,15 @@ export interface WindowsProcessIdentity {
   readonly arguments: readonly string[];
   readonly parentProcessId: number;
   readonly sessionId: number;
+}
+
+/** Starts background hardware consumption only after durable startup recovery and session refresh succeed. */
+export async function startStandaloneHardwareSignalDispatch(input: Readonly<{
+  endpoint: Readonly<{ ready(): Promise<void> }>;
+  hardwareSignalDispatcher: Readonly<{ start(): Promise<void> }>;
+}>): Promise<void> {
+  await input.endpoint.ready();
+  await input.hardwareSignalDispatcher.start();
 }
 
 /**
@@ -163,6 +173,7 @@ export async function runStandaloneCompanion(options: Readonly<{
   }
   let pipe: AuthenticatedPipeServer | undefined;
   let rawHidSupervisor: InstalledRawHidSupervisor | undefined;
+  let hardwareSignalDispatcher: CompanionHardwareSignalDispatcher | undefined;
   let voiceRuntime: { shutdown(): Promise<void> } | undefined;
   let councilLifecycle: { dispose(): Promise<void> } | undefined;
   let councilResources: { shutdownForRestart(): Promise<void> } | undefined;
@@ -178,6 +189,7 @@ export async function runStandaloneCompanion(options: Readonly<{
       instance: instance.record,
       resources: [
         { name: "authenticated-pipe", close: () => pipe?.stop() },
+        { name: "hardware-signal-dispatcher", close: () => hardwareSignalDispatcher?.stop() },
         { name: "transcript-retention", close: () => { transcriptVault?.stopRetentionEnforcement(); } },
         { name: "voice-runtime", close: () => voiceRuntime?.shutdown() },
         { name: "raw-hid", close: () => rawHidSupervisor?.stop() },
@@ -264,11 +276,12 @@ export async function runStandaloneCompanion(options: Readonly<{
     snapshotEnvironmentFor: () => ({ toolVersions: exactVersions })
   });
   rawHidSupervisor = companion.rawHidSupervisor;
+  hardwareSignalDispatcher = companion.hardwareSignalDispatcher;
   voiceRuntime = companion.voiceRuntime;
   councilLifecycle = companion.councilLifecycle;
   councilResources = companion.councilResources;
   transcriptVault = companion.transcriptVault;
-  await companion.endpoint.ready();
+  await startStandaloneHardwareSignalDispatch(companion);
   await transcriptVault.startRetentionEnforcement({
     onFailure: () => { void voiceRuntime?.shutdown(); }
   });

@@ -3,12 +3,18 @@ import { isAbsolute, resolve } from "node:path";
 
 import { assignmentFor, type Control, type HandlerName, type Modifier } from "../../../packages/protocol/src/b122.ts";
 import type { RawHidFrame } from "../../../packages/protocol/src/raw-hid.ts";
+import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { JournalEntry, JsonStoreTransaction, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 
 const acceptedKind = "b122.hardware-signal.accepted.v1";
 const claimedKind = "b122.hardware-signal.claimed.v1";
 const dispatchedKind = "b122.hardware-signal.dispatched.v1";
 const completedKind = "b122.hardware-signal.completed.v1";
+const companionBackgroundWindowSessionId = "b122-companion-hardware-background-v1";
+const companionBackgroundBinding: HardwareSignalClaimBinding = Object.freeze({
+  windowSessionId: companionBackgroundWindowSessionId,
+  workspaceRoots: Object.freeze([])
+});
 
 export type CanonicalHardwareSignal = Extract<RawHidFrame, { type: "signal" }>;
 export type HardwareSignalCompletionOutcome = "handled" | "failed_before_dispatch" | "needs_reconciliation" | "cancelled";
@@ -115,10 +121,33 @@ export interface DurableHardwareSignalInboxOptions {
 }
 
 /**
- * Protected two-phase inbox between the Raw-HID replay boundary and a focused
- * VS Code window. `accept` returns only after the canonical signal is in the
- * authenticated journal, so the transport may ACK only after this promise
- * resolves. A claimed signal is never silently redelivered after a crash.
+ * This is the complete authority-free background boundary. It is derived from
+ * the closed command catalog, and intentionally requires every safety field so
+ * a newly-added contextual or outbound adapter does not become background work
+ * merely because one flag was omitted.
+ */
+export function isCompanionOwnedHardwareSignal(control: Control, modifier: Modifier): boolean {
+  const assignment = assignmentFor(control, modifier);
+  const definition = commandFor(control, modifier);
+  return !!assignment && !!definition && definition.assignment === assignment
+    && definition.executor === "adapter"
+    && definition.requiresCapabilities.length === 0
+    && definition.requiresAuthority === false
+    && definition.requiresTarget === false
+    && definition.requiresCompleteTargetSnapshot === false
+    && definition.requiresConfirmation === false
+    && definition.highConsequence === false
+    && definition.acceptanceGates.length === 0
+    && definition.outbound === false;
+}
+
+/**
+ * Protected two-phase inbox between the Raw-HID replay boundary and its two
+ * disjoint consumers: the companion may claim only safe targetless actions,
+ * while a focused VS Code window may claim only contextual actions. `accept`
+ * returns only after the canonical signal is in the authenticated journal, so
+ * the transport may ACK only after this promise resolves. A claimed signal is
+ * never silently redelivered after a crash.
  */
 export class DurableHardwareSignalInbox {
   private readonly store: ProtectedJsonStore;
@@ -149,19 +178,28 @@ export class DurableHardwareSignalInbox {
   }
 
   async claim(binding: HardwareSignalClaimBinding): Promise<HardwareSignalClaim | undefined> {
-    const normalized = normalizeBinding(binding);
+    const normalized = normalizeBinding(binding, false);
+    return this.claimMatching(normalized, (candidate) => !isCompanionOwnedHardwareSignal(candidate.accepted.control, candidate.accepted.modifier));
+  }
+
+  /** Claims only the exact catalog-derived safe targetless subset for this companion process. */
+  async claimCompanionTargetless(): Promise<HardwareSignalClaim | undefined> {
+    return this.claimMatching(companionBackgroundBinding, (candidate) => isCompanionOwnedHardwareSignal(candidate.accepted.control, candidate.accepted.modifier));
+  }
+
+  private async claimMatching(binding: HardwareSignalClaimBinding, eligible: (candidate: MutableSignalState) => boolean): Promise<HardwareSignalClaim | undefined> {
     return this.store.transaction(async (transaction) => {
       const states = await stateFrom(transaction);
       const next = [...states.values()]
-        .filter((candidate) => candidate.phase === "pending")
+        .filter((candidate) => candidate.phase === "pending" && eligible(candidate))
         .sort((left, right) => left.acceptedAt.localeCompare(right.acceptedAt) || left.accepted.signalId.localeCompare(right.accepted.signalId))[0];
       if (!next) return undefined;
       const claimToken = boundedClaimToken(this.claimTokenFactory());
       const payload: ClaimedPayload = {
         signalId: next.accepted.signalId,
         claimToken,
-        windowSessionId: normalized.windowSessionId,
-        workspaceRoots: normalized.workspaceRoots,
+        windowSessionId: binding.windowSessionId,
+        workspaceRoots: binding.workspaceRoots,
         attempt: next.attempt + 1
       };
       const entry = await transaction.append(claimedKind, payload);
@@ -172,7 +210,7 @@ export class DurableHardwareSignalInbox {
 
   /** Resolves only a claim created by this live process with the exact binding. */
   async resolveLiveClaim(binding: HardwareSignalClaimBinding & Readonly<{ signalId: string; claimToken: string }>): Promise<HardwareSignalClaim> {
-    const normalized = normalizeBinding(binding);
+    const normalized = normalizeBinding(binding, true);
     validateSignalId(binding.signalId);
     boundedClaimToken(binding.claimToken);
     return this.store.transaction(async (transaction) => {
@@ -189,7 +227,7 @@ export class DurableHardwareSignalInbox {
   }
 
   async complete(input: HardwareSignalCompletion): Promise<Readonly<{ signalId: string; outcome: HardwareSignalCompletionOutcome }>> {
-    const normalized = normalizeBinding(input);
+    const normalized = normalizeBinding(input, true);
     validateSignalId(input.signalId);
     boundedClaimToken(input.claimToken);
     const summary = boundedSummary(input.summary);
@@ -240,7 +278,7 @@ export class DurableHardwareSignalInbox {
     resultStatus: string;
     operationId?: string;
   }>): Promise<Readonly<{ dispatchReceiptId: string }>> {
-    const normalized = normalizeBinding(input);
+    const normalized = normalizeBinding(input, true);
     validateSignalId(input.signalId);
     boundedClaimToken(input.claimToken);
     if (!boundedReference(input.resultStatus) || input.resultStatus.length > 80) throw new Error("The hardware dispatch result status is invalid.");
@@ -373,6 +411,10 @@ function applyEntry(entry: JournalEntry<JsonValue>, states: Map<string, MutableS
   if (entry.kind === claimedKind) {
     const payload = parseClaimed(entry.payload);
     const current = states.get(payload.signalId);
+    // Older releases allowed a focused window to claim every assignment. Keep
+    // those authenticated historical records readable so startup can mark an
+    // interrupted legacy claim for reconciliation. New claims are partitioned
+    // by claim()/claimCompanionTargetless() before this journal boundary.
     if (!current || current.phase !== "pending" || payload.attempt !== current.attempt + 1) throw new Error("The protected hardware signal claim journal is inconsistent.");
     current.phase = "claimed";
     current.attempt = payload.attempt;
@@ -442,8 +484,14 @@ function claimView(state: MutableSignalState, claim: ClaimedPayload, claimedAt: 
   };
 }
 
-function normalizeBinding(binding: HardwareSignalClaimBinding): HardwareSignalClaimBinding {
+function normalizeBinding(binding: HardwareSignalClaimBinding, allowCompanionBackground = false): HardwareSignalClaimBinding {
   if (!boundedReference(binding.windowSessionId)) throw new Error("The hardware signal window session ID is invalid.");
+  if (binding.windowSessionId === companionBackgroundWindowSessionId) {
+    if (!allowCompanionBackground || !Array.isArray(binding.workspaceRoots) || binding.workspaceRoots.length !== 0) {
+      throw new Error("The reserved companion hardware binding is not a focused VS Code claim binding.");
+    }
+    return companionBackgroundBinding;
+  }
   if (!Array.isArray(binding.workspaceRoots) || binding.workspaceRoots.length < 1 || binding.workspaceRoots.length > 32) throw new Error("The hardware signal workspace-root binding requires at least one exact canonical root.");
   const roots = binding.workspaceRoots.map((root) => {
     if (!boundedAbsolute(root)) throw new Error("The hardware signal workspace-root binding requires bounded absolute paths.");
@@ -467,7 +515,7 @@ function parseClaimed(value: JsonValue): ClaimedPayload {
     || typeof value.signalId !== "string" || typeof value.claimToken !== "string" || typeof value.windowSessionId !== "string" || !Array.isArray(value.workspaceRoots)
     || !value.workspaceRoots.every((item) => typeof item === "string") || typeof value.attempt !== "number" || !Number.isSafeInteger(value.attempt) || value.attempt < 1) throw new Error("The protected hardware signal claim journal is malformed.");
   validateSignalId(value.signalId); boundedClaimToken(value.claimToken);
-  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots });
+  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots }, true);
   return { signalId: value.signalId, claimToken: value.claimToken, windowSessionId: binding.windowSessionId, workspaceRoots: binding.workspaceRoots, attempt: value.attempt };
 }
 
@@ -476,7 +524,7 @@ function parseCompleted(value: JsonValue): CompletedPayload {
     || typeof value.signalId !== "string" || typeof value.claimToken !== "string" || typeof value.windowSessionId !== "string" || !Array.isArray(value.workspaceRoots)
     || !value.workspaceRoots.every((item) => typeof item === "string") || !completionOutcome(value.outcome) || typeof value.summary !== "string") throw new Error("The protected hardware signal completion journal is malformed.");
   validateSignalId(value.signalId); boundedClaimToken(value.claimToken); boundedSummary(value.summary);
-  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots });
+  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots }, true);
   if (value.dispatchSessionId !== undefined && (typeof value.dispatchSessionId !== "string" || !boundedReference(value.dispatchSessionId))) throw new Error("The protected hardware signal dispatch session is malformed.");
   if (value.repositoryRoot !== undefined && (typeof value.repositoryRoot !== "string" || !boundedAbsolute(value.repositoryRoot))) throw new Error("The protected hardware signal repository binding is malformed.");
   if (value.dispatchReceiptId !== undefined && typeof value.dispatchReceiptId !== "string") throw new Error("The protected hardware dispatch receipt is malformed.");
@@ -491,7 +539,7 @@ function parseDispatched(value: JsonValue): DispatchedPayload {
     || typeof value.dispatchReceiptId !== "string" || typeof value.operationId !== "string") throw new Error("The protected hardware dispatch receipt journal is malformed.");
   validateSignalId(value.signalId); boundedClaimToken(value.claimToken); validateDispatchReceiptId(value.dispatchReceiptId);
   if (!boundedReference(value.resultStatus) || (value.operationId && !boundedReference(value.operationId))) throw new Error("The protected hardware dispatch result is malformed.");
-  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots });
+  const binding = normalizeBinding({ windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots }, true);
   return { signalId: value.signalId, claimToken: value.claimToken, windowSessionId: binding.windowSessionId, workspaceRoots: binding.workspaceRoots, handler: value.handler as HandlerName, resultStatus: value.resultStatus, dispatchReceiptId: value.dispatchReceiptId, operationId: value.operationId };
 }
 

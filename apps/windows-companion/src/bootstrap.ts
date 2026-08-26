@@ -33,6 +33,7 @@ import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, p
 import { protocolVersion } from "../../../packages/protocol/src/b122.ts";
 import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { DurableHardwareSignalInbox } from "./hardware-signal-queue.ts";
+import { CompanionHardwareSignalDispatcher } from "./hardware-signal-dispatcher.ts";
 import {
   AttestedRawHidInstallationCoordinator,
   DurableRawHidInstallationRegistry,
@@ -183,6 +184,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly providerGateway: AuthenticatedProviderGatewayClient;
   readonly hardwareSignals: DurableHardwareSignalInbox;
+  readonly hardwareSignalDispatcher: CompanionHardwareSignalDispatcher;
   readonly checkpointCapture: LocalCheckpointCapture | NonNullable<DurableMediatedExecutorOptions["checkpointCapture"]>;
   readonly checkpointVerifier: LocalRecoveryArtifactVerifier | NonNullable<DurableMediatedExecutorOptions["checkpointVerifier"]>;
   readonly operationControl: InstalledOperationControl;
@@ -638,6 +640,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
+  const hardwareSignalDispatcher = new CompanionHardwareSignalDispatcher(hardwareSignals, executor);
   const containmentRelease = new AttestedContainmentReleaseCoordinator(executor, {
     inspect: async (sessionId) => {
       const session = await sessions.get(sessionId);
@@ -679,6 +682,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     networkPolicyRegistry,
     providerGateway,
     hardwareSignals,
+    hardwareSignalDispatcher,
     checkpointCapture,
     checkpointVerifier,
     operationControl,
