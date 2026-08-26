@@ -250,8 +250,13 @@ test("failure trace fails closed when selected job logs are retained elsewhere, 
 });
 
 test("composite pipeline status preserves local evidence when hosted CI is unavailable", async () => {
+  const localReceipts = [{
+    id: "receipt:local-current", action: "pipeline_local_gate", targetSnapshotId: target.id,
+    result: "passed", completeness: "complete", createdAt: "2026-08-24T00:00:00.000Z",
+    freshness: "current", gateFresh: true
+  }] as const;
   const adapter = new CompositePipelineStatusAdapter(
-    { id: "local", kind: "generic", async execute() { return { status: "completed", summary: "Local diff check passed.", effectDisposition: "committed" as const, data: { clean: true } }; } },
+    { id: "local", kind: "generic", async execute() { return { status: "completed", summary: "Local diff check passed.", effectDisposition: "committed" as const, data: { clean: true, localReceiptState: "current", localReceipts } }; } },
     { id: "hosted", kind: "generic", async execute() { return { status: "unavailable", summary: "No configured hosted route.", effectDisposition: "not_started" as const }; } }
   );
   const outcome = await adapter.execute(request("pipeline_status"));
@@ -260,6 +265,33 @@ test("composite pipeline status preserves local evidence when hosted CI is unava
   assert.equal((outcome.data?.local as { status: string }).status, "completed");
   assert.equal((outcome.data?.hosted as { status: string }).status, "unavailable");
   assert.equal(outcome.data?.completeness, "partial");
+  assert.equal(outcome.data?.localReceiptState, "current");
+  assert.deepEqual(outcome.data?.localReceipts, localReceipts);
+});
+
+test("composite pipeline status preserves local receipts across hosted failure and combined success", async () => {
+  const localReceipts = [{
+    id: "receipt:local-failed", action: "pipeline_local_gate", targetSnapshotId: target.id,
+    result: "failed", completeness: "complete", createdAt: "2026-08-24T00:00:00.000Z",
+    freshness: "current", gateFresh: false
+  }] as const;
+  const local = { id: "local", kind: "generic" as const, async execute() {
+    return { status: "completed" as const, summary: "Local evidence read.", effectDisposition: "committed" as const, data: { clean: true, localReceiptState: "current", localReceipts } };
+  } };
+
+  const failed = await new CompositePipelineStatusAdapter(local, {
+    id: "hosted", kind: "generic", async execute() { return { status: "failed" as const, summary: "Hosted response was malformed.", effectDisposition: "ambiguous" as const }; }
+  }).execute(request("pipeline_status"));
+  assert.equal(failed.status, "unavailable");
+  assert.equal(failed.data?.localReceiptState, "current");
+  assert.deepEqual(failed.data?.localReceipts, localReceipts);
+
+  const combined = await new CompositePipelineStatusAdapter(local, {
+    id: "hosted", kind: "generic", async execute() { return { status: "completed" as const, summary: "Hosted checks observed.", effectDisposition: "committed" as const, data: { hostedState: "SUCCESS", head: target.head } }; }
+  }).execute(request("pipeline_status"));
+  assert.equal(combined.status, "completed");
+  assert.equal(combined.data?.localReceiptState, "current");
+  assert.deepEqual(combined.data?.localReceipts, localReceipts);
 });
 
 test("composite pipeline status never lets hosted success overwrite a local inspection failure", async () => {

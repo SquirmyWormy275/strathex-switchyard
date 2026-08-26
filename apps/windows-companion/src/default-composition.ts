@@ -27,7 +27,7 @@ import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, creat
 import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor, type CouncilAssignmentResourceVerifier, type CouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
 import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter } from "./pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter, readPipelineLocalReceipts, type PipelineReceiptReader } from "./pipeline-adapters.ts";
 import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
 import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
 
@@ -59,15 +59,31 @@ class LocalFailClosedIsolationRuntime implements IsolationRuntime {
 export class LocalPipelineStatusAdapter implements CommandAdapter {
   readonly id = "local-pipeline-status"; readonly kind = "generic" as const;
   private readonly git: LocalGitRunner;
-  constructor(git: LocalGitRunner = new SpawnLocalGitRunner()) { this.git = git; }
+  private readonly receipts: PipelineReceiptReader;
+  private readonly now: () => string;
+  constructor(receipts: PipelineReceiptReader, git: LocalGitRunner = new SpawnLocalGitRunner(), now: () => string = () => new Date().toISOString()) { this.receipts = receipts; this.git = git; this.now = now; }
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target.", effectDisposition: "not_started" };
     try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist.", effectDisposition: "not_started" }; }
     if (request.effectGuard) { const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" }; }
+    let receiptObservation;
+    try { receiptObservation = await readPipelineLocalReceipts(this.receipts, request.target.id, this.now()); }
+    catch { return { status: "unavailable", summary: "The protected local Pipeline receipt ledger is unavailable; no local receipt state was inferred.", effectDisposition: "not_started" }; }
+    const receiptData = { localReceiptState: receiptObservation.state, localReceipts: receiptObservation.receipts };
+    let checked: Awaited<ReturnType<LocalGitRunner["run"]>>;
     try {
-      const checked = await this.git.run(["status", "--porcelain=v1", "--branch"], { cwd: request.target.repositoryRoot });
-      return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? "Inspected pipeline target status with the fixed absolute Git host." : "The fixed Git status inspection failed.", effectDisposition: "committed", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")) } };
-    } catch { return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for pipeline status.", effectDisposition: "not_started" }; }
+      checked = await this.git.run(["status", "--porcelain=v1", "--branch"], { cwd: request.target.repositoryRoot });
+    } catch {
+      return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for live repository status; protected local Pipeline receipts remain visible as separate evidence.", effectDisposition: "not_started", data: receiptData };
+    }
+    if (request.effectGuard) {
+      let current;
+      try { current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); }
+      catch { return { status: "unavailable", summary: "The exact Pipeline target could not be revalidated after local observation; observed receipt data was discarded.", effectDisposition: "not_started" }; }
+      if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
+    }
+    const receiptSummary = receiptObservation.state === "absent" ? "no protected local receipts exist" : `protected local receipt state is ${receiptObservation.state}`;
+    return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? `Inspected pipeline target status with the fixed absolute Git host; ${receiptSummary}.` : `The fixed Git status inspection failed; ${receiptSummary}.`, effectDisposition: "committed", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")), ...receiptData } };
   }
 }
 
@@ -112,7 +128,9 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
   const workflowArtifacts = new WorkflowArtifactStore(store);
   const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
-  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", new LocalPipelineStatusAdapter());
+  const receiptLedger = new ReceiptLedger(store);
+  const localPipeline = new LocalPipelineStatusAdapter(receiptLedger);
+  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", localPipeline);
   const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
   const providerTransport = options.providerTransport ?? dynamicNetwork;
   if (providerTransport) {
@@ -125,8 +143,8 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
   if (options.providerDesktopAdapter) for (const action of installedProviderDesktopActions) adapters.register(action, options.providerDesktopAdapter);
   if (dynamicNetwork) {
-    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, new ReceiptLedger(store), configuredGitHost!, new DurablePipelineFailureCursor(store));
-    adapters.register("pipeline_status", new CompositePipelineStatusAdapter(new LocalPipelineStatusAdapter(), pipeline));
+    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, receiptLedger, configuredGitHost!, new DurablePipelineFailureCursor(store));
+    adapters.register("pipeline_status", new CompositePipelineStatusAdapter(localPipeline, pipeline));
     adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(pipeline, hostActions));
   }
   const git = new InMemoryGitBroker(context.policy, containment);
@@ -135,7 +153,6 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
     git.register("local_commit", (request) => localGit.execute(request));
   }
   if (dynamicNetwork) {
-    const receiptLedger = new ReceiptLedger(store);
     const directMainReceipts = { async verify(receiptId: string, targetSnapshotId: string) { const receipt = await receiptLedger.get(receiptId); return !!receipt && receipt.action === "release_shield" && await receiptLedger.isFresh(receipt, targetSnapshotId); } };
     const pullRequestHost = { async open(request: GitRequest, url: string): Promise<BrokerOutcome> {
         const fence = await containment.check(request.target.repositoryRoot, "adapter");

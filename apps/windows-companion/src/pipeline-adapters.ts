@@ -12,6 +12,75 @@ export interface PipelineGitHostResolver { resolve(repositoryRoot: string): Prom
 
 export interface PipelineReceiptReader { list(): Promise<readonly ProtectedReceipt[]>; }
 
+export type PipelineLocalReceiptState = "current" | "mixed" | "stale" | "absent";
+export interface PipelineLocalReceiptSummary {
+  readonly id: string;
+  readonly action: "pipeline_local_gate" | "pipeline_clean_reproduction" | "release_shield";
+  readonly targetSnapshotId: string;
+  readonly result: ProtectedReceipt["result"];
+  readonly completeness: ProtectedReceipt["completeness"];
+  readonly createdAt: string;
+  readonly freshness: "current" | "stale";
+  readonly staleReason?: "target_mismatch" | "invalidated" | "expired";
+  /** Gate semantics stay stricter than evidence currency. */
+  readonly gateFresh: boolean;
+}
+
+export interface PipelineLocalReceiptObservation {
+  readonly state: PipelineLocalReceiptState;
+  readonly receipts: readonly PipelineLocalReceiptSummary[];
+}
+
+const localReceiptActions = ["pipeline_local_gate", "pipeline_clean_reproduction", "release_shield"] as const;
+
+/**
+ * Reads the last protected receipt for each local Pipeline/Shield evidence
+ * class. An exact failed or incomplete receipt is still current evidence; it
+ * is never promoted to a fresh passing gate. If only prior-target, expired, or
+ * invalidated evidence exists, it remains visible and explicitly stale.
+ */
+export async function readPipelineLocalReceipts(
+  reader: PipelineReceiptReader,
+  targetSnapshotId: string,
+  now = new Date().toISOString()
+): Promise<PipelineLocalReceiptObservation> {
+  const nowMs = Date.parse(now);
+  if (!/^[a-f0-9]{64}$/.test(targetSnapshotId) || !Number.isFinite(nowMs)) throw new Error("Local Pipeline receipt observation requires an exact target and trusted clock.");
+  const all = (await reader.list()).filter((receipt): receipt is ProtectedReceipt & { readonly action: PipelineLocalReceiptSummary["action"] } =>
+    (localReceiptActions as readonly string[]).includes(receipt.action));
+  for (const receipt of all) requireLocalReceipt(receipt);
+  const ordered = [...all].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  const selected = localReceiptActions.flatMap((action) => {
+    const actionReceipts = ordered.filter((receipt) => receipt.action === action);
+    if (!actionReceipts.length) return [];
+    return [actionReceipts.find((receipt) => receipt.targetSnapshotId === targetSnapshotId) ?? actionReceipts[0]!];
+  });
+  const receipts = selected.map((receipt): PipelineLocalReceiptSummary => {
+    const staleReason = receipt.targetSnapshotId !== targetSnapshotId
+      ? "target_mismatch" as const
+      : receipt.invalidatedBy
+        ? "invalidated" as const
+        : receipt.expiresAt && Date.parse(receipt.expiresAt) <= nowMs
+          ? "expired" as const
+          : undefined;
+    const freshness = staleReason ? "stale" as const : "current" as const;
+    return {
+      id: receipt.id,
+      action: receipt.action,
+      targetSnapshotId: receipt.targetSnapshotId,
+      result: receipt.result,
+      completeness: receipt.completeness,
+      createdAt: receipt.createdAt,
+      freshness,
+      ...(staleReason ? { staleReason } : {}),
+      gateFresh: freshness === "current" && receipt.result === "passed" && receipt.completeness === "complete"
+    };
+  });
+  const current = receipts.filter((receipt) => receipt.freshness === "current").length;
+  const state: PipelineLocalReceiptState = receipts.length === 0 ? "absent" : current === receipts.length ? "current" : current > 0 ? "mixed" : "stale";
+  return { state, receipts };
+}
+
 /**
  * Keeps the live local observation and the exact-head hosted observation as
  * separate evidence. A hosted outage can never erase a local failure or turn
@@ -30,7 +99,13 @@ export class CompositePipelineStatusAdapter implements CommandAdapter {
     const local = await this.local.execute(request);
     if (["blocked", "cancelled", "timed_out"].includes(local.status)) return { ...local, data: { local: observationData(local), hosted: { status: "not_requested" }, completeness: "blocked_before_hosted" } };
     const hosted = await this.hosted.execute(request);
-    const data = { local: observationData(local), hosted: observationData(hosted), completeness: local.status === "completed" && hosted.status === "completed" ? "local_and_hosted" : "partial" };
+    const localReceiptState = local.data?.localReceiptState;
+    const localReceipts = local.data?.localReceipts;
+    const data = {
+      local: observationData(local), hosted: observationData(hosted),
+      ...(validLocalReceiptState(localReceiptState) && Array.isArray(localReceipts) ? { localReceiptState, localReceipts } : {}),
+      completeness: local.status === "completed" && hosted.status === "completed" ? "local_and_hosted" : "partial"
+    };
     if (local.status === "failed") return { status: "failed", summary: `Local pipeline inspection failed; hosted observation was ${hosted.status}.`, effectDisposition: combineDisposition(local, hosted), data };
     if (hosted.status !== "completed") return { status: "unavailable", summary: `Local status was ${local.status}; hosted exact-head status was ${hosted.status}. Local evidence is not hosted CI evidence.`, effectDisposition: combineDisposition(local, hosted), data };
     if (local.status !== "completed") return { status: "unavailable", summary: `Hosted exact-head status was observed, but local status was ${local.status}; the observations remain separate.`, effectDisposition: combineDisposition(local, hosted), data };
@@ -315,6 +390,19 @@ function cancellationOutcome(control: DurableAbortControl, summary: string, effe
   };
 }
 function observationData(outcome: AdapterOutcome): Readonly<Record<string, unknown>> { return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition ?? "ambiguous", data: outcome.data ?? {} }; }
+function validLocalReceiptState(value: unknown): value is PipelineLocalReceiptState { return value === "current" || value === "mixed" || value === "stale" || value === "absent"; }
+function requireLocalReceipt(receipt: ProtectedReceipt): void {
+  if (!boundedReceiptReference(receipt.id, 512) || !/^[a-f0-9]{64}$/.test(receipt.targetSnapshotId)
+    || !["passed", "failed", "unavailable", "incomplete", "not_run"].includes(receipt.result)
+    || (receipt.completeness !== "complete" && receipt.completeness !== "incomplete")
+    || !boundedReceiptTimestamp(receipt.createdAt)
+    || (receipt.expiresAt !== undefined && !boundedReceiptTimestamp(receipt.expiresAt))
+    || (receipt.invalidatedBy !== undefined && !boundedReceiptReference(receipt.invalidatedBy, 512))) {
+    throw new Error("A protected local Pipeline receipt is malformed.");
+  }
+}
+function boundedReceiptReference(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
+function boundedReceiptTimestamp(value: unknown): value is string { return typeof value === "string" && value.length <= 64 && Number.isFinite(Date.parse(value)); }
 function combineDisposition(left: AdapterOutcome, right: AdapterOutcome): NonNullable<AdapterOutcome["effectDisposition"]> {
   const values = [left.effectDisposition, right.effectDisposition];
   if (values.includes("ambiguous") || values.includes(undefined)) return "ambiguous";
