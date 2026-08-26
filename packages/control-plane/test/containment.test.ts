@@ -22,7 +22,7 @@ test("containment survives an in-memory restart snapshot and cannot be released 
   const restored = InMemoryContainmentManager.restore(original.exportState());
 
   assert.equal(restored.check("C:/work/example", "git").allowed, false);
-  const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "op-1", expectedIncidentId: active.incidentId!, expectedIncidentDigest: "0".repeat(64) } as const;
+  const binding = { expectedFenceEpoch: 1, expectedActivationOperationId: "op-1", expectedIncidentId: active.incidentId!, expectedIncidentDigest: "0".repeat(64), expectedAssessmentTargetSnapshotId: "legacy-unverified:test" } as const;
   assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: false, ...binding }).status, "blocked");
   assert.equal(restored.release({ repositoryRoot: "C:/work/example", reason: "done", reauthenticated: true, ...binding }).status, "blocked");
   assert.equal(restored.check("C:/work/example", "git").allowed, false);

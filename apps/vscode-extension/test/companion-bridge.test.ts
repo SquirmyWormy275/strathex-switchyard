@@ -27,6 +27,7 @@ function readyContainmentIncident(repositoryRoot: string, fenceEpoch: number, ac
   return {
     version: 1 as const, id, repositoryRoot, fenceEpoch, activationOperationId, reason: "reviewed incident",
     createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:02.000Z", status: "ready_for_release" as const,
+    assessment: { generation: 1, purpose: "initial" as const, targetSnapshotId: "snapshot-containment", basedOnFindingIds: [], basedOnReceiptIds: [], credentialRotationRequired: false, startedAt: "2026-08-25T00:00:00.000Z" },
     steps: (["working_tree", "history", "remote"] as const).map((step) => ({
       name: step, operationId: `assessment-${step}`, externalId: `external-${step}`, status: "completed" as const,
       attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z",
@@ -141,13 +142,33 @@ test("containment IPC exact-parses the active fence inspection and carries both 
     incident,
     incidentDigest: "c".repeat(64)
   } as const;
+  const verifiedContainment = {
+    ...containment,
+    incident: {
+      ...incident,
+      status: "remediation_required" as const,
+      assessment: {
+        generation: 2,
+        purpose: "post_remediation" as const,
+        targetSnapshotId: "snapshot-remediated",
+        basedOnFindingIds: [`containment-finding:${"f".repeat(64)}`],
+        basedOnReceiptIds: [`containment-remediation-receipt:${"e".repeat(64)}`],
+        credentialRotationRequired: true,
+        sourceIncidentDigest: containment.incidentDigest,
+        startedAt: "2026-08-25T00:01:00.000Z"
+      }
+    },
+    incidentDigest: "d".repeat(64)
+  } as const;
   const bridge = new JsonLineCompanionBridge({
     async request(line) {
       const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
       seen.push({ method: request.method, payload: request.payload });
       const result = request.method === "containment.inspect"
         ? { containment }
-        : { command: { status: "completed", summary: "Exact containment generation released." } };
+        : request.method === "containment.verify"
+          ? { containment: verifiedContainment }
+          : { command: { status: "completed", summary: "Exact containment generation released." } };
       return JSON.stringify({ version: 1, id: request.id, ok: true, result });
     }
   }, "containment-vscode");
@@ -155,6 +176,9 @@ test("containment IPC exact-parses the active fence inspection and carries both 
   const inspected = await bridge.inspectContainment(session.id);
   assert.equal(inspected.ok, true);
   if (inspected.ok) assert.equal(inspected.value.fenceEpoch, 9);
+  const verified = await bridge.verifyContainmentRemediation({ sessionId: session.id, expectedIncidentId: incident.id, expectedIncidentDigest: containment.incidentDigest });
+  assert.equal(verified.ok, true);
+  if (verified.ok) assert.equal(verified.value.incident.assessment.generation, 2);
   const request = {
     sessionId: session.id,
     reason: "Reviewed exact active containment generation.",
@@ -167,6 +191,7 @@ test("containment IPC exact-parses the active fence inspection and carries both 
   assert.equal(released.ok, true);
   assert.deepEqual(seen, [
     { method: "containment.inspect", payload: { sessionId: session.id } },
+    { method: "containment.verify", payload: { sessionId: session.id, expectedIncidentId: incident.id, expectedIncidentDigest: containment.incidentDigest } },
     { method: "containment.release", payload: request }
   ]);
 });

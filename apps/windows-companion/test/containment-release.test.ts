@@ -32,6 +32,7 @@ const incident: ContainmentIncidentRecord = {
   createdAt: record.activatedAt,
   updatedAt: "2026-08-25T12:00:03.000Z",
   status: "ready_for_release",
+  assessment: { generation: 1, purpose: "initial", targetSnapshotId: "snapshot-release", basedOnFindingIds: [], basedOnReceiptIds: [], credentialRotationRequired: false, startedAt: record.activatedAt },
   steps: (["working_tree", "history", "remote"] as const).map((step) => ({
     name: step,
     operationId: `assessment-${step}`,
@@ -161,6 +162,63 @@ test("containment incident administration binds reassessment, permits, and rotat
     "permit:remove_exposed_value:config/local.env",
     `rotation:complete:${"e".repeat(64)}`
   ]);
+});
+
+test("post-remediation verification starts and completes one fresh exact assessment generation", async () => {
+  let current = incident;
+  const calls: string[] = [];
+  const coordinator = new AttestedContainmentReleaseCoordinator({
+    async prepareCommand() { throw new Error("not used"); },
+    async releaseContainment() { throw new Error("not used"); }
+  }, {
+    inspect: async () => ({ fence: record, incident: current }),
+    beginVerification: async (input) => {
+      calls.push(`begin:${input.expectedIncidentDigest}`);
+      current = {
+        ...current,
+        status: "assessing",
+        assessment: {
+          generation: 2,
+          purpose: "post_remediation",
+          targetSnapshotId: "snapshot-remediated",
+          basedOnFindingIds: [`containment-finding:${"f".repeat(64)}`],
+          basedOnReceiptIds: [`containment-remediation-receipt:${"e".repeat(64)}`],
+          credentialRotationRequired: true,
+          sourceIncidentDigest: input.expectedIncidentDigest,
+          startedAt: "2026-08-25T12:01:00.000Z"
+        },
+        steps: current.steps.map(({ result: _result, ...step }) => ({ ...step, status: "pending" as const, attempts: 0, updatedAt: "2026-08-25T12:01:00.000Z" }))
+      };
+    },
+    assess: async (input) => {
+      calls.push(`assess:${input.expectedIncidentDigest}`);
+      current = {
+        ...current,
+        status: "remediation_required",
+        steps: current.steps.map((step) => ({
+          ...step,
+          status: "completed" as const,
+          attempts: 1,
+          updatedAt: "2026-08-25T12:01:01.000Z",
+          result: {
+            ...incident.steps.find((candidate) => candidate.name === step.name)!.result!,
+            operationId: step.operationId,
+            externalId: step.externalId,
+            status: "passed" as const,
+            exposure: "none" as const,
+            findings: []
+          }
+        }))
+      };
+    }
+  });
+  const verified = await coordinator.verifyRemediation({ sessionId: "session-3", expectedIncidentId: incident.id, expectedIncidentDigest: containmentIncidentReviewDigest(incident) });
+  assert.equal(verified.incident.assessment.generation, 2);
+  assert.equal(verified.incident.steps.every((step) => step.status === "completed"), true);
+  assert.equal(calls.length, 2);
+  assert.match(calls[0]!, /^begin:[a-f0-9]{64}$/);
+  assert.match(calls[1]!, /^assess:[a-f0-9]{64}$/);
+  assert.notEqual(calls[0], calls[1], "assessment must bind the new generation digest, not the pre-generation review digest");
 });
 
 test("authenticated companion service exposes only closed containment-administration payloads", async () => {

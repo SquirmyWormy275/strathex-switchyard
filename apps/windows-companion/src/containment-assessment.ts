@@ -131,7 +131,10 @@ function unknown(request: ContainmentAssessmentRequest, summary: string): Contai
 
 function exposed(request: ContainmentAssessmentRequest, paths: readonly string[], summary: string): ContainmentAssessmentResult {
   const findings: ContainmentFinding[] = paths.map((relativePath) => ({
-    id: `containment-finding:${createHash("sha256").update(`${request.incidentId}:${request.step}:${relativePath.toLowerCase()}`).digest("hex")}`,
+    // The assessment operation ID carries the durable generation.  A later
+    // scan finding at the same path must never be satisfiable by a receipt
+    // issued for an earlier repository image.
+    id: `containment-finding:${createHash("sha256").update(`${request.operationId}:${relativePath.toLowerCase()}`).digest("hex")}`,
     relativePath,
     credentialRelated: true
   }));

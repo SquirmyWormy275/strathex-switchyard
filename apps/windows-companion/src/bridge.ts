@@ -71,6 +71,7 @@ export type CompanionMethod =
   | "provider.handshake"
   | "containment.inspect"
   | "containment.assess"
+  | "containment.verify"
   | "containment.permit.issue"
   | "containment.rotation.record"
   | "containment.release"
@@ -392,7 +393,7 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
     "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
     "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
     "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
-    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider-host.profile.install", "provider-host.profile.current", "provider.handshake", "containment.inspect", "containment.assess", "containment.permit.issue", "containment.rotation.record", "containment.release",
+    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider-host.profile.install", "provider-host.profile.current", "provider.handshake", "containment.inspect", "containment.assess", "containment.verify", "containment.permit.issue", "containment.rotation.record", "containment.release",
     "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.claim", "host-action.authorize", "host-action.complete",
     "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
     "workflow.prepare", "workflow.cancel", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"

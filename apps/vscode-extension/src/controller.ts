@@ -891,7 +891,23 @@ export class ManagedSessionController {
         await this.vscode.window.showWarningMessage(`SXSY-B122 containment still requires exact local remediation commits for: ${pendingFindings.map((finding) => `${finding.id} (${finding.relativePath})`).join(", ")}. Use the local-commit chord; it will request a one-time no-egress permit for only those findings.`);
         return;
       }
-      const credentialFinding = containment.incident.steps.some((step) => step.result?.findings.some((finding) => finding.credentialRelated));
+      const receiptIds = containment.incident.receipts.map((receipt) => receipt.id).sort((left, right) => left.localeCompare(right));
+      const verifiedReceiptIds = [...containment.incident.assessment.basedOnReceiptIds].sort((left, right) => left.localeCompare(right));
+      const needsPostRemediationVerification = receiptIds.length > 0
+        && (containment.incident.assessment.purpose !== "post_remediation"
+          || receiptIds.length !== verifiedReceiptIds.length
+          || receiptIds.some((id, index) => id !== verifiedReceiptIds[index]));
+      if (needsPostRemediationVerification) {
+        const label = `Verify remediation for ${containment.incident.id}`;
+        const choice = await this.vscode.window.showQuickPick([{ label, description: "Start a fresh no-egress working-tree, history, and remote assessment generation" }], { placeHolder: "Receipts prove effects ran; a clean post-remediation assessment is still required" });
+        if (!choice || choice.label !== label) return;
+        const verified = await this.bridge.verifyContainmentRemediation({ sessionId: session.id, expectedIncidentId: containment.incident.id, expectedIncidentDigest: containment.incidentDigest });
+        if (!verified.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 post-remediation verification unavailable: ${verified.message}`); return; }
+        await this.vscode.window.showInformationMessage(`SXSY-B122 post-remediation assessment generation ${verified.value.incident.assessment.generation} is ${verified.value.incident.status}; review the exact incident again before any rotation or release step.`);
+        return;
+      }
+      const credentialFinding = containment.incident.assessment.credentialRotationRequired
+        || containment.incident.steps.some((step) => step.result?.findings.some((finding) => finding.credentialRelated));
       const dispositionChoice = await this.vscode.window.showQuickPick(credentialFinding
         ? [{ label: "Credential rotation completed", description: "Credential-related findings cannot be marked not-required" }]
         : [{ label: "Credential rotation completed", description: "Record externally completed rotation evidence" }, { label: "Credential rotation not required", description: "Valid only because no credential-related finding exists" }],

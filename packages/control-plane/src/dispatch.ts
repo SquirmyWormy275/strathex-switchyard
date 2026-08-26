@@ -184,6 +184,7 @@ export interface ContainmentReleaseCommandRequest {
     expectedActivationOperationId: string;
     expectedIncidentId: string;
     expectedIncidentDigest: string;
+    expectedAssessmentTargetSnapshotId: string;
   }>;
 }
 
@@ -447,7 +448,7 @@ export class CommandDispatcher {
       case "containment": {
         if (!base) return unavailable("Containment requires a verified target.", operationId);
         if (!this.dependencies.containment) return unavailable("No durable containment manager is configured.", operationId);
-        const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
+        const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, targetSnapshotId: base.target.id, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
         return {
           status: "completed",
           summary: `Containment fence ${record.fenceEpoch} is active and incident assessment is open for brokered egress; unmediated paths remain disclosed as uncontrolled.`,

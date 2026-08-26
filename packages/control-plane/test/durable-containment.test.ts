@@ -28,7 +28,7 @@ const noExposureAssessment: ContainmentAssessmentEffectPort = {
   async observe() { return undefined; }
 };
 
-async function readyReleaseBinding(manager: DurableContainmentManager, incidentId: string): Promise<ContainmentReleaseBinding> {
+async function readyReleaseBinding(manager: DurableContainmentManager, incidentId: string): Promise<ContainmentReleaseBinding & Readonly<{ expectedAssessmentTargetSnapshotId: string }>> {
   const assessed = await manager.incidents.assess(incidentId, noExposureAssessment);
   const incident = await manager.incidents.recordRotationReview({
     incidentId,
@@ -41,7 +41,8 @@ async function readyReleaseBinding(manager: DurableContainmentManager, incidentI
     expectedFenceEpoch: incident.fenceEpoch,
     expectedActivationOperationId: incident.activationOperationId,
     expectedIncidentId: incident.id,
-    expectedIncidentDigest: containmentIncidentReviewDigest(incident)
+    expectedIncidentDigest: containmentIncidentReviewDigest(incident),
+    expectedAssessmentTargetSnapshotId: incident.assessment.targetSnapshotId
   };
 }
 

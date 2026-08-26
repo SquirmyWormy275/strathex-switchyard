@@ -41,6 +41,8 @@ export interface ContainmentHookState {
 
 export interface ContainmentRecord {
   readonly repositoryRoot: string;
+  /** Exact snapshot observed when this fence generation was opened. */
+  readonly targetSnapshotId?: string;
   readonly fenceEpoch: number;
   /** Present on every newly activated durable fence; optional only for legacy/test records restored from before incident orchestration existed. */
   readonly incidentId?: string;
@@ -63,6 +65,7 @@ export interface ContainmentState {
 
 export interface ContainmentActivation {
   readonly repositoryRoot: string;
+  readonly targetSnapshotId?: string;
   readonly operationId: string;
   readonly reason: string;
 }
@@ -85,6 +88,8 @@ export interface ContainmentReleaseRequest {
   /** Exact durable incident image reviewed by the current-user release UI. */
   readonly expectedIncidentId: string;
   readonly expectedIncidentDigest: string;
+  /** Current complete target re-resolved immediately before release. */
+  readonly expectedAssessmentTargetSnapshotId: string;
 }
 
 export interface ContainmentReleaseResult {
@@ -198,6 +203,7 @@ export class InMemoryContainmentManager {
     if (current?.active) return current; // repeated press is idempotent
     const record: ContainmentRecord = {
       repositoryRoot: request.repositoryRoot,
+      ...(request.targetSnapshotId ? { targetSnapshotId: request.targetSnapshotId } : {}),
       fenceEpoch: (current?.fenceEpoch ?? 0) + 1,
       incidentId: containmentIncidentId(request.repositoryRoot, (current?.fenceEpoch ?? 0) + 1, request.operationId),
       active: true,
@@ -306,6 +312,7 @@ export class DurableContainmentManager {
           repositoryRoot: current.repositoryRoot,
           fenceEpoch: current.fenceEpoch,
           activationOperationId: current.activatedByOperationId,
+          targetSnapshotId: current.targetSnapshotId ?? `legacy-unverified:${sha256(`${current.repositoryRoot}:${current.fenceEpoch}`)}`,
           reason: current.reason
         }, current.activatedAt);
         return { record: cloneRecord(current), activated: false };
@@ -314,6 +321,7 @@ export class DurableContainmentManager {
       const activatedAt = this.clock();
       const next: ContainmentRecord = {
         repositoryRoot: request.repositoryRoot,
+        ...(request.targetSnapshotId ? { targetSnapshotId: request.targetSnapshotId } : {}),
         fenceEpoch,
         incidentId: containmentIncidentId(request.repositoryRoot, fenceEpoch, request.operationId),
         active: true,
@@ -328,6 +336,7 @@ export class DurableContainmentManager {
         repositoryRoot: request.repositoryRoot,
         fenceEpoch,
         activationOperationId: request.operationId,
+        targetSnapshotId: request.targetSnapshotId ?? `legacy-unverified:${sha256(`${request.repositoryRoot}:${fenceEpoch}`)}`,
         reason: request.reason
       }, activatedAt);
       if (incident.id !== next.incidentId) throw new Error("The containment fence and incident IDs diverged inside the protected transaction.");
@@ -417,7 +426,8 @@ export class DurableContainmentManager {
           incidentDigest: request.expectedIncidentDigest,
           repositoryRoot: current.repositoryRoot,
           fenceEpoch: current.fenceEpoch,
-          activationOperationId: current.activatedByOperationId
+          activationOperationId: current.activatedByOperationId,
+          targetSnapshotId: request.expectedAssessmentTargetSnapshotId
         }, this.clock());
       } catch {
         return { status: "blocked", reason: "The exact durable containment incident is stale, incomplete, or not ready for release.", record: cloneRecord(current) };

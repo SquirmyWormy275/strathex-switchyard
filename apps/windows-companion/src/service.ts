@@ -355,6 +355,8 @@ export class CompanionService {
           return this.success(request.id, { containment: await this.inspectContainment(this.requireContainmentInspection(request.payload)) });
         case "containment.assess":
           return this.success(request.id, { containment: await this.assessContainment(this.requireContainmentIncidentBinding(request.payload)) });
+        case "containment.verify":
+          return this.success(request.id, { containment: await this.verifyContainmentRemediation(this.requireContainmentIncidentBinding(request.payload)) });
         case "containment.permit.issue":
           return this.success(request.id, await this.issueContainmentPermit(this.requireContainmentPermitIssue(request.payload)));
         case "containment.rotation.record":
@@ -888,6 +890,17 @@ export class CompanionService {
       return result;
     } catch {
       throw new CompanionServiceError("capability_denied", "The exact containment assessment is unavailable, stale, or incomplete.");
+    }
+  }
+
+  private async verifyContainmentRemediation(payload: ContainmentIncidentBindingPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed post-remediation verification boundary is attached.");
+    try {
+      const result = await this.containmentRelease.verifyRemediation(payload);
+      this.record("containment.verify", "completed", "Completed one fresh durable post-remediation assessment generation without egress.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact post-remediation verification was refused because its incident, receipts, or assessment generation changed.");
     }
   }
 

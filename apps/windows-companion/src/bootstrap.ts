@@ -705,6 +705,21 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after assessment review.");
       await containmentManager.assessIncident(input.incidentId, input.expectedIncidentDigest);
     },
+    beginVerification: async (input) => {
+      const current = await inspectContainmentSession(input.sessionId);
+      if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after remediation-verification review.");
+      const session = await sessions.get(input.sessionId);
+      if (!session) throw new Error("The containment remediation-verification session is unavailable.");
+      const target = await targetResolver.resolve({ definition: commandForAction("containment_release"), session });
+      if (!target || target.completeness !== "complete" || target.repositoryRoot.replaceAll("\\", "/").toLowerCase() !== current.incident.repositoryRoot.replaceAll("\\", "/").toLowerCase()) {
+        throw new Error("The containment remediation-verification target is incomplete or changed.");
+      }
+      await containmentManager.incidents.beginRemediationVerification({
+        incidentId: input.incidentId,
+        expectedIncidentDigest: input.expectedIncidentDigest,
+        targetSnapshotId: target.id
+      });
+    },
     issuePermit: async (input) => {
       const current = await inspectContainmentSession(input.sessionId);
       if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after remediation review.");

@@ -105,6 +105,17 @@ export interface ContainmentRotationReview {
   readonly reviewedAt: string;
 }
 
+export interface ContainmentAssessmentCycle {
+  readonly generation: number;
+  readonly purpose: "initial" | "post_remediation";
+  readonly targetSnapshotId: string;
+  readonly basedOnFindingIds: readonly string[];
+  readonly basedOnReceiptIds: readonly string[];
+  readonly credentialRotationRequired: boolean;
+  readonly sourceIncidentDigest?: string;
+  readonly startedAt: string;
+}
+
 export interface ContainmentIncidentRecord {
   readonly version: 1;
   readonly id: string;
@@ -115,6 +126,7 @@ export interface ContainmentIncidentRecord {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly status: ContainmentIncidentStatus;
+  readonly assessment: ContainmentAssessmentCycle;
   readonly steps: readonly ContainmentIncidentStepState[];
   readonly permits: readonly ContainmentRemediationPermit[];
   readonly receipts: readonly ContainmentRemediationReceipt[];
@@ -126,6 +138,7 @@ export interface ContainmentIncidentActivation {
   readonly repositoryRoot: string;
   readonly fenceEpoch: number;
   readonly activationOperationId: string;
+  readonly targetSnapshotId: string;
   readonly reason: string;
 }
 
@@ -135,6 +148,7 @@ export interface ContainmentIncidentReleaseBinding {
   readonly repositoryRoot: string;
   readonly fenceEpoch: number;
   readonly activationOperationId: string;
+  readonly targetSnapshotId: string;
 }
 
 export type ContainmentIncidentLifecyclePhase = "assessment_claimed" | "assessment_effect_returned" | "assessment_persisted";
@@ -178,6 +192,15 @@ export async function activateContainmentIncidentInTransaction(
     createdAt: exactTimestamp(timestamp),
     updatedAt: exactTimestamp(timestamp),
     status: "assessing",
+    assessment: {
+      generation: 1,
+      purpose: "initial",
+      targetSnapshotId: exact.targetSnapshotId,
+      basedOnFindingIds: [],
+      basedOnReceiptIds: [],
+      credentialRotationRequired: false,
+      startedAt: exactTimestamp(timestamp)
+    },
     steps: assessmentSteps.map((name) => ({
       name,
       operationId: `containment-assessment:${sha256(`${id}:${name}:operation`)}`,
@@ -213,13 +236,15 @@ export async function releaseContainmentIncidentInTransaction(
   const repositoryRoot = exactRepositoryRoot(input.repositoryRoot);
   const fenceEpoch = positiveInteger(input.fenceEpoch, "containment incident release fence epoch");
   const activationOperationId = boundedIdentifier(input.activationOperationId, "containment activation operation");
+  const targetSnapshotId = boundedIdentifier(input.targetSnapshotId, "containment release target snapshot");
   const incidents = incidentsFrom(await transaction.readEntries());
   const current = requireCurrentIncident(incidents, incidentId);
   requireLatestFence(incidents.values(), current);
   const derived = deriveStatus(current);
   if (containmentKey(derived.repositoryRoot) !== containmentKey(repositoryRoot)
     || derived.fenceEpoch !== fenceEpoch
-    || derived.activationOperationId !== activationOperationId) {
+    || derived.activationOperationId !== activationOperationId
+    || derived.assessment.targetSnapshotId !== targetSnapshotId) {
     throw new Error("The containment incident does not match the exact active fence reviewed for release.");
   }
   if (containmentIncidentReviewDigest(derived) !== expectedDigest) {
@@ -325,6 +350,60 @@ export class DurableContainmentIncidentCoordinator {
       await this.probe("assessment_persisted", current, stepName);
     }
     return this.requireCurrent(exactId);
+  }
+
+  /**
+   * Starts a new no-egress assessment generation after every currently known
+   * finding has an exact remediation receipt.  A receipt is evidence that one
+   * reviewed effect ran; it is never proof that the repository is clean.
+   */
+  async beginRemediationVerification(input: Readonly<{
+    incidentId: string;
+    expectedIncidentDigest: string;
+    targetSnapshotId: string;
+  }>): Promise<ContainmentIncidentRecord> {
+    const exactId = exactIncidentId(input.incidentId);
+    const expectedIncidentDigest = exactDigest(input.expectedIncidentDigest, "containment incident review");
+    return this.update(exactId, (current, incidents) => {
+      requireLatestFence(incidents.values(), current);
+      if (containmentIncidentReviewDigest(current) !== expectedIncidentDigest) throw new Error("The containment incident changed after remediation-verification review.");
+      if (!current.steps.every((step) => step.status === "completed")) throw new Error("Containment assessment must be terminal before remediation verification begins.");
+      const findings = allFindings(current);
+      const remediated = new Set(current.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
+      if (!findings.length || findings.some((finding) => !remediated.has(finding.id))) {
+        throw new Error("Post-remediation verification requires exact receipts for every current finding.");
+      }
+      if (current.permits.some((permit) => !permit.consumedAt && Date.parse(permit.expiresAt) > Date.parse(exactTimestamp(this.now())))) {
+        throw new Error("Post-remediation verification cannot start while a reviewed remediation permit is still live.");
+      }
+      const generation = current.assessment.generation + 1;
+      const startedAt = exactTimestamp(this.now());
+      const basedOnFindingIds = findings.map((finding) => finding.id).sort((left, right) => left.localeCompare(right));
+      const basedOnReceiptIds = current.receipts.map((receipt) => receipt.id).sort((left, right) => left.localeCompare(right));
+      return {
+        ...current,
+        status: "assessing",
+        assessment: {
+          generation,
+          purpose: "post_remediation",
+          targetSnapshotId: boundedIdentifier(input.targetSnapshotId, "containment assessment target snapshot"),
+          basedOnFindingIds,
+          basedOnReceiptIds,
+          credentialRotationRequired: current.assessment.credentialRotationRequired || findings.some((finding) => finding.credentialRelated),
+          sourceIncidentDigest: expectedIncidentDigest,
+          startedAt
+        },
+        steps: assessmentSteps.map((name) => ({
+          name,
+          operationId: assessmentOperationId(current.id, name, generation, "operation"),
+          externalId: assessmentOperationId(current.id, name, generation, "external"),
+          status: "pending" as const,
+          attempts: 0,
+          updatedAt: startedAt
+        })),
+        updatedAt: startedAt
+      };
+    });
   }
 
   async issueRemediationPermit(input: Readonly<{
@@ -460,7 +539,7 @@ export class DurableContainmentIncidentCoordinator {
     return this.update(exactId, (current, incidents) => {
       requireLatestFence(incidents.values(), current);
       if (containmentIncidentReviewDigest(current) !== expectedIncidentDigest) throw new Error("The containment incident changed after credential-rotation review.");
-      if (input.disposition === "not_required" && allFindings(current).some((finding) => finding.credentialRelated)) {
+      if (input.disposition === "not_required" && (current.assessment.credentialRotationRequired || allFindings(current).some((finding) => finding.credentialRelated))) {
         throw new Error("Credential-related findings require completed rotation evidence.");
       }
       const reviewedAt = exactTimestamp(this.now());
@@ -482,6 +561,7 @@ export class DurableContainmentIncidentCoordinator {
     if (derived.status === "remediation_required") {
       const remediated = new Set(derived.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
       if (allFindings(derived).some((finding) => !remediated.has(finding.id))) throw new Error("Containment release requires exact finding remediation receipts.");
+      if (!remediationVerificationIsCurrent(derived)) throw new Error("Containment release requires a fresh clean post-remediation verification generation.");
       throw new Error("Containment release requires credential-rotation evidence.");
     }
     if (derived.status !== "ready_for_release") throw new Error("The containment incident is not ready for release.");
@@ -495,7 +575,8 @@ export class DurableContainmentIncidentCoordinator {
       incidentDigest: containmentIncidentReviewDigest(current),
       repositoryRoot: current.repositoryRoot,
       fenceEpoch: current.fenceEpoch,
-      activationOperationId: current.activationOperationId
+      activationOperationId: current.activationOperationId,
+      targetSnapshotId: current.assessment.targetSnapshotId
     }, exactTimestamp(this.now())));
   }
 
@@ -575,10 +656,19 @@ function deriveStatus(record: ContainmentIncidentRecord): ContainmentIncidentRec
     return { ...record, status: "assessment_incomplete" };
   }
   const findings = allFindings(record);
-  const remediated = new Set(record.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
-  const remediationComplete = findings.every((finding) => remediated.has(finding.id));
-  const rotationComplete = !!record.rotation && (record.rotation.disposition === "complete" || (!findings.some((finding) => finding.credentialRelated) && record.rotation.disposition === "not_required"));
+  const remediationComplete = findings.length === 0 && remediationVerificationIsCurrent(record);
+  const latestAssessmentAt = record.steps.reduce((latest, step) => Date.parse(step.updatedAt) > Date.parse(latest) ? step.updatedAt : latest, record.assessment.startedAt);
+  const credentialRotationRequired = record.assessment.credentialRotationRequired || findings.some((finding) => finding.credentialRelated);
+  const rotationComplete = !!record.rotation && Date.parse(record.rotation.reviewedAt) >= Date.parse(latestAssessmentAt)
+    && (record.rotation.disposition === "complete" || (!credentialRotationRequired && record.rotation.disposition === "not_required"));
   return { ...record, status: remediationComplete && rotationComplete ? "ready_for_release" : "remediation_required" };
+}
+
+function remediationVerificationIsCurrent(record: ContainmentIncidentRecord): boolean {
+  if (!record.receipts.length) return record.assessment.purpose === "initial";
+  if (record.assessment.purpose !== "post_remediation") return false;
+  const receiptIds = record.receipts.map((receipt) => receipt.id).sort((left, right) => left.localeCompare(right));
+  return sameStrings(record.assessment.basedOnReceiptIds, receiptIds);
 }
 
 function incidentsFrom(entries: readonly JournalEntry<unknown>[]): Map<string, ContainmentIncidentRecord> {
@@ -594,7 +684,17 @@ function incidentsFrom(entries: readonly JournalEntry<unknown>[]): Map<string, C
 
 function validateIncident(value: unknown): ContainmentIncidentRecord {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The protected containment incident is malformed.");
-  const record = value as ContainmentIncidentRecord;
+  const candidate = value as ContainmentIncidentRecord;
+  const assessment = candidate.assessment ?? {
+    generation: 1,
+    purpose: "initial" as const,
+    targetSnapshotId: `legacy-unverified:${sha256(`${candidate.repositoryRoot}:${candidate.fenceEpoch}`)}`,
+    basedOnFindingIds: [],
+    basedOnReceiptIds: [],
+    credentialRotationRequired: true,
+    startedAt: candidate.createdAt
+  };
+  const record: ContainmentIncidentRecord = { ...candidate, assessment };
   if (record.version !== 1 || !incidentIdPattern.test(record.id) || !Number.isSafeInteger(record.fenceEpoch) || record.fenceEpoch < 1
     || !Array.isArray(record.steps) || record.steps.length !== assessmentSteps.length || !Array.isArray(record.permits) || !Array.isArray(record.receipts)
     || !["assessing", "assessment_incomplete", "remediation_required", "ready_for_release", "released"].includes(record.status)) {
@@ -603,6 +703,23 @@ function validateIncident(value: unknown): ContainmentIncidentRecord {
   exactRepositoryRoot(record.repositoryRoot);
   boundedIdentifier(record.activationOperationId, "containment activation operation");
   exactTimestamp(record.createdAt); exactTimestamp(record.updatedAt);
+  if (!Number.isSafeInteger(record.assessment.generation) || record.assessment.generation < 1
+    || (record.assessment.purpose !== "initial" && record.assessment.purpose !== "post_remediation")
+    || !Array.isArray(record.assessment.basedOnFindingIds)
+    || record.assessment.basedOnFindingIds.some((id) => !identifierPattern.test(id))
+    || new Set(record.assessment.basedOnFindingIds).size !== record.assessment.basedOnFindingIds.length
+    || !Array.isArray(record.assessment.basedOnReceiptIds)
+    || record.assessment.basedOnReceiptIds.some((id) => !/^containment-remediation-receipt:[a-f0-9]{64}$/.test(id))
+    || new Set(record.assessment.basedOnReceiptIds).size !== record.assessment.basedOnReceiptIds.length
+    || typeof record.assessment.credentialRotationRequired !== "boolean"
+    || (record.assessment.sourceIncidentDigest !== undefined && !digestPattern.test(record.assessment.sourceIncidentDigest))) {
+    throw new Error("The protected containment assessment generation is malformed.");
+  }
+  boundedIdentifier(record.assessment.targetSnapshotId, "containment assessment target snapshot");
+  exactTimestamp(record.assessment.startedAt);
+  if (record.assessment.purpose === "initial" && (record.assessment.generation !== 1 || record.assessment.basedOnFindingIds.length || record.assessment.basedOnReceiptIds.length || record.assessment.sourceIncidentDigest !== undefined)) {
+    throw new Error("The protected initial containment assessment generation is malformed.");
+  }
   const names = new Set(record.steps.map((step) => step.name));
   if (names.size !== assessmentSteps.length || assessmentSteps.some((name) => !names.has(name))) throw new Error("The protected containment incident steps are malformed.");
   return cloneIncident(record);
@@ -613,6 +730,7 @@ function validateActivation(input: ContainmentIncidentActivation): ContainmentIn
     repositoryRoot: exactRepositoryRoot(input.repositoryRoot),
     fenceEpoch: positiveInteger(input.fenceEpoch, "containment fence epoch"),
     activationOperationId: boundedIdentifier(input.activationOperationId, "containment activation operation"),
+    targetSnapshotId: boundedIdentifier(input.targetSnapshotId, "containment activation target snapshot"),
     reason: boundedText(input.reason, "containment incident reason", 2_048)
   };
 }
@@ -669,3 +787,6 @@ function exactRelativePath(value: string): string { const normalized = value.rep
 function exactRelativePaths(values: readonly string[]): readonly string[] { if (!Array.isArray(values) || !values.length || values.length > 1_024) throw new Error("The containment remediation paths are invalid."); const paths = values.map(exactRelativePath).sort((a, b) => a.localeCompare(b)); if (new Set(paths.map((path) => path.toLowerCase())).size !== paths.length) throw new Error("The containment remediation paths are duplicated."); return paths; }
 function exactIdentifiers(values: readonly string[], label: string): readonly string[] { if (!Array.isArray(values) || values.length > 1_024) throw new Error(`The ${label} identifiers are invalid.`); const result = values.map((value) => boundedIdentifier(value, label)).sort((a, b) => a.localeCompare(b)); if (new Set(result).size !== result.length) throw new Error(`The ${label} identifiers are duplicated.`); return result; }
 function sameStrings(left: readonly string[], right: readonly string[]): boolean { return left.length === right.length && left.every((value, index) => value === right[index]); }
+function assessmentOperationId(incidentId: string, step: ContainmentAssessmentStep, generation: number, role: "operation" | "external"): string {
+  return `containment-assessment:${sha256(`${incidentId}:${step}:generation:${generation}:${role}`)}`;
+}

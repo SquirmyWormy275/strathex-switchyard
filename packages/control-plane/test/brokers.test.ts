@@ -172,7 +172,8 @@ test("active containment prevents a test-environment allocation before any dispo
     expectedFenceEpoch: 1,
     expectedActivationOperationId: "containment",
     expectedIncidentId: containment.exportState().records[0]!.incidentId!,
-    expectedIncidentDigest: "0".repeat(64)
+    expectedIncidentDigest: "0".repeat(64),
+    expectedAssessmentTargetSnapshotId: target.id
   });
   assert.equal(released.status, "blocked");
   assert.equal((await testEnvironment.prepare(request)).status, "blocked");

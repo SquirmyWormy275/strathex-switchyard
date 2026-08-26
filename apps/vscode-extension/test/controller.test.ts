@@ -115,6 +115,7 @@ function readyContainmentIncident(repositoryRoot: string, fenceEpoch: number, ac
   return {
     version: 1, id, repositoryRoot, fenceEpoch, activationOperationId, reason: "reviewed incident",
     createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:02.000Z", status: "ready_for_release",
+    assessment: { generation: 1, purpose: "initial", targetSnapshotId: "snapshot-containment", basedOnFindingIds: [], basedOnReceiptIds: [], credentialRotationRequired: false, startedAt: "2026-08-25T00:00:00.000Z" },
     steps: (["working_tree", "history", "remote"] as const).map((step) => ({
       name: step, operationId: `assessment-${step}`, externalId: `external-${step}`, status: "completed" as const,
       attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z",
@@ -294,6 +295,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly providerRevokeRequests: ProviderDesktopId[] = [];
   readonly credentialProvisionRequests: Array<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }> = [];
   readonly containmentReleaseRequests: Array<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
+  readonly containmentVerificationRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
   readonly councilRecommendationApprovals: Array<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }> = [];
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
@@ -322,6 +324,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   registerCalls = 0;
   registerFailure = false;
   containmentInspection?: ContainmentInspectionSummary;
+  containmentVerificationResult?: ContainmentInspectionSummary;
   completeHostActionFailure?: string;
 
   async health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { this.healthCalls += 1; await this.healthGate; return { ok: true, value: { status: "healthy" } }; }
@@ -405,6 +408,12 @@ class FakeBridge implements ExtensionCompanionBridge {
   }
   async reassessContainment(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
     return this.inspectContainment(input.sessionId);
+  }
+  async verifyContainmentRemediation(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    this.containmentVerificationRequests.push(input);
+    return this.containmentVerificationResult
+      ? { ok: true, value: this.containmentVerificationResult }
+      : this.inspectContainment(input.sessionId);
   }
   async issueContainmentPermit(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: "remove_exposed_value" | "rewrite_local_history" | "add_ignore_rule"; relativePaths: readonly string[]; expiresAt: string }) {
     const inspected = await this.inspectContainment(input.sessionId);
@@ -707,6 +716,75 @@ test("containment release presents and rebinds the exact active fence, activatio
   assert.match(JSON.stringify(final), /containment-incident/);
   assert.match(JSON.stringify(final), /operation-containment-17/);
   assert.match(JSON.stringify(final), /unmediated-local-user-processes/);
+});
+
+test("containment workflow requires a fresh post-remediation generation before rotation or release", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/contained" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const base = readyContainmentIncident("C:\\repo", 19, "operation-containment-19");
+  const finding = { id: `containment-finding:${"f".repeat(64)}`, relativePath: "config/local.env", credentialRelated: true };
+  const receiptId = `containment-remediation-receipt:${"e".repeat(64)}`;
+  const incident = {
+    ...base,
+    status: "remediation_required" as const,
+    rotation: undefined,
+    steps: base.steps.map((step) => step.name === "working_tree"
+      ? { ...step, result: { ...step.result!, status: "failed" as const, exposure: "found" as const, findings: [finding] } }
+      : step),
+    receipts: [{
+      id: receiptId,
+      permitId: `containment-remediation-permit:${"d".repeat(64)}`,
+      incidentId: base.id,
+      fenceEpoch: 19,
+      action: "remove_exposed_value" as const,
+      relativePaths: [finding.relativePath],
+      remediatedFindingIds: [finding.id],
+      evidenceDigest: "a".repeat(64),
+      recordedAt: "2026-08-25T00:00:03.000Z"
+    }]
+  };
+  bridge.containmentInspection = {
+    sessionId: target.id, repositoryRoot: "C:\\repo", active: true, fenceEpoch: 19,
+    activatedByOperationId: "operation-containment-19",
+    hookStates: [
+      { name: "credential_lease_revocation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:00.000Z" },
+      { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
+    ],
+    hookFailures: [], uncontrolledPaths: [], incident, incidentDigest: "c".repeat(64)
+  };
+  bridge.containmentVerificationResult = {
+    ...bridge.containmentInspection,
+    incident: {
+      ...incident,
+      status: "remediation_required",
+      assessment: {
+        generation: 2,
+        purpose: "post_remediation",
+        targetSnapshotId: "snapshot-remediated",
+        basedOnFindingIds: [finding.id],
+        basedOnReceiptIds: [receiptId],
+        credentialRotationRequired: true,
+        sourceIncidentDigest: "c".repeat(64),
+        startedAt: "2026-08-25T00:01:00.000Z"
+      },
+      steps: incident.steps.map((step) => ({ ...step, result: { ...step.result!, status: "passed" as const, exposure: "none" as const, findings: [] } }))
+    },
+    incidentDigest: "b".repeat(64)
+  };
+
+  vscode.choose(`${target.provider}: ${target.id}`);
+  vscode.choose(`Verify remediation for ${incident.id}`);
+  await vscode.invoke("sxsy-b122.releaseContainment");
+
+  assert.deepEqual(bridge.containmentVerificationRequests, [{ sessionId: target.id, expectedIncidentId: incident.id, expectedIncidentDigest: "c".repeat(64) }]);
+  assert.equal(bridge.containmentReleaseRequests.length, 0);
+  assert.equal(vscode.information.some((message) => message.includes("assessment generation 2")), true);
 });
 
 test("containment release stops before confirmation when the inspected active fence has an incomplete hook", async () => {

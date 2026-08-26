@@ -836,7 +836,8 @@ export class DurableMediatedExecutor {
         expectedFenceEpoch: request.expectedFenceEpoch,
         expectedActivationOperationId: request.expectedActivationOperationId,
         expectedIncidentId: request.expectedIncidentId,
-        expectedIncidentDigest: request.expectedIncidentDigest
+        expectedIncidentDigest: request.expectedIncidentDigest,
+        expectedAssessmentTargetSnapshotId: target.id
       }
     };
     return dispatcher.dispatchContainmentRelease(release);

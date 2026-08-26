@@ -29,6 +29,7 @@ export interface ContainmentInspectionSummary {
 export interface ContainmentReleaseInspector {
   inspect(sessionId: string): Promise<Readonly<{ fence: ContainmentRecord; incident: ContainmentIncidentRecord }> | undefined>;
   assess?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string }>): Promise<void>;
+  beginVerification?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string }>): Promise<void>;
   issuePermit?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<ContainmentRemediationPermit>;
   recordRotation?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<void>;
 }
@@ -67,6 +68,22 @@ export class AttestedContainmentReleaseCoordinator {
     await this.inspector.assess({ sessionId: input.sessionId, incidentId: input.expectedIncidentId, expectedIncidentDigest: input.expectedIncidentDigest });
     const updated = await this.inspect(input.sessionId);
     if (!updated || updated.incident.id !== input.expectedIncidentId) throw new Error("The containment incident changed during assessment.");
+    return updated;
+  }
+
+  async verifyRemediation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<ContainmentInspectionSummary> {
+    if (!this.inspector.beginVerification || !this.inspector.assess) throw new Error("No installed post-remediation verification boundary is attached.");
+    await this.requireExactInspection(input);
+    await this.inspector.beginVerification({ sessionId: input.sessionId, incidentId: input.expectedIncidentId, expectedIncidentDigest: input.expectedIncidentDigest });
+    const started = await this.inspect(input.sessionId);
+    if (!started || started.incident.id !== input.expectedIncidentId || started.incident.assessment.purpose !== "post_remediation") {
+      throw new Error("The containment remediation verification generation did not start safely.");
+    }
+    await this.inspector.assess({ sessionId: input.sessionId, incidentId: input.expectedIncidentId, expectedIncidentDigest: started.incidentDigest });
+    const updated = await this.inspect(input.sessionId);
+    if (!updated || updated.incident.id !== input.expectedIncidentId || updated.incident.assessment.generation !== started.incident.assessment.generation) {
+      throw new Error("The containment remediation verification generation changed during assessment.");
+    }
     return updated;
   }
 
