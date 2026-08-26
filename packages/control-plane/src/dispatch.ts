@@ -16,6 +16,7 @@ import type {
 } from "./brokers.ts";
 import { commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
 import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
+import type { ContainmentRemediationBinding } from "./containment-incidents.ts";
 import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { ChildOperationLease, ChildOperationSaga } from "./operations.ts";
 import type { CouncilRecommendation } from "./council.ts";
@@ -52,7 +53,7 @@ type MaybePromise<T> = T | Promise<T>;
 /** Both the in-memory harness and ProtectedJsonStore implementation satisfy this boundary. */
 export interface ContainmentManager {
   activate(request: ContainmentActivation): MaybePromise<ContainmentRecord>;
-  check(repositoryRoot: string, channel: "git" | "credential" | "network" | "deployment" | "execution" | "test_environment" | "automation" | "isolation" | "council" | "adapter" | "local_remediation"): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
+  check(repositoryRoot: string, channel: "git" | "credential" | "network" | "deployment" | "execution" | "test_environment" | "automation" | "isolation" | "council" | "adapter" | "local_remediation" | "local_cleanup", remediation?: ContainmentRemediationBinding): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
   release(request: ContainmentReleaseRequest): MaybePromise<ContainmentReleaseResult>;
 }
 
@@ -446,7 +447,12 @@ export class CommandDispatcher {
         if (!base) return unavailable("Containment requires a verified target.", operationId);
         if (!this.dependencies.containment) return unavailable("No durable containment manager is configured.", operationId);
         const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
-        return { status: "completed", summary: `Containment fence ${record.fenceEpoch} is active for brokered egress; unmediated paths remain disclosed as uncontrolled.`, operationId, data: { fenceEpoch: record.fenceEpoch } };
+        return {
+          status: "completed",
+          summary: `Containment fence ${record.fenceEpoch} is active and incident assessment is open for brokered egress; unmediated paths remain disclosed as uncontrolled.`,
+          operationId,
+          data: { fenceEpoch: record.fenceEpoch, ...(record.incidentId ? { incidentId: record.incidentId } : {}) }
+        };
       }
     }
   }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction } from "./command-catalog.ts";
 import type { ContainmentChannel } from "./containment.ts";
+import type { ContainmentRemediationAction, ContainmentRemediationBinding } from "./containment-incidents.ts";
 import type { ExecutionControl } from "./execution-control.ts";
 import { readDurableCancellation } from "./execution-cancellation.ts";
 import type { ChildOperationSaga } from "./operations.ts";
@@ -54,7 +55,7 @@ export interface PermitVerifier {
 }
 
 export interface ContainmentGuard {
-  check(repositoryRoot: string, channel: ContainmentChannel): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
+  check(repositoryRoot: string, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
 }
 
 export interface EffectGuard {
@@ -96,8 +97,8 @@ async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): 
   return undefined;
 }
 
-async function fenced(containment: ContainmentGuard | undefined, invocation: BrokerInvocation, channel: ContainmentChannel): Promise<BrokerOutcome | undefined> {
-  const result = containment ? await containment.check(invocation.target.repositoryRoot, channel) : undefined;
+async function fenced(containment: ContainmentGuard | undefined, invocation: BrokerInvocation, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): Promise<BrokerOutcome | undefined> {
+  const result = containment ? await containment.check(invocation.target.repositoryRoot, channel, remediation) : undefined;
   return result && !result.allowed ? { status: "blocked", summary: result.reason, effectDisposition: "not_started" } : undefined;
 }
 
@@ -181,7 +182,7 @@ function normalisePath(path: string): string {
 }
 
 export type GitMutation =
-  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string }
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string; readonly containmentRemediation?: Readonly<{ permitId: string; incidentId: string; fenceEpoch: number; action: ContainmentRemediationAction; remediatedFindingIds: readonly string[] }> }
   | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
   | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
   | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
@@ -228,9 +229,12 @@ export class InMemoryGitBroker {
     if (!validGitMutation(request.mutation)) return { status: "blocked", summary: "Git request omits an exact branch, head, receipt, or owned path requirement.", effectDisposition: "not_started" };
     const ownership = validateLocalCommitOwnership(request);
     if (ownership) return { status: "blocked", summary: ownership, effectDisposition: "not_started" };
-    // Containment includes a local commit: it must not be used as an escape
-    // route when an incident fence was activated after policy admission.
-    const fence = await fenced(this.containment, request, "git");
+    const remediation: ContainmentRemediationBinding | undefined = request.mutation.kind === "local_commit" && request.mutation.containmentRemediation
+      ? { ...request.mutation.containmentRemediation, relativePaths: request.mutation.paths }
+      : undefined;
+    // Ordinary local commits stay fenced. Only an exact one-time incident
+    // permit can admit a path-bounded local remediation commit.
+    const fence = await fenced(this.containment, request, remediation ? "local_remediation" : "git", remediation);
     if (fence) return fence;
     const handler = this.handlers.get(request.mutation.kind);
     if (!handler) return { status: "unavailable", summary: `No trusted Git adapter is registered for ${request.mutation.kind}.`, effectDisposition: "not_started" };
@@ -240,11 +244,22 @@ export class InMemoryGitBroker {
 
 function validGitMutation(mutation: GitMutation): boolean {
   switch (mutation.kind) {
-    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim() && (mutation.featureBranch === undefined || !!mutation.featureBranch.trim());
+    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim() && (mutation.featureBranch === undefined || !!mutation.featureBranch.trim())
+      && (mutation.containmentRemediation === undefined || validContainmentRemediation(mutation.containmentRemediation));
     case "pr_upsert": return !!mutation.headBranch && !!mutation.baseBranch && !!mutation.title.trim() && mutation.title.length <= 256 && mutation.body.length <= 16_384;
     case "merge_pr": return mutation.pullRequest > 0 && !!mutation.head && !!mutation.baseBranch;
     case "direct_main": return !!mutation.branch && !!mutation.validationReceiptId;
   }
+}
+
+function validContainmentRemediation(value: NonNullable<Extract<GitMutation, { kind: "local_commit" }>["containmentRemediation"]>): boolean {
+  return /^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    && /^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    && Number.isSafeInteger(value.fenceEpoch) && value.fenceEpoch > 0
+    && ["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(value.action)
+    && Array.isArray(value.remediatedFindingIds) && value.remediatedFindingIds.length > 0 && value.remediatedFindingIds.length <= 1_024
+    && value.remediatedFindingIds.every((id) => /^containment-finding:[a-f0-9]{64}$|^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id))
+    && new Set(value.remediatedFindingIds).size === value.remediatedFindingIds.length;
 }
 
 function validateLocalCommitOwnership(request: GitRequest): string | undefined {

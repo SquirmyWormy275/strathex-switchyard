@@ -108,6 +108,7 @@ import {
 } from "./windows-voice-port.ts";
 import { InstalledVoiceConversationRuntime } from "./voice-runtime.ts";
 import { WindowsErasableVoiceTranscriptVault } from "./windows-voice-transcript-vault.ts";
+import { InstalledLocalContainmentAssessmentPort } from "./containment-assessment.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -350,7 +351,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     effectGuard: {
       async assertAllowed({ scope, effect, remediation }) {
         if (remediation) {
-          const cleanup = await containmentManager.check(scope.repositoryRoot, "local_remediation");
+          const cleanup = await containmentManager.check(scope.repositoryRoot, "local_cleanup");
           if (!cleanup.allowed) throw new Error(cleanup.reason);
           return;
         }
@@ -406,6 +407,8 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   containmentManager = new DurableContainmentManager(store, {
     revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot),
     cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
+  }, {
+    incidentAssessmentPort: new InstalledLocalContainmentAssessmentPort()
   });
   credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
   const councilResourceHost = new CouncilResourceHost({

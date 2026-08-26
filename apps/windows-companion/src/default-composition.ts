@@ -131,7 +131,7 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   }
   const git = new InMemoryGitBroker(context.policy, containment);
   if (options.localGitStateDirectory) {
-    const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory });
+    const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory, remediation: containment.incidents });
     git.register("local_commit", (request) => localGit.execute(request));
   }
   if (dynamicNetwork) {

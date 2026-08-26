@@ -9,7 +9,7 @@
  * task-owned paths in a temporary index, and disables repository hooks so a
  * commit cannot become an arbitrary repository-script execution path.
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { copyFile, lstat, mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -21,6 +21,7 @@ import {
 } from "../../../packages/control-plane/src/brokers.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import type { ChildOperationLease } from "../../../packages/control-plane/src/operations.ts";
+import type { ContainmentRemediationBinding, DurableContainmentIncidentCoordinator } from "../../../packages/control-plane/src/containment-incidents.ts";
 
 export interface LocalGitResult {
   readonly exitCode: number;
@@ -102,6 +103,7 @@ export interface MediatedGitHandlerOptions {
   readonly runner?: LocalGitRunner;
   readonly now?: () => number;
   readonly lockTimeoutMs?: number;
+  readonly remediation?: Pick<DurableContainmentIncidentCoordinator, "assertRemediationPermit" | "recordRemediation">;
 }
 
 interface HeldLock {
@@ -133,12 +135,14 @@ export class LocalMediatedGitHandler {
   private readonly runner: LocalGitRunner;
   private readonly now: () => number;
   private readonly lockTimeoutMs: number;
+  private readonly remediation?: MediatedGitHandlerOptions["remediation"];
 
   constructor(options: MediatedGitHandlerOptions) {
     this.stateDirectory = resolve(options.stateDirectory);
     this.runner = options.runner ?? new SpawnLocalGitRunner();
     this.now = options.now ?? Date.now;
     this.lockTimeoutMs = options.lockTimeoutMs ?? 2_000;
+    this.remediation = options.remediation;
   }
 
   async execute(request: GitRequest): Promise<BrokerOutcome> {
@@ -286,6 +290,12 @@ export class LocalMediatedGitHandler {
         }
         await request.childSaga.markExecuting(localCommitChild);
       }
+      const remediation = containmentRemediation(request);
+      if (remediation) {
+        if (!this.remediation) return { status: "blocked", summary: "The exact containment remediation recorder is unavailable; no local commit was started.", effectDisposition: "not_started" };
+        try { await this.remediation.assertRemediationPermit(remediation); }
+        catch { return { status: "blocked", summary: "The containment remediation permit changed immediately before the local commit effect.", effectDisposition: "not_started" }; }
+      }
       const commit = await this.runner.run([
         "-c", `core.hooksPath=${temporaryHooks}`,
         "-c", "commit.gpgSign=false",
@@ -315,6 +325,25 @@ export class LocalMediatedGitHandler {
             summary: redactText(`Git advanced HEAD but the shared index could not be reconciled safely: ${errorMessage(error, "unknown index error")}`),
             effectDisposition: "committed"
           };
+        }
+        if (remediation) {
+          try {
+            await this.remediation!.recordRemediation({
+              permitId: remediation.permitId,
+              incidentId: remediation.incidentId,
+              action: remediation.action,
+              relativePaths: remediation.relativePaths,
+              remediatedFindingIds: remediation.remediatedFindingIds,
+              evidenceDigest: createHash("sha256").update(JSON.stringify({ beforeHead: request.target.head, committedTree, postHead, permitId: remediation.permitId })).digest("hex")
+            });
+          } catch {
+            return {
+              status: "incomplete",
+              summary: "Git committed the exact remediation tree, but the protected incident receipt could not be reconciled; the permit will not be replayed automatically.",
+              effectDisposition: "committed",
+              data: { beforeHead: request.target.head, postHead, remediationReceiptRecorded: false }
+            };
+          }
         }
         return {
           status: "completed",
@@ -522,6 +551,11 @@ async function currentEffect(request: GitRequest): Promise<BrokerOutcome | undef
 function validFeatureBranch(branch: string, defaultBranch: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(branch)
     && !branch.includes("..") && !branch.endsWith("/") && !branch.startsWith("-") && branch !== defaultBranch;
+}
+
+function containmentRemediation(request: GitRequest): ContainmentRemediationBinding | undefined {
+  if (request.mutation.kind !== "local_commit" || !request.mutation.containmentRemediation) return undefined;
+  return { ...request.mutation.containmentRemediation, relativePaths: request.mutation.paths };
 }
 
 function samePath(left: string, right: string): boolean {

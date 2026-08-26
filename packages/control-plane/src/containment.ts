@@ -1,5 +1,11 @@
 import { jsonClone, sha256, stableJson, type JournalEntry, ProtectedJsonStore } from "./store.ts";
 import { redactText } from "./redaction.ts";
+import {
+  activateContainmentIncidentInTransaction,
+  DurableContainmentIncidentCoordinator,
+  type ContainmentAssessmentEffectPort,
+  type ContainmentRemediationBinding
+} from "./containment-incidents.ts";
 
 /** Durable repository-level fence for brokered outbound effects. */
 /**
@@ -18,7 +24,8 @@ export type ContainmentChannel =
   | "isolation"
   | "council"
   | "adapter"
-  | "local_remediation";
+  | "local_remediation"
+  | "local_cleanup";
 export type IncidentStatus = "rotation_pending" | "rotation_complete" | "not_required";
 export type ContainmentHookName = "credential_lease_revocation" | "queued_operation_cancellation";
 export type ContainmentHookStatus = "pending" | "running" | "completed" | "failed" | "unavailable";
@@ -34,6 +41,8 @@ export interface ContainmentHookState {
 export interface ContainmentRecord {
   readonly repositoryRoot: string;
   readonly fenceEpoch: number;
+  /** Present on every newly activated durable fence; optional only for legacy/test records restored from before incident orchestration existed. */
+  readonly incidentId?: string;
   readonly active: boolean;
   readonly activatedAt: string;
   readonly activatedByOperationId: string;
@@ -109,6 +118,8 @@ export type ContainmentLifecyclePhase = "fence_persisted" | "hook_claimed" | "ho
 export interface DurableContainmentManagerOptions {
   readonly clock?: () => string;
   readonly hookTimeoutMs?: number;
+  /** Installed, read-only/no-egress incident assessor. Omission leaves the incident visibly awaiting assessment. */
+  readonly incidentAssessmentPort?: ContainmentAssessmentEffectPort;
   /** Deterministic crash seam for isolated recovery tests; production omits it. */
   readonly lifecycleProbe?: (input: Readonly<{ phase: ContainmentLifecyclePhase; repositoryRoot: string; fenceEpoch: number; hook?: ContainmentHookName }>) => Promise<void> | void;
 }
@@ -157,7 +168,10 @@ function durableRecords(entries: readonly JournalEntry<unknown>[]): Map<string, 
       throw new Error("Protected containment record is malformed.");
     }
     const hookStates = validateHookStates(record.hookStates);
-    records.set(containmentKey(record.repositoryRoot), cloneRecord({ ...record, ...(hookStates ? { hookStates } : {}) }));
+    const incidentId = typeof record.incidentId === "string" && /^containment-incident:[a-f0-9]{64}$/.test(record.incidentId)
+      ? record.incidentId
+      : containmentIncidentId(record.repositoryRoot, record.fenceEpoch, record.activatedByOperationId);
+    records.set(containmentKey(record.repositoryRoot), cloneRecord({ ...record, incidentId, ...(hookStates ? { hookStates } : {}) }));
   }
   return records;
 }
@@ -177,6 +191,7 @@ export class InMemoryContainmentManager {
     const record: ContainmentRecord = {
       repositoryRoot: request.repositoryRoot,
       fenceEpoch: (current?.fenceEpoch ?? 0) + 1,
+      incidentId: containmentIncidentId(request.repositoryRoot, (current?.fenceEpoch ?? 0) + 1, request.operationId),
       active: true,
       activatedAt: new Date().toISOString(),
       activatedByOperationId: request.operationId,
@@ -188,11 +203,12 @@ export class InMemoryContainmentManager {
     return record;
   }
 
-  check(repositoryRoot: string, channel: ContainmentChannel): ContainmentCheck {
+  check(repositoryRoot: string, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): ContainmentCheck {
     const record = this.records.get(repositoryRoot);
-    if (!record?.active || channel === "local_remediation") {
-      return { allowed: true, reason: channel === "local_remediation" ? "Local remediation remains available during containment." : "No active containment fence." };
+    if (!record?.active || channel === "local_cleanup") {
+      return { allowed: true, reason: channel === "local_cleanup" ? "Bounded local cleanup remains available during containment." : "No active containment fence." };
     }
+    if (channel === "local_remediation") return { allowed: false, reason: remediation ? "The in-memory containment harness cannot validate durable remediation permits." : "Local remediation requires an exact durable incident permit." };
     return {
       allowed: false,
       reason: `Containment fence ${record.fenceEpoch} blocks brokered ${channel}; unmediated paths remain visibly uncontrolled.`,
@@ -253,11 +269,13 @@ export class InMemoryContainmentManager {
  * record and the fence remains active.
  */
 export class DurableContainmentManager {
+  readonly incidents: DurableContainmentIncidentCoordinator;
   private readonly store: ProtectedJsonStore;
   private readonly hooks: DurableContainmentHooks;
   private readonly clock: () => string;
   private readonly lifecycleProbe?: DurableContainmentManagerOptions["lifecycleProbe"];
   private readonly hookTimeoutMs: number;
+  private readonly incidentAssessmentPort?: ContainmentAssessmentEffectPort;
   private readonly reconciliationTails = new Map<string, Promise<void>>();
   private readonly startupRecovery: Promise<void>;
   private startupFailure: unknown;
@@ -268,7 +286,9 @@ export class DurableContainmentManager {
     this.store = store;
     this.hooks = hooks;
     this.clock = options.clock ?? (() => new Date().toISOString());
+    this.incidents = new DurableContainmentIncidentCoordinator(store, { now: this.clock });
     this.lifecycleProbe = options.lifecycleProbe;
+    this.incidentAssessmentPort = options.incidentAssessmentPort;
     this.hookTimeoutMs = options.hookTimeoutMs ?? 10_000;
     if (!Number.isSafeInteger(this.hookTimeoutMs) || this.hookTimeoutMs < 1 || this.hookTimeoutMs > 60_000) throw new Error("Containment hook timeout must be between 1 and 60000 milliseconds.");
     // Defer one microtask so bootstrap compositions can finish assigning hook
@@ -285,30 +305,60 @@ export class DurableContainmentManager {
       const records = durableRecords(await transaction.readEntries());
       const key = containmentKey(request.repositoryRoot);
       const current = records.get(key);
-      if (current?.active) return { record: cloneRecord(current), activated: false };
+      if (current?.active) {
+        await activateContainmentIncidentInTransaction(transaction, {
+          repositoryRoot: current.repositoryRoot,
+          fenceEpoch: current.fenceEpoch,
+          activationOperationId: current.activatedByOperationId,
+          reason: current.reason
+        }, current.activatedAt);
+        return { record: cloneRecord(current), activated: false };
+      }
+      const fenceEpoch = (current?.fenceEpoch ?? 0) + 1;
+      const activatedAt = this.clock();
       const next: ContainmentRecord = {
         repositoryRoot: request.repositoryRoot,
-        fenceEpoch: (current?.fenceEpoch ?? 0) + 1,
+        fenceEpoch,
+        incidentId: containmentIncidentId(request.repositoryRoot, fenceEpoch, request.operationId),
         active: true,
-        activatedAt: this.clock(),
+        activatedAt,
         activatedByOperationId: request.operationId,
         reason: request.reason,
         uncontrolledPaths: current?.uncontrolledPaths ?? [],
         hookStates: this.initialHookStates()
       };
       await transaction.append<DurableContainmentSavedEvent>("containment.saved", { record: next });
+      const incident = await activateContainmentIncidentInTransaction(transaction, {
+        repositoryRoot: request.repositoryRoot,
+        fenceEpoch,
+        activationOperationId: request.operationId,
+        reason: request.reason
+      }, activatedAt);
+      if (incident.id !== next.incidentId) throw new Error("The containment fence and incident IDs diverged inside the protected transaction.");
       return { record: cloneRecord(next), activated: true };
     });
     const record = activation.record;
     if (activation.activated) await this.probe("fence_persisted", record);
-    return this.serializeReconciliation(record.repositoryRoot, () => this.reconcileHooks(record.repositoryRoot, record.fenceEpoch));
+    const reconciled = await this.serializeReconciliation(record.repositoryRoot, () => this.reconcileHooks(record.repositoryRoot, record.fenceEpoch));
+    if (this.incidentAssessmentPort && reconciled.incidentId) await this.incidents.assess(reconciled.incidentId, this.incidentAssessmentPort);
+    return reconciled;
   }
 
-  async check(repositoryRoot: string, channel: ContainmentChannel): Promise<ContainmentCheck> {
+  async check(repositoryRoot: string, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): Promise<ContainmentCheck> {
     await this.ensureStartupRecovery(repositoryRoot);
     const record = durableRecords(await this.store.readEntries()).get(containmentKey(repositoryRoot));
-    if (!record?.active || channel === "local_remediation") {
-      return { allowed: true, reason: channel === "local_remediation" ? "Local remediation remains available during containment." : "No active containment fence." };
+    if (!record?.active || channel === "local_cleanup") {
+      return { allowed: true, reason: channel === "local_cleanup" ? "Bounded local cleanup remains available during containment." : "No active containment fence." };
+    }
+    if (channel === "local_remediation") {
+      if (!remediation) return { allowed: false, reason: "Local remediation requires an exact active incident permit.", fenceEpoch: record.fenceEpoch };
+      try {
+        await this.incidents.assertRemediationPermit(remediation);
+        if (record.incidentId !== remediation.incidentId || record.fenceEpoch !== remediation.fenceEpoch) throw new Error("fence changed");
+        return { allowed: true, reason: "The exact one-time incident remediation permit is current.", fenceEpoch: record.fenceEpoch };
+      } catch {
+        return { allowed: false, reason: "The local remediation permit is absent, stale, consumed, expired, or mismatched.", fenceEpoch: record.fenceEpoch };
+      }
     }
     return {
       allowed: false,
@@ -479,7 +529,10 @@ export class DurableContainmentManager {
     const active = [...durableRecords(await this.store.readEntries()).values()].filter((record) => record.active);
     for (const record of active) {
       const key = containmentKey(record.repositoryRoot);
-      const recovery = this.serializeReconciliation(record.repositoryRoot, () => this.reconcileHooks(record.repositoryRoot, record.fenceEpoch))
+      const recovery = this.serializeReconciliation(record.repositoryRoot, async () => {
+        const reconciled = await this.reconcileHooks(record.repositoryRoot, record.fenceEpoch);
+        if (this.incidentAssessmentPort && reconciled.incidentId) await this.incidents.assess(reconciled.incidentId, this.incidentAssessmentPort);
+      })
         .then(() => undefined)
         .catch((error: unknown) => { this.startupFailures.set(key, error); });
       this.startupRecoveries.set(key, recovery);
@@ -516,4 +569,12 @@ export class DurableContainmentManager {
       );
     });
   }
+}
+
+function containmentIncidentId(repositoryRoot: string, fenceEpoch: number, activationOperationId: string): string {
+  return `containment-incident:${sha256(stableJson({
+    activationOperationId,
+    fenceEpoch,
+    repositoryRoot: containmentKey(repositoryRoot)
+  }))}`;
 }
