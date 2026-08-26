@@ -70,11 +70,12 @@ test("attested local history remediation removes a history-only path, preserves 
   });
   const permitted = (await incidents.get(incident.id))!;
   let presenceCalls = 0;
+  let presencePrompt = "";
   const remediator = new AttestedContainmentHistoryRemediator({
     store,
     stateDirectory,
     incidents,
-    presence: { async verify() { presenceCalls += 1; return { verified: true, operator: "ISOLATED\\User" }; } },
+    presence: { async verify(prompt) { presenceCalls += 1; presencePrompt = prompt; return { verified: true, operator: "ISOLATED\\User" }; } },
     targets: {
       async resolve(sessionId) {
         assert.equal(sessionId, "session-history");
@@ -96,6 +97,9 @@ test("attested local history remediation removes a history-only path, preserves 
 
   assert.equal(result.oldHead, oldHead);
   assert.notEqual(result.newHead, oldHead);
+  assert.ok(presencePrompt.length <= 240);
+  assert.match(presencePrompt, new RegExp(`${oldHead.slice(0, 10)}>${result.newHead.slice(0, 10)}`));
+  assert.match(presencePrompt, /purge 1 path\(s\) from all commits; tip changes 0; scope [a-f0-9]{64}; no remote/);
   assert.equal((await ok(git, ["rev-parse", "HEAD^{tree}"], repositoryRoot)).trim(), oldTree);
   assert.equal(presenceCalls, 1);
   assert.equal((await ok(git, ["status", "--porcelain=v1"], repositoryRoot)).trim(), "");

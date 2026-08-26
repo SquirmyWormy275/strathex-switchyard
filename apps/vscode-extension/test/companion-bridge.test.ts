@@ -168,6 +168,12 @@ test("containment IPC exact-parses the active fence inspection and carries both 
         ? { containment }
         : request.method === "containment.verify"
           ? { containment: verifiedContainment }
+          : request.method === "containment.history.rewrite"
+            ? { remediation: {
+                operationId: `containment-history:${"1".repeat(64)}`, incidentId: incident.id, permitId: `containment-remediation-permit:${"2".repeat(64)}`,
+                repositoryRoot: containment.repositoryRoot, branch: "feature/contained", oldHead: "3".repeat(40), newHead: "4".repeat(40),
+                backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "5".repeat(64), incidentDigest: "6".repeat(64), status: "completed"
+              } }
           : { command: { status: "completed", summary: "Exact containment generation released." } };
       return JSON.stringify({ version: 1, id: request.id, ok: true, result });
     }
@@ -179,6 +185,13 @@ test("containment IPC exact-parses the active fence inspection and carries both 
   const verified = await bridge.verifyContainmentRemediation({ sessionId: session.id, expectedIncidentId: incident.id, expectedIncidentDigest: containment.incidentDigest });
   assert.equal(verified.ok, true);
   if (verified.ok) assert.equal(verified.value.incident.assessment.generation, 2);
+  const historyRequest = {
+    sessionId: session.id, expectedIncidentId: incident.id, expectedIncidentDigest: containment.incidentDigest,
+    permitId: `containment-remediation-permit:${"2".repeat(64)}`, relativePaths: ["config/local.env"], remediatedFindingIds: [`containment-finding:${"f".repeat(64)}`]
+  };
+  const rewritten = await bridge.rewriteContainmentHistory(historyRequest);
+  assert.equal(rewritten.ok, true);
+  if (rewritten.ok) assert.equal(rewritten.value.newHead, "4".repeat(40));
   const request = {
     sessionId: session.id,
     reason: "Reviewed exact active containment generation.",
@@ -192,6 +205,7 @@ test("containment IPC exact-parses the active fence inspection and carries both 
   assert.deepEqual(seen, [
     { method: "containment.inspect", payload: { sessionId: session.id } },
     { method: "containment.verify", payload: { sessionId: session.id, expectedIncidentId: incident.id, expectedIncidentDigest: containment.incidentDigest } },
+    { method: "containment.history.rewrite", payload: historyRequest },
     { method: "containment.release", payload: request }
   ]);
 });

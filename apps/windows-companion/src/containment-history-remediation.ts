@@ -59,6 +59,8 @@ export interface ContainmentHistoryRemediationRequest {
 
 export interface ContainmentHistoryRemediationResult {
   readonly operationId: string;
+  readonly incidentId: string;
+  readonly permitId: string;
   readonly repositoryRoot: string;
   readonly branch: string;
   readonly oldHead: string;
@@ -147,6 +149,7 @@ export class AttestedContainmentHistoryRemediator {
       if (existing) return this.reconcile(existing, request);
       const incident = await this.incidents.get(request.expectedIncidentId);
       if (!incident || containmentIncidentReviewDigest(incident) !== request.expectedIncidentDigest) throw new Error("The containment incident changed after history-remediation review.");
+      if ((await realpath(incident.repositoryRoot)).toLowerCase() !== root.toLowerCase()) throw new Error("The containment incident is bound to a different canonical repository root.");
       const binding: ContainmentRemediationBinding = {
         permitId: request.permitId,
         incidentId: request.expectedIncidentId,
@@ -158,8 +161,6 @@ export class AttestedContainmentHistoryRemediator {
       await this.incidents.assertRemediationPermit(binding);
       this.assertHistoryFindings(incident, binding.remediatedFindingIds, paths);
       await this.assertRepositoryPreconditions(root, target);
-      const presence = await this.presence.verify(`Approve SXSY-B122 local history rewrite on branch ${target.branch}. A verified external backup is created first; no remote is contacted.`);
-      if (!presence.verified || !presence.operator?.trim()) throw new Error("Current-user presence did not approve the local history rewrite.");
       const operationDirectory = join(this.stateDirectory, "history-remediation", operationKey);
       await mkdir(operationDirectory, { recursive: true, mode: 0o700 });
       const backupBundlePath = join(operationDirectory, "before.bundle");
@@ -168,11 +169,15 @@ export class AttestedContainmentHistoryRemediator {
       let newHead: string;
       try { newHead = await this.rewriteBranch(root, target, paths, privateIndex); }
       finally { await rm(privateIndex, { force: true }).catch(() => undefined); }
-      await this.assertOnlyReviewedPathsChanged(root, target.head, newHead, paths);
+      const tipChanges = await this.assertOnlyReviewedPathsChanged(root, target.head, newHead, paths);
       await this.assertReviewedPathsAbsentFromHistory(root, newHead, paths);
       const reviewed = await this.incidents.get(request.expectedIncidentId);
       if (!reviewed || containmentIncidentReviewDigest(reviewed) !== request.expectedIncidentDigest) throw new Error("The containment incident changed before the protected history-remediation effect was prepared.");
       await this.incidents.assertRemediationPermit(binding);
+      const previewDigest = sha256(stableJson({ backup, branch: target.branch, newHead, oldHead: target.head, paths, tipChanges }));
+      const branchLabel = target.branch.length > 24 ? `${target.branch.slice(0, 21)}...` : target.branch;
+      const presence = await this.presence.verify(`Approve B122 rewrite ${target.head.slice(0, 10)}>${newHead.slice(0, 10)} branch ${branchLabel}; purge ${paths.length} path(s) from all commits; tip changes ${tipChanges.length}; scope ${previewDigest}; no remote.`);
+      if (!presence.verified || !presence.operator?.trim()) throw new Error("Current-user presence did not approve the exact prepared local history rewrite.");
       const startedAt = timestamp(this.now());
       const prepared: HistoryEffectRecord = {
         version: 1,
@@ -330,11 +335,12 @@ export class AttestedContainmentHistoryRemediator {
     return { branch: exactBranch, head: exactSha(head.stdout.trim(), "current head") };
   }
 
-  private async assertOnlyReviewedPathsChanged(root: string, oldHead: string, newHead: string, paths: readonly string[]): Promise<void> {
+  private async assertOnlyReviewedPathsChanged(root: string, oldHead: string, newHead: string, paths: readonly string[]): Promise<readonly string[]> {
     const diff = await requireGit(this.git, ["diff", "--name-only", "-z", "--no-renames", oldHead, newHead, "--"], { cwd: root }, "compare the exact rewritten tip tree");
     const changed = diff.stdout.split("\0").filter(Boolean).map(exactPath).sort((left, right) => left.localeCompare(right));
     const reviewed = new Set(paths);
     if (changed.some((path) => !reviewed.has(path))) throw new Error("The prepared history rewrite changes paths outside the exact reviewed finding set.");
+    return changed;
   }
 
   private async assertReviewedPathsAbsentFromHistory(root: string, newHead: string, paths: readonly string[]): Promise<void> {
@@ -387,8 +393,15 @@ export class AttestedContainmentHistoryRemediator {
     if (!incident) throw new Error("The exact containment incident is unavailable.");
     const historyFindings = new Map(incident.steps.find((step) => step.name === "history")?.result?.findings.map((finding) => [finding.id, finding]) ?? []);
     if (!findingIds.length || findingIds.some((id) => !historyFindings.has(id))) throw new Error("Local history remediation may cover only exact current history findings.");
-    const findingPaths = findingIds.map((id) => historyFindings.get(id)!.relativePath).sort((left, right) => left.localeCompare(right));
-    if (!sameCaseInsensitive(findingPaths, paths)) throw new Error("The local history remediation paths changed their exact finding binding.");
+    const byPath = new Map<string, string>();
+    for (const id of findingIds) {
+      const path = exactPath(historyFindings.get(id)!.relativePath);
+      const prior = byPath.get(path.toLowerCase());
+      if (prior && prior !== path) throw new Error("History findings disagree on the exact case-sensitive Git path.");
+      byPath.set(path.toLowerCase(), path);
+    }
+    const findingPaths = [...byPath.values()].sort((left, right) => left.localeCompare(right));
+    if (!sameStrings(findingPaths, paths)) throw new Error("The local history remediation paths changed their exact finding binding.");
   }
 
   private async requireTarget(sessionId: string): Promise<ContainmentHistoryTarget> {
@@ -603,7 +616,7 @@ function assertSameRequest(record: HistoryEffectRecord, request: ContainmentHist
 }
 
 function result(record: HistoryEffectRecord, incidentDigest: string): ContainmentHistoryRemediationResult {
-  return { operationId: record.operationId, repositoryRoot: record.repositoryRoot, branch: record.branch, oldHead: record.oldHead, newHead: record.newHead, backupBundlePath: record.backupBundlePath, backupBundleSha256: record.backupBundleSha256, incidentDigest, status: "completed" };
+  return { operationId: record.operationId, incidentId: record.incidentId, permitId: record.permitId, repositoryRoot: record.repositoryRoot, branch: record.branch, oldHead: record.oldHead, newHead: record.newHead, backupBundlePath: record.backupBundlePath, backupBundleSha256: record.backupBundleSha256, incidentDigest, status: "completed" };
 }
 
 function remediationBinding(record: HistoryEffectRecord): ContainmentRemediationBinding {

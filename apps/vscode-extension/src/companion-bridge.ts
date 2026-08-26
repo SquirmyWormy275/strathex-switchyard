@@ -206,6 +206,7 @@ export interface ContainmentInspectionSummary {
   readonly incident: ContainmentIncidentInspection;
   readonly incidentDigest: string;
 }
+export interface ContainmentHistoryRemediationSummary { readonly operationId: string; readonly incidentId: string; readonly permitId: string; readonly repositoryRoot: string; readonly branch: string; readonly oldHead: string; readonly newHead: string; readonly backupBundlePath: string; readonly backupBundleSha256: string; readonly incidentDigest: string; readonly status: "completed"; }
 export interface ExtensionCouncilAssignment { readonly sessionId: string; readonly paths: readonly string[]; readonly resources: readonly string[]; }
 export interface ExtensionCouncilRecommendation {
   readonly id: string;
@@ -333,6 +334,7 @@ export interface ExtensionCompanionBridge {
   reassessContainment(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
   verifyContainmentRemediation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
   issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>>;
+  rewriteContainmentHistory(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }>): Promise<BridgeResult<ContainmentHistoryRemediationSummary>>;
   recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
   releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
   approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>>;
@@ -452,6 +454,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
       || !isContainmentPermit(result.value.permit, input) || !isContainmentInspection(result.value.containment, input.sessionId)
       || result.value.containment.incident.id !== input.expectedIncidentId) return invalidResponse();
     return { ok: true, value: { permit: result.value.permit, containment: result.value.containment } };
+  }
+
+  async rewriteContainmentHistory(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }>): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> {
+    const result = await this.call<unknown>("containment.history.rewrite", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["remediation"]) || !isContainmentHistoryRemediation(result.value.remediation, input)) return invalidResponse();
+    return { ok: true, value: result.value.remediation };
   }
 
   async recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
@@ -871,6 +880,7 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   reassessContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   verifyContainmentRemediation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   issueContainmentPermit(): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> { return this.unavailable(); }
+  rewriteContainmentHistory(): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> { return this.unavailable(); }
   recordContainmentRotation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   releaseContainment(_input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   approveCouncilRecommendation(): Promise<BridgeResult<ExtensionCouncilRecommendation>> { return this.unavailable(); }
@@ -1031,6 +1041,19 @@ function isContainmentInspection(value: unknown, expectedSessionId: string): val
     hookNames.add(hook.name);
   }
   return hookNames.has("credential_lease_revocation") && hookNames.has("queued_operation_cancellation");
+}
+
+function isContainmentHistoryRemediation(value: unknown, expected: Readonly<{ expectedIncidentId: string; expectedIncidentDigest: string; permitId: string }>): value is ContainmentHistoryRemediationSummary {
+  return isRecord(value) && exactKeys(value, ["operationId", "incidentId", "permitId", "repositoryRoot", "branch", "oldHead", "newHead", "backupBundlePath", "backupBundleSha256", "incidentDigest", "status"])
+    && typeof value.operationId === "string" && /^containment-history:[a-f0-9]{64}$/.test(value.operationId)
+    && value.incidentId === expected.expectedIncidentId && value.permitId === expected.permitId
+    && pathText(value.repositoryRoot) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.repositoryRoot)
+    && typeof value.branch === "string" && safeBranch(value.branch)
+    && typeof value.oldHead === "string" && /^[a-f0-9]{40,64}$/.test(value.oldHead)
+    && typeof value.newHead === "string" && /^[a-f0-9]{40,64}$/.test(value.newHead) && value.newHead !== value.oldHead
+    && pathText(value.backupBundlePath) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.backupBundlePath)
+    && digestText(value.backupBundleSha256) && digestText(value.incidentDigest) && value.status === "completed"
+    && /^containment-remediation-permit:[a-f0-9]{64}$/.test(expected.permitId) && digestText(expected.expectedIncidentDigest);
 }
 
 function isContainmentIncident(value: unknown, repositoryRoot: string, fenceEpoch: number, activationOperationId: string): value is ContainmentIncidentInspection {

@@ -886,9 +886,59 @@ export class ManagedSessionController {
     }
     if (containment.incident.status === "remediation_required") {
       const remediated = new Set(containment.incident.receipts.flatMap((receipt) => receipt.remediatedFindingIds));
-      const pendingFindings = containment.incident.steps.flatMap((step) => step.result?.findings ?? []).filter((finding) => !remediated.has(finding.id));
-      if (pendingFindings.length) {
-        await this.vscode.window.showWarningMessage(`SXSY-B122 containment still requires exact local remediation commits for: ${pendingFindings.map((finding) => `${finding.id} (${finding.relativePath})`).join(", ")}. Use the local-commit chord; it will request a one-time no-egress permit for only those findings.`);
+      const pending = containment.incident.steps.flatMap((step) => (step.result?.findings ?? []).filter((finding) => !remediated.has(finding.id)).map((finding) => ({ step: step.name, finding })));
+      const workingTree = pending.filter((item) => item.step === "working_tree");
+      if (workingTree.length) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 containment still requires exact local remediation commits for: ${workingTree.map(({ finding }) => `${finding.id} (${finding.relativePath})`).join(", ")}. Use the local-commit chord; it will request a one-time no-egress permit for only those working-tree findings.`);
+        return;
+      }
+      const history = pending.filter((item) => item.step === "history");
+      if (history.length) {
+        const paths = [...new Set(history.map(({ finding }) => finding.relativePath))].sort((left, right) => left.localeCompare(right));
+        const findingIds = history.map(({ finding }) => finding.id).sort((left, right) => left.localeCompare(right));
+        const reviewLabel = `Prepare current-branch history rewrite for ${paths.length} path(s)`;
+        const review = await this.vscode.window.showQuickPick([{
+          label: reviewLabel,
+          description: "Creates a verified external bundle; never contacts or rewrites a remote",
+          detail: `This removes each exact reviewed path from every commit reachable from the current local branch: ${paths.join(", ")}`
+        }], { placeHolder: "Destructive local-history review: other refs remain fenced and the native prompt shows the prepared old/new heads" });
+        if (!review || review.label !== reviewLabel) return;
+        const expiresAt = new Date(Date.parse(this.now()) + 10 * 60_000).toISOString();
+        const issued = await this.bridge.issueContainmentPermit({
+          sessionId: session.id,
+          expectedIncidentId: containment.incident.id,
+          expectedIncidentDigest: containment.incidentDigest,
+          action: "rewrite_local_history",
+          relativePaths: paths,
+          expiresAt
+        });
+        if (!issued.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 local-history permit unavailable: ${issued.message}`); return; }
+        const finalLabel = `Rewrite only branch history under permit ${issued.value.permit.id}`;
+        const finalReview = await this.vscode.window.showQuickPick([{
+          label: finalLabel,
+          description: `Expires ${issued.value.permit.expiresAt}`,
+          detail: `Exact paths ${paths.join(", ")}; findings ${findingIds.join(", ")}. Windows presence will show the host-prepared old/new heads and exact preview digest.`
+        }], { placeHolder: "Final VS Code review before the host prepares a branch-only rewrite and asks for Windows presence" });
+        if (!finalReview || finalReview.label !== finalLabel) return;
+        const rewritten = await this.bridge.rewriteContainmentHistory({
+          sessionId: session.id,
+          expectedIncidentId: containment.incident.id,
+          expectedIncidentDigest: issued.value.containment.incidentDigest,
+          permitId: issued.value.permit.id,
+          relativePaths: paths,
+          remediatedFindingIds: findingIds
+        });
+        if (!rewritten.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 local-history rewrite unavailable: ${rewritten.message}`); return; }
+        if (!samePath(rewritten.value.repositoryRoot, containment.repositoryRoot)) {
+          await this.vscode.window.showWarningMessage("SXSY-B122 refused a local-history result bound to another repository.");
+          return;
+        }
+        await this.vscode.window.showInformationMessage(`SXSY-B122 rewrote local branch ${rewritten.value.branch} from ${rewritten.value.oldHead} to ${rewritten.value.newHead}. Recovery bundle: ${rewritten.value.backupBundlePath} (SHA-256 ${rewritten.value.backupBundleSha256}). Other local/remote refs were not changed; review and run containment verification again.`);
+        return;
+      }
+      const remote = pending.filter((item) => item.step === "remote");
+      if (remote.length) {
+        await this.vscode.window.showWarningMessage(`SXSY-B122 remote containment findings require the signed offline remote-evidence workflow; local history controls will not alter remote refs: ${remote.map(({ finding }) => `${finding.id} (${finding.relativePath})`).join(", ")}.`);
         return;
       }
       const receiptIds = containment.incident.receipts.map((receipt) => receipt.id).sort((left, right) => left.localeCompare(right));

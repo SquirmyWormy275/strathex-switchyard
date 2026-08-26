@@ -222,6 +222,7 @@ test("post-remediation verification starts and completes one fresh exact assessm
 });
 
 test("authenticated companion service exposes only closed containment-administration payloads", async () => {
+  const historyRequests: unknown[] = [];
   const coordinator = new AttestedContainmentReleaseCoordinator({
     async prepareCommand() { throw new Error("not used"); }, async releaseContainment() { throw new Error("not used"); }
   }, {
@@ -234,7 +235,19 @@ test("authenticated companion service exposes only closed containment-administra
     }),
     recordRotation: async () => undefined
   });
-  const service = new CompanionService({ containmentRelease: coordinator });
+  const service = new CompanionService({
+    containmentRelease: coordinator,
+    containmentHistory: {
+      async execute(input) {
+        historyRequests.push(input);
+        return {
+          operationId: `containment-history:${"1".repeat(64)}`, incidentId: input.expectedIncidentId, permitId: input.permitId,
+          repositoryRoot: record.repositoryRoot, branch: "feature/contained", oldHead: "2".repeat(40), newHead: "3".repeat(40),
+          backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "4".repeat(64), incidentDigest: "5".repeat(64), status: "completed"
+        };
+      }
+    }
+  });
   const exact = { sessionId: "session-3", expectedIncidentId: incident.id, expectedIncidentDigest: binding.expectedIncidentDigest };
   const assessed = await service.handle({ version: 1, id: "assess", method: "containment.assess", payload: exact });
   assert.equal(assessed.ok, true);
@@ -242,6 +255,16 @@ test("authenticated companion service exposes only closed containment-administra
   assert.equal(permit.ok, true);
   const rotation = await service.handle({ version: 1, id: "rotation", method: "containment.rotation.record", payload: { ...exact, disposition: "complete", evidenceReference: "ticket-19", evidenceDigest: "e".repeat(64) } });
   assert.equal(rotation.ok, true);
+  const history = await service.handle({ version: 1, id: "history", method: "containment.history.rewrite", payload: {
+    ...exact, permitId: `containment-remediation-permit:${"d".repeat(64)}`, relativePaths: ["config/local.env"], remediatedFindingIds: [`containment-finding:${"f".repeat(64)}`]
+  } });
+  assert.equal(history.ok, true);
+  assert.equal(historyRequests.length, 1);
+  const injectedHistory = await service.handle({ version: 1, id: "history-injected", method: "containment.history.rewrite", payload: {
+    ...exact, permitId: `containment-remediation-permit:${"d".repeat(64)}`, relativePaths: ["config/local.env"], remediatedFindingIds: [`containment-finding:${"f".repeat(64)}`], remoteAllowed: true
+  } });
+  assert.equal(injectedHistory.ok, false);
+  assert.equal(injectedHistory.error?.code, "invalid_request");
   const injected = await service.handle({ version: 1, id: "injected", method: "containment.permit.issue", payload: { ...exact, action: "remove_exposed_value", relativePaths: ["config/local.env"], expiresAt: "2026-08-25T12:05:00.000Z", networkAllowed: true } });
   assert.equal(injected.ok, false);
   assert.equal(injected.error?.code, "invalid_request");

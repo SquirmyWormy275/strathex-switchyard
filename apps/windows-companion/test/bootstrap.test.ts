@@ -82,6 +82,7 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   assert.ok(companion.checkpointCapture instanceof LocalCheckpointCapture);
   assert.ok(companion.checkpointVerifier instanceof LocalRecoveryArtifactVerifier);
   assert.ok(companion.operationControl instanceof InstalledOperationControl);
+  assert.equal(companion.containmentHistory, undefined);
   const councilIngress = await companion.endpoint.handle({
     version: companionBridgeVersion,
     id: "council-resource-ingress",
@@ -435,6 +436,7 @@ test("installed bootstrap exposes protected acceptance and scanner administratio
   assert.ok(companion.acceptanceAdministration);
   assert.ok(companion.scannerAdministration);
   assert.ok(companion.scannerFixtures);
+  assert.ok(companion.containmentHistory);
   const acceptance = await companion.endpoint.handle({
     version: companionBridgeVersion,
     id: "acceptance-list",

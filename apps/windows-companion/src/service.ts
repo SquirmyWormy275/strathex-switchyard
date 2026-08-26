@@ -14,6 +14,7 @@ import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from
 import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import type { CouncilResourceBrokerPort } from "./council-resource-broker.ts";
 import type { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
+import type { AttestedContainmentHistoryRemediator } from "./containment-history-remediation.ts";
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
@@ -71,6 +72,7 @@ import {
   type ContainmentInspectionPayload,
   type ContainmentIncidentBindingPayload,
   type ContainmentPermitIssuePayload,
+  type ContainmentHistoryRewritePayload,
   type ContainmentRotationRecordPayload,
   type ContainmentReleasePayload,
   type RawHidInstallPayload,
@@ -180,6 +182,7 @@ export interface CompanionServiceOptions {
   readonly providerDispatchProfiles?: Pick<AttestedProviderDispatchProfileCoordinator, "install" | "current">;
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
+  readonly containmentHistory?: Pick<AttestedContainmentHistoryRemediator, "execute">;
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
   readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -223,6 +226,7 @@ export class CompanionService {
   private readonly providerDispatchProfiles?: CompanionServiceOptions["providerDispatchProfiles"];
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
   private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
+  private readonly containmentHistory?: CompanionServiceOptions["containmentHistory"];
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
   private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   private readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -252,6 +256,7 @@ export class CompanionService {
     this.providerDispatchProfiles = options.providerDispatchProfiles;
     this.providerHandshakes = options.providerHandshakes;
     this.containmentRelease = options.containmentRelease;
+    this.containmentHistory = options.containmentHistory;
     this.rawHidInstallations = options.rawHidInstallations;
     this.rawHidSupervisor = options.rawHidSupervisor;
     this.hardwareSignals = options.hardwareSignals;
@@ -359,6 +364,8 @@ export class CompanionService {
           return this.success(request.id, { containment: await this.verifyContainmentRemediation(this.requireContainmentIncidentBinding(request.payload)) });
         case "containment.permit.issue":
           return this.success(request.id, await this.issueContainmentPermit(this.requireContainmentPermitIssue(request.payload)));
+        case "containment.history.rewrite":
+          return this.success(request.id, { remediation: await this.rewriteContainmentHistory(this.requireContainmentHistoryRewrite(request.payload)) });
         case "containment.rotation.record":
           return this.success(request.id, { containment: await this.recordContainmentRotation(this.requireContainmentRotationRecord(request.payload)) });
         case "containment.release":
@@ -915,6 +922,17 @@ export class CompanionService {
     }
   }
 
+  private async rewriteContainmentHistory(payload: ContainmentHistoryRewritePayload) {
+    if (!this.containmentHistory) throw new CompanionServiceError("capability_denied", "No installed attested local-history remediation boundary is attached.");
+    try {
+      const result = await this.containmentHistory.execute(payload);
+      this.record("containment.history.rewrite", "completed", "Rewrote only the reviewed current local branch history after creating a verified external recovery bundle.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact local-history remediation was refused, changed, or requires manual reconciliation; containment remains active.");
+    }
+  }
+
   private async recordContainmentRotation(payload: ContainmentRotationRecordPayload) {
     if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment credential-rotation review boundary is attached.");
     try {
@@ -1053,6 +1071,26 @@ export class CompanionService {
     return {
       sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
       action: payload.action as ContainmentPermitIssuePayload["action"], relativePaths: payload.relativePaths as string[], expiresAt: payload.expiresAt
+    };
+  }
+
+  private requireContainmentHistoryRewrite(payload: unknown): ContainmentHistoryRewritePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "permitId", "relativePaths", "remediatedFindingIds"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || typeof payload.permitId !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(payload.permitId)
+      || !Array.isArray(payload.relativePaths) || !payload.relativePaths.length || payload.relativePaths.length > 256
+      || !payload.relativePaths.every((path) => safeContainmentRelativePath(path))
+      || new Set(payload.relativePaths.map((path) => String(path).toLowerCase())).size !== payload.relativePaths.length
+      || !Array.isArray(payload.remediatedFindingIds) || !payload.remediatedFindingIds.length || payload.remediatedFindingIds.length > 256
+      || !payload.remediatedFindingIds.every((id) => typeof id === "string" && /^containment-finding:[a-f0-9]{64}$/.test(id))
+      || new Set(payload.remediatedFindingIds).size !== payload.remediatedFindingIds.length) {
+      throw new CompanionServiceError("invalid_request", "Local-history remediation requires one exact reviewed incident, permit, unique path set, and unique history-finding set.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      permitId: payload.permitId, relativePaths: payload.relativePaths as string[], remediatedFindingIds: payload.remediatedFindingIds as string[]
     };
   }
 

@@ -32,6 +32,7 @@ import {
   type RawHidInstallationPin,
   type RawHidRuntimeStatus,
   type ContainmentInspectionSummary,
+  type ContainmentHistoryRemediationSummary,
   type HardwareSignalClaim,
   type HardwareSignalDispatchResult,
   type HardwareSignalPreparationResult,
@@ -296,6 +297,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly credentialProvisionRequests: Array<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }> = [];
   readonly containmentReleaseRequests: Array<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
   readonly containmentVerificationRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
+  readonly containmentHistoryRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }> = [];
   readonly councilRecommendationApprovals: Array<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }> = [];
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
@@ -419,6 +421,17 @@ class FakeBridge implements ExtensionCompanionBridge {
     const inspected = await this.inspectContainment(input.sessionId);
     if (!inspected.ok) return inspected;
     return { ok: true as const, value: { permit: { id: `containment-remediation-permit:${"d".repeat(64)}`, incidentId: input.expectedIncidentId, fenceEpoch: inspected.value.fenceEpoch, action: input.action, relativePaths: input.relativePaths, reviewedBy: "fake-current-user", issuedAt: "2026-08-25T00:00:03.000Z", expiresAt: input.expiresAt, networkAllowed: false as const, credentialAccessAllowed: false as const }, containment: inspected.value } };
+  }
+  async rewriteContainmentHistory(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> {
+    this.containmentHistoryRequests.push(input);
+    const inspected = await this.inspectContainment(input.sessionId);
+    if (!inspected.ok) return inspected;
+    return { ok: true, value: {
+      operationId: `containment-history:${"1".repeat(64)}`, incidentId: input.expectedIncidentId, permitId: input.permitId,
+      repositoryRoot: inspected.value.repositoryRoot, branch: "feature/contained", oldHead: "2".repeat(40), newHead: "3".repeat(40),
+      backupBundlePath: "C:\\state\\containment-history\\before.bundle", backupBundleSha256: "4".repeat(64),
+      incidentDigest: "5".repeat(64), status: "completed"
+    } };
   }
   async recordContainmentRotation(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
     return this.inspectContainment(input.sessionId);
@@ -785,6 +798,54 @@ test("containment workflow requires a fresh post-remediation generation before r
   assert.deepEqual(bridge.containmentVerificationRequests, [{ sessionId: target.id, expectedIncidentId: incident.id, expectedIncidentDigest: "c".repeat(64) }]);
   assert.equal(bridge.containmentReleaseRequests.length, 0);
   assert.equal(vscode.information.some((message) => message.includes("assessment generation 2")), true);
+});
+
+test("containment workflow rewrites only reviewed current-branch history findings and surfaces the recovery bundle", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-25T00:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/contained" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const base = readyContainmentIncident("C:\\repo", 21, "operation-containment-21");
+  const finding = { id: `containment-finding:${"f".repeat(64)}`, relativePath: "config/local.env", credentialRelated: true };
+  const incident = {
+    ...base,
+    status: "remediation_required" as const,
+    rotation: undefined,
+    steps: base.steps.map((step) => step.name === "history"
+      ? { ...step, result: { ...step.result!, status: "failed" as const, exposure: "found" as const, findings: [finding] } }
+      : step)
+  };
+  bridge.containmentInspection = {
+    sessionId: target.id, repositoryRoot: "C:\\repo", active: true, fenceEpoch: 21,
+    activatedByOperationId: "operation-containment-21",
+    hookStates: [
+      { name: "credential_lease_revocation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:00.000Z" },
+      { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T00:00:01.000Z" }
+    ],
+    hookFailures: [], uncontrolledPaths: [], incident, incidentDigest: "c".repeat(64)
+  };
+
+  vscode.choose(`${target.provider}: ${target.id}`);
+  vscode.choose("Prepare current-branch history rewrite for 1 path(s)");
+  vscode.choose(`Rewrite only branch history under permit containment-remediation-permit:${"d".repeat(64)}`);
+  await vscode.invoke("sxsy-b122.releaseContainment");
+
+  assert.deepEqual(bridge.containmentHistoryRequests, [{
+    sessionId: target.id,
+    expectedIncidentId: incident.id,
+    expectedIncidentDigest: "c".repeat(64),
+    permitId: `containment-remediation-permit:${"d".repeat(64)}`,
+    relativePaths: [finding.relativePath],
+    remediatedFindingIds: [finding.id]
+  }]);
+  assert.equal(bridge.containmentReleaseRequests.length, 0);
+  assert.match(vscode.information.at(-1) ?? "", /Recovery bundle: C:\\state\\containment-history\\before\.bundle/);
+  assert.match(JSON.stringify(vscode.quickPickSurfaces), /removes each exact reviewed path from every commit reachable from the current local branch/i);
 });
 
 test("containment release stops before confirmation when the inspected active fence has an incomplete hook", async () => {
