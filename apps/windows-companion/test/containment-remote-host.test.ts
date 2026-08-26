@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -10,6 +10,7 @@ import { containmentIncidentReviewDigest, type ContainmentAssessmentRequest, typ
 import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import {
   createContainmentRemoteEvidenceAdministration,
+  containmentRemoteDetectorManifest,
   DurableContainmentRemoteEvidenceRegistry,
   type ContainmentRemoteTrustPolicy
 } from "../src/containment-remote-evidence.ts";
@@ -104,10 +105,10 @@ async function setup(context: test.TestContext, configured: boolean) {
     registry, now: () => new Date(now),
     presence: { async verify() { return { verified: true, operator: "TEST\\Security" }; } }
   });
-  const remotes = configured ? {
+  const remotes: Readonly<Record<string, Readonly<{ fetch: readonly string[]; push: readonly string[] }>>> = configured ? {
     origin: {
       fetch: ["https://github.com/example/switchyard.git"],
-      push: ["https://github.com/example/switchyard.git", "ssh://git@github.com/example/switchyard.git"]
+      push: ["https://github.com/example/switchyard.git"]
     }
   } : {};
   const coordinator = new InstalledContainmentRemoteCoordinator({
@@ -126,8 +127,10 @@ test("installed remote challenge derives the exact target and all configured end
   const publicKeyPem = keys.publicKey.export({ type: "spki", format: "pem" }).toString();
   const keyId = createHash("sha256").update(keys.publicKey.export({ type: "spki", format: "der" })).digest("hex");
   const trust: ContainmentRemoteTrustPolicy = {
-    schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose: "containment-remote-assessment",
-    authorityId: "independent-remote-auditor", keyId, publicKeyPem, expiresAt: "2026-08-26T12:00:00.000Z"
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 2, purpose: "containment-remote-assessment",
+    authorityId: "independent-remote-auditor", keyId, publicKeyPem,
+    gitExecutableSha256: "f".repeat(64), detectorManifestId: containmentRemoteDetectorManifest.id,
+    networkPolicy: "public-https-dns-pinned-no-redirect-v1", expiresAt: "2026-08-26T12:00:00.000Z"
   };
   const trustPath = join(fixture.root, "trust.json");
   await writeFile(trustPath, JSON.stringify(trust), "utf8");
@@ -142,9 +145,12 @@ test("installed remote challenge derives the exact target and all configured end
   assert.equal(challenge.incidentId, fixture.currentIncident.id);
   assert.equal(challenge.targetSnapshotId, fixture.currentTarget.id);
   assert.deepEqual(challenge.configuredRemotes, [
-    { name: "origin.endpoint-1", canonicalIdentity: "https://github.com/example/switchyard.git" },
-    { name: "origin.endpoint-2", canonicalIdentity: "ssh://git@github.com/example/switchyard.git" }
+    { name: "origin", canonicalIdentity: "https://github.com/example/switchyard.git" }
   ]);
+  const challengeDocument = JSON.parse(await readFile(challenge.challengePath, "utf8"));
+  assert.equal(challengeDocument.gitExecutableSha256, "f".repeat(64));
+  assert.equal(challengeDocument.detectorManifestId, containmentRemoteDetectorManifest.id);
+  assert.equal(challengeDocument.networkPolicy, "public-https-dns-pinned-no-redirect-v1");
   assert.match(challenge.challengePath.replaceAll("\\", "/"), /\/challenges\/[a-f0-9]{64}\.json$/);
   const unresolved = await fixture.coordinator.execute(remoteRequest(fixture.currentIncident));
   assert.equal(unresolved.status, "incomplete");

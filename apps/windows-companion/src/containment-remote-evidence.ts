@@ -1,6 +1,8 @@
 /** Host-owned, offline signed evidence for the complete containment remote namespace. */
 import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { lstat, open, realpath } from "node:fs/promises";
+import { isIP } from "node:net";
 import { isAbsolute, resolve } from "node:path";
 
 import type {
@@ -14,11 +16,11 @@ import { untrustedSummary } from "../../../packages/control-plane/src/redaction.
 import { stableJson, type JournalEntry, type JsonValue, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
-const trustInstallKind = "b122.containment-remote.trust.install.v2";
-const trustRevokeKind = "b122.containment-remote.trust.revoke.v2";
-const challengeIssueKind = "b122.containment-remote.challenge.issue.v2";
-const evidenceImportKind = "b122.containment-remote.evidence.import.v2";
-const evidenceConsumeKind = "b122.containment-remote.evidence.consume.v2";
+const trustInstallKind = "b122.containment-remote.trust.install.v3";
+const trustRevokeKind = "b122.containment-remote.trust.revoke.v3";
+const challengeIssueKind = "b122.containment-remote.challenge.issue.v3";
+const evidenceImportKind = "b122.containment-remote.evidence.import.v3";
+const evidenceConsumeKind = "b122.containment-remote.evidence.consume.v3";
 const purpose = "containment-remote-assessment" as const;
 const signatureAlgorithm = "ecdsa-p256-sha256" as const;
 const maximumTrustBytes = 64 * 1024;
@@ -40,15 +42,85 @@ const findingPattern = /^containment-finding:[a-f0-9]{64}$/;
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const remoteNamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+const containmentRemoteDetectorPatterns = Object.freeze([
+  "(api[_-]?key|password|passwd|pwd|secret|token|credential|authorization|client[_-]?secret|private[_-]?key|access[_-]?key)[[:space:]]*[:=][[:space:]]*[^[:space:]]+",
+  "-----BEGIN[[:space:]]+(RSA|EC|OPENSSH|DSA|PGP)?[[:space:]]*PRIVATE KEY-----",
+  "(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})",
+  "(AKIA|ASIA)[A-Z0-9]{16}",
+  "xox[baprs]-[A-Za-z0-9-]{10,}",
+  "Bearer[[:space:]]+[A-Za-z0-9._~+/-]{16,}"
+] as const);
+const containmentRemoteScanArguments = Object.freeze([
+  "--root", "-m", "--full-history", "--text", "--no-ext-diff", "--no-textconv",
+  "--extended-regexp", "--regexp-ignore-case", "--format=", "--name-only", "-z"
+] as const);
+const containmentRemotePathspec = Object.freeze(["--", "."] as const);
+const containmentRemoteMirrorIntegrityChecks = Object.freeze([
+  Object.freeze({ id: "non-shallow" as const, arguments: Object.freeze(["rev-parse", "--is-shallow-repository"] as const), expectation: "stdout-exact-false" as const }),
+  Object.freeze({ id: "no-promisor-config" as const, arguments: Object.freeze(["config", "--local", "--get-regexp", "^(extensions\\.partialClone|remote\\..*\\.promisor)$"] as const), expectation: "exit-one-empty" as const }),
+  Object.freeze({ id: "object-closure" as const, arguments: Object.freeze(["rev-list", "--objects", "--all", "--missing=print"] as const), expectation: "no-missing-markers" as const }),
+  Object.freeze({ id: "strict-fsck" as const, arguments: Object.freeze(["fsck", "--full", "--strict", "--no-dangling", "--no-reflogs"] as const), expectation: "exit-zero" as const })
+] as const);
+
+export const containmentRemoteDetectorManifest = Object.freeze({
+  schema: "sxsy-b122.containment-remote-detector-manifest" as const,
+  version: 2 as const,
+  id: "credential-history-signatures-v2" as const,
+  namespaceScope: "all-advertised-refs" as const,
+  pathHandling: "sha256-redacted-v1" as const,
+  detectors: Object.freeze([
+    "credential-assignment", "authorization-bearer", "private-key-block",
+    "github-token", "aws-access-key", "slack-token"
+  ] as const),
+  patterns: containmentRemoteDetectorPatterns,
+  patternSha256: sha256(containmentRemoteDetectorPatterns.join("|")),
+  scanProfile: Object.freeze({
+    id: "git-log-full-history-paths-v1" as const,
+    fixedArguments: containmentRemoteScanArguments,
+    patternOption: "-G" as const,
+    pathspec: containmentRemotePathspec,
+    mirrorIntegrityChecks: containmentRemoteMirrorIntegrityChecks,
+    fixedArgumentsSha256: sha256(stableJson({
+      fixedArguments: containmentRemoteScanArguments, patternOption: "-G", pathspec: containmentRemotePathspec,
+      mirrorIntegrityChecks: containmentRemoteMirrorIntegrityChecks
+    }))
+  })
+});
+
+export type ContainmentRemoteEvaluationProfile = "production-public-https-v1" | "test-local-file-v1";
+export type ContainmentRemoteNetworkPolicy = "public-https-dns-pinned-no-redirect-v1" | "test-local-file-no-network-v1";
+
+export interface ContainmentRemoteNetworkBinding {
+  readonly remoteName: string;
+  readonly hostname: string;
+  readonly port: 443;
+  readonly addresses: readonly string[];
+}
+
+export interface ContainmentRemoteToolManifest {
+  readonly schema: "sxsy-b122.containment-remote-tool-manifest";
+  readonly version: 1;
+  readonly detectorManifest: typeof containmentRemoteDetectorManifest;
+  readonly gitExecutableSha256: string;
+  readonly gitVersion: string;
+  readonly evaluationProfile: ContainmentRemoteEvaluationProfile;
+  readonly networkPolicy: ContainmentRemoteNetworkPolicy;
+  readonly networkBindings: readonly ContainmentRemoteNetworkBinding[];
+}
+
 export type ContainmentRemoteEvidencePurpose = typeof purpose;
 
 export interface ContainmentRemoteTrustPolicy {
   readonly schema: "sxsy-b122.containment-remote-trust-policy";
-  readonly version: 1;
+  /** Version 1 is retained in the structural type only for legacy test/admin adapters; installation rejects it closed. */
+  readonly version: 1 | 2;
   readonly purpose: ContainmentRemoteEvidencePurpose;
   readonly authorityId: string;
   readonly keyId: string;
   readonly publicKeyPem: string;
+  readonly gitExecutableSha256?: string;
+  readonly detectorManifestId?: typeof containmentRemoteDetectorManifest.id;
+  readonly networkPolicy?: "public-https-dns-pinned-no-redirect-v1";
   readonly expiresAt: string;
 }
 
@@ -91,7 +163,7 @@ export interface ContainmentRemoteChallengeIssue extends ContainmentRemoteEviden
 
 export interface ContainmentRemoteEvidenceChallenge {
   readonly schema: "sxsy-b122.containment-remote-challenge";
-  readonly version: 2;
+  readonly version: 3;
   readonly purpose: ContainmentRemoteEvidencePurpose;
   readonly id: string;
   readonly authorityId: string;
@@ -105,6 +177,10 @@ export interface ContainmentRemoteEvidenceChallenge {
   readonly targetSnapshotId: string;
   readonly policyVersion: string;
   readonly configuredRemotes: readonly ContainmentConfiguredRemote[];
+  readonly gitExecutableSha256: string;
+  readonly detectorManifestId: typeof containmentRemoteDetectorManifest.id;
+  readonly evaluationProfile: ContainmentRemoteEvaluationProfile;
+  readonly networkPolicy: ContainmentRemoteNetworkPolicy;
   readonly challengeNonce: string;
   readonly issuedAt: string;
   readonly expiresAt: string;
@@ -118,6 +194,7 @@ export interface InstalledContainmentRemoteChallenge extends ContainmentRemoteEv
 
 export interface ContainmentRemoteEvidenceFinding {
   readonly relativePath: string;
+  readonly pathSha256: string;
   readonly credentialRelated: boolean;
 }
 
@@ -141,7 +218,7 @@ export interface ContainmentRemoteNamespaceResult extends ContainmentConfiguredR
 
 export interface SignedContainmentRemoteEvidence {
   readonly schema: "sxsy-b122.containment-remote-evidence";
-  readonly version: 2;
+  readonly version: 3;
   readonly purpose: ContainmentRemoteEvidencePurpose;
   readonly evidenceId: string;
   readonly authorityId: string;
@@ -154,6 +231,7 @@ export interface SignedContainmentRemoteEvidence {
   readonly status: ContainmentAssessmentStatus;
   readonly exposure: ContainmentExposure;
   readonly summary: string;
+  readonly toolManifest: ContainmentRemoteToolManifest;
   readonly remoteResults: readonly ContainmentRemoteNamespaceResult[];
   readonly signatureAlgorithm: typeof signatureAlgorithm;
   readonly signature: string;
@@ -179,6 +257,7 @@ export interface ImportedContainmentRemoteEvidence {
   readonly documentSha256: string;
   readonly importedAt: string;
   readonly importedBy: string;
+  readonly toolManifest: ContainmentRemoteToolManifest;
   readonly result: StoredRemoteResult;
   readonly status: "available" | "consumed";
   readonly consumedAt?: string;
@@ -276,23 +355,29 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
     const issuedAt = exactNow(this.now());
     const binding = validateBinding(input);
     if (binding.configuredRemotes.length === 0) throw new Error("No configured remotes exist; signed remote evidence is not required.");
+    for (const remote of binding.configuredRemotes) requireProductionRemoteIdentity(remote.canonicalIdentity);
     const expiresAt = future(input.expiresAt, issuedAt, maximumChallengeLifetimeMs, "containment remote challenge expiry");
     const challengeNonce = digest(this.nonceFactory(), "containment remote challenge nonce");
-    const withoutId = {
-      schema: "sxsy-b122.containment-remote-challenge" as const, version: 2 as const, purpose,
-      authorityId: binding.authorityId, keyId: binding.keyId,
-      incidentId: binding.request.incidentId, repositoryRootDigest: repositoryDigest(binding.request.repositoryRoot),
-      fenceEpoch: binding.request.fenceEpoch, generation: binding.generation,
-      remoteOperationId: binding.request.operationId, remoteExternalId: binding.request.externalId,
-      targetSnapshotId: binding.targetSnapshotId, policyVersion: binding.policyVersion,
-      configuredRemotes: binding.configuredRemotes, challengeNonce,
-      issuedAt: issuedAt.toISOString(), expiresAt
-    };
-    const challenge: ContainmentRemoteEvidenceChallenge = { ...withoutId, id: deriveChallengeId(withoutId) };
     const issuedBy = boundedText(issuedByInput, "containment remote challenge operator", 160);
     return this.store.transaction(async (transaction) => {
       const state = readState(await transaction.readEntries());
-      requireUsableTrust(state.trust.get(trustKey(challenge.authorityId, challenge.keyId)), issuedAt, challenge.expiresAt);
+      const anchor = state.trust.get(trustKey(binding.authorityId, binding.keyId));
+      requireUsableTrust(anchor, issuedAt, expiresAt);
+      const withoutId = {
+        schema: "sxsy-b122.containment-remote-challenge" as const, version: 3 as const, purpose,
+        authorityId: binding.authorityId, keyId: binding.keyId,
+        incidentId: binding.request.incidentId, repositoryRootDigest: repositoryDigest(binding.request.repositoryRoot),
+        fenceEpoch: binding.request.fenceEpoch, generation: binding.generation,
+        remoteOperationId: binding.request.operationId, remoteExternalId: binding.request.externalId,
+        targetSnapshotId: binding.targetSnapshotId, policyVersion: binding.policyVersion,
+        configuredRemotes: binding.configuredRemotes,
+        gitExecutableSha256: digest(anchor.gitExecutableSha256, "containment remote Git executable"),
+        detectorManifestId: detectorManifestId(anchor.detectorManifestId),
+        evaluationProfile: "production-public-https-v1" as const,
+        networkPolicy: productionNetworkPolicy(anchor.networkPolicy),
+        challengeNonce, issuedAt: issuedAt.toISOString(), expiresAt
+      };
+      const challenge: ContainmentRemoteEvidenceChallenge = { ...withoutId, id: deriveChallengeId(withoutId) };
       const exactBinding = challengeBindingDigest(challenge);
       const existing = [...state.challenges.values()].filter((item) => challengeBindingDigest(item) === exactBinding);
       if (existing.some((item) => item.evidenceId || Date.parse(item.expiresAt) > issuedAt.getTime())) {
@@ -325,6 +410,11 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
       const anchor = state.trust.get(trustKey(signed.authorityId, signed.keyId));
       requireUsableTrust(anchor, observedAt, signed.expiresAt);
       if (signed.authorityId !== challenge.authorityId || signed.keyId !== challenge.keyId) throw new Error("Containment remote evidence uses the wrong authority or key binding.");
+      if (signed.challenge.evaluationProfile !== "production-public-https-v1"
+        || signed.toolManifest.evaluationProfile !== "production-public-https-v1"
+        || signed.challenge.networkPolicy !== "public-https-dns-pinned-no-redirect-v1") {
+        throw new Error("Test-local or non-production remote evidence cannot be imported into the release registry.");
+      }
       verifySignedEvidence(signed, anchor);
       assertRemoteCoverage(challenge.configuredRemotes, signed.remoteResults);
       if ([...state.evidence.values()].some((item) => item.authorityId === signed.authorityId && item.keyId === signed.keyId && item.evaluatorNonce === signed.evaluatorNonce)) {
@@ -334,7 +424,7 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
       const stored: Omit<ImportedContainmentRemoteEvidence, "importedAt" | "status"> = {
         evidenceId: signed.evidenceId, challengeId: challenge.id, authorityId: signed.authorityId, keyId: signed.keyId,
         evaluatorNonce: signed.evaluatorNonce, evaluatedAt: signed.evaluatedAt, expiresAt: signed.expiresAt,
-        documentSha256: sha256(selected.bytes), importedBy, result
+        documentSha256: sha256(selected.bytes), importedBy, toolManifest: signed.toolManifest, result
       };
       if (state.evidence.has(stored.evidenceId)) throw new Error("Containment remote evidence identity was already imported; replay is rejected.");
       const entry = await transaction.append(evidenceImportKind, { evidence: stored as unknown as JsonValue });
@@ -455,7 +545,17 @@ export function containmentRemoteEvidenceId(challengeIdInput: string, evaluatorN
   return `containment-remote-evidence:${sha256(stableJson({ authorityId, challengeId, evaluatorNonce, keyId, purpose }))}`;
 }
 
-/** Digest of the evaluator's ordered, complete heads+tags namespace inventory. */
+/** Exact identity of a host-issued challenge, for independent evaluator verification. */
+export function containmentRemoteChallengeId(value: Omit<ContainmentRemoteEvidenceChallenge, "id">): string {
+  return deriveChallengeId(value);
+}
+
+/** Strict shared parser used by the host and an independent evaluator. */
+export function validateContainmentRemoteEvidenceChallenge(value: unknown, now: Date): ContainmentRemoteEvidenceChallenge {
+  return parseChallenge(value, exactNow(now));
+}
+
+/** Digest of the evaluator's ordered complete advertised-ref namespace inventory. */
 export function containmentRemoteNamespaceDigest(refsInput: readonly ContainmentRemoteNamespaceRef[]): string {
   const refs = parseNamespaceRefs(refsInput, "containment remote namespace");
   return sha256(stableJson(refs));
@@ -463,6 +563,39 @@ export function containmentRemoteNamespaceDigest(refsInput: readonly Containment
 
 /** Canonical credential-free identity used by the trusted host inventory. */
 export function canonicalContainmentRemoteIdentity(value: string): string { return canonicalRemote(value); }
+
+export function containmentProductionRemoteEndpoint(value: string): Readonly<{ hostname: string; port: 443 }> {
+  const canonical = canonicalRemote(value);
+  let url: URL;
+  try { url = new URL(canonical); } catch { throw new Error("Containment production remote must be fixed public HTTPS."); }
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")
+    || url.hostname.toLowerCase() === "localhost" || (isIP(url.hostname) && !containmentPublicAddress(url.hostname))) {
+    throw new Error("Containment production remote must be credential-free public HTTPS on port 443.");
+  }
+  return { hostname: url.hostname.toLowerCase(), port: 443 };
+}
+
+export function containmentPublicAddress(value: string): boolean {
+  const family = isIP(value);
+  if (family === 4) {
+    const octets = value.split(".").map(Number);
+    const [a, b] = octets;
+    return !(a === 0 || a === 10 || a === 127 || a! >= 224
+      || (a === 100 && b! >= 64 && b! <= 127)
+      || (a === 169 && b === 254) || (a === 172 && b! >= 16 && b! <= 31)
+      || (a === 192 && (b === 0 || b === 168)) || (a === 198 && (b === 18 || b === 19))
+      || (a === 192 && b === 0 && octets[2] === 2) || (a === 198 && b === 51 && octets[2] === 100)
+      || (a === 203 && b === 0 && octets[2] === 113));
+  }
+  if (family === 6) {
+    const normalized = value.toLowerCase();
+    if (normalized === "::" || normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd")
+      || /^fe[89ab]/.test(normalized) || normalized.startsWith("ff") || normalized.startsWith("2001:db8:")) return false;
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized);
+    return mapped ? containmentPublicAddress(mapped[1]!) : true;
+  }
+  return false;
+}
 
 /** The only clean result path that does not use signed evidence. */
 export function containmentRemoteResultForNoConfiguredRemotes(bindingInput: ContainmentRemoteEvidenceBinding): ContainmentAssessmentResult {
@@ -520,7 +653,7 @@ function readState(entries: readonly JournalEntry<unknown>[]): RegistryState {
 }
 
 function parseStoredEvidence(value: unknown): Omit<ImportedContainmentRemoteEvidence, "importedAt" | "status" | "consumedAt" | "consumptionDigest"> {
-  const payload = exactRecord(value, ["evidenceId", "challengeId", "authorityId", "keyId", "evaluatorNonce", "evaluatedAt", "expiresAt", "documentSha256", "importedBy", "result"], "protected containment remote evidence");
+  const payload = exactRecord(value, ["evidenceId", "challengeId", "authorityId", "keyId", "evaluatorNonce", "evaluatedAt", "expiresAt", "documentSha256", "importedBy", "toolManifest", "result"], "protected containment remote evidence");
   return {
     evidenceId: pattern(payload.evidenceId, evidencePattern, "containment remote evidence id"),
     challengeId: pattern(payload.challengeId, challengePattern, "containment remote challenge id"),
@@ -528,7 +661,7 @@ function parseStoredEvidence(value: unknown): Omit<ImportedContainmentRemoteEvid
     evaluatorNonce: digest(payload.evaluatorNonce, "containment remote evaluator nonce"),
     evaluatedAt: exactIso(payload.evaluatedAt, "containment remote evaluation"), expiresAt: exactIso(payload.expiresAt, "containment remote evidence expiry"),
     documentSha256: digest(payload.documentSha256, "containment remote document"), importedBy: boundedText(payload.importedBy, "containment remote evidence operator", 160),
-    result: parseStoredResult(payload.result)
+    toolManifest: parseToolManifest(payload.toolManifest), result: parseStoredResult(payload.result)
   };
 }
 
@@ -553,8 +686,11 @@ function parseTrust(bytes: Uint8Array, now: Date): ContainmentRemoteTrustPolicy 
 }
 
 function validateTrust(value: unknown, now: Date, allowExpired = false): ContainmentRemoteTrustPolicy {
-  const item = exactRecord(value, ["schema", "version", "purpose", "authorityId", "keyId", "publicKeyPem", "expiresAt"], "containment remote trust policy");
-  if (item.schema !== "sxsy-b122.containment-remote-trust-policy" || item.version !== 1 || item.purpose !== purpose) throw new Error("Containment remote trust policy schema or purpose is invalid.");
+  const item = exactRecord(value, ["schema", "version", "purpose", "authorityId", "keyId", "publicKeyPem", "gitExecutableSha256", "detectorManifestId", "networkPolicy", "expiresAt"], "containment remote trust policy");
+  if (item.schema !== "sxsy-b122.containment-remote-trust-policy" || item.version !== 2 || item.purpose !== purpose
+    || item.detectorManifestId !== containmentRemoteDetectorManifest.id || item.networkPolicy !== "public-https-dns-pinned-no-redirect-v1") {
+    throw new Error("Containment remote trust policy schema, purpose, detector, or network policy is invalid.");
+  }
   const publicKeyPem = boundedText(item.publicKeyPem, "containment remote public key", 16_384);
   let publicKey;
   try { publicKey = createPublicKey(publicKeyPem); } catch { throw new Error("Containment remote trust policy public key is invalid."); }
@@ -563,14 +699,20 @@ function validateTrust(value: unknown, now: Date, allowExpired = false): Contain
   if (!sameDigest(keyId, digest(item.keyId, "containment remote key"))) throw new Error("Containment remote trust key ID does not match its P-256 SPKI key.");
   const expiresAt = exactIso(item.expiresAt, "containment remote trust expiry");
   if (!allowExpired && Date.parse(expiresAt) <= exactNow(now).getTime()) throw new Error("Containment remote trust policy is expired.");
-  return { schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose, authorityId: identifier(item.authorityId, "containment remote authority"), keyId, publicKeyPem, expiresAt };
+  return {
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 2, purpose,
+    authorityId: identifier(item.authorityId, "containment remote authority"), keyId, publicKeyPem,
+    gitExecutableSha256: digest(item.gitExecutableSha256, "containment remote Git executable"),
+    detectorManifestId: containmentRemoteDetectorManifest.id,
+    networkPolicy: "public-https-dns-pinned-no-redirect-v1", expiresAt
+  };
 }
 
 function parseEvidence(bytes: Uint8Array, now: Date): SignedContainmentRemoteEvidence {
   let value: unknown;
   try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new Error("Containment remote evidence is not JSON."); }
-  const item = exactRecord(value, ["schema", "version", "purpose", "evidenceId", "authorityId", "keyId", "challenge", "evaluatorNonce", "evaluatedAt", "expiresAt", "namespaceComplete", "status", "exposure", "summary", "remoteResults", "signatureAlgorithm", "signature"], "containment remote evidence");
-  if (item.schema !== "sxsy-b122.containment-remote-evidence" || item.version !== 2 || item.purpose !== purpose || item.signatureAlgorithm !== signatureAlgorithm || item.namespaceComplete !== true) {
+  const item = exactRecord(value, ["schema", "version", "purpose", "evidenceId", "authorityId", "keyId", "challenge", "evaluatorNonce", "evaluatedAt", "expiresAt", "namespaceComplete", "status", "exposure", "summary", "toolManifest", "remoteResults", "signatureAlgorithm", "signature"], "containment remote evidence");
+  if (item.schema !== "sxsy-b122.containment-remote-evidence" || item.version !== 3 || item.purpose !== purpose || item.signatureAlgorithm !== signatureAlgorithm || item.namespaceComplete !== true) {
     throw new Error("Containment remote evidence schema, purpose, complete-namespace assertion, or signature algorithm is invalid.");
   }
   const challenge = parseChallenge(item.challenge, now);
@@ -591,6 +733,14 @@ function parseEvidence(bytes: Uint8Array, now: Date): SignedContainmentRemoteEvi
     throw new Error("Containment remote evidence is future-dated, expired, or outside its exact freshness window.");
   }
   const remoteResults = parseRemoteResults(item.remoteResults);
+  const toolManifest = parseToolManifest(item.toolManifest);
+  if (toolManifest.gitExecutableSha256 !== challenge.gitExecutableSha256
+    || toolManifest.detectorManifest.id !== challenge.detectorManifestId
+    || toolManifest.evaluationProfile !== challenge.evaluationProfile
+    || toolManifest.networkPolicy !== challenge.networkPolicy) {
+    throw new Error("Containment remote evidence tool manifest changed the host-issued evaluator policy binding.");
+  }
+  assertNetworkCoverage(challenge, toolManifest);
   assertRemoteCoverage(challenge.configuredRemotes, remoteResults);
   const status = assessmentStatus(item.status);
   const exposure = exposureStatus(item.exposure);
@@ -598,15 +748,63 @@ function parseEvidence(bytes: Uint8Array, now: Date): SignedContainmentRemoteEvi
   if (status !== derived.status || exposure !== derived.exposure) throw new Error("Containment remote evidence aggregate result is inconsistent with its complete remote namespaces.");
   const signature = boundedText(item.signature, "containment remote evidence signature", 512);
   return {
-    schema: "sxsy-b122.containment-remote-evidence", version: 2, purpose, evidenceId, authorityId, keyId, challenge,
+    schema: "sxsy-b122.containment-remote-evidence", version: 3, purpose, evidenceId, authorityId, keyId, challenge,
     evaluatorNonce, evaluatedAt, expiresAt, namespaceComplete: true, status, exposure,
-    summary: boundedText(item.summary, "containment remote evidence summary", 2_048), remoteResults, signatureAlgorithm, signature
+    summary: boundedText(item.summary, "containment remote evidence summary", 2_048), toolManifest, remoteResults, signatureAlgorithm, signature
   };
 }
 
+function parseToolManifest(value: unknown): ContainmentRemoteToolManifest {
+  const item = exactRecord(value, ["schema", "version", "detectorManifest", "gitExecutableSha256", "gitVersion", "evaluationProfile", "networkPolicy", "networkBindings"], "containment remote tool manifest");
+  if (item.schema !== "sxsy-b122.containment-remote-tool-manifest" || item.version !== 1) throw new Error("Containment remote tool manifest schema is invalid.");
+  const detector = exactRecord(item.detectorManifest, ["schema", "version", "id", "namespaceScope", "pathHandling", "detectors", "patterns", "patternSha256", "scanProfile"], "containment remote detector manifest");
+  if (!Array.isArray(detector.detectors)
+    || !Array.isArray(detector.patterns)
+    || stableJson(detector) !== stableJson(containmentRemoteDetectorManifest)) throw new Error("Containment remote detector manifest is unsupported or incomplete.");
+  const evaluation = evaluationProfile(item.evaluationProfile);
+  const policy = networkPolicy(item.networkPolicy);
+  if ((evaluation === "production-public-https-v1") !== (policy === "public-https-dns-pinned-no-redirect-v1")) throw new Error("Containment remote tool profile and network policy are inconsistent.");
+  if (!Array.isArray(item.networkBindings) || item.networkBindings.length > maximumRemotes) throw new Error("Containment remote network bindings are invalid or unbounded.");
+  const networkBindings = item.networkBindings.map((candidate) => {
+    const binding = exactRecord(candidate, ["remoteName", "hostname", "port", "addresses"], "containment remote network binding");
+    if (binding.port !== 443 || typeof binding.hostname !== "string" || !binding.hostname || binding.hostname.length > 253 || /[\0\r\n\s]/.test(binding.hostname)
+      || !Array.isArray(binding.addresses) || binding.addresses.length < 1 || binding.addresses.length > 8) throw new Error("Containment remote network binding is invalid or unbounded.");
+    const addresses = binding.addresses.map((address) => {
+      if (typeof address !== "string" || isIP(address) !== 4) throw new Error("Containment remote network binding requires an unambiguous IPv4 address.");
+      return address;
+    });
+    if (evaluation === "production-public-https-v1" && addresses.some((address) => !containmentPublicAddress(address))) {
+      throw new Error("Containment production remote evidence contains a private, loopback, link-local, or reserved network binding.");
+    }
+    assertStrictOrder(addresses, "Containment remote network binding addresses are duplicate or unordered.");
+    return { remoteName: remoteName(binding.remoteName), hostname: binding.hostname.toLowerCase(), port: 443 as const, addresses };
+  });
+  assertStrictOrder(networkBindings.map((binding) => binding.remoteName), "Containment remote network bindings are duplicate or unordered.", true);
+  return {
+    schema: "sxsy-b122.containment-remote-tool-manifest", version: 1,
+    detectorManifest: containmentRemoteDetectorManifest,
+    gitExecutableSha256: digest(item.gitExecutableSha256, "containment remote Git executable"),
+    gitVersion: gitVersion(item.gitVersion), evaluationProfile: evaluation, networkPolicy: policy, networkBindings
+  };
+}
+
+function assertNetworkCoverage(challenge: ContainmentRemoteEvidenceChallenge, manifest: ContainmentRemoteToolManifest): void {
+  if (challenge.evaluationProfile === "test-local-file-v1") {
+    if (manifest.networkBindings.length !== 0) throw new Error("Test-local containment evidence cannot assert network bindings.");
+    return;
+  }
+  if (manifest.networkBindings.length !== challenge.configuredRemotes.length
+    || challenge.configuredRemotes.some((remote, index) => {
+      const binding = manifest.networkBindings[index];
+      return remote.name !== binding?.remoteName || containmentProductionRemoteEndpoint(remote.canonicalIdentity).hostname !== binding.hostname;
+    })) {
+    throw new Error("Containment remote tool manifest lacks exact configured-remote network coverage.");
+  }
+}
+
 function parseChallenge(value: unknown, now: Date, allowExpired = false): ContainmentRemoteEvidenceChallenge {
-  const item = exactRecord(value, ["schema", "version", "purpose", "id", "authorityId", "keyId", "incidentId", "repositoryRootDigest", "fenceEpoch", "generation", "remoteOperationId", "remoteExternalId", "targetSnapshotId", "policyVersion", "configuredRemotes", "challengeNonce", "issuedAt", "expiresAt"], "containment remote challenge");
-  if (item.schema !== "sxsy-b122.containment-remote-challenge" || item.version !== 2 || item.purpose !== purpose) throw new Error("Containment remote challenge schema or purpose is invalid.");
+  const item = exactRecord(value, ["schema", "version", "purpose", "id", "authorityId", "keyId", "incidentId", "repositoryRootDigest", "fenceEpoch", "generation", "remoteOperationId", "remoteExternalId", "targetSnapshotId", "policyVersion", "configuredRemotes", "gitExecutableSha256", "detectorManifestId", "evaluationProfile", "networkPolicy", "challengeNonce", "issuedAt", "expiresAt"], "containment remote challenge");
+  if (item.schema !== "sxsy-b122.containment-remote-challenge" || item.version !== 3 || item.purpose !== purpose) throw new Error("Containment remote challenge schema or purpose is invalid.");
   const issuedAt = exactIso(item.issuedAt, "containment remote challenge issue");
   const expiresAt = exactIso(item.expiresAt, "containment remote challenge expiry");
   if (Date.parse(expiresAt) <= Date.parse(issuedAt) || Date.parse(expiresAt) - Date.parse(issuedAt) > maximumChallengeLifetimeMs || (!allowExpired && Date.parse(expiresAt) <= exactNow(now).getTime())) {
@@ -615,15 +813,23 @@ function parseChallenge(value: unknown, now: Date, allowExpired = false): Contai
   const configuredRemotes = parseConfiguredRemotes(item.configuredRemotes);
   if (configuredRemotes.length === 0) throw new Error("A signed containment remote challenge cannot represent zero configured remotes.");
   const challenge: ContainmentRemoteEvidenceChallenge = {
-    schema: "sxsy-b122.containment-remote-challenge", version: 2, purpose,
+    schema: "sxsy-b122.containment-remote-challenge", version: 3, purpose,
     id: pattern(item.id, challengePattern, "containment remote challenge id"),
     authorityId: identifier(item.authorityId, "containment remote authority"), keyId: digest(item.keyId, "containment remote key"),
     incidentId: pattern(item.incidentId, incidentPattern, "containment incident id"), repositoryRootDigest: digest(item.repositoryRootDigest, "containment repository root"),
     fenceEpoch: positiveInteger(item.fenceEpoch, "containment fence epoch"), generation: positiveInteger(item.generation, "containment assessment generation"),
     remoteOperationId: pattern(item.remoteOperationId, childPattern, "containment remote operation id"), remoteExternalId: pattern(item.remoteExternalId, childPattern, "containment remote external id"),
     targetSnapshotId: identifier(item.targetSnapshotId, "containment target snapshot"), policyVersion: identifier(item.policyVersion, "containment remote policy"),
-    configuredRemotes, challengeNonce: digest(item.challengeNonce, "containment remote challenge nonce"), issuedAt, expiresAt
+    configuredRemotes,
+    gitExecutableSha256: digest(item.gitExecutableSha256, "containment remote Git executable"),
+    detectorManifestId: detectorManifestId(item.detectorManifestId),
+    evaluationProfile: evaluationProfile(item.evaluationProfile),
+    networkPolicy: networkPolicy(item.networkPolicy),
+    challengeNonce: digest(item.challengeNonce, "containment remote challenge nonce"), issuedAt, expiresAt
   };
+  if ((challenge.evaluationProfile === "production-public-https-v1") !== (challenge.networkPolicy === "public-https-dns-pinned-no-redirect-v1")) {
+    throw new Error("Containment remote challenge evaluation profile and network policy are inconsistent.");
+  }
   if (!sameDigest(challenge.id, deriveChallengeId(challengeIdentityDocument(challenge)))) throw new Error("Containment remote challenge identity does not bind its exact contents.");
   return challenge;
 }
@@ -675,9 +881,12 @@ function parseRefResults(value: unknown): readonly ContainmentRemoteEvidenceRefR
     const exposure = exposureStatus(item.exposure);
     if (!Array.isArray(item.findings) || item.findings.length > maximumFindingsPerRef) throw new Error("Containment remote ref findings exceed their bound.");
     const findings = item.findings.map((candidateFinding) => {
-      const finding = exactRecord(candidateFinding, ["relativePath", "credentialRelated"], "containment remote ref finding");
+      const finding = exactRecord(candidateFinding, ["relativePath", "pathSha256", "credentialRelated"], "containment remote ref finding");
       if (typeof finding.credentialRelated !== "boolean") throw new Error("Containment remote ref finding is malformed.");
-      return { relativePath: safeRelative(finding.relativePath), credentialRelated: finding.credentialRelated };
+      const pathSha256 = digest(finding.pathSha256, "containment remote finding path");
+      const relativePath = safeRelative(finding.relativePath);
+      if (relativePath !== `redacted/${pathSha256}`) throw new Error("Containment remote finding path is not the exact redacted path digest.");
+      return { relativePath, pathSha256, credentialRelated: finding.credentialRelated };
     });
     if (new Set(findings.map((finding) => finding.relativePath.toLowerCase())).size !== findings.length) throw new Error("Containment remote ref findings contain duplicate paths.");
     assertResultConsistency(status, exposure, findings.length);
@@ -755,7 +964,7 @@ function resultFor(request: ContainmentAssessmentRequest, result: StoredRemoteRe
 function storedResult(evidence: SignedContainmentRemoteEvidence): StoredRemoteResult {
   const byPath = new Map<string, { relativePath: string; credentialRelated: boolean }>();
   for (const remote of evidence.remoteResults) for (const ref of remote.refResults) for (const finding of ref.findings) {
-    const key = finding.relativePath.toLowerCase();
+    const key = finding.pathSha256;
     const current = byPath.get(key);
     byPath.set(key, { relativePath: current?.relativePath ?? finding.relativePath, credentialRelated: (current?.credentialRelated ?? false) || finding.credentialRelated });
   }
@@ -764,7 +973,7 @@ function storedResult(evidence: SignedContainmentRemoteEvidence): StoredRemoteRe
     id: `containment-finding:${sha256(stableJson({
       configuredRemotes: evidence.challenge.configuredRemotes, generation: evidence.challenge.generation,
       incidentId: evidence.challenge.incidentId, remoteOperationId: evidence.challenge.remoteOperationId,
-      targetSnapshotId: evidence.challenge.targetSnapshotId, relativePath: finding.relativePath.toLowerCase()
+      targetSnapshotId: evidence.challenge.targetSnapshotId, pathSha256: finding.relativePath.slice("redacted/".length)
     }))}`,
     relativePath: finding.relativePath, credentialRelated: finding.credentialRelated
   }));
@@ -854,9 +1063,10 @@ function deriveChallengeId(value: Omit<ContainmentRemoteEvidenceChallenge, "id">
 }
 
 function exactRef(value: unknown): string {
-  if (typeof value !== "string" || value.length > 512 || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(value)
+  if (typeof value !== "string" || value.length > 512 || !/^refs\/[A-Za-z0-9._/-]+$/.test(value)
     || value.includes("..") || value.includes("@{") || value.endsWith(".") || value.endsWith(".lock")
-    || value.split("/").some((part) => !part || part === "." || part === "..") || /[\0\r\n\\~^:?*[ ]/.test(value)) {
+    || value.split("/").some((part) => !part || part === "." || part === ".." || part.startsWith(".") || part.endsWith(".lock"))
+    || /[\0\r\n\\~^:?*[ ]/.test(value)) {
     throw new Error("Containment remote ref is invalid.");
   }
   return value;
@@ -895,6 +1105,35 @@ function safeRemotePath(value: string): boolean {
   return value.startsWith("/") && value.length > 1 && !/[\0\r\n]/.test(value) && !value.split("/").some((part, index) => index > 0 && (!part || part === "." || part === ".."));
 }
 
+function requireProductionRemoteIdentity(value: string): void { containmentProductionRemoteEndpoint(value); }
+
+function detectorManifestId(value: unknown): typeof containmentRemoteDetectorManifest.id {
+  if (value !== containmentRemoteDetectorManifest.id) throw new Error("Containment remote detector manifest identity is unsupported.");
+  return containmentRemoteDetectorManifest.id;
+}
+
+function evaluationProfile(value: unknown): ContainmentRemoteEvaluationProfile {
+  if (value !== "production-public-https-v1" && value !== "test-local-file-v1") throw new Error("Containment remote evaluation profile is invalid.");
+  return value;
+}
+
+function networkPolicy(value: unknown): ContainmentRemoteNetworkPolicy {
+  if (value !== "public-https-dns-pinned-no-redirect-v1" && value !== "test-local-file-no-network-v1") throw new Error("Containment remote network policy is invalid.");
+  return value;
+}
+
+function productionNetworkPolicy(value: unknown): "public-https-dns-pinned-no-redirect-v1" {
+  if (value !== "public-https-dns-pinned-no-redirect-v1") throw new Error("Containment remote trust has no supported production network policy.");
+  return value;
+}
+
+function gitVersion(value: unknown): string {
+  if (typeof value !== "string" || !/^git version [0-9]+\.[0-9]+\.[0-9]+(?:\.[A-Za-z0-9.-]+)?$/.test(value) || value.length > 96) {
+    throw new Error("Containment remote Git tool version is invalid.");
+  }
+  return value;
+}
+
 async function readBoundedRegularFile(pathInput: string, maximum: number, label: string): Promise<Readonly<{ path: string; bytes: Uint8Array }>> {
   if (typeof pathInput !== "string" || !isAbsolute(pathInput) || pathInput.length > 4_096 || /[\0\r\n]/.test(pathInput)) throw new Error(`${label} path must be fixed and absolute.`);
   const selected = resolve(pathInput);
@@ -903,10 +1142,20 @@ async function readBoundedRegularFile(pathInput: string, maximum: number, label:
   const canonical = await realpath(selected);
   const canonicalBefore = await lstat(canonical);
   if (!canonicalBefore.isFile() || canonicalBefore.isSymbolicLink() || canonicalBefore.size !== before.size || canonicalBefore.dev !== before.dev || canonicalBefore.ino !== before.ino) throw new Error(`${label} changed during regular-file validation.`);
-  const bytes = await readFile(canonical);
-  const after = await lstat(canonical);
-  if (bytes.byteLength !== before.size || after.size !== before.size || after.mtimeMs !== canonicalBefore.mtimeMs || after.dev !== canonicalBefore.dev || after.ino !== canonicalBefore.ino) throw new Error(`${label} changed while being read.`);
-  return { path: canonical, bytes };
+  const flags = process.platform === "win32" ? fsConstants.O_RDONLY : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+  const handle = await open(canonical, flags);
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.size !== before.size || opened.dev !== before.dev || opened.ino !== before.ino) throw new Error(`${label} changed before its stable handle was opened.`);
+    const bytes = await handle.readFile();
+    const afterHandle = await handle.stat();
+    const afterPath = await lstat(canonical);
+    if (bytes.byteLength !== before.size || afterHandle.size !== opened.size || afterHandle.mtimeMs !== opened.mtimeMs
+      || afterHandle.dev !== opened.dev || afterHandle.ino !== opened.ino || afterPath.dev !== opened.dev || afterPath.ino !== opened.ino) {
+      throw new Error(`${label} changed while it was read through a stable handle.`);
+    }
+    return { path: canonical, bytes };
+  } finally { await handle.close(); }
 }
 
 function exactRecord(value: unknown, keys: readonly string[], label: string): Record<string, unknown> {

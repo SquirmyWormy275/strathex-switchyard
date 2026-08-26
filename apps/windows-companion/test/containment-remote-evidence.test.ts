@@ -9,6 +9,7 @@ import type { ContainmentAssessmentRequest } from "../../../packages/control-pla
 import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import {
   DurableContainmentRemoteEvidenceRegistry,
+  containmentRemoteDetectorManifest,
   containmentRemoteEvidenceId,
   containmentRemoteEvidenceSigningPayload,
   containmentRemoteNamespaceDigest,
@@ -25,6 +26,7 @@ import {
 const initialNow = "2026-08-25T12:00:00.000Z";
 const authorityId = "independent-remote-auditor";
 const purpose = "containment-remote-assessment" as const;
+const gitExecutableSha256 = "f".repeat(64);
 const authenticator = {
   provider: "containment-remote-test",
   async seal(hash: string) { return `test:${hash}`; },
@@ -44,8 +46,11 @@ async function setup(context: test.TestContext) {
   const options = { now: () => new Date(clock), nonceFactory: () => (++nonce).toString(16).padStart(64, "0") };
   const registry = new DurableContainmentRemoteEvidenceRegistry(store, options);
   const trust: ContainmentRemoteTrustPolicy = {
-    schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose,
-    authorityId, keyId, publicKeyPem, expiresAt: "2026-08-26T12:00:00.000Z"
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 2, purpose,
+    authorityId, keyId, publicKeyPem, gitExecutableSha256,
+    detectorManifestId: containmentRemoteDetectorManifest.id,
+    networkPolicy: "public-https-dns-pinned-no-redirect-v1",
+    expiresAt: "2026-08-26T12:00:00.000Z"
   };
   await registry.installTrust(trust, "TEST\\Security");
   const repositoryRoot = resolve(root, "repository");
@@ -61,7 +66,7 @@ async function setup(context: test.TestContext) {
     policyVersion: "containment-policy-9", authorityId, keyId,
     configuredRemotes: [
       { name: "origin", canonicalIdentity: "https://github.com/acme/switchyard.git" },
-      { name: "upstream", canonicalIdentity: "ssh://git@github.com/upstream/switchyard.git" }
+      { name: "upstream", canonicalIdentity: "https://github.com/upstream/switchyard.git" }
     ]
   };
   const challenge = await registry.issueChallenge({ ...binding, expiresAt: "2026-08-25T12:10:00.000Z" }, "TEST\\Security");
@@ -90,6 +95,7 @@ function completeNamespaces(challenge: ContainmentRemoteEvidenceChallenge): read
   return [
     namespace(challenge.configuredRemotes[0]!, [
       { ref: "refs/heads/main", head: "5".repeat(40) },
+      { ref: "refs/pull/22/head", head: "7".repeat(40) },
       { ref: "refs/tags/v1.0.0", head: "6".repeat(40) }
     ]),
     namespace(challenge.configuredRemotes[1]!, [])
@@ -103,12 +109,22 @@ function unsigned(
 ): UnsignedContainmentRemoteEvidence {
   const evaluatorNonce = "a".repeat(64);
   const base: UnsignedContainmentRemoteEvidence = {
-    schema: "sxsy-b122.containment-remote-evidence", version: 2, purpose,
+    schema: "sxsy-b122.containment-remote-evidence", version: 3, purpose,
     evidenceId: containmentRemoteEvidenceId(challenge.id, evaluatorNonce, authorityId, fixture.keyId),
     authorityId, keyId: fixture.keyId, challenge, evaluatorNonce,
     evaluatedAt: "2026-08-25T12:01:00.000Z", expiresAt: "2026-08-25T12:08:00.000Z",
     namespaceComplete: true, status: "passed", exposure: "none",
     summary: "Every configured remote namespace was completely assessed.",
+    toolManifest: {
+      schema: "sxsy-b122.containment-remote-tool-manifest", version: 1,
+      detectorManifest: containmentRemoteDetectorManifest, gitExecutableSha256,
+      gitVersion: "git version 2.51.0", evaluationProfile: challenge.evaluationProfile,
+      networkPolicy: challenge.networkPolicy,
+      networkBindings: challenge.configuredRemotes.map((remote) => ({
+        remoteName: remote.name, hostname: new URL(remote.canonicalIdentity).hostname, port: 443 as const,
+        addresses: ["140.82.112.4"]
+      }))
+    },
     remoteResults: completeNamespaces(challenge), signatureAlgorithm: "ecdsa-p256-sha256"
   };
   return { ...base, ...overrides };
@@ -271,11 +287,75 @@ test("signature, challenge identity, freshness, and one-use import fail closed",
   await assert.rejects(expired.registry.importEvidence(await signedFile(expired, unsigned(expired), expired.keys.privateKey, "expired.json"), "TEST\\Security"), /expired|fresh/i);
 });
 
+test("tool, detector, redacted-path, legacy trust, and non-public remote policy drift fail closed", async (context) => {
+  const fixture = await setup(context);
+  const differentTool = unsigned(fixture, fixture.challenge, {
+    toolManifest: { ...unsigned(fixture).toolManifest, gitExecutableSha256: "e".repeat(64) }
+  });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, differentTool, fixture.keys.privateKey, "wrong-tool.json"), "TEST\\Security"), /tool manifest|policy binding|Git executable/i);
+
+  const wrongNetwork = unsigned(fixture, fixture.challenge, {
+    toolManifest: {
+      ...unsigned(fixture).toolManifest,
+      networkBindings: unsigned(fixture).toolManifest.networkBindings.map((binding, index) => index === 0 ? { ...binding, hostname: "attacker.example" } : binding)
+    }
+  });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, wrongNetwork, fixture.keys.privateKey, "wrong-network.json"), "TEST\\Security"), /network coverage|configured-remote/i);
+
+  const detectorDrift = unsigned(fixture, fixture.challenge, {
+    toolManifest: {
+      ...unsigned(fixture).toolManifest,
+      detectorManifest: { ...containmentRemoteDetectorManifest, detectors: ["credential-assignment"] }
+    } as unknown as UnsignedContainmentRemoteEvidence["toolManifest"]
+  });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, detectorDrift, fixture.keys.privateKey, "wrong-detector.json"), "TEST\\Security"), /detector manifest|unsupported|incomplete/i);
+
+  const patternDrift = unsigned(fixture, fixture.challenge, {
+    toolManifest: {
+      ...unsigned(fixture).toolManifest,
+      detectorManifest: {
+        ...containmentRemoteDetectorManifest,
+        patterns: [...containmentRemoteDetectorManifest.patterns.slice(0, -1), "Bearer[[:space:]]+.*"]
+      }
+    } as unknown as UnsignedContainmentRemoteEvidence["toolManifest"]
+  });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, patternDrift, fixture.keys.privateKey, "wrong-pattern.json"), "TEST\\Security"), /detector manifest|unsupported|incomplete/i);
+
+  const namespaces = completeNamespaces(fixture.challenge);
+  const pathSha256 = createHash("sha256").update("secret-name.txt").digest("hex");
+  const badFinding = {
+    ...namespaces[0]!.refResults[0]!, status: "failed" as const, exposure: "found" as const,
+    findings: [{ relativePath: `redacted/${"0".repeat(64)}`, pathSha256, credentialRelated: true }]
+  };
+  const badRemote = { ...namespaces[0]!, status: "failed" as const, exposure: "found" as const, refResults: [badFinding, namespaces[0]!.refResults[1]!] };
+  const badPath = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", remoteResults: [badRemote, namespaces[1]!] });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, badPath, fixture.keys.privateKey, "bad-redaction.json"), "TEST\\Security"), /redacted path digest|finding path/i);
+
+  const legacyRoot = await mkdtemp(join(tmpdir(), "sxsy-containment-legacy-trust-"));
+  context.after(async () => { await rm(legacyRoot, { recursive: true, force: true }); });
+  const legacyRegistry = new DurableContainmentRemoteEvidenceRegistry(new ProtectedJsonStore({ filePath: join(legacyRoot, "protected.jsonl"), authenticator }), { now: () => new Date(initialNow) });
+  await assert.rejects(legacyRegistry.installTrust({
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose,
+    authorityId, keyId: fixture.keyId, publicKeyPem: fixture.publicKeyPem,
+    expiresAt: "2026-08-26T12:00:00.000Z"
+  }, "TEST\\Security"), /schema|detector|network policy/i);
+
+  await assert.rejects(fixture.registry.issueChallenge({
+    ...fixture.binding, configuredRemotes: [{ name: "private", canonicalIdentity: "https://127.0.0.1/repository.git" }],
+    expiresAt: "2026-08-25T12:09:00.000Z"
+  }, "TEST\\Security"), /public HTTPS|credential-free|port 443/i);
+  await assert.rejects(fixture.registry.issueChallenge({
+    ...fixture.binding, configuredRemotes: [{ name: "credentialed", canonicalIdentity: "https://user:secret@example.com/repository.git" }],
+    expiresAt: "2026-08-25T12:09:00.000Z"
+  }, "TEST\\Security"), /credential|canonical remote/i);
+});
+
 test("findings are generation-scoped and summaries are redacted before protected persistence", async (context) => {
   const fixture = await setup(context);
   const remotes = completeNamespaces(fixture.challenge);
-  const exposedRef = { ...remotes[0]!.refResults[0]!, status: "failed" as const, exposure: "found" as const, summary: "token=supersecretvalue", findings: [{ relativePath: "config/credential.txt", credentialRelated: true }] };
-  const failedOrigin: ContainmentRemoteNamespaceResult = { ...remotes[0]!, status: "failed", exposure: "found", summary: "token=supersecretvalue", refResults: [exposedRef, remotes[0]!.refResults[1]!] };
+  const pathSha256 = createHash("sha256").update("config/credential.txt").digest("hex");
+  const exposedRef = { ...remotes[0]!.refResults[0]!, status: "failed" as const, exposure: "found" as const, summary: "token=supersecretvalue", findings: [{ relativePath: `redacted/${pathSha256}`, pathSha256, credentialRelated: true }] };
+  const failedOrigin: ContainmentRemoteNamespaceResult = { ...remotes[0]!, status: "failed", exposure: "found", summary: "token=supersecretvalue", refResults: [exposedRef, ...remotes[0]!.refResults.slice(1)] };
   const value = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", summary: "token=supersecretvalue", remoteResults: [failedOrigin, remotes[1]!] });
   await fixture.registry.importEvidence(await signedFile(fixture, value, fixture.keys.privateKey, "redaction.json"), "TEST\\Security");
   const result = await fixture.registry.resolve(fixture.binding);
@@ -294,7 +374,11 @@ test("the administration boundary requires current-user presence for every state
   const keys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const publicKeyPem = keys.publicKey.export({ type: "spki", format: "pem" }).toString();
   const keyId = createHash("sha256").update(keys.publicKey.export({ type: "spki", format: "der" })).digest("hex");
-  const policy = { schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose, authorityId, keyId, publicKeyPem, expiresAt: "2026-08-26T12:00:00.000Z" };
+  const policy = {
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 2, purpose, authorityId, keyId, publicKeyPem,
+    gitExecutableSha256, detectorManifestId: containmentRemoteDetectorManifest.id,
+    networkPolicy: "public-https-dns-pinned-no-redirect-v1", expiresAt: "2026-08-26T12:00:00.000Z"
+  } as const;
   const policyPath = join(root, "trust.json");
   await writeFile(policyPath, JSON.stringify(policy), "utf8");
   assert.throws(() => new DurableContainmentRemoteEvidenceRegistry(new ProtectedJsonStore({ filePath: join(root, "unprotected.jsonl") })), /authenticated.*storage/i);
