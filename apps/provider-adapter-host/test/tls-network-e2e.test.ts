@@ -19,6 +19,7 @@ import {
 } from "../../windows-companion/src/configured-network.ts";
 import { DurableCredentialReferenceVault, type CredentialContainmentFence } from "../../windows-companion/src/durable-credentials.ts";
 import { WindowsDpapiCurrentUserProtector, type UserSecretProtector } from "../../windows-companion/src/windows-secret.ts";
+import { providerDispatchProfileIdentityDigest, type ProviderDispatchLeaseProfile } from "../../windows-companion/src/provider-dispatch-lease.ts";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const powershell = "pwsh.exe";
@@ -71,10 +72,11 @@ test("provider secret generation validates and Initialize emits its exact ready-
   const canonicalInitializedRoot = await realpath(initializedRoot);
   assertInitializeReceipt(windowsInitialized, canonicalInitializedRoot);
   const expectedPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
+  assertScopedProviderCredential(expectedPolicy);
 
   const initialized = parseReceipt(await runPowerShell(initializeScript, [...instanceArguments, "-Replace"]));
   assertInitializeReceipt(initialized, canonicalInitializedRoot);
-  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "pwsh and Windows PowerShell 5.1 must emit the same parsed source policy");
+  assertEquivalentProviderPolicy(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "pwsh and Windows PowerShell 5.1 must emit the same parsed source policy");
 
   await createInitializationBundle(initializationBundle);
   const packagedInitialize = join(initializationBundle, "scripts", "Initialize-B122ProviderHost.ps1");
@@ -82,13 +84,15 @@ test("provider secret generation validates and Initialize emits its exact ready-
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
   ], 20_000));
   assertInitializeReceipt(packagedInitialized, canonicalInitializedRoot);
-  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged Windows PowerShell 5.1 policy must preserve the exact parsed source policy");
+  assertEquivalentProviderPolicy(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged Windows PowerShell 5.1 policy must preserve the exact parsed source policy");
 
   const packagedPwsh = parseReceipt(await runPowerShellExecutable(powershell, packagedInitialize, [
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
   ], 20_000));
   assertInitializeReceipt(packagedPwsh, canonicalInitializedRoot);
-  assert.deepEqual(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged pwsh policy must preserve the exact parsed source policy");
+  const finalPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
+  assertEquivalentProviderPolicy(finalPolicy, expectedPolicy, "the packaged pwsh policy must preserve the exact parsed source policy");
+  await assertDispatchProvisioningArtifact(initializedRoot, repository, finalPolicy);
 });
 
 test("packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS", { skip: process.platform !== "win32" }, async (context) => {
@@ -113,6 +117,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
   const replacementPrivateKey = join(root, "provider-private-key-rotated.pem");
   const tokenEnvelope = join(root, "authentication-token.envelope.json");
   const journalEnvelope = join(root, "journal-authentication.envelope.json");
+  const dispatchLeaseEnvelope = join(root, "dispatch-lease-authentication.envelope.json");
   const backendPlan = join(root, "backend-plan.json");
   const stateFile = join(root, "provider-state.jsonl");
   const networkPolicyPath = join(root, "network-policy.json");
@@ -121,6 +126,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
   await runExecutable(process.execPath, [join(repository, "deployment/windows/New-B122LoopbackTlsIdentity.mjs"), "--certificate", certificate, "--private-key", privateKey]);
   await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateAuthenticationToken", "-ProtectedStateRoot", root, "-EnvelopePath", tokenEnvelope, "-ConfirmCurrentUser"]);
   await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateJournalAuthenticationKey", "-ProtectedStateRoot", root, "-EnvelopePath", journalEnvelope, "-ConfirmCurrentUser"]);
+  await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateDispatchLeaseAuthenticationKey", "-ProtectedStateRoot", root, "-EnvelopePath", dispatchLeaseEnvelope, "-ConfirmCurrentUser"]);
   await writeFile(backendPlan, JSON.stringify({ schema: "sxsy-b122.provider-host-backend-plan", version: 1, providers: [{ provider: "codex", kind: "fixture" }] }), { mode: 0o600 });
   const tls = JSON.parse(await runExecutable(process.execPath, [join(repository, "deployment/windows/Get-B122TlsIdentity.mjs"), "--certificate", certificate, "--private-key", privateKey]));
   const sealedToken = JSON.parse(await readFile(tokenEnvelope, "utf8"));
@@ -132,7 +138,8 @@ test("packaged provider host lifecycle and the production pinned network broker 
   const configurationGenerator = join(repository, "deployment/windows/New-B122ProviderHostConfiguration.ps1");
   const configurationArguments = (certificatePath: string, privateKeyPath: string) => [
     "-OutputPath", config, "-ProtectedStateRoot", root, "-BackendPlanPath", backendPlan, "-CertificateFile", certificatePath, "-PrivateKeyFile", privateKeyPath,
-    "-AuthenticationTokenEnvelopeFile", tokenEnvelope, "-JournalAuthenticationEnvelopeFile", journalEnvelope, "-StateFile", stateFile, "-ListenHost", "127.0.0.1", "-AllowFixtureBackends"
+    "-AuthenticationTokenEnvelopeFile", tokenEnvelope, "-JournalAuthenticationEnvelopeFile", journalEnvelope,
+    "-DispatchLeaseAuthenticationEnvelopeFile", dispatchLeaseEnvelope, "-StateFile", stateFile, "-ListenHost", "127.0.0.1", "-AllowFixtureBackends"
   ];
   await runPowerShell(configurationGenerator, [...configurationArguments(certificate, privateKey), "-ListenPort", String(firstPort)]);
   await runExecutable(process.execPath, [join(repository, "deployment/windows/New-B122LoopbackTlsIdentity.mjs"), "--certificate", replacementCertificate, "--private-key", replacementPrivateKey]);
@@ -299,8 +306,54 @@ function assertInitializeReceipt(receipt: Record<string, unknown>, expectedRoot:
   assert.equal(receipt.fixtureDiagnosticOnly, true);
   assert.equal(receipt.providerEffectsEnabled, false);
   assert.equal(receipt.journalAuthenticationStable, true);
+  assert.equal(receipt.dispatchLeaseAuthenticationStable, true);
   assert.equal(receipt.authenticationTokenExposed, false);
+  assert.equal(receipt.dispatchLeaseKeyExposed, false);
   assert.equal(receipt.proprietaryCredentialsAccessed, false);
+}
+function assertScopedProviderCredential(policy: ConfiguredNetworkPolicy): string {
+  const references = new Set(policy.routes.filter((candidate) => candidate.credential?.purpose === "provider-api").map((candidate) => candidate.credential!.reference));
+  assert.equal(references.size, 1, "all provider-host routes must share one exact repository-scoped bearer reference");
+  const reference = [...references][0]!;
+  assert.match(reference, /^b122-provider-bearer-[a-f0-9]{64}$/);
+  return reference;
+}
+function assertEquivalentProviderPolicy(actual: ConfiguredNetworkPolicy, expected: ConfiguredNetworkPolicy, message: string): void {
+  assertScopedProviderCredential(actual);
+  assertScopedProviderCredential(expected);
+  const normalize = (policy: ConfiguredNetworkPolicy): ConfiguredNetworkPolicy => ({
+    ...policy,
+    routes: policy.routes.map((candidate) => candidate.credential?.purpose === "provider-api"
+      ? { ...candidate, credential: { ...candidate.credential, reference: "b122-provider-bearer-<repository-scoped>" } }
+      : candidate)
+  });
+  assert.deepEqual(normalize(actual), normalize(expected), message);
+}
+async function assertDispatchProvisioningArtifact(initializedRoot: string, expectedRepositoryRoot: string, policy: ConfiguredNetworkPolicy): Promise<void> {
+  const artifact = JSON.parse(await readFile(join(initializedRoot, "companion-provisioning.json"), "utf8")) as Record<string, unknown>;
+  assert.equal(artifact.schema, "sxsy-b122.provider-host-companion-provisioning");
+  assert.equal(artifact.version, 2);
+  assert.ok(Array.isArray(artifact.credentials) && artifact.credentials.length === 2);
+  const profile = artifact.profile as ProviderDispatchLeaseProfile;
+  assert.equal(resolve(profile.repositoryRoot).toLowerCase(), resolve(expectedRepositoryRoot).toLowerCase());
+  assert.equal(profile.profileDigest, providerDispatchProfileIdentityDigest(profile));
+  assert.ok(profile.generation >= 1);
+  if (profile.generation === 1) {
+    assert.equal(profile.expectedPriorConfigurationSha256, null);
+    assert.equal(profile.expectedPriorProfileDigest, null);
+  } else {
+    assert.match(profile.expectedPriorConfigurationSha256!, /^[a-f0-9]{64}$/);
+    assert.match(profile.expectedPriorProfileDigest!, /^[a-f0-9]{64}$/);
+  }
+  const credentials = artifact.credentials as Array<Record<string, unknown>>;
+  const bearer = credentials.find((candidate) => candidate.role === "bearer");
+  const dispatch = credentials.find((candidate) => candidate.role === "dispatch-lease");
+  assert.equal(bearer?.reference, profile.bearerCredentialReference);
+  assert.equal(dispatch?.reference, profile.dispatchLeaseCredentialReference);
+  assert.notEqual(bearer?.reference, dispatch?.reference);
+  assert.equal(profile.bearerCredentialReference, assertScopedProviderCredential(policy));
+  const config = JSON.parse(await readFile(profile.configurationPath, "utf8")) as Record<string, unknown>;
+  assert.equal(config.dispatchLeaseAuthenticationEnvelopeFile, join(initializedRoot, "dispatch-lease-authentication.envelope.json"));
 }
 async function windowsKnownLocalAppData(): Promise<string> {
   const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;

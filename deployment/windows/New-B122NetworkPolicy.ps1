@@ -13,7 +13,7 @@ param(
   [string]$ProviderConfigurationPath,
   [ValidatePattern('^[a-f0-9]{64}$')][string]$ProviderTlsSpkiSha256,
   [string]$ProviderTlsCertificateFile,
-  [string]$ProviderCredentialReference = 'b122-provider-token',
+  [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$')][string]$ProviderCredentialReference = 'b122-provider-token',
   [Parameter(Mandatory=$true)][string]$OutputPath
 )
 $ErrorActionPreference='Stop'

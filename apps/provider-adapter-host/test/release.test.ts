@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -53,16 +54,32 @@ test("provider companion provisioning loads the flat packaged extension transpor
   async request(value) {
     const request = JSON.parse(value);
     const result = request.method === "credential.provision"
-      ? { credential: { reference: "b122-provider-token" } }
-      : { policy: { status: "active" } };
+      ? { credential: { reference: request.payload.reference } }
+      : request.method === "network-policy.install"
+        ? { policy: { status: "active" } }
+        : { profile: { configurationSha256: request.payload.profile.configurationSha256 } };
     return JSON.stringify({ version: 1, id: request.id, ok: true, result });
   }
 };\n`, "utf8");
+  const repositoryRoot = root;
+  const configurationPath = join(fixture, "provider-host.json");
+  const bearerReference = `b122-provider-bearer-${"b".repeat(64)}`;
+  const dispatchReference = `b122-provider-dispatch-lease-${"d".repeat(64)}`;
+  const profile = {
+    schema: "sxsy-b122.provider-host-dispatch-profile", version: 1, generation: 1,
+    expectedPriorConfigurationSha256: null, expectedPriorProfileDigest: null,
+    repositoryRoot, configurationPath, configurationSha256: "a".repeat(64), tlsSpkiSha256: "c".repeat(64),
+    bearerCredentialReference: bearerReference, dispatchLeaseCredentialReference: dispatchReference,
+    providers: [{ provider: "codex", adapterId: "sxsy-b122.fixture.codex", moduleSha256: "e".repeat(64) }]
+  } as const;
+  const profileDigest = dispatchProfileDigest(profile);
   await writeFile(artifactPath, JSON.stringify({
-    schema: "sxsy-b122.provider-host-companion-provisioning", version: 1, reference: "b122-provider-token",
-    repositoryRoot: root, purposes: ["provider-api"], sealedSecret: "YQ==", protector: "windows-dpapi-current-user",
-    networkPolicyPath: join(fixture, "network-policy.json"), providerConfigurationPath: join(fixture, "provider-host.json"),
-    tlsSpkiSha256: "a".repeat(64)
+    schema: "sxsy-b122.provider-host-companion-provisioning", version: 2,
+    credentials: [
+      { role: "bearer", reference: bearerReference, scopes: [{ repositoryRoot, adapterId: "configured-network", purpose: "provider-api" }], sealedSecret: "YQ==", protector: "windows-dpapi-current-user" },
+      { role: "dispatch-lease", reference: dispatchReference, scopes: [{ repositoryRoot, adapterId: "provider-dispatch-lease-issuer", purpose: "provider-dispatch-lease" }], sealedSecret: "Yg==", protector: "windows-dpapi-current-user" }
+    ],
+    networkPolicyPath: join(fixture, "network-policy.json"), profile: { ...profile, profileDigest }
   }), "utf8");
 
   const receipt = JSON.parse(await run(process.execPath, [join(deployment, "Provision-B122ProviderHostCompanion.mjs"), "--artifact", artifactPath, "--bundle-root", bundle]));
@@ -70,8 +87,25 @@ test("provider companion provisioning loads the flat packaged extension transpor
   assert.equal(receipt.status, "provisioned");
   assert.equal(receipt.authenticatedPipe, true);
   assert.equal(receipt.cleartextSecretRead, false);
+  assert.equal(receipt.sealedSecretCount, 2);
+  assert.equal(receipt.repositoryRoot, repositoryRoot);
   await assert.rejects(() => run(process.execPath, ["-e", "setInterval(() => {}, 1000)"], 100), /timed out/i);
 });
+
+function dispatchProfileDigest(profile: Readonly<{
+  repositoryRoot: string;
+  configurationPath: string;
+  configurationSha256: string;
+  tlsSpkiSha256: string;
+  bearerCredentialReference: string;
+  dispatchLeaseCredentialReference: string;
+  providers: readonly Readonly<{ provider: string; adapterId: string; moduleSha256: string }>[];
+}>): string {
+  const path = (value: string) => value.replaceAll("/", "\\").replace(/\\+$/u, "").toLowerCase();
+  const providers = [...profile.providers].sort((left, right) => left.provider.localeCompare(right.provider))
+    .map((entry) => `${entry.provider}\0${entry.adapterId}\0${entry.moduleSha256}\0`).join("");
+  return createHash("sha256").update(`sxsy-b122.provider-host-dispatch-profile\0v1\0${path(profile.repositoryRoot)}\0${path(profile.configurationPath)}\0${profile.configurationSha256}\0${profile.tlsSpkiSha256}\0${profile.bearerCredentialReference}\0${profile.dispatchLeaseCredentialReference}\0${providers}`, "utf8").digest("hex");
+}
 
 function run(executable: string, args: readonly string[], timeoutMs = 10_000): Promise<string> {
   return new Promise((resolveRun, rejectRun) => {

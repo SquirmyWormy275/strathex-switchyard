@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('GenerateAuthenticationToken','GenerateJournalAuthenticationKey','SealCredential','Remove','Restore','Validate')][string]$Action,
+  [Parameter(Mandatory=$true)][ValidateSet('GenerateAuthenticationToken','GenerateJournalAuthenticationKey','GenerateDispatchLeaseAuthenticationKey','SealCredential','Remove','Restore','Validate')][string]$Action,
   [Parameter(Mandatory=$true)][string]$ProtectedStateRoot,
   [Parameter(Mandatory=$true)][string]$EnvelopePath,
   [switch]$Replace,
@@ -33,7 +33,7 @@ if($Action -ceq 'Restore'){if(-not(Test-Path -LiteralPath $backup -PathType Leaf
 if((Test-Path -LiteralPath $path)-and-not $Replace){throw 'The provider-host secret envelope already exists; rotation requires -Replace.'}
 $clear=$null;$random=$null;$tokenText=$null;$secureInput=$null;$bstr=[IntPtr]::Zero
 try{
-  if($Action -ceq 'GenerateAuthenticationToken'-or$Action-ceq'GenerateJournalAuthenticationKey'){$random=New-Object byte[] 32;$rng=[Security.Cryptography.RandomNumberGenerator]::Create();try{$rng.GetBytes($random)}finally{$rng.Dispose()};$tokenText=([BitConverter]::ToString($random)).Replace('-','').ToLowerInvariant();$clear=[Text.Encoding]::ASCII.GetBytes($tokenText)}
+  if($Action -ceq 'GenerateAuthenticationToken'-or$Action-ceq'GenerateJournalAuthenticationKey'-or$Action-ceq'GenerateDispatchLeaseAuthenticationKey'){$random=New-Object byte[] 32;$rng=[Security.Cryptography.RandomNumberGenerator]::Create();try{$rng.GetBytes($random)}finally{$rng.Dispose()};$tokenText=([BitConverter]::ToString($random)).Replace('-','').ToLowerInvariant();$clear=[Text.Encoding]::ASCII.GetBytes($tokenText)}
   else{
     if([Console]::IsInputRedirected){$inputText=[Console]::In.ReadToEnd();$inputText=$inputText.TrimEnd("`r","`n")}
     else{$secureInput=Read-Host 'Provider credential (input is hidden)' -AsSecureString;$bstr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureInput);$inputText=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)}
@@ -43,6 +43,6 @@ try{
   $document=[ordered]@{schema='sxsy-b122.provider-host-secret-envelope';version=1;protector='windows-dpapi-current-user';sealed=$sealed};$parent=Split-Path -Parent $path;New-ProtectedDirectory $parent;$temporary=Join-Path $parent ('.provider-secret-'+[guid]::NewGuid().ToString('N')+'.tmp')
   try{[IO.File]::WriteAllText($temporary,($document|ConvertTo-Json -Compress),$utf8NoBom);Protect-File $temporary;if(Test-Path -LiteralPath $path){Copy-Item -LiteralPath $path -Destination $backup -Force;Protect-File $backup};Move-Item -LiteralPath $temporary -Destination $path -Force;Protect-File $path}finally{if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}}
   Assert-NoReparseSegments $path
-  $receiptAction=if($Action-ceq'GenerateAuthenticationToken'){'generate-authentication-token'}elseif($Action-ceq'GenerateJournalAuthenticationKey'){'generate-journal-authentication-key'}else{'seal-credential'}
+  $receiptAction=if($Action-ceq'GenerateAuthenticationToken'){'generate-authentication-token'}elseif($Action-ceq'GenerateJournalAuthenticationKey'){'generate-journal-authentication-key'}elseif($Action-ceq'GenerateDispatchLeaseAuthenticationKey'){'generate-dispatch-lease-authentication-key'}else{'seal-credential'}
   [ordered]@{schema='sxsy-b122.provider-host-secret-operation';version=1;action=$receiptAction;status='sealed';envelopePath=$path;envelopeSha256=(Sha $path);protector='windows-dpapi-current-user';rotated=(Test-Path -LiteralPath $backup -PathType Leaf);cleartextOutput=$false}|ConvertTo-Json -Compress
 }finally{if($bstr-ne[IntPtr]::Zero){[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)};if($null-ne$clear){[Array]::Clear($clear,0,$clear.Length)};if($null-ne$random){[Array]::Clear($random,0,$random.Length)};$tokenText=$null;$secureInput=$null}
