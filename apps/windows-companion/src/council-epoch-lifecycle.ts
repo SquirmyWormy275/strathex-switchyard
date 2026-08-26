@@ -9,6 +9,7 @@ export interface CouncilEpochLifecycleIsolation {
   recover(epochId: string): Promise<CouncilIsolationPlan>;
   assertCurrent(epochId: string): Promise<CouncilIsolationPlan>;
   cleanup(epochId: string): Promise<CouncilIsolationPlan>;
+  cleanupOwned(epochId: string, expectedRepositoryRoot: string): Promise<CouncilIsolationPlan | undefined>;
 }
 
 export interface CouncilEpochLifecycleScheduler {
@@ -125,6 +126,17 @@ export class CouncilEpochLifecycleManager {
     await this.inFlight?.catch(() => undefined);
   }
 
+  /** Aborts and cleans every durable nonterminal epoch for one exact repository only. */
+  async cancelRepository(repositoryRoot: string, failure: string): Promise<readonly CouncilEpoch[]> {
+    const key = pathKey(repositoryRoot);
+    const cancelled: CouncilEpoch[] = [];
+    for (const epoch of await this.council.listOngoing()) {
+      if (pathKey(epoch.repositoryRoot) !== key) continue;
+      cancelled.push(await this.abortAndCleanup(epoch.id, failure));
+    }
+    return cancelled.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
   private async recoverAndReconcile(): Promise<void> {
     await this.refreshConfiguredProviderState(true);
     for (const epoch of await this.council.listOngoing()) {
@@ -132,6 +144,9 @@ export class CouncilEpochLifecycleManager {
       try {
         const recovered = await this.isolation.recover(epoch.id);
         if (recovered.status !== "prepared") throw new Error(`Council isolation recovery returned ${recovered.status}.`);
+        if (epoch.status !== "active") {
+          await this.abortAndCleanup(epoch.id, "Council stopped an interrupted pre-activation epoch during companion startup recovery.");
+        }
       } catch (error) {
         await this.abortAndCleanup(epoch.id, reason(error, "Council isolation could not be recovered on companion startup."));
       }
@@ -166,19 +181,22 @@ export class CouncilEpochLifecycleManager {
 
   private async finishCompletionCleanup(epoch: CouncilEpoch): Promise<CouncilEpoch> {
     if (!await this.cleanupProviderResources(epoch, "completed")) return epoch;
-    const cleaned = await this.isolation.cleanup(epoch.id);
-    if (cleaned.status !== "cleaned") return epoch;
+    const cleaned = await this.isolation.cleanupOwned(epoch.id, epoch.repositoryRoot);
+    if (!cleaned || cleaned.status !== "cleaned") return epoch;
     return this.council.complete(epoch.id);
   }
 
   private async abortAndCleanup(epochId: string, failure: string): Promise<CouncilEpoch> {
-    return this.finishAbortCleanup(await this.council.abort(epochId, failure));
+    return this.finishAbortCleanup(await this.council.abort(epochId, failure, { cleanupRequired: true }));
   }
 
   private async finishAbortCleanup(epoch: CouncilEpoch): Promise<CouncilEpoch> {
     const providerCleaned = await this.cleanupProviderResources(epoch, "aborted");
-    const local = await this.isolation.cleanup(epoch.id).catch(() => undefined);
-    if (!providerCleaned || local?.status !== "cleaned") return (await this.council.get(epoch.id)) ?? epoch;
+    const local = await this.isolation.cleanupOwned(epoch.id, epoch.repositoryRoot).then(
+      (plan) => plan === undefined || plan.status === "cleaned",
+      () => false
+    );
+    if (!providerCleaned || !local) return (await this.council.get(epoch.id)) ?? epoch;
     return this.council.settleAbort(epoch.id);
   }
 
@@ -186,7 +204,7 @@ export class CouncilEpochLifecycleManager {
     const requests = epoch.participants.flatMap((participant) => {
       const digest = epoch.assignments[participant.id]?.resourceHostDigest;
       if (!digest) return [];
-      if ((participant.provider === "claude" || participant.provider === "codex") && this.providerControl?.managesProvider?.(participant.provider) === false) return [];
+      if ((participant.provider === "claude" || participant.provider === "codex") && this.providerControl?.managesProvider?.(participant.provider) === false) return [undefined];
       if ((participant.provider !== "claude" && participant.provider !== "codex") || !this.providerControl) return [undefined];
       return [{
         provider: participant.provider,

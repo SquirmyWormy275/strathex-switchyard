@@ -1,22 +1,25 @@
+import { resolve } from "node:path";
+
 import type { BrokerOutcome } from "../../../packages/control-plane/src/brokers.ts";
 import type { GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
 import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CouncilExecutor } from "../../../packages/control-plane/src/dispatch.ts";
-import { CouncilCoordinator, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
+import { CouncilCoordinator, type CouncilEpoch, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { DynamicConfiguredNetworkClient } from "./remote-adapters.ts";
-import type { CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "./council-workspace-isolation.ts";
+import type { CouncilIsolationEffectControl, CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "./council-workspace-isolation.ts";
 import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 
 type CouncilRequest = Parameters<CouncilExecutor["execute"]>[0];
 type CouncilPhase = "pause" | "assignment" | "resume";
 
 export interface CouncilWorkspaceIsolator {
-  prepare(input: CouncilIsolationPrepareRequest): Promise<CouncilIsolationPlan>;
+  prepare(input: CouncilIsolationPrepareRequest, control?: CouncilIsolationEffectControl): Promise<CouncilIsolationPlan>;
   assertCurrent(epochId: string): Promise<CouncilIsolationPlan>;
   cleanup(epochId: string): Promise<CouncilIsolationPlan>;
+  cleanupOwned(epochId: string, expectedRepositoryRoot: string): Promise<CouncilIsolationPlan | undefined>;
 }
 
 export interface CouncilAutomaticAcceptanceGate {
@@ -55,6 +58,7 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
   private readonly isolation?: CouncilWorkspaceIsolator;
   private readonly automaticGate?: CouncilAutomaticAcceptanceGate;
   private readonly resources?: CouncilAssignmentResourceVerifier;
+  private readonly activeExecutions = new Map<string, Set<ActiveCouncilExecution>>();
   constructor(council: CouncilCoordinator, sessions: SessionRegistry, network?: DynamicConfiguredNetworkClient, now: () => number = Date.now, options: DurableConfiguredCouncilOptions = {}) { this.council = council; this.sessions = sessions; this.network = network; this.now = now; this.isolation = options.isolation; this.automaticGate = options.automaticGate; this.resources = options.resources; }
 
   async execute(request: CouncilRequest): Promise<BrokerOutcome> {
@@ -83,35 +87,88 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     try { epoch = await this.council.beginAutomatic({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants }); }
     catch (error) { return { status: "blocked", summary: untrustedSummary(error instanceof Error ? error.message : "Council automatic preconditions failed."), effectDisposition: "not_started" }; }
     let isolationPlan: CouncilIsolationPlan | undefined;
+    let isolationAttempted = false;
+    let externalEffectMayHaveCommitted = false;
+    let durableControl: DurableAbortControl | undefined;
+    let activeExecution: ActiveCouncilExecution | undefined;
     try {
-      for (const participant of participants) { await this.phase(request, epoch.id, participant, "pause"); await this.council.acknowledgePause(epoch.id, participant.id); }
-      isolationPlan = await this.prepareIsolation(request, epoch.id, participants, defaultBranch);
+      activeExecution = this.beginActiveExecution(request.target.repositoryRoot, epoch.id);
+      durableControl = await operationSignal(request);
+      const control = combinedControl(durableControl, activeExecution.controller.signal);
+      await this.assertEffectCurrent(request, control);
+      for (const participant of participants) {
+        await this.phase(request, control, epoch.id, participant, "pause");
+        externalEffectMayHaveCommitted = true;
+        await this.council.acknowledgePause(epoch.id, participant.id);
+      }
+      isolationAttempted = true;
+      isolationPlan = await this.prepareIsolation(request, control, epoch.id, participants, defaultBranch);
+      externalEffectMayHaveCommitted = true;
       for (const participant of participants) {
         const binding = await this.currentBinding(epoch.id, participant.id, requiredBinding(isolationPlan, participant.id));
         await this.council.assign(epoch.id, participant.id, participant.plannedFiles, participant.resources, binding.assignmentDigest, binding.resourceHost!.digest);
-        await this.phase(request, epoch.id, participant, "assignment", binding);
+        await this.phase(request, control, epoch.id, participant, "assignment", binding);
+        externalEffectMayHaveCommitted = true;
         await this.council.acknowledgeAssignment(epoch.id, participant.id, binding.assignmentDigest);
       }
       if (!this.resources) throw new Error("Automatic Council requires the installed host resource broker before any participant may resume.");
       isolationPlan = await this.isolation.assertCurrent(epoch.id);
+      await this.assertEffectCurrent(request, control);
       await this.resources.assertPlanOperational(isolationPlan);
+      await this.assertEffectCurrent(request, control);
+      isolationPlan = await this.isolation.assertCurrent(epoch.id);
       await this.council.beginResume(epoch.id);
       for (const participant of participants) {
         const binding = requiredBinding(isolationPlan, participant.id);
-        await this.phase(request, epoch.id, participant, "resume", binding);
+        await this.phase(request, control, epoch.id, participant, "resume", binding);
+        externalEffectMayHaveCommitted = true;
         await this.council.acknowledgeResume(epoch.id, participant.id, binding.assignmentDigest);
       }
-      const final = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final activation guard." };
-      if (!final.allowed) throw new Error(final.reason);
+      await this.assertEffectCurrent(request, control);
       isolationPlan = await this.isolation.assertCurrent(epoch.id);
       await this.resources.assertPlanOperational(isolationPlan);
+      await this.assertEffectCurrent(request, control);
+      isolationPlan = await this.isolation.assertCurrent(epoch.id);
       const active = await this.council.activate(epoch.id);
+      await this.assertEffectCurrent(request, control);
       return { status: "completed", summary: "All exact-target mediated participants acknowledged pause, disjoint host-isolated assignments, and resume through configured provider routes.", effectDisposition: "committed", data: { epochId: active.id, isolationDigest: isolationPlan.digest, participants: participants.length, status: active.status } };
     } catch (error) {
-      const aborted = await this.council.abort(epoch.id, error instanceof Error ? error.message : "A Council provider acknowledgement failed.").catch(() => undefined);
-      if (isolationPlan) await this.isolation.cleanup(epoch.id).catch(() => undefined);
-      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), effectDisposition: "ambiguous", data: { epochId: epoch.id, status: aborted?.status ?? "abort_pending" } };
+      externalEffectMayHaveCommitted ||= error instanceof CouncilEffectBoundaryError && error.effectMayHaveCommitted;
+      const aborted = await this.council.abort(
+        epoch.id,
+        error instanceof Error ? error.message : "A Council provider acknowledgement failed.",
+        { cleanupRequired: isolationAttempted }
+      ).catch(() => undefined);
+      if (isolationAttempted) await this.isolation.cleanupOwned(epoch.id, request.target.repositoryRoot).catch(() => undefined);
+      return { status: "incomplete", summary: untrustedSummary(error instanceof Error ? error.message : "Automatic Council stopped without complete acknowledgements."), effectDisposition: externalEffectMayHaveCommitted ? "ambiguous" : "not_started", data: { epochId: epoch.id, status: aborted?.status ?? "abort_pending" } };
+    } finally {
+      durableControl?.dispose();
+      activeExecution?.finish();
     }
+  }
+
+  /** Aborts and joins only live transports for one repository, then fences its durable epochs for cleanup. */
+  async cancelRepository(repositoryRoot: string, reason: string): Promise<readonly CouncilEpoch[]> {
+    const key = repositoryKey(repositoryRoot);
+    const active = [...(this.activeExecutions.get(key) ?? [])];
+    for (const execution of active) execution.controller.abort();
+    await Promise.allSettled(active.map((execution) => execution.done));
+    const cancelled = new Map<string, CouncilEpoch>();
+    for (const execution of active) {
+      const epoch = await this.council.get(execution.epochId);
+      if (epoch) cancelled.set(epoch.id, epoch);
+    }
+    for (const epoch of await this.council.listOngoing()) {
+      if (repositoryKey(epoch.repositoryRoot) !== key) continue;
+      let current = await this.council.abort(epoch.id, reason, { cleanupRequired: true });
+      const local = this.isolation
+        ? await this.isolation.cleanupOwned(epoch.id, epoch.repositoryRoot).then(() => true, () => false)
+        : false;
+      const remote = Object.values(current.assignments).some((assignment) => assignment.resourceHostDigest !== undefined);
+      if (current.status === "abort_pending" && local && !remote) current = await this.council.settleAbort(current.id);
+      cancelled.set(current.id, current);
+    }
+    return [...cancelled.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
 
   private async participants(request: CouncilRequest): Promise<readonly CouncilParticipant[]> {
@@ -120,7 +177,8 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     if (request.session && !byId.has(request.session.id)) byId.set(request.session.id, request.session);
     const result: CouncilParticipant[] = [];
     for (const session of byId.values()) {
-      if (session.targetSnapshotId !== request.target.id || !session.capabilities.includes("observable") || session.status === "stale" || session.status === "unreachable") continue;
+      if (session.targetSnapshotId !== request.target.id || !session.workspaceRoot || repositoryKey(session.workspaceRoot) !== repositoryKey(request.target.repositoryRoot)
+        || !session.capabilities.includes("observable") || session.status === "stale" || session.status === "unreachable") continue;
       if (this.now() - Date.parse(session.lastHeartbeat) > 5 * 60_000) continue;
       result.push({
         id: session.id,
@@ -138,36 +196,33 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     return result.sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  private async phase(request: CouncilRequest, epochId: string, participant: CouncilParticipant, phase: CouncilPhase, binding?: CouncilWorkspaceBinding): Promise<void> {
+  private async phase(request: CouncilRequest, control: DurableAbortControl, epochId: string, participant: CouncilParticipant, phase: CouncilPhase, binding?: CouncilWorkspaceBinding): Promise<void> {
     const session = await this.sessions.get(participant.id);
     if (!session || session.metadata["sxsy-b122.providerHandshake"] !== "exact-route-v1") throw new Error(`Council participant ${participant.id} lacks an exact-route provider handshake.`);
-    const control = await operationSignal(request);
-    if (control.signal.aborted) {
-      control.dispose();
-      throw new Error(control.reason() === "unavailable" ? "Automatic Council could not verify durable cancellation state." : "Automatic Council was cancelled or exceeded its durable deadline.");
-    }
     const child = request.childSaga ? await request.childSaga.begin({ action: `council.${phase}`, idempotencyScope: `${epochId}:${participant.id}:${phase}`, details: { epochId, phase, sessionId: participant.id, target: request.target.id } }) : undefined;
     if (child && !child.mayExecute) throw new Error(`Council ${phase} for ${participant.id} requires reconciliation and was not replayed.`);
     if (child) await request.childSaga!.markExecuting(child);
+    let effectMayHaveCommitted = false;
     try {
       if (phase !== "pause" && !binding) throw new Error(`Council ${phase} has no exact durable isolation binding for ${participant.id}.`);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
-      const current = request.effectGuard ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) }) : { allowed: false, reason: "Council has no final effect guard." };
-      if (!current.allowed) throw new Error(current.reason);
+      await this.assertEffectCurrent(request, control, session);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
+      effectMayHaveCommitted = true;
       const response = await this.network!.request({ routeId: `provider.council.${session.provider}`, repositoryRoot: request.target.repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.council-phase", version: 1, epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, ...(phase === "assignment" ? { paths: participant.plannedFiles, resources: participant.resources } : {}), ...(binding ? { assignmentDigest: binding.assignmentDigest, worktreeRoot: binding.worktreeRoot, branch: binding.branch, head: binding.head, leases: binding.leases.map((lease) => ({ kind: lease.kind, resource: lease.resource, fence: lease.fence })), resourceHost: binding.resourceHost } : {}) }), signal: control.signal });
+      if (child) await request.childSaga!.markExternalCommitted(child, { responseReceived: "true" });
+      await this.assertEffectCurrent(request, control, session);
       if (binding) binding = await this.currentBinding(epochId, participant.id, binding);
       const acknowledgement = parseAcknowledgement(response.body, response.outcome, { epochId, phase, sessionId: session.id, targetSnapshotId: request.target.id, ...(binding ? { assignmentDigest: binding.assignmentDigest, resourceHostDigest: binding.resourceHost!.digest } : {}) });
       if (!acknowledgement) throw new Error(`Council ${phase} was not acknowledged by ${participant.id}.`);
       if (child) {
         const evidence = { acknowledged: "true", ...(binding ? { assignmentDigest: binding.assignmentDigest, resourceHostDigest: binding.resourceHost!.digest } : {}) };
-        await request.childSaga!.markExternalCommitted(child, evidence);
         await request.childSaga!.settle(child, "completed", evidence);
       }
     } catch (error) {
-      if (child) await request.childSaga!.settle(child, "ambiguous", { acknowledged: "unknown" }).catch(() => undefined);
-      throw error;
-    } finally { control.dispose(); }
+      if (child) await request.childSaga!.settle(child, effectMayHaveCommitted ? "ambiguous" : control.signal.aborted ? "cancelled" : "failed", { acknowledged: effectMayHaveCommitted ? "unknown" : "false" }).catch(() => undefined);
+      throw new CouncilEffectBoundaryError(error, effectMayHaveCommitted);
+    }
   }
 
   private async currentBinding(epochId: string, sessionId: string, expected: CouncilWorkspaceBinding): Promise<CouncilWorkspaceBinding> {
@@ -189,21 +244,64 @@ export class DurableConfiguredCouncilExecutor implements CouncilExecutor {
     return branch;
   }
 
-  private async prepareIsolation(request: CouncilRequest, epochId: string, participants: readonly CouncilParticipant[], defaultBranch: string): Promise<CouncilIsolationPlan> {
+  private async prepareIsolation(request: CouncilRequest, control: DurableAbortControl, epochId: string, participants: readonly CouncilParticipant[], defaultBranch: string): Promise<CouncilIsolationPlan> {
     const child = request.childSaga ? await request.childSaga.begin({ action: "council.isolation", idempotencyScope: epochId, details: { epochId, targetSnapshotId: request.target.id, participantCount: String(participants.length) } }) : undefined;
     if (child && !child.mayExecute) throw new Error("Council isolation has prior external state and requires reconciliation without replay.");
     if (child) await request.childSaga!.markExecuting(child);
     let plan: CouncilIsolationPlan | undefined;
+    let effectMayHaveCommitted = false;
     try {
-      plan = await this.isolation!.prepare({ epochId, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, targetHead: request.target.head!, defaultBranch, assignments: participants.map((participant) => ({ sessionId: participant.id, paths: participant.plannedFiles, resources: participant.resources })) });
+      await this.assertEffectCurrent(request, control);
+      plan = await this.isolation!.prepare(
+        { epochId, targetSnapshotId: request.target.id, repositoryRoot: request.target.repositoryRoot, targetHead: request.target.head!, defaultBranch, assignments: participants.map((participant) => ({ sessionId: participant.id, paths: participant.plannedFiles, resources: participant.resources })) },
+        {
+          signal: control.signal,
+          assertCurrent: () => this.assertEffectCurrent(request, control),
+          markExternalEffect: () => { effectMayHaveCommitted = true; }
+        }
+      );
+      effectMayHaveCommitted = true;
+      if (child) await request.childSaga!.markExternalCommitted(child, { isolationDigest: plan.digest });
+      await this.assertEffectCurrent(request, control);
       if (plan.status !== "prepared" || plan.executionAuthorized !== false) throw new Error("Council isolation host did not return an exact non-authorizing prepared plan.");
-      if (child) { await request.childSaga!.markExternalCommitted(child, { isolationDigest: plan.digest }); await request.childSaga!.settle(child, "completed", { isolationDigest: plan.digest }); }
+      if (child) await request.childSaga!.settle(child, "completed", { isolationDigest: plan.digest });
       return plan;
     } catch (error) {
-      if (plan) await this.isolation!.cleanup(epochId).catch(() => undefined);
-      if (child) await request.childSaga!.settle(child, "ambiguous", { isolationState: "unknown" }).catch(() => undefined);
-      throw error;
+      if (effectMayHaveCommitted) await this.isolation!.cleanupOwned(epochId, request.target.repositoryRoot).catch(() => undefined);
+      if (child) await request.childSaga!.settle(child, effectMayHaveCommitted ? "ambiguous" : control.signal.aborted ? "cancelled" : "failed", { isolationState: effectMayHaveCommitted ? "unknown" : "not_started" }).catch(() => undefined);
+      throw new CouncilEffectBoundaryError(error, effectMayHaveCommitted);
     }
+  }
+
+  private async assertEffectCurrent(request: CouncilRequest, control: DurableAbortControl, session?: ManagedSession): Promise<void> {
+    if (control.signal.aborted) throw cancellationError(control);
+    const current = request.effectGuard
+      ? await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(session ? { session } : request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) })
+      : { allowed: false, reason: "Council has no final effect guard." };
+    if (!current.allowed) throw new Error(current.reason);
+    if (control.signal.aborted) throw cancellationError(control);
+  }
+
+  private beginActiveExecution(repositoryRoot: string, epochId: string): ActiveCouncilExecution {
+    const key = repositoryKey(repositoryRoot);
+    const controller = new AbortController();
+    let resolveDone!: () => void;
+    const done = new Promise<void>((resolve) => { resolveDone = resolve; });
+    const execution: ActiveCouncilExecution = {
+      controller,
+      done,
+      epochId,
+      finish: () => {
+        const current = this.activeExecutions.get(key);
+        current?.delete(execution);
+        if (current?.size === 0) this.activeExecutions.delete(key);
+        resolveDone();
+      }
+    };
+    const current = this.activeExecutions.get(key) ?? new Set<ActiveCouncilExecution>();
+    current.add(execution);
+    this.activeExecutions.set(key, current);
+    return execution;
   }
 }
 
@@ -212,5 +310,20 @@ function declarations(session: ManagedSession, key: string): readonly string[] {
 function trustedDiff(session: ManagedSession): string | undefined { const value = session.metadata["sxsy-b122.diffDigest"]; return value && /^[a-f0-9]{64}$/i.test(value) ? value : undefined; }
 function parseAcknowledgement(body: Uint8Array | undefined, outcome: string, expected: Readonly<{ epochId: string; phase: CouncilPhase; sessionId: string; targetSnapshotId: string; assignmentDigest?: string; resourceHostDigest?: string }>): boolean { if (outcome !== "passed" || !body) return false; let value: unknown; try { value = JSON.parse(Buffer.from(body).toString("utf8")); } catch { return false; } const expectedKeys = expected.assignmentDigest ? 9 : 7; if (!record(value) || Object.keys(value).length !== expectedKeys || value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== expected.epochId || value.phase !== expected.phase || value.sessionId !== expected.sessionId || value.targetSnapshotId !== expected.targetSnapshotId || value.accepted !== true || (expected.assignmentDigest !== undefined && value.assignmentDigest !== expected.assignmentDigest) || (expected.resourceHostDigest !== undefined && value.resourceHostDigest !== expected.resourceHostDigest)) return false; return true; }
 async function operationSignal(request: CouncilRequest): Promise<DurableAbortControl> { return createDurableAbortControl(request.executionControl); }
+interface ActiveCouncilExecution { readonly controller: AbortController; readonly done: Promise<void>; readonly epochId: string; finish(): void; }
+class CouncilEffectBoundaryError extends Error {
+  readonly effectMayHaveCommitted: boolean;
+  constructor(cause: unknown, effectMayHaveCommitted: boolean) {
+    super(cause instanceof Error ? cause.message : "Council effect boundary failed.", { cause });
+    this.name = "CouncilEffectBoundaryError";
+    this.effectMayHaveCommitted = effectMayHaveCommitted;
+  }
+}
+function cancellationError(control: DurableAbortControl): Error { return new Error(control.reason() === "unavailable" ? "Automatic Council could not verify durable cancellation state." : "Automatic Council was cancelled or exceeded its durable deadline."); }
+function combinedControl(durable: DurableAbortControl, repositorySignal: AbortSignal): DurableAbortControl {
+  const signal = AbortSignal.any([durable.signal, repositorySignal]);
+  return { signal, reason: () => durable.reason() ?? (repositorySignal.aborted ? "cancelled" : undefined), dispose() {} };
+}
+function repositoryKey(value: string): string { return resolve(value.trim()).replace(/[\\/]+$/, "").toLowerCase(); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function requiredBinding(plan: CouncilIsolationPlan, sessionId: string): CouncilWorkspaceBinding { const binding = plan.bindings.find((candidate) => candidate.sessionId === sessionId); if (!binding) throw new Error(`Council isolation plan omitted participant ${sessionId}.`); if (!binding.resourceHost || !/^[a-f0-9]{64}$/.test(binding.resourceHost.digest)) throw new Error(`Council isolation plan omitted the exact resource-host binding for ${sessionId}.`); return binding; }

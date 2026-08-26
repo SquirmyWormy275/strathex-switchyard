@@ -32,6 +32,14 @@ export interface CouncilIsolationPrepareRequest {
   readonly assignments: readonly CouncilIsolationAssignmentRequest[];
 }
 
+/** Host-owned cancellation and final-current barrier for isolation effects. */
+export interface CouncilIsolationEffectControl {
+  readonly signal: AbortSignal;
+  assertCurrent(): Promise<void>;
+  /** Called synchronously immediately before a materializing external mutation. */
+  markExternalEffect?(): void;
+}
+
 export interface CouncilResourceLease {
   readonly id: string;
   readonly epochId: string;
@@ -150,10 +158,12 @@ export class CouncilWorkspaceIsolationManager {
   }
 
   /** Reserves every branch, worktree, and resource collision key before any Git mutation. */
-  async reserve(input: CouncilIsolationPrepareRequest): Promise<CouncilIsolationPlan> {
-    const normalized = await this.normalizeRequest(input);
+  async reserve(input: CouncilIsolationPrepareRequest, control?: CouncilIsolationEffectControl): Promise<CouncilIsolationPlan> {
+    await assertEffectCurrent(control);
+    const normalized = await this.normalizeRequest(input, control);
+    await assertEffectCurrent(control);
     const desired = this.desiredPlan(normalized);
-    return this.store.transaction(async (transaction) => {
+    const reserved = await this.store.transaction(async (transaction) => {
       const plans = planMap(await transaction.readEntries());
       const existing = plans.get(desired.epochId);
       if (existing) {
@@ -178,17 +188,20 @@ export class CouncilWorkspaceIsolationManager {
       await transaction.append<CouncilIsolationSavedEvent>(savedKind, { plan: reserved });
       return clonePlan(reserved);
     });
+    await assertEffectCurrent(control);
+    return reserved;
   }
 
-  async prepare(input: CouncilIsolationPrepareRequest): Promise<CouncilIsolationPlan> {
-    const reserved = await this.reserve(input);
+  async prepare(input: CouncilIsolationPrepareRequest, control?: CouncilIsolationEffectControl): Promise<CouncilIsolationPlan> {
+    const reserved = await this.reserve(input, control);
     if (reserved.status === "prepared") return reserved;
     if (reserved.status !== "reserved") throw new CouncilIsolationError("Council isolation has prior external state and must be recovered without replay.");
-    return this.materialize(reserved.epochId);
+    return this.materialize(reserved.epochId, control);
   }
 
   /** Materialization is intentionally private to the single reserve->prepare call path. */
-  private async materialize(epochId: string): Promise<CouncilIsolationPlan> {
+  private async materialize(epochId: string, control?: CouncilIsolationEffectControl): Promise<CouncilIsolationPlan> {
+    await assertEffectCurrent(control);
     let plan = await this.mutate(epochId, (current) => {
       if (current.status === "prepared") return current;
       if (current.status !== "reserved") throw new CouncilIsolationError("Council isolation materialization cannot be replayed; run recovery.");
@@ -196,16 +209,16 @@ export class CouncilWorkspaceIsolationManager {
     });
     const externallyMaterialized = new Map<string, CouncilResourceHostBinding>();
     try {
-      await this.assertPortsAvailable(plan);
+      await guardedEffect(control, () => this.assertPortsAvailable(plan));
       for (const binding of plan.bindings) {
-        await this.assertBranchAndPathUnused(plan, binding);
-        await mkdir(resolve(binding.worktreeRoot, ".."), { recursive: true, mode: 0o700 });
-        const added = await this.runGit(["worktree", "add", "-b", binding.branch, binding.worktreeRoot, plan.targetHead], plan.repositoryRoot);
+        await guardedEffect(control, () => this.assertBranchAndPathUnused(plan, binding));
+        await guardedMutation(control, () => mkdir(resolve(binding.worktreeRoot, ".."), { recursive: true, mode: 0o700 }));
+        const added = await guardedMutation(control, () => this.runGit(["worktree", "add", "-b", binding.branch, binding.worktreeRoot, plan.targetHead], plan.repositoryRoot));
         if (added.exitCode !== 0) throw new CouncilIsolationError("Git could not create the exact Council worktree on its reserved branch.");
-        await this.verifyWorktree(plan, binding, true);
+        await guardedEffect(control, () => this.verifyWorktree(plan, binding, true));
       }
       for (const binding of plan.bindings) {
-        const resourceHost = await this.resourceHost.materialize(resourceRequest(plan, binding));
+        const resourceHost = await guardedMutation(control, () => this.resourceHost.materialize(resourceRequest(plan, binding)));
         externallyMaterialized.set(binding.sessionId, resourceHost);
         plan = await this.mutate(plan.epochId, (current) => ({
           ...current,
@@ -214,12 +227,15 @@ export class CouncilWorkspaceIsolationManager {
             : candidate)
         }));
       }
-      await this.verifyMaterialized(plan, true);
-      return this.mutate(plan.epochId, (current) => {
+      await guardedEffect(control, () => this.verifyMaterialized(plan, true));
+      await assertEffectCurrent(control);
+      const prepared = await this.mutate(plan.epochId, (current) => {
         if (current.status !== "materializing") throw new CouncilIsolationError("Council isolation state changed during materialization.");
         const { failureReason: _failureReason, ...withoutFailure } = current;
         return { ...withoutFailure, status: "prepared" };
       });
+      await assertEffectCurrent(control);
+      return prepared;
     } catch (error) {
       const reason = controlledReason(error, "Council isolation could not prove exact independent host resources.");
       for (const binding of plan.bindings) {
@@ -346,7 +362,21 @@ export class CouncilWorkspaceIsolationManager {
     }
   }
 
-  private async normalizeRequest(input: CouncilIsolationPrepareRequest): Promise<CouncilIsolationPrepareRequest & { readonly repositoryRoot: string; readonly stateRoot: string }> {
+  /**
+   * Cancellation/recovery cleanup that cannot be redirected to a different
+   * repository by an epoch-id collision or caller substitution. A missing
+   * plan means no local isolation effect was durably reserved.
+   */
+  async cleanupOwned(epochId: string, expectedRepositoryRoot: string): Promise<CouncilIsolationPlan | undefined> {
+    const plan = await this.get(epochId);
+    if (!plan) return undefined;
+    if (!samePath(plan.repositoryRoot, expectedRepositoryRoot)) {
+      throw new CouncilIsolationError("Council cleanup refused a changed exact repository binding.");
+    }
+    return this.cleanup(epochId);
+  }
+
+  private async normalizeRequest(input: CouncilIsolationPrepareRequest, control?: CouncilIsolationEffectControl): Promise<CouncilIsolationPrepareRequest & { readonly repositoryRoot: string; readonly stateRoot: string }> {
     const epochId = bounded(input.epochId, "Council epoch ID");
     const targetSnapshotId = bounded(input.targetSnapshotId, "TargetSnapshot ID");
     if (!digestPattern.test(targetSnapshotId)) throw new CouncilIsolationError("Council isolation requires an exact SHA-256 TargetSnapshot ID.");
@@ -354,19 +384,19 @@ export class CouncilWorkspaceIsolationManager {
     if (!gitDigestPattern.test(targetHead)) throw new CouncilIsolationError("Council isolation requires an exact Git object ID.");
     const defaultBranch = normalizedBranch(input.defaultBranch, "default branch");
     if (!input.assignments.length) throw new CouncilIsolationError("Council isolation requires at least one explicit assignment.");
-    const repositoryRoot = await canonicalDirectory(input.repositoryRoot, "Council repository");
+    const repositoryRoot = await guardedEffect(control, () => canonicalDirectory(input.repositoryRoot, "Council repository"));
     if (!samePath(repositoryRoot, input.repositoryRoot)) throw new CouncilIsolationError("Council repository input is not its exact canonical path.");
     if (inside(repositoryRoot, this.configuredStateRoot) || inside(this.configuredStateRoot, repositoryRoot)) throw new CouncilIsolationError("Council state root must be outside the verified repository.");
-    await mkdir(this.configuredStateRoot, { recursive: true, mode: 0o700 });
-    const stateRoot = await canonicalDirectory(this.configuredStateRoot, "Council state root");
+    await guardedMutation(control, () => mkdir(this.configuredStateRoot, { recursive: true, mode: 0o700 }));
+    const stateRoot = await guardedEffect(control, () => canonicalDirectory(this.configuredStateRoot, "Council state root"));
     if (inside(repositoryRoot, stateRoot) || inside(stateRoot, repositoryRoot)) throw new CouncilIsolationError("Council state root must be outside the verified repository.");
-    const gitRoot = await this.gitText(["rev-parse", "--show-toplevel"], repositoryRoot, "Git worktree capability");
-    if (!samePath(await canonicalDirectory(gitRoot, "Git root"), repositoryRoot)) throw new CouncilIsolationError("Council repository is not the exact canonical Git root.");
-    if ((await this.gitText(["rev-parse", "HEAD"], repositoryRoot, "Git HEAD")).toLowerCase() !== targetHead) throw new CouncilIsolationError("Council repository HEAD no longer matches the exact TargetSnapshot.");
-    await this.gitText(["worktree", "list", "--porcelain"], repositoryRoot, "Git worktree capability");
-    await this.assertSafeCheckoutConfiguration(repositoryRoot);
-    const defaultRef = await this.runGit(["show-ref", "--verify", "--quiet", `refs/heads/${defaultBranch}`], repositoryRoot);
-    const remoteDefaultRef = defaultRef.exitCode === 0 ? defaultRef : await this.runGit(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${defaultBranch}`], repositoryRoot);
+    const gitRoot = await guardedEffect(control, () => this.gitText(["rev-parse", "--show-toplevel"], repositoryRoot, "Git worktree capability"));
+    if (!samePath(await guardedEffect(control, () => canonicalDirectory(gitRoot, "Git root")), repositoryRoot)) throw new CouncilIsolationError("Council repository is not the exact canonical Git root.");
+    if ((await guardedEffect(control, () => this.gitText(["rev-parse", "HEAD"], repositoryRoot, "Git HEAD"))).toLowerCase() !== targetHead) throw new CouncilIsolationError("Council repository HEAD no longer matches the exact TargetSnapshot.");
+    await guardedEffect(control, () => this.gitText(["worktree", "list", "--porcelain"], repositoryRoot, "Git worktree capability"));
+    await guardedEffect(control, () => this.assertSafeCheckoutConfiguration(repositoryRoot));
+    const defaultRef = await guardedEffect(control, () => this.runGit(["show-ref", "--verify", "--quiet", `refs/heads/${defaultBranch}`], repositoryRoot));
+    const remoteDefaultRef = defaultRef.exitCode === 0 ? defaultRef : await guardedEffect(control, () => this.runGit(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${defaultBranch}`], repositoryRoot));
     if (defaultRef.exitCode !== 0 && remoteDefaultRef.exitCode !== 0) throw new CouncilIsolationError("Council cannot prove the host-observed default branch identity.");
 
     const assignments = input.assignments.map((assignment) => normalizeAssignment(assignment));
@@ -623,6 +653,28 @@ function bounded(value: string, field: string): string {
 }
 
 function samePath(left: string, right: string): boolean { return resolve(left).replace(/[\\/]+$/, "").toLowerCase() === resolve(right).replace(/[\\/]+$/, "").toLowerCase(); }
+
+async function assertEffectCurrent(control?: CouncilIsolationEffectControl): Promise<void> {
+  if (!control) return;
+  if (control.signal.aborted) throw new CouncilIsolationError("Council isolation was cancelled before its external effect boundary.");
+  await control.assertCurrent();
+  if (control.signal.aborted) throw new CouncilIsolationError("Council isolation was cancelled at its external effect boundary.");
+}
+
+async function guardedEffect<T>(control: CouncilIsolationEffectControl | undefined, effect: () => Promise<T>): Promise<T> {
+  await assertEffectCurrent(control);
+  const result = await effect();
+  await assertEffectCurrent(control);
+  return result;
+}
+
+async function guardedMutation<T>(control: CouncilIsolationEffectControl | undefined, effect: () => Promise<T>): Promise<T> {
+  await assertEffectCurrent(control);
+  control?.markExternalEffect?.();
+  const result = await effect();
+  await assertEffectCurrent(control);
+  return result;
+}
 function inside(parent: string, candidate: string): boolean { const rel = relative(resolve(parent), resolve(candidate)); return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel)); }
 
 async function canonicalDirectory(path: string, field: string): Promise<string> {

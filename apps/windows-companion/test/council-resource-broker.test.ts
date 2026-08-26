@@ -287,6 +287,152 @@ test("Council credential broker redacts a trusted consumer failure", async () =>
   }
 });
 
+test("installed Council resource broker rechecks Council containment immediately before credential redemption", async () => {
+  const context = await fixture();
+  let redemptions = 0;
+  let networkEffects = 0;
+  const adapter: CredentialAdapterPort = {
+    async acquireLease() { return { id: "vault-lease", expiresAt: Date.now() + 60_000 }; },
+    async redeem(_lease, consume) { redemptions += 1; return consume(new TextEncoder().encode("never-redeemed")); },
+    async withCredential(request, consume) { return this.redeem(await this.acquireLease(request), consume); }
+  };
+  const host = new CouncilResourceHost({
+    stateRoot: context.stateRoot,
+    credentials: new VaultBackedCouncilCredentialCapabilityPort(adapter, () => "blocked-capability")
+  });
+  const request = { ...context.request, leases: [context.request.leases[1]!] };
+  try {
+    const resourceHost = await host.materialize(request);
+    const plan = planFor(request, resourceHost);
+    const credential = resourceHost.resources.find((resource) => resource.kind === "credential_scope");
+    assert.ok(credential);
+    const channels: string[] = [];
+    const broker = new InstalledCouncilResourceBroker(
+      { async assertCurrent() { return plan; } },
+      host,
+      {
+        async resolve() {
+          return {
+            version: 1,
+            proxy: "direct",
+            routes: [{
+              id: "provider.health",
+              method: "GET",
+              url: "https://127.0.0.1:9443/v1/b122/health",
+              credential: { reference: "provider-read", purpose: "provider-api", header: "authorization" },
+              redirects: "deny"
+            }]
+          };
+        }
+      },
+      {
+        async check(_repositoryRoot, channel) {
+          channels.push(channel);
+          return channel === "council"
+            ? { allowed: false, reason: "Council containment activated" }
+            : { allowed: true, reason: "network fixture" };
+        }
+      },
+      () => ({
+        async request() {
+          networkEffects += 1;
+          throw new Error("network must not start");
+        }
+      })
+    );
+
+    await assert.rejects(broker.credentialNetwork({
+      epochId: plan.epochId,
+      sessionId: request.sessionId,
+      targetSnapshotId: plan.targetSnapshotId,
+      leaseId: "credential-lease",
+      operationId: "blocked-by-containment",
+      fenceDigest: resourceHost.fenceDigest,
+      resourceHostDigest: resourceHost.digest,
+      capabilityId: credential.value,
+      routeId: "provider.health"
+    }), /containment/i);
+    assert.deepEqual(channels, ["council"]);
+    assert.equal(redemptions, 0);
+    assert.equal(networkEffects, 0);
+  } finally {
+    await host.shutdownForRestart();
+    await rm(context.base, { recursive: true, force: true });
+  }
+});
+
+test("installed Council port activation rechecks containment after installing the host proxy", async () => {
+  const context = await fixture();
+  const host = new CouncilResourceHost({ stateRoot: context.stateRoot });
+  const request = { ...context.request, leases: [context.request.leases[0]!] };
+  let thief: ReturnType<typeof createServer> | undefined;
+  let backend: ReturnType<typeof createServer> | undefined;
+  try {
+    const resourceHost = await host.materialize(request);
+    const plan = planFor(request, resourceHost);
+    const port = resourceHost.resources.find((resource) => resource.kind === "port");
+    assert.ok(port);
+    let containmentChecks = 0;
+    const operationId = "contained-port-activation";
+    const suffix = sha256(operationId).slice(0, 40);
+    const backendPipePath = process.platform === "win32"
+      ? `\\\\.\\pipe\\sxsy-b122-council-backend-${suffix}`
+      : join(context.stateRoot, `sxsy-b122-council-backend-${suffix}.sock`);
+    const backendProof = "3".repeat(64);
+    backend = createServer((socket) => {
+      void oneLine(socket).then((line) => {
+        const challenge: unknown = JSON.parse(line);
+        assert.ok(challenge && typeof challenge === "object");
+        socket.end(`${stableJson({
+          schema: "sxsy-b122.council-backend-proof",
+          version: 1,
+          operationId,
+          proof: createHmac("sha256", Buffer.from(backendProof, "hex")).update(stableJson(challenge)).digest("hex")
+        })}\n`);
+      }, () => socket.destroy());
+    });
+    await new Promise<void>((resolve, reject) => { backend!.once("error", reject); backend!.listen(backendPipePath, resolve); });
+    const broker = new InstalledCouncilResourceBroker(
+      { async assertCurrent() { return plan; } },
+      host,
+      { async resolve() { throw new Error("credential network is not used"); } },
+      {
+        async check(_repositoryRoot, channel) {
+          if (channel === "council") containmentChecks += 1;
+          return containmentChecks === 1
+            ? { allowed: true, reason: "pre-effect current" }
+            : { allowed: false, reason: "containment activated after proxy install" };
+        }
+      }
+    );
+
+    await assert.rejects(broker.activatePortProxy({
+      epochId: plan.epochId,
+      sessionId: request.sessionId,
+      targetSnapshotId: plan.targetSnapshotId,
+      leaseId: "port-lease",
+      operationId,
+      fenceDigest: resourceHost.fenceDigest,
+      resourceHostDigest: resourceHost.digest,
+      expectedPort: port.value,
+      backendPipePath,
+      backendProof
+    }), /containment/i);
+    assert.equal(containmentChecks, 2);
+    thief = createServer();
+    await assert.rejects(new Promise<void>((resolve, reject) => {
+      thief!.once("error", reject);
+      thief!.listen(Number(port.value), "127.0.0.1", resolve);
+    }), /EADDRINUSE|address.*use/i);
+    await host.cleanup(request, resourceHost);
+  } finally {
+    if (thief?.listening) await new Promise<void>((resolve) => thief!.close(() => resolve()));
+    if (backend?.listening) await new Promise<void>((resolve) => backend!.close(() => resolve()));
+    await host.shutdownForRestart();
+    await rm(context.base, { recursive: true, force: true });
+  }
+});
+
 test("installed Council participant client reaches both fenced resource paths through authenticated IPC and leaves no live proxy", async () => {
   const context = await fixture();
   const secret = Buffer.from("installed-council-secret", "utf8");

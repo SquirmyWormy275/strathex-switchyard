@@ -97,7 +97,8 @@ function isolation(): CouncilEpochLifecycleIsolation & { recovered: string[]; as
   return Object.assign(state, {
     async recover(epochId: string) { state.recovered.push(epochId); return plan(epochId, "prepared"); },
     async assertCurrent(epochId: string) { state.asserted.push(epochId); if (state.failCurrent) throw new Error("isolation fence lost"); return plan(epochId, "prepared"); },
-    async cleanup(epochId: string) { state.cleaned.push(epochId); return plan(epochId, "cleaned"); }
+    async cleanup(epochId: string) { state.cleaned.push(epochId); return plan(epochId, "cleaned"); },
+    async cleanupOwned(epochId: string) { state.cleaned.push(epochId); return plan(epochId, "cleaned"); }
   });
 }
 
@@ -145,6 +146,34 @@ test("Council startup recovers active epochs, advances heartbeats, and disposes 
     assert.equal(timers.cleared, 1);
     await lifecycle.dispose();
     assert.equal(timers.cleared, 1);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Council startup aborts and cleans an interrupted pre-activation epoch without replaying a provider phase", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-preactivation-recovery-"));
+  try {
+    const now = "2026-08-25T10:02:00.000Z";
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const initial = [managed("one", "2026-08-25T10:01:00.000Z"), managed("two", "2026-08-25T10:01:00.000Z")];
+    for (const value of initial) await sessions.upsert(value);
+    const council = new CouncilCoordinator(store, { clock: () => now, idFactory: () => "epoch-interrupted-startup" });
+    await council.beginAutomatic({ repositoryRoot, targetSnapshotId, participants: initial.map(participant) });
+    const workspace = isolation();
+    const lifecycle = new CouncilEpochLifecycleManager(council, sessions, workspace, {
+      now: () => Date.parse(now),
+      scheduler: scheduler()
+    });
+
+    await lifecycle.start();
+
+    assert.deepEqual(workspace.recovered, ["epoch-interrupted-startup"]);
+    assert.deepEqual(workspace.cleaned, ["epoch-interrupted-startup"]);
+    assert.equal((await council.get("epoch-interrupted-startup"))?.status, "aborted");
+    assert.match((await council.get("epoch-interrupted-startup"))?.abortReason ?? "", /interrupted.*pre-activation/i);
+    await lifecycle.dispose();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -310,3 +339,105 @@ test("Council remote cleanup remains pending across restart and is retried witho
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("Council remote cleanup remains pending when no installed controller owns the exact provider route", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-unmanaged-provider-"));
+  try {
+    const now = "2026-08-25T10:02:00.000Z";
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const initial = [managed("one", "2026-08-25T10:01:00.000Z"), managed("two", "2026-08-25T10:01:00.000Z")];
+    for (const value of initial) await sessions.upsert(value);
+    const council = new CouncilCoordinator(store, { clock: () => now, idFactory: () => "epoch-unmanaged-provider" });
+    await activateWithRemoteResources(council, initial, "epoch-unmanaged-provider");
+    for (const value of initial) await sessions.upsert({ ...value, status: "verified_finished", lastHeartbeat: "2026-08-25T10:01:30.000Z" });
+    const workspace = isolation();
+    let cleanupCalls = 0;
+    const provider: CouncilEpochProviderControl = {
+      managesProvider() { return false; },
+      async reconcile() { return { operationsInspected: 0, operationsSettled: 0, councilsInspected: 0, councilsSettled: 0 }; },
+      async refreshSessions(values) { return values; },
+      async cleanupCouncilResources() { cleanupCalls += 1; }
+    };
+    const lifecycle = new CouncilEpochLifecycleManager(council, sessions, workspace, {
+      now: () => Date.parse(now),
+      scheduler: scheduler(),
+      providerControl: provider
+    });
+
+    await lifecycle.start();
+
+    assert.equal((await council.get("epoch-unmanaged-provider"))?.status, "completion_pending");
+    assert.equal(cleanupCalls, 0);
+    assert.deepEqual(workspace.cleaned, []);
+    await lifecycle.dispose();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Council repository cancellation aborts and cleans every nonterminal phase for only the exact repository", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-cancel-repository-"));
+  try {
+    const now = "2026-08-25T10:02:00.000Z";
+    const otherRoot = "C:\\other-repository";
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const ids = ["epoch-pause", "epoch-assignment", "epoch-resume", "epoch-other"];
+    const council = new CouncilCoordinator(store, { clock: () => now, idFactory: () => ids.shift()! });
+    const values = [managed("one", "2026-08-25T10:01:00.000Z"), managed("two", "2026-08-25T10:01:00.000Z")];
+    const begin = (root: string) => council.beginAutomatic({
+      repositoryRoot: root,
+      targetSnapshotId,
+      participants: values.map((value) => participant({ ...value, workspaceRoot: root }))
+    });
+    const pause = await begin(repositoryRoot);
+    const assignment = await begin(repositoryRoot);
+    for (const value of values) await council.acknowledgePause(assignment.id, value.id);
+    const resume = await begin(repositoryRoot);
+    for (const value of values) await council.acknowledgePause(resume.id, value.id);
+    for (const value of values) {
+      const digest = (value.id === "one" ? "3" : "4").repeat(64);
+      await council.assign(resume.id, value.id, value.plannedFiles, participant(value).resources, digest);
+      await council.acknowledgeAssignment(resume.id, value.id, digest);
+    }
+    await council.beginResume(resume.id);
+    const untouched = await begin(otherRoot);
+    const cleaned: Array<readonly [string, string]> = [];
+    const lifecycleIsolation: CouncilEpochLifecycleIsolation = {
+      async recover(epochId) { return plan(epochId, repositoryRoot, "prepared"); },
+      async assertCurrent(epochId) { return plan(epochId, repositoryRoot, "prepared"); },
+      async cleanup(epochId) { return plan(epochId, repositoryRoot, "cleaned"); },
+      async cleanupOwned(epochId, root) { cleaned.push([epochId, root]); return plan(epochId, root, "cleaned"); }
+    };
+    const lifecycle = new CouncilEpochLifecycleManager(council, new SessionRegistry(store), lifecycleIsolation, { scheduler: scheduler() });
+
+    const cancelled = await lifecycle.cancelRepository(repositoryRoot, "repository containment activated");
+
+    assert.deepEqual(cancelled.map((epoch) => epoch.id), [assignment.id, pause.id, resume.id].sort());
+    assert.deepEqual(cleaned, [assignment.id, pause.id, resume.id].sort().map((id) => [id, repositoryRoot] as const));
+    for (const epoch of cancelled) {
+      assert.equal((await council.get(epoch.id))?.status, "aborted");
+      assert.match((await council.get(epoch.id))?.abortReason ?? "", /containment/i);
+    }
+    assert.equal((await council.get(untouched.id))?.status, "awaiting_pause_acknowledgements");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+function plan(epochId: string, root: string, status: CouncilIsolationPlan["status"]): CouncilIsolationPlan {
+  return {
+    epochId,
+    targetSnapshotId,
+    repositoryRoot: root,
+    targetHead: "b".repeat(40),
+    defaultBranch: "main",
+    stateRoot: "C:\\host-state",
+    bindings: [],
+    status,
+    executionAuthorized: false,
+    createdAt: "2026-08-25T10:00:00.000Z",
+    updatedAt: "2026-08-25T10:00:00.000Z",
+    digest: "5".repeat(64)
+  };
+}

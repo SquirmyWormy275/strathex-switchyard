@@ -350,7 +350,7 @@ export class CouncilCoordinator {
   /** Returns durable nonterminal epochs that require the installed lifecycle verifier. */
   async listOngoing(): Promise<readonly CouncilEpoch[]> {
     return [...epochs(await this.store.readEntries()).values()]
-      .filter((epoch) => epoch.status === "active" || epoch.status === "completion_pending" || epoch.status === "abort_pending")
+      .filter((epoch) => epoch.status !== "completed" && epoch.status !== "aborted")
       .sort((left, right) => left.id.localeCompare(right.id))
       .map(cloneEpoch);
   }
@@ -478,12 +478,13 @@ export class CouncilCoordinator {
     });
   }
 
-  async abort(id: string, reason: string): Promise<CouncilEpoch> {
+  async abort(id: string, reason: string, options: { readonly cleanupRequired?: boolean } = {}): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status === "aborted") return epoch;
       if (epoch.status === "abort_pending") return epoch;
       if (epoch.status === "completed") throw new CouncilError("A completed Council epoch cannot be aborted.");
-      const cleanupRequired = Object.values(epoch.assignments).some((assignment) => assignment.isolationDigest !== undefined || assignment.resourceHostDigest !== undefined);
+      const cleanupRequired = options.cleanupRequired === true
+        || Object.values(epoch.assignments).some((assignment) => assignment.isolationDigest !== undefined || assignment.resourceHostDigest !== undefined);
       return { ...epoch, status: cleanupRequired ? "abort_pending" : "aborted", abortReason: nonEmpty(reason, "abort reason") };
     });
   }

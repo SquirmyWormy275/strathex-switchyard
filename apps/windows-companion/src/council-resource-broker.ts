@@ -3,6 +3,7 @@ import { connect, type Socket } from "node:net";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import type { ContainmentCheck } from "../../../packages/control-plane/src/containment.ts";
 import {
   createDirectConfiguredNetworkBroker,
   type ConfiguredHttpsNetworkBroker,
@@ -68,6 +69,10 @@ export type CouncilConfiguredNetworkFactory = (
   credentials: CredentialAdapterPort
 ) => Pick<ConfiguredHttpsNetworkBroker, "request">;
 
+export interface CouncilResourceContainmentFence {
+  check(repositoryRoot: string, channel: "network" | "council"): Promise<ContainmentCheck> | ContainmentCheck;
+}
+
 /**
  * Production-reachable Council resource boundary. Its caller arrives through
  * the companion's mutually authenticated pipe; this class independently
@@ -78,7 +83,7 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
     private readonly isolation: Pick<CouncilWorkspaceIsolationManager, "assertCurrent">,
     private readonly host: CouncilResourceHost,
     private readonly networkPolicies: Pick<DurableNetworkPolicyRegistry, "resolve">,
-    private readonly containment: NetworkContainmentFence,
+    private readonly containment: CouncilResourceContainmentFence,
     private readonly networkFactory: CouncilConfiguredNetworkFactory = createDirectConfiguredNetworkBroker
   ) {}
 
@@ -103,11 +108,14 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
       fenceDigest: resourceHost.fenceDigest,
       resourceHostDigest: resourceHost.digest
     };
+    await this.assertCouncilUncontained(plan.repositoryRoot);
     await this.host.activatePortProxy(resourceRequest(plan, binding), resourceHost, {
       leaseId: identity(input.leaseId, "Council port lease ID"),
       activationId: operationId,
       connectBackend: () => connectBackend(backendPipePath, backendProof, backendBinding)
     });
+    await this.assertCouncilUncontained(plan.repositoryRoot);
+    await this.assertBindingCurrent(input, plan, binding);
     const unsigned = {
       schema: "sxsy-b122.council-port-proxy" as const,
       version: 1 as const,
@@ -135,7 +143,8 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
       || route.credential.reference !== scope.reference || route.credential.purpose !== "provider-api") {
       throw new CouncilResourceHostError("Council credential route is not the exact fixed provider-health credential scope.");
     }
-    return this.host.performCredentialOperation(
+    await this.assertCouncilUncontained(plan.repositoryRoot);
+    const receipt = await this.host.performCredentialOperation(
       resourceRequest(plan, binding),
       resourceHost,
       { leaseId: identity(input.leaseId, "Council credential lease ID"), operationId: identity(input.operationId, "Council credential operation ID") },
@@ -143,10 +152,12 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
         perform: async (credentialInput, cleartext) => {
           if (credentialInput.credentialReference !== scope.reference) throw new CouncilResourceHostError("Council credential reference changed after its exact route was authorized.");
           const credentials = oneCredential(credentialInput.credentialReference, credentialInput.repositoryRoot, route.credential!.purpose, cleartext);
+          await this.assertCouncilUncontained(plan.repositoryRoot);
           const result = await this.networkFactory(policy, this.containment, credentials).request({
             routeId: scope.routeId,
             repositoryRoot: credentialInput.repositoryRoot
           });
+          await this.assertCouncilUncontained(plan.repositoryRoot);
           return {
             outcome: result.outcome === "passed" ? "passed" as const : "failed" as const,
             summary: result.detail.slice(0, 512)
@@ -154,6 +165,9 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
         }
       }
     );
+    await this.assertCouncilUncontained(plan.repositoryRoot);
+    await this.assertBindingCurrent(input, plan, binding);
+    return receipt;
   }
 
   async assertPlanOperational(plan: CouncilIsolationPlan): Promise<void> {
@@ -174,6 +188,24 @@ export class InstalledCouncilResourceBroker implements CouncilResourceBrokerPort
     const binding = plan.bindings.find((candidate) => candidate.sessionId === sessionId);
     if (!binding) throw new CouncilResourceHostError("Council resource request is not bound to the exact participant session.");
     return { plan, binding };
+  }
+
+  private async assertCouncilUncontained(repositoryRoot: string): Promise<void> {
+    const current = await this.containment.check(repositoryRoot, "council");
+    if (!current.allowed) throw new CouncilResourceHostError(`Council containment check blocked this operation: ${current.reason}`);
+  }
+
+  private async assertBindingCurrent(
+    input: Pick<CouncilPortProxyRequest, "epochId" | "sessionId" | "targetSnapshotId">,
+    expectedPlan: CouncilIsolationPlan,
+    expectedBinding: CouncilWorkspaceBinding
+  ): Promise<void> {
+    const current = await this.binding(input);
+    if (current.plan.repositoryRoot !== expectedPlan.repositoryRoot || current.plan.digest !== expectedPlan.digest
+      || current.binding.assignmentDigest !== expectedBinding.assignmentDigest
+      || requiredHost(current.binding).digest !== requiredHost(expectedBinding).digest) {
+      throw new CouncilResourceHostError("Council resource binding changed across its external effect boundary.");
+    }
   }
 }
 

@@ -177,6 +177,61 @@ test("Council allocates exact non-default worktrees and collision-free scoped re
   }
 });
 
+test("Council isolation observes cancellation after a Git worktree effect and compensates without materializing resources", async () => {
+  const context = await fixture();
+  const controller = new AbortController();
+  let resourceMaterializations = 0;
+  const resourceHost = new CouncilResourceHost({ stateRoot: context.stateRoot, credentials: context.credentials });
+  const cancellingGit: LocalGitRunner = {
+    async run(args, options) {
+      const result = await context.runner.run(args, options);
+      const worktree = args.indexOf("worktree");
+      if (worktree >= 0 && args[worktree + 1] === "add" && result.exitCode === 0) controller.abort();
+      return result;
+    }
+  };
+  const manager = new CouncilWorkspaceIsolationManager(context.store, {
+    stateRoot: context.stateRoot,
+    git: cancellingGit,
+    ports: portsAvailable,
+    clock: () => at,
+    resourceHost: {
+      async materialize(request) { resourceMaterializations += 1; return resourceHost.materialize(request); },
+      recover: (request, binding) => resourceHost.recover(request, binding),
+      assertCurrent: (request, binding) => resourceHost.assertCurrent(request, binding),
+      preflightCleanup: (request, binding) => resourceHost.preflightCleanup(request, binding),
+      cleanup: (request, binding) => resourceHost.cleanup(request, binding)
+    }
+  });
+  try {
+    await assert.rejects(manager.prepare(context.request, {
+      signal: controller.signal,
+      async assertCurrent() {
+        if (controller.signal.aborted) throw new Error("Council operation cancelled after external effect");
+      }
+    }), /cancelled|external effect/i);
+    assert.equal(resourceMaterializations, 0);
+    assert.equal((await manager.get(context.request.epochId))?.status, "cleaned");
+  } finally {
+    await resourceHost.shutdownForRestart();
+    await rm(context.base, { recursive: true, force: true });
+  }
+});
+
+test("Council cleanup refuses a substituted repository before touching exact epoch resources", async () => {
+  const context = await fixture();
+  const manager = managerFor(context);
+  try {
+    const prepared = await manager.prepare(context.request);
+    const substitutedRoot = join(context.base, "different-repository");
+    await assert.rejects(manager.cleanupOwned(prepared.epochId, substitutedRoot), /exact.*repository|repository.*binding/i);
+    assert.equal((await manager.get(prepared.epochId))?.status, "prepared");
+    assert.equal((await manager.cleanupOwned(prepared.epochId, context.repositoryRoot))?.status, "cleaned");
+  } finally {
+    await rm(context.base, { recursive: true, force: true });
+  }
+});
+
 test("Council fails closed when credential capability injection is unavailable or crosses a session fence", async () => {
   const context = await fixture();
   let crossSessionManager: CouncilWorkspaceIsolationManager | undefined;

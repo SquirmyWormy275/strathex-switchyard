@@ -201,6 +201,47 @@ test("Council assignment and resume acknowledgements bind the exact durable isol
   });
 });
 
+test("Council restart discovery includes every nonterminal pre-activation epoch", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-ongoing-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    let id = 0;
+    const council = new CouncilCoordinator(store, { idFactory: () => `epoch-${++id}` });
+    const values = [session("agent-a", ["src/a.ts"]), session("agent-b", ["src/b.ts"])];
+    const pause = await council.beginAutomatic({ repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), participants: values.map((value) => ({ ...value, targetSnapshotId: "a".repeat(64) })) });
+    const assignment = await council.beginAutomatic({ repositoryRoot: "C:\\repo", targetSnapshotId: "b".repeat(64), participants: values.map((value) => ({ ...value, targetSnapshotId: "b".repeat(64) })) });
+    for (const value of values) await council.acknowledgePause(assignment.id, value.id);
+    const resume = await council.beginAutomatic({ repositoryRoot: "C:\\repo", targetSnapshotId: "c".repeat(64), participants: values.map((value) => ({ ...value, targetSnapshotId: "c".repeat(64) })) });
+    for (const value of values) await council.acknowledgePause(resume.id, value.id);
+    for (const value of values) {
+      await council.assign(resume.id, value.id, value.plannedFiles, value.resources, "d".repeat(64));
+      await council.acknowledgeAssignment(resume.id, value.id, "d".repeat(64));
+    }
+    await council.beginResume(resume.id);
+    assert.deepEqual((await council.listOngoing()).map((epoch) => epoch.id).sort(), [pause.id, assignment.id, resume.id].sort());
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("Council can durably require cleanup for an interrupted epoch before any assignment was recorded", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-forced-cleanup-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const council = new CouncilCoordinator(store, { idFactory: () => "epoch-interrupted" });
+    const values = [session("agent-a", ["src/a.ts"]), session("agent-b", ["src/b.ts"])];
+    await council.beginAutomatic({
+      repositoryRoot: "C:\\repo",
+      targetSnapshotId: "a".repeat(64),
+      participants: values.map((value) => ({ ...value, targetSnapshotId: "a".repeat(64) }))
+    });
+
+    const pending = await council.abort("epoch-interrupted", "repository cancellation", { cleanupRequired: true });
+    assert.equal(pending.status, "abort_pending");
+    assert.equal((await council.settleAbort(pending.id)).status, "aborted");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("Council normal is truthful for an Observable-only participant instead of pretending it can pause or isolate", async () => {
   await withStore(async (store) => {
     const council = new CouncilCoordinator(store, { clock: () => "2026-08-23T10:00:00.000Z" });
