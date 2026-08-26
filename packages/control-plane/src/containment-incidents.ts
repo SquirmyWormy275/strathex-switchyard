@@ -458,12 +458,15 @@ export class DurableContainmentIncidentCoordinator {
     relativePaths: readonly string[];
     remediatedFindingIds: readonly string[];
     evidenceDigest: string;
+    /** Protected host-effect start time used only for crash reconciliation. */
+    effectStartedAt?: string;
   }>): Promise<ContainmentIncidentRecord> {
     const exactId = exactIncidentId(input.incidentId);
     const action = remediationAction(input.action);
     const paths = exactRelativePaths(input.relativePaths);
     const findingIds = exactIdentifiers(input.remediatedFindingIds, "remediated finding");
     const evidenceDigest = exactDigest(input.evidenceDigest, "remediation evidence");
+    const effectStartedAt = input.effectStartedAt === undefined ? undefined : exactTimestamp(input.effectStartedAt);
     return this.store.transaction(async (transaction) => {
       const incidents = incidentsFrom(await transaction.readEntries());
       const current = requireCurrentIncident(incidents, exactId);
@@ -471,7 +474,12 @@ export class DurableContainmentIncidentCoordinator {
       const permit = current.permits.find((candidate) => candidate.id === input.permitId);
       if (!permit) throw new Error("The containment remediation permit is unknown.");
       if (permit.consumedAt) throw new Error("The containment remediation permit was already consumed.");
-      if (Date.parse(permit.expiresAt) <= Date.parse(exactTimestamp(this.now()))) throw new Error("The containment remediation permit expired.");
+      const currentTime = exactTimestamp(this.now());
+      if (effectStartedAt && Date.parse(effectStartedAt) > Date.parse(currentTime)) throw new Error("The protected remediation effect start is future-dated.");
+      if (Date.parse(permit.expiresAt) <= Date.parse(currentTime)
+        && (!effectStartedAt || Date.parse(effectStartedAt) < Date.parse(permit.issuedAt) || Date.parse(effectStartedAt) >= Date.parse(permit.expiresAt))) {
+        throw new Error("The containment remediation permit expired before the protected effect started.");
+      }
       if (permit.incidentId !== exactId || permit.fenceEpoch !== current.fenceEpoch || permit.action !== action || !sameStrings(permit.relativePaths, paths)) {
         throw new Error("The containment remediation receipt changed its exact permit action or path binding.");
       }

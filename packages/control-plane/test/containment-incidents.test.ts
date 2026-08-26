@@ -211,6 +211,35 @@ test("release readiness requires exact finding receipts and credential-rotation 
   await assert.rejects(coordinator.assertReadyForRelease(incident.id), /finding.*remediation/i);
 });
 
+test("an expired permit reconciles only an effect durably started inside its validity window", async (context) => {
+  let now = Date.parse("2026-08-25T12:00:00.000Z");
+  const { coordinator, incident } = await fixture(context, { now: () => new Date(now).toISOString() });
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0]!;
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2026-08-25T12:05:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  const receipt = (effectStartedAt: string) => coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("crash-reconciled remediation"),
+    effectStartedAt
+  });
+  now = Date.parse("2026-08-25T12:10:00.000Z");
+  await assert.rejects(receipt("2026-08-25T12:11:00.000Z"), /future-dated/i);
+  await assert.rejects(receipt("2026-08-25T11:59:00.000Z"), /expired before.*started/i);
+  const reconciled = await receipt("2026-08-25T12:02:00.000Z");
+  assert.equal(reconciled.receipts.at(-1)?.permitId, permit.id);
+});
+
 test("release is bound to one exact ready incident image and published in the caller transaction", async (context) => {
   const { store, coordinator, incident } = await fixture(context);
   const assessed = await coordinator.assess(incident.id, new AssessmentPort());
