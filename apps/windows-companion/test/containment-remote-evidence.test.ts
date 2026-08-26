@@ -8,13 +8,16 @@ import test from "node:test";
 import type { ContainmentAssessmentRequest } from "../../../packages/control-plane/src/containment-incidents.ts";
 import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import {
+  DurableContainmentRemoteEvidenceRegistry,
   containmentRemoteEvidenceId,
   containmentRemoteEvidenceSigningPayload,
+  containmentRemoteNamespaceDigest,
+  containmentRemoteResultForNoConfiguredRemotes,
   createContainmentRemoteEvidenceAdministration,
-  DurableContainmentRemoteEvidenceRegistry,
   type ContainmentRemoteEvidenceBinding,
   type ContainmentRemoteEvidenceChallenge,
   type ContainmentRemoteEvidenceRefResult,
+  type ContainmentRemoteNamespaceResult,
   type ContainmentRemoteTrustPolicy,
   type UnsignedContainmentRemoteEvidence
 } from "../src/containment-remote-evidence.ts";
@@ -55,11 +58,10 @@ async function setup(context: test.TestContext) {
   };
   const binding: ContainmentRemoteEvidenceBinding = {
     request, generation: 3, targetSnapshotId: `target:${"4".repeat(64)}`,
-    canonicalRemote: "https://github.com/acme/switchyard.git", policyVersion: "containment-policy-9",
-    authorityId, keyId,
-    requiredRefs: [
-      { ref: "refs/heads/main", expectedHead: "5".repeat(40) },
-      { ref: "refs/heads/release", expectedHead: "6".repeat(40) }
+    policyVersion: "containment-policy-9", authorityId, keyId,
+    configuredRemotes: [
+      { name: "origin", canonicalIdentity: "https://github.com/acme/switchyard.git" },
+      { name: "upstream", canonicalIdentity: "ssh://git@github.com/upstream/switchyard.git" }
     ]
   };
   const challenge = await registry.issueChallenge({ ...binding, expiresAt: "2026-08-25T12:10:00.000Z" }, "TEST\\Security");
@@ -69,238 +71,224 @@ async function setup(context: test.TestContext) {
   };
 }
 
-function passedRefs(challenge: ContainmentRemoteEvidenceChallenge): readonly ContainmentRemoteEvidenceRefResult[] {
-  return challenge.requiredRefs.map((item) => ({ ...item, status: "passed", exposure: "none", summary: "Remote ref was assessed.", findings: [] }));
+function namespace(
+  remote: ContainmentRemoteEvidenceChallenge["configuredRemotes"][number],
+  refs: readonly Readonly<{ ref: string; head: string }>[]
+): ContainmentRemoteNamespaceResult {
+  const namespaceRefs = refs.map((item) => ({ ...item }));
+  const refResults: readonly ContainmentRemoteEvidenceRefResult[] = refs.map((item) => ({
+    ...item, status: "passed", exposure: "none", summary: "Ref was assessed.", findings: []
+  }));
+  return {
+    ...remote, namespaceComplete: true, refCount: namespaceRefs.length,
+    namespaceSha256: containmentRemoteNamespaceDigest(namespaceRefs),
+    namespaceRefs, status: "passed", exposure: "none", summary: "Complete namespace assessed.", refResults
+  };
+}
+
+function completeNamespaces(challenge: ContainmentRemoteEvidenceChallenge): readonly ContainmentRemoteNamespaceResult[] {
+  return [
+    namespace(challenge.configuredRemotes[0]!, [
+      { ref: "refs/heads/main", head: "5".repeat(40) },
+      { ref: "refs/tags/v1.0.0", head: "6".repeat(40) }
+    ]),
+    namespace(challenge.configuredRemotes[1]!, [])
+  ];
 }
 
 function unsigned(
-  setupValue: Awaited<ReturnType<typeof setup>>,
-  challenge: ContainmentRemoteEvidenceChallenge = setupValue.challenge,
+  fixture: Awaited<ReturnType<typeof setup>>,
+  challenge: ContainmentRemoteEvidenceChallenge = fixture.challenge,
   overrides: Partial<UnsignedContainmentRemoteEvidence> = {}
 ): UnsignedContainmentRemoteEvidence {
   const evaluatorNonce = "a".repeat(64);
   const base: UnsignedContainmentRemoteEvidence = {
-    schema: "sxsy-b122.containment-remote-evidence", version: 1, purpose,
-    evidenceId: containmentRemoteEvidenceId(challenge.id, evaluatorNonce, authorityId, setupValue.keyId),
-    authorityId, keyId: setupValue.keyId, challenge, evaluatorNonce,
+    schema: "sxsy-b122.containment-remote-evidence", version: 2, purpose,
+    evidenceId: containmentRemoteEvidenceId(challenge.id, evaluatorNonce, authorityId, fixture.keyId),
+    authorityId, keyId: fixture.keyId, challenge, evaluatorNonce,
     evaluatedAt: "2026-08-25T12:01:00.000Z", expiresAt: "2026-08-25T12:08:00.000Z",
-    status: "passed", exposure: "none", summary: "Every required remote ref was assessed.",
-    refResults: passedRefs(challenge), signatureAlgorithm: "ecdsa-p256-sha256"
+    namespaceComplete: true, status: "passed", exposure: "none",
+    summary: "Every configured remote namespace was completely assessed.",
+    remoteResults: completeNamespaces(challenge), signatureAlgorithm: "ecdsa-p256-sha256"
   };
   return { ...base, ...overrides };
 }
 
 async function signedFile(
-  setupValue: Awaited<ReturnType<typeof setup>>,
+  fixture: Awaited<ReturnType<typeof setup>>,
   value: UnsignedContainmentRemoteEvidence,
-  key: KeyObject = setupValue.keys.privateKey,
+  key: KeyObject = fixture.keys.privateKey,
   name = `evidence-${Math.random().toString(16).slice(2)}.json`
 ): Promise<string> {
   const signature = sign("sha256", containmentRemoteEvidenceSigningPayload(value), key).toString("base64");
-  const path = join(setupValue.root, name);
+  const path = join(fixture.root, name);
   await writeFile(path, JSON.stringify({ ...value, signature }), "utf8");
   return path;
 }
 
-test("signed offline evidence resolves once, consumes once, and survives restart for observation", async (context) => {
+test("complete multi-remote evidence includes an empty namespace and has a durable release proof", async (context) => {
   const fixture = await setup(context);
-  const source = await signedFile(fixture, unsigned(fixture));
-  const imported = await fixture.registry.importEvidence(source, "TEST\\Security");
+  const imported = await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture)), "TEST\\Security");
   assert.equal(imported.status, "available");
   assert.match(imported.documentSha256, /^[a-f0-9]{64}$/);
-
-  const before = await fixture.registry.resolve(fixture.binding);
-  assert.equal(before?.status, "passed");
-  assert.equal(before?.exposure, "none");
-  assert.equal(before?.effectDisposition, "committed");
-  assert.deepEqual(before?.findings, []);
-
+  const available = await fixture.registry.observe(fixture.binding);
+  assert.equal(available.state, "available");
+  assert.equal(available.result?.status, "passed");
+  assert.deepEqual(available.result?.findings, []);
   const consumed = await fixture.registry.consume(fixture.binding);
-  assert.deepEqual(consumed, before);
-  await assert.rejects(fixture.registry.consume(fixture.binding), /consumed|replay/i);
-  await assert.rejects(fixture.registry.importEvidence(source, "TEST\\Security"), /challenge.*used|replay/i);
-
-  const restarted = new DurableContainmentRemoteEvidenceRegistry(
-    new ProtectedJsonStore({ filePath: fixture.filePath, clock: () => initialNow, authenticator }), fixture.options
-  );
-  assert.deepEqual(await restarted.resolve(fixture.binding), before);
-  assert.equal((await restarted.listChallenges())[0]?.status, "used");
-  assert.equal((await restarted.listTrust())[0]?.status, "active");
+  assert.equal(consumed?.status, "passed");
+  const observation = await fixture.registry.observe(fixture.binding);
+  assert.equal(observation.state, "consumed");
+  assert.deepEqual(observation.result, consumed);
+  const release = await fixture.registry.validateConsumedForRelease(fixture.binding);
+  assert.equal(release.evidenceId, imported.evidenceId);
+  assert.equal(release.challengeId, fixture.challenge.id);
+  assert.equal(release.generation, fixture.binding.generation);
+  assert.equal(release.targetSnapshotId, fixture.binding.targetSnapshotId);
+  assert.equal(release.remoteOperationId, fixture.binding.request.operationId);
+  assert.equal(release.remoteExternalId, fixture.binding.request.externalId);
+  assert.deepEqual(release.configuredRemotes, fixture.challenge.configuredRemotes);
 });
 
-test("racing imports cannot both consume the same durable challenge", async (context) => {
+test("zero configured remotes is an explicit clean host result and cannot issue evidence", async (context) => {
   const fixture = await setup(context);
-  const source = await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "racing-import.json");
-  const results = await Promise.allSettled([
-    fixture.registry.importEvidence(source, "TEST\\Security-A"),
-    fixture.registry.importEvidence(source, "TEST\\Security-B")
-  ]);
-  assert.equal(results.filter((item) => item.status === "fulfilled").length, 1);
-  assert.equal(results.filter((item) => item.status === "rejected").length, 1);
-  assert.equal((await fixture.registry.listEvidence()).length, 1);
-  assert.equal((await fixture.registry.listChallenges())[0]?.status, "used");
+  const binding = { ...fixture.binding, configuredRemotes: [] };
+  const clean = containmentRemoteResultForNoConfiguredRemotes(binding);
+  assert.equal(clean.status, "passed");
+  assert.equal(clean.exposure, "none");
+  assert.deepEqual(clean.findings, []);
+  assert.deepEqual(await fixture.registry.resolve(binding), clean);
+  assert.deepEqual(await fixture.registry.consume(binding), clean);
+  await assert.rejects(fixture.registry.issueChallenge({ ...binding, expiresAt: "2026-08-25T12:10:00.000Z" }, "TEST\\Security"), /no configured remotes|not require.*evidence/i);
+  await assert.rejects(fixture.registry.validateConsumedForRelease(binding), /no configured remotes|signed.*not required/i);
 });
 
-test("every incident, fence, generation, remote-child, target, remote, policy, nonce, time, and ref binding is exact", async (context) => {
+test("configured remote identity coverage is exact, complete, and duplicate-free", async (context) => {
   const fixture = await setup(context);
-  const mutations: readonly ((challenge: ContainmentRemoteEvidenceChallenge) => ContainmentRemoteEvidenceChallenge)[] = [
-    (value) => ({ ...value, incidentId: `containment-incident:${"9".repeat(64)}` }),
-    (value) => ({ ...value, repositoryRootDigest: "9".repeat(64) }),
-    (value) => ({ ...value, fenceEpoch: value.fenceEpoch + 1 }),
-    (value) => ({ ...value, generation: value.generation + 1 }),
-    (value) => ({ ...value, remoteOperationId: `containment-assessment:${"8".repeat(64)}` }),
-    (value) => ({ ...value, remoteExternalId: `containment-assessment:${"7".repeat(64)}` }),
-    (value) => ({ ...value, targetSnapshotId: `target:${"9".repeat(64)}` }),
-    (value) => ({ ...value, canonicalRemote: "https://github.com/acme/other.git" }),
-    (value) => ({ ...value, policyVersion: "containment-policy-other" }),
-    (value) => ({ ...value, challengeNonce: "f".repeat(64) }),
-    (value) => ({ ...value, issuedAt: "2026-08-25T12:00:01.000Z" }),
-    (value) => ({ ...value, expiresAt: "2026-08-25T12:09:59.000Z" }),
-    (value) => ({ ...value, requiredRefs: value.requiredRefs.slice(0, 1) })
+  const complete = completeNamespaces(fixture.challenge);
+  const cases: readonly Readonly<{ name: string; results: readonly ContainmentRemoteNamespaceResult[] }>[] = [
+    { name: "omitted-remote", results: complete.slice(0, 1) },
+    { name: "extra-remote", results: [...complete, namespace({ name: "other", canonicalIdentity: "https://github.com/acme/other.git" }, [])] },
+    { name: "duplicate-remote", results: [complete[0]!, complete[0]!] },
+    { name: "changed-identity", results: [{ ...complete[0]!, canonicalIdentity: "https://github.com/acme/other.git" }, complete[1]!] }
   ];
-  for (const [index, mutate] of mutations.entries()) {
-    const changed = mutate(fixture.challenge);
-    const source = await signedFile(fixture, unsigned(fixture, changed, { challenge: changed, refResults: passedRefs(changed) }), fixture.keys.privateKey, `wrong-binding-${index}.json`);
-    await assert.rejects(fixture.registry.importEvidence(source, "TEST\\Security"), /challenge|binding|identity/i);
+  for (const item of cases) {
+    const value = unsigned(fixture, fixture.challenge, { remoteResults: item.results });
+    await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, value, fixture.keys.privateKey, `${item.name}.json`), "TEST\\Security"), /coverage|duplicate|configured remote|identity/i);
+  }
+  const duplicateBinding = { ...fixture.binding, configuredRemotes: [fixture.binding.configuredRemotes[0]!, fixture.binding.configuredRemotes[0]!] };
+  await assert.rejects(fixture.registry.issueChallenge({ ...duplicateBinding, expiresAt: "2026-08-25T12:10:00.000Z" }, "TEST\\Security"), /duplicate/i);
+});
+
+test("each signed complete namespace rejects omitted, extra, duplicate, and head-drifted ref assessments", async (context) => {
+  const fixture = await setup(context);
+  const complete = completeNamespaces(fixture.challenge);
+  const origin = complete[0]!;
+  const extraRef = { ref: "refs/heads/new", head: "7".repeat(40), status: "passed" as const, exposure: "none" as const, summary: "new", findings: [] };
+  const variants: readonly Readonly<{ name: string; remote: ContainmentRemoteNamespaceResult }>[] = [
+    { name: "omitted-ref", remote: { ...origin, refResults: origin.refResults.slice(0, 1) } },
+    { name: "extra-ref", remote: { ...origin, refResults: [...origin.refResults, extraRef] } },
+    { name: "duplicate-result-ref", remote: { ...origin, refResults: [origin.refResults[0]!, origin.refResults[0]!] } },
+    { name: "head-drift", remote: { ...origin, refResults: [{ ...origin.refResults[0]!, head: "8".repeat(40) }, origin.refResults[1]!] } },
+    { name: "duplicate-namespace-ref", remote: { ...origin, namespaceRefs: [origin.namespaceRefs[0]!, origin.namespaceRefs[0]!] } },
+    { name: "wrong-count", remote: { ...origin, refCount: origin.refCount + 1 } },
+    { name: "wrong-digest", remote: { ...origin, namespaceSha256: "9".repeat(64) } },
+    { name: "not-complete", remote: { ...origin, namespaceComplete: false as true } }
+  ];
+  for (const item of variants) {
+    const value = unsigned(fixture, fixture.challenge, { remoteResults: [item.remote, complete[1]!] });
+    await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, value, fixture.keys.privateKey, `${item.name}.json`), "TEST\\Security"), /namespace|coverage|duplicate|head|complete|count|digest/i);
   }
 });
 
-test("signature, trusted key identity, purpose, and revocation fail closed", async (context) => {
+test("post-consume expiry invalidates resolution and release without replaying the effect", async (context) => {
   const fixture = await setup(context);
-  const other = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), other.privateKey, "wrong-signature.json"), "TEST\\Security"), /signature/i);
-
-  const otherKeyId = createHash("sha256").update(other.publicKey.export({ type: "spki", format: "der" })).digest("hex");
-  const wrongKey = unsigned(fixture, fixture.challenge, {
-    keyId: otherKeyId,
-    evidenceId: containmentRemoteEvidenceId(fixture.challenge.id, "a".repeat(64), authorityId, otherKeyId)
-  });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, wrongKey, other.privateKey, "wrong-key.json"), "TEST\\Security"), /authority|key|trust/i);
-  await assert.rejects(fixture.registry.installTrust({ ...fixture.trust, keyId: "0".repeat(64) }, "TEST\\Security"), /key ID/i);
-  await assert.rejects(fixture.registry.installTrust({ ...fixture.trust, authorityId: "wrong-purpose", purpose: "acceptance" as typeof purpose }, "TEST\\Security"), /purpose/i);
-  await assert.rejects(fixture.registry.installTrust({ ...fixture.trust, authorityId: "expired-authority", expiresAt: initialNow }, "TEST\\Security"), /expired/i);
-
-  await fixture.registry.revokeTrust(authorityId, fixture.keyId, "rotation", "TEST\\Security");
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "revoked.json"), "TEST\\Security"), /revoked|trust|authority/i);
-  assert.equal((await fixture.registry.listTrust())[0]?.status, "revoked");
+  await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "expiry.json"), "TEST\\Security");
+  await fixture.registry.consume(fixture.binding);
+  fixture.setNow("2026-08-25T12:09:00.000Z");
+  assert.equal(await fixture.registry.resolve(fixture.binding), undefined);
+  assert.equal((await fixture.registry.observe(fixture.binding)).state, "invalid");
+  await assert.rejects(fixture.registry.validateConsumedForRelease(fixture.binding), /expired|invalid|unavailable/i);
+  await assert.rejects(fixture.registry.consume(fixture.binding), /expired|unavailable/i);
 });
 
-test("revocation after import invalidates available evidence before its only consumption", async (context) => {
+test("post-consume trust revocation invalidates resolution and release", async (context) => {
   const fixture = await setup(context);
-  await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "before-revocation.json"), "TEST\\Security");
-  assert.equal((await fixture.registry.resolve(fixture.binding))?.status, "passed");
+  await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "revocation.json"), "TEST\\Security");
+  await fixture.registry.consume(fixture.binding);
   await fixture.registry.revokeTrust(authorityId, fixture.keyId, "authority withdrawn", "TEST\\Security");
   assert.equal(await fixture.registry.resolve(fixture.binding), undefined);
+  assert.equal((await fixture.registry.observe(fixture.binding)).state, "invalid");
+  await assert.rejects(fixture.registry.validateConsumedForRelease(fixture.binding), /revoked|invalid|unavailable/i);
   await assert.rejects(fixture.registry.consume(fixture.binding), /revoked|unavailable/i);
 });
 
-test("expired, stale, and future-dated evidence cannot satisfy a live challenge", async (context) => {
+test("generation, target, child, fence, policy, and remote-set drift cannot select consumed evidence", async (context) => {
   const fixture = await setup(context);
-  fixture.setNow("2026-08-25T12:11:00.000Z");
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "expired.json"), "TEST\\Security"), /expired|fresh/i);
-
-  const second = await setup(context);
-  const future = unsigned(second, second.challenge, {
-    evaluatedAt: "2026-08-25T12:06:00.000Z",
-    expiresAt: "2026-08-25T12:09:00.000Z"
-  });
-  await assert.rejects(second.registry.importEvidence(await signedFile(second, future, second.keys.privateKey, "future.json"), "TEST\\Security"), /future|fresh/i);
-
-  const sameNonce = unsigned(second, second.challenge, {
-    evaluatorNonce: second.challenge.challengeNonce,
-    evidenceId: containmentRemoteEvidenceId(second.challenge.id, second.challenge.challengeNonce, authorityId, second.keyId)
-  });
-  await assert.rejects(second.registry.importEvidence(await signedFile(second, sameNonce, second.keys.privateKey, "same-nonce.json"), "TEST\\Security"), /independent.*nonce/i);
+  await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "drift.json"), "TEST\\Security");
+  await fixture.registry.consume(fixture.binding);
+  const mutations: readonly ((binding: ContainmentRemoteEvidenceBinding) => ContainmentRemoteEvidenceBinding)[] = [
+    (value) => ({ ...value, generation: value.generation + 1 }),
+    (value) => ({ ...value, targetSnapshotId: `target:${"9".repeat(64)}` }),
+    (value) => ({ ...value, request: { ...value.request, operationId: `containment-assessment:${"8".repeat(64)}` } }),
+    (value) => ({ ...value, request: { ...value.request, externalId: `containment-assessment:${"7".repeat(64)}` } }),
+    (value) => ({ ...value, request: { ...value.request, fenceEpoch: value.request.fenceEpoch + 1 } }),
+    (value) => ({ ...value, policyVersion: "containment-policy-10" }),
+    (value) => ({ ...value, configuredRemotes: value.configuredRemotes.slice(0, 1) })
+  ];
+  for (const mutate of mutations) {
+    const drifted = mutate(fixture.binding);
+    assert.equal(await fixture.registry.resolve(drifted), undefined);
+    await assert.rejects(fixture.registry.validateConsumedForRelease(drifted), /consumed|exact|binding|absent/i);
+  }
 });
 
-test("required remote refs must have exact complete coverage and immutable expected heads", async (context) => {
+test("a crash after durable consumption is read-only reconcilable after restart and cannot consume twice", async (context) => {
   const fixture = await setup(context);
-  const complete = passedRefs(fixture.challenge);
-  const partial = unsigned(fixture, fixture.challenge, { refResults: complete.slice(0, 1) });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, partial, fixture.keys.privateKey, "partial.json"), "TEST\\Security"), /coverage|refs/i);
-
-  const changedHead = [{ ...complete[0]!, expectedHead: "b".repeat(40) }, complete[1]!];
-  const drifted = unsigned(fixture, fixture.challenge, { refResults: changedHead });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, drifted, fixture.keys.privateKey, "head-drift.json"), "TEST\\Security"), /coverage|head|refs/i);
+  await fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "crash.json"), "TEST\\Security");
+  const first = await fixture.registry.consume(fixture.binding);
+  const restarted = new DurableContainmentRemoteEvidenceRegistry(new ProtectedJsonStore({ filePath: fixture.filePath, clock: () => initialNow, authenticator }), fixture.options);
+  const observed = await restarted.observe(fixture.binding);
+  assert.equal(observed.state, "consumed");
+  assert.deepEqual(observed.result, first);
+  assert.deepEqual(await restarted.resolve(fixture.binding), first);
+  await assert.rejects(restarted.consume(fixture.binding), /consumed|replay/i);
+  assert.equal((await restarted.listEvidence())[0]?.status, "consumed");
 });
 
-test("path traversal, relative imports, and oversized evidence documents are rejected", async (context) => {
+test("signature, challenge identity, freshness, and one-use import fail closed", async (context) => {
   const fixture = await setup(context);
-  const refs: readonly ContainmentRemoteEvidenceRefResult[] = [
-    { ...fixture.challenge.requiredRefs[0]!, status: "failed", exposure: "found", summary: "finding", findings: [{ relativePath: "../secret.txt", credentialRelated: true }] },
-    { ...fixture.challenge.requiredRefs[1]!, status: "passed", exposure: "none", summary: "clean", findings: [] }
-  ];
-  const traversing = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", refResults: refs });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, traversing, fixture.keys.privateKey, "traversal.json"), "TEST\\Security"), /path|repository boundary/i);
-  await assert.rejects(fixture.registry.importEvidence("relative-evidence.json", "TEST\\Security"), /absolute|fixed/i);
-
-  const oversized = join(fixture.root, "oversized.json");
-  await writeFile(oversized, "x".repeat(256 * 1024 + 1), "utf8");
-  await assert.rejects(fixture.registry.importEvidence(oversized, "TEST\\Security"), /oversized|size/i);
+  const wrong = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, unsigned(fixture), wrong.privateKey, "wrong-signature.json"), "TEST\\Security"), /signature/i);
+  const changedChallenge = { ...fixture.challenge, generation: fixture.challenge.generation + 1 };
+  const changed = unsigned(fixture, changedChallenge, { challenge: changedChallenge, evidenceId: containmentRemoteEvidenceId(changedChallenge.id, "a".repeat(64), authorityId, fixture.keyId), remoteResults: completeNamespaces(changedChallenge) });
+  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, changed, fixture.keys.privateKey, "changed-challenge.json"), "TEST\\Security"), /challenge|identity|binding/i);
+  const source = await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "one-use.json");
+  await fixture.registry.importEvidence(source, "TEST\\Security");
+  await assert.rejects(fixture.registry.importEvidence(source, "TEST\\Security"), /used|replay/i);
+  const expired = await setup(context);
+  expired.setNow("2026-08-25T12:11:00.000Z");
+  await assert.rejects(expired.registry.importEvidence(await signedFile(expired, unsigned(expired), expired.keys.privateKey, "expired.json"), "TEST\\Security"), /expired|fresh/i);
 });
 
-test("top-level and per-ref result contradictions are rejected instead of hiding partial truth", async (context) => {
+test("findings are generation-scoped and summaries are redacted before protected persistence", async (context) => {
   const fixture = await setup(context);
-  const finding = { relativePath: "config/credential.txt", credentialRelated: true };
-  const exposed: readonly ContainmentRemoteEvidenceRefResult[] = [
-    { ...fixture.challenge.requiredRefs[0]!, status: "failed", exposure: "found", summary: "found", findings: [finding] },
-    { ...fixture.challenge.requiredRefs[1]!, status: "passed", exposure: "none", summary: "clean", findings: [] }
-  ];
-  const wrongOverall = unsigned(fixture, fixture.challenge, { status: "passed", exposure: "none", refResults: exposed });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, wrongOverall, fixture.keys.privateKey, "wrong-overall.json"), "TEST\\Security"), /inconsistent|result/i);
-
-  const contradictory = [{ ...exposed[0]!, status: "passed" as const }, exposed[1]!];
-  const wrongRef = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", refResults: contradictory });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, wrongRef, fixture.keys.privateKey, "wrong-ref.json"), "TEST\\Security"), /inconsistent|result/i);
-
-  const partialTruth: readonly ContainmentRemoteEvidenceRefResult[] = [
-    exposed[0]!,
-    { ...fixture.challenge.requiredRefs[1]!, status: "unavailable", exposure: "unknown", summary: "unknown", findings: [] }
-  ];
-  const hiddenUnknown = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", refResults: partialTruth });
-  await assert.rejects(fixture.registry.importEvidence(await signedFile(fixture, hiddenUnknown, fixture.keys.privateKey, "hidden-unknown.json"), "TEST\\Security"), /partial|inconsistent|unknown/i);
-
-  const openSchemaPath = await signedFile(fixture, unsigned(fixture), fixture.keys.privateKey, "open-schema.json");
-  const openSchema = JSON.parse(await readFile(openSchemaPath, "utf8")) as Record<string, unknown>;
-  openSchema.networkAllowed = true;
-  await writeFile(openSchemaPath, JSON.stringify(openSchema), "utf8");
-  await assert.rejects(fixture.registry.importEvidence(openSchemaPath, "TEST\\Security"), /open or incomplete schema/i);
-});
-
-test("findings are host-derived, generation-scoped, and redacted before protected persistence", async (context) => {
-  const fixture = await setup(context);
-  const failedRefs = (challenge: ContainmentRemoteEvidenceChallenge): readonly ContainmentRemoteEvidenceRefResult[] => [
-    { ...challenge.requiredRefs[0]!, status: "failed", exposure: "found", summary: "token=supersecretvalue", findings: [{ relativePath: "config/credential.txt", credentialRelated: true }] },
-    { ...challenge.requiredRefs[1]!, status: "passed", exposure: "none", summary: "clean", findings: [] }
-  ];
-  const first = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", summary: "token=supersecretvalue", refResults: failedRefs(fixture.challenge) });
-  await fixture.registry.importEvidence(await signedFile(fixture, first, fixture.keys.privateKey, "generation-3.json"), "TEST\\Security");
-  const firstResult = await fixture.registry.resolve(fixture.binding);
-  assert.equal(firstResult?.status, "failed");
-  assert.match(firstResult?.summary ?? "", /\[REDACTED\]/);
+  const remotes = completeNamespaces(fixture.challenge);
+  const exposedRef = { ...remotes[0]!.refResults[0]!, status: "failed" as const, exposure: "found" as const, summary: "token=supersecretvalue", findings: [{ relativePath: "config/credential.txt", credentialRelated: true }] };
+  const failedOrigin: ContainmentRemoteNamespaceResult = { ...remotes[0]!, status: "failed", exposure: "found", summary: "token=supersecretvalue", refResults: [exposedRef, remotes[0]!.refResults[1]!] };
+  const value = unsigned(fixture, fixture.challenge, { status: "failed", exposure: "found", summary: "token=supersecretvalue", remoteResults: [failedOrigin, remotes[1]!] });
+  await fixture.registry.importEvidence(await signedFile(fixture, value, fixture.keys.privateKey, "redaction.json"), "TEST\\Security");
+  const result = await fixture.registry.resolve(fixture.binding);
+  assert.equal(result?.status, "failed");
+  assert.match(result?.summary ?? "", /\[REDACTED\]/);
+  assert.match(result?.findings[0]?.id ?? "", /^containment-finding:[a-f0-9]{64}$/);
   assert.doesNotMatch(JSON.stringify(await fixture.registry.listEvidence()), /supersecretvalue/);
   assert.doesNotMatch(await readFile(fixture.filePath, "utf8"), /supersecretvalue/);
-  const firstFinding = firstResult?.findings[0];
-  assert.match(firstFinding?.id ?? "", /^containment-finding:[a-f0-9]{64}$/);
-
-  const nextRequest = {
-    ...fixture.binding.request,
-    operationId: `containment-assessment:${"7".repeat(64)}`,
-    externalId: `containment-assessment:${"8".repeat(64)}`
-  };
-  const nextBinding: ContainmentRemoteEvidenceBinding = { ...fixture.binding, request: nextRequest, generation: 4 };
-  const nextChallenge = await fixture.registry.issueChallenge({ ...nextBinding, expiresAt: "2026-08-25T12:10:00.000Z" }, "TEST\\Security");
-  const next = unsigned(fixture, nextChallenge, {
-    challenge: nextChallenge,
-    evidenceId: containmentRemoteEvidenceId(nextChallenge.id, "a".repeat(64), authorityId, fixture.keyId),
-    status: "failed", exposure: "found", summary: "same path", refResults: failedRefs(nextChallenge)
-  });
-  await fixture.registry.importEvidence(await signedFile(fixture, next, fixture.keys.privateKey, "generation-4.json"), "TEST\\Security");
-  const nextFinding = (await fixture.registry.resolve(nextBinding))?.findings[0];
-  assert.notEqual(nextFinding?.id, firstFinding?.id);
+  await fixture.registry.consume(fixture.binding);
+  await assert.rejects(fixture.registry.validateConsumedForRelease(fixture.binding), /not a clean|release result/i);
 });
 
-test("the administration boundary requires current-user presence for trust and evidence transitions", async (context) => {
+test("the administration boundary requires current-user presence for every state transition", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-containment-remote-admin-"));
   context.after(async () => { await rm(root, { recursive: true, force: true }); });
   const keys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });

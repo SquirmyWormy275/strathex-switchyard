@@ -1,4 +1,4 @@
-/** Host-owned, offline signed evidence for the containment remote-assessment child. */
+/** Host-owned, offline signed evidence for the complete containment remote namespace. */
 import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -11,14 +11,14 @@ import type {
   ContainmentFinding
 } from "../../../packages/control-plane/src/containment-incidents.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
-import { stableJson, type JournalEntry, type JsonStoreTransaction, type JsonValue, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { stableJson, type JournalEntry, type JsonValue, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
-const trustInstallKind = "b122.containment-remote.trust.install.v1";
-const trustRevokeKind = "b122.containment-remote.trust.revoke.v1";
-const challengeIssueKind = "b122.containment-remote.challenge.issue.v1";
-const evidenceImportKind = "b122.containment-remote.evidence.import.v1";
-const evidenceConsumeKind = "b122.containment-remote.evidence.consume.v1";
+const trustInstallKind = "b122.containment-remote.trust.install.v2";
+const trustRevokeKind = "b122.containment-remote.trust.revoke.v2";
+const challengeIssueKind = "b122.containment-remote.challenge.issue.v2";
+const evidenceImportKind = "b122.containment-remote.evidence.import.v2";
+const evidenceConsumeKind = "b122.containment-remote.evidence.consume.v2";
 const purpose = "containment-remote-assessment" as const;
 const signatureAlgorithm = "ecdsa-p256-sha256" as const;
 const maximumTrustBytes = 64 * 1024;
@@ -26,15 +26,19 @@ const maximumEvidenceBytes = 256 * 1024;
 const maximumChallengeLifetimeMs = 15 * 60_000;
 const maximumEvidenceAgeMs = 15 * 60_000;
 const maximumFutureSkewMs = 60_000;
-const maximumRefs = 32;
-const maximumFindings = 256;
+const maximumRemotes = 16;
+const maximumRefsPerRemote = 256;
+const maximumFindingsPerRef = 64;
+const maximumFindings = 512;
 const digestPattern = /^[a-f0-9]{64}$/;
 const commitPattern = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const incidentPattern = /^containment-incident:[a-f0-9]{64}$/;
 const childPattern = /^containment-assessment:[a-f0-9]{64}$/;
 const challengePattern = /^containment-remote-challenge:[a-f0-9]{64}$/;
 const evidencePattern = /^containment-remote-evidence:[a-f0-9]{64}$/;
+const findingPattern = /^containment-finding:[a-f0-9]{64}$/;
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
+const remoteNamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export type ContainmentRemoteEvidencePurpose = typeof purpose;
 
@@ -55,24 +59,30 @@ export interface InstalledContainmentRemoteTrust extends ContainmentRemoteTrustP
   readonly revokedAt?: string;
 }
 
-export interface ContainmentRemoteRefBinding {
+/** A trusted host inventory entry. This must never be populated from an IPC command payload. */
+export interface ContainmentConfiguredRemote {
+  readonly name: string;
+  readonly canonicalIdentity: string;
+}
+
+export interface ContainmentRemoteNamespaceRef {
   readonly ref: string;
-  readonly expectedHead: string;
+  readonly head: string;
 }
 
 /**
- * The host supplies the current incident generation and TargetSnapshot data;
- * neither an offline evaluator nor a command payload gets to choose them.
+ * The trusted host supplies this complete binding from the current incident,
+ * TargetSnapshot, policy, and live Git configuration. An evaluator supplies no
+ * part of it and a UI/API caller must not select remote names or refs.
  */
 export interface ContainmentRemoteEvidenceBinding {
   readonly request: ContainmentAssessmentRequest;
   readonly generation: number;
   readonly targetSnapshotId: string;
-  readonly canonicalRemote: string;
   readonly policyVersion: string;
   readonly authorityId: string;
   readonly keyId: string;
-  readonly requiredRefs: readonly ContainmentRemoteRefBinding[];
+  readonly configuredRemotes: readonly ContainmentConfiguredRemote[];
 }
 
 export interface ContainmentRemoteChallengeIssue extends ContainmentRemoteEvidenceBinding {
@@ -81,7 +91,7 @@ export interface ContainmentRemoteChallengeIssue extends ContainmentRemoteEviden
 
 export interface ContainmentRemoteEvidenceChallenge {
   readonly schema: "sxsy-b122.containment-remote-challenge";
-  readonly version: 1;
+  readonly version: 2;
   readonly purpose: ContainmentRemoteEvidencePurpose;
   readonly id: string;
   readonly authorityId: string;
@@ -93,9 +103,8 @@ export interface ContainmentRemoteEvidenceChallenge {
   readonly remoteOperationId: string;
   readonly remoteExternalId: string;
   readonly targetSnapshotId: string;
-  readonly canonicalRemote: string;
   readonly policyVersion: string;
-  readonly requiredRefs: readonly ContainmentRemoteRefBinding[];
+  readonly configuredRemotes: readonly ContainmentConfiguredRemote[];
   readonly challengeNonce: string;
   readonly issuedAt: string;
   readonly expiresAt: string;
@@ -112,16 +121,27 @@ export interface ContainmentRemoteEvidenceFinding {
   readonly credentialRelated: boolean;
 }
 
-export interface ContainmentRemoteEvidenceRefResult extends ContainmentRemoteRefBinding {
+export interface ContainmentRemoteEvidenceRefResult extends ContainmentRemoteNamespaceRef {
   readonly status: ContainmentAssessmentStatus;
   readonly exposure: ContainmentExposure;
   readonly summary: string;
   readonly findings: readonly ContainmentRemoteEvidenceFinding[];
 }
 
+export interface ContainmentRemoteNamespaceResult extends ContainmentConfiguredRemote {
+  readonly namespaceComplete: true;
+  readonly refCount: number;
+  readonly namespaceSha256: string;
+  readonly namespaceRefs: readonly ContainmentRemoteNamespaceRef[];
+  readonly status: ContainmentAssessmentStatus;
+  readonly exposure: ContainmentExposure;
+  readonly summary: string;
+  readonly refResults: readonly ContainmentRemoteEvidenceRefResult[];
+}
+
 export interface SignedContainmentRemoteEvidence {
   readonly schema: "sxsy-b122.containment-remote-evidence";
-  readonly version: 1;
+  readonly version: 2;
   readonly purpose: ContainmentRemoteEvidencePurpose;
   readonly evidenceId: string;
   readonly authorityId: string;
@@ -130,10 +150,11 @@ export interface SignedContainmentRemoteEvidence {
   readonly evaluatorNonce: string;
   readonly evaluatedAt: string;
   readonly expiresAt: string;
+  readonly namespaceComplete: true;
   readonly status: ContainmentAssessmentStatus;
   readonly exposure: ContainmentExposure;
   readonly summary: string;
-  readonly refResults: readonly ContainmentRemoteEvidenceRefResult[];
+  readonly remoteResults: readonly ContainmentRemoteNamespaceResult[];
   readonly signatureAlgorithm: typeof signatureAlgorithm;
   readonly signature: string;
 }
@@ -164,11 +185,37 @@ export interface ImportedContainmentRemoteEvidence {
   readonly consumptionDigest?: string;
 }
 
+export interface ContainmentRemoteEvidenceObservation {
+  readonly state: "absent" | "available" | "consumed" | "invalid" | "not_required";
+  readonly evidenceId?: string;
+  readonly challengeId?: string;
+  readonly result?: ContainmentAssessmentResult;
+}
+
+export interface ContainmentRemoteReleaseValidation {
+  readonly evidenceId: string;
+  readonly challengeId: string;
+  readonly documentSha256: string;
+  readonly consumptionDigest: string;
+  readonly consumedAt: string;
+  readonly validatedAt: string;
+  readonly generation: number;
+  readonly targetSnapshotId: string;
+  readonly remoteOperationId: string;
+  readonly remoteExternalId: string;
+  readonly configuredRemotes: readonly ContainmentConfiguredRemote[];
+  readonly result: ContainmentAssessmentResult;
+}
+
 export interface ContainmentRemoteEvidencePort {
-  /** Read-only recovery/observation. A consumed result remains observable. */
+  /** Read-only recovery. A valid consumed result remains observable after a host crash. */
   resolve(binding: ContainmentRemoteEvidenceBinding): Promise<ContainmentAssessmentResult | undefined>;
-  /** One durable transition from imported evidence to the exact remote child. */
+  /** The only transition from imported evidence to the exact remote child. */
   consume(binding: ContainmentRemoteEvidenceBinding): Promise<ContainmentAssessmentResult | undefined>;
+  /** Distinguishes a crash-reconcilable consumed result from absent or invalid evidence. */
+  observe(binding: ContainmentRemoteEvidenceBinding): Promise<ContainmentRemoteEvidenceObservation>;
+  /** Host-only, read-only final check for the exact current release binding. */
+  validateConsumedForRelease(binding: ContainmentRemoteEvidenceBinding): Promise<ContainmentRemoteReleaseValidation>;
 }
 
 export interface ContainmentRemoteEvidenceRegistryOptions {
@@ -182,11 +229,7 @@ interface RegistryState {
   readonly evidence: Map<string, ImportedContainmentRemoteEvidence>;
 }
 
-/**
- * Protected, append-only registry for an offline evaluator. This class owns no
- * network or credential port; the only ingress is a selected bounded regular
- * file and the only egress is a closed ContainmentAssessmentResult.
- */
+/** Protected, append-only registry. It performs no network access. */
 export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemoteEvidencePort {
   private readonly now: () => Date;
   private readonly nonceFactory: () => string;
@@ -197,17 +240,17 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
     this.nonceFactory = options.nonceFactory ?? (() => randomBytes(32).toString("hex"));
   }
 
-  async installTrust(policyInput: ContainmentRemoteTrustPolicy, installedBy: string): Promise<InstalledContainmentRemoteTrust> {
+  async installTrust(policyInput: ContainmentRemoteTrustPolicy, installedByInput: string): Promise<InstalledContainmentRemoteTrust> {
     const policy = validateTrust(policyInput, this.now());
-    const operator = boundedText(installedBy, "containment remote trust operator", 160);
+    const installedBy = boundedText(installedByInput, "containment remote trust operator", 160);
     return this.store.transaction(async (transaction) => {
       const state = readState(await transaction.readEntries());
       if ([...state.trust.values()].some((item) => item.authorityId === policy.authorityId && item.status === "active")) {
         throw new Error("An active containment remote authority already exists; revoke it before key rotation.");
       }
       if (state.trust.has(trustKey(policy.authorityId, policy.keyId))) throw new Error("Containment remote trust history cannot reinstall the same key identity.");
-      const entry = await transaction.append(trustInstallKind, { policy: policy as unknown as JsonValue, installedBy: operator });
-      return { ...policy, installedAt: entry.at, installedBy: operator, status: "active" };
+      const entry = await transaction.append(trustInstallKind, { policy: policy as unknown as JsonValue, installedBy });
+      return { ...policy, installedAt: entry.at, installedBy, status: "active" };
     });
   }
 
@@ -232,27 +275,28 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
   async issueChallenge(input: ContainmentRemoteChallengeIssue, issuedByInput: string): Promise<ContainmentRemoteEvidenceChallenge> {
     const issuedAt = exactNow(this.now());
     const binding = validateBinding(input);
+    if (binding.configuredRemotes.length === 0) throw new Error("No configured remotes exist; signed remote evidence is not required.");
     const expiresAt = future(input.expiresAt, issuedAt, maximumChallengeLifetimeMs, "containment remote challenge expiry");
     const challengeNonce = digest(this.nonceFactory(), "containment remote challenge nonce");
     const withoutId = {
-      schema: "sxsy-b122.containment-remote-challenge" as const, version: 1 as const, purpose,
+      schema: "sxsy-b122.containment-remote-challenge" as const, version: 2 as const, purpose,
       authorityId: binding.authorityId, keyId: binding.keyId,
       incidentId: binding.request.incidentId, repositoryRootDigest: repositoryDigest(binding.request.repositoryRoot),
       fenceEpoch: binding.request.fenceEpoch, generation: binding.generation,
       remoteOperationId: binding.request.operationId, remoteExternalId: binding.request.externalId,
-      targetSnapshotId: binding.targetSnapshotId, canonicalRemote: binding.canonicalRemote,
-      policyVersion: binding.policyVersion, requiredRefs: binding.requiredRefs,
-      challengeNonce, issuedAt: issuedAt.toISOString(), expiresAt
+      targetSnapshotId: binding.targetSnapshotId, policyVersion: binding.policyVersion,
+      configuredRemotes: binding.configuredRemotes, challengeNonce,
+      issuedAt: issuedAt.toISOString(), expiresAt
     };
     const challenge: ContainmentRemoteEvidenceChallenge = { ...withoutId, id: deriveChallengeId(withoutId) };
     const issuedBy = boundedText(issuedByInput, "containment remote challenge operator", 160);
     return this.store.transaction(async (transaction) => {
       const state = readState(await transaction.readEntries());
-      const anchor = state.trust.get(trustKey(challenge.authorityId, challenge.keyId));
-      requireUsableTrust(anchor, issuedAt, challenge.expiresAt);
-      const exactBindingDigest = challengeBindingDigest(challenge);
-      if ([...state.challenges.values()].some((item) => challengeBindingDigest(item) === exactBindingDigest)) {
-        throw new Error("A containment remote challenge already exists for this exact generation and child binding.");
+      requireUsableTrust(state.trust.get(trustKey(challenge.authorityId, challenge.keyId)), issuedAt, challenge.expiresAt);
+      const exactBinding = challengeBindingDigest(challenge);
+      const existing = [...state.challenges.values()].filter((item) => challengeBindingDigest(item) === exactBinding);
+      if (existing.some((item) => item.evidenceId || Date.parse(item.expiresAt) > issuedAt.getTime())) {
+        throw new Error("A live or already-used containment remote challenge exists for this exact generation and child binding.");
       }
       if ([...state.challenges.values()].some((item) => item.challengeNonce === challenge.challengeNonce)) throw new Error("The containment remote challenge nonce was reused.");
       await transaction.append(challengeIssueKind, { challenge: challenge as unknown as JsonValue, issuedBy });
@@ -281,8 +325,11 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
       const anchor = state.trust.get(trustKey(signed.authorityId, signed.keyId));
       requireUsableTrust(anchor, observedAt, signed.expiresAt);
       if (signed.authorityId !== challenge.authorityId || signed.keyId !== challenge.keyId) throw new Error("Containment remote evidence uses the wrong authority or key binding.");
-      verifySignedEvidence(signed, anchor!);
-      assertRefCoverage(challenge.requiredRefs, signed.refResults);
+      verifySignedEvidence(signed, anchor);
+      assertRemoteCoverage(challenge.configuredRemotes, signed.remoteResults);
+      if ([...state.evidence.values()].some((item) => item.authorityId === signed.authorityId && item.keyId === signed.keyId && item.evaluatorNonce === signed.evaluatorNonce)) {
+        throw new Error("Containment remote evaluator nonce replay is rejected.");
+      }
       const result = storedResult(signed);
       const stored: Omit<ImportedContainmentRemoteEvidence, "importedAt" | "status"> = {
         evidenceId: signed.evidenceId, challengeId: challenge.id, authorityId: signed.authorityId, keyId: signed.keyId,
@@ -299,27 +346,64 @@ export class DurableContainmentRemoteEvidenceRegistry implements ContainmentRemo
     return [...readState(await this.store.readEntries()).evidence.values()].map(clone);
   }
 
-  async resolve(bindingInput: ContainmentRemoteEvidenceBinding): Promise<ContainmentAssessmentResult | undefined> {
+  async observe(bindingInput: ContainmentRemoteEvidenceBinding): Promise<ContainmentRemoteEvidenceObservation> {
     const binding = validateBinding(bindingInput);
+    if (binding.configuredRemotes.length === 0) return { state: "not_required", result: containmentRemoteResultForNoConfiguredRemotes(binding) };
     const state = readState(await this.store.readEntries());
     const selected = selectEvidence(state, binding);
-    if (!selected) return undefined;
-    if (selected.evidence.status === "available" && !usableEvidence(state, selected.evidence, this.now())) return undefined;
-    return resultFor(binding.request, selected.evidence.result);
+    if (!selected) return { state: "absent" };
+    if (!usableEvidence(state, selected.challenge, selected.evidence, this.now())) {
+      return { state: "invalid", evidenceId: selected.evidence.evidenceId, challengeId: selected.challenge.id };
+    }
+    return {
+      state: selected.evidence.status, evidenceId: selected.evidence.evidenceId, challengeId: selected.challenge.id,
+      result: resultFor(binding.request, selected.evidence.result)
+    };
+  }
+
+  async resolve(bindingInput: ContainmentRemoteEvidenceBinding): Promise<ContainmentAssessmentResult | undefined> {
+    const observation = await this.observe(bindingInput);
+    return observation.state === "available" || observation.state === "consumed" || observation.state === "not_required" ? observation.result : undefined;
   }
 
   async consume(bindingInput: ContainmentRemoteEvidenceBinding): Promise<ContainmentAssessmentResult | undefined> {
     const binding = validateBinding(bindingInput);
+    if (binding.configuredRemotes.length === 0) return containmentRemoteResultForNoConfiguredRemotes(binding);
     const consumptionDigest = bindingDigest(binding);
     return this.store.transaction(async (transaction) => {
       const state = readState(await transaction.readEntries());
       const selected = selectEvidence(state, binding);
       if (!selected) return undefined;
+      if (!usableEvidence(state, selected.challenge, selected.evidence, this.now())) throw new Error("Containment remote evidence is expired, revoked, or otherwise unavailable.");
       if (selected.evidence.status === "consumed") throw new Error("Containment remote evidence was already consumed; replay is rejected.");
-      if (!usableEvidence(state, selected.evidence, this.now())) throw new Error("Containment remote evidence is expired, revoked, or otherwise unavailable.");
       await transaction.append(evidenceConsumeKind, { evidenceId: selected.evidence.evidenceId, consumptionDigest });
       return resultFor(binding.request, selected.evidence.result);
     });
+  }
+
+  async validateConsumedForRelease(bindingInput: ContainmentRemoteEvidenceBinding): Promise<ContainmentRemoteReleaseValidation> {
+    const binding = validateBinding(bindingInput);
+    if (binding.configuredRemotes.length === 0) throw new Error("No configured remotes exist; signed evidence is not required for this release binding.");
+    const state = readState(await this.store.readEntries());
+    const selected = selectEvidence(state, binding);
+    if (!selected || selected.evidence.status !== "consumed" || !selected.evidence.consumedAt || !selected.evidence.consumptionDigest) {
+      throw new Error("No consumed containment remote evidence exists for the exact current release binding.");
+    }
+    const validatedAt = exactNow(this.now());
+    if (!usableEvidence(state, selected.challenge, selected.evidence, validatedAt)) throw new Error("Consumed containment remote evidence is expired, revoked, invalid, or unavailable.");
+    const expectedDigest = bindingDigest(binding);
+    if (!sameDigest(selected.evidence.consumptionDigest, expectedDigest)) throw new Error("Consumed containment remote evidence changed its exact release binding.");
+    if (selected.evidence.result.status !== "passed" || selected.evidence.result.exposure !== "none" || selected.evidence.result.findings.length !== 0) {
+      throw new Error("Consumed containment remote evidence is not a clean complete-namespace release result.");
+    }
+    return {
+      evidenceId: selected.evidence.evidenceId, challengeId: selected.challenge.id,
+      documentSha256: selected.evidence.documentSha256, consumptionDigest: selected.evidence.consumptionDigest,
+      consumedAt: selected.evidence.consumedAt, validatedAt: validatedAt.toISOString(),
+      generation: selected.challenge.generation, targetSnapshotId: selected.challenge.targetSnapshotId,
+      remoteOperationId: selected.challenge.remoteOperationId, remoteExternalId: selected.challenge.remoteExternalId,
+      configuredRemotes: clone(selected.challenge.configuredRemotes), result: resultFor(binding.request, selected.evidence.result)
+    };
   }
 }
 
@@ -351,14 +435,14 @@ export function createContainmentRemoteEvidenceAdministration(options: Readonly<
     },
     async listTrust() { return options.registry.listTrust(); },
     async revokeTrust(authorityId, keyId, reason) { return options.registry.revokeTrust(authorityId, keyId, reason, await operator(`Revoke containment remote authority ${authorityId} key ${keyId.slice(0, 12)}.`)); },
-    async issueChallenge(input) { return options.registry.issueChallenge(input, await operator(`Issue one offline containment remote-assessment challenge for ${input.request.incidentId}.`)); },
+    async issueChallenge(input) { return options.registry.issueChallenge(input, await operator(`Issue one offline complete-namespace challenge for ${input.request.incidentId}.`)); },
     async listChallenges() { return options.registry.listChallenges(); },
-    async importEvidence(sourcePath) { return options.registry.importEvidence(sourcePath, await operator("Import one selected signed containment remote-assessment evidence document.")); },
+    async importEvidence(sourcePath) { return options.registry.importEvidence(sourcePath, await operator("Import one selected signed complete-namespace evidence document.")); },
     async listEvidence() { return options.registry.listEvidence(); }
   };
 }
 
-/** Exact bytes an independent evaluator signs; the signature field is excluded by type. */
+/** Exact canonical bytes an independent evaluator signs. */
 export function containmentRemoteEvidenceSigningPayload(value: UnsignedContainmentRemoteEvidence): Uint8Array {
   return Buffer.from(stableJson(value), "utf8");
 }
@@ -369,6 +453,19 @@ export function containmentRemoteEvidenceId(challengeIdInput: string, evaluatorN
   const authorityId = identifier(authorityIdInput, "containment remote authority");
   const keyId = digest(keyIdInput, "containment remote key");
   return `containment-remote-evidence:${sha256(stableJson({ authorityId, challengeId, evaluatorNonce, keyId, purpose }))}`;
+}
+
+/** Digest of the evaluator's ordered, complete heads+tags namespace inventory. */
+export function containmentRemoteNamespaceDigest(refsInput: readonly ContainmentRemoteNamespaceRef[]): string {
+  const refs = parseNamespaceRefs(refsInput, "containment remote namespace");
+  return sha256(stableJson(refs));
+}
+
+/** The only clean result path that does not use signed evidence. */
+export function containmentRemoteResultForNoConfiguredRemotes(bindingInput: ContainmentRemoteEvidenceBinding): ContainmentAssessmentResult {
+  const binding = validateBinding(bindingInput);
+  if (binding.configuredRemotes.length !== 0) throw new Error("The no-configured-remotes result cannot represent a repository that has remotes.");
+  return resultFor(binding.request, { status: "passed", exposure: "none", summary: "No Git remotes are configured in the current host-derived target.", findings: [] });
 }
 
 function readState(entries: readonly JournalEntry<unknown>[]): RegistryState {
@@ -386,7 +483,8 @@ function readState(entries: readonly JournalEntry<unknown>[]): RegistryState {
     } else if (entry.kind === trustRevokeKind) {
       const payload = exactRecord(entry.payload, ["authorityId", "keyId", "reason", "revokedBy"], "protected containment remote trust revocation");
       const key = trustKey(identifier(payload.authorityId, "containment remote authority"), digest(payload.keyId, "containment remote key"));
-      boundedText(payload.reason, "containment remote trust revocation", 512); boundedText(payload.revokedBy, "containment remote trust operator", 160);
+      boundedText(payload.reason, "containment remote trust revocation", 512);
+      boundedText(payload.revokedBy, "containment remote trust operator", 160);
       const current = trust.get(key);
       if (!current || current.status !== "active") throw new Error("Protected containment remote trust revocation has no active predecessor.");
       trust.set(key, { ...current, status: "revoked", revokedAt: exactIso(entry.at, "containment remote trust revocation") });
@@ -394,16 +492,17 @@ function readState(entries: readonly JournalEntry<unknown>[]): RegistryState {
       const payload = exactRecord(entry.payload, ["challenge", "issuedBy"], "protected containment remote challenge");
       const challenge = parseChallenge(payload.challenge, new Date(0), true);
       if (challenges.has(challenge.id)) throw new Error("Protected containment remote challenge history contains a duplicate identity.");
-      boundedText(payload.issuedBy, "containment remote challenge operator", 160);
-      challenges.set(challenge.id, { ...challenge, issuedBy: payload.issuedBy as string, status: "active" });
+      const issuedBy = boundedText(payload.issuedBy, "containment remote challenge operator", 160);
+      challenges.set(challenge.id, { ...challenge, issuedBy, status: "active" });
     } else if (entry.kind === evidenceImportKind) {
       const payload = exactRecord(entry.payload, ["evidence"], "protected containment remote evidence import");
       const stored = parseStoredEvidence(payload.evidence);
       if (evidence.has(stored.evidenceId) || evidenceByChallenge.has(stored.challengeId)) throw new Error("Protected containment remote evidence history contains a replay.");
       const challenge = challenges.get(stored.challengeId);
-      if (!challenge) throw new Error("Protected containment remote evidence has no durable challenge.");
+      if (!challenge || challenge.status !== "active") throw new Error("Protected containment remote evidence has no unused durable challenge.");
       const item: ImportedContainmentRemoteEvidence = { ...stored, importedAt: exactIso(entry.at, "containment remote evidence import"), status: "available" };
-      evidence.set(item.evidenceId, item); evidenceByChallenge.set(item.challengeId, item.evidenceId);
+      evidence.set(item.evidenceId, item);
+      evidenceByChallenge.set(item.challengeId, item.evidenceId);
       challenges.set(challenge.id, { ...challenge, status: "used", evidenceId: item.evidenceId });
     } else if (entry.kind === evidenceConsumeKind) {
       const payload = exactRecord(entry.payload, ["evidenceId", "consumptionDigest"], "protected containment remote evidence consumption");
@@ -432,12 +531,13 @@ function parseStoredEvidence(value: unknown): Omit<ImportedContainmentRemoteEvid
 
 function parseStoredResult(value: unknown): StoredRemoteResult {
   const item = exactRecord(value, ["status", "exposure", "summary", "findings"], "protected containment remote result");
-  const status = assessmentStatus(item.status); const exposure = exposureStatus(item.exposure);
+  const status = assessmentStatus(item.status);
+  const exposure = exposureStatus(item.exposure);
   if (!Array.isArray(item.findings) || item.findings.length > maximumFindings) throw new Error("Protected containment remote findings are invalid.");
   const findings = item.findings.map((finding) => {
     const entry = exactRecord(finding, ["id", "relativePath", "credentialRelated"], "protected containment remote finding");
     if (typeof entry.credentialRelated !== "boolean") throw new Error("Protected containment remote finding is malformed.");
-    return { id: pattern(entry.id, /^containment-finding:[a-f0-9]{64}$/, "containment finding id"), relativePath: safeRelative(entry.relativePath), credentialRelated: entry.credentialRelated };
+    return { id: pattern(entry.id, findingPattern, "containment finding id"), relativePath: safeRelative(entry.relativePath), credentialRelated: entry.credentialRelated };
   });
   assertResultConsistency(status, exposure, findings.length);
   return { status, exposure, summary: boundedText(item.summary, "containment remote result summary", 1_024), findings };
@@ -466,104 +566,178 @@ function validateTrust(value: unknown, now: Date, allowExpired = false): Contain
 function parseEvidence(bytes: Uint8Array, now: Date): SignedContainmentRemoteEvidence {
   let value: unknown;
   try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new Error("Containment remote evidence is not JSON."); }
-  const item = exactRecord(value, ["schema", "version", "purpose", "evidenceId", "authorityId", "keyId", "challenge", "evaluatorNonce", "evaluatedAt", "expiresAt", "status", "exposure", "summary", "refResults", "signatureAlgorithm", "signature"], "containment remote evidence");
-  if (item.schema !== "sxsy-b122.containment-remote-evidence" || item.version !== 1 || item.purpose !== purpose || item.signatureAlgorithm !== signatureAlgorithm) throw new Error("Containment remote evidence schema, purpose, or signature algorithm is invalid.");
+  const item = exactRecord(value, ["schema", "version", "purpose", "evidenceId", "authorityId", "keyId", "challenge", "evaluatorNonce", "evaluatedAt", "expiresAt", "namespaceComplete", "status", "exposure", "summary", "remoteResults", "signatureAlgorithm", "signature"], "containment remote evidence");
+  if (item.schema !== "sxsy-b122.containment-remote-evidence" || item.version !== 2 || item.purpose !== purpose || item.signatureAlgorithm !== signatureAlgorithm || item.namespaceComplete !== true) {
+    throw new Error("Containment remote evidence schema, purpose, complete-namespace assertion, or signature algorithm is invalid.");
+  }
   const challenge = parseChallenge(item.challenge, now);
-  const authorityId = identifier(item.authorityId, "containment remote authority"); const keyId = digest(item.keyId, "containment remote key");
+  const authorityId = identifier(item.authorityId, "containment remote authority");
+  const keyId = digest(item.keyId, "containment remote key");
   if (authorityId !== challenge.authorityId || keyId !== challenge.keyId) throw new Error("Containment remote evidence uses the wrong challenge authority or key.");
   const evaluatorNonce = digest(item.evaluatorNonce, "containment remote evaluator nonce");
   if (sameDigest(evaluatorNonce, challenge.challengeNonce)) throw new Error("Containment remote evidence requires an independent evaluator nonce.");
   const evidenceId = pattern(item.evidenceId, evidencePattern, "containment remote evidence id");
   if (!sameDigest(evidenceId, containmentRemoteEvidenceId(challenge.id, evaluatorNonce, authorityId, keyId))) throw new Error("Containment remote evidence identity does not match its exact challenge and evaluator nonce.");
-  const evaluatedAt = exactIso(item.evaluatedAt, "containment remote evaluation"); const expiresAt = exactIso(item.expiresAt, "containment remote evidence expiry");
-  const observed = exactNow(now).getTime(); const evaluated = Date.parse(evaluatedAt); const expires = Date.parse(expiresAt);
+  const evaluatedAt = exactIso(item.evaluatedAt, "containment remote evaluation");
+  const expiresAt = exactIso(item.expiresAt, "containment remote evidence expiry");
+  const observed = exactNow(now).getTime();
+  const evaluated = Date.parse(evaluatedAt);
+  const expires = Date.parse(expiresAt);
   if (evaluated < Date.parse(challenge.issuedAt) || evaluated > observed + maximumFutureSkewMs || observed - evaluated > maximumEvidenceAgeMs
     || expires <= observed || expires <= evaluated || expires > Date.parse(challenge.expiresAt)) {
     throw new Error("Containment remote evidence is future-dated, expired, or outside its exact freshness window.");
   }
-  if (!Array.isArray(item.refResults) || item.refResults.length < 1 || item.refResults.length > maximumRefs) throw new Error("Containment remote evidence ref coverage is invalid.");
-  const refResults = item.refResults.map(parseRefResult);
-  const status = assessmentStatus(item.status); const exposure = exposureStatus(item.exposure);
-  const derived = deriveAggregate(refResults);
-  if (status !== derived.status || exposure !== derived.exposure) throw new Error("Containment remote evidence aggregate result is inconsistent with its ref results.");
+  const remoteResults = parseRemoteResults(item.remoteResults);
+  assertRemoteCoverage(challenge.configuredRemotes, remoteResults);
+  const status = assessmentStatus(item.status);
+  const exposure = exposureStatus(item.exposure);
+  const derived = deriveAggregate(remoteResults.map((remote) => ({ status: remote.status, exposure: remote.exposure, findings: remote.refResults.reduce((total, ref) => total + ref.findings.length, 0) })));
+  if (status !== derived.status || exposure !== derived.exposure) throw new Error("Containment remote evidence aggregate result is inconsistent with its complete remote namespaces.");
   const signature = boundedText(item.signature, "containment remote evidence signature", 512);
   return {
-    schema: "sxsy-b122.containment-remote-evidence", version: 1, purpose, evidenceId, authorityId, keyId, challenge,
-    evaluatorNonce, evaluatedAt, expiresAt, status, exposure, summary: boundedText(item.summary, "containment remote evidence summary", 2_048),
-    refResults, signatureAlgorithm, signature
+    schema: "sxsy-b122.containment-remote-evidence", version: 2, purpose, evidenceId, authorityId, keyId, challenge,
+    evaluatorNonce, evaluatedAt, expiresAt, namespaceComplete: true, status, exposure,
+    summary: boundedText(item.summary, "containment remote evidence summary", 2_048), remoteResults, signatureAlgorithm, signature
   };
 }
 
 function parseChallenge(value: unknown, now: Date, allowExpired = false): ContainmentRemoteEvidenceChallenge {
-  const item = exactRecord(value, ["schema", "version", "purpose", "id", "authorityId", "keyId", "incidentId", "repositoryRootDigest", "fenceEpoch", "generation", "remoteOperationId", "remoteExternalId", "targetSnapshotId", "canonicalRemote", "policyVersion", "requiredRefs", "challengeNonce", "issuedAt", "expiresAt"], "containment remote challenge");
-  if (item.schema !== "sxsy-b122.containment-remote-challenge" || item.version !== 1 || item.purpose !== purpose) throw new Error("Containment remote challenge schema or purpose is invalid.");
-  const issuedAt = exactIso(item.issuedAt, "containment remote challenge issue"); const expiresAt = exactIso(item.expiresAt, "containment remote challenge expiry");
-  if (Date.parse(expiresAt) <= Date.parse(issuedAt) || Date.parse(expiresAt) - Date.parse(issuedAt) > maximumChallengeLifetimeMs || (!allowExpired && Date.parse(expiresAt) <= exactNow(now).getTime())) throw new Error("Containment remote challenge is expired or exceeds its maximum lifetime.");
+  const item = exactRecord(value, ["schema", "version", "purpose", "id", "authorityId", "keyId", "incidentId", "repositoryRootDigest", "fenceEpoch", "generation", "remoteOperationId", "remoteExternalId", "targetSnapshotId", "policyVersion", "configuredRemotes", "challengeNonce", "issuedAt", "expiresAt"], "containment remote challenge");
+  if (item.schema !== "sxsy-b122.containment-remote-challenge" || item.version !== 2 || item.purpose !== purpose) throw new Error("Containment remote challenge schema or purpose is invalid.");
+  const issuedAt = exactIso(item.issuedAt, "containment remote challenge issue");
+  const expiresAt = exactIso(item.expiresAt, "containment remote challenge expiry");
+  if (Date.parse(expiresAt) <= Date.parse(issuedAt) || Date.parse(expiresAt) - Date.parse(issuedAt) > maximumChallengeLifetimeMs || (!allowExpired && Date.parse(expiresAt) <= exactNow(now).getTime())) {
+    throw new Error("Containment remote challenge is expired or exceeds its maximum lifetime.");
+  }
+  const configuredRemotes = parseConfiguredRemotes(item.configuredRemotes);
+  if (configuredRemotes.length === 0) throw new Error("A signed containment remote challenge cannot represent zero configured remotes.");
   const challenge: ContainmentRemoteEvidenceChallenge = {
-    schema: "sxsy-b122.containment-remote-challenge", version: 1, purpose,
-    id: pattern(item.id, challengePattern, "containment remote challenge id"), authorityId: identifier(item.authorityId, "containment remote authority"), keyId: digest(item.keyId, "containment remote key"),
+    schema: "sxsy-b122.containment-remote-challenge", version: 2, purpose,
+    id: pattern(item.id, challengePattern, "containment remote challenge id"),
+    authorityId: identifier(item.authorityId, "containment remote authority"), keyId: digest(item.keyId, "containment remote key"),
     incidentId: pattern(item.incidentId, incidentPattern, "containment incident id"), repositoryRootDigest: digest(item.repositoryRootDigest, "containment repository root"),
     fenceEpoch: positiveInteger(item.fenceEpoch, "containment fence epoch"), generation: positiveInteger(item.generation, "containment assessment generation"),
     remoteOperationId: pattern(item.remoteOperationId, childPattern, "containment remote operation id"), remoteExternalId: pattern(item.remoteExternalId, childPattern, "containment remote external id"),
-    targetSnapshotId: identifier(item.targetSnapshotId, "containment target snapshot"), canonicalRemote: strictCanonicalRemote(item.canonicalRemote),
-    policyVersion: identifier(item.policyVersion, "containment remote policy"), requiredRefs: parseRefs(item.requiredRefs), challengeNonce: digest(item.challengeNonce, "containment remote challenge nonce"),
-    issuedAt, expiresAt
+    targetSnapshotId: identifier(item.targetSnapshotId, "containment target snapshot"), policyVersion: identifier(item.policyVersion, "containment remote policy"),
+    configuredRemotes, challengeNonce: digest(item.challengeNonce, "containment remote challenge nonce"), issuedAt, expiresAt
   };
   if (!sameDigest(challenge.id, deriveChallengeId(challengeIdentityDocument(challenge)))) throw new Error("Containment remote challenge identity does not bind its exact contents.");
   return challenge;
 }
 
-function parseRefResult(value: unknown): ContainmentRemoteEvidenceRefResult {
-  const item = exactRecord(value, ["ref", "expectedHead", "status", "exposure", "summary", "findings"], "containment remote ref result");
-  const ref = exactRef(item.ref); const expectedHead = commit(item.expectedHead); const status = assessmentStatus(item.status); const exposure = exposureStatus(item.exposure);
-  if (!Array.isArray(item.findings) || item.findings.length > 64) throw new Error("Containment remote ref findings exceed their bound.");
-  const findings = item.findings.map((valueItem) => {
-    const finding = exactRecord(valueItem, ["relativePath", "credentialRelated"], "containment remote ref finding");
-    if (typeof finding.credentialRelated !== "boolean") throw new Error("Containment remote ref finding is malformed.");
-    return { relativePath: safeRelative(finding.relativePath), credentialRelated: finding.credentialRelated };
+function parseRemoteResults(value: unknown): readonly ContainmentRemoteNamespaceResult[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > maximumRemotes) throw new Error("Containment remote evidence configured-remote coverage is invalid or unbounded.");
+  const results = value.map(parseRemoteResult);
+  assertStrictOrder(results.map((item) => item.name), "Containment remote results contain duplicate or non-canonical remote names.", true);
+  if (new Set(results.map((item) => item.canonicalIdentity.toLowerCase())).size !== results.length) throw new Error("Containment remote results contain duplicate canonical identities.");
+  return results;
+}
+
+function parseRemoteResult(value: unknown): ContainmentRemoteNamespaceResult {
+  const item = exactRecord(value, ["name", "canonicalIdentity", "namespaceComplete", "refCount", "namespaceSha256", "namespaceRefs", "status", "exposure", "summary", "refResults"], "containment remote namespace result");
+  if (item.namespaceComplete !== true) throw new Error("Containment remote namespace must assert namespaceComplete true.");
+  const namespaceRefs = parseNamespaceRefs(item.namespaceRefs, "containment remote namespace");
+  const refCount = nonNegativeInteger(item.refCount, "containment remote namespace ref count");
+  if (refCount !== namespaceRefs.length) throw new Error("Containment remote namespace ref count is inconsistent.");
+  const namespaceSha256 = digest(item.namespaceSha256, "containment remote namespace digest");
+  if (!sameDigest(namespaceSha256, containmentRemoteNamespaceDigest(namespaceRefs))) throw new Error("Containment remote namespace digest is inconsistent.");
+  const refResults = parseRefResults(item.refResults);
+  assertRefCoverage(namespaceRefs, refResults);
+  const status = assessmentStatus(item.status);
+  const exposure = exposureStatus(item.exposure);
+  const derived = deriveAggregate(refResults.map((ref) => ({ status: ref.status, exposure: ref.exposure, findings: ref.findings.length })));
+  if (status !== derived.status || exposure !== derived.exposure) throw new Error("Containment remote namespace aggregate result is inconsistent with its refs.");
+  return {
+    name: remoteName(item.name), canonicalIdentity: strictCanonicalRemote(item.canonicalIdentity), namespaceComplete: true,
+    refCount, namespaceSha256, namespaceRefs, status, exposure,
+    summary: boundedText(item.summary, "containment remote namespace summary", 1_024), refResults
+  };
+}
+
+function parseNamespaceRefs(value: unknown, label: string): readonly ContainmentRemoteNamespaceRef[] {
+  if (!Array.isArray(value) || value.length > maximumRefsPerRemote) throw new Error(`${label} refs are invalid or unbounded.`);
+  const refs = value.map((candidate) => {
+    const item = exactRecord(candidate, ["ref", "head"], `${label} ref`);
+    return { ref: exactRef(item.ref), head: commit(item.head) };
   });
-  if (new Set(findings.map((finding) => finding.relativePath.toLowerCase())).size !== findings.length) throw new Error("Containment remote ref findings contain duplicate paths.");
-  assertResultConsistency(status, exposure, findings.length);
-  return { ref, expectedHead, status, exposure, summary: boundedText(item.summary, "containment remote ref summary", 1_024), findings };
+  assertStrictOrder(refs.map((item) => item.ref), `${label} refs contain duplicates or are not in canonical order.`);
+  return refs;
+}
+
+function parseRefResults(value: unknown): readonly ContainmentRemoteEvidenceRefResult[] {
+  if (!Array.isArray(value) || value.length > maximumRefsPerRemote) throw new Error("Containment remote ref results are invalid or unbounded.");
+  const refs = value.map((candidate) => {
+    const item = exactRecord(candidate, ["ref", "head", "status", "exposure", "summary", "findings"], "containment remote ref result");
+    const status = assessmentStatus(item.status);
+    const exposure = exposureStatus(item.exposure);
+    if (!Array.isArray(item.findings) || item.findings.length > maximumFindingsPerRef) throw new Error("Containment remote ref findings exceed their bound.");
+    const findings = item.findings.map((candidateFinding) => {
+      const finding = exactRecord(candidateFinding, ["relativePath", "credentialRelated"], "containment remote ref finding");
+      if (typeof finding.credentialRelated !== "boolean") throw new Error("Containment remote ref finding is malformed.");
+      return { relativePath: safeRelative(finding.relativePath), credentialRelated: finding.credentialRelated };
+    });
+    if (new Set(findings.map((finding) => finding.relativePath.toLowerCase())).size !== findings.length) throw new Error("Containment remote ref findings contain duplicate paths.");
+    assertResultConsistency(status, exposure, findings.length);
+    return { ref: exactRef(item.ref), head: commit(item.head), status, exposure, summary: boundedText(item.summary, "containment remote ref summary", 1_024), findings };
+  });
+  assertStrictOrder(refs.map((item) => item.ref), "Containment remote ref results contain duplicate refs or are not in canonical order.");
+  return refs;
 }
 
 function validateBinding(input: ContainmentRemoteEvidenceBinding): ContainmentRemoteEvidenceBinding {
   const request = validateRemoteRequest(input.request);
   return {
     request, generation: positiveInteger(input.generation, "containment assessment generation"),
-    targetSnapshotId: identifier(input.targetSnapshotId, "containment target snapshot"), canonicalRemote: canonicalRemote(input.canonicalRemote),
-    policyVersion: identifier(input.policyVersion, "containment remote policy"), authorityId: identifier(input.authorityId, "containment remote authority"),
-    keyId: digest(input.keyId, "containment remote key"), requiredRefs: parseRefs(input.requiredRefs)
+    targetSnapshotId: identifier(input.targetSnapshotId, "containment target snapshot"),
+    policyVersion: identifier(input.policyVersion, "containment remote policy"),
+    authorityId: identifier(input.authorityId, "containment remote authority"), keyId: digest(input.keyId, "containment remote key"),
+    configuredRemotes: parseConfiguredRemotes(input.configuredRemotes)
   };
 }
 
 function validateRemoteRequest(value: ContainmentAssessmentRequest): ContainmentAssessmentRequest {
   const item = exactRecord(value, ["schema", "version", "incidentId", "repositoryRoot", "fenceEpoch", "step", "operationId", "externalId", "egressAllowed", "revealSecretValues"], "containment remote assessment request");
-  if (item.schema !== "sxsy-b122.containment-assessment-request" || item.version !== 1 || item.step !== "remote" || item.egressAllowed !== false || item.revealSecretValues !== false) throw new Error("Containment remote evidence requires the exact no-egress remote assessment child.");
-  const repositoryRoot = absolutePath(item.repositoryRoot, "containment repository root");
+  if (item.schema !== "sxsy-b122.containment-assessment-request" || item.version !== 1 || item.step !== "remote" || item.egressAllowed !== false || item.revealSecretValues !== false) {
+    throw new Error("Containment remote evidence requires the exact no-egress remote assessment child.");
+  }
   return {
-    schema: "sxsy-b122.containment-assessment-request", version: 1, incidentId: pattern(item.incidentId, incidentPattern, "containment incident id"), repositoryRoot,
+    schema: "sxsy-b122.containment-assessment-request", version: 1,
+    incidentId: pattern(item.incidentId, incidentPattern, "containment incident id"), repositoryRoot: absolutePath(item.repositoryRoot, "containment repository root"),
     fenceEpoch: positiveInteger(item.fenceEpoch, "containment fence epoch"), step: "remote",
     operationId: pattern(item.operationId, childPattern, "containment remote operation id"), externalId: pattern(item.externalId, childPattern, "containment remote external id"),
     egressAllowed: false, revealSecretValues: false
   };
 }
 
+function parseConfiguredRemotes(value: unknown): readonly ContainmentConfiguredRemote[] {
+  if (!Array.isArray(value) || value.length > maximumRemotes) throw new Error("Containment configured remotes are invalid or unbounded.");
+  const remotes = value.map((candidate) => {
+    const item = exactRecord(candidate, ["name", "canonicalIdentity"], "containment configured remote");
+    return { name: remoteName(item.name), canonicalIdentity: canonicalRemote(item.canonicalIdentity) };
+  }).sort((left, right) => compareText(left.name, right.name));
+  if (new Set(remotes.map((item) => item.name.toLowerCase())).size !== remotes.length) throw new Error("Containment configured remotes contain duplicate names.");
+  if (new Set(remotes.map((item) => item.canonicalIdentity.toLowerCase())).size !== remotes.length) throw new Error("Containment configured remotes contain duplicate canonical identities.");
+  return remotes;
+}
+
 function selectEvidence(state: RegistryState, binding: ContainmentRemoteEvidenceBinding): Readonly<{ challenge: InstalledContainmentRemoteChallenge; evidence: ImportedContainmentRemoteEvidence }> | undefined {
   const wanted = bindingDigest(binding);
-  const matches = [...state.challenges.values()].filter((item) => challengeBindingDigest(item) === wanted);
-  if (matches.length > 1) throw new Error("Protected containment remote challenge selection is ambiguous.");
-  const challenge = matches[0]; if (!challenge?.evidenceId) return undefined;
+  const imported = [...state.challenges.values()].filter((item) => challengeBindingDigest(item) === wanted && item.evidenceId);
+  if (imported.length > 1) throw new Error("Protected containment remote challenge selection is ambiguous.");
+  const challenge = imported[0];
+  if (!challenge?.evidenceId) return undefined;
   const evidence = state.evidence.get(challenge.evidenceId);
   if (!evidence) throw new Error("Protected containment remote challenge lost its imported evidence.");
   if (evidence.status === "consumed" && evidence.consumptionDigest !== wanted) throw new Error("Protected containment remote evidence consumption changed its exact child binding.");
   return { challenge, evidence };
 }
 
-function usableEvidence(state: RegistryState, evidence: ImportedContainmentRemoteEvidence, nowInput: Date): boolean {
-  const now = exactNow(nowInput);
+function usableEvidence(state: RegistryState, challenge: InstalledContainmentRemoteChallenge, evidence: ImportedContainmentRemoteEvidence, nowInput: Date): boolean {
+  const now = exactNow(nowInput).getTime();
   const trust = state.trust.get(trustKey(evidence.authorityId, evidence.keyId));
-  return !!trust && trust.status === "active" && Date.parse(trust.expiresAt) > now.getTime() && Date.parse(evidence.expiresAt) > now.getTime();
+  return !!trust && trust.status === "active" && trust.purpose === purpose
+    && Date.parse(trust.expiresAt) > now && Date.parse(challenge.expiresAt) > now && Date.parse(evidence.expiresAt) > now
+    && evidence.challengeId === challenge.id && evidence.authorityId === challenge.authorityId && evidence.keyId === challenge.keyId;
 }
 
 function resultFor(request: ContainmentAssessmentRequest, result: StoredRemoteResult): ContainmentAssessmentResult {
@@ -577,16 +751,17 @@ function resultFor(request: ContainmentAssessmentRequest, result: StoredRemoteRe
 
 function storedResult(evidence: SignedContainmentRemoteEvidence): StoredRemoteResult {
   const byPath = new Map<string, { relativePath: string; credentialRelated: boolean }>();
-  for (const ref of evidence.refResults) for (const finding of ref.findings) {
-    const key = finding.relativePath.toLowerCase(); const current = byPath.get(key);
+  for (const remote of evidence.remoteResults) for (const ref of remote.refResults) for (const finding of ref.findings) {
+    const key = finding.relativePath.toLowerCase();
+    const current = byPath.get(key);
     byPath.set(key, { relativePath: current?.relativePath ?? finding.relativePath, credentialRelated: (current?.credentialRelated ?? false) || finding.credentialRelated });
   }
   if (byPath.size > maximumFindings) throw new Error("Containment remote evidence has too many generation-scoped findings.");
-  const findings = [...byPath.values()].sort((left, right) => left.relativePath.localeCompare(right.relativePath)).map((finding) => ({
+  const findings = [...byPath.values()].sort((left, right) => compareText(left.relativePath, right.relativePath)).map((finding) => ({
     id: `containment-finding:${sha256(stableJson({
-      generation: evidence.challenge.generation, incidentId: evidence.challenge.incidentId,
-      remoteOperationId: evidence.challenge.remoteOperationId, targetSnapshotId: evidence.challenge.targetSnapshotId,
-      relativePath: finding.relativePath.toLowerCase()
+      configuredRemotes: evidence.challenge.configuredRemotes, generation: evidence.challenge.generation,
+      incidentId: evidence.challenge.incidentId, remoteOperationId: evidence.challenge.remoteOperationId,
+      targetSnapshotId: evidence.challenge.targetSnapshotId, relativePath: finding.relativePath.toLowerCase()
     }))}`,
     relativePath: finding.relativePath, credentialRelated: finding.credentialRelated
   }));
@@ -602,18 +777,20 @@ function verifySignedEvidence(evidence: SignedContainmentRemoteEvidence, trust: 
   if (!verify("sha256", containmentRemoteEvidenceSigningPayload(unsigned), trust.publicKeyPem, signature)) throw new Error("Containment remote evidence signature is invalid.");
 }
 
-function requireUsableTrust(trust: InstalledContainmentRemoteTrust | undefined, now: Date, evidenceExpiry?: string): asserts trust is InstalledContainmentRemoteTrust {
+function requireUsableTrust(trust: InstalledContainmentRemoteTrust | undefined, nowInput: Date, evidenceExpiry?: string): asserts trust is InstalledContainmentRemoteTrust {
+  const now = exactNow(nowInput);
   if (!trust || trust.status !== "active" || trust.purpose !== purpose || Date.parse(trust.expiresAt) <= now.getTime()
     || (evidenceExpiry !== undefined && Date.parse(evidenceExpiry) > Date.parse(trust.expiresAt))) {
     throw new Error("Containment remote evidence authority is absent, revoked, expired, wrong-purpose, or shorter-lived than the requested evidence.");
   }
 }
 
-function deriveAggregate(refs: readonly ContainmentRemoteEvidenceRefResult[]): Readonly<{ status: ContainmentAssessmentStatus; exposure: ContainmentExposure }> {
-  const unknown = refs.filter((item) => item.exposure === "unknown");
-  const findings = refs.reduce((total, item) => total + item.findings.length, 0);
+function deriveAggregate(items: readonly Readonly<{ status: ContainmentAssessmentStatus; exposure: ContainmentExposure; findings: number }>[]): Readonly<{ status: ContainmentAssessmentStatus; exposure: ContainmentExposure }> {
+  if (items.length === 0) return { status: "passed", exposure: "none" };
+  const unknown = items.filter((item) => item.exposure === "unknown");
+  const findings = items.reduce((total, item) => total + item.findings, 0);
   if (unknown.length) {
-    if (findings > 0 || refs.some((item) => item.status === "failed" || item.exposure === "found")) throw new Error("Containment remote evidence cannot hide known findings behind partial or unknown ref truth.");
+    if (findings > 0 || items.some((item) => item.status === "failed" || item.exposure === "found")) throw new Error("Containment remote evidence cannot hide known findings behind partial or unknown namespace truth.");
     return { status: unknown.some((item) => item.status === "incomplete") ? "incomplete" : "unavailable", exposure: "unknown" };
   }
   if (findings > 0) return { status: "failed", exposure: "found" };
@@ -627,29 +804,35 @@ function assertResultConsistency(status: ContainmentAssessmentStatus, exposure: 
   }
 }
 
-function assertRefCoverage(required: readonly ContainmentRemoteRefBinding[], actual: readonly ContainmentRemoteEvidenceRefResult[]): void {
-  if (required.length !== actual.length || required.some((item, index) => item.ref !== actual[index]?.ref || item.expectedHead !== actual[index]?.expectedHead)) {
-    throw new Error("Containment remote evidence does not provide exact complete required-ref coverage and expected heads.");
+function assertRemoteCoverage(required: readonly ContainmentConfiguredRemote[], actual: readonly ContainmentRemoteNamespaceResult[]): void {
+  if (required.length !== actual.length || required.some((remote, index) => remote.name !== actual[index]?.name || remote.canonicalIdentity !== actual[index]?.canonicalIdentity)) {
+    throw new Error("Containment remote evidence does not provide exact complete configured-remote identity coverage.");
+  }
+}
+
+function assertRefCoverage(required: readonly ContainmentRemoteNamespaceRef[], actual: readonly ContainmentRemoteEvidenceRefResult[]): void {
+  if (required.length !== actual.length || required.some((item, index) => item.ref !== actual[index]?.ref || item.head !== actual[index]?.head)) {
+    throw new Error("Containment remote evidence does not assess the exact complete namespace refs and heads.");
   }
 }
 
 function bindingDigest(binding: ContainmentRemoteEvidenceBinding): string {
   return sha256(stableJson({
-    authorityId: binding.authorityId, canonicalRemote: binding.canonicalRemote, fenceEpoch: binding.request.fenceEpoch,
-    generation: binding.generation, incidentId: binding.request.incidentId, keyId: binding.keyId, policyVersion: binding.policyVersion,
-    purpose, remoteExternalId: binding.request.externalId, remoteOperationId: binding.request.operationId,
-    repositoryRootDigest: repositoryDigest(binding.request.repositoryRoot), requiredRefs: binding.requiredRefs,
-    targetSnapshotId: binding.targetSnapshotId
+    authorityId: binding.authorityId, configuredRemotes: binding.configuredRemotes,
+    fenceEpoch: binding.request.fenceEpoch, generation: binding.generation,
+    incidentId: binding.request.incidentId, keyId: binding.keyId, policyVersion: binding.policyVersion, purpose,
+    remoteExternalId: binding.request.externalId, remoteOperationId: binding.request.operationId,
+    repositoryRootDigest: repositoryDigest(binding.request.repositoryRoot), targetSnapshotId: binding.targetSnapshotId
   }));
 }
 
 function challengeBindingDigest(challenge: ContainmentRemoteEvidenceChallenge): string {
   return sha256(stableJson({
-    authorityId: challenge.authorityId, canonicalRemote: challenge.canonicalRemote, fenceEpoch: challenge.fenceEpoch,
-    generation: challenge.generation, incidentId: challenge.incidentId, keyId: challenge.keyId, policyVersion: challenge.policyVersion,
-    purpose, remoteExternalId: challenge.remoteExternalId, remoteOperationId: challenge.remoteOperationId,
-    repositoryRootDigest: challenge.repositoryRootDigest, requiredRefs: challenge.requiredRefs,
-    targetSnapshotId: challenge.targetSnapshotId
+    authorityId: challenge.authorityId, configuredRemotes: challenge.configuredRemotes,
+    fenceEpoch: challenge.fenceEpoch, generation: challenge.generation,
+    incidentId: challenge.incidentId, keyId: challenge.keyId, policyVersion: challenge.policyVersion, purpose,
+    remoteExternalId: challenge.remoteExternalId, remoteOperationId: challenge.remoteOperationId,
+    repositoryRootDigest: challenge.repositoryRootDigest, targetSnapshotId: challenge.targetSnapshotId
   }));
 }
 
@@ -667,16 +850,6 @@ function deriveChallengeId(value: Omit<ContainmentRemoteEvidenceChallenge, "id">
   return `containment-remote-challenge:${sha256(stableJson(value))}`;
 }
 
-function parseRefs(value: unknown): readonly ContainmentRemoteRefBinding[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > maximumRefs) throw new Error("Containment remote required refs are invalid or unbounded.");
-  const refs = value.map((candidate) => {
-    const item = exactRecord(candidate, ["ref", "expectedHead"], "containment remote ref binding");
-    return { ref: exactRef(item.ref), expectedHead: commit(item.expectedHead) };
-  }).sort((left, right) => left.ref.localeCompare(right.ref));
-  if (new Set(refs.map((item) => item.ref.toLowerCase())).size !== refs.length) throw new Error("Containment remote required refs contain duplicates.");
-  return refs;
-}
-
 function exactRef(value: unknown): string {
   if (typeof value !== "string" || value.length > 512 || !/^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/.test(value)
     || value.includes("..") || value.includes("@{") || value.endsWith(".") || value.endsWith(".lock")
@@ -687,17 +860,25 @@ function exactRef(value: unknown): string {
 }
 
 function canonicalRemote(value: unknown): string {
-  if (typeof value !== "string" || !value || value.length > 2_048 || /[\0\r\n\s]/.test(value)) throw new Error("Containment canonical remote is invalid.");
-  if (/^https?:\/\//i.test(value) || /^ssh:\/\//i.test(value)) {
+  if (typeof value !== "string" || !value || value.length > 2_048 || /[\0\r\n\s]/.test(value)) throw new Error("Containment canonical remote identity is invalid.");
+  if (/^(?:https?|ssh|file):\/\//i.test(value)) {
     let url: URL;
-    try { url = new URL(value); } catch { throw new Error("Containment canonical remote is invalid."); }
-    if (!(["https:", "ssh:"] as const).includes(url.protocol as "https:" | "ssh:") || url.password || url.search || url.hash || !url.hostname || !safeRemotePath(url.pathname)) throw new Error("Containment canonical remote is invalid or credential-bearing.");
-    if (url.protocol === "https:" && url.username) throw new Error("Containment canonical remote cannot contain HTTPS credentials.");
-    const user = url.username ? `${url.username}@` : ""; const port = url.port ? `:${url.port}` : "";
+    try { url = new URL(value); } catch { throw new Error("Containment canonical remote identity is invalid."); }
+    if (!(url.protocol === "https:" || url.protocol === "ssh:" || url.protocol === "file:") || url.password || url.search || url.hash || !safeRemotePath(url.pathname)) {
+      throw new Error("Containment canonical remote identity is invalid or credential-bearing.");
+    }
+    if (url.protocol === "https:" && url.username) throw new Error("Containment canonical remote identity cannot contain HTTPS credentials.");
+    if (url.protocol === "file:") {
+      if (url.username || url.hostname && url.hostname !== "localhost") throw new Error("Containment file remote identity is invalid.");
+      return `file://${url.pathname.replace(/\/+$/, "")}`;
+    }
+    if (!url.hostname) throw new Error("Containment canonical remote identity is invalid.");
+    const user = url.username ? `${url.username}@` : "";
+    const port = url.port ? `:${url.port}` : "";
     return `${url.protocol}//${user}${url.hostname.toLowerCase()}${port}${url.pathname.replace(/\/+$/, "")}`;
   }
   const scp = /^([A-Za-z0-9._-]+)@([A-Za-z0-9.-]+):(.+)$/.exec(value);
-  if (!scp || !safeRemotePath(`/${scp[3]}`)) throw new Error("Containment canonical remote must be fixed HTTPS, SSH, or SCP-style Git identity.");
+  if (!scp || !safeRemotePath(`/${scp[3]}`)) throw new Error("Containment canonical remote identity must be fixed HTTPS, SSH, file, or SCP-style Git identity.");
   return `${scp[1]}@${scp[2]!.toLowerCase()}:${scp[3]!.replace(/\/+$/, "")}`;
 }
 
@@ -713,11 +894,14 @@ function safeRemotePath(value: string): boolean {
 
 async function readBoundedRegularFile(pathInput: string, maximum: number, label: string): Promise<Readonly<{ path: string; bytes: Uint8Array }>> {
   if (typeof pathInput !== "string" || !isAbsolute(pathInput) || pathInput.length > 4_096 || /[\0\r\n]/.test(pathInput)) throw new Error(`${label} path must be fixed and absolute.`);
-  const selected = resolve(pathInput); const before = await lstat(selected);
+  const selected = resolve(pathInput);
+  const before = await lstat(selected);
   if (!before.isFile() || before.isSymbolicLink() || before.size <= 0 || before.size > maximum) throw new Error(`${label} is absent, linked, empty, or oversized.`);
-  const canonical = await realpath(selected); const canonicalBefore = await lstat(canonical);
+  const canonical = await realpath(selected);
+  const canonicalBefore = await lstat(canonical);
   if (!canonicalBefore.isFile() || canonicalBefore.isSymbolicLink() || canonicalBefore.size !== before.size || canonicalBefore.dev !== before.dev || canonicalBefore.ino !== before.ino) throw new Error(`${label} changed during regular-file validation.`);
-  const bytes = await readFile(canonical); const after = await lstat(canonical);
+  const bytes = await readFile(canonical);
+  const after = await lstat(canonical);
   if (bytes.byteLength !== before.size || after.size !== before.size || after.mtimeMs !== canonicalBefore.mtimeMs || after.dev !== canonicalBefore.dev || after.ino !== canonicalBefore.ino) throw new Error(`${label} changed while being read.`);
   return { path: canonical, bytes };
 }
@@ -731,26 +915,31 @@ function exactRecord(value: unknown, keys: readonly string[], label: string): Re
   return item;
 }
 
-function assessmentStatus(value: unknown): ContainmentAssessmentStatus {
-  if (value !== "passed" && value !== "failed" && value !== "unavailable" && value !== "incomplete") throw new Error("Containment remote assessment status is invalid.");
-  return value;
+function assertStrictOrder(values: readonly string[], message: string, caseInsensitive = false): void {
+  for (let index = 1; index < values.length; index += 1) {
+    const previous = caseInsensitive ? values[index - 1]!.toLowerCase() : values[index - 1]!;
+    const current = caseInsensitive ? values[index]!.toLowerCase() : values[index]!;
+    if (compareText(previous, current) >= 0) throw new Error(message);
+  }
 }
-function exposureStatus(value: unknown): ContainmentExposure {
-  if (value !== "none" && value !== "found" && value !== "unknown") throw new Error("Containment remote exposure is invalid.");
-  return value;
-}
+
+function compareText(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
+function assessmentStatus(value: unknown): ContainmentAssessmentStatus { if (value !== "passed" && value !== "failed" && value !== "unavailable" && value !== "incomplete") throw new Error("Containment remote assessment status is invalid."); return value; }
+function exposureStatus(value: unknown): ContainmentExposure { if (value !== "none" && value !== "found" && value !== "unknown") throw new Error("Containment remote exposure is invalid."); return value; }
 function absolutePath(value: unknown, label: string): string { if (typeof value !== "string" || !isAbsolute(value) || value.length > 4_096 || /[\0\r\n]/.test(value)) throw new Error(`${label} must be exact and absolute.`); return resolve(value); }
 function repositoryDigest(value: string): string { const canonical = resolve(value).replaceAll("\\", "/").replace(/\/+$/, ""); return sha256(process.platform === "win32" ? canonical.toLowerCase() : canonical); }
 function safeRelative(value: unknown): string { if (typeof value !== "string") throw new Error("Containment remote finding path is invalid."); const normalized = value.replaceAll("\\", "/"); if (!normalized || normalized.length > 2_048 || isAbsolute(normalized) || /^[A-Za-z]:/.test(normalized) || /[\0\r\n]/.test(normalized) || normalized.split("/").some((part) => !part || part === "." || part === ".." || part.toLowerCase() === ".git")) throw new Error("Containment remote finding path is outside the repository boundary."); return normalized; }
 function exactNow(value: Date): Date { if (!(value instanceof Date) || !Number.isFinite(value.getTime())) throw new Error("Containment remote clock is invalid."); return new Date(value); }
 function exactIso(value: unknown, label: string): string { if (typeof value !== "string" || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) throw new Error(`${label} timestamp is invalid.`); return value; }
 function future(value: unknown, now: Date, maximum: number, label: string): string { const timestamp = exactIso(value, label); const delta = Date.parse(timestamp) - now.getTime(); if (delta <= 0 || delta > maximum) throw new Error(`${label} is expired or exceeds its maximum lifetime.`); return timestamp; }
+function nonNegativeInteger(value: unknown, label: string): number { if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error(`${label} is invalid.`); return value as number; }
 function positiveInteger(value: unknown, label: string): number { if (!Number.isSafeInteger(value) || (value as number) < 1) throw new Error(`${label} is invalid.`); return value as number; }
-function commit(value: unknown): string { if (typeof value !== "string" || !commitPattern.test(value)) throw new Error("Containment remote expected head is invalid."); return value; }
+function commit(value: unknown): string { if (typeof value !== "string" || !commitPattern.test(value)) throw new Error("Containment remote head is invalid."); return value; }
+function remoteName(value: unknown): string { if (typeof value !== "string" || !remoteNamePattern.test(value)) throw new Error("Containment remote name is invalid."); return value; }
 function identifier(value: unknown, label: string): string { if (typeof value !== "string" || !identifierPattern.test(value)) throw new Error(`${label} is invalid.`); return value; }
 function digest(value: unknown, label: string): string { if (typeof value !== "string" || !digestPattern.test(value)) throw new Error(`${label} is invalid.`); return value; }
 function pattern(value: unknown, expected: RegExp, label: string): string { if (typeof value !== "string" || !expected.test(value)) throw new Error(`${label} is invalid.`); return value; }
-function boundedText(value: unknown, label: string, maximum: number): string { if (typeof value !== "string" || !value.trim() || value.length > maximum || /[\0]/.test(value)) throw new Error(`${label} is invalid.`); return value.trim(); }
+function boundedText(value: unknown, label: string, maximum: number): string { if (typeof value !== "string" || !value.trim() || value.length > maximum || /\0/.test(value)) throw new Error(`${label} is invalid.`); return value.trim(); }
 function trustKey(authorityId: string, keyId: string): string { return `${authorityId}:${keyId}`; }
 function sha256(value: Uint8Array | string): string { return createHash("sha256").update(value).digest("hex"); }
 function sameDigest(left: string, right: string): boolean { const leftHash = sha256(left); const rightHash = sha256(right); if (leftHash.length !== rightHash.length) return false; let result = 0; for (let index = 0; index < leftHash.length; index += 1) result |= leftHash.charCodeAt(index) ^ rightHash.charCodeAt(index); return result === 0; }
