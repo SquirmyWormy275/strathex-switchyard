@@ -20,6 +20,8 @@ import { mapFingerprint } from "../../../packages/protocol/src/raw-hid.ts";
 import { loadProviderDesktopPaths } from "./provider-desktop-configuration.ts";
 import type { CompanionRequest, CompanionResponse } from "./bridge.ts";
 import type { CompanionRequestHandler } from "./stdio.ts";
+import { CompanionWindowsHostActionConsumer } from "./windows-host-action-consumer.ts";
+import { PinnedWindowsHostActionEffectPort, provisionWindowsHostActionApplications } from "./windows-host-action-effects.ts";
 
 export interface StandaloneCloseResource { readonly name: string; close(): Promise<void> | void; }
 export interface WindowsProcessIdentity {
@@ -35,8 +37,10 @@ export interface WindowsProcessIdentity {
 export async function startStandaloneHardwareSignalDispatch(input: Readonly<{
   endpoint: Readonly<{ ready(): Promise<void> }>;
   hardwareSignalDispatcher: Readonly<{ start(): Promise<void> }>;
+  windowsHostActionConsumer?: Readonly<{ start(): Promise<void> }>;
 }>): Promise<void> {
   await input.endpoint.ready();
+  await input.windowsHostActionConsumer?.start();
   await input.hardwareSignalDispatcher.start();
 }
 
@@ -174,6 +178,7 @@ export async function runStandaloneCompanion(options: Readonly<{
   let pipe: AuthenticatedPipeServer | undefined;
   let rawHidSupervisor: InstalledRawHidSupervisor | undefined;
   let hardwareSignalDispatcher: CompanionHardwareSignalDispatcher | undefined;
+  let windowsHostActionConsumer: CompanionWindowsHostActionConsumer | undefined;
   let voiceRuntime: { shutdown(): Promise<void> } | undefined;
   let councilLifecycle: { dispose(): Promise<void> } | undefined;
   let councilResources: { shutdownForRestart(): Promise<void> } | undefined;
@@ -190,6 +195,7 @@ export async function runStandaloneCompanion(options: Readonly<{
       resources: [
         { name: "authenticated-pipe", close: () => pipe?.stop() },
         { name: "hardware-signal-dispatcher", close: () => hardwareSignalDispatcher?.stop() },
+        { name: "windows-host-action-consumer", close: () => windowsHostActionConsumer?.stop() },
         { name: "transcript-retention", close: () => { transcriptVault?.stopRetentionEnforcement(); } },
         { name: "voice-runtime", close: () => voiceRuntime?.shutdown() },
         { name: "raw-hid", close: () => rawHidSupervisor?.stop() },
@@ -281,7 +287,15 @@ export async function runStandaloneCompanion(options: Readonly<{
   councilLifecycle = companion.councilLifecycle;
   councilResources = companion.councilResources;
   transcriptVault = companion.transcriptVault;
-  await startStandaloneHardwareSignalDispatch(companion);
+  const windowsHostApplications = await provisionWindowsHostActionApplications();
+  windowsHostActionConsumer = new CompanionWindowsHostActionConsumer(
+    store,
+    companion.hostActions,
+    companion.executor,
+    new PinnedWindowsHostActionEffectPort({ applications: windowsHostApplications }),
+    { applications: windowsHostApplications }
+  );
+  await startStandaloneHardwareSignalDispatch({ ...companion, windowsHostActionConsumer });
   await transcriptVault.startRetentionEnforcement({
     onFailure: () => { void voiceRuntime?.shutdown(); }
   });
