@@ -22,15 +22,15 @@ if (!npmCli) throw new Error("A pinned npm CLI entrypoint is required to build t
  * suite ran, rather than a glob whose expansion could vary by shell/runtime.
  */
 const controlPlaneTests = [
-  "acceptance-evidence", "adapters", "brokers", "budgets", "checkpoints",
+  "acceptance-evidence", "adapters", "automation-protocol", "brokers", "budgets", "checkpoints",
   "child-saga-recovery", "command-catalog", "confirmations", "containment",
-  "context-council", "dispatch", "durable-containment", "git-inspector",
-  "policy", "recipes", "redaction", "runtime", "session-authority",
+  "containment-incidents", "context-council", "dispatch", "durable-containment", "git-inspector",
+  "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
   "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts",
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-release", "control-plane",
+  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-release", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "durable-credentials", "main-shutdown",
   "direct-request-cancellation", "durable-endpoint", "git-review", "hardware-signal-dispatcher", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
@@ -44,7 +44,7 @@ const companionTests = [
   "repository-runtime-release-package", "router", "runtime-provisioning",
   "runtime-registry", "sandbox-installation", "sandbox-lifecycle-helper", "service", "session-freshness", "stdio",
   "voice-gateway", "voice-helper-source", "voice-runtime", "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
-  "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-context-preparation", "workflow-voice-service"
+  "windows-host-action-consumer", "windows-host-action-effects", "windows-host-action-startup", "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-context-preparation", "workflow-voice-service"
 ].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime", ...(name === "companion-lifecycle-helper" ? { timeoutMs: 240_000 } : {}) }));
 const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
@@ -54,7 +54,7 @@ const mediatedGitTests = [
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
-const providerHostTests = ["config", "council-resources", "dispatch-lease", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
+const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
   .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 75_000 } : {}) }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
