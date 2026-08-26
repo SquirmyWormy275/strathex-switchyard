@@ -1,7 +1,7 @@
 import { createServer, type Server as HttpsServer, type ServerOptions } from "node:https";
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 
-import type { ProviderAdapterHostService } from "./service.ts";
+import type { ProviderAdapterHostService, ProviderHostEffectProgress } from "./service.ts";
 
 const maximumBodyBytes = 64 * 1024;
 const maximumRequestDurationMs = 60_000;
@@ -51,18 +51,26 @@ export function createProviderHostRequestListener(service: ProviderAdapterHostSe
 
 async function dispatchHttp(service: ProviderAdapterHostService, request: IncomingMessage, response: ServerResponse, requestDeadlineMs: number): Promise<void> {
   const controller = new AbortController();
+  let effectDisposition: "not_started" | "ambiguous" = "not_started";
+  const effectProgress: ProviderHostEffectProgress = {
+    markAmbiguous() { effectDisposition = "ambiguous"; },
+    disposition: () => effectDisposition
+  };
   const timeout = setTimeout(() => controller.abort(), requestDeadlineMs);
   timeout.unref?.();
   const onClose = (): void => { if (!request.complete) controller.abort(); };
+  const onResponseClose = (): void => { if (!response.writableFinished) controller.abort(); };
   request.once("close", onClose);
+  response.once("close", onResponseClose);
   try {
-    const body = await readBoundedBody(request, controller.signal);
+    const body = await abortable(readBoundedBody(request, controller.signal), controller.signal);
     const pending = service.handle({
       method: request.method ?? "",
       path: exactRequestPath(request.url),
       headers: { authorization: oneHeader(request.headers.authorization) },
       ...(body.byteLength ? { body } : {}),
-      signal: controller.signal
+      signal: controller.signal,
+      effectProgress
     });
     const result = await abortable(pending, controller.signal);
     if (response.headersSent || response.destroyed) return;
@@ -78,12 +86,13 @@ async function dispatchHttp(service: ProviderAdapterHostService, request: Incomi
   } catch (error) {
     if (response.headersSent || response.destroyed) return;
     const status = error instanceof OversizedBodyError ? 413 : controller.signal.aborted ? 408 : 400;
-    const encoded = Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-host-error", version: 1, status: "blocked", summary: status === 413 ? "The provider host request exceeded its fixed input cap." : status === 408 ? "The provider host request timed out." : "The provider host rejected the HTTP request.", effectDisposition: "not_started" }), "utf8");
+    const encoded = Buffer.from(JSON.stringify({ schema: "sxsy-b122.provider-host-error", version: 1, status: "blocked", summary: status === 413 ? "The provider host request exceeded its fixed input cap." : status === 408 ? "The provider host request timed out." : "The provider host rejected the HTTP request.", effectDisposition }), "utf8");
     response.writeHead(status, { "content-type": "application/json; charset=utf-8", "content-length": String(encoded.byteLength), "cache-control": "no-store" });
     response.end(encoded);
   } finally {
     clearTimeout(timeout);
     request.removeListener("close", onClose);
+    response.removeListener("close", onResponseClose);
   }
 }
 

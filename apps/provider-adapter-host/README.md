@@ -13,6 +13,8 @@ provider or repository text as authority.
   cancellation, health, and restart-reconciliation endpoints;
 - a hash-chained HMAC-authenticated durable journal for sessions, operation
   idempotency, results, cancellations, and Council phase acknowledgements;
+- a separately keyed, HMAC-authenticated, single-use companion dispatch lease
+  consumed durably before every command, automation, or Council effect;
 - pre- and post-effect session/TargetSnapshot verification;
 - exact Council resource-host validation and digest echoing; assignment and
   resume accept only the companion's fenced non-secret environment projection;
@@ -88,6 +90,7 @@ Exact configuration shape:
   },
   "authenticationTokenEnvelopeFile": "C:\\Users\\operator\\AppData\\Local\\STRATHEX\\switchyard\\provider-host\\authentication-token.envelope.json",
   "journalAuthenticationEnvelopeFile": "C:\\Users\\operator\\AppData\\Local\\STRATHEX\\switchyard\\provider-host\\journal-authentication.envelope.json",
+  "dispatchLeaseAuthenticationEnvelopeFile": "C:\\Users\\operator\\AppData\\Local\\STRATHEX\\switchyard\\provider-host\\dispatch-lease-authentication.envelope.json",
   "stateFile": "C:\\Users\\operator\\AppData\\Local\\STRATHEX\\switchyard\\provider-host\\provider-state.jsonl",
   "providers": [
     {
@@ -102,8 +105,14 @@ Exact configuration shape:
 }
 ```
 
-The authentication token, independent durable-journal key, and module
-credentials are exact DPAPI CurrentUser envelopes under the protected root.
+The authentication token, independent durable-journal key, independent
+dispatch-lease key, and module credentials are exact DPAPI CurrentUser
+envelopes under the protected root. The three host keys must be pairwise
+distinct. The companion signs each effect lease with the dispatch-lease key;
+the host verifies the exact authority, full TargetSnapshot, session, route,
+operation, artifact, confirmation, clear-containment, running-host, and pinned
+module identities, then atomically records the lease ID and nonce before the
+provider boundary can run. Replay and cross-binding reuse fail closed.
 The validator requires that root and every private file be owned by the current
 Windows user, have inheritance disabled at the root, and grant access only to
 that user and SYSTEM. TLS is exact loopback-only, non-CA, currently valid,
@@ -120,16 +129,21 @@ export async function createB122ProviderRuntimePort({ provider, credential, opti
     handshake,
     execute,
     observeSession,
+    observeWorkflowContext,
     observeOperation,
     cancelOperation,
     council,
     observeCouncil,
+    cleanupCouncilResources,
+    abortCouncilAssignment,
     shutdown
   };
 }
 ```
 
-The installed module must be self-contained ESM (it may use `node:` built-ins,
+Every runtime method receives the host's bounded `AbortSignal`; optional Council
+cleanup/abort methods receive the same signal when present. The installed module
+must be self-contained ESM (it may use `node:` built-ins,
 but not relative imports) because the host evaluates the exact bytes that
 matched `moduleSha256`. Every method must return the typed exact binding defined
 in [`src/backends.ts`](src/backends.ts), and `shutdown(signal)` must settle

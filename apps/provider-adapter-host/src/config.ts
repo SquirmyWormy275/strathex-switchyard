@@ -53,6 +53,8 @@ export interface LoadedProviderHostConfiguration {
   readonly authenticationTokenText: string;
   readonly journalAuthenticationKey: Uint8Array;
   readonly journalAuthenticationKeyText: string;
+  readonly dispatchLeaseAuthenticationKey: Uint8Array;
+  readonly dispatchLeaseAuthenticationKeyText: string;
   readonly stateFile: string;
   readonly providers: readonly LoadedProviderConfiguration[];
 }
@@ -72,10 +74,10 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); }
   finally { bytes.fill(0); }
   if (!record(value) || value.schema !== "sxsy-b122.provider-host-config" || value.version !== 1 || !record(value.listen) || !record(value.tls)
-    || !allowedKeys(value, ["schema", "version", "protectedStateRoot", "listen", "tls", "authenticationTokenEnvelopeFile", "journalAuthenticationEnvelopeFile", "stateFile", "providers"], ["allowFixtureBackends"])
+    || !allowedKeys(value, ["schema", "version", "protectedStateRoot", "listen", "tls", "authenticationTokenEnvelopeFile", "journalAuthenticationEnvelopeFile", "dispatchLeaseAuthenticationEnvelopeFile", "stateFile", "providers"], ["allowFixtureBackends"])
     || !exactKeys(value.listen, ["host", "port"]) || !exactKeys(value.tls, ["certificateFile", "privateKeyFile", "certificateSha256", "privateKeySha256", "tlsSpkiSha256"])
     || !Array.isArray(value.providers) || value.providers.length < 1 || value.providers.length > 2
-    || typeof value.protectedStateRoot !== "string" || typeof value.authenticationTokenEnvelopeFile !== "string" || typeof value.journalAuthenticationEnvelopeFile !== "string" || typeof value.stateFile !== "string"
+    || typeof value.protectedStateRoot !== "string" || typeof value.authenticationTokenEnvelopeFile !== "string" || typeof value.journalAuthenticationEnvelopeFile !== "string" || typeof value.dispatchLeaseAuthenticationEnvelopeFile !== "string" || typeof value.stateFile !== "string"
     || !digest(value.tls.certificateSha256) || !digest(value.tls.privateKeySha256) || !digest(value.tls.tlsSpkiSha256)) {
     throw new Error("The provider host configuration schema is invalid.");
   }
@@ -90,12 +92,13 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   const privateKeyFile = ownedPath(protectedStateRoot, value.tls.privateKeyFile, "TLS private-key path");
   const tokenEnvelopeFile = ownedPath(protectedStateRoot, value.authenticationTokenEnvelopeFile, "authentication token envelope path");
   const journalEnvelopeFile = ownedPath(protectedStateRoot, value.journalAuthenticationEnvelopeFile, "journal authentication envelope path");
+  const dispatchLeaseEnvelopeFile = ownedPath(protectedStateRoot, value.dispatchLeaseAuthenticationEnvelopeFile, "dispatch-lease authentication envelope path");
   const stateFile = ownedPath(protectedStateRoot, value.stateFile, "provider state path");
   if (!inside(protectedStateRoot, absoluteConfigurationPath)) throw new Error("The provider-host configuration must remain beneath its protected state root.");
 
   const protector = options.secretProtector ?? new WindowsDpapiCurrentUserProtector();
   const pathSecurity = options.pathSecurity ?? new WindowsCurrentUserProviderHostPathSecurity();
-  const protectedExistingPaths = [absoluteConfigurationPath, privateKeyFile, tokenEnvelopeFile, journalEnvelopeFile];
+  const protectedExistingPaths = [absoluteConfigurationPath, privateKeyFile, tokenEnvelopeFile, journalEnvelopeFile, dispatchLeaseEnvelopeFile];
   const allowFixtureBackends = value.allowFixtureBackends === true;
   const providers: LoadedProviderConfiguration[] = [];
   const seen = new Set<string>();
@@ -138,6 +141,15 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     journalAuthenticationKey = Buffer.from(journalBytes).toString("ascii");
     if (!/^[a-f0-9]{64}$/.test(journalAuthenticationKey)) throw new Error("The protected provider-host journal authentication key must contain exactly 256 canonical bits.");
   } finally { journalBytes.fill(0); }
+  const dispatchLeaseBytes = await openProviderHostSecretEnvelope(dispatchLeaseEnvelopeFile, protector);
+  let dispatchLeaseAuthenticationKey: string;
+  try {
+    dispatchLeaseAuthenticationKey = Buffer.from(dispatchLeaseBytes).toString("ascii");
+    if (!/^[a-f0-9]{64}$/.test(dispatchLeaseAuthenticationKey)) throw new Error("The protected provider-host dispatch-lease authentication key must contain exactly 256 canonical bits.");
+  } finally { dispatchLeaseBytes.fill(0); }
+  if (token === journalAuthenticationKey || token === dispatchLeaseAuthenticationKey || journalAuthenticationKey === dispatchLeaseAuthenticationKey) {
+    throw new Error("The provider-host bearer, journal, and dispatch-lease authentication keys must be cryptographically independent.");
+  }
   for (const provider of providers) {
     if (provider.kind !== "module") continue;
     const credential = await openProviderHostSecretEnvelope(provider.credentialEnvelopeFile, protector);
@@ -186,6 +198,7 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     tls: { certificate, privateKey, certificateSha256: value.tls.certificateSha256, privateKeySha256: value.tls.privateKeySha256, tlsSpkiSha256: value.tls.tlsSpkiSha256 },
     authenticationToken: Buffer.from(token, "ascii"), authenticationTokenText: token,
     journalAuthenticationKey: Buffer.from(journalAuthenticationKey, "ascii"), journalAuthenticationKeyText: journalAuthenticationKey,
+    dispatchLeaseAuthenticationKey: Buffer.from(dispatchLeaseAuthenticationKey, "ascii"), dispatchLeaseAuthenticationKeyText: dispatchLeaseAuthenticationKey,
     stateFile, providers
   };
 }

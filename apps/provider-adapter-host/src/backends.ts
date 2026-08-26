@@ -89,13 +89,14 @@ export interface ProviderRuntimePort {
   observeCouncil(request: ProviderCouncilRequest, signal: AbortSignal): Promise<ProviderCouncilAcknowledgement | undefined>;
   /** Typed, bounded host shutdown. Modules must close every owned handle and descendant before resolving. */
   shutdown(signal: AbortSignal): Promise<void>;
-  cleanupCouncilResources?(request: ProviderCouncilCleanupRequest): Promise<void>;
-  abortCouncilAssignment?(request: ProviderCouncilRequest): Promise<void>;
+  cleanupCouncilResources?(request: ProviderCouncilCleanupRequest, signal: AbortSignal): Promise<void>;
+  abortCouncilAssignment?(request: ProviderCouncilRequest, signal: AbortSignal): Promise<void>;
 }
 
 abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
   readonly boundary = "local-only" as const;
   readonly provider: ProviderGatewayProvider;
+  readonly dispatchIdentity: Readonly<{ adapterId: string; moduleSha256: string }>;
   protected readonly port: ProviderRuntimePort;
   private readonly mediationAttestedForTests: boolean;
   private readonly adapterIdentity: Readonly<{ id: string; moduleSha256: string }>;
@@ -118,6 +119,7 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
       throw new Error("The provider backend requires one host-owned adapter identity and module digest.");
     }
     this.adapterIdentity = Object.freeze({ id: selected.adapterId, moduleSha256: selected.moduleSha256 });
+    this.dispatchIdentity = Object.freeze({ adapterId: selected.adapterId, moduleSha256: selected.moduleSha256 });
     this.observationDeadlineMs = boundedDeadline(identity?.observationDeadlineMs ?? 10_000);
   }
 
@@ -212,7 +214,7 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
       requireCouncilSession(after, afterRequest, "after");
       return acknowledgement;
     } catch (error) {
-      if (request.phase === "assignment") await this.port.abortCouncilAssignment?.(request).catch(() => undefined);
+      if (request.phase === "assignment") await this.port.abortCouncilAssignment?.(request, signal).catch(() => undefined);
       throw error;
     }
   }
@@ -223,9 +225,9 @@ abstract class ExactProviderAdapterBackend implements ProviderGatewayBackend {
     return acknowledgement;
   }
 
-  async cleanupCouncilResources(request: ProviderCouncilCleanupRequest): Promise<void> {
+  async cleanupCouncilResources(request: ProviderCouncilCleanupRequest, signal: AbortSignal): Promise<void> {
     if (!this.port.cleanupCouncilResources) throw new Error("The provider runtime has no Council resource cleanup boundary.");
-    await this.port.cleanupCouncilResources(request);
+    await this.port.cleanupCouncilResources(request, signal);
   }
 
   private exactProvider(provider: ProviderGatewayProvider): void {

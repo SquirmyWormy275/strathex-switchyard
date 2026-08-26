@@ -95,3 +95,34 @@ test("concurrent activation of one exact port lease creates only one tracked par
   await lifecycle.closeAll();
   assert.equal(closed, 1);
 });
+
+test("resource cleanup propagates cancellation, observes late settlement, and does not retain a successfully closed handle", async () => {
+  let closeCalls = 0;
+  let closeStarted!: () => void;
+  let releaseClose!: () => void;
+  const started = new Promise<void>((resolve) => { closeStarted = resolve; });
+  const held = new Promise<void>((resolve) => { releaseClose = resolve; });
+  const participant = {
+    async openPortProxy() {
+      return {
+        receipt: { status: "active" },
+        async close() { closeCalls += 1; closeStarted(); await held; }
+      };
+    }
+  } as unknown as InstalledCouncilParticipantClient;
+  const lifecycle = new InstalledProviderCouncilResourceLifecycle("C:\\state", async () => participant);
+  await lifecycle.callbacks.openPortProxy(assignment, { leaseId: "port-lease", onConnection() {} });
+  const controller = new AbortController();
+  const cleanup = lifecycle.closeBinding({
+    schema: "sxsy-b122.council-resource-cleanup", version: 1, epochId: assignment.epochId,
+    sessionId: assignment.sessionId, targetSnapshotId: assignment.targetSnapshotId,
+    resourceHostDigest: resourceHost.digest, outcome: "completed"
+  }, controller.signal);
+  await started;
+  controller.abort();
+  await assert.rejects(cleanup, /cancelled|remain open/i);
+  releaseClose();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await lifecycle.closeAll();
+  assert.equal(closeCalls, 1, "a late successful close must remove the exact retained handle without a duplicate close");
+});

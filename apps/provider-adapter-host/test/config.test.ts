@@ -67,19 +67,20 @@ test("configuration requires digest-pinned modules and DPAPI-shaped protected cr
   const configPath = join(root, "config.json");
   const tokenPath = join(root, "token.envelope.json");
   const journalPath = join(root, "journal.envelope.json");
+  const dispatchLeasePath = join(root, "dispatch-lease.envelope.json");
   const credentialPath = join(root, "provider.envelope.json");
   const certPath = join(root, "cert.pem");
   const keyPath = join(root, "key.pem");
   const modulePath = join(root, "backend.mjs");
   await Promise.all([
-    envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(credentialPath, "provider-secret"),
+    envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(dispatchLeasePath, "c".repeat(64)), envelope(credentialPath, "provider-secret"),
     writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem),
     writeFile(modulePath, "export const value = 1;")
   ]);
   const base = {
     schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root,
     listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(certPath, keyPath),
-    authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath, stateFile: join(root, "state.jsonl")
+    authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath, dispatchLeaseAuthenticationEnvelopeFile: dispatchLeasePath, stateFile: join(root, "state.jsonl")
   };
   await writeFile(configPath, JSON.stringify({ ...base, providers: [{ provider: "codex", kind: "module", modulePath, moduleSha256: "0".repeat(64), credentialEnvelopeFile: credentialPath }] }));
   await assert.rejects(() => loadProviderHostConfiguration(configPath, options(root)), /digest|sha256/i);
@@ -94,12 +95,13 @@ test("credential-free fixture mode is loopback diagnostic-only and all owned pat
   const configPath = join(root, "config.json");
   const tokenPath = join(root, "token.envelope.json");
   const journalPath = join(root, "journal.envelope.json");
+  const dispatchLeasePath = join(root, "dispatch-lease.envelope.json");
   const certPath = join(root, "cert.pem");
   const keyPath = join(root, "key.pem");
-  await Promise.all([envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem)]);
+  await Promise.all([envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(dispatchLeasePath, "c".repeat(64)), writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem)]);
   const base = {
     schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root,
-    tls: pinnedTls(certPath, keyPath), authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath,
+    tls: pinnedTls(certPath, keyPath), authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath, dispatchLeaseAuthenticationEnvelopeFile: dispatchLeasePath,
     stateFile: join(root, "state.jsonl"), providers: [{ provider: "claude", kind: "fixture" }]
   };
   await writeFile(configPath, JSON.stringify({ ...base, listen: { host: "0.0.0.0", port: 4747 }, allowFixtureBackends: true }));
@@ -109,9 +111,14 @@ test("credential-free fixture mode is loopback diagnostic-only and all owned pat
   const loaded = await loadProviderHostConfiguration(configPath, options(root, security));
   assert.equal(loaded.providers[0]?.kind, "fixture");
   assert.equal(security.calls.length, 1);
-  assert.deepEqual(new Set(security.calls[0]?.paths), new Set([configPath, keyPath, tokenPath, journalPath]));
+  assert.deepEqual(new Set(security.calls[0]?.paths), new Set([configPath, keyPath, tokenPath, journalPath, dispatchLeasePath]));
   loaded.authenticationToken.fill(0);
   loaded.journalAuthenticationKey.fill(0);
+  loaded.dispatchLeaseAuthenticationKey.fill(0);
+
+  await envelope(dispatchLeasePath, "a".repeat(64));
+  await assert.rejects(() => loadProviderHostConfiguration(configPath, options(root)), /independent/i);
+  await envelope(dispatchLeasePath, "c".repeat(64));
 
   const mismatched = createLoopbackTlsFixture();
   await writeFile(keyPath, mismatched.privateKeyPem);
@@ -129,19 +136,20 @@ test("digest-pinned modules receive only an opened protected credential and sour
   const configPath = join(root, "config.json");
   const tokenPath = join(root, "token.envelope.json");
   const journalPath = join(root, "journal.envelope.json");
+  const dispatchLeasePath = join(root, "dispatch-lease.envelope.json");
   const credentialPath = join(root, "provider.envelope.json");
   const certPath = join(root, "cert.pem");
   const keyPath = join(root, "key.pem");
   const modulePath = join(root, "backend.mjs");
   const moduleSource = `export async function createB122ProviderRuntimePort(input) { if (new TextDecoder().decode(input.credential) !== "provider-secret") throw new Error("credential missing"); return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(signal){ globalThis.__b122ProviderShutdown = signal.aborted ? "aborted" : "clean"; } }; }`;
   await Promise.all([
-    envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(credentialPath, "provider-secret"),
+    envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(dispatchLeasePath, "c".repeat(64)), envelope(credentialPath, "provider-secret"),
     writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem), writeFile(modulePath, moduleSource)
   ]);
   await writeFile(configPath, JSON.stringify({
     schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root,
     listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(certPath, keyPath),
-    authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath, stateFile: join(root, "state.jsonl"),
+    authenticationTokenEnvelopeFile: tokenPath, journalAuthenticationEnvelopeFile: journalPath, dispatchLeaseAuthenticationEnvelopeFile: dispatchLeasePath, stateFile: join(root, "state.jsonl"),
     providers: [{ provider: "claude", kind: "module", modulePath, moduleSha256: createHash("sha256").update(moduleSource).digest("hex"), credentialEnvelopeFile: credentialPath }]
   }));
   const loaded = await loadProviderHostConfiguration(configPath, options(root));
@@ -153,20 +161,21 @@ test("digest-pinned modules receive only an opened protected credential and sour
   delete (globalThis as Record<string, unknown>).__b122ProviderShutdown;
   loaded.authenticationToken.fill(0);
   loaded.journalAuthenticationKey.fill(0);
+  loaded.dispatchLeaseAuthenticationKey.fill(0);
 });
 
 test("module providers must expose the typed shutdown contract", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-module-shutdown-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
-  const paths = { config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"), credential: join(root, "credential.json"), cert: join(root, "cert.pem"), key: join(root, "key.pem"), module: join(root, "backend.mjs") };
+  const paths = { config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"), dispatchLease: join(root, "dispatch-lease.json"), credential: join(root, "credential.json"), cert: join(root, "cert.pem"), key: join(root, "key.pem"), module: join(root, "backend.mjs") };
   const source = `export function createB122ProviderRuntimePort(input){ return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){} }; }`;
-  await Promise.all([envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.credential, "provider-secret"), writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem), writeFile(paths.module, source)]);
-  await writeFile(paths.config, JSON.stringify({ schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root, listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key), authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal, stateFile: join(root, "state.jsonl"), providers: [{ provider: "codex", kind: "module", modulePath: paths.module, moduleSha256: createHash("sha256").update(source).digest("hex"), credentialEnvelopeFile: paths.credential }] }));
+  await Promise.all([envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.dispatchLease, "c".repeat(64)), envelope(paths.credential, "provider-secret"), writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem), writeFile(paths.module, source)]);
+  await writeFile(paths.config, JSON.stringify({ schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root, listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key), authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal, dispatchLeaseAuthenticationEnvelopeFile: paths.dispatchLease, stateFile: join(root, "state.jsonl"), providers: [{ provider: "codex", kind: "module", modulePath: paths.module, moduleSha256: createHash("sha256").update(source).digest("hex"), credentialEnvelopeFile: paths.credential }] }));
   const loaded = await loadProviderHostConfiguration(paths.config, options(root));
   await assert.rejects(() => loadProviderBackendRuntime(loaded), /runtime port contract/i);
 });
 
-test("the rotatable bearer token is cryptographically independent from the durable journal key", async (context) => {
+test("the rotatable bearer, durable journal, and single-use dispatch-lease keys have separate roles", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-journal-key-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
   const statePath = join(root, "state.jsonl");

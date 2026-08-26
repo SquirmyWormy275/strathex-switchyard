@@ -14,9 +14,9 @@ export interface ProviderCouncilResourceCallbacks {
 
 export interface ProviderCouncilResourceLifecycle {
   readonly callbacks: ProviderCouncilResourceCallbacks;
-  closeForRequest(request: ProviderCouncilRequest): Promise<void>;
-  closeBinding(request: ProviderCouncilCleanupRequest): Promise<void>;
-  closeAll(): Promise<void>;
+  closeForRequest(request: ProviderCouncilRequest, signal?: AbortSignal): Promise<void>;
+  closeBinding(request: ProviderCouncilCleanupRequest, signal?: AbortSignal): Promise<void>;
+  closeAll(signal?: AbortSignal): Promise<void>;
 }
 
 export type ProviderCouncilParticipantLoader = (request: ProviderCouncilRequest) => Promise<InstalledCouncilParticipantClient>;
@@ -31,6 +31,7 @@ export class InstalledProviderCouncilResourceLifecycle implements ProviderCounci
   private readonly loader: ProviderCouncilParticipantLoader;
   private readonly portHandles = new Map<string, CouncilParticipantPortProxyHandle>();
   private readonly portActivations = new Map<string, Promise<void>>();
+  private readonly portClosures = new Map<string, Promise<void>>();
 
   constructor(companionStateDirectory: string, loader?: ProviderCouncilParticipantLoader) {
     this.loader = loader ?? (async (request) => {
@@ -49,30 +50,39 @@ export class InstalledProviderCouncilResourceLifecycle implements ProviderCounci
     this.callbacks = Object.freeze(callbacks);
   }
 
-  async closeForRequest(request: ProviderCouncilRequest): Promise<void> {
+  async closeForRequest(request: ProviderCouncilRequest, signal?: AbortSignal): Promise<void> {
     const prefix = `${request.epochId}\0${request.sessionId}\0`;
-    await this.closeSelected((key) => key.startsWith(prefix));
+    await this.closeSelected((key) => key.startsWith(prefix), signal);
   }
 
-  async closeBinding(request: ProviderCouncilCleanupRequest): Promise<void> {
+  async closeBinding(request: ProviderCouncilCleanupRequest, signal?: AbortSignal): Promise<void> {
     const prefix = `${request.epochId}\0${request.sessionId}\0${request.resourceHostDigest}\0`;
-    await this.closeSelected((key) => key.startsWith(prefix));
+    await this.closeSelected((key) => key.startsWith(prefix), signal);
   }
 
-  async closeAll(): Promise<void> {
-    await this.closeSelected(() => true);
+  async closeAll(signal?: AbortSignal): Promise<void> {
+    await this.closeSelected(() => true, signal);
   }
 
-  private async closeSelected(selected: (key: string) => boolean): Promise<void> {
+  private async closeSelected(selected: (key: string) => boolean, signal?: AbortSignal): Promise<void> {
     const failures: unknown[] = [];
     const activations = [...this.portActivations.entries()].filter(([key]) => selected(key));
-    for (const [, activation] of activations) {
-      try { await activation; } catch { /* activation failure left no retained handle */ }
+    for (const [key, activation] of activations) {
+      try { await waitForResourceBoundary(activation, signal); }
+      catch (error) {
+        if (signal?.aborted) {
+          const lateClose = activation.then(() => {
+            const handle = this.portHandles.get(key);
+            return handle ? this.closeHandle(key, handle) : undefined;
+          }, () => undefined);
+          lateClose.then(() => undefined, () => undefined);
+        }
+        failures.push(error);
+      }
     }
     for (const [key, handle] of [...this.portHandles.entries()].filter(([candidate]) => selected(candidate))) {
       try {
-        await handle.close();
-        this.portHandles.delete(key);
+        await waitForResourceBoundary(this.closeHandle(key, handle), signal);
       } catch (error) {
         // Retain the failed handle so an idempotent cleanup replay or shutdown
         // retry can close it. A failure never prevents later handles closing.
@@ -80,6 +90,20 @@ export class InstalledProviderCouncilResourceLifecycle implements ProviderCounci
       }
     }
     if (failures.length) throw new AggregateError(failures, "One or more Council participant port proxies remain open.");
+  }
+
+  private closeHandle(key: string, handle: CouncilParticipantPortProxyHandle): Promise<void> {
+    const active = this.portClosures.get(key);
+    if (active) return active;
+    const closing = Promise.resolve().then(() => handle.close()).then(() => {
+      if (this.portHandles.get(key) === handle) this.portHandles.delete(key);
+    });
+    const tracked = closing.finally(() => {
+      if (this.portClosures.get(key) === tracked) this.portClosures.delete(key);
+    });
+    tracked.then(() => undefined, () => undefined);
+    this.portClosures.set(key, tracked);
+    return tracked;
   }
 
   private async openPortProxy(request: ProviderCouncilRequest, input: Readonly<{ leaseId: string; onConnection(socket: Socket): void }>): Promise<Readonly<{ receipt: unknown }>> {
@@ -110,11 +134,11 @@ export class InstalledProviderCouncilResourceLifecycle implements ProviderCounci
   }
 }
 
-export function wrapProviderRuntimeCouncilLifecycle<T extends Readonly<{ council(request: ProviderCouncilRequest, signal: AbortSignal): Promise<unknown> }>>(port: T, resources: ProviderCouncilResourceLifecycle): T & Readonly<{ cleanupCouncilResources(request: ProviderCouncilCleanupRequest): Promise<void>; abortCouncilAssignment(request: ProviderCouncilRequest): Promise<void> }> {
+export function wrapProviderRuntimeCouncilLifecycle<T extends Readonly<{ council(request: ProviderCouncilRequest, signal: AbortSignal): Promise<unknown> }>>(port: T, resources: ProviderCouncilResourceLifecycle): T & Readonly<{ cleanupCouncilResources(request: ProviderCouncilCleanupRequest, signal?: AbortSignal): Promise<void>; abortCouncilAssignment(request: ProviderCouncilRequest, signal?: AbortSignal): Promise<void> }> {
   return new Proxy(port, {
     get(target, property, receiver) {
-      if (property === "cleanupCouncilResources") return (request: ProviderCouncilCleanupRequest) => resources.closeBinding(request);
-      if (property === "abortCouncilAssignment") return (request: ProviderCouncilRequest) => resources.closeForRequest(request);
+      if (property === "cleanupCouncilResources") return (request: ProviderCouncilCleanupRequest, signal?: AbortSignal) => resources.closeBinding(request, signal);
+      if (property === "abortCouncilAssignment") return (request: ProviderCouncilRequest, signal?: AbortSignal) => resources.closeForRequest(request, signal);
       if (property !== "council") {
         const value = Reflect.get(target, property, receiver) as unknown;
         return typeof value === "function" ? value.bind(target) : value;
@@ -129,7 +153,19 @@ export function wrapProviderRuntimeCouncilLifecycle<T extends Readonly<{ council
         }
       };
     }
-  }) as T & Readonly<{ cleanupCouncilResources(request: ProviderCouncilCleanupRequest): Promise<void>; abortCouncilAssignment(request: ProviderCouncilRequest): Promise<void> }>;
+  }) as T & Readonly<{ cleanupCouncilResources(request: ProviderCouncilCleanupRequest, signal?: AbortSignal): Promise<void>; abortCouncilAssignment(request: ProviderCouncilRequest, signal?: AbortSignal): Promise<void> }>;
+}
+
+function waitForResourceBoundary<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  pending.then(() => undefined, () => undefined);
+  if (!signal) return pending;
+  if (signal.aborted) return Promise.reject(new Error("Council resource cleanup was cancelled or exceeded its host deadline."));
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => { cleanup(); reject(new Error("Council resource cleanup was cancelled or exceeded its host deadline.")); };
+    signal.addEventListener("abort", onAbort, { once: true });
+    pending.then((value) => { cleanup(); resolve(value); }, (error) => { cleanup(); reject(error); });
+  });
 }
 
 function requireAssignment(request: ProviderCouncilRequest): void {

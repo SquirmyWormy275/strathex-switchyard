@@ -14,6 +14,14 @@ import type {
   ProviderWorkflowContextObservation
 } from "./backends.ts";
 import {
+  ProviderDispatchLeaseAuthority,
+  type ProviderDispatchLeaseArtifactBinding,
+  type ProviderDispatchLeaseExpectation,
+  type ProviderDispatchLeaseHostIdentity,
+  type ProviderDispatchLeaseSessionBinding,
+  type ProviderDispatchLeaseTarget
+} from "./dispatch-lease.ts";
+import {
   councilEventKind,
   councilKey,
   readCouncilPhases,
@@ -33,6 +41,7 @@ const maximumResponseBytes = 64 * 1024;
 const providerOperationKind = "provider-gateway.operation";
 const councilCleanupKind = "provider-host.council-cleanup";
 const workflowContextObservationKind = "provider-host.workflow-context-observation";
+const maximumOperationDeadlineMs = 60_000;
 
 export interface ProviderHostRequest {
   readonly method: string;
@@ -40,6 +49,13 @@ export interface ProviderHostRequest {
   readonly headers: Readonly<Record<string, string | undefined>>;
   readonly body?: string | Uint8Array;
   readonly signal?: AbortSignal;
+  /** Listener-owned state; never deserialized from HTTP. */
+  readonly effectProgress?: ProviderHostEffectProgress;
+}
+
+export interface ProviderHostEffectProgress {
+  markAmbiguous(): void;
+  disposition(): "not_started" | "ambiguous";
 }
 
 export interface ProviderHostResponse {
@@ -53,6 +69,11 @@ export interface ProviderAdapterHostServiceOptions {
   readonly store: ProtectedJsonStore;
   readonly backends: readonly ProviderAdapterBackend[];
   readonly now?: () => string;
+  readonly operationDeadlineMs?: number;
+  readonly dispatchLease: Readonly<{
+    authenticationKey: string;
+    host: ProviderDispatchLeaseHostIdentity;
+  }>;
   readonly lifecycle?: Readonly<{
     nonce: string;
     processId: number;
@@ -78,10 +99,14 @@ export class ProviderAdapterHostService {
   private readonly backends: ReadonlyMap<ProviderGatewayProvider, ProviderAdapterBackend>;
   private readonly now: () => string;
   private readonly lifecycle?: ProviderAdapterHostServiceOptions["lifecycle"];
+  private readonly operationDeadlineMs: number;
+  private readonly dispatchLeases: ProviderDispatchLeaseAuthority;
+  private readonly inFlightCancellations = new Map<string, Readonly<{ requestDigest: string; result: Promise<ProviderHostResponse> }>>();
   private readonly inFlightCouncilCleanups = new Map<string, Readonly<{ requestDigest: string; result: Promise<ProviderHostResponse> }>>();
 
   constructor(options: ProviderAdapterHostServiceOptions) {
     if (!/^[a-f0-9]{64}$/.test(options.authenticationToken)) throw new Error("The provider host authentication token must be exactly 256 canonical bits.");
+    if (options.dispatchLease.authenticationKey === options.authenticationToken) throw new Error("The provider dispatch-lease authentication key must be independent from the HTTP bearer token.");
     if (!options.store.hasAuthenticatedProtection) throw new Error("The provider adapter host requires authenticated durable state.");
     const backends = new Map<ProviderGatewayProvider, ProviderAdapterBackend>();
     for (const backend of options.backends) {
@@ -94,9 +119,20 @@ export class ProviderAdapterHostService {
     this.store = options.store;
     this.sessions = new SessionRegistry(options.store, { clock: options.now });
     this.now = options.now ?? (() => new Date().toISOString());
+    this.operationDeadlineMs = boundedOperationDeadline(options.operationDeadlineMs ?? 10_000);
     this.backends = backends;
     if (options.lifecycle && (!digest(options.lifecycle.nonce) || !Number.isSafeInteger(options.lifecycle.processId) || options.lifecycle.processId < 1 || !digest(options.lifecycle.configurationSha256))) throw new Error("The provider-host lifecycle identity is invalid.");
+    if (options.lifecycle && (options.dispatchLease.host.configurationSha256 !== options.lifecycle.configurationSha256
+      || options.dispatchLease.host.lifecycleNonceSha256 !== sha256(options.lifecycle.nonce))) {
+      throw new Error("The provider dispatch-lease host identity does not match the exact running lifecycle.");
+    }
     this.lifecycle = options.lifecycle;
+    this.dispatchLeases = new ProviderDispatchLeaseAuthority({
+      authenticationKey: options.dispatchLease.authenticationKey,
+      store: options.store,
+      host: options.dispatchLease.host,
+      now: this.now
+    });
     this.gateway = new LocalProviderCommandGateway({
       store: options.store,
       sessions: this.sessions,
@@ -109,64 +145,81 @@ export class ProviderAdapterHostService {
   async handle(input: ProviderHostRequest): Promise<ProviderHostResponse> {
     if (!this.authenticated(input.headers.authorization)) return response(401, { schema: "sxsy-b122.provider-host-error", version: 1, status: "unauthorized", summary: "Provider host authentication failed.", effectDisposition: "not_started" });
     if (bodyLength(input.body) > maximumRequestBytes) return errorResponse(413, "The provider host request exceeded its fixed input cap.");
+    const progress = input.effectProgress ?? createEffectProgress();
+    const boundary = new ProviderOperationBoundary(input.signal, this.operationDeadlineMs);
     try {
       if (input.method === "GET" && input.path === "/v1/b122/health" && input.body === undefined) return this.health();
       if (input.method !== "POST") return errorResponse(405, "The provider host route requires an exact method.");
       if (input.path === "/v1/b122/lifecycle/shutdown") return this.shutdown(input.body);
       const handshakeMatch = /^\/v1\/b122\/handshake\/(claude|codex)$/.exec(input.path);
-      if (handshakeMatch) return await this.handshake(handshakeMatch[1] as ProviderGatewayProvider, input.body, input.signal);
+      if (handshakeMatch) return await boundary.wait(this.handshake(handshakeMatch[1] as ProviderGatewayProvider, input.body, boundary.signal));
       const commandMatch = /^\/v1\/b122\/command\/([a-z][a-z0-9_]*)$/.exec(input.path);
-      if (commandMatch) return await this.gatewayRequest(`provider.${commandMatch[1]}`, input.body, input.signal);
+      if (commandMatch) return await boundary.wait(this.gatewayRequest(`provider.${commandMatch[1]}`, input.body, boundary.signal, progress));
       const automationMatch = /^\/v1\/b122\/automation\/([a-z][a-z0-9_]*)$/.exec(input.path);
-      if (automationMatch) return await this.gatewayRequest(`automation.${automationMatch[1]}`, input.body, input.signal);
+      if (automationMatch) return await boundary.wait(this.gatewayRequest(`automation.${automationMatch[1]}`, input.body, boundary.signal, progress));
       const councilMatch = /^\/v1\/b122\/council\/(claude|codex)$/.exec(input.path);
-      if (councilMatch) return await this.council(councilMatch[1] as ProviderGatewayProvider, input.body, input.signal);
+      if (councilMatch) return await boundary.wait(this.council(councilMatch[1] as ProviderGatewayProvider, input.body, boundary.signal, progress));
       const councilCleanupMatch = /^\/v1\/b122\/council\/cleanup\/(claude|codex)$/.exec(input.path);
-      if (councilCleanupMatch) return await this.cleanupCouncil(councilCleanupMatch[1] as ProviderGatewayProvider, input.body);
+      if (councilCleanupMatch) return await this.cleanupCouncil(councilCleanupMatch[1] as ProviderGatewayProvider, input.body, boundary, progress);
       const sessionMatch = /^\/v1\/b122\/observe\/session\/(claude|codex)$/.exec(input.path);
-      if (sessionMatch) return await this.observeSession(sessionMatch[1] as ProviderGatewayProvider, input.body);
+      if (sessionMatch) return await boundary.wait(this.observeSession(sessionMatch[1] as ProviderGatewayProvider, input.body, boundary));
       const workflowContextMatch = /^\/v1\/b122\/observe\/workflow-context\/(claude|codex)$/.exec(input.path);
-      if (workflowContextMatch) return await this.observeWorkflowContext(workflowContextMatch[1] as ProviderGatewayProvider, input.body, input.signal);
+      if (workflowContextMatch) return await boundary.wait(this.observeWorkflowContext(workflowContextMatch[1] as ProviderGatewayProvider, input.body, boundary.signal));
       const operationMatch = /^\/v1\/b122\/observe\/operation\/(claude|codex)$/.exec(input.path);
-      if (operationMatch) return await this.observeOperation(operationMatch[1] as ProviderGatewayProvider, input.body);
+      if (operationMatch) return await boundary.wait(this.observeOperation(operationMatch[1] as ProviderGatewayProvider, input.body, boundary));
       const cancelMatch = /^\/v1\/b122\/cancel\/(claude|codex)$/.exec(input.path);
-      if (cancelMatch) return await this.cancel(cancelMatch[1] as ProviderGatewayProvider, input.body);
-      if (input.path === "/v1/b122/reconcile") return response(200, { schema: "sxsy-b122.provider-host-reconciliation", version: 1, ...(await this.reconcile()) });
+      if (cancelMatch) return await boundary.wait(this.cancel(cancelMatch[1] as ProviderGatewayProvider, input.body, boundary, progress));
+      if (input.path === "/v1/b122/reconcile") return response(200, { schema: "sxsy-b122.provider-host-reconciliation", version: 1, ...(await this.reconcileWithin(boundary)) });
       return errorResponse(404, "No exact provider host route matches this request.");
     } catch (error) {
+      if (progress.disposition() === "ambiguous") return errorResponse(503, safeError(error), "ambiguous");
       if (error instanceof CouncilConflictError) return errorResponse(409, safeError(error));
       if (error instanceof CouncilUnresolvedError) return errorResponse(503, safeError(error), "ambiguous");
       if (error instanceof WorkflowContextConflictError) return errorResponse(409, safeError(error));
-      return errorResponse(400, safeError(error));
+      if (error instanceof DispatchLeaseConflictError) return errorResponse(409, safeError(error));
+      if (error instanceof ProviderOperationBoundaryError) return errorResponse(408, safeError(error), progress.disposition());
+      return errorResponse(progress.disposition() === "ambiguous" ? 503 : 400, safeError(error), progress.disposition());
+    } finally {
+      boundary.dispose();
     }
   }
 
-  async reconcile(): Promise<ProviderHostReconciliationReceipt> {
-    const entries = await this.store.readEntries();
-    const latestOperations = new Map<string, { operationId: string; state: string }>();
+  async reconcile(signal?: AbortSignal): Promise<ProviderHostReconciliationReceipt> {
+    const boundary = new ProviderOperationBoundary(signal, this.operationDeadlineMs);
+    try { return await this.reconcileWithin(boundary); }
+    finally { boundary.dispose(); }
+  }
+
+  private async reconcileWithin(boundary: ProviderOperationBoundary): Promise<ProviderHostReconciliationReceipt> {
+    const entries = await boundary.wait(this.store.readEntries());
+    const latestOperations = new Map<string, SavedProviderOperation>();
     for (const entry of entries) {
       if (entry.kind !== providerOperationKind || !record(entry.payload) || !record(entry.payload.operation)) continue;
-      const operation = entry.payload.operation;
-      if (safeIdentifier(operation.operationId) && typeof operation.state === "string") latestOperations.set(operation.operationId, { operationId: operation.operationId, state: operation.state });
+      const operation = parseSavedProviderOperation(entry.payload.operation);
+      latestOperations.set(operation.operationId, operation);
     }
     const uncertainOperations = [...latestOperations.values()].filter((operation) => operation.state === "submitted" || operation.state === "unresolved");
     let operationsSettled = 0;
     for (const operation of uncertainOperations) {
-      const observed = await this.gateway.observeOperation(operation.operationId);
-      if (observed.settled) operationsSettled += 1;
+      const backend = this.backends.get(operation.provider);
+      if (!backend) continue;
+      const observed = await this.observeBackendOperation(operation, backend, boundary).catch(() => undefined);
+      if (!observed) continue;
+      await boundary.wait(this.saveProviderOperation({ ...operation, state: observed.outcome, updatedAt: this.timestamp() }));
+      if (observed.outcome !== "unresolved") operationsSettled += 1;
     }
 
-    const councils = await readCouncilPhases(this.store);
+    const councils = await boundary.wait(readCouncilPhases(this.store));
     const uncertainCouncils = [...councils.values()].filter((entry) => entry.state === "submitted" || entry.state === "unresolved");
     let councilsSettled = 0;
     for (const saved of uncertainCouncils) {
       const backend = this.backends.get(saved.provider);
       if (!backend) continue;
-      const session = await this.sessions.get(saved.request.sessionId);
-      if (!session?.workspaceRoot || !await this.refreshExactSession(saved.request.sessionId, saved.provider, saved.request.targetSnapshotId, session.workspaceRoot)) continue;
-      const acknowledgement = await backend.observeCouncil(saved.request, new AbortController().signal).catch(() => undefined);
+      const session = await boundary.wait(this.sessions.get(saved.request.sessionId));
+      if (!session?.workspaceRoot || !await this.refreshExactSession(saved.request.sessionId, saved.provider, saved.request.targetSnapshotId, session.workspaceRoot, boundary)) continue;
+      const acknowledgement = await boundary.wait(backend.observeCouncil(saved.request, boundary.signal)).catch(() => undefined);
       if (!acknowledgement) continue;
-      await this.saveCouncil({ ...saved, state: "acknowledged", acknowledgement, updatedAt: this.timestamp() });
+      await boundary.wait(this.saveCouncil({ ...saved, state: "acknowledged", acknowledgement, updatedAt: this.timestamp() }));
       councilsSettled += 1;
     }
     return { operationsInspected: uncertainOperations.length, operationsSettled, councilsInspected: uncertainCouncils.length, councilsSettled };
@@ -231,18 +284,46 @@ export class ProviderAdapterHostService {
     return mapped;
   }
 
-  private async gatewayRequest(routeId: string, body: string | Uint8Array | undefined, signal?: AbortSignal): Promise<ProviderHostResponse> {
+  private async gatewayRequest(routeId: string, body: string | Uint8Array | undefined, signal: AbortSignal, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
     const document = parseBody(body);
     const target = record(document.target) ? document.target : undefined;
     if (!target || !absoluteRoot(target.repositoryRoot)) return errorResponse(400, "The provider command lacks an exact absolute repository root.");
-    return mapGatewayResult(await this.gateway.request({ routeId, repositoryRoot: target.repositoryRoot, body: encode(document), ...(signal ? { signal } : {}) }));
+    const session = record(document.session) ? document.session : undefined;
+    if (!session || (session.provider !== "claude" && session.provider !== "codex") || !safeIdentifier(session.id)
+      || !safeIdentifier(document.action) || !safeIdentifier(document.operationId) || !safeIdentifier(document.authorityId)
+      || routeId !== `${routeId.startsWith("provider.") ? "provider" : "automation"}.${document.action}`) {
+      return errorResponse(400, "The provider command lacks an exact dispatch identity.");
+    }
+    if (routeId.startsWith("automation.") && (!exactKeys(document, ["schema", "version", "action", "operationId", "target", "session", "authorityId", "dispatchLease"])
+      || document.schema !== "sxsy-b122.remote-automation" || document.version !== 1)) {
+      return errorResponse(400, "The provider automation command contains an unknown or missing field.");
+    }
+    const current = await this.exactSession(session.id, session.provider, String(target.id), target.repositoryRoot);
+    if (!current || current.status !== "running" || !current.capabilities.includes("mediated") || !current.capabilities.includes("controllable")) {
+      return errorResponse(409, "The exact provider session is not current, running, Controllable, and Mediated.");
+    }
+    const backend = this.backends.get(session.provider);
+    if (!backend) return errorResponse(503, "The exact provider backend is unavailable.");
+    const lease = document.dispatchLease;
+    if (lease === undefined) return errorResponse(400, "The provider effect requires one exact companion dispatch lease.");
+    const expectation = gatewayLeaseExpectation(routeId, document, current, backend.dispatchIdentity);
+    try { await this.dispatchLeases.consume(lease, expectation, { signal, onCommitStart: () => progress.markAmbiguous() }); }
+    catch (error) {
+      if (dispatchLeaseConflict(error)) throw new DispatchLeaseConflictError();
+      throw error;
+    }
+    progress.markAmbiguous();
+    const { dispatchLease: _dispatchLease, ...forwarded } = document;
+    const mapped = mapGatewayResult(await this.gateway.request({ routeId, repositoryRoot: target.repositoryRoot, body: encode(forwarded), signal }));
+    return mapped.status === 200 ? mapped : ambiguousResponse(mapped);
   }
 
-  private async observeSession(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined): Promise<ProviderHostResponse> {
+  private async observeSession(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, boundary: ProviderOperationBoundary): Promise<ProviderHostResponse> {
     const document = exactOperationDocument(parseBody(body), "sxsy-b122.provider-session-observe", "session");
     const current = await this.exactSession(document.sessionId, provider, document.targetSnapshotId, document.repositoryRoot);
     if (!current) return errorResponse(409, "The requested provider session binding is no longer current.");
-    const observed = await this.gateway.observeSession(document.sessionId);
+    const observed = await this.refreshExactSession(document.sessionId, provider, document.targetSnapshotId, document.repositoryRoot, boundary);
+    if (!observed) return errorResponse(409, "The requested provider session could not be refreshed under its exact binding.");
     return response(200, {
       schema: "sxsy-b122.provider-session-observation", version: 1,
       sessionId: observed.id, provider, targetSnapshotId: observed.targetSnapshotId,
@@ -276,46 +357,106 @@ export class ProviderAdapterHostService {
     return response(200, envelope);
   }
 
-  private async observeOperation(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined): Promise<ProviderHostResponse> {
+  private async observeOperation(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, boundary: ProviderOperationBoundary): Promise<ProviderHostResponse> {
     const document = exactOperationDocument(parseBody(body), "sxsy-b122.provider-operation-observe", "operation");
     const current = await this.exactSession(document.sessionId, provider, document.targetSnapshotId, document.repositoryRoot);
     if (!current) return errorResponse(409, "The requested provider operation session binding is no longer current.");
-    if (!await this.exactDurableOperation(document, provider)) return errorResponse(404, "No exact durable provider operation matches the complete requested identity.");
-    const observed = await this.gateway.observeProviderOperation({ repositoryRoot: document.repositoryRoot, routeId: document.routeId!, externalId: document.externalId!, targetSnapshotId: document.targetSnapshotId });
-    if (!observed) return errorResponse(404, "No exact provider operation exists.");
+    const durable = await this.exactDurableOperation(document, provider);
+    if (!durable) return errorResponse(404, "No exact durable provider operation matches the complete requested identity.");
+    const backend = this.backends.get(provider);
+    if (!backend) return errorResponse(503, "The exact provider operation backend is unavailable.");
+    const observed = await this.observeBackendOperation(durable, backend, boundary);
+    await this.saveProviderOperation({ ...durable, state: observed.outcome, updatedAt: this.timestamp() });
     return response(200, {
       schema: "sxsy-b122.provider-operation-observation", version: 1,
       operationId: document.operationId!, externalId: document.externalId!, routeId: document.routeId!,
       sessionId: document.sessionId, provider, targetSnapshotId: document.targetSnapshotId,
-      repositoryRoot: document.repositoryRoot, outcome: observed.outcome, summary: observed.note
+      repositoryRoot: document.repositoryRoot, outcome: observed.outcome, summary: observed.summary
     });
   }
 
-  private async cancel(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined): Promise<ProviderHostResponse> {
+  private async cancel(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, boundary: ProviderOperationBoundary, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
     const value = parseBody(body);
     const document = exactOperationDocument(value, "sxsy-b122.provider-operation-cancel", "cancel");
     if (!safeSummary(value.reason, 1_024)) throw new Error("The provider cancellation reason is invalid.");
-    const current = await this.refreshExactSession(document.sessionId, provider, document.targetSnapshotId, document.repositoryRoot);
+    const current = await this.refreshExactSession(document.sessionId, provider, document.targetSnapshotId, document.repositoryRoot, boundary);
     if (!current) return errorResponse(409, "The requested provider cancellation session binding is no longer current.");
-    if (!await this.exactDurableOperation(document, provider)) return errorResponse(404, "No exact durable provider operation matches the complete requested identity.");
-    const before = await this.gateway.observeProviderOperation({ repositoryRoot: document.repositoryRoot, routeId: document.routeId!, externalId: document.externalId!, targetSnapshotId: document.targetSnapshotId });
-    if (!before) return errorResponse(404, "No exact provider operation exists.");
-    const cancelled = await this.gateway.cancelByOperation(document.operationId!, value.reason);
-    return response(cancelled === 1 ? 200 : 409, {
+    const durable = await this.exactDurableOperation(document, provider);
+    if (!durable) return errorResponse(404, "No exact durable provider operation matches the complete requested identity.");
+    if (durable.cancellationAcknowledged || terminalProviderOperation(durable.state)) return response(409, {
       schema: "sxsy-b122.provider-cancellation-ack", version: 1, operationId: document.operationId,
-      externalId: document.externalId, sessionId: document.sessionId, provider,
-      targetSnapshotId: document.targetSnapshotId, accepted: cancelled === 1,
-      summary: cancelled === 1 ? "The exact provider operation cancellation was acknowledged." : "The operation was already terminal or cancelled."
+      externalId: document.externalId, sessionId: document.sessionId, provider, targetSnapshotId: document.targetSnapshotId,
+      accepted: false, summary: "The operation was already terminal or cancelled."
+    });
+    const backend = this.backends.get(provider);
+    if (!backend) return errorResponse(503, "The exact provider cancellation backend is unavailable.");
+    const cancellationKey = `${provider}:${durable.operationId}`;
+    const requestDigest = sha256(stableJson({ provider, ...document, reason: value.reason }));
+    const active = this.inFlightCancellations.get(cancellationKey);
+    if (active) {
+      if (active.requestDigest !== requestDigest) return errorResponse(409, "The active provider cancellation identity is bound to another exact request.");
+      progress.markAmbiguous();
+      return boundary.wait(active.result);
+    }
+    const result = this.cancelOnce(backend, durable, value.reason, boundary, progress).finally(() => {
+      if (this.inFlightCancellations.get(cancellationKey)?.result === result) this.inFlightCancellations.delete(cancellationKey);
+    });
+    this.inFlightCancellations.set(cancellationKey, { requestDigest, result });
+    return result;
+  }
+
+  private async cancelOnce(backend: ProviderAdapterBackend, durable: SavedProviderOperation, reason: string, boundary: ProviderOperationBoundary, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
+    progress.markAmbiguous();
+    const acknowledgement = await boundary.wait(backend.cancelOperation({
+      operationId: durable.operationId, externalId: durable.externalId, routeId: durable.routeId,
+      targetSnapshotId: durable.targetSnapshotId, repositoryRoot: durable.repositoryRoot, reason
+    }, boundary.signal));
+    if (acknowledgement.operationId !== durable.operationId || acknowledgement.externalId !== durable.externalId
+      || acknowledgement.targetSnapshotId !== durable.targetSnapshotId || acknowledgement.accepted !== true || !safeSummary(acknowledgement.summary, 512)) {
+      throw new Error("The provider cancellation acknowledgement changed its exact binding or refused cancellation.");
+    }
+    const acknowledged: SavedProviderOperation = { ...durable, state: "unresolved", cancellationAcknowledged: true, updatedAt: this.timestamp() };
+    await this.saveProviderOperation(acknowledged);
+    const observed = await this.observeBackendOperation(acknowledged, backend, boundary).catch(() => undefined);
+    if (observed) await this.saveProviderOperation({ ...acknowledged, state: observed.outcome, updatedAt: this.timestamp() });
+    return response(200, {
+      schema: "sxsy-b122.provider-cancellation-ack", version: 1, operationId: durable.operationId,
+      externalId: durable.externalId, sessionId: durable.sessionId, provider: durable.provider,
+      targetSnapshotId: durable.targetSnapshotId, accepted: true,
+      summary: "The exact provider operation cancellation was acknowledged."
     });
   }
 
-  private async council(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, signal?: AbortSignal): Promise<ProviderHostResponse> {
-    const request = parseCouncil(parseBody(body));
+  private async council(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, signal: AbortSignal, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
+    const document = parseBody(body);
+    if (!safeIdentifier(document.authorityId) || !safeIdentifier(document.operationId) || document.dispatchLease === undefined) {
+      return errorResponse(400, "The Council effect requires exact authority, operation, and companion dispatch-lease bindings.");
+    }
+    const { authorityId, operationId, dispatchLease, ...councilDocument } = document;
+    const request = parseCouncil(councilDocument);
+    const expectedOperationId = `council:${request.epochId}:${request.phase}`;
+    if (operationId !== expectedOperationId) return errorResponse(409, "The Council operation identity does not match its exact epoch and phase.");
     const current = await this.sessions.get(request.sessionId);
     if (!current || current.provider !== provider || current.targetSnapshotId !== request.targetSnapshotId || !current.workspaceRoot
       || rootKey(current.workspaceRoot) !== rootKey(request.repositoryRoot)) {
       return errorResponse(409, "The Council provider session and target are no longer current.");
     }
+    const backend = this.backends.get(provider);
+    if (!backend) return errorResponse(503, `No ${provider} provider backend is installed.`);
+    const artifact = request.phase === "pause" ? null : {
+      id: request.epochId, digest: request.assignmentDigest!, coordinatorContextDigest: null, coordinatorContextRevision: null
+    } as const;
+    const expectation: ProviderDispatchLeaseExpectation = {
+      provider, routeId: `council.${provider}`, action: `council_${request.phase}`, operationId: expectedOperationId,
+      authorityId, target: { id: request.targetSnapshotId, repositoryRoot: request.repositoryRoot },
+      session: leaseSession(current, provider), artifact, confirmation: null, module: backend.dispatchIdentity
+    };
+    try { await this.dispatchLeases.consume(dispatchLease, expectation, { signal, onCommitStart: () => progress.markAmbiguous() }); }
+    catch (error) {
+      if (dispatchLeaseConflict(error)) throw new DispatchLeaseConflictError();
+      throw error;
+    }
+    progress.markAmbiguous();
     const requestDigest = sha256(stableJson(request));
     const key = councilKey(request);
     let replay: ProviderCouncilAcknowledgement | undefined;
@@ -336,11 +477,9 @@ export class ProviderAdapterHostService {
     });
     if (replay) return response(200, replay as unknown as Readonly<Record<string, unknown>>);
     if (!shouldDispatch) throw new CouncilUnresolvedError("The Council phase was not dispatchable.");
-    const backend = this.backends.get(provider);
-    if (!backend) return errorResponse(503, `No ${provider} provider backend is installed.`);
     const submitted: SavedCouncilPhase = { key, provider, requestDigest, request, state: "submitted", updatedAt: this.timestamp() };
     try {
-      const acknowledgement = await backend.council(request, signal ?? new AbortController().signal);
+      const acknowledgement = await backend.council(request, signal);
       await this.saveCouncil({ ...submitted, state: "acknowledged", acknowledgement, updatedAt: this.timestamp() });
       return response(200, acknowledgement as unknown as Readonly<Record<string, unknown>>);
     } catch {
@@ -349,22 +488,24 @@ export class ProviderAdapterHostService {
     }
   }
 
-  private async cleanupCouncil(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined): Promise<ProviderHostResponse> {
+  private async cleanupCouncil(provider: ProviderGatewayProvider, body: string | Uint8Array | undefined, boundary: ProviderOperationBoundary, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
     const request = parseCouncilCleanup(parseBody(body));
     const cleanupKey = `${provider}:${request.epochId}:${request.sessionId}:${request.resourceHostDigest}`;
     const requestDigest = sha256(stableJson(request));
     const active = this.inFlightCouncilCleanups.get(cleanupKey);
-    if (active) return active.requestDigest === requestDigest
-      ? active.result
-      : errorResponse(409, "The active Council cleanup identity is bound to another exact request.");
-    const result = this.cleanupCouncilOnce(provider, request, cleanupKey, requestDigest).finally(() => {
+    if (active) {
+      if (active.requestDigest !== requestDigest) return errorResponse(409, "The active Council cleanup identity is bound to another exact request.");
+      progress.markAmbiguous();
+      return boundary.wait(active.result);
+    }
+    const result = this.cleanupCouncilOnce(provider, request, cleanupKey, requestDigest, boundary, progress).finally(() => {
       if (this.inFlightCouncilCleanups.get(cleanupKey)?.result === result) this.inFlightCouncilCleanups.delete(cleanupKey);
     });
     this.inFlightCouncilCleanups.set(cleanupKey, { requestDigest, result });
     return result;
   }
 
-  private async cleanupCouncilOnce(provider: ProviderGatewayProvider, request: ProviderCouncilCleanupRequest, cleanupKey: string, requestDigest: string): Promise<ProviderHostResponse> {
+  private async cleanupCouncilOnce(provider: ProviderGatewayProvider, request: ProviderCouncilCleanupRequest, cleanupKey: string, requestDigest: string, boundary: ProviderOperationBoundary, progress: ProviderHostEffectProgress): Promise<ProviderHostResponse> {
     let replay: ProviderCouncilCleanupAcknowledgement | undefined;
     let conflict: string | undefined;
     await this.store.transaction(async (transaction) => {
@@ -389,7 +530,8 @@ export class ProviderAdapterHostService {
     if (replay) return response(200, replay as unknown as Readonly<Record<string, unknown>>);
     const backend = this.backends.get(provider);
     if (!backend) return errorResponse(503, "The exact Council cleanup backend is unavailable.");
-    try { await backend.cleanupCouncilResources(request); }
+    progress.markAmbiguous();
+    try { await boundary.wait(backend.cleanupCouncilResources(request, boundary.signal)); }
     catch { await this.store.append(councilCleanupKind, { key: cleanupKey, provider, requestDigest, request, state: "unresolved", updatedAt: this.timestamp() }); return errorResponse(503, "The exact Council cleanup remains pending and will be retried idempotently.", "ambiguous"); }
     const acknowledgement: ProviderCouncilCleanupAcknowledgement = { ...request, schema: "sxsy-b122.council-resource-cleanup-ack", closed: true };
     await this.store.append(councilCleanupKind, { key: cleanupKey, provider, requestDigest, request, state: "acknowledged", acknowledgement, updatedAt: this.timestamp() });
@@ -401,25 +543,55 @@ export class ProviderAdapterHostService {
     return session && session.provider === provider && session.targetSnapshotId === targetSnapshotId && session.workspaceRoot && rootKey(session.workspaceRoot) === rootKey(repositoryRoot) ? session : undefined;
   }
 
-  private async refreshExactSession(sessionId: string, provider: ProviderGatewayProvider, targetSnapshotId: string, repositoryRoot: string): Promise<ManagedSession | undefined> {
-    if (!await this.exactSession(sessionId, provider, targetSnapshotId, repositoryRoot)) return undefined;
-    const observed = await this.gateway.observeSession(sessionId).catch(() => undefined);
-    return observed && observed.provider === provider && observed.targetSnapshotId === targetSnapshotId && observed.workspaceRoot
-      && rootKey(observed.workspaceRoot) === rootKey(repositoryRoot) && observed.capabilities.includes("observable")
-      && observed.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1"
-      ? observed : undefined;
+  private async refreshExactSession(sessionId: string, provider: ProviderGatewayProvider, targetSnapshotId: string, repositoryRoot: string, boundary: ProviderOperationBoundary): Promise<ManagedSession | undefined> {
+    const current = await this.exactSession(sessionId, provider, targetSnapshotId, repositoryRoot);
+    const backend = this.backends.get(provider);
+    if (!current || !backend) return undefined;
+    let observed: Awaited<ReturnType<ProviderAdapterBackend["observeSession"]>> | undefined;
+    try { observed = await boundary.wait(backend.observeSession({ sessionId, provider, targetSnapshotId, repositoryRoot }, boundary.signal)); }
+    catch (error) { if (error instanceof ProviderOperationBoundaryError) throw error; return undefined; }
+    if (!observed || observed.sessionId !== sessionId || observed.provider !== provider || observed.targetSnapshotId !== targetSnapshotId
+      || !observed.capabilities.includes("observable") || !safeAdapterVersion(observed.adapterVersion)) return undefined;
+    return this.sessions.upsert({
+      ...current,
+      capabilities: observed.capabilities,
+      status: observed.status,
+      adapterVersion: observed.adapterVersion,
+      lastHeartbeat: this.timestamp()
+    });
   }
 
-  private async exactDurableOperation(document: ExactOperationDocument, provider: ProviderGatewayProvider): Promise<boolean> {
-    let latest: Record<string, unknown> | undefined;
+  private async exactDurableOperation(document: ExactOperationDocument, provider: ProviderGatewayProvider): Promise<SavedProviderOperation | undefined> {
+    let latest: SavedProviderOperation | undefined;
     for (const entry of await this.store.readEntries()) {
       if (entry.kind !== providerOperationKind || !record(entry.payload) || !record(entry.payload.operation)) continue;
-      if (entry.payload.operation.operationId === document.operationId) latest = entry.payload.operation;
+      const parsed = parseSavedProviderOperation(entry.payload.operation);
+      if (parsed.operationId === document.operationId) latest = parsed;
     }
-    return !!latest && latest.operationId === document.operationId && latest.externalId === document.externalId
+    return latest && latest.operationId === document.operationId && latest.externalId === document.externalId
       && latest.routeId === document.routeId && latest.sessionId === document.sessionId && latest.provider === provider
       && latest.targetSnapshotId === document.targetSnapshotId && typeof latest.repositoryRoot === "string"
-      && rootKey(latest.repositoryRoot) === rootKey(document.repositoryRoot);
+      && rootKey(latest.repositoryRoot) === rootKey(document.repositoryRoot) ? latest : undefined;
+  }
+
+  private async observeBackendOperation(operation: SavedProviderOperation, backend: ProviderAdapterBackend, boundary: ProviderOperationBoundary) {
+    const observed = await boundary.wait(backend.observeOperation({
+      operationId: operation.operationId,
+      externalId: operation.externalId,
+      routeId: operation.routeId,
+      targetSnapshotId: operation.targetSnapshotId,
+      repositoryRoot: operation.repositoryRoot
+    }, boundary.signal));
+    if (observed.operationId !== operation.operationId || observed.externalId !== operation.externalId || observed.routeId !== operation.routeId
+      || observed.targetSnapshotId !== operation.targetSnapshotId || !providerOperationOutcome(observed.outcome) || !safeSummary(observed.summary, 512)) {
+      throw new Error("The provider operation observation changed its exact durable binding.");
+    }
+    return observed;
+  }
+
+  private async saveProviderOperation(operation: SavedProviderOperation): Promise<void> {
+    parseSavedProviderOperation(operation);
+    await this.store.append(providerOperationKind, { operation });
   }
 
   private async recordWorkflowContextObservation(observation: ProviderWorkflowContextObservation): Promise<void> {
@@ -468,6 +640,101 @@ export class ProviderAdapterHostService {
 }
 
 interface ExactOperationDocument { readonly sessionId: string; readonly targetSnapshotId: string; readonly repositoryRoot: string; readonly operationId?: string; readonly externalId?: string; readonly routeId?: string; }
+interface SavedProviderOperation {
+  readonly operationId: string;
+  readonly externalId: string;
+  readonly routeId: string;
+  readonly provider: ProviderGatewayProvider;
+  readonly sessionId: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly requestDigest: string;
+  readonly state: "submitted" | "committed" | "failed" | "cancelled" | "unresolved";
+  readonly responseBody?: string;
+  readonly cancellationAcknowledged: boolean;
+  readonly updatedAt: string;
+}
+
+function parseSavedProviderOperation(value: unknown): SavedProviderOperation {
+  if (!record(value) || !allowedKeys(value,
+    ["operationId", "externalId", "routeId", "provider", "sessionId", "repositoryRoot", "targetSnapshotId", "requestDigest", "state", "cancellationAcknowledged", "updatedAt"],
+    ["responseBody"])
+    || !safeIdentifier(value.operationId) || !safeIdentifier(value.externalId) || !safeRoute(value.routeId)
+    || (value.provider !== "claude" && value.provider !== "codex") || !safeIdentifier(value.sessionId) || !absoluteRoot(value.repositoryRoot)
+    || !digest(value.targetSnapshotId) || !digest(value.requestDigest) || !providerOperationState(value.state)
+    || typeof value.cancellationAcknowledged !== "boolean" || typeof value.updatedAt !== "string" || !Number.isFinite(Date.parse(value.updatedAt))
+    || (value.responseBody !== undefined && (typeof value.responseBody !== "string" || Buffer.byteLength(value.responseBody, "utf8") > maximumResponseBytes))) {
+    throw new Error("The protected provider operation journal is malformed.");
+  }
+  return value as unknown as SavedProviderOperation;
+}
+
+function providerOperationState(value: unknown): value is SavedProviderOperation["state"] { return value === "submitted" || providerOperationOutcome(value); }
+function providerOperationOutcome(value: unknown): value is Exclude<SavedProviderOperation["state"], "submitted"> { return value === "committed" || value === "failed" || value === "cancelled" || value === "unresolved"; }
+function terminalProviderOperation(value: SavedProviderOperation["state"]): boolean { return value === "committed" || value === "failed" || value === "cancelled"; }
+
+function gatewayLeaseExpectation(
+  routeId: string,
+  document: Record<string, unknown>,
+  current: ManagedSession,
+  module: Readonly<{ adapterId: string; moduleSha256: string }>
+): ProviderDispatchLeaseExpectation {
+  const target = document.target as Record<string, unknown>;
+  const session = document.session as Record<string, unknown>;
+  if (!allowedKeys(target, ["id", "repositoryRoot", "policyVersion", "trackedManifest", "untrackedManifest"], ["branch", "head"])
+    || !allowedKeys(session, ["id", "provider", "surface", "capabilities", "plannedFiles"], ["taskId", "planRevision"])
+    || !digest(target.id) || !absoluteRoot(target.repositoryRoot) || !safeBoundedText(target.policyVersion, 256)
+    || !safeBoundedText(target.trackedManifest, 512) || !safeBoundedText(target.untrackedManifest, 512)
+    || (target.branch !== undefined && !safeBranch(target.branch)) || (target.head !== undefined && !safeBoundedText(target.head, 256))) {
+    throw new Error("The provider effect target or session binding is malformed.");
+  }
+  const expectedTask = session.taskId === undefined ? null : safeIdentifier(session.taskId) ? session.taskId : undefined;
+  const expectedPlan = session.planRevision === undefined ? null : safeIdentifier(session.planRevision) ? session.planRevision : undefined;
+  if (expectedTask === undefined || expectedPlan === undefined || (current.taskId ?? null) !== expectedTask || (current.planRevision ?? null) !== expectedPlan) {
+    throw new Error("The provider effect task or plan binding is no longer current.");
+  }
+  const sessionBinding = leaseSession(current, session.provider as ProviderGatewayProvider);
+  let artifact: ProviderDispatchLeaseArtifactBinding | null = null;
+  if (document.schema === "sxsy-b122.workflow-command") {
+    if (!record(document.artifact)) throw new Error("The provider workflow artifact binding is missing.");
+    const value = document.artifact;
+    if (!safeIdentifier(value.id) || !digest(value.digest)) throw new Error("The provider workflow artifact binding is invalid.");
+    const contextDigest = value.coordinatorContextDigest === undefined ? null : digest(value.coordinatorContextDigest) ? value.coordinatorContextDigest : undefined;
+    const contextRevision = value.coordinatorContextRevision === undefined ? null : Number.isSafeInteger(value.coordinatorContextRevision) && (value.coordinatorContextRevision as number) >= 1 ? value.coordinatorContextRevision as number : undefined;
+    if (contextDigest === undefined || contextRevision === undefined || ((contextDigest === null) !== (contextRevision === null))) throw new Error("The provider workflow coordinator binding is partial or invalid.");
+    artifact = { id: value.id, digest: value.digest, coordinatorContextDigest: contextDigest, coordinatorContextRevision: contextRevision };
+  } else if (document.artifact !== undefined || document.executionAuthorization !== undefined) {
+    throw new Error("Only a workflow command may carry artifact or confirmation material.");
+  }
+  let confirmation: Readonly<{ digest: string; scopeDigest: string }> | null = null;
+  if (document.executionAuthorization !== undefined) {
+    if (!record(document.executionAuthorization) || !digest(document.executionAuthorization.confirmationDigest) || !digest(document.executionAuthorization.confirmationScopeDigest)) throw new Error("The provider workflow confirmation binding is invalid.");
+    confirmation = { digest: document.executionAuthorization.confirmationDigest, scopeDigest: document.executionAuthorization.confirmationScopeDigest };
+  }
+  return {
+    provider: session.provider as ProviderGatewayProvider,
+    routeId, action: document.action as string, operationId: document.operationId as string,
+    authorityId: document.authorityId as string,
+    target: {
+      id: target.id, repositoryRoot: target.repositoryRoot,
+      ...(target.branch === undefined ? {} : { branch: target.branch as string }),
+      ...(target.head === undefined ? {} : { head: target.head as string }),
+      trackedManifest: target.trackedManifest, untrackedManifest: target.untrackedManifest, policyVersion: target.policyVersion
+    },
+    session: sessionBinding, artifact, confirmation, module
+  };
+}
+
+function leaseSession(session: ManagedSession, provider: ProviderGatewayProvider): ProviderDispatchLeaseSessionBinding {
+  if (session.provider !== provider || !safeAdapterVersion(session.adapterVersion)) throw new Error("The provider dispatch-lease session identity is invalid.");
+  return {
+    id: session.id,
+    provider,
+    taskId: session.taskId ?? null,
+    planRevision: session.planRevision ?? null,
+    adapterVersion: session.adapterVersion
+  };
+}
 
 function parseWorkflowContextRequest(value: Record<string, unknown>, provider: ProviderGatewayProvider): ProviderRuntimeWorkflowContextRequest {
   if (!exactKeys(value, ["schema", "version", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "branch", "head", "taskId", "planRevision", "requestNonce"])
@@ -596,6 +863,8 @@ function bindingTypeForResource(kind: ProviderCouncilHostedResource["kind"]): Pr
 class CouncilConflictError extends Error {}
 class CouncilUnresolvedError extends Error {}
 class WorkflowContextConflictError extends Error {}
+class DispatchLeaseConflictError extends Error {}
+class ProviderOperationBoundaryError extends Error {}
 
 function mapGatewayResult(result: Awaited<ReturnType<AuthenticatedProviderGatewayClient["request"]>>): ProviderHostResponse {
   if (result.outcome === "passed" && result.body) {
@@ -604,6 +873,10 @@ function mapGatewayResult(result: Awaited<ReturnType<AuthenticatedProviderGatewa
   }
   const status = result.outcome === "blocked" ? 409 : result.outcome === "unavailable" ? 503 : 502;
   return errorResponse(status, result.detail, result.effectDisposition);
+}
+
+function ambiguousResponse(value: ProviderHostResponse): ProviderHostResponse {
+  return response(value.status === 409 ? 503 : value.status, { ...value.body, effectDisposition: "ambiguous" });
 }
 
 function parseBody(value: string | Uint8Array | undefined): Record<string, unknown> {
@@ -624,6 +897,8 @@ function safeError(error: unknown): string {
   if (error instanceof CouncilConflictError) return "The Council phase conflicts with the exact durable phase binding.";
   if (error instanceof CouncilUnresolvedError) return "The Council phase is unresolved and requires exact observation before retry.";
   if (error instanceof WorkflowContextConflictError) return "The provider workflow context conflicts with its durable monotonic source binding.";
+  if (error instanceof DispatchLeaseConflictError) return "The provider dispatch lease was replayed or does not match the exact effect binding.";
+  if (error instanceof ProviderOperationBoundaryError) return "The provider-host operation was cancelled or exceeded its fixed deadline.";
   return "The provider runtime or request boundary failed closed.";
 }
 function bodyLength(value: string | Uint8Array | undefined): number { return value === undefined ? 0 : typeof value === "string" ? Buffer.byteLength(value, "utf8") : value.byteLength; }
@@ -653,4 +928,64 @@ function safeAdapterVersion(value: unknown): string { if (typeof value !== "stri
 function rootKey(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
 function workflowContextKey(value: Pick<ProviderWorkflowContextObservation, "provider" | "sessionId" | "targetSnapshotId" | "repositoryRoot" | "taskId" | "planRevision">): string {
   return sha256(stableJson({ provider: value.provider, sessionId: value.sessionId, targetSnapshotId: value.targetSnapshotId, repositoryRoot: rootKey(value.repositoryRoot), taskId: value.taskId, planRevision: value.planRevision }));
+}
+
+function createEffectProgress(): ProviderHostEffectProgress {
+  let ambiguous = false;
+  return Object.freeze({
+    markAmbiguous() { ambiguous = true; },
+    disposition: () => ambiguous ? "ambiguous" as const : "not_started" as const
+  });
+}
+
+function dispatchLeaseConflict(error: unknown): boolean {
+  return error instanceof Error && /already consumed|replay|does not match the exact .*binding/i.test(error.message);
+}
+
+class ProviderOperationBoundary {
+  readonly signal: AbortSignal;
+  private readonly controller = new AbortController();
+  private readonly deadlineAt: number;
+  private readonly timer: ReturnType<typeof setTimeout>;
+  private readonly caller?: AbortSignal;
+  private readonly onCallerAbort: () => void;
+
+  constructor(caller: AbortSignal | undefined, timeoutMs: number) {
+    this.signal = this.controller.signal;
+    this.deadlineAt = Date.now() + timeoutMs;
+    this.caller = caller;
+    this.onCallerAbort = () => this.controller.abort();
+    if (caller?.aborted) this.controller.abort();
+    else caller?.addEventListener("abort", this.onCallerAbort, { once: true });
+    this.timer = setTimeout(() => this.controller.abort(), timeoutMs);
+    this.timer.unref?.();
+  }
+
+  wait<T>(pending: Promise<T>): Promise<T> {
+    pending.then(() => undefined, () => undefined);
+    if (this.signal.aborted) return Promise.reject(new ProviderOperationBoundaryError());
+    return new Promise<T>((resolve, reject) => {
+      const cleanup = () => this.signal.removeEventListener("abort", onAbort);
+      const onAbort = () => { cleanup(); reject(new ProviderOperationBoundaryError()); };
+      this.signal.addEventListener("abort", onAbort, { once: true });
+      pending.then((value) => {
+        cleanup();
+        if (this.signal.aborted || Date.now() >= this.deadlineAt) {
+          this.controller.abort();
+          reject(new ProviderOperationBoundaryError());
+        } else resolve(value);
+      }, (error) => { cleanup(); reject(error); });
+    });
+  }
+
+  dispose(): void {
+    clearTimeout(this.timer);
+    this.caller?.removeEventListener("abort", this.onCallerAbort);
+    this.controller.abort();
+  }
+}
+
+function boundedOperationDeadline(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 1 || value > maximumOperationDeadlineMs) throw new Error("The provider-host operation deadline is invalid.");
+  return value;
 }

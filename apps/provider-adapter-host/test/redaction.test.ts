@@ -7,7 +7,10 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
+import { sha256 } from "../../../packages/control-plane/src/store.ts";
 import { CodexProviderAdapterBackend, FixtureProviderRuntimePort } from "../src/backends.ts";
+import { signProviderDispatchLease } from "../src/dispatch-lease.ts";
 import { ProviderAdapterHostService } from "../src/service.ts";
 import { createProviderHostStore } from "../src/state.ts";
 import { createLoopbackTlsFixture } from "./support/tls-fixture.ts";
@@ -16,6 +19,8 @@ const hostToken = "a".repeat(64);
 const providerSecret = "sk-proj-malicious-provider-secret";
 const pii = "operator@example.invalid";
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const fixedNow = "2026-08-25T12:00:00.000Z";
+const leaseHost = { configurationSha256: "1".repeat(64), lifecycleNonceSha256: "2".repeat(64), tlsSpkiSha256: "3".repeat(64) } as const;
 
 class MaliciousCouncilPort extends FixtureProviderRuntimePort {
   constructor() { super("codex", { effectfulTestOnly: true }); }
@@ -31,18 +36,34 @@ test("a malicious provider runtime cannot reflect credential or PII text into an
   const service = new ProviderAdapterHostService({
     authenticationToken: hostToken,
     store: createProviderHostStore(join(root, "state.jsonl"), hostToken),
-    backends: [new CodexProviderAdapterBackend(port)]
+    backends: [new CodexProviderAdapterBackend(port)],
+    dispatchLease: { authenticationKey: "c".repeat(64), host: leaseHost },
+    now: () => fixedNow
   });
   const authorization = { authorization: `Bearer ${hostToken}` };
-  const targetSnapshotId = "b".repeat(64);
+  const targetIdentity = {
+    repositoryRoot: "C:\\repo", branch: "feature/provider-host", head: "d".repeat(40), indexTree: "e".repeat(40),
+    trackedManifest: "4".repeat(64), untrackedManifest: "5".repeat(64), submodules: {}, policyVersion: "policy-v1",
+    environmentFingerprint: "6".repeat(64), completeness: "complete" as const, reasons: [] as readonly string[]
+  };
+  const fullTarget = { id: targetSnapshotDigest(targetIdentity), ...targetIdentity, canonicalRemote: null, defaultBranch: null, detached: false, upstream: null, capturedAt: fixedNow } as const;
+  const targetSnapshotId = fullTarget.id;
   const handshake = await service.handle({ method: "POST", path: "/v1/b122/handshake/codex", headers: authorization, body: JSON.stringify({
     schema: "sxsy-b122.provider-handshake-request", version: 1, sessionId: "codex-session", provider: "codex",
     targetSnapshotId, repositoryRoot: "C:\\repo", branch: "feature/provider-host", head: "d".repeat(40), requestedAt: "2026-08-25T12:00:00.000Z"
   }) });
   assert.equal(handshake.status, 200);
-  const response = await service.handle({ method: "POST", path: "/v1/b122/council/codex", headers: authorization, body: JSON.stringify({
-    schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-malicious", phase: "pause", sessionId: "codex-session", targetSnapshotId, repositoryRoot: "C:\\repo"
-  }) });
+  const council = { schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-malicious", phase: "pause", sessionId: "codex-session", targetSnapshotId, repositoryRoot: "C:\\repo", authorityId: "authority-redaction", operationId: "council:epoch-malicious:pause" } as const;
+  const dispatchLease = signProviderDispatchLease({
+    schema: "sxsy-b122.provider-dispatch-lease", version: 1, leaseId: "lease-redaction", nonce: "7".repeat(64), issuedAt: fixedNow, expiresAt: "2026-08-25T12:00:30.000Z",
+    authority: { id: council.authorityId, grantDigest: "8".repeat(64), scopeDigest: "9".repeat(64), expiresAt: "2026-08-25T12:01:00.000Z" },
+    target: fullTarget,
+    session: { id: "codex-session", provider: "codex", taskId: "task-provider-host", planRevision: "plan-1", adapterVersion: "codex-fixture-provider-host-v1" },
+    dispatch: { routeId: "council.codex", action: "council_pause", operationId: council.operationId }, artifact: null, confirmation: null,
+    containment: { status: "clear", bindingDigest: "a".repeat(64), fenceEpoch: 1, activationOperationId: null }, host: leaseHost,
+    module: { adapterId: "sxsy-b122.fixture.codex", moduleSha256: sha256("sxsy-b122.fixture.codex.v1") }
+  }, "c".repeat(64));
+  const response = await service.handle({ method: "POST", path: "/v1/b122/council/codex", headers: authorization, body: JSON.stringify({ ...council, dispatchLease }) });
   assert.equal(response.status, 503);
   const serialized = JSON.stringify(response);
   assert.equal(serialized.includes(providerSecret), false);

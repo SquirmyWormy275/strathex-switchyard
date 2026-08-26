@@ -24,6 +24,14 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
       authenticationToken: configuration.authenticationTokenText,
       store: createProviderHostStore(configuration.stateFile, configuration.journalAuthenticationKeyText),
       backends: runtime.backends,
+      dispatchLease: {
+        authenticationKey: configuration.dispatchLeaseAuthenticationKeyText,
+        host: {
+          configurationSha256: configuration.configurationSha256,
+          lifecycleNonceSha256: sha256(argv[3]!),
+          tlsSpkiSha256: configuration.tls.tlsSpkiSha256
+        }
+      },
       lifecycle: { nonce: argv[3]!, processId: process.pid, configurationSha256: configuration.configurationSha256, requestShutdown: () => requestShutdown() }
     });
     const reconciliation = await service.reconcile();
@@ -34,6 +42,7 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     configuration.tls.privateKey.fill(0);
     configuration.authenticationToken.fill(0);
     configuration.journalAuthenticationKey.fill(0);
+    configuration.dispatchLeaseAuthenticationKey.fill(0);
     process.stdout.write(`${JSON.stringify({ schema: "sxsy-b122.provider-host-started", version: 1, host: running.host, port: running.port, providers: configuration.providers.map((entry) => entry.provider), processId: process.pid, lifecycleNonceSha256: sha256(argv[3]!), configurationSha256: configuration.configurationSha256, reconciliation })}\n`);
     const shutdown = (): Promise<void> => shutdownPromise ??= (async () => {
       const results = await Promise.allSettled([running.close(), runtime!.close()]);
@@ -48,6 +57,7 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     await runtime?.close().catch(() => undefined);
     configuration.authenticationToken.fill(0);
     configuration.journalAuthenticationKey.fill(0);
+    configuration.dispatchLeaseAuthenticationKey.fill(0);
     configuration.tls.privateKey.fill(0);
     for (const provider of configuration.providers) if (provider.kind === "module") { provider.credential.fill(0); provider.moduleSource.fill(0); }
     throw error;
@@ -59,7 +69,15 @@ async function selfTest(): Promise<number> {
   const token = sha256("sxsy-b122-provider-host-self-test-token");
   try {
     const port = new FixtureProviderRuntimePort("codex");
-    const service = new ProviderAdapterHostService({ authenticationToken: token, store: createProviderHostStore(join(root, "state.jsonl"), token), backends: [new CodexProviderAdapterBackend(port)] });
+    const service = new ProviderAdapterHostService({
+      authenticationToken: token,
+      store: createProviderHostStore(join(root, "state.jsonl"), "b".repeat(64)),
+      backends: [new CodexProviderAdapterBackend(port)],
+      dispatchLease: {
+        authenticationKey: "c".repeat(64),
+        host: { configurationSha256: "d".repeat(64), lifecycleNonceSha256: "e".repeat(64), tlsSpkiSha256: "f".repeat(64) }
+      }
+    });
     const result = await service.handle({ method: "GET", path: "/v1/b122/health", headers: { authorization: `Bearer ${token}` } });
     if (result.status !== 200) throw new Error("Provider host self-test health check failed.");
     process.stdout.write(`${JSON.stringify({ schema: "sxsy-b122.provider-host-self-test", version: 1, status: "ok", authenticatedState: true, fixtureBackend: true, networkAccessed: false, proprietaryCredentialAccessed: false })}\n`);

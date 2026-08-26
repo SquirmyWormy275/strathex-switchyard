@@ -18,6 +18,7 @@ const token = "a".repeat(64);
 const targetSnapshotId = "b".repeat(64);
 const moduleSha256 = "c".repeat(64);
 const repositoryRoot = "C:\\repo";
+const dispatchLease = { authenticationKey: "d".repeat(64), host: { configurationSha256: "1".repeat(64), lifecycleNonceSha256: "2".repeat(64), tlsSpkiSha256: "3".repeat(64) } } as const;
 
 class ContextFixturePort extends FixtureProviderRuntimePort {
   sourceRevision = 7;
@@ -54,6 +55,7 @@ async function setup(context: test.TestContext, port = new ContextFixturePort(),
     authenticationToken: token,
     store,
     backends: [backend],
+    dispatchLease,
     now: () => "2026-08-25T12:00:01.000Z"
   });
   const connected = await service.handle(request("/v1/b122/handshake/codex", handshake()));
@@ -100,6 +102,7 @@ test("workflow-context observation is exact, non-authorizing, digest-bound, and 
     authenticationToken: token,
     store: createProviderHostStore(join(setupResult.directory, "state.jsonl"), token),
     backends: [setupResult.backend],
+    dispatchLease,
     now: () => "2026-08-25T12:00:02.000Z"
   });
   const rolledBack = await restarted.handle(request(

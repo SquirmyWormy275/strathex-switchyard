@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { canonicalWorkflowArtifact, planApprovalReviewScopeDigest } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -12,30 +13,93 @@ import {
   FixtureProviderRuntimePort,
   type ProviderRuntimePort
 } from "../src/backends.ts";
+import { signProviderDispatchLease } from "../src/dispatch-lease.ts";
 import { ProviderAdapterHostService } from "../src/service.ts";
 import { createProviderHostStore } from "../src/state.ts";
 import type { ProviderCouncilCleanupRequest } from "../src/state.ts";
 
 const token = "a".repeat(64);
-const target = "b".repeat(64);
+const leaseKey = "c".repeat(64);
+const fixedNow = "2026-08-25T12:00:00.000Z";
+const hostIdentity = { configurationSha256: "1".repeat(64), lifecycleNonceSha256: "2".repeat(64), tlsSpkiSha256: "3".repeat(64) } as const;
+const targetIdentity = {
+  repositoryRoot: "C:\\repo", canonicalRemote: "https://github.com/acme/repo.git", branch: "feature/provider-host",
+  defaultBranch: "main", upstream: "origin/feature/provider-host", head: "d".repeat(40), indexTree: "1".repeat(40),
+  trackedManifest: "e".repeat(64), untrackedManifest: "f".repeat(64), submodules: {}, policyVersion: "policy-v1",
+  environmentFingerprint: "2".repeat(64), completeness: "complete", reasons: []
+} as const;
+const fullTarget = { id: targetSnapshotDigest(targetIdentity), ...targetIdentity, detached: false, capturedAt: fixedNow } as const;
+const target = fullTarget.id;
 const changedTarget = "c".repeat(64);
+let leaseSequence = 0;
+const dispatchLeaseOptions = { authenticationKey: leaseKey, host: hostIdentity } as const;
 
-async function fixture(context: test.TestContext) {
+async function fixture(context: test.TestContext, codex = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true }), operationDeadlineMs = 10_000) {
   const directory = await mkdtemp(join(tmpdir(), "b122-provider-host-"));
-  context.after(async () => rm(directory, { recursive: true, force: true }));
+  context.after(async () => rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }));
   const store = createProviderHostStore(join(directory, "provider-host.jsonl"), token);
   const claude = new FixtureProviderRuntimePort("claude", { effectfulTestOnly: true });
-  const codex = new FixtureProviderRuntimePort("codex", { effectfulTestOnly: true });
   const service = new ProviderAdapterHostService({
     authenticationToken: token,
     store,
-    backends: [new ClaudeProviderAdapterBackend(claude), new CodexProviderAdapterBackend(codex)]
+    backends: [new ClaudeProviderAdapterBackend(claude), new CodexProviderAdapterBackend(codex)],
+    dispatchLease: dispatchLeaseOptions,
+    operationDeadlineMs,
+    now: () => fixedNow
   });
   return { directory, store, claude, codex, service };
 }
 
-function request(path: string, body?: unknown, authorization = `Bearer ${token}`, method = "POST") {
-  return { method, path, headers: { authorization }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
+function request(path: string, body?: unknown, authorization = `Bearer ${token}`, method = "POST", attachLease = true) {
+  const council = /^\/v1\/b122\/council\/(?:claude|codex)$/.test(path);
+  const effectBody = council && body && typeof body === "object" && !Array.isArray(body)
+    ? { ...(body as Record<string, unknown>), authorityId: "authority-provider-host", operationId: `council:${String((body as Record<string, unknown>).epochId)}:${String((body as Record<string, unknown>).phase)}` }
+    : body;
+  const document = attachLease && effectPath(path) && effectBody && typeof effectBody === "object" && !Array.isArray(effectBody) && !Object.hasOwn(effectBody, "dispatchLease")
+    ? { ...(effectBody as Record<string, unknown>), dispatchLease: dispatchLease(path, effectBody as Record<string, unknown>) }
+    : effectBody;
+  return { method, path, headers: { authorization }, ...(document === undefined ? {} : { body: JSON.stringify(document) }) };
+}
+
+function effectPath(path: string): boolean { return /^\/v1\/b122\/(?:command|automation|council\/(?:claude|codex)$)/.test(path); }
+
+function requiredSignal(value: AbortSignal | undefined): AbortSignal {
+  assert.ok(value, "the provider-host boundary must supply one exact cancellation signal");
+  return value;
+}
+
+function dispatchLease(path: string, body: Record<string, unknown>, nonce = sha256(`lease-${++leaseSequence}`)) {
+  const provider = path.endsWith("/claude") || (body.session as { provider?: string } | undefined)?.provider === "claude" ? "claude" : "codex";
+  const council = body.schema === "sxsy-b122.council-phase";
+  const action = council ? `council_${String(body.phase)}` : String(body.action);
+  const routeId = council ? `council.${provider}` : path.includes("/automation/") ? `automation.${action}` : `provider.${action}`;
+  const operationId = council ? `council:${String(body.epochId)}:${String(body.phase)}` : String(body.operationId);
+  const artifactValue = body.artifact as Record<string, unknown> | undefined;
+  const authorization = body.executionAuthorization as Record<string, unknown> | undefined;
+  return signProviderDispatchLease({
+    schema: "sxsy-b122.provider-dispatch-lease", version: 1,
+    leaseId: `lease-${nonce.slice(0, 24)}`, nonce, issuedAt: fixedNow, expiresAt: "2026-08-25T12:00:30.000Z",
+    authority: { id: typeof body.authorityId === "string" ? body.authorityId : "authority-provider-host", grantDigest: "4".repeat(64), scopeDigest: "5".repeat(64), expiresAt: "2026-08-25T12:01:00.000Z" },
+    target: fullTarget,
+    session: {
+      id: council ? String(body.sessionId) : String((body.session as Record<string, unknown>).id), provider,
+      taskId: council ? "task-provider-host" : ((body.session as Record<string, unknown>).taskId as string | undefined) ?? null,
+      planRevision: council ? "plan-1" : ((body.session as Record<string, unknown>).planRevision as string | undefined) ?? null,
+      adapterVersion: `${provider}-fixture-provider-host-v1`
+    },
+    dispatch: { routeId, action, operationId },
+    artifact: artifactValue ? {
+      id: String(artifactValue.id), digest: String(artifactValue.digest),
+      coordinatorContextDigest: typeof artifactValue.coordinatorContextDigest === "string" ? artifactValue.coordinatorContextDigest : null,
+      coordinatorContextRevision: typeof artifactValue.coordinatorContextRevision === "number" ? artifactValue.coordinatorContextRevision : null
+    } : council && body.phase !== "pause" ? {
+      id: String(body.epochId), digest: String(body.assignmentDigest), coordinatorContextDigest: null, coordinatorContextRevision: null
+    } : null,
+    confirmation: authorization ? { digest: String(authorization.confirmationDigest), scopeDigest: String(authorization.confirmationScopeDigest) } : null,
+    containment: { status: "clear", bindingDigest: "6".repeat(64), fenceEpoch: 1, activationOperationId: null },
+    host: hostIdentity,
+    module: { adapterId: `sxsy-b122.fixture.${provider}`, moduleSha256: sha256(`sxsy-b122.fixture.${provider}.v1`) }
+  }, leaseKey);
 }
 
 function handshake(provider: "claude" | "codex" = "codex", snapshot = target) {
@@ -269,6 +333,51 @@ test("authenticated health, handshake, workflow, and automation routes use exact
   assert.equal(codex.executeCalls, 3);
 });
 
+test("effect routes require one exact single-use companion dispatch lease and classify post-consume failure as ambiguous", async (context) => {
+  const { service, codex, store } = await fixture(context);
+  await service.handle(request("/v1/b122/handshake/codex", handshake()));
+
+  const missing = await service.handle(request("/v1/b122/automation/compound_capture", automation("operation-no-lease"), undefined, "POST", false));
+  assert.equal(missing.status, 400);
+  assert.equal((missing.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(codex.executeCalls, 0);
+  const missingCommand = await service.handle(request("/v1/b122/command/proof", workflow("operation-command-no-lease"), undefined, "POST", false));
+  assert.equal(missingCommand.status, 400);
+  assert.equal((missingCommand.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(codex.executeCalls, 0);
+  const missingCouncil = await service.handle(request("/v1/b122/council/codex", {
+    schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-no-lease", phase: "pause",
+    sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo"
+  }, undefined, "POST", false));
+  assert.equal(missingCouncil.status, 400);
+  assert.equal((missingCouncil.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.deepEqual(codex.councilPhases, []);
+
+  const body = automation("operation-single-use");
+  const signed = dispatchLease("/v1/b122/automation/compound_capture", body, "7".repeat(64));
+  const exactRequest = request("/v1/b122/automation/compound_capture", { ...body, dispatchLease: signed });
+  assert.equal((await service.handle(exactRequest)).status, 200);
+  assert.equal(codex.executeCalls, 1);
+  const replay = await service.handle(exactRequest);
+  assert.equal(replay.status, 409);
+  assert.equal((replay.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(codex.executeCalls, 1);
+
+  const crossBoundBody = automation("operation-cross-bound");
+  const wrongActionLease = dispatchLease("/v1/b122/automation/other_action", { ...crossBoundBody, action: "other_action" }, "8".repeat(64));
+  const crossBound = await service.handle(request("/v1/b122/automation/compound_capture", { ...crossBoundBody, dispatchLease: wrongActionLease }));
+  assert.equal(crossBound.status, 409);
+  assert.equal(codex.executeCalls, 1);
+
+  codex.malformedNextResponse();
+  const malformedBody = automation("operation-post-consume-malformed");
+  const malformed = await service.handle(request("/v1/b122/automation/compound_capture", malformedBody));
+  assert.equal(malformed.status, 503);
+  assert.equal((malformed.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(codex.executeCalls, 2);
+  assert.ok((await store.readEntries()).some((entry) => entry.kind === "provider-host.dispatch-lease-consumed"));
+});
+
 test("authenticated graceful shutdown is fenced to the exact lifecycle nonce, process, and configuration", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "b122-provider-shutdown-"));
   context.after(async () => rm(directory, { recursive: true, force: true }));
@@ -277,6 +386,7 @@ test("authenticated graceful shutdown is fenced to the exact lifecycle nonce, pr
     authenticationToken: token,
     store: createProviderHostStore(join(directory, "state.jsonl"), token),
     backends: [new CodexProviderAdapterBackend(new FixtureProviderRuntimePort("codex"))],
+    dispatchLease: { authenticationKey: leaseKey, host: { configurationSha256: "8".repeat(64), lifecycleNonceSha256: sha256("9".repeat(64)), tlsSpkiSha256: "3".repeat(64) } },
     lifecycle: { nonce: "9".repeat(64), processId: 4242, configurationSha256: "8".repeat(64), requestShutdown: () => { shutdowns += 1; } }
   });
   const health = await service.handle(request("/v1/b122/health", undefined, undefined, "GET"));
@@ -306,7 +416,8 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
   const service = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(directory, "state.jsonl"), "f".repeat(64)),
-    backends: [new CodexProviderAdapterBackend(dishonest, { adapterId: "test.module.codex", moduleSha256: "e".repeat(64) })]
+    backends: [new CodexProviderAdapterBackend(dishonest, { adapterId: "test.module.codex", moduleSha256: "e".repeat(64) })],
+    dispatchLease: dispatchLeaseOptions
   });
   const connected = await service.handle(request("/v1/b122/handshake/codex", handshake()));
   assert.equal(connected.status, 200);
@@ -315,7 +426,7 @@ test("a digest-pinned module cannot self-assert the host Mediated capability", a
     schema: "sxsy-b122.council-phase", version: 1, epochId: "unattested", phase: "pause",
     sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo"
   }));
-  assert.equal(blockedCouncil.status, 503);
+  assert.equal(blockedCouncil.status, 400);
   assert.deepEqual(source.councilPhases, []);
 });
 
@@ -411,7 +522,9 @@ test("operation IDs are restart-durable, exact-request idempotent, and conflict-
   const restarted = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(setup.directory, "provider-host.jsonl"), token),
-    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)]
+    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)],
+    dispatchLease: dispatchLeaseOptions,
+    now: () => fixedNow
   });
   const afterRestart = await restarted.handle(request("/v1/b122/automation/compound_capture", automation()));
   assert.deepEqual(afterRestart.body, first.body);
@@ -439,7 +552,8 @@ test("Council phases are ordered, exact, durable, observable, and cancellable", 
   const base = { schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-1", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo" };
   const resourceHost = councilResourceHost();
   const early = await service.handle(request("/v1/b122/council/codex", { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: [], resourceHost }));
-  assert.equal(early.status, 409);
+  assert.equal(early.status, 503);
+  assert.equal((early.body as { effectDisposition: string }).effectDisposition, "ambiguous");
   const pause = await service.handle(request("/v1/b122/council/codex", { ...base, phase: "pause" }));
   assert.equal(pause.status, 200);
   const secretResourceHost = councilCredentialResourceHost("sk-live-secret");
@@ -458,7 +572,9 @@ test("Council phases are ordered, exact, durable, observable, and cancellable", 
   assert.equal(JSON.stringify(await store.readEntries()).includes("secret-value"), false);
   const staleResourceHost = councilResourceHost("9".repeat(64));
   const staleResume = { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: assignment.leases, resourceHost: staleResourceHost };
-  assert.equal((await service.handle(request("/v1/b122/council/codex", staleResume))).status, 409);
+  const staleResumeResult = await service.handle(request("/v1/b122/council/codex", staleResume));
+  assert.equal(staleResumeResult.status, 503);
+  assert.equal((staleResumeResult.body as { effectDisposition: string }).effectDisposition, "ambiguous");
   const resume = { ...base, phase: "resume", assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: "council/epoch-1", head: "d".repeat(40), leases: assignment.leases, resourceHost };
   assert.equal((await service.handle(request("/v1/b122/council/codex", resume))).status, 200);
   assert.deepEqual(codex.councilPhases, ["pause", "assignment", "resume"]);
@@ -472,6 +588,45 @@ test("Council phases are ordered, exact, durable, observable, and cancellable", 
   const cancelled = await service.handle(request("/v1/b122/cancel/codex", { schema: "sxsy-b122.provider-operation-cancel", version: 1, operationId: "operation-running", externalId: "operation-running", routeId: "automation.compound_capture", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo", reason: "operator cancelled" }));
   assert.equal(cancelled.status, 200);
   assert.equal((cancelled.body as { accepted: boolean }).accepted, true);
+});
+
+test("concurrent cancellation is single-flight for one exact request and rejects a changed reason", async (context) => {
+  let release!: () => void;
+  let started!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const cancellationStarted = new Promise<void>((resolve) => { started = resolve; });
+  class HeldCancellationPort extends FixtureProviderRuntimePort {
+    cancelCalls = 0;
+    constructor() { super("codex", { effectfulTestOnly: true }); }
+    override async cancelOperation(request_: Parameters<ProviderRuntimePort["cancelOperation"]>[0], _signal?: AbortSignal): ReturnType<ProviderRuntimePort["cancelOperation"]> {
+      this.cancelCalls += 1;
+      started();
+      await held;
+      return super.cancelOperation(request_);
+    }
+  }
+
+  const port = new HeldCancellationPort();
+  const { service } = await fixture(context, port);
+  await service.handle(request("/v1/b122/handshake/codex", handshake()));
+  port.setNextStatus("running");
+  assert.equal((await service.handle(request("/v1/b122/automation/compound_capture", automation("operation-concurrent-cancel")))).status, 200);
+  const cancel = {
+    schema: "sxsy-b122.provider-operation-cancel", version: 1, operationId: "operation-concurrent-cancel",
+    externalId: "operation-concurrent-cancel", routeId: "automation.compound_capture", sessionId: "codex-session",
+    targetSnapshotId: target, repositoryRoot: "C:\\repo", reason: "operator cancelled"
+  };
+  const first = service.handle(request("/v1/b122/cancel/codex", cancel));
+  await cancellationStarted;
+  const duplicate = service.handle(request("/v1/b122/cancel/codex", cancel));
+  const conflicting = await service.handle(request("/v1/b122/cancel/codex", { ...cancel, reason: "changed cancellation reason" }));
+  assert.equal(conflicting.status, 409);
+  assert.equal((conflicting.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(port.cancelCalls, 1);
+  release();
+  assert.equal((await first).status, 200);
+  assert.equal((await duplicate).status, 200);
+  assert.equal(port.cancelCalls, 1);
 });
 
 test("Council refuses stale capability, status, and repository observations before and after dispatch", async (context) => {
@@ -503,7 +658,9 @@ test("concurrent Council cleanup claims one exact durable identity before execut
   const service = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(directory, "state.jsonl"), "f".repeat(64)),
-    backends: [new CodexProviderAdapterBackend(port)]
+    backends: [new CodexProviderAdapterBackend(port)],
+    dispatchLease: dispatchLeaseOptions,
+    now: () => fixedNow
   });
   await service.handle(request("/v1/b122/handshake/codex", handshake()));
   const base = { schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-cleanup", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo" };
@@ -516,10 +673,12 @@ test("concurrent Council cleanup claims one exact durable identity before execut
   assert.equal((await service.handle(request("/v1/b122/council/codex", { ...base, phase: "resume", ...binding }))).status, 200);
   const cleanup = { schema: "sxsy-b122.council-resource-cleanup", version: 1, epochId: base.epochId, sessionId: base.sessionId, targetSnapshotId: target, resourceHostDigest: host.digest, outcome: "completed" };
   const first = service.handle(request("/v1/b122/council/cleanup/codex", cleanup));
+  const duplicate = service.handle(request("/v1/b122/council/cleanup/codex", cleanup));
   const conflicting = await service.handle(request("/v1/b122/council/cleanup/codex", { ...cleanup, outcome: "aborted" }));
   assert.equal(conflicting.status, 409);
   release();
   assert.equal((await first).status, 200);
+  assert.equal((await duplicate).status, 200);
   assert.equal((await service.handle(request("/v1/b122/council/cleanup/codex", cleanup))).status, 200);
   assert.equal(port.cleanupCalls, 1);
 });
@@ -535,7 +694,9 @@ test("submitted operations reconcile after restart without replay", async (conte
   const restarted = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(setup.directory, "provider-host.jsonl"), token),
-    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)]
+    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)],
+    dispatchLease: dispatchLeaseOptions,
+    now: () => fixedNow
   });
   const receipt = await restarted.reconcile();
   assert.deepEqual(receipt, { operationsInspected: 1, operationsSettled: 1, councilsInspected: 0, councilsSettled: 0 });
@@ -559,10 +720,92 @@ test("an ambiguous Council acknowledgement reconciles after restart without repl
   const restarted = new ProviderAdapterHostService({
     authenticationToken: token,
     store: createProviderHostStore(join(setup.directory, "provider-host.jsonl"), token),
-    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)]
+    backends: [new ClaudeProviderAdapterBackend(setup.claude), new CodexProviderAdapterBackend(setup.codex)],
+    dispatchLease: dispatchLeaseOptions,
+    now: () => fixedNow
   });
   const receipt = await restarted.reconcile();
   assert.deepEqual(receipt, { operationsInspected: 0, operationsSettled: 0, councilsInspected: 1, councilsSettled: 1 });
   assert.equal((await restarted.handle(request("/v1/b122/council/codex", pauseRequest))).status, 200);
   assert.deepEqual(setup.codex.councilPhases, ["pause"]);
+});
+
+test("session refresh, operation observation, cancellation, cleanup, and restart reconciliation propagate one bounded host signal", async (context) => {
+  type Mode = "observeSession" | "observeOperation" | "cancel" | "cleanup";
+  class HangingBoundaryPort extends FixtureProviderRuntimePort {
+    mode?: Mode;
+    readonly aborted = new Set<Mode>();
+    constructor() { super("codex", { effectfulTestOnly: true }); }
+    private blocked(kind: Mode, signal: AbortSignal): Promise<never> {
+      return new Promise((_resolve, reject) => {
+        const abort = () => { this.aborted.add(kind); reject(new Error("bounded provider test operation aborted")); };
+        if (signal.aborted) abort(); else signal.addEventListener("abort", abort, { once: true });
+      });
+    }
+    override observeSession(request_: Parameters<ProviderRuntimePort["observeSession"]>[0], signal?: AbortSignal): ReturnType<ProviderRuntimePort["observeSession"]> {
+      return this.mode === "observeSession" ? this.blocked("observeSession", requiredSignal(signal)) : super.observeSession(request_);
+    }
+    override observeOperation(request_: Parameters<ProviderRuntimePort["observeOperation"]>[0], signal?: AbortSignal): ReturnType<ProviderRuntimePort["observeOperation"]> {
+      return this.mode === "observeOperation" ? this.blocked("observeOperation", requiredSignal(signal)) : super.observeOperation(request_);
+    }
+    override cancelOperation(request_: Parameters<ProviderRuntimePort["cancelOperation"]>[0], signal?: AbortSignal): ReturnType<ProviderRuntimePort["cancelOperation"]> {
+      return this.mode === "cancel" ? this.blocked("cancel", requiredSignal(signal)) : super.cancelOperation(request_);
+    }
+    cleanupCouncilResources(_request: ProviderCouncilCleanupRequest, signal?: AbortSignal): Promise<void> {
+      return this.mode === "cleanup" ? this.blocked("cleanup", requiredSignal(signal)) : Promise.resolve();
+    }
+  }
+
+  const port = new HangingBoundaryPort();
+  const setup = await fixture(context, port, 250);
+  await setup.service.handle(request("/v1/b122/handshake/codex", handshake()));
+
+  port.mode = "observeSession";
+  const sessionResult = await setup.service.handle(request("/v1/b122/observe/session/codex", {
+    schema: "sxsy-b122.provider-session-observe", version: 1, sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo"
+  }));
+  assert.equal(sessionResult.status, 408);
+  assert.equal((sessionResult.body as { effectDisposition: string }).effectDisposition, "not_started");
+  assert.equal(port.aborted.has("observeSession"), true);
+
+  port.mode = undefined;
+  port.setNextStatus("running");
+  assert.equal((await setup.service.handle(request("/v1/b122/automation/compound_capture", automation("operation-bounded")))).status, 200);
+
+  port.mode = "observeOperation";
+  const operationResult = await setup.service.handle(request("/v1/b122/observe/operation/codex", {
+    schema: "sxsy-b122.provider-operation-observe", version: 1, operationId: "operation-bounded", externalId: "operation-bounded",
+    routeId: "automation.compound_capture", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo"
+  }));
+  assert.equal(operationResult.status, 408);
+  assert.equal(port.aborted.has("observeOperation"), true);
+
+  port.mode = "cancel";
+  const cancelResult = await setup.service.handle(request("/v1/b122/cancel/codex", {
+    schema: "sxsy-b122.provider-operation-cancel", version: 1, operationId: "operation-bounded", externalId: "operation-bounded",
+    routeId: "automation.compound_capture", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo", reason: "bounded cancellation"
+  }));
+  assert.equal(cancelResult.status, 503);
+  assert.equal((cancelResult.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(port.aborted.has("cancel"), true);
+
+  port.mode = undefined;
+  const base = { schema: "sxsy-b122.council-phase", version: 1, epochId: "epoch-bounded-cleanup", sessionId: "codex-session", targetSnapshotId: target, repositoryRoot: "C:\\repo" };
+  const host = councilResourceHost("8".repeat(64), base.epochId);
+  assert.equal((await setup.service.handle(request("/v1/b122/council/codex", { ...base, phase: "pause" }))).status, 200);
+  const binding = { assignmentDigest: "7".repeat(64), worktreeRoot: "C:\\worktree", branch: `council/${base.epochId}`, head: "d".repeat(40), leases: [], resourceHost: host };
+  assert.equal((await setup.service.handle(request("/v1/b122/council/codex", { ...base, phase: "assignment", paths: ["src/example.ts"], resources: ["port:4100"], ...binding }))).status, 200);
+  assert.equal((await setup.service.handle(request("/v1/b122/council/codex", { ...base, phase: "resume", ...binding }))).status, 200);
+  port.mode = "cleanup";
+  const cleanupResult = await setup.service.handle(request("/v1/b122/council/cleanup/codex", {
+    schema: "sxsy-b122.council-resource-cleanup", version: 1, epochId: base.epochId, sessionId: base.sessionId,
+    targetSnapshotId: target, resourceHostDigest: host.digest, outcome: "completed"
+  }));
+  assert.equal(cleanupResult.status, 503);
+  assert.equal((cleanupResult.body as { effectDisposition: string }).effectDisposition, "ambiguous");
+  assert.equal(port.aborted.has("cleanup"), true);
+
+  port.mode = "observeOperation";
+  await assert.rejects(() => setup.service.reconcile());
+  assert.equal(port.aborted.has("observeOperation"), true);
 });
