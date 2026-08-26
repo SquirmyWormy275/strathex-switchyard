@@ -62,7 +62,7 @@ export interface PipelineFailureCursor { select(targetSnapshotId: string, ordere
 export interface PipelineFailurePresentationQueue {
   enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: "show_pipeline_failure_trace" }>): Promise<Readonly<{
     id: string;
-    hostAction: "show_pipeline_failure_trace";
+    hostAction: string;
     expiresAt: string;
     workspaceRoot?: string;
   }>>;
@@ -86,7 +86,10 @@ export class PipelineFailurePresentationAdapter implements CommandAdapter {
       return { status: "failed", summary: "The hosted pipeline adapter returned malformed exact-head failure evidence; no presentation was queued.", effectDisposition: observed.effectDisposition ?? "ambiguous" };
     }
     let intent;
-    try { intent = await this.queue.enqueue(request, { hostAction: "show_pipeline_failure_trace" }); }
+    try {
+      intent = await this.queue.enqueue(request, { hostAction: "show_pipeline_failure_trace" });
+      if (intent.hostAction !== "show_pipeline_failure_trace") throw new Error("wrong host action");
+    }
     catch { return { status: "failed", summary: "The exact failure evidence could not be durably queued for presentation.", effectDisposition: "ambiguous" }; }
     return {
       status: "running",
