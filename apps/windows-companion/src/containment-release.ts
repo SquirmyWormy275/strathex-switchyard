@@ -28,6 +28,8 @@ export interface ContainmentInspectionSummary {
 
 export interface ContainmentReleaseInspector {
   inspect(sessionId: string): Promise<Readonly<{ fence: ContainmentRecord; incident: ContainmentIncidentRecord }> | undefined>;
+  /** Final host-derived, freshness-sensitive remote proof validation immediately before release. */
+  validateRemoteRelease?(input: Readonly<{ sessionId: string; incident: ContainmentIncidentRecord; expectedIncidentDigest: string }>): Promise<void>;
   assess?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string }>): Promise<void>;
   beginVerification?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string }>): Promise<void>;
   issuePermit?(input: Readonly<{ sessionId: string; incidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<ContainmentRemediationPermit>;
@@ -165,6 +167,12 @@ export class AttestedContainmentReleaseCoordinator {
     const prepared = await this.runtime.prepareCommand({ action: "containment_release", sessionId: input.sessionId, reason, confirmationScopeDigest });
     if (prepared.status !== "prepared") return { status: prepared.status, summary: prepared.summary };
     if (!prepared.authorityId || !prepared.confirmationToken) return { status: "unavailable", summary: "Containment release preparation omitted its exact protected authority or one-time confirmation." };
+    if (!this.inspector.validateRemoteRelease) return { status: "unavailable", summary: "No installed final signed remote-evidence release validator is attached." };
+    try {
+      await this.inspector.validateRemoteRelease({ sessionId: input.sessionId, incident: inspected.incident, expectedIncidentDigest: input.expectedIncidentDigest });
+    } catch {
+      return { status: "blocked", summary: "Signed remote evidence changed, expired, was revoked, or no longer matches the exact current target; containment remains active." };
+    }
     return this.runtime.releaseContainment({
       sessionId: input.sessionId,
       authorityId: prepared.authorityId,

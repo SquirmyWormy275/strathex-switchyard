@@ -110,7 +110,9 @@ import {
 } from "./windows-voice-port.ts";
 import { InstalledVoiceConversationRuntime } from "./voice-runtime.ts";
 import { WindowsErasableVoiceTranscriptVault } from "./windows-voice-transcript-vault.ts";
-import { InstalledLocalContainmentAssessmentPort } from "./containment-assessment.ts";
+import { InstalledContainmentAssessmentPort, InstalledLocalContainmentAssessmentPort } from "./containment-assessment.ts";
+import { createContainmentRemoteEvidenceAdministration, DurableContainmentRemoteEvidenceRegistry } from "./containment-remote-evidence.ts";
+import { InstalledContainmentRemoteCoordinator } from "./containment-remote-host.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -217,6 +219,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly rawHidInstallations?: AttestedRawHidInstallationCoordinator;
   readonly rawHidSupervisor?: InstalledRawHidSupervisor;
   readonly containmentHistory?: AttestedContainmentHistoryRemediator;
+  readonly containmentRemote?: InstalledContainmentRemoteCoordinator;
   readonly acceptanceAdministration?: AcceptanceAdministration;
   readonly scannerFixtures: DurableScannerFixtureRegistry;
   readonly scannerAdministration?: ScannerFixtureAdministration;
@@ -258,6 +261,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const hardwareSignals = new DurableHardwareSignalInbox(store);
   let targetResolver!: TargetResolver;
   let containmentManager!: DurableContainmentManager;
+  let containmentRemote: InstalledContainmentRemoteCoordinator | undefined;
   let configuredNetwork!: DynamicConfiguredNetworkClient;
   let providerDesktopRegistry: AttestedProviderDesktopRegistry | undefined;
   const hostActions = new DurableHostActionQueue(store, {
@@ -407,11 +411,16 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ]
   });
   let credentialVault!: DurableCredentialReferenceVault;
+  const localContainmentAssessment = new InstalledLocalContainmentAssessmentPort();
+  const containmentAssessment = new InstalledContainmentAssessmentPort(localContainmentAssessment, {
+    execute: (request) => containmentRemote ? containmentRemote.execute(request) : localContainmentAssessment.execute(request),
+    observe: (request) => containmentRemote ? containmentRemote.observe(request) : localContainmentAssessment.observe(request)
+  });
   containmentManager = new DurableContainmentManager(store, {
     revokeCredentialLeases: async ({ repositoryRoot }) => credentialVault.revokeRepositoryLeases(repositoryRoot),
     cancelQueuedOperations: async (input) => { await operationControl.cancelQueuedOperations(input); }
   }, {
-    incidentAssessmentPort: new InstalledLocalContainmentAssessmentPort()
+    incidentAssessmentPort: containmentAssessment
   });
   credentialVault = new DurableCredentialReferenceVault(store, credentialProtector, containmentManager);
   const councilResourceHost = new CouncilResourceHost({
@@ -522,6 +531,25 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     })),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  const containmentRemoteRegistry = new DurableContainmentRemoteEvidenceRegistry(store, {
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
+  if (options.runtimePinPresence) {
+    containmentRemote = new InstalledContainmentRemoteCoordinator({
+      policyVersion: options.policyVersion,
+      stateDirectory: join(localStateDirectory, "containment-remote"),
+      incidents: containmentManager.incidents,
+      sessions,
+      targets: targetResolver,
+      registry: containmentRemoteRegistry,
+      administration: createContainmentRemoteEvidenceAdministration({
+        registry: containmentRemoteRegistry,
+        presence: options.runtimePinPresence,
+        ...(options.runtime?.now ? { now: options.runtime.now } : {})
+      }),
+      ...(options.runtime?.now ? { now: options.runtime.now } : {})
+    });
+  }
   const providerHandshakes = options.runtimePinPresence
     ? new AttestedProviderHandshakeCoordinator(
         providerTransport,
@@ -702,6 +730,19 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   };
   const containmentRelease = new AttestedContainmentReleaseCoordinator(executor, {
     inspect: inspectContainmentSession,
+    validateRemoteRelease: async (input) => {
+      const current = await inspectContainmentSession(input.sessionId);
+      if (!current || current.incident.id !== input.incident.id
+        || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) {
+        throw new Error("The containment incident changed before final remote-evidence validation.");
+      }
+      if (!containmentRemote) throw new Error("No installed signed remote-evidence release boundary is attached.");
+      await containmentRemote.validateRelease({
+        sessionId: input.sessionId,
+        incident: current.incident,
+        expectedIncidentDigest: input.expectedIncidentDigest
+      });
+    },
     assess: async (input) => {
       const current = await inspectContainmentSession(input.sessionId);
       if (!current || current.incident.id !== input.incidentId || containmentIncidentReviewDigest(current.incident) !== input.expectedIncidentDigest) throw new Error("The containment incident changed after assessment review.");
@@ -770,7 +811,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       })
     : undefined;
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(containmentHistory ? { containmentHistory } : {}), ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerDispatchProfileProvisioning ? { providerDispatchProfiles: providerDispatchProfileProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(containmentHistory ? { containmentHistory } : {}), ...(containmentRemote ? { containmentRemote } : {}), ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerDispatchProfileProvisioning ? { providerDispatchProfiles: providerDispatchProfileProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
@@ -818,6 +859,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     ...(acceptanceAdministration ? { acceptanceAdministration } : {}),
     ...(scannerAdministration ? { scannerAdministration } : {}),
     ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}),
+    ...(containmentRemote ? { containmentRemote } : {}),
     ...(gitReviews ? { gitReviews } : {}),
     ...(runtimePins ? { runtimePins } : {}),
     ...(sandboxInstallationRegistry ? { sandboxInstallationRegistry } : {}),

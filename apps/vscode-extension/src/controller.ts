@@ -9,6 +9,7 @@ import {
   forwardedHostAction,
   forwardedWorkflowOutcome,
   type ExtensionCompanionBridge,
+  type ContainmentInspectionSummary,
   type ExtensionManagedSession,
   type ExtensionProvider,
   type ExtensionHandoffPackage,
@@ -877,8 +878,25 @@ export class ManagedSessionController {
       return;
     }
     if (containment.incident.status === "assessing" || containment.incident.status === "assessment_incomplete") {
-      const choice = await this.vscode.window.showQuickPick([{ label: `Reassess exact incident ${containment.incident.id}`, description: "Read-only local Git assessment; network and secret-value output remain disabled" }], { placeHolder: "Containment assessment is incomplete; explicitly retry only this exact durable incident" });
-      if (!choice || choice.label !== `Reassess exact incident ${containment.incident.id}`) return;
+      const remoteStep = containment.incident.steps.find((step) => step.name === "remote");
+      const remotePending = !!remoteStep && (remoteStep.status !== "completed" || remoteStep.result?.status === "incomplete" || remoteStep.result?.status === "unavailable");
+      const reassessLabel = `Reassess exact incident ${containment.incident.id}`;
+      const remoteActions = remotePending ? [
+        { label: "Install signed remote-evidence authority", description: "Current-user presence; reviewed purpose-scoped public-key policy only" },
+        { label: "Issue offline signed remote-evidence challenge", description: "Host derives the exact current target and every configured remote endpoint" },
+        { label: "Import signed remote evidence and resume exact assessment", description: "Current-user presence; exact challenge, namespace, target, and incident binding" },
+        { label: "Show signed remote-evidence status", description: "List installed trust, issued challenges, and imported evidence" },
+        { label: "Revoke signed remote-evidence authority", description: "Current-user presence; containment remains active" }
+      ] : [];
+      const choice = await this.vscode.window.showQuickPick([
+        ...remoteActions,
+        { label: reassessLabel, description: "Read-only local Git assessment; network and secret-value output remain disabled" }
+      ], { placeHolder: remotePending ? "Remote assessment needs a signed complete-namespace offline proof" : "Containment assessment is incomplete; explicitly retry only this exact durable incident" });
+      if (!choice) return;
+      if (choice.label !== reassessLabel) {
+        await this.manageContainmentRemoteEvidence(choice.label, session, containment);
+        return;
+      }
       const reassessed = await this.bridge.reassessContainment({ sessionId: session.id, expectedIncidentId: containment.incident.id, expectedIncidentDigest: containment.incidentDigest });
       if (!reassessed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment reassessment unavailable: ${reassessed.message}`); return; }
       await this.vscode.window.showInformationMessage(`SXSY-B122 containment reassessment is now ${reassessed.value.incident.status}; review the exact incident again before any next step.`);
@@ -896,12 +914,12 @@ export class ManagedSessionController {
       if (history.length) {
         const paths = [...new Set(history.map(({ finding }) => finding.relativePath))].sort((left, right) => left.localeCompare(right));
         const findingIds = history.map(({ finding }) => finding.id).sort((left, right) => left.localeCompare(right));
-        const reviewLabel = `Prepare current-branch history rewrite for ${paths.length} path(s)`;
+        const reviewLabel = `Prepare local branch/tag history rewrite for ${paths.length} path(s)`;
         const review = await this.vscode.window.showQuickPick([{
           label: reviewLabel,
           description: "Creates a verified external bundle; never contacts or rewrites a remote",
-          detail: `This removes each exact reviewed path from every commit reachable from the current local branch: ${paths.join(", ")}`
-        }], { placeHolder: "Destructive local-history review: other refs remain fenced and the native prompt shows the prepared old/new heads" });
+          detail: `This removes each exact reviewed path from every commit reachable from all local branches and tags: ${paths.join(", ")}. Invalidated annotated-tag signatures are stripped and counted.`
+        }], { placeHolder: "Destructive local-history review: remote refs remain fenced and the native prompt shows the complete prepared local-ref scope" });
         if (!review || review.label !== reviewLabel) return;
         const expiresAt = new Date(Date.parse(this.now()) + 10 * 60_000).toISOString();
         const issued = await this.bridge.issueContainmentPermit({
@@ -913,12 +931,12 @@ export class ManagedSessionController {
           expiresAt
         });
         if (!issued.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 local-history permit unavailable: ${issued.message}`); return; }
-        const finalLabel = `Rewrite only branch history under permit ${issued.value.permit.id}`;
+        const finalLabel = `Rewrite local branch/tag history under permit ${issued.value.permit.id}`;
         const finalReview = await this.vscode.window.showQuickPick([{
           label: finalLabel,
           description: `Expires ${issued.value.permit.expiresAt}`,
-          detail: `Exact paths ${paths.join(", ")}; findings ${findingIds.join(", ")}. Windows presence will show the host-prepared old/new heads and exact preview digest.`
-        }], { placeHolder: "Final VS Code review before the host prepares a branch-only rewrite and asks for Windows presence" });
+          detail: `Exact paths ${paths.join(", ")}; findings ${findingIds.join(", ")}. Windows presence will show the host-prepared ref count, current old/new heads, stripped-signature count, and exact preview digest.`
+        }], { placeHolder: "Final VS Code review before the host prepares one atomic local branch/tag transaction and asks for Windows presence" });
         if (!finalReview || finalReview.label !== finalLabel) return;
         const rewritten = await this.bridge.rewriteContainmentHistory({
           sessionId: session.id,
@@ -933,7 +951,7 @@ export class ManagedSessionController {
           await this.vscode.window.showWarningMessage("SXSY-B122 refused a local-history result bound to another repository.");
           return;
         }
-        await this.vscode.window.showInformationMessage(`SXSY-B122 rewrote local branch ${rewritten.value.branch} from ${rewritten.value.oldHead} to ${rewritten.value.newHead}. Recovery bundle: ${rewritten.value.backupBundlePath} (SHA-256 ${rewritten.value.backupBundleSha256}). Other local/remote refs were not changed; review and run containment verification again.`);
+        await this.vscode.window.showInformationMessage(`SXSY-B122 atomically rewrote ${rewritten.value.updatedRefs.length} reviewed local branch/tag ref(s). Current branch ${rewritten.value.branch}: ${rewritten.value.oldHead} to ${rewritten.value.newHead}. Stripped invalidated tag signatures: ${rewritten.value.strippedTagSignatures}. Recovery bundle: ${rewritten.value.backupBundlePath} (SHA-256 ${rewritten.value.backupBundleSha256}). Remote refs were not changed; review and run containment verification again.`);
         return;
       }
       const remote = pending.filter((item) => item.step === "remote");
@@ -998,6 +1016,72 @@ export class ManagedSessionController {
     if (!result.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 containment release unavailable: ${result.message}`); return; }
     const show = result.value.status === "completed" ? this.vscode.window.showInformationMessage.bind(this.vscode.window) : this.vscode.window.showWarningMessage.bind(this.vscode.window);
     await show(`SXSY-B122 containment release ${result.value.status}: ${result.value.summary}`);
+  }
+
+  private async manageContainmentRemoteEvidence(action: string, session: ExtensionManagedSession, containment: ContainmentInspectionSummary): Promise<void> {
+    if (action === "Install signed remote-evidence authority") {
+      const sourcePath = await this.pickReviewedJson("Install reviewed remote-evidence trust policy");
+      if (!sourcePath) return;
+      const installed = await this.bridge.installContainmentRemoteTrust(sourcePath);
+      if (!installed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 remote-evidence authority was not installed: ${installed.message}`); return; }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 installed purpose-scoped remote-evidence authority ${installed.value.authorityId} (${installed.value.keyId.slice(0, 12)}…) until ${installed.value.expiresAt}.`);
+      return;
+    }
+    if (action === "Issue offline signed remote-evidence challenge") {
+      const issued = await this.bridge.issueContainmentRemoteChallenge({
+        sessionId: session.id,
+        expectedIncidentId: containment.incident.id,
+        expectedIncidentDigest: containment.incidentDigest,
+        expiresAt: new Date(Date.parse(this.now()) + 10 * 60_000).toISOString()
+      });
+      if (!issued.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 remote-evidence challenge was not issued: ${issued.message}`); return; }
+      const endpoints = issued.value.configuredRemotes.map((remote) => `${remote.name}=${remote.canonicalIdentity}`).join("; ");
+      await this.vscode.window.showInformationMessage(`SXSY-B122 wrote exact offline challenge ${issued.value.id} to ${issued.value.challengePath}. It covers ${issued.value.configuredRemotes.length} host-derived endpoint(s): ${endpoints}.`);
+      return;
+    }
+    if (action === "Import signed remote evidence and resume exact assessment") {
+      const sourcePath = await this.pickReviewedJson("Import reviewed signed remote evidence");
+      if (!sourcePath) return;
+      const imported = await this.bridge.importContainmentRemoteEvidence({
+        sessionId: session.id,
+        expectedIncidentId: containment.incident.id,
+        expectedIncidentDigest: containment.incidentDigest,
+        sourcePath
+      });
+      if (!imported.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 signed remote evidence was not imported: ${imported.message}`); return; }
+      const reassessed = await this.bridge.reassessContainment({ sessionId: session.id, expectedIncidentId: containment.incident.id, expectedIncidentDigest: containment.incidentDigest });
+      if (!reassessed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 imported ${imported.value.evidenceId}, but exact assessment reconciliation remained unavailable: ${reassessed.message}`); return; }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 consumed signed evidence ${imported.value.evidenceId}; durable incident status is now ${reassessed.value.incident.status}. Review the incident again before release.`);
+      return;
+    }
+    if (action === "Show signed remote-evidence status") {
+      const [trust, challenges, evidence] = await Promise.all([
+        this.bridge.listContainmentRemoteTrust(),
+        this.bridge.listContainmentRemoteChallenges(),
+        this.bridge.listContainmentRemoteEvidence()
+      ]);
+      if (!trust.ok || !challenges.ok || !evidence.ok) {
+        const message = !trust.ok ? trust.message : !challenges.ok ? challenges.message : !evidence.ok ? evidence.message : "unknown status error";
+        await this.vscode.window.showWarningMessage(`SXSY-B122 remote-evidence status unavailable: ${message}`);
+        return;
+      }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 remote evidence: trust ${trust.value.map((item) => `${item.authorityId}:${item.status}`).join(", ") || "none"}; challenges ${challenges.value.map((item) => `${item.id}:${item.status}`).join(", ") || "none"}; evidence ${evidence.value.map((item) => `${item.evidenceId}:${item.status}`).join(", ") || "none"}.`);
+      return;
+    }
+    if (action === "Revoke signed remote-evidence authority") {
+      const listed = await this.bridge.listContainmentRemoteTrust();
+      if (!listed.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 remote-evidence trust registry unavailable: ${listed.message}`); return; }
+      const active = listed.value.filter((item) => item.status === "active");
+      const selected = await this.vscode.window.showQuickPick(active.map((item) => ({ label: item.authorityId, description: item.keyId, detail: `Expires ${item.expiresAt}` })), { placeHolder: "Choose the exact active remote-evidence authority to revoke" });
+      if (!selected) return;
+      const trust = active.find((item) => item.authorityId === selected.label && item.keyId === selected.description);
+      if (!trust) { await this.vscode.window.showWarningMessage("SXSY-B122 refused a changed remote-evidence authority selection."); return; }
+      const reason = await this.vscode.window.showInputBox?.({ prompt: "Record why this remote-evidence authority is being revoked", validateInput: (value) => value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value) ? undefined : "Enter one non-empty line of at most 512 characters." });
+      if (!reason) return;
+      const revoked = await this.bridge.revokeContainmentRemoteTrust(trust.authorityId, trust.keyId, reason.trim());
+      if (!revoked.ok) { await this.vscode.window.showWarningMessage(`SXSY-B122 remote-evidence authority was not revoked: ${revoked.message}`); return; }
+      await this.vscode.window.showInformationMessage(`SXSY-B122 revoked remote-evidence authority ${revoked.value.authorityId}; containment remains active.`);
+    }
   }
 
   private async refreshWorkspaceRegistration(generation = this.lifecycleGeneration): Promise<boolean> {

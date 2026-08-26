@@ -37,7 +37,7 @@ test("working-tree assessment scans only bounded Git-observed changed paths and 
   assert.equal(git.calls[2]?.includes("--"), true);
 });
 
-test("history and remote assessment use local no-egress refs and preserve remote unknown truth", async () => {
+test("history scans only local branches and tags while remote assessment preserves remote unknown truth", async () => {
   const git = new FakeGit([
     ok("config/old.env\0"),
     ok("")
@@ -49,8 +49,13 @@ test("history and remote assessment use local no-egress refs and preserve remote
   assert.equal(history.exposure, "found");
   assert.equal(remote.status, "incomplete");
   assert.equal(remote.exposure, "unknown");
-  assert.equal(git.calls[0]?.includes("--all"), true);
+  assert.equal(git.calls[0]?.includes("--branches"), true);
+  assert.equal(git.calls[0]?.includes("--tags"), true);
+  assert.equal(git.calls[0]?.includes("--all"), false);
+  assert.equal(git.calls[0]?.includes("--remotes"), false);
   assert.equal(git.calls[1]?.includes("--remotes"), true);
+  assert.equal(git.calls[1]?.includes("--branches"), false);
+  assert.equal(git.calls[1]?.includes("--tags"), false);
   assert.equal(git.calls.flat().some((argument) => argument === "fetch" || argument === "ls-remote"), false);
 });
 

@@ -69,6 +69,7 @@ const binding = {
 
 test("containment release inspects and binds the exact fence generation through preparation and release", async () => {
   const prepared: unknown[] = [];
+  const validated: unknown[] = [];
   const released: unknown[] = [];
   const coordinator = new AttestedContainmentReleaseCoordinator({
     async prepareCommand(request) {
@@ -79,7 +80,10 @@ test("containment release inspects and binds the exact fence generation through 
       released.push(request);
       return { status: "completed", summary: "released" };
     }
-  }, { inspect: async (sessionId) => sessionId === "session-3" ? { fence: record, incident } : undefined });
+  }, {
+    inspect: async (sessionId) => sessionId === "session-3" ? { fence: record, incident } : undefined,
+    validateRemoteRelease: async (input) => { validated.push(input); }
+  });
 
   assert.deepEqual(await coordinator.inspect("session-3"), {
     sessionId: "session-3",
@@ -105,6 +109,7 @@ test("containment release inspects and binds the exact fence generation through 
     reason: "incident complete",
     confirmationScopeDigest: containmentReleaseScopeDigest(binding)
   }]);
+  assert.deepEqual(validated, [{ sessionId: "session-3", incident, expectedIncidentDigest: binding.expectedIncidentDigest }]);
   assert.deepEqual(released, [{
     sessionId: "session-3",
     authorityId: "authority-3",
@@ -112,6 +117,22 @@ test("containment release inspects and binds the exact fence generation through 
     reason: "incident complete",
     ...binding
   }]);
+});
+
+test("containment release fails closed after preparation when final signed remote evidence is stale", async () => {
+  let releases = 0;
+  const coordinator = new AttestedContainmentReleaseCoordinator({
+    async prepareCommand() { return { status: "prepared", summary: "prepared", authorityId: "authority-3", confirmationToken: "confirmation-3" }; },
+    async releaseContainment() { releases += 1; return { status: "completed", summary: "must not release" }; }
+  }, {
+    inspect: async () => ({ fence: record, incident }),
+    validateRemoteRelease: async () => { throw new Error("evidence revoked"); }
+  });
+
+  const result = await coordinator.release({ sessionId: "session-3", reason: "reviewed", ...binding });
+  assert.equal(result.status, "blocked");
+  assert.match(result.summary, /remote evidence changed/i);
+  assert.equal(releases, 0);
 });
 
 test("containment release refuses stale inspection fields before attestation", async () => {
@@ -243,7 +264,9 @@ test("authenticated companion service exposes only closed containment-administra
         return {
           operationId: `containment-history:${"1".repeat(64)}`, incidentId: input.expectedIncidentId, permitId: input.permitId,
           repositoryRoot: record.repositoryRoot, branch: "feature/contained", oldHead: "2".repeat(40), newHead: "3".repeat(40),
-          backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "4".repeat(64), incidentDigest: "5".repeat(64), status: "completed"
+          backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "4".repeat(64), incidentDigest: "5".repeat(64),
+          updatedRefs: [{ refName: "refs/heads/feature/contained", kind: "head" as const, oldObject: "2".repeat(40), newObject: "3".repeat(40), oldPeeledCommit: "2".repeat(40), newPeeledCommit: "3".repeat(40) }],
+          strippedTagSignatures: 0, status: "completed"
         };
       }
     }
@@ -275,7 +298,7 @@ test("authenticated companion service exposes only exact inspection and release 
   const coordinator = new AttestedContainmentReleaseCoordinator({
     async prepareCommand() { return { status: "prepared", summary: "prepared", authorityId: "authority-3", confirmationToken: "confirmation-3" }; },
     async releaseContainment(request) { released.push(request); return { status: "completed", summary: "released" }; }
-  }, { inspect: async () => ({ fence: record, incident }) });
+  }, { inspect: async () => ({ fence: record, incident }), validateRemoteRelease: async () => undefined });
   const service = new CompanionService({ containmentRelease: coordinator });
 
   const inspected = await service.handle({ version: companionBridgeVersion, id: "inspect", method: "containment.inspect", payload: { sessionId: "session-3" } });

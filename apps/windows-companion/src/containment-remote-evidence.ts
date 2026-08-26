@@ -461,6 +461,9 @@ export function containmentRemoteNamespaceDigest(refsInput: readonly Containment
   return sha256(stableJson(refs));
 }
 
+/** Canonical credential-free identity used by the trusted host inventory. */
+export function canonicalContainmentRemoteIdentity(value: string): string { return canonicalRemote(value); }
+
 /** The only clean result path that does not use signed evidence. */
 export function containmentRemoteResultForNoConfiguredRemotes(bindingInput: ContainmentRemoteEvidenceBinding): ContainmentAssessmentResult {
   const binding = validateBinding(bindingInput);

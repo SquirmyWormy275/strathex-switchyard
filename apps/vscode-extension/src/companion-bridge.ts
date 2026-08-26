@@ -206,7 +206,12 @@ export interface ContainmentInspectionSummary {
   readonly incident: ContainmentIncidentInspection;
   readonly incidentDigest: string;
 }
-export interface ContainmentHistoryRemediationSummary { readonly operationId: string; readonly incidentId: string; readonly permitId: string; readonly repositoryRoot: string; readonly branch: string; readonly oldHead: string; readonly newHead: string; readonly backupBundlePath: string; readonly backupBundleSha256: string; readonly incidentDigest: string; readonly status: "completed"; }
+export interface ContainmentHistoryRefUpdateSummary { readonly refName: string; readonly kind: "head" | "tag"; readonly oldObject: string; readonly newObject: string; readonly oldPeeledCommit: string | null; readonly newPeeledCommit: string | null; }
+export interface ContainmentHistoryRemediationSummary { readonly operationId: string; readonly incidentId: string; readonly permitId: string; readonly repositoryRoot: string; readonly branch: string; readonly oldHead: string; readonly newHead: string; readonly backupBundlePath: string; readonly backupBundleSha256: string; readonly incidentDigest: string; readonly updatedRefs: readonly ContainmentHistoryRefUpdateSummary[]; readonly strippedTagSignatures: number; readonly status: "completed"; }
+export interface ContainmentRemoteTrustSummary { readonly schema: "sxsy-b122.containment-remote-trust-policy"; readonly version: 1; readonly purpose: "containment-remote-assessment"; readonly authorityId: string; readonly keyId: string; readonly publicKeyPem: string; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; readonly revokedAt?: string; }
+export interface ContainmentConfiguredRemoteSummary { readonly name: string; readonly canonicalIdentity: string; }
+export interface ContainmentRemoteChallengeSummary { readonly id: string; readonly incidentId: string; readonly generation: number; readonly targetSnapshotId: string; readonly configuredRemotes: readonly ContainmentConfiguredRemoteSummary[]; readonly issuedAt: string; readonly expiresAt: string; readonly status: "active" | "used"; readonly challengePath: string; }
+export interface ContainmentRemoteEvidenceSummary { readonly evidenceId: string; readonly challengeId: string; readonly documentSha256: string; readonly expiresAt: string; readonly status: "available" | "consumed"; }
 export interface ExtensionCouncilAssignment { readonly sessionId: string; readonly paths: readonly string[]; readonly resources: readonly string[]; }
 export interface ExtensionCouncilRecommendation {
   readonly id: string;
@@ -335,6 +340,13 @@ export interface ExtensionCompanionBridge {
   verifyContainmentRemediation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
   issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>>;
   rewriteContainmentHistory(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }>): Promise<BridgeResult<ContainmentHistoryRemediationSummary>>;
+  installContainmentRemoteTrust(sourcePath: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>>;
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>>;
+  revokeContainmentRemoteTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>>;
+  issueContainmentRemoteChallenge(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }>): Promise<BridgeResult<ContainmentRemoteChallengeSummary>>;
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>>;
+  importContainmentRemoteEvidence(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }>): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>>;
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>>;
   recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
   releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
   approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>>;
@@ -461,6 +473,36 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["remediation"]) || !isContainmentHistoryRemediation(result.value.remediation, input)) return invalidResponse();
     return { ok: true, value: result.value.remediation };
+  }
+
+  installContainmentRemoteTrust(sourcePath: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    return this.adminItem("containment.remote.trust.install", { sourcePath }, "trust", isContainmentRemoteTrust);
+  }
+
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>> {
+    return this.adminList("containment.remote.trust.list", "trust", isContainmentRemoteTrust);
+  }
+
+  revokeContainmentRemoteTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    return this.adminItem("containment.remote.trust.revoke", { authorityId, keyId, reason }, "trust", isContainmentRemoteTrust);
+  }
+
+  async issueContainmentRemoteChallenge(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }>): Promise<BridgeResult<ContainmentRemoteChallengeSummary>> {
+    const result = await this.adminItem("containment.remote.challenge.issue", input, "challenge", isContainmentRemoteChallenge);
+    if (!result.ok) return result;
+    return result.value.incidentId === input.expectedIncidentId ? result : invalidResponse();
+  }
+
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>> {
+    return this.adminList("containment.remote.challenge.list", "challenges", isContainmentRemoteChallenge);
+  }
+
+  async importContainmentRemoteEvidence(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }>): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>> {
+    return this.adminItem("containment.remote.evidence.import", input, "evidence", isContainmentRemoteEvidence);
+  }
+
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>> {
+    return this.adminList("containment.remote.evidence.list", "evidence", isContainmentRemoteEvidence);
   }
 
   async recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
@@ -881,6 +923,13 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   verifyContainmentRemediation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   issueContainmentPermit(): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> { return this.unavailable(); }
   rewriteContainmentHistory(): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> { return this.unavailable(); }
+  installContainmentRemoteTrust(): Promise<BridgeResult<ContainmentRemoteTrustSummary>> { return this.unavailable(); }
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>> { return this.unavailable(); }
+  revokeContainmentRemoteTrust(): Promise<BridgeResult<ContainmentRemoteTrustSummary>> { return this.unavailable(); }
+  issueContainmentRemoteChallenge(): Promise<BridgeResult<ContainmentRemoteChallengeSummary>> { return this.unavailable(); }
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>> { return this.unavailable(); }
+  importContainmentRemoteEvidence(): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>> { return this.unavailable(); }
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>> { return this.unavailable(); }
   recordContainmentRotation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
   releaseContainment(_input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
   approveCouncilRecommendation(): Promise<BridgeResult<ExtensionCouncilRecommendation>> { return this.unavailable(); }
@@ -1044,16 +1093,34 @@ function isContainmentInspection(value: unknown, expectedSessionId: string): val
 }
 
 function isContainmentHistoryRemediation(value: unknown, expected: Readonly<{ expectedIncidentId: string; expectedIncidentDigest: string; permitId: string }>): value is ContainmentHistoryRemediationSummary {
-  return isRecord(value) && exactKeys(value, ["operationId", "incidentId", "permitId", "repositoryRoot", "branch", "oldHead", "newHead", "backupBundlePath", "backupBundleSha256", "incidentDigest", "status"])
-    && typeof value.operationId === "string" && /^containment-history:[a-f0-9]{64}$/.test(value.operationId)
+  if (!isRecord(value) || !exactKeys(value, ["operationId", "incidentId", "permitId", "repositoryRoot", "branch", "oldHead", "newHead", "backupBundlePath", "backupBundleSha256", "incidentDigest", "updatedRefs", "strippedTagSignatures", "status"])
+    || !Array.isArray(value.updatedRefs) || !value.updatedRefs.length || value.updatedRefs.length > 256 || !value.updatedRefs.every(isContainmentHistoryRefUpdate)
+    || new Set(value.updatedRefs.map((update) => update.refName)).size !== value.updatedRefs.length
+    || !Number.isSafeInteger(value.strippedTagSignatures) || Number(value.strippedTagSignatures) < 0
+    || Number(value.strippedTagSignatures) > value.updatedRefs.filter((update) => update.kind === "tag").length) return false;
+  const current = value.updatedRefs.find((update) => update.refName === `refs/heads/${String(value.branch)}`);
+  if (current ? current.oldObject !== value.oldHead || current.newObject !== value.newHead : value.oldHead !== value.newHead) return false;
+  return typeof value.operationId === "string" && /^containment-history:[a-f0-9]{64}$/.test(value.operationId)
     && value.incidentId === expected.expectedIncidentId && value.permitId === expected.permitId
     && pathText(value.repositoryRoot) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.repositoryRoot)
     && typeof value.branch === "string" && safeBranch(value.branch)
     && typeof value.oldHead === "string" && /^[a-f0-9]{40,64}$/.test(value.oldHead)
-    && typeof value.newHead === "string" && /^[a-f0-9]{40,64}$/.test(value.newHead) && value.newHead !== value.oldHead
+    && typeof value.newHead === "string" && /^[a-f0-9]{40,64}$/.test(value.newHead)
     && pathText(value.backupBundlePath) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.backupBundlePath)
     && digestText(value.backupBundleSha256) && digestText(value.incidentDigest) && value.status === "completed"
     && /^containment-remediation-permit:[a-f0-9]{64}$/.test(expected.permitId) && digestText(expected.expectedIncidentDigest);
+}
+
+function isContainmentHistoryRefUpdate(value: unknown): value is ContainmentHistoryRefUpdateSummary {
+  return isRecord(value) && exactKeys(value, ["refName", "kind", "oldObject", "newObject", "oldPeeledCommit", "newPeeledCommit"])
+    && typeof value.refName === "string" && value.refName.length <= 1_024 && !/[\r\n\0]/.test(value.refName)
+    && ((value.kind === "head" && value.refName.startsWith("refs/heads/")) || (value.kind === "tag" && value.refName.startsWith("refs/tags/")))
+    && safeBranch(value.refName.slice(value.kind === "head" ? "refs/heads/".length : "refs/tags/".length))
+    && typeof value.oldObject === "string" && /^[a-f0-9]{40,64}$/.test(value.oldObject)
+    && typeof value.newObject === "string" && /^[a-f0-9]{40,64}$/.test(value.newObject) && value.newObject !== value.oldObject
+    && (value.oldPeeledCommit === null || (typeof value.oldPeeledCommit === "string" && /^[a-f0-9]{40,64}$/.test(value.oldPeeledCommit)))
+    && (value.newPeeledCommit === null || (typeof value.newPeeledCommit === "string" && /^[a-f0-9]{40,64}$/.test(value.newPeeledCommit)))
+    && (value.oldPeeledCommit === null) === (value.newPeeledCommit === null);
 }
 
 function isContainmentIncident(value: unknown, repositoryRoot: string, fenceEpoch: number, activationOperationId: string): value is ContainmentIncidentInspection {
@@ -1186,6 +1253,48 @@ function isAcceptanceTrust(value: unknown): value is AcceptanceTrustSummary {
     && contentText(value.publicKeyPem, 16_384) && Array.isArray(value.allowedGates) && value.allowedGates.length > 0 && value.allowedGates.length <= 27
     && new Set(value.allowedGates).size === value.allowedGates.length && value.allowedGates.every((gate) => Number.isInteger(gate) && gate >= 1 && gate <= 27)
     && timeText(value.expiresAt) && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isContainmentRemoteTrust(value: unknown): value is ContainmentRemoteTrustSummary {
+  return isRecord(value) && allowedExactKeys(value,
+    ["schema", "version", "purpose", "authorityId", "keyId", "publicKeyPem", "expiresAt", "installedAt", "installedBy", "status"],
+    ["revokedAt"])
+    && value.schema === "sxsy-b122.containment-remote-trust-policy" && value.version === 1
+    && value.purpose === "containment-remote-assessment" && reference(value.authorityId) && digestText(value.keyId)
+    && contentText(value.publicKeyPem, 16_384) && timeText(value.expiresAt) && timeText(value.installedAt)
+    && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked")
+    && (value.revokedAt === undefined || timeText(value.revokedAt))
+    && (value.status === "revoked") === (value.revokedAt !== undefined);
+}
+
+function isContainmentRemoteChallenge(value: unknown): value is ContainmentRemoteChallengeSummary {
+  if (!isRecord(value) || !exactKeys(value, ["id", "incidentId", "generation", "targetSnapshotId", "configuredRemotes", "issuedAt", "expiresAt", "status", "challengePath"])
+    || typeof value.id !== "string" || !/^containment-remote-challenge:[a-f0-9]{64}$/.test(value.id)
+    || typeof value.incidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    || !Number.isSafeInteger(value.generation) || (value.generation as number) < 1 || !reference(value.targetSnapshotId)
+    || !Array.isArray(value.configuredRemotes) || value.configuredRemotes.length < 1 || value.configuredRemotes.length > 16
+    || !value.configuredRemotes.every(isContainmentConfiguredRemote) || !timeText(value.issuedAt) || !timeText(value.expiresAt)
+    || Date.parse(value.expiresAt as string) <= Date.parse(value.issuedAt as string)
+    || Date.parse(value.expiresAt as string) - Date.parse(value.issuedAt as string) > 15 * 60_000
+    || (value.status !== "active" && value.status !== "used") || !pathText(value.challengePath)
+    || !/^(?:[A-Za-z]:[\\/]|\/)/.test(value.challengePath as string)) return false;
+  const remotes = value.configuredRemotes as ContainmentConfiguredRemoteSummary[];
+  return new Set(remotes.map((remote) => remote.name.toLowerCase())).size === remotes.length
+    && new Set(remotes.map((remote) => remote.canonicalIdentity.toLowerCase())).size === remotes.length;
+}
+
+function isContainmentConfiguredRemote(value: unknown): value is ContainmentConfiguredRemoteSummary {
+  return isRecord(value) && exactKeys(value, ["name", "canonicalIdentity"])
+    && typeof value.name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.name)
+    && contentText(value.canonicalIdentity, 2_048) && !/\s/.test(value.canonicalIdentity as string);
+}
+
+function isContainmentRemoteEvidence(value: unknown): value is ContainmentRemoteEvidenceSummary {
+  return isRecord(value) && exactKeys(value, ["evidenceId", "challengeId", "documentSha256", "expiresAt", "status"])
+    && typeof value.evidenceId === "string" && /^containment-remote-evidence:[a-f0-9]{64}$/.test(value.evidenceId)
+    && typeof value.challengeId === "string" && /^containment-remote-challenge:[a-f0-9]{64}$/.test(value.challengeId)
+    && digestText(value.documentSha256) && timeText(value.expiresAt)
+    && (value.status === "available" || value.status === "consumed");
 }
 
 function isAcceptanceEvidence(value: unknown): value is AcceptanceEvidenceSummary {

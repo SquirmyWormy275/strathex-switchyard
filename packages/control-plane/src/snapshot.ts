@@ -230,7 +230,9 @@ export class TargetSnapshotFactory {
   private fromInspection(inspection: GitInspection, options: SnapshotCaptureOptions): TargetSnapshot {
     const reasons = [...(inspection.issues ?? [])];
     const repositoryRoot = nonEmpty(inspection.repositoryRoot, "Canonical Git root", reasons) ?? options.targetHint ?? "<unresolved>";
-    const canonicalRemote = nonEmpty(inspection.canonicalRemote, "Canonical remote", reasons);
+    const canonicalRemote = (options.requireCanonicalRemote ?? true)
+      ? nonEmpty(inspection.canonicalRemote, "Canonical remote", reasons)
+      : optionalNonEmpty(inspection.canonicalRemote, "Canonical remote", reasons);
     const branch = optionalNonEmpty(inspection.branch, "Branch", reasons);
     const defaultBranch = optionalNonEmpty(inspection.defaultBranch, "Default branch", reasons);
     const detached = inspection.detached === true;

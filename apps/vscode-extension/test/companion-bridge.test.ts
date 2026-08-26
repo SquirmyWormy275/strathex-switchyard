@@ -172,7 +172,9 @@ test("containment IPC exact-parses the active fence inspection and carries both 
             ? { remediation: {
                 operationId: `containment-history:${"1".repeat(64)}`, incidentId: incident.id, permitId: `containment-remediation-permit:${"2".repeat(64)}`,
                 repositoryRoot: containment.repositoryRoot, branch: "feature/contained", oldHead: "3".repeat(40), newHead: "4".repeat(40),
-                backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "5".repeat(64), incidentDigest: "6".repeat(64), status: "completed"
+                backupBundlePath: "C:\\state\\history\\before.bundle", backupBundleSha256: "5".repeat(64), incidentDigest: "6".repeat(64),
+                updatedRefs: [{ refName: "refs/heads/feature/contained", kind: "head", oldObject: "3".repeat(40), newObject: "4".repeat(40), oldPeeledCommit: "3".repeat(40), newPeeledCommit: "4".repeat(40) }],
+                strippedTagSignatures: 0, status: "completed"
               } }
           : { command: { status: "completed", summary: "Exact containment generation released." } };
       return JSON.stringify({ version: 1, id: request.id, ok: true, result });
@@ -243,6 +245,57 @@ test("containment IPC rejects a mismatched session, incomplete hook inventory, o
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.code, "invalid_response");
   }
+});
+
+test("signed remote-evidence bridge carries only incident/file selections and exact-parses host-derived identities", async () => {
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  const trust = {
+    schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose: "containment-remote-assessment",
+    authorityId: "independent-remote-auditor", keyId: "6".repeat(64), publicKeyPem: "-----BEGIN PUBLIC KEY-----\nTEST\n-----END PUBLIC KEY-----",
+    expiresAt: "2026-08-25T12:30:00.000Z", installedAt: "2026-08-25T12:00:00.000Z", installedBy: "TEST\\Security", status: "active"
+  } as const;
+  const challenge = {
+    id: `containment-remote-challenge:${"7".repeat(64)}`, incidentId: `containment-incident:${"8".repeat(64)}`,
+    generation: 2, targetSnapshotId: `target:${"9".repeat(64)}`,
+    configuredRemotes: [{ name: "origin", canonicalIdentity: "https://github.com/example/switchyard.git" }],
+    issuedAt: "2026-08-25T12:00:00.000Z", expiresAt: "2026-08-25T12:10:00.000Z", status: "active",
+    challengePath: "C:\\state\\containment-remote\\challenge.json"
+  } as const;
+  const evidence = {
+    evidenceId: `containment-remote-evidence:${"a".repeat(64)}`, challengeId: challenge.id,
+    documentSha256: "b".repeat(64), expiresAt: "2026-08-25T12:08:00.000Z", status: "available"
+  } as const;
+  let corruptChallenge = false;
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+    seen.push({ method: request.method, payload: request.payload });
+    const result = request.method === "containment.remote.trust.install" || request.method === "containment.remote.trust.revoke"
+      ? { trust: request.method.endsWith("revoke") ? { ...trust, status: "revoked", revokedAt: "2026-08-25T12:01:00.000Z" } : trust }
+      : request.method === "containment.remote.trust.list" ? { trust: [trust] }
+        : request.method === "containment.remote.challenge.issue" ? { challenge: corruptChallenge ? { ...challenge, refs: [] } : challenge }
+          : request.method === "containment.remote.challenge.list" ? { challenges: [challenge] }
+            : request.method === "containment.remote.evidence.import" ? { evidence }
+              : { evidence: [evidence] };
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+  } }, "containment-remote-vscode");
+
+  const exact = { sessionId: session.id, expectedIncidentId: challenge.incidentId, expectedIncidentDigest: "c".repeat(64) } as const;
+  assert.equal((await bridge.installContainmentRemoteTrust("C:\\reviewed\\trust.json")).ok, true);
+  assert.equal((await bridge.listContainmentRemoteTrust()).ok, true);
+  assert.equal((await bridge.issueContainmentRemoteChallenge({ ...exact, expiresAt: challenge.expiresAt })).ok, true);
+  assert.equal((await bridge.listContainmentRemoteChallenges()).ok, true);
+  assert.equal((await bridge.importContainmentRemoteEvidence({ ...exact, sourcePath: "C:\\reviewed\\evidence.json" })).ok, true);
+  assert.equal((await bridge.listContainmentRemoteEvidence()).ok, true);
+  assert.equal((await bridge.revokeContainmentRemoteTrust(trust.authorityId, trust.keyId, "reviewed revocation")).ok, true);
+  assert.deepEqual(seen[2], { method: "containment.remote.challenge.issue", payload: { ...exact, expiresAt: challenge.expiresAt } });
+  assert.deepEqual(seen[4], { method: "containment.remote.evidence.import", payload: { ...exact, sourcePath: "C:\\reviewed\\evidence.json" } });
+  assert.equal(JSON.stringify([seen[2], seen[4]]).includes("configuredRemotes"), false);
+  assert.equal(JSON.stringify([seen[2], seen[4]]).includes("refs"), false);
+
+  corruptChallenge = true;
+  const rejected = await bridge.issueContainmentRemoteChallenge({ ...exact, expiresAt: challenge.expiresAt });
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "invalid_response");
 });
 
 test("Council recommendation approval exact-parses the immutable digest binding and rejects forged authority", async () => {

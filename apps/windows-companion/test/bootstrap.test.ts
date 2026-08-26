@@ -437,6 +437,7 @@ test("installed bootstrap exposes protected acceptance and scanner administratio
   assert.ok(companion.scannerAdministration);
   assert.ok(companion.scannerFixtures);
   assert.ok(companion.containmentHistory);
+  assert.ok(companion.containmentRemote);
   const acceptance = await companion.endpoint.handle({
     version: companionBridgeVersion,
     id: "acceptance-list",
@@ -449,8 +450,17 @@ test("installed bootstrap exposes protected acceptance and scanner administratio
     method: "scanner.fixture.list",
     payload: {}
   });
+  const remoteTrust = await companion.endpoint.handle({ version: companionBridgeVersion, id: "remote-trust-list", method: "containment.remote.trust.list", payload: {} });
+  const remoteChallenges = await companion.endpoint.handle({ version: companionBridgeVersion, id: "remote-challenge-list", method: "containment.remote.challenge.list", payload: {} });
+  const remoteEvidence = await companion.endpoint.handle({ version: companionBridgeVersion, id: "remote-evidence-list", method: "containment.remote.evidence.list", payload: {} });
   assert.equal(acceptance.ok, true, JSON.stringify(acceptance));
   assert.deepEqual((acceptance.result as { trust: readonly unknown[] }).trust, []);
   assert.equal(scanner.ok, true, JSON.stringify(scanner));
   assert.deepEqual((scanner.result as { fixtures: readonly unknown[] }).fixtures, []);
+  assert.equal(remoteTrust.ok, true, JSON.stringify(remoteTrust));
+  assert.deepEqual((remoteTrust.result as { trust: readonly unknown[] }).trust, []);
+  assert.equal(remoteChallenges.ok, true, JSON.stringify(remoteChallenges));
+  assert.deepEqual((remoteChallenges.result as { challenges: readonly unknown[] }).challenges, []);
+  assert.equal(remoteEvidence.ok, true, JSON.stringify(remoteEvidence));
+  assert.deepEqual((remoteEvidence.result as { evidence: readonly unknown[] }).evidence, []);
 });

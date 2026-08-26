@@ -30,7 +30,7 @@ const controlPlaneTests = [
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "control-plane",
+  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "containment-remote-host", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "durable-credentials", "main-shutdown",
   "direct-request-cancellation", "durable-endpoint", "git-review", "hardware-signal-dispatcher", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",

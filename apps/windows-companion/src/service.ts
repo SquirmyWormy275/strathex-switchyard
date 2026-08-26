@@ -15,6 +15,8 @@ import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import type { CouncilResourceBrokerPort } from "./council-resource-broker.ts";
 import type { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
 import type { AttestedContainmentHistoryRemediator } from "./containment-history-remediation.ts";
+import type { ContainmentRemoteChallengeSummary, ContainmentRemoteEvidenceSummary, InstalledContainmentRemoteCoordinator } from "./containment-remote-host.ts";
+import type { InstalledContainmentRemoteTrust } from "./containment-remote-evidence.ts";
 import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
 import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
@@ -73,6 +75,9 @@ import {
   type ContainmentIncidentBindingPayload,
   type ContainmentPermitIssuePayload,
   type ContainmentHistoryRewritePayload,
+  type ContainmentRemoteTrustRevokePayload,
+  type ContainmentRemoteChallengeIssuePayload,
+  type ContainmentRemoteEvidenceImportPayload,
   type ContainmentRotationRecordPayload,
   type ContainmentReleasePayload,
   type RawHidInstallPayload,
@@ -183,6 +188,7 @@ export interface CompanionServiceOptions {
   readonly providerHandshakes?: ProviderHandshakeCoordinator;
   readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   readonly containmentHistory?: Pick<AttestedContainmentHistoryRemediator, "execute">;
+  readonly containmentRemote?: Pick<InstalledContainmentRemoteCoordinator, "installTrustPolicy" | "listTrust" | "revokeTrust" | "issueChallenge" | "listChallenges" | "importEvidence" | "listEvidence">;
   readonly rawHidInstallations?: RawHidInstallationCoordinator;
   readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -227,6 +233,7 @@ export class CompanionService {
   private readonly providerHandshakes?: ProviderHandshakeCoordinator;
   private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
   private readonly containmentHistory?: CompanionServiceOptions["containmentHistory"];
+  private readonly containmentRemote?: CompanionServiceOptions["containmentRemote"];
   private readonly rawHidInstallations?: RawHidInstallationCoordinator;
   private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
   private readonly hardwareSignals?: DurableHardwareSignalInbox;
@@ -257,6 +264,7 @@ export class CompanionService {
     this.providerHandshakes = options.providerHandshakes;
     this.containmentRelease = options.containmentRelease;
     this.containmentHistory = options.containmentHistory;
+    this.containmentRemote = options.containmentRemote;
     this.rawHidInstallations = options.rawHidInstallations;
     this.rawHidSupervisor = options.rawHidSupervisor;
     this.hardwareSignals = options.hardwareSignals;
@@ -366,6 +374,20 @@ export class CompanionService {
           return this.success(request.id, await this.issueContainmentPermit(this.requireContainmentPermitIssue(request.payload)));
         case "containment.history.rewrite":
           return this.success(request.id, { remediation: await this.rewriteContainmentHistory(this.requireContainmentHistoryRewrite(request.payload)) });
+        case "containment.remote.trust.install":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.installContainmentRemoteTrust(this.requireAdministrationSource(request.payload, "Containment remote trust installation"), signal)) });
+        case "containment.remote.trust.list":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.listContainmentRemoteTrust(request.payload, signal)) });
+        case "containment.remote.trust.revoke":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.revokeContainmentRemoteTrust(this.requireContainmentRemoteTrustRevoke(request.payload), signal)) });
+        case "containment.remote.challenge.issue":
+          return this.success(request.id, { challenge: await this.direct(context, (signal) => this.issueContainmentRemoteChallenge(this.requireContainmentRemoteChallengeIssue(request.payload), signal)) });
+        case "containment.remote.challenge.list":
+          return this.success(request.id, { challenges: await this.direct(context, (signal) => this.listContainmentRemoteChallenges(request.payload, signal)) });
+        case "containment.remote.evidence.import":
+          return this.success(request.id, { evidence: await this.direct(context, (signal) => this.importContainmentRemoteEvidence(this.requireContainmentRemoteEvidenceImport(request.payload), signal)) });
+        case "containment.remote.evidence.list":
+          return this.success(request.id, { evidence: await this.direct(context, (signal) => this.listContainmentRemoteEvidence(request.payload, signal)) });
         case "containment.rotation.record":
           return this.success(request.id, { containment: await this.recordContainmentRotation(this.requireContainmentRotationRecord(request.payload)) });
         case "containment.release":
@@ -926,11 +948,71 @@ export class CompanionService {
     if (!this.containmentHistory) throw new CompanionServiceError("capability_denied", "No installed attested local-history remediation boundary is attached.");
     try {
       const result = await this.containmentHistory.execute(payload);
-      this.record("containment.history.rewrite", "completed", "Rewrote only the reviewed current local branch history after creating a verified external recovery bundle.", payload.sessionId);
+      this.record("containment.history.rewrite", "completed", `Atomically rewrote ${result.updatedRefs.length} reviewed local branch/tag ref(s) after creating a verified external recovery bundle; no remote ref was changed.`, payload.sessionId);
       return result;
     } catch {
       throw new CompanionServiceError("capability_denied", "The exact local-history remediation was refused, changed, or requires manual reconciliation; containment remains active.");
     }
+  }
+
+  private containmentRemoteAdmin(): NonNullable<CompanionServiceOptions["containmentRemote"]> {
+    if (!this.containmentRemote) throw new CompanionServiceError("capability_denied", "No installed signed containment remote-evidence administration boundary is attached.");
+    return this.containmentRemote;
+  }
+
+  private async callContainmentRemote<T>(methodName: keyof NonNullable<CompanionServiceOptions["containmentRemote"]>, args: readonly unknown[], signal?: AbortSignal): Promise<T> {
+    const administration = this.containmentRemoteAdmin();
+    try {
+      return await callDirect<T>(administration, methodName, args, signal);
+    } catch (error) {
+      if (error instanceof CompanionServiceError) throw error;
+      throw new CompanionServiceError("capability_denied", "The signed containment remote-evidence boundary refused this exact request; no result was inferred.");
+    }
+  }
+
+  private async installContainmentRemoteTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledContainmentRemoteTrust> {
+    const trust = await this.callContainmentRemote<InstalledContainmentRemoteTrust>("installTrustPolicy", [payload.sourcePath], signal);
+    this.record("containment.remote.trust.install", "completed", "Installed one current-user-approved purpose-scoped containment remote-evidence authority.");
+    return trust;
+  }
+
+  private async listContainmentRemoteTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledContainmentRemoteTrust[]> {
+    requireEmptyPayload(payload, "Containment remote trust listing");
+    const trust = await this.callContainmentRemote<readonly InstalledContainmentRemoteTrust[]>("listTrust", [], signal);
+    this.record("containment.remote.trust.list", "completed", "Listed the bounded signed containment remote-evidence trust registry.");
+    return trust;
+  }
+
+  private async revokeContainmentRemoteTrust(payload: ContainmentRemoteTrustRevokePayload, signal?: AbortSignal): Promise<InstalledContainmentRemoteTrust> {
+    const trust = await this.callContainmentRemote<InstalledContainmentRemoteTrust>("revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal);
+    this.record("containment.remote.trust.revoke", "completed", "Revoked one current-user-approved containment remote-evidence authority.");
+    return trust;
+  }
+
+  private async issueContainmentRemoteChallenge(payload: ContainmentRemoteChallengeIssuePayload, signal?: AbortSignal): Promise<ContainmentRemoteChallengeSummary> {
+    const challenge = await this.callContainmentRemote<ContainmentRemoteChallengeSummary>("issueChallenge", [payload], signal);
+    this.record("containment.remote.challenge.issue", "completed", "Issued one host-derived exact-incident offline remote-evidence challenge.", payload.sessionId);
+    return challenge;
+  }
+
+  private async listContainmentRemoteChallenges(payload: unknown, signal?: AbortSignal): Promise<readonly ContainmentRemoteChallengeSummary[]> {
+    requireEmptyPayload(payload, "Containment remote challenge listing");
+    const challenges = await this.callContainmentRemote<readonly ContainmentRemoteChallengeSummary[]>("listChallenges", [], signal);
+    this.record("containment.remote.challenge.list", "completed", "Listed the bounded host-derived containment remote-evidence challenges.");
+    return challenges;
+  }
+
+  private async importContainmentRemoteEvidence(payload: ContainmentRemoteEvidenceImportPayload, signal?: AbortSignal): Promise<ContainmentRemoteEvidenceSummary> {
+    const evidence = await this.callContainmentRemote<ContainmentRemoteEvidenceSummary>("importEvidence", [payload], signal);
+    this.record("containment.remote.evidence.import", "completed", "Imported one signed complete-namespace remote assessment bound to the exact current incident image.", payload.sessionId);
+    return evidence;
+  }
+
+  private async listContainmentRemoteEvidence(payload: unknown, signal?: AbortSignal): Promise<readonly ContainmentRemoteEvidenceSummary[]> {
+    requireEmptyPayload(payload, "Containment remote evidence listing");
+    const evidence = await this.callContainmentRemote<readonly ContainmentRemoteEvidenceSummary[]>("listEvidence", [], signal);
+    this.record("containment.remote.evidence.list", "completed", "Listed the bounded signed containment remote-evidence registry.");
+    return evidence;
   }
 
   private async recordContainmentRotation(payload: ContainmentRotationRecordPayload) {
@@ -1022,6 +1104,39 @@ export class CompanionService {
     return callDirect(this.councilResources, "credentialNetwork", [payload], signal);
   }
   private requireAdministrationSource(payload: unknown, label: string): AdministrationSourcePayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", `${label} requires one bounded absolute source path.`); return { sourcePath: payload.sourcePath }; }
+  private requireContainmentRemoteTrustRevoke(payload: unknown): ContainmentRemoteTrustRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"])
+      || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId)
+      || !boundedReason(payload.reason)) {
+      throw new CompanionServiceError("invalid_request", "Containment remote trust revocation requires exact bounded authority, key, and reason fields.");
+    }
+    return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason };
+  }
+  private requireContainmentRemoteChallengeIssue(payload: unknown): ContainmentRemoteChallengeIssuePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "expiresAt"])
+      || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt))
+      || new Date(payload.expiresAt).toISOString() !== payload.expiresAt) {
+      throw new CompanionServiceError("invalid_request", "Containment remote challenge issuance requires one exact reviewed incident image and canonical ISO expiry.");
+    }
+    const binding = this.requireContainmentIncidentBinding({
+      sessionId: payload.sessionId,
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
+    });
+    return { ...binding, expiresAt: payload.expiresAt };
+  }
+  private requireContainmentRemoteEvidenceImport(payload: unknown): ContainmentRemoteEvidenceImportPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "sourcePath"])
+      || !boundedHostPath(payload.sourcePath)) {
+      throw new CompanionServiceError("invalid_request", "Containment remote evidence import requires one exact reviewed incident image and bounded absolute source path.");
+    }
+    const binding = this.requireContainmentIncidentBinding({
+      sessionId: payload.sessionId,
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
+    });
+    return { ...binding, sourcePath: payload.sourcePath };
+  }
   private requireAcceptanceTrustRevoke(payload: unknown): AcceptanceTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
   private requireAcceptanceEvidenceInvalidate(payload: unknown): AcceptanceEvidenceInvalidatePayload { if (!isRecord(payload) || !exactKeys(payload, ["evidenceId", "reason"]) || !boundedIdentifier(payload.evidenceId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance evidence invalidation requires one exact evidence ID and bounded reason."); return { evidenceId: payload.evidenceId, reason: payload.reason }; }
   private requireAcceptanceActivation(payload: unknown): AcceptanceActivationPayload { if (!isRecord(payload) || !exactKeys(payload, ["action", "targetSnapshotId", "expiresAt"]) || typeof payload.action !== "string" || !commandActionIds.includes(payload.action as CommandAction) || !boundedIdentifier(payload.targetSnapshotId) || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt))) throw new CompanionServiceError("invalid_request", "High-consequence activation requires one catalog action, exact target snapshot, and ISO expiry."); return { action: payload.action as CommandAction, targetSnapshotId: payload.targetSnapshotId, expiresAt: payload.expiresAt }; }

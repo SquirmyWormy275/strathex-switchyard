@@ -33,6 +33,9 @@ import {
   type RawHidRuntimeStatus,
   type ContainmentInspectionSummary,
   type ContainmentHistoryRemediationSummary,
+  type ContainmentRemoteTrustSummary,
+  type ContainmentRemoteChallengeSummary,
+  type ContainmentRemoteEvidenceSummary,
   type HardwareSignalClaim,
   type HardwareSignalDispatchResult,
   type HardwareSignalPreparationResult,
@@ -296,8 +299,15 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly providerRevokeRequests: ProviderDesktopId[] = [];
   readonly credentialProvisionRequests: Array<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }> = [];
   readonly containmentReleaseRequests: Array<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
+  readonly containmentReassessmentRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
   readonly containmentVerificationRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }> = [];
   readonly containmentHistoryRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }> = [];
+  readonly containmentRemoteTrustInstallRequests: string[] = [];
+  readonly containmentRemoteChallengeRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }> = [];
+  readonly containmentRemoteEvidenceImportRequests: Array<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }> = [];
+  containmentRemoteTrust: ContainmentRemoteTrustSummary[] = [];
+  containmentRemoteChallenges: ContainmentRemoteChallengeSummary[] = [];
+  containmentRemoteEvidence: ContainmentRemoteEvidenceSummary[] = [];
   readonly councilRecommendationApprovals: Array<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }> = [];
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
@@ -409,6 +419,7 @@ class FakeBridge implements ExtensionCompanionBridge {
     return { ok: true, value: configured };
   }
   async reassessContainment(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    this.containmentReassessmentRequests.push(input);
     return this.inspectContainment(input.sessionId);
   }
   async verifyContainmentRemediation(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
@@ -430,9 +441,39 @@ class FakeBridge implements ExtensionCompanionBridge {
       operationId: `containment-history:${"1".repeat(64)}`, incidentId: input.expectedIncidentId, permitId: input.permitId,
       repositoryRoot: inspected.value.repositoryRoot, branch: "feature/contained", oldHead: "2".repeat(40), newHead: "3".repeat(40),
       backupBundlePath: "C:\\state\\containment-history\\before.bundle", backupBundleSha256: "4".repeat(64),
-      incidentDigest: "5".repeat(64), status: "completed"
+      incidentDigest: "5".repeat(64),
+      updatedRefs: [{ refName: "refs/heads/feature/contained", kind: "head", oldObject: "2".repeat(40), newObject: "3".repeat(40), oldPeeledCommit: "2".repeat(40), newPeeledCommit: "3".repeat(40) }],
+      strippedTagSignatures: 0, status: "completed"
     } };
   }
+  async installContainmentRemoteTrust(sourcePath: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    this.containmentRemoteTrustInstallRequests.push(sourcePath);
+    const trust: ContainmentRemoteTrustSummary = { schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose: "containment-remote-assessment", authorityId: "independent-remote-auditor", keyId: "6".repeat(64), publicKeyPem: "-----BEGIN PUBLIC KEY-----\nTEST\n-----END PUBLIC KEY-----", expiresAt: "2026-08-25T12:30:00.000Z", installedAt: "2026-08-25T12:00:00.000Z", installedBy: "fake-current-user", status: "active" };
+    this.containmentRemoteTrust = [trust];
+    return { ok: true, value: trust };
+  }
+  async listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>> { return { ok: true, value: this.containmentRemoteTrust }; }
+  async revokeContainmentRemoteTrust(authorityId: string, keyId: string, _reason: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    const current = this.containmentRemoteTrust.find((item) => item.authorityId === authorityId && item.keyId === keyId);
+    if (!current) return { ok: false, code: "not_found", message: "missing" };
+    const revoked = { ...current, status: "revoked" as const, revokedAt: "2026-08-25T12:01:00.000Z" };
+    this.containmentRemoteTrust = [revoked];
+    return { ok: true, value: revoked };
+  }
+  async issueContainmentRemoteChallenge(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }): Promise<BridgeResult<ContainmentRemoteChallengeSummary>> {
+    this.containmentRemoteChallengeRequests.push(input);
+    const challenge: ContainmentRemoteChallengeSummary = { id: `containment-remote-challenge:${"7".repeat(64)}`, incidentId: input.expectedIncidentId, generation: 1, targetSnapshotId: "snapshot-containment", configuredRemotes: [{ name: "origin", canonicalIdentity: "https://github.com/example/switchyard.git" }], issuedAt: "2026-08-25T12:00:00.000Z", expiresAt: input.expiresAt, status: "active", challengePath: "C:\\state\\containment-remote\\challenge.json" };
+    this.containmentRemoteChallenges = [challenge];
+    return { ok: true, value: challenge };
+  }
+  async listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>> { return { ok: true, value: this.containmentRemoteChallenges }; }
+  async importContainmentRemoteEvidence(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>> {
+    this.containmentRemoteEvidenceImportRequests.push(input);
+    const evidence: ContainmentRemoteEvidenceSummary = { evidenceId: `containment-remote-evidence:${"8".repeat(64)}`, challengeId: `containment-remote-challenge:${"7".repeat(64)}`, documentSha256: "9".repeat(64), expiresAt: "2026-08-25T12:08:00.000Z", status: "available" };
+    this.containmentRemoteEvidence = [evidence];
+    return { ok: true, value: evidence };
+  }
+  async listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>> { return { ok: true, value: this.containmentRemoteEvidence }; }
   async recordContainmentRotation(input: { sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }): Promise<BridgeResult<ContainmentInspectionSummary>> {
     return this.inspectContainment(input.sessionId);
   }
@@ -731,6 +772,66 @@ test("containment release presents and rebinds the exact active fence, activatio
   assert.match(JSON.stringify(final), /unmediated-local-user-processes/);
 });
 
+test("containment remote evidence UI sends no caller-selected remotes or refs and resumes the exact incident after import", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-25T12:00:00.000Z",
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/contained" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const base = readyContainmentIncident("C:\\repo", 23, "operation-containment-23");
+  const incident: ContainmentInspectionSummary["incident"] = {
+    ...base,
+    status: "assessment_incomplete",
+    rotation: undefined,
+    steps: base.steps.map((step) => step.name === "remote" ? {
+      ...step,
+      status: "ambiguous",
+      result: { ...step.result!, effectDisposition: "ambiguous", status: "incomplete", exposure: "unknown", summary: "Signed complete-namespace evidence is required." }
+    } : step)
+  };
+  bridge.containmentInspection = {
+    sessionId: target.id, repositoryRoot: "C:\\repo", active: true, fenceEpoch: 23,
+    activatedByOperationId: "operation-containment-23",
+    hookStates: [
+      { name: "credential_lease_revocation", status: "completed", attempts: 1, updatedAt: "2026-08-25T12:00:00.000Z" },
+      { name: "queued_operation_cancellation", status: "completed", attempts: 1, updatedAt: "2026-08-25T12:00:01.000Z" }
+    ],
+    hookFailures: [], uncontrolledPaths: [], incident, incidentDigest: "c".repeat(64)
+  };
+  bridge.containmentRemoteTrust = [{ schema: "sxsy-b122.containment-remote-trust-policy", version: 1, purpose: "containment-remote-assessment", authorityId: "independent-remote-auditor", keyId: "6".repeat(64), publicKeyPem: "-----BEGIN PUBLIC KEY-----\nTEST\n-----END PUBLIC KEY-----", expiresAt: "2026-08-25T12:30:00.000Z", installedAt: "2026-08-25T11:59:00.000Z", installedBy: "fake-current-user", status: "active" }];
+
+  vscode.choose(`${target.provider}: ${target.id}`);
+  vscode.choose("Issue offline signed remote-evidence challenge");
+  await vscode.invoke("sxsy-b122.releaseContainment");
+  assert.deepEqual(bridge.containmentRemoteChallengeRequests, [{
+    sessionId: target.id,
+    expectedIncidentId: incident.id,
+    expectedIncidentDigest: "c".repeat(64),
+    expiresAt: "2026-08-25T12:10:00.000Z"
+  }]);
+  assert.equal(JSON.stringify(bridge.containmentRemoteChallengeRequests).includes("configuredRemotes"), false);
+  assert.equal(JSON.stringify(bridge.containmentRemoteChallengeRequests).includes("refs"), false);
+  assert.match(vscode.information.at(-1) ?? "", /host-derived endpoint/i);
+
+  vscode.choose(`${target.provider}: ${target.id}`);
+  vscode.choose("Import signed remote evidence and resume exact assessment");
+  vscode.file("C:\\reviewed\\remote-evidence.json");
+  await vscode.invoke("sxsy-b122.releaseContainment");
+  assert.deepEqual(bridge.containmentRemoteEvidenceImportRequests, [{
+    sessionId: target.id,
+    expectedIncidentId: incident.id,
+    expectedIncidentDigest: "c".repeat(64),
+    sourcePath: "C:\\reviewed\\remote-evidence.json"
+  }]);
+  assert.deepEqual(bridge.containmentReassessmentRequests, [{ sessionId: target.id, expectedIncidentId: incident.id, expectedIncidentDigest: "c".repeat(64) }]);
+  assert.equal(JSON.stringify(bridge.containmentRemoteEvidenceImportRequests).includes("configuredRemotes"), false);
+  assert.equal(JSON.stringify(bridge.containmentRemoteEvidenceImportRequests).includes("refs"), false);
+});
+
 test("containment workflow requires a fresh post-remediation generation before rotation or release", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
@@ -800,7 +901,7 @@ test("containment workflow requires a fresh post-remediation generation before r
   assert.equal(vscode.information.some((message) => message.includes("assessment generation 2")), true);
 });
 
-test("containment workflow rewrites only reviewed current-branch history findings and surfaces the recovery bundle", async () => {
+test("containment workflow rewrites only reviewed local branch/tag history findings and surfaces the recovery bundle", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
@@ -831,8 +932,8 @@ test("containment workflow rewrites only reviewed current-branch history finding
   };
 
   vscode.choose(`${target.provider}: ${target.id}`);
-  vscode.choose("Prepare current-branch history rewrite for 1 path(s)");
-  vscode.choose(`Rewrite only branch history under permit containment-remediation-permit:${"d".repeat(64)}`);
+  vscode.choose("Prepare local branch/tag history rewrite for 1 path(s)");
+  vscode.choose(`Rewrite local branch/tag history under permit containment-remediation-permit:${"d".repeat(64)}`);
   await vscode.invoke("sxsy-b122.releaseContainment");
 
   assert.deepEqual(bridge.containmentHistoryRequests, [{
@@ -845,7 +946,7 @@ test("containment workflow rewrites only reviewed current-branch history finding
   }]);
   assert.equal(bridge.containmentReleaseRequests.length, 0);
   assert.match(vscode.information.at(-1) ?? "", /Recovery bundle: C:\\state\\containment-history\\before\.bundle/);
-  assert.match(JSON.stringify(vscode.quickPickSurfaces), /removes each exact reviewed path from every commit reachable from the current local branch/i);
+  assert.match(JSON.stringify(vscode.quickPickSurfaces), /every commit reachable from all local branches and tags/i);
 });
 
 test("containment release stops before confirmation when the inspected active fence has an incomplete hook", async () => {

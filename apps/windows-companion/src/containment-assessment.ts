@@ -71,7 +71,7 @@ export class InstalledLocalContainmentAssessmentPort implements ContainmentAsses
     try {
       result = await this.git.run([
         "log",
-        step === "history" ? "--all" : "--remotes",
+        ...(step === "history" ? ["--branches", "--tags"] : ["--remotes"]),
         "--format=",
         "--name-only",
         "-z",
@@ -88,7 +88,26 @@ export class InstalledLocalContainmentAssessmentPort implements ContainmentAsses
     catch { return unknown(request, `The contained ${step === "history" ? "history" : "remote-tracking"} path evidence is unsafe or exceeds its bound.`); }
     if (paths.length) return exposed(request, paths, `Credential-shaped content is reachable from ${step === "history" ? "local Git history" : "a locally observed remote-tracking ref"} in ${paths.length} path(s); values were not retained.`);
     if (step === "remote") return unknown(request, "No exposure is visible in local remote-tracking refs, but their network freshness is not proven while containment blocks egress.");
-    return clean(request, "No credential-shaped content was found in locally reachable Git history.");
+    return clean(request, "No credential-shaped content was found in local branch or tag history.");
+  }
+}
+
+/** Routes the remote child to its signed host boundary without broadening the local no-egress scanner. */
+export class InstalledContainmentAssessmentPort implements ContainmentAssessmentEffectPort {
+  constructor(
+    private readonly local: ContainmentAssessmentEffectPort = new InstalledLocalContainmentAssessmentPort(),
+    private readonly remote?: ContainmentAssessmentEffectPort
+  ) {}
+
+  execute(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult> {
+    if (request.step !== "remote") return this.local.execute(request);
+    if (!this.remote) return Promise.resolve(unknown(request, "No signed complete-namespace remote assessment boundary is installed."));
+    return this.remote.execute(request);
+  }
+
+  observe(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult | undefined> {
+    if (request.step !== "remote") return this.local.observe(request);
+    return this.remote?.observe(request) ?? Promise.resolve(undefined);
   }
 }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { companionBridgeVersion, InProcessCompanionBridge, UnavailableCompanionBridge } from "../src/bridge.ts";
+import { companionBridgeVersion, InProcessCompanionBridge, isCompanionMethod, UnavailableCompanionBridge } from "../src/bridge.ts";
 import { CompanionService, type CompanionServiceOptions, type MediatedCommandExecutor } from "../src/service.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
 
@@ -474,6 +474,139 @@ test("acceptance and scanner administration cross only installed user-presence-b
   const unavailable = await new CompanionService().handle(request("missing", "acceptance.trust.list"));
   assert.equal(unavailable.ok, false);
   assert.equal(unavailable.error?.code, "capability_denied");
+});
+
+test("signed containment remote-evidence administration carries only exact host-bound selections", async () => {
+  for (const method of [
+    "containment.remote.trust.install", "containment.remote.trust.list", "containment.remote.trust.revoke",
+    "containment.remote.challenge.issue", "containment.remote.challenge.list",
+    "containment.remote.evidence.import", "containment.remote.evidence.list"
+  ]) assert.equal(isCompanionMethod(method), true, method);
+  assert.equal(isCompanionMethod("containment.remote.evidence.consume"), false);
+
+  const calls: unknown[][] = [];
+  const keyId = "a".repeat(64);
+  const incidentId = `containment-incident:${"b".repeat(64)}`;
+  const incidentDigest = "c".repeat(64);
+  const trust = {
+    schema: "sxsy-b122.containment-remote-trust-policy" as const,
+    version: 1 as const,
+    authorityId: "remote-security-lab",
+    keyId,
+    publicKeyPem: "test",
+    purpose: "containment-remote-assessment" as const,
+    expiresAt: "2027-08-25T00:00:00.000Z",
+    installedAt: "2026-08-25T00:00:00.000Z",
+    installedBy: "TEST\\Reviewer",
+    status: "active" as const
+  };
+  const challenge = {
+    id: `containment-remote-challenge:${"d".repeat(64)}`,
+    incidentId,
+    generation: 2,
+    targetSnapshotId: `target-snapshot:${"e".repeat(64)}`,
+    configuredRemotes: [{ name: "origin", canonicalIdentity: "https://github.com/example/repo.git" }],
+    issuedAt: "2026-08-25T00:00:00.000Z",
+    expiresAt: "2026-08-25T00:10:00.000Z",
+    status: "active" as const,
+    challengePath: "C:\\state\\containment\\challenge.json"
+  };
+  const evidence = {
+    evidenceId: `containment-remote-evidence:${"f".repeat(64)}`,
+    challengeId: challenge.id,
+    documentSha256: "1".repeat(64),
+    expiresAt: challenge.expiresAt,
+    status: "available" as const
+  };
+  const containmentRemote: NonNullable<CompanionServiceOptions["containmentRemote"]> = {
+    async installTrustPolicy(sourcePath) { calls.push(["trust.install", sourcePath]); return trust; },
+    async listTrust() { calls.push(["trust.list"]); return [trust]; },
+    async revokeTrust(authorityId, receivedKeyId, reason) { calls.push(["trust.revoke", authorityId, receivedKeyId, reason]); return { ...trust, status: "revoked" as const }; },
+    async issueChallenge(input) { calls.push(["challenge.issue", input]); return challenge; },
+    async listChallenges() { calls.push(["challenge.list"]); return [challenge]; },
+    async importEvidence(input) { calls.push(["evidence.import", input]); return evidence; },
+    async listEvidence() { calls.push(["evidence.list"]); return [evidence]; }
+  };
+  let auditSequence = 0;
+  const service = new CompanionService({ containmentRemote, idFactory: () => `audit-${++auditSequence}`, now: () => "2026-08-25T00:00:00.000Z" });
+  const binding = { sessionId: "session-remote", expectedIncidentId: incidentId, expectedIncidentDigest: incidentDigest } as const;
+
+  const installed = await service.handle(request("remote-trust-install", "containment.remote.trust.install", { sourcePath: "C:\\reviewed\\remote-trust.json" }));
+  const listedTrust = await service.handle(request("remote-trust-list", "containment.remote.trust.list"));
+  const revoked = await service.handle(request("remote-trust-revoke", "containment.remote.trust.revoke", { authorityId: trust.authorityId, keyId, reason: "Rotated independent assessment key." }));
+  const issued = await service.handle(request("remote-challenge-issue", "containment.remote.challenge.issue", { ...binding, expiresAt: challenge.expiresAt }));
+  const listedChallenges = await service.handle(request("remote-challenge-list", "containment.remote.challenge.list", {}));
+  const imported = await service.handle(request("remote-evidence-import", "containment.remote.evidence.import", { ...binding, sourcePath: "C:\\reviewed\\remote-evidence.json" }));
+  const listedEvidence = await service.handle(request("remote-evidence-list", "containment.remote.evidence.list"));
+
+  assert.equal(installed.ok, true);
+  assert.deepEqual(installed.result, { trust });
+  assert.deepEqual(listedTrust.result, { trust: [trust] });
+  assert.deepEqual(revoked.result, { trust: { ...trust, status: "revoked" } });
+  assert.deepEqual(issued.result, { challenge });
+  assert.deepEqual(listedChallenges.result, { challenges: [challenge] });
+  assert.deepEqual(imported.result, { evidence });
+  assert.deepEqual(listedEvidence.result, { evidence: [evidence] });
+  assert.deepEqual(calls, [
+    ["trust.install", "C:\\reviewed\\remote-trust.json"],
+    ["trust.list"],
+    ["trust.revoke", trust.authorityId, keyId, "Rotated independent assessment key."],
+    ["challenge.issue", { ...binding, expiresAt: challenge.expiresAt }],
+    ["challenge.list"],
+    ["evidence.import", { ...binding, sourcePath: "C:\\reviewed\\remote-evidence.json" }],
+    ["evidence.list"]
+  ]);
+  assert.deepEqual(service.listAuditEvents().map((event) => event.action), [
+    "containment.remote.trust.install",
+    "containment.remote.trust.list",
+    "containment.remote.trust.revoke",
+    "containment.remote.challenge.issue",
+    "containment.remote.challenge.list",
+    "containment.remote.evidence.import",
+    "containment.remote.evidence.list"
+  ]);
+});
+
+test("signed containment remote-evidence routes reject client-authored authority, namespace, and result fields", async () => {
+  let calls = 0;
+  const remote = {
+    async installTrustPolicy() { calls += 1; return {}; }, async listTrust() { calls += 1; return []; }, async revokeTrust() { calls += 1; return {}; },
+    async issueChallenge() { calls += 1; return {}; }, async listChallenges() { calls += 1; return []; },
+    async importEvidence() { calls += 1; return {}; }, async listEvidence() { calls += 1; return []; }
+  } as unknown as NonNullable<CompanionServiceOptions["containmentRemote"]>;
+  const service = new CompanionService({ containmentRemote: remote });
+  const incidentId = `containment-incident:${"b".repeat(64)}`;
+  const incidentDigest = "c".repeat(64);
+  const binding = { sessionId: "session-remote", expectedIncidentId: incidentId, expectedIncidentDigest: incidentDigest };
+  const invalidRequests = [
+    request("relative-trust", "containment.remote.trust.install", { sourcePath: "remote-trust.json" }),
+    request("forged-trust", "containment.remote.trust.install", { sourcePath: "C:\\reviewed\\remote-trust.json", operatorApproved: true }),
+    request("listed-trust-options", "containment.remote.trust.list", { includeRevoked: true }),
+    request("bad-revoke-key", "containment.remote.trust.revoke", { authorityId: "lab", keyId: "BAD", reason: "rotate" }),
+    request("forged-challenge", "containment.remote.challenge.issue", { ...binding, expiresAt: "2026-08-25T00:10:00.000Z", configuredRemotes: [{ name: "origin" }] }),
+    request("noncanonical-expiry", "containment.remote.challenge.issue", { ...binding, expiresAt: "2026-08-25T00:10:00Z" }),
+    request("listed-challenge-options", "containment.remote.challenge.list", { incidentId }),
+    request("forged-evidence", "containment.remote.evidence.import", { ...binding, sourcePath: "C:\\reviewed\\remote-evidence.json", refs: ["refs/heads/main"] }),
+    request("relative-evidence", "containment.remote.evidence.import", { ...binding, sourcePath: "remote-evidence.json" }),
+    request("listed-evidence-options", "containment.remote.evidence.list", { status: "available" })
+  ];
+  for (const invalid of invalidRequests) {
+    const response = await service.handle(invalid);
+    assert.equal(response.ok, false, invalid.id);
+    assert.equal(response.error?.code, "invalid_request", invalid.id);
+  }
+  assert.equal(calls, 0);
+
+  const unavailable = await new CompanionService().handle(request("remote-unavailable", "containment.remote.challenge.list"));
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error?.code, "capability_denied");
+
+  const refusing = new CompanionService({ containmentRemote: { ...remote, async importEvidence() { throw new Error("secret provider detail: token=should-not-cross-ipc"); } } });
+  const refused = await refusing.handle(request("remote-refused", "containment.remote.evidence.import", { ...binding, sourcePath: "C:\\reviewed\\remote-evidence.json" }));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.error?.code, "capability_denied");
+  assert.equal(refused.error?.message.includes("secret provider detail"), false);
+  assert.equal(refused.error?.message.includes("token="), false);
 });
 
 test("runtime pin routes accept paths only and delegate digest and presence authority to the host", async () => {
