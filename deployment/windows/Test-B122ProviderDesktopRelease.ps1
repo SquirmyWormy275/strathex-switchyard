@@ -11,12 +11,17 @@ $requiredBuildTokens = @(
   'provider-desktop-helper\Sxsy.B122.ProviderDesktopHelper.csproj',
   'sxsy-b122-provider-desktop-helper.exe',
   'providerDesktopHelperSha256',
-  'New-B122ProviderDesktopPaths.ps1'
+  'New-B122ProviderDesktopPaths.ps1',
+  "Join-Path `$reviewedRuntimeBin 'LICENSE'",
+  "Join-Path `$reviewedRuntimeBin 'node_modules\npm\bin\npm-cli.js'"
 )
 foreach ($token in $requiredBuildTokens) {
   if ($build.IndexOf($token, [StringComparison]::Ordinal) -lt 0) {
     throw "Release build is missing provider-desktop integration token: $token"
   }
+}
+if ($build.IndexOf('-Filter LICENSE -File -Recurse', [StringComparison]::Ordinal) -ge 0) {
+  throw 'Release build must validate the exact root Node LICENSE instead of counting dependency licenses recursively.'
 }
 
 foreach ($content in @($portable, $artifact)) {

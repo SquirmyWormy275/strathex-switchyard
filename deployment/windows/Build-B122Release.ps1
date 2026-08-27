@@ -124,11 +124,14 @@ if($sentinelDifference-ne0){throw 'The release build-output ownership sentinel c
 $runtimeExtract = Join-Path $output '.node-runtime'
 Assert-Child $output $runtimeExtract
 Expand-Archive -LiteralPath $nodeRuntimeArchive -DestinationPath $runtimeExtract
-$nodes=@(Get-ChildItem -LiteralPath $runtimeExtract -Filter node.exe -File -Recurse);$nodeLicenses=@(Get-ChildItem -LiteralPath $runtimeExtract -Filter LICENSE -File -Recurse);$npmClis=@(Get-ChildItem -LiteralPath $runtimeExtract -Filter npm-cli.js -File -Recurse)
-if($nodes.Count -ne 1 -or $nodeLicenses.Count -ne 1 -or $npmClis.Count -ne 1){throw 'The reviewed Node runtime must contain exactly one node.exe, LICENSE, and npm-cli.js.'}
-$node=$nodes[0];$nodeLicense=$nodeLicenses[0];$npmCli=$npmClis[0]
+$nodes=@(Get-ChildItem -LiteralPath $runtimeExtract -Filter node.exe -File -Recurse)
+if($nodes.Count -ne 1){throw 'The reviewed Node runtime must contain exactly one node.exe.'}
+$node=$nodes[0];$reviewedRuntimeBin=Split-Path -Parent $node.FullName
+$nodeLicense=Get-Item -LiteralPath (Join-Path $reviewedRuntimeBin 'LICENSE') -Force -ErrorAction SilentlyContinue
+$npmCli=Get-Item -LiteralPath (Join-Path $reviewedRuntimeBin 'node_modules\npm\bin\npm-cli.js') -Force -ErrorAction SilentlyContinue
+if($null-eq$nodeLicense-or$nodeLicense.PSIsContainer-or$null-eq$npmCli-or$npmCli.PSIsContainer){throw 'The reviewed Node runtime is missing its exact root LICENSE or npm-cli.js.'}
 foreach($runtimeFile in @($node,$nodeLicense,$npmCli)){if(($runtimeFile.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'The reviewed Node runtime contains a reparse file.'}}
-$reviewedRuntimeBin=Split-Path -Parent $node.FullName;$reviewedNpmCommand=Join-Path $reviewedRuntimeBin 'npm.cmd'
+$reviewedNpmCommand=Join-Path $reviewedRuntimeBin 'npm.cmd'
 if(-not(Test-Path -LiteralPath $reviewedNpmCommand -PathType Leaf)-or(Get-Item -LiteralPath $reviewedNpmCommand -Force).Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'The reviewed Node runtime does not contain its concrete npm command shim.'}
 $programFiles=[Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFiles)
 $programFilesX86=[Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
