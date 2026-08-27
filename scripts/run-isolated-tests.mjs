@@ -102,6 +102,12 @@ export const requiredGroups = [
   ...providerHostTests
 ];
 const limit = 64 * 1024;
+const diagnosticLimit = 4096;
+function failureDiagnostic(chunks) {
+  return Buffer.concat(chunks).toString("utf8").slice(-diagnosticLimit)
+    .replace(/[A-Za-z0-9+\/_=-]{32,}/g, "[redacted]")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "?");
+}
 const patternArgument = (pattern) => pattern ? `^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$` : undefined;
 function testCounts(output, isTestRun) {
   if (!isTestRun) return undefined;
@@ -241,7 +247,8 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         const counts = testCounts(tapTail, isTestRun);
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
         const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, spawnError, cleanupCompleted: false, cleanupError: null, success: !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess };
+        const success = !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess;
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
       } catch {
         result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
@@ -288,4 +295,4 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
   try { return { receipt, receiptPath: await receiptWriter(outputDirectory, receipt) }; }
   catch { receipt.receiptWrite = { completed: false, error: "atomic-receipt-write-failed" }; receipt.success = false; return { receipt, receiptPath: null }; }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { const { receipt, receiptPath } = await runVerification(); for (const child of receipt.children) { process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`); if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null })}\n`); } process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`); process.exitCode = receipt.success ? 0 : 1; }
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { const { receipt, receiptPath } = await runVerification(); for (const child of receipt.children) { process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`); if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, diagnostic: child.failureDiagnostic })}\n`); } process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`); process.exitCode = receipt.success ? 0 : 1; }
