@@ -146,6 +146,17 @@ function Stop-B122PortableProcessTree([int]$RootProcessId, [hashtable]$Inventory
   throw "Portable verifier cleanup left $($survivors.Count) exact process-tree survivor(s): $detail"
 }
 
+function Wait-B122PortableProcessTreeExit([hashtable]$Inventory, [int]$TimeoutSeconds) {
+  if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 10) { throw 'A portable process-tree exit grace period is outside the bounded range.' }
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  do {
+    $survivors = @($Inventory.Values | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
+    if (-not $survivors.Count) { return $true }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  return $false
+}
+
 function Invoke-B122PortableBoundedProcess([string]$Executable, [string[]]$ArgumentValues, [int]$TimeoutSeconds, [string]$Label) {
   if ($TimeoutSeconds -lt 1 -or $TimeoutSeconds -gt 120) { throw 'A portable verifier timeout is outside the bounded range.' }
   $start = New-Object Diagnostics.ProcessStartInfo
@@ -179,8 +190,12 @@ function Invoke-B122PortableBoundedProcess([string]$Executable, [string[]]$Argum
     Add-B122PortableProcessTree -Inventory $inventory -RootProcessId $child.Id
     $survivors = @($inventory.Values | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
     if ($survivors.Count) {
-      Stop-B122PortableProcessTree -RootProcessId $child.Id -Inventory $inventory
-      if (-not $timedOut) { throw "$Label left an unexpected process-tree survivor." }
+      if (-not $timedOut -and (Wait-B122PortableProcessTreeExit -Inventory $inventory -TimeoutSeconds 5)) {
+        $survivors = @()
+      } else {
+        Stop-B122PortableProcessTree -RootProcessId $child.Id -Inventory $inventory
+        if (-not $timedOut) { throw "$Label left an unexpected process-tree survivor." }
+      }
     }
     if (-not [Threading.Tasks.Task]::WaitAll(@($stdoutTask,$stderrTask),10000)) { throw "$Label output drains did not close within the bounded cleanup interval." }
     return [pscustomobject]@{
