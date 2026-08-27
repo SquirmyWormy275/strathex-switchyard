@@ -303,16 +303,22 @@ setInterval(() => {}, 1000);
   # readiness before exact process-tree cleanup.
   $startupTimeoutSeconds = 300
   $deadline = [DateTime]::UtcNow.AddSeconds($startupTimeoutSeconds)
+  $configuration = Join-Path $state 'authenticated-pipe.json'
+  $nextInventoryAt = [DateTime]::MinValue
   do {
-    Start-Sleep -Milliseconds 250
-    Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
+    Start-Sleep -Milliseconds 1000
+    $observedAt = [DateTime]::UtcNow
+    if ($observedAt -ge $nextInventoryAt) {
+      Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
+      $nextInventoryAt = $observedAt.AddSeconds(5)
+    }
     Assert-B122PortableCompanionLogsBounded
     if ($process.HasExited) {
       $process.WaitForExit()
       $detail = Read-B122PortableBoundedFile $stderr
       throw "The portable companion exited before health verification: $detail"
     }
-    $configuration = Join-Path $state 'authenticated-pipe.json'
+    if (-not (Test-Path -LiteralPath $configuration -PathType Leaf)) { continue }
     $healthCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($health,'--configuration',$configuration) -TimeoutSeconds 120 -Label 'The portable companion health probe'
     if ($healthCommand.timedOut) { throw 'The portable companion health probe timed out after exact process-tree cleanup.' }
     if ($healthCommand.exitCode -eq 0) {

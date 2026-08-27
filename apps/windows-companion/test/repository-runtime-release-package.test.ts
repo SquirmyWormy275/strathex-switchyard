@@ -65,6 +65,11 @@ test("Windows release packages and runtime-pins the companion lifecycle supervis
   assert.match(portable, /AddSeconds\(\$startupTimeoutSeconds\)/);
   assert.match(portable, /\$health[^\r\n]+-TimeoutSeconds 120 -Label 'The portable companion health probe'/);
   assert.match(portable, /--shutdown[^\r\n]+-TimeoutSeconds 120 -Label 'The portable companion authenticated shutdown probe'/);
+  const endpointExists = portable.indexOf("Test-Path -LiteralPath $configuration -PathType Leaf");
+  const healthLaunch = portable.indexOf("-Label 'The portable companion health probe'");
+  assert.ok(endpointExists >= 0 && healthLaunch > endpointExists);
+  assert.match(portable, /Start-Sleep -Milliseconds 1000/);
+  assert.match(portable, /\$nextInventoryAt = \$observedAt\.AddSeconds\(5\)/);
   const unhealthyCleanup = portable.indexOf("The unhealthy portable companion did not exit after exact process-tree cleanup.");
   const diagnosticRead = portable.indexOf("$companionDetail = Read-B122PortableBoundedFile $stderr");
   assert.ok(unhealthyCleanup >= 0 && diagnosticRead > unhealthyCleanup);
