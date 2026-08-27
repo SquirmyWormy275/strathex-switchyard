@@ -301,7 +301,7 @@ setInterval(() => {}, 1000);
   # slower under Windows Defender on hosted runners. Keep the probe bounded,
   # but allow enough time for a valid release bundle to reach authenticated
   # readiness before exact process-tree cleanup.
-  $startupTimeoutSeconds = 120
+  $startupTimeoutSeconds = 300
   $deadline = [DateTime]::UtcNow.AddSeconds($startupTimeoutSeconds)
   do {
     Start-Sleep -Milliseconds 250
@@ -313,7 +313,7 @@ setInterval(() => {}, 1000);
       throw "The portable companion exited before health verification: $detail"
     }
     $configuration = Join-Path $state 'authenticated-pipe.json'
-    $healthCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($health,'--configuration',$configuration) -TimeoutSeconds 8 -Label 'The portable companion health probe'
+    $healthCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($health,'--configuration',$configuration) -TimeoutSeconds 120 -Label 'The portable companion health probe'
     if ($healthCommand.timedOut) { throw 'The portable companion health probe timed out after exact process-tree cleanup.' }
     if ($healthCommand.exitCode -eq 0) {
       $unexpectedRawHid = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" | Where-Object { $_.Name -ceq 'strathex-b122-hid-helper.exe' })
@@ -329,7 +329,7 @@ setInterval(() => {}, 1000);
       Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
       $capturedTree = @($companionInventory.Values)
       if (-not $capturedTree.Count) { throw 'The portable companion process identity disappeared before graceful shutdown.' }
-      $shutdownCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($health,'--shutdown','--configuration',$configuration) -TimeoutSeconds 10 -Label 'The portable companion authenticated shutdown probe'
+      $shutdownCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($health,'--shutdown','--configuration',$configuration) -TimeoutSeconds 120 -Label 'The portable companion authenticated shutdown probe'
       Assert-B122PortableCommandSucceeded $shutdownCommand 'The portable companion authenticated shutdown probe'
       $shutdownReceipt = $shutdownCommand.stdout | ConvertFrom-Json
       if ($shutdownReceipt.schema -cne 'sxsy-b122.install-shutdown' -or $shutdownReceipt.version -ne 1 -or $shutdownReceipt.status -cne 'stopping') { throw 'The portable companion returned an invalid authenticated shutdown receipt.' }

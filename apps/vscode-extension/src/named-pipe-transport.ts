@@ -13,7 +13,7 @@ const maxFrameBytes = 64 * 1024;
 const defaultTimeoutMs = 5_000;
 const maximumSecretBytes = 64 * 1024;
 const maximumEnvelopeBytes = maximumSecretBytes * 4;
-const defaultDpapiTimeoutMs = 30_000;
+const defaultDpapiTimeoutMs = 120_000;
 const cleanupTimeoutMs = 5_000;
 const maximumPipeConfigurationBytes = 64 * 1024;
 const maximumSealedTokenCharacters = 16 * 1024;
@@ -42,7 +42,7 @@ export async function runBoundedWindowsHostProcess(request: BoundedWindowsHostPr
   const environment = dpapiEnvironment();
   if (process.platform !== "win32" || !validDpapiInvocation(request) || !isAbsolute(request.executable) || /[\0\r\n]/.test(request.executable)
     || request.args.some((value) => /[\0\r\n]/.test(value))
-    || !Number.isSafeInteger(request.timeoutMs) || request.timeoutMs < 100 || request.timeoutMs > 30_000
+    || !Number.isSafeInteger(request.timeoutMs) || request.timeoutMs < 100 || request.timeoutMs > 120_000
     || !Number.isSafeInteger(request.maximumOutputBytes) || request.maximumOutputBytes < 1 || request.maximumOutputBytes > 1024 * 1024
     || request.input.byteLength > maximumEnvelopeBytes) {
     throw new Error("The bounded Windows helper request is invalid.");
