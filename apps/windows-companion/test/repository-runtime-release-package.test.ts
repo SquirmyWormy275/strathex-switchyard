@@ -453,6 +453,14 @@ test("Windows release output is an authenticated exclusive leaf with no reparse 
   assert.match(build, /Set-B122ProtectedBuildOutputAcl -Path \$output/);
   assert.match(build, /function Remove-B122OwnedBuildTree/);
   assert.match(build, /Build cleanup target identity changed before quarantine/);
+  const cleanupFunction = build.slice(
+    build.indexOf("function Remove-B122OwnedBuildTree"),
+    build.indexOf("Assert-Child ([IO.Path]::GetFullPath((Join-Path $repo 'artifacts'))) $output"),
+  );
+  const quarantineMove = cleanupFunction.indexOf("Move-Item -LiteralPath $tree -Destination $quarantine");
+  const quarantineInventory = cleanupFunction.indexOf("$queue.Enqueue($quarantine)");
+  assert.ok(quarantineMove >= 0 && quarantineInventory > quarantineMove);
+  assert.equal(cleanupFunction.includes("$queue.Enqueue($tree)"), false);
   assert.doesNotMatch(build, /Remove-Item[^\r\n]*-Recurse/);
   assert.equal(artifact.includes("$_.FullName.Substring($root.Length+1).Replace('\\','/') -notin @('SHA256SUMS.json','sbom.spdx.json','release.json')"), true);
 });
