@@ -70,6 +70,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
       ["apps/windows-companion/test/installed-automation-e2e.test.ts", 240_000],
       ["apps/windows-companion/test/repository-runner-helper.test.ts", 240_000],
+      ["deployment/windows/Test-B122ManifestGenerators.ps1", 180_000],
       ["deployment/windows/Test-B122InstallLifecycle.ps1", 240_000],
       ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 240_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 300_000],

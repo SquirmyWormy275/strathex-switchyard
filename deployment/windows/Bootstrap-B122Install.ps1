@@ -302,11 +302,11 @@ function Get-B122BootstrapStagingBase([string]$Override,[bool]$AllowOverride){
 }
 
 function Get-B122BootstrapKnownFolder([Environment+SpecialFolder]$Folder,[string]$Label){
-  if($env:SXSY_TEST_MODE-ceq'1'-and$Folder-in@([Environment+SpecialFolder]::UserProfile,[Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolder]::ApplicationData)){
+  if($env:SXSY_TEST_MODE-ceq'1'){
     $test=[IO.Path]::GetFullPath([string]$env:SXSY_TEST_ROOT)
-    $value=if($Folder-eq[Environment+SpecialFolder]::UserProfile){[string]$env:USERPROFILE}elseif($Folder-eq[Environment+SpecialFolder]::LocalApplicationData){[string]$env:LOCALAPPDATA}else{[string]$env:APPDATA}
-    if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)){throw "The isolated $Label path is unavailable."}
-    $value=[IO.Path]::GetFullPath($value);$prefix=$test.TrimEnd('\')+'\';$profileRoot=$Folder-eq[Environment+SpecialFolder]::UserProfile-and$value.Equals($test,[StringComparison]::OrdinalIgnoreCase);if(-not$profileRoot-and-not$value.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "The isolated $Label path must remain within SXSY_TEST_ROOT."};return $value
+    $isolated=$Folder-in@([Environment+SpecialFolder]::UserProfile,[Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolder]::ApplicationData)
+    $value=if($Folder-eq[Environment+SpecialFolder]::UserProfile){[string]$env:USERPROFILE}elseif($Folder-eq[Environment+SpecialFolder]::LocalApplicationData){[string]$env:LOCALAPPDATA}elseif($Folder-eq[Environment+SpecialFolder]::ApplicationData){[string]$env:APPDATA}elseif($Folder-eq[Environment+SpecialFolder]::CommonApplicationData){[string]$env:ProgramData}elseif($Folder-eq[Environment+SpecialFolder]::ProgramFiles){[string]${env:ProgramFiles}}else{$null}
+    if($null-ne$value){if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)){throw "The isolated $Label path is unavailable."};$value=[IO.Path]::GetFullPath($value);if($isolated){$prefix=$test.TrimEnd('\')+'\';$profileRoot=$Folder-eq[Environment+SpecialFolder]::UserProfile-and$value.Equals($test,[StringComparison]::OrdinalIgnoreCase);if(-not$profileRoot-and-not$value.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "The isolated $Label path must remain within SXSY_TEST_ROOT."}};return $value}
   }
   $value=[Environment]::GetFolderPath($Folder)
   if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)-or$value.IndexOfAny([char[]]@([char]0,[char]10,[char]13))-ge0){throw "The current-user $Label Known Folder is unavailable."}
@@ -402,7 +402,7 @@ function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath
   $environmentBlock=New-B122BootstrapEnvironmentBlock $Environment $working
   $process=$script:B122BootstrapIdentityType::StartSupervisor($HelperPath,$command,$working,$environmentBlock,$StdoutPath,$StderrPath,$JobName)
   try{
-    $deadline=[DateTime]::UtcNow.AddSeconds(30);$runningState=$null
+    $deadline=[DateTime]::UtcNow.AddSeconds(60);$runningState=$null
     do{
       if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
       if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}

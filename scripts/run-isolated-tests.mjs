@@ -156,7 +156,7 @@ export function assertRequiredTestManifest(groups = requiredGroups, discovered =
 const inheritedNames = [
   "PATH", "SystemRoot", "WINDIR", "ComSpec", "PATHEXT", "OS", "SystemDrive",
   "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER",
-  "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "CommonProgramFiles",
+  "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "CommonProgramFiles",
   "CommonProgramFiles(x86)", "CommonProgramW6432", "LANG", "LC_ALL", "TZ", "TERM",
   "DOTNET_ROOT", "NUGET_PACKAGES", "SXSY_B122_NUGET_CONFIG", "SXSY_B122_NUGET_FEED"
 ];
