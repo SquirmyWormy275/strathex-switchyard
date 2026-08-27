@@ -59,6 +59,12 @@ test("Windows release packages and runtime-pins the companion lifecycle supervis
   assert.match(portable, /activeProcesses/);
   assert.match(portable, /processTreeSurvivors/);
   assert.match(portable, /function Invoke-B122PortableExactTreeKill/);
+  assert.match(portable, /function Wait-B122PortableProcessTreeExit/);
+  assert.match(portable, /Wait-B122PortableProcessTreeExit -Inventory \$inventory -TimeoutSeconds 5/);
+  const naturalExitGrace = portable.indexOf("Wait-B122PortableProcessTreeExit -Inventory $inventory -TimeoutSeconds 5");
+  const unexpectedSurvivorKill = portable.indexOf("Stop-B122PortableProcessTree -RootProcessId $child.Id -Inventory $inventory", naturalExitGrace);
+  const unexpectedSurvivorError = portable.indexOf("$Label left an unexpected process-tree survivor.", naturalExitGrace);
+  assert.ok(naturalExitGrace >= 0 && unexpectedSurvivorKill > naturalExitGrace && unexpectedSurvivorError > unexpectedSurvivorKill);
   assert.match(portable, /foreach \(\$identity in \$survivors\) \{ Invoke-B122PortableExactTreeKill \$identity \}/);
   assert.match(portable, /created=\$\(\[string\]\$_\.createdAt\)/);
   assert.match(portable, /\$startupTimeoutSeconds = 300/);
