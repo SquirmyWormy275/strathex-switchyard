@@ -109,42 +109,41 @@ function Add-B122PortableProcessTree([hashtable]$Inventory, [int]$RootProcessId)
   }
 }
 
+function Invoke-B122PortableExactTreeKill($Identity) {
+  if (-not (Test-B122PortableProcessIdentityAlive $Identity)) { return }
+  $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+  $kill = New-Object Diagnostics.ProcessStartInfo
+  $kill.FileName = $taskkill
+  $kill.Arguments = "/PID $([int]$Identity.processId) /T /F"
+  $kill.UseShellExecute = $false
+  $kill.CreateNoWindow = $true
+  $killer = New-Object Diagnostics.Process
+  $killer.StartInfo = $kill
+  try {
+    if ($killer.Start() -and -not $killer.WaitForExit(10000)) { try { $killer.Kill() } catch {} }
+  } finally { $killer.Dispose() }
+}
+
 function Stop-B122PortableProcessTree([int]$RootProcessId, [hashtable]$Inventory) {
   Add-B122PortableProcessTree -Inventory $Inventory -RootProcessId $RootProcessId
-  $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
   $rootIdentity = @($Inventory.Values | Where-Object { [int]$_.processId -eq $RootProcessId } | Select-Object -First 1)
-  if ($rootIdentity.Count -and (Test-B122PortableProcessIdentityAlive $rootIdentity[0])) {
-    $kill = New-Object Diagnostics.ProcessStartInfo
-    $kill.FileName = $taskkill
-    $kill.Arguments = "/PID $RootProcessId /T /F"
-    $kill.UseShellExecute = $false
-    $kill.CreateNoWindow = $true
-    $killer = New-Object Diagnostics.Process
-    $killer.StartInfo = $kill
-    try {
-      if ($killer.Start() -and -not $killer.WaitForExit(10000)) { try { $killer.Kill() } catch {} }
-    } finally { $killer.Dispose() }
-  }
+  if ($rootIdentity.Count) { Invoke-B122PortableExactTreeKill $rootIdentity[0] }
   foreach ($identity in @($Inventory.Values | Sort-Object processId -Descending)) {
-    if (-not (Test-B122PortableProcessIdentityAlive $identity)) { continue }
-    $kill = New-Object Diagnostics.ProcessStartInfo
-    $kill.FileName = $taskkill
-    $kill.Arguments = "/PID $([int]$identity.processId) /T /F"
-    $kill.UseShellExecute = $false
-    $kill.CreateNoWindow = $true
-    $killer = New-Object Diagnostics.Process
-    $killer.StartInfo = $kill
-    try {
-      if ($killer.Start() -and -not $killer.WaitForExit(10000)) { try { $killer.Kill() } catch {} }
-    } finally { $killer.Dispose() }
+    Invoke-B122PortableExactTreeKill $identity
   }
   $deadline = [DateTime]::UtcNow.AddSeconds(10)
   do {
     $survivors = @($Inventory.Values | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
     if (-not $survivors.Count) { return }
-    Start-Sleep -Milliseconds 100
+    foreach ($identity in $survivors) { Invoke-B122PortableExactTreeKill $identity }
+    Start-Sleep -Milliseconds 250
   } while ([DateTime]::UtcNow -lt $deadline)
-  throw "Portable verifier cleanup left $($survivors.Count) exact process-tree survivor(s)."
+  $detail = @($survivors | ForEach-Object {
+    $candidate = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$_.processId)" -ErrorAction SilentlyContinue
+    "pid=$([int]$_.processId),created=$([string]$_.createdAt),name=$(if($null-eq$candidate){'exited'}else{[string]$candidate.Name})"
+  }) -join ';'
+  if ($detail.Length -gt 1024) { $detail = $detail.Substring(0,1024) }
+  throw "Portable verifier cleanup left $($survivors.Count) exact process-tree survivor(s): $detail"
 }
 
 function Invoke-B122PortableBoundedProcess([string]$Executable, [string[]]$ArgumentValues, [int]$TimeoutSeconds, [string]$Label) {

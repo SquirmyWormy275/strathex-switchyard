@@ -58,6 +58,9 @@ test("Windows release packages and runtime-pins the companion lifecycle supervis
   assert.match(portable, /capturedProcesses/);
   assert.match(portable, /activeProcesses/);
   assert.match(portable, /processTreeSurvivors/);
+  assert.match(portable, /function Invoke-B122PortableExactTreeKill/);
+  assert.match(portable, /foreach \(\$identity in \$survivors\) \{ Invoke-B122PortableExactTreeKill \$identity \}/);
+  assert.match(portable, /created=\$\(\[string\]\$_\.createdAt\)/);
 });
 
 test("Windows release binds the reviewed local dotnet toolchain and isolates nested build authority", async () => {
