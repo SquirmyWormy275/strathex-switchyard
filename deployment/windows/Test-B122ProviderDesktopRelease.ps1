@@ -230,6 +230,15 @@ try {
   if($bootstrap.schema-cne'sxsy-b122.provider-host-bootstrap'-or$bootstrap.status-cne'ready-to-provision'-or$bootstrap.fixtureDiagnosticOnly-ne$true-or$bootstrap.authenticationTokenExposed-ne$false-or$bootstrap.proprietaryCredentialsAccessed-ne$false){throw 'The packaged provider bootstrap returned an invalid or unsafe receipt.'}
   $providerConfiguration=[IO.Path]::GetFullPath([string]$bootstrap.configurationPath)
   if(-not$providerConfiguration.StartsWith($providerState+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'The packaged provider bootstrap escaped its exact current-user instance.'}
+  $installedPolicy=Get-Content -LiteralPath ([IO.Path]::GetFullPath([string]$bootstrap.networkPolicyPath)) -Raw|ConvertFrom-Json
+  $installedRoutes=@{};foreach($route in @($installedPolicy.routes)){$installedRoutes[[string]$route.id]=$route}
+  if($installedRoutes.ContainsKey('provider.reanchor')){throw 'The installed provider policy contains the forbidden generic Re-anchor command route.'}
+  foreach($provider in @('claude','codex')){
+    if($installedRoutes["provider.reanchor.$provider"].url-cne"https://127.0.0.1:$listenPort/v1/b122/reanchor/$provider"-or$installedRoutes["provider.observe-reanchor.$provider"].url-cne"https://127.0.0.1:$listenPort/v1/b122/observe/reanchor/$provider"){throw "The installed provider policy does not bind the exact $provider Re-anchor apply/observe routes."}
+  }
+  foreach($action in @('compound_capture','compound_refresh','lfg','repair_mission')){
+    if($installedRoutes["automation.proposal.$action"].url-cne"https://127.0.0.1:$listenPort/v1/b122/automation-proposal/$action"){throw "The installed provider policy does not bind the exact $action proposal route."}
+  }
   $fixtureLocalAppData=Join-Path $providerBundle 'current user data'
   $fixtureCompanionState=Join-Path $fixtureLocalAppData 'STRATHEX\switchyard'
   $fixtureReady=Join-Path $fixtureCompanionState 'release-fixture-ready.json'
@@ -256,6 +265,9 @@ const handler = {
     }
     if (request.method === "network-policy.install") {
       return { version: 1, id: request.id, ok: true, result: { policy: { status: "active" } } };
+    }
+    if (request.method === "provider-host.profile.install") {
+      return { version: 1, id: request.id, ok: true, result: { profile: request.payload?.profile } };
     }
     if (request.method === "ping" && request.payload?.lifecycle === "shutdown") {
       if (!stopping) {
@@ -295,7 +307,7 @@ await writeFile(readyPath, JSON.stringify({ schema: "sxsy-b122.release-companion
   $provisioningScript=Join-Path $providerBundle 'scripts\provisioning\Provision-B122ProviderHostCompanion.mjs'
   $provisioningRaw=Invoke-B122ProviderFixtureProcess -Executable (Join-Path $providerBundle 'runtime\node.exe') -Arguments @($provisioningScript,'--artifact',[string]$bootstrap.companionProvisioningPath,'--bundle-root',$providerBundle,'--configuration',$companionFixtureConfiguration) -Environment @{LOCALAPPDATA=$fixtureLocalAppData}
   $provisioningReceipt=$provisioningRaw|Select-Object -Last 1|ConvertFrom-Json
-  if($provisioningReceipt.schema-cne'sxsy-b122.provider-host-companion-provisioning-receipt'-or$provisioningReceipt.status-cne'provisioned'-or$provisioningReceipt.authenticatedPipe-ne$true-or$provisioningReceipt.currentUserPresenceRequired-ne$true-or$provisioningReceipt.sealedSecretTransferred-ne$true-or$provisioningReceipt.cleartextSecretRead-ne$false){throw 'The packaged provider companion provisioning receipt is invalid.'}
+  if($provisioningReceipt.schema-cne'sxsy-b122.provider-host-companion-provisioning-receipt'-or$provisioningReceipt.version-ne2-or$provisioningReceipt.status-cne'provisioned'-or$provisioningReceipt.authenticatedPipe-ne$true-or$provisioningReceipt.currentUserPresenceRequired-ne$true-or[int]$provisioningReceipt.sealedSecretCount-ne2-or$provisioningReceipt.cleartextSecretRead-ne$false){throw 'The packaged provider companion provisioning receipt is invalid.'}
   Write-B122ProviderReleaseTrace 'companion-provisioning-complete'
   $shutdownRaw=Invoke-B122ProviderFixtureProcess -Executable (Join-Path $providerBundle 'runtime\node.exe') -Arguments @((Join-Path $providerBundle 'scripts\Test-B122Health.mjs'),'--shutdown','--configuration',$companionFixtureConfiguration) -Environment @{LOCALAPPDATA=$fixtureLocalAppData}
   $shutdownReceipt=$shutdownRaw|Select-Object -Last 1|ConvertFrom-Json

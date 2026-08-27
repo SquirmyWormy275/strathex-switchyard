@@ -5,7 +5,7 @@ import { assignmentFor, controls, type Control, type Modifier } from "../../../p
 import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import type { HandoffPackage, HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
-import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowArtifactPayload, WorkflowArtifactStore, WorkflowPreparationCoordinator, WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactPayload, type WorkflowArtifactStore, type WorkflowPreparationCoordinator, type WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { VoiceBinding, VoiceConsent, VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import type { GitReviewResult, GitReviewWorkspace } from "./git-review.ts";
 import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
@@ -45,6 +45,12 @@ import {
   type DispatchPayload,
   type CommandPreparationPayload,
   type ConfirmationRequestPayload,
+  type ReanchorAuthorityListPayload,
+  type ReanchorBeginPayload,
+  type ReanchorHardwareBeginPayload,
+  type ReanchorConfirmationPayload,
+  type ReanchorGetPayload,
+  type ReanchorEligibleAuthority,
   type HostActionAuthorizationPayload,
   type HostActionClaimPayload,
   type HostActionCompletionPayload,
@@ -103,6 +109,12 @@ import {
   type SessionStatusPayload
 } from "./bridge.ts";
 import type { CompanionRequestContext } from "./stdio.ts";
+import type { InstalledReanchorStatus } from "./reanchor-runtime.ts";
+import type { ProviderMediatedFinalCurrentDecision } from "./provider-mediated-final-current.ts";
+import type { AutomationOperationManifest } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
+import type { InstalledAutomationManifestCoordinator } from "./automation-manifest-coordinator.ts";
+import type { DurableAutomationManifestReviewQueue } from "./automation-manifest-review.ts";
+import { debugStopReview, type DebugStopReview, type DurableDebugStopBindingStore } from "./debug-stop.ts";
 
 /**
  * A mediator can be attached after it has a verified execution boundary.  The
@@ -119,11 +131,30 @@ export interface CancellableMediatedCommandExecutor extends MediatedCommandExecu
 }
 
 export interface ConfirmationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
-  requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string }>): Promise<Readonly<{ status: string; summary: string; token?: string; expiresAt?: string }>>;
+  requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string; confirmationScopeDigest?: string }>): Promise<Readonly<{ status: "issued" | "blocked" | "unavailable" | "incomplete"; summary: string; token?: string; expiresAt?: string }>>;
 }
 
 export interface CommandPreparationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
   prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>>;
+}
+
+export interface AutomationManifestCommandReview {
+  readonly action: "compound_capture" | "compound_refresh" | "lfg" | "repair_mission";
+  readonly manifest: AutomationOperationManifest;
+  readonly reviewScopeDigest: string;
+}
+
+export interface PreparedCommandResult {
+  readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
+  readonly summary: string;
+  readonly session?: ManagedSession;
+  readonly authorityId?: string;
+  readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
+  readonly confirmationExpiresAt?: string;
+  readonly workflowReview?: WorkflowContextReview;
+  readonly automationReview?: AutomationManifestCommandReview;
+  readonly debugStopReview?: DebugStopReview;
 }
 
 export interface CouncilReviewCapableMediatedCommandExecutor extends MediatedCommandExecutor {
@@ -170,10 +201,26 @@ export interface ExternalCompletionCapableMediatedCommandExecutor extends Mediat
   completeExternalOperation(record: HostActionCompletionRecord): Promise<CommandResult>;
 }
 
+export interface InstalledReanchorServicePort {
+  eligibleAuthorities(sessionId: string, signal?: AbortSignal): Promise<readonly ReanchorEligibleAuthority[]>;
+  begin(input: ReanchorBeginPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus>;
+  confirmAndApply(input: ReanchorConfirmationPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus>;
+  get(requestId: string, signal?: AbortSignal): Promise<InstalledReanchorStatus | undefined>;
+}
+
+export interface ProviderMediatedFinalCurrentServicePort {
+  decide(value: unknown, signal?: AbortSignal): Promise<ProviderMediatedFinalCurrentDecision>;
+}
+
 export interface CompanionServiceOptions {
   readonly now?: () => string;
   readonly idFactory?: () => string;
   readonly executor?: MediatedCommandExecutor;
+  readonly reanchor?: InstalledReanchorServicePort;
+  readonly providerMediatedFinalCurrent?: ProviderMediatedFinalCurrentServicePort;
+  readonly automationManifestCoordinator?: InstalledAutomationManifestCoordinator;
+  readonly automationManifestReviews?: DurableAutomationManifestReviewQueue;
+  readonly debugStops?: DurableDebugStopBindingStore;
   readonly hostActions?: HostActionCoordinator;
   readonly gitReviews?: GitMutationReviewCoordinator;
   readonly runtimePins?: RuntimePinCoordinator;
@@ -219,6 +266,11 @@ export class CompanionService {
   private readonly now: () => string;
   private readonly idFactory: () => string;
   private readonly executor?: MediatedCommandExecutor;
+  private readonly reanchor?: InstalledReanchorServicePort;
+  private readonly providerMediatedFinalCurrent?: ProviderMediatedFinalCurrentServicePort;
+  private readonly automationManifestCoordinator?: InstalledAutomationManifestCoordinator;
+  private readonly automationManifestReviews?: DurableAutomationManifestReviewQueue;
+  private readonly debugStops?: DurableDebugStopBindingStore;
   private readonly hostActions?: HostActionCoordinator;
   private readonly gitReviews?: GitMutationReviewCoordinator;
   private readonly runtimePins?: RuntimePinCoordinator;
@@ -250,6 +302,11 @@ export class CompanionService {
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? (() => `audit-${crypto.randomUUID()}`);
     this.executor = options.executor;
+    this.reanchor = options.reanchor;
+    this.providerMediatedFinalCurrent = options.providerMediatedFinalCurrent;
+    this.automationManifestCoordinator = options.automationManifestCoordinator;
+    this.automationManifestReviews = options.automationManifestReviews;
+    this.debugStops = options.debugStops;
     this.hostActions = options.hostActions;
     this.gitReviews = options.gitReviews;
     this.runtimePins = options.runtimePins;
@@ -308,6 +365,19 @@ export class CompanionService {
           return this.success(request.id, { preparation: await this.prepareCommand(this.requireCommandPreparation(request.payload)) });
         case "confirmation.request":
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
+        case "provider-mediated.final-current":
+          if (!this.providerMediatedFinalCurrent) throw new CompanionServiceError("companion_unavailable", "The installed provider mediated final-current boundary is unavailable.");
+          return this.success(request.id, { decision: await this.direct(context, (signal) => this.providerMediatedFinalCurrent!.decide(request.payload, signal)) });
+        case "reanchor.authority.list":
+          return this.success(request.id, { authorities: await this.direct(context, (signal) => this.listEligibleReanchorAuthorities(this.requireReanchorAuthorityList(request.payload), signal)) });
+        case "reanchor.begin":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.beginReanchor(this.requireReanchorBegin(request.payload), signal)) });
+        case "reanchor.hardware.begin":
+          return this.success(request.id, await this.direct(context, (signal) => this.beginHardwareReanchor(this.requireReanchorHardwareBegin(request.payload), signal)));
+        case "reanchor.confirm-apply":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.confirmAndApplyReanchor(this.requireReanchorConfirmation(request.payload), signal)) });
+        case "reanchor.get":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.getReanchor(this.requireReanchorGet(request.payload), signal)) });
         case "git.review.submit":
           return this.success(request.id, { review: await this.reviewGitMutation(this.requireGitReview(request.payload)) });
         case "git.review.inspect":
@@ -561,6 +631,10 @@ export class CompanionService {
       return result;
     }
 
+    if (assignment.control === "REANCHOR" && assignment.modifier === "normal") {
+      throw new CompanionServiceError("invalid_request", "Re-anchor is available only through the dedicated Re-anchor lifecycle with explicit review.");
+    }
+
     if (!this.executor) {
       const result: CommandResult = {
         status: assignment.capability === "disabled_pending_gates" ? "blocked" : "unavailable",
@@ -612,10 +686,274 @@ export class CompanionService {
     return waitForDirectOperation(operation, context?.signal);
   }
 
-  private async prepareCommand(payload: CommandPreparationPayload): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>> {
+  private async listEligibleReanchorAuthorities(payload: ReanchorAuthorityListPayload, signal?: AbortSignal): Promise<readonly ReanchorEligibleAuthority[]> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return exactEligibleReanchorAuthorities(await this.reanchor.eligibleAuthorities(payload.sessionId, signal));
+  }
+
+  private async beginReanchor(payload: ReanchorBeginPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return this.reanchor.begin(payload, signal);
+  }
+
+  private async beginHardwareReanchor(payload: ReanchorHardwareBeginPayload, signal?: AbortSignal): Promise<Readonly<{ reanchor: InstalledReanchorStatus; dispatchReceiptId: string }>> {
+    if (!this.reanchor || !this.hardwareSignals) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor and hardware claim boundaries are unavailable.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    if (claim.control !== "REANCHOR" || claim.modifier !== "normal") {
+      throw new CompanionServiceError("capability_denied", "The live hardware claim is not the canonical Re-anchor assignment.");
+    }
+    await this.assertHardwareDispatchSession(claim, payload.sessionId);
+    const reanchor = await this.reanchor.begin({ sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason }, signal);
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The canonical Re-anchor assignment disappeared before dispatch receipt creation.");
+    const dispatch = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: `reanchor:${reanchor.state}`,
+      operationId: reanchor.operationId
+    });
+    return { reanchor, dispatchReceiptId: dispatch.dispatchReceiptId };
+  }
+
+  private async confirmAndApplyReanchor(payload: ReanchorConfirmationPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return this.reanchor.confirmAndApply(payload, signal);
+  }
+
+  private async getReanchor(payload: ReanchorGetPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    const found = await this.reanchor.get(payload.requestId, signal);
+    if (!found) throw new CompanionServiceError("not_found", "The exact durable Re-anchor request is unknown.");
+    return found;
+  }
+
+  private async prepareCommand(payload: CommandPreparationPayload): Promise<PreparedCommandResult> {
     if (!isCommandPreparationExecutor(this.executor)) return { status: "unavailable", summary: "No durable command-preparation boundary is attached." };
     const definition = commandFor(payload.control, payload.modifier);
     if (!definition) return { status: "blocked", summary: "The chord is intentionally unassigned and cannot be prepared." };
+    const hasReviewArtifact = !!payload.reviewArtifactId || !!payload.reviewArtifactDigest;
+    if (isAutomationManifestAction(definition.action)) {
+      if (payload.effectSessionId) return { status: "blocked", summary: "Automation review never accepts a debug-effect session reference." };
+      if (hasReviewArtifact || payload.reviewScopeDigest) {
+        if (!payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.reviewScopeDigest || !payload.sessionId) {
+          return { status: "blocked", summary: "Automation confirmation requires one exact protected manifest id, digest, review scope, and managed session." };
+        }
+        if (!this.automationManifestReviews || !isConfirmationCapableExecutor(this.executor)) {
+          return { status: "unavailable", summary: "The protected automation manifest or confirmation boundary is unavailable." };
+        }
+        const inspected = await this.automationManifestReviews.inspect({
+          manifestId: payload.reviewArtifactId,
+          manifestDigest: payload.reviewArtifactDigest,
+          reviewScopeDigest: payload.reviewScopeDigest,
+          sessionId: payload.sessionId
+        });
+        if (!inspected || inspected.manifest.action !== definition.action) {
+          return { status: "blocked", summary: "The reviewed automation manifest is absent, stale, consumed, changed, or bound to a different action." };
+        }
+        let current: ManagedSession;
+        try { current = this.requireSession(payload.sessionId); }
+        catch { return { status: "blocked", summary: "The reviewed automation source session is no longer current in this companion connection." }; }
+        const confirmation = await this.executor.requestConfirmation({
+          action: definition.action,
+          sessionId: current.id,
+          authorityId: inspected.manifest.authorityId,
+          reason: payload.reason,
+          confirmationScopeDigest: inspected.reviewScopeDigest
+        });
+        if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+          const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+          this.record("command.prepare", status, confirmation.summary, current.id);
+          return { status, summary: confirmation.summary, session: current, authorityId: inspected.manifest.authorityId };
+        }
+        const approved = await this.automationManifestReviews.approve({
+          manifestId: inspected.manifest.id,
+          manifestDigest: inspected.manifest.digest,
+          reviewScopeDigest: inspected.reviewScopeDigest,
+          confirmationToken: confirmation.token,
+          confirmationExpiresAt: confirmation.expiresAt
+        });
+        if (approved.status !== "approved" || !approved.approval) {
+          const status = approved.status === "blocked" ? "blocked" : "unavailable";
+          this.record("command.prepare", status, approved.summary, current.id);
+          return { status, summary: approved.summary, session: current, authorityId: inspected.manifest.authorityId };
+        }
+        const result: PreparedCommandResult = {
+          status: "prepared",
+          summary: approved.summary,
+          session: current,
+          authorityId: inspected.manifest.authorityId,
+          confirmationToken: confirmation.token,
+          confirmationScopeDigest: inspected.reviewScopeDigest,
+          confirmationExpiresAt: confirmation.expiresAt
+        };
+        this.record("command.prepare", "completed", result.summary, current.id);
+        return result;
+      }
+      const initial = await this.executor.prepareCommand({
+        action: definition.action,
+        ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+        reason: payload.reason
+      });
+      if (initial.session) this.installTrustedSession(initial.session);
+      if (initial.status !== "incomplete" || !initial.session || !initial.authorityId) {
+        this.record("command.prepare", initial.status === "prepared" ? "completed" : initial.status, initial.summary, payload.sessionId);
+        return initial;
+      }
+      if (!this.automationManifestCoordinator) {
+        return { status: "unavailable", summary: "No installed automation manifest proposal coordinator is attached.", session: initial.session, authorityId: initial.authorityId };
+      }
+      const prepared = await this.automationManifestCoordinator.prepare({
+        action: definition.action,
+        sessionId: initial.session.id,
+        authorityId: initial.authorityId
+      });
+      if (prepared.status !== "prepared") {
+        this.record("command.prepare", prepared.status, prepared.summary, initial.session.id);
+        return { status: prepared.status, summary: prepared.summary, session: initial.session, authorityId: initial.authorityId };
+      }
+      if (!prepared.manifest || !prepared.reviewScopeDigest) {
+        const summary = "The automation proposal coordinator returned no exact protected review manifest.";
+        this.record("command.prepare", "unavailable", summary, initial.session.id);
+        return { status: "unavailable", summary, session: initial.session, authorityId: initial.authorityId };
+      }
+      const result: PreparedCommandResult = {
+        status: "incomplete",
+        summary: prepared.summary,
+        session: initial.session,
+        authorityId: initial.authorityId,
+        automationReview: { action: definition.action, manifest: prepared.manifest, reviewScopeDigest: prepared.reviewScopeDigest }
+      };
+      this.record("command.prepare", "incomplete", result.summary, initial.session.id);
+      return result;
+    }
+    if (definition.action === "stop_managed_run") {
+      if (hasReviewArtifact || payload.reviewScopeDigest) {
+        if (payload.effectSessionId || !payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.reviewScopeDigest || !payload.sessionId) {
+          return { status: "blocked", summary: "Debug-stop confirmation requires one exact protected binding id, digest, review scope, and source session; an effect session is forbidden in phase two." };
+        }
+        if (!this.debugStops || !isConfirmationCapableExecutor(this.executor)) {
+          return { status: "unavailable", summary: "The protected debug-stop binding or confirmation boundary is unavailable." };
+        }
+        const review = await this.debugStops.inspect({
+          bindingId: payload.reviewArtifactId,
+          bindingDigest: payload.reviewArtifactDigest,
+          reviewScopeDigest: payload.reviewScopeDigest,
+          sourceSessionId: payload.sessionId
+        });
+        if (!review) return { status: "blocked", summary: "The reviewed debug-stop binding is absent, stale, consumed, changed, or forged." };
+        let current: ManagedSession;
+        try { current = this.requireSession(payload.sessionId); }
+        catch { return { status: "blocked", summary: "The reviewed debug-stop authority source session is no longer current in this companion connection." }; }
+        const confirmation = await this.executor.requestConfirmation({
+          action: definition.action,
+          sessionId: current.id,
+          authorityId: review.authorityId,
+          reason: payload.reason,
+          confirmationScopeDigest: review.reviewScopeDigest
+        });
+        if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+          const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+          this.record("command.prepare", status, confirmation.summary, current.id);
+          return { status, summary: confirmation.summary, session: current, authorityId: review.authorityId };
+        }
+        const result: PreparedCommandResult = {
+          status: "prepared",
+          summary: "The exact reviewed debug-stop split binding was reauthenticated for one dispatch.",
+          session: current,
+          authorityId: review.authorityId,
+          confirmationToken: confirmation.token,
+          confirmationScopeDigest: review.reviewScopeDigest,
+          confirmationExpiresAt: confirmation.expiresAt
+        };
+        this.record("command.prepare", "completed", result.summary, current.id);
+        return result;
+      }
+      if (!payload.sessionId || !payload.effectSessionId) {
+        return { status: "blocked", summary: "Debug-stop preparation requires the exact provider authority session and a distinct trusted-host debug effect session." };
+      }
+      const initial = await this.executor.prepareCommand({ action: definition.action, sessionId: payload.sessionId, reason: payload.reason });
+      if (initial.session) this.installTrustedSession(initial.session);
+      if (initial.status !== "incomplete" || !initial.session || !initial.authorityId) {
+        this.record("command.prepare", initial.status === "prepared" ? "completed" : initial.status, initial.summary, payload.sessionId);
+        return initial;
+      }
+      if (!this.debugStops) {
+        return { status: "unavailable", summary: "No protected debug-stop split-binding store is attached.", session: initial.session, authorityId: initial.authorityId };
+      }
+      try {
+        const prepared = await this.debugStops.prepare({
+          sourceSessionId: initial.session.id,
+          effectSessionId: payload.effectSessionId,
+          authorityId: initial.authorityId
+        });
+        const result: PreparedCommandResult = {
+          status: "incomplete",
+          summary: "The exact protected debug-stop split binding is ready for trusted UI review; no debug effect has started.",
+          session: initial.session,
+          authorityId: initial.authorityId,
+          debugStopReview: debugStopReview(prepared.binding)
+        };
+        this.record("command.prepare", "incomplete", result.summary, initial.session.id);
+        return result;
+      } catch {
+        return { status: "blocked", summary: "The exact current provider/debug/origin binding could not be prepared for debug-stop review.", session: initial.session, authorityId: initial.authorityId };
+      }
+    }
+    if (payload.effectSessionId) {
+      return { status: "blocked", summary: "A debug-effect session is accepted only during the first phase of exact debug-stop preparation." };
+    }
+    if (definition.action === "authority_broadcast" && payload.reviewScopeDigest) {
+      if (!payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.sessionId) {
+        return { status: "blocked", summary: "Authority Broadcast confirmation requires one exact protected reviewed artifact and managed session." };
+      }
+      if (!this.workflowArtifacts || !isConfirmationCapableExecutor(this.executor)) {
+        return { status: "unavailable", summary: "The protected Authority Broadcast artifact or confirmation boundary is unavailable." };
+      }
+      let artifact: WorkflowArtifact | undefined;
+      try { artifact = await this.workflowArtifacts.get(payload.reviewArtifactId); }
+      catch { return { status: "unavailable", summary: "The protected Authority Broadcast artifact could not be verified." }; }
+      if (!artifact || artifact.status !== "prepared" || artifact.action !== "authority_broadcast"
+        || artifact.digest !== payload.reviewArtifactDigest || artifact.sessionId !== payload.sessionId || !artifact.authorityId
+        || artifact.payload.kind !== "authority" || artifact.payload.mode !== "broadcast") {
+        return { status: "blocked", summary: "The reviewed Authority Broadcast artifact is absent, stale, or changed its exact action/session/authority binding." };
+      }
+      let current: ManagedSession;
+      try { current = this.requireSession(payload.sessionId); }
+      catch { return { status: "blocked", summary: "The reviewed Authority Broadcast source session is no longer current." }; }
+      if (!current.workspaceRoot || !current.targetSnapshotId
+        || normalizeHostPath(current.workspaceRoot) !== normalizeHostPath(artifact.repositoryRoot)
+        || current.targetSnapshotId !== artifact.targetSnapshotId
+        || current.taskId !== artifact.taskId || current.planRevision !== artifact.planRevision) {
+        return { status: "blocked", summary: "The reviewed Authority Broadcast artifact no longer matches the exact current session target, task, and plan." };
+      }
+      let scopeDigest: string;
+      try { scopeDigest = authorityBroadcastReviewScopeDigest(artifact); }
+      catch { return { status: "blocked", summary: "The Authority Broadcast review artifact is malformed." }; }
+      if (scopeDigest !== payload.reviewScopeDigest) {
+        return { status: "blocked", summary: "The Authority Broadcast review acknowledgement does not match the exact protected recipient packet scope." };
+      }
+      const confirmation = await this.executor.requestConfirmation({
+        action: definition.action, sessionId: current.id, authorityId: artifact.authorityId,
+        reason: payload.reason, confirmationScopeDigest: scopeDigest
+      });
+      if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+        const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+        this.record("command.prepare", status, confirmation.summary, current.id);
+        return { status, summary: confirmation.summary, session: current, authorityId: artifact.authorityId };
+      }
+      const result = {
+        status: "prepared" as const, summary: confirmation.summary, session: current, authorityId: artifact.authorityId,
+        confirmationToken: confirmation.token, confirmationScopeDigest: scopeDigest, confirmationExpiresAt: confirmation.expiresAt
+      };
+      this.record("command.prepare", "completed", result.summary, current.id);
+      return result;
+    }
+    if (payload.reviewArtifactId || payload.reviewArtifactDigest) {
+      return { status: "blocked", summary: "Protected review artifact references are accepted only by their exact two-phase review ceremony." };
+    }
     const result = await this.executor.prepareCommand({ action: definition.action, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), reason: payload.reason, ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) });
     if (result.session) this.installTrustedSession(result.session);
     this.record("command.prepare", result.status === "prepared" ? "completed" : result.status, result.summary, payload.sessionId);
@@ -1293,7 +1631,13 @@ export class CompanionService {
     const claim = await this.hardwareSignals.resolveLiveClaim(payload);
     const sessionId = payload.sessionId ?? claim.windowSessionId;
     await this.assertHardwareDispatchSession(claim, sessionId);
-    const preparation = await this.prepareCommand({ control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason, ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) });
+    const preparation = await this.prepareCommand({
+      control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason,
+      ...(payload.effectSessionId ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(payload.reviewArtifactId ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(payload.reviewArtifactDigest ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    });
     if (preparation.status === "prepared") return { preparation };
     // Plan Approval is deliberately a two-phase host ceremony.  The first
     // preparation returns the exact provider-observed review packet without
@@ -1301,7 +1645,8 @@ export class CompanionService {
     // live so the same canonical signal can be prepared again only after the
     // trusted UI echoes that exact review scope.  Recording a disposition here
     // would consume the signal before the reviewed second phase could occur.
-    if (preparation.status === "incomplete" && preparation.workflowReview) return { preparation };
+    if (preparation.status === "incomplete" && (preparation.workflowReview || preparation.automationReview || preparation.debugStopReview
+      || (claim.control === "AUTHORITY_REFRESH" && claim.modifier === "shift" && preparation.authorityId))) return { preparation };
     const assignment = assignmentFor(claim.control, claim.modifier);
     if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
     const disposition = await this.hardwareSignals.recordDispatch({
@@ -1375,11 +1720,22 @@ export class CompanionService {
   }
 
   private requireHardwareSignalPreparation(payload: unknown): HardwareSignalPreparationPayload {
-    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId", "reviewScopeDigest"])
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId", "effectSessionId", "reviewScopeDigest", "reviewArtifactId", "reviewArtifactDigest"])
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
       || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))
-      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, bounded reason, and only a host-issued Plan Approval review digest.");
-    return { ...parseHardwareClaimReference(payload), reason: payload.reason, ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}), ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) };
+      || (payload.effectSessionId !== undefined && !boundedReferenceValue(payload.effectSessionId))
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))
+      || (payload.reviewArtifactId !== undefined && !boundedReferenceValue(payload.reviewArtifactId))
+      || (payload.reviewArtifactDigest !== undefined && (typeof payload.reviewArtifactDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewArtifactDigest)))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, bounded reason, and only exact host-issued review references.");
+    if ((payload.reviewArtifactId === undefined) !== (payload.reviewArtifactDigest === undefined)) throw new CompanionServiceError("invalid_request", "A protected review artifact ID and digest must be supplied together.");
+    return {
+      ...parseHardwareClaimReference(payload), reason: payload.reason,
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}),
+      ...(typeof payload.effectSessionId === "string" ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(typeof payload.reviewArtifactId === "string" ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(typeof payload.reviewArtifactDigest === "string" ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    };
   }
 
   private requireHardwareSignalDispatch(payload: unknown): HardwareSignalDispatchPayload {
@@ -1506,14 +1862,61 @@ export class CompanionService {
     return { action: payload.action as CommandAction, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(payload.authorityId ? { authorityId: payload.authorityId } : {}) };
   }
 
+  private requireReanchorAuthorityList(payload: unknown): ReanchorAuthorityListPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId"]) || !boundedReferenceValue(payload.sessionId)) {
+      throw new CompanionServiceError("invalid_request", "Eligible Re-anchor authority lookup requires one exact managed-session ID.");
+    }
+    return { sessionId: payload.sessionId };
+  }
+
+  private requireReanchorBegin(payload: unknown): ReanchorBeginPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "authorityId", "reason"])
+      || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512 || /[\r\n\0]/.test(payload.reason)) {
+      throw new CompanionServiceError("invalid_request", "Re-anchor begin requires one exact managed session, existing authority, and bounded reason.");
+    }
+    return { sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason.trim() };
+  }
+
+  private requireReanchorHardwareBegin(payload: unknown): ReanchorHardwareBeginPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "sessionId", "authorityId", "reason"])) {
+      throw new CompanionServiceError("invalid_request", "Hardware Re-anchor begin requires one exact live claim, managed session, existing authority, and bounded reason.");
+    }
+    const claim = parseHardwareClaimReference(payload);
+    const begin = this.requireReanchorBegin({ sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason });
+    return { ...claim, ...begin };
+  }
+
+  private requireReanchorConfirmation(payload: unknown): ReanchorConfirmationPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["requestId"]) || typeof payload.requestId !== "string" || !/^reanchor:[a-f0-9]{64}$/.test(payload.requestId)) {
+      throw new CompanionServiceError("invalid_request", "Re-anchor confirmation accepts only one exact protected request ID.");
+    }
+    return { requestId: payload.requestId };
+  }
+
+  private requireReanchorGet(payload: unknown): ReanchorGetPayload {
+    return this.requireReanchorConfirmation(payload);
+  }
+
   private requireCommandPreparation(payload: unknown): CommandPreparationPayload {
-    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier", "reason"], ["sessionId", "reviewScopeDigest"]) || !isControl(payload.control) || !isModifier(payload.modifier)
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier", "reason"], ["sessionId", "effectSessionId", "reviewScopeDigest", "reviewArtifactId", "reviewArtifactDigest"]) || !isControl(payload.control) || !isModifier(payload.modifier)
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
       || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")
-      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))) {
+      || (payload.effectSessionId !== undefined && !boundedReferenceValue(payload.effectSessionId))
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))
+      || (payload.reviewArtifactId !== undefined && !boundedReferenceValue(payload.reviewArtifactId))
+      || (payload.reviewArtifactDigest !== undefined && (typeof payload.reviewArtifactDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewArtifactDigest)))) {
       throw new CompanionServiceError("invalid_request", "Command preparation requires a canonical chord, bounded host reason, and optional exact session ID.");
     }
-    return { control: payload.control, modifier: payload.modifier, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) };
+    if ((payload.reviewArtifactId === undefined) !== (payload.reviewArtifactDigest === undefined)) throw new CompanionServiceError("invalid_request", "A protected review artifact ID and digest must be supplied together.");
+    return {
+      control: payload.control, modifier: payload.modifier, reason: payload.reason,
+      ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+      ...(typeof payload.effectSessionId === "string" ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(typeof payload.reviewArtifactId === "string" ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(typeof payload.reviewArtifactDigest === "string" ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    };
   }
 
   private requireHostActionCompletion(payload: unknown): HostActionCompletionPayload {
@@ -1538,13 +1941,17 @@ export class CompanionService {
   }
 
   private requireHostActionClaim(payload: unknown): HostActionClaimPayload {
-    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "adapterVersion", "capabilities", "focused"])
+    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "workspaceRoots", "adapterVersion", "capabilities", "focused"])
       || !boundedReferenceValue(payload.windowSessionId) || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || !Array.isArray(payload.workspaceRoots) || payload.workspaceRoots.length > 32
+      || !payload.workspaceRoots.every((root) => boundedHostPath(root))
+      || new Set(payload.workspaceRoots.map((root) => normalizeHostPath(root as string))).size !== payload.workspaceRoots.length
       || payload.focused !== true || !Array.isArray(payload.capabilities) || payload.capabilities.length !== 1 || payload.capabilities[0] !== "show_voice_center") {
       throw new CompanionServiceError("invalid_request", "A host-action claim requires one focused extension window, exact adapter version, and the closed Voice Center capability.");
     }
-    this.requireCurrentHostActionWindowBinding(payload.windowSessionId, payload.adapterVersion);
-    return { windowSessionId: payload.windowSessionId, adapterVersion: payload.adapterVersion, capabilities: ["show_voice_center"], focused: true };
+    const workspaceRoots = payload.workspaceRoots as string[];
+    this.requireCurrentHostActionWindowBinding(payload.windowSessionId, payload.adapterVersion, workspaceRoots);
+    return { windowSessionId: payload.windowSessionId, workspaceRoots, adapterVersion: payload.adapterVersion, capabilities: ["show_voice_center"], focused: true };
   }
 
   private requireHostActionAuthorization(payload: unknown): HostActionAuthorizationPayload {
@@ -1560,7 +1967,7 @@ export class CompanionService {
     return { hostActionId: payload.hostActionId, adapterVersion: payload.adapterVersion, ...(typeof payload.selectionId === "string" ? { selectionId: payload.selectionId } : {}), ...claim };
   }
 
-  private requireCurrentHostActionWindowBinding(windowSessionId: string, adapterVersion: string): void {
+  private requireCurrentHostActionWindowBinding(windowSessionId: string, adapterVersion: string, workspaceRoots?: readonly string[]): void {
     const session = this.requireSession(windowSessionId);
     if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !session.capabilities.includes("registered")
       || session.status === "stale" || session.status === "unreachable") {
@@ -1573,6 +1980,14 @@ export class CompanionService {
     try { registeredCapabilities = JSON.parse(session.metadata["sxsy-b122.hostActionCapabilities"] ?? "null"); } catch { registeredCapabilities = undefined; }
     if (!Array.isArray(registeredCapabilities) || registeredCapabilities.length !== 1 || registeredCapabilities[0] !== "show_voice_center") {
       throw new CompanionServiceError("capability_denied", "The Registered extension window has no exact Voice Center delivery capability.");
+    }
+    if (workspaceRoots) {
+      let registeredRoots: unknown;
+      try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+      if (!Array.isArray(registeredRoots) || registeredRoots.length > 32 || !registeredRoots.every((root) => boundedHostPath(root))
+        || !sameHostRoots(registeredRoots as string[], workspaceRoots)) {
+        throw new CompanionServiceError("capability_denied", "The host-action claim workspace roots do not match the exact Registered VS Code window binding.");
+      }
     }
   }
 
@@ -1608,6 +2023,7 @@ export class CompanionService {
 
   private requireWorkflowPrepare(payload: unknown): WorkflowPreparePayload {
     if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "authorityId", "intent"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, host-issued authority, and bounded intent.");
+    if (payload.action === "reanchor") throw new CompanionServiceError("invalid_request", "Re-anchor requires the dedicated Re-anchor lifecycle; generic workflow preparation is forbidden.");
     return { action: payload.action, sessionId: payload.sessionId, authorityId: payload.authorityId, intent: workflowPreparationIntent(payload.intent) };
   }
 
@@ -1917,6 +2333,22 @@ function sameHostRoots(left: readonly string[], right: readonly string[]): boole
 }
 
 function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
+
+function exactEligibleReanchorAuthorities(value: unknown): readonly ReanchorEligibleAuthority[] {
+  if (!Array.isArray(value) || value.length > 32) throw new CompanionServiceError("invalid_request", "The host returned an invalid eligible Re-anchor authority set.");
+  const seen = new Set<string>();
+  const result: ReanchorEligibleAuthority[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !exactKeys(item, ["id", "issuedBy", "expiresAt"])
+      || !boundedReferenceValue(item.id) || !boundedReferenceValue(item.issuedBy)
+      || typeof item.expiresAt !== "string" || !Number.isFinite(Date.parse(item.expiresAt)) || seen.has(item.id)) {
+      throw new CompanionServiceError("invalid_request", "The host returned an invalid eligible Re-anchor authority set.");
+    }
+    seen.add(item.id);
+    result.push({ id: item.id, issuedBy: item.issuedBy, expiresAt: new Date(Date.parse(item.expiresAt)).toISOString() });
+  }
+  return result.sort((left, right) => left.expiresAt.localeCompare(right.expiresAt) || left.id.localeCompare(right.id));
+}
 function boundedIdentifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
 function boundedReason(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 2_048 && !/\0/.test(value); }
 function boundedStringList(value: unknown, label: string): readonly string[] { if (!Array.isArray(value) || value.length > 512 || !value.every((item) => typeof item === "string" && item.trim() && item.length <= 16_384 && !/\0/.test(item))) throw new CompanionServiceError("invalid_request", `${label} must be a bounded string list.`); return [...new Set(value.map((item) => (item as string).trim()))]; }
@@ -1984,6 +2416,10 @@ function isTerminalProvider(value: unknown): value is SessionAdoptionPayload["pr
 
 function isGitReviewAction(value: unknown): value is GitReviewPayload["action"] {
   return value === "local_commit" || value === "pr_upsert" || value === "pr_merge" || value === "direct_main";
+}
+
+function isAutomationManifestAction(value: CommandAction): value is AutomationManifestCommandReview["action"] {
+  return value === "compound_capture" || value === "compound_refresh" || value === "lfg" || value === "repair_mission";
 }
 
 function isSurface(value: unknown): value is ManagedSession["surface"] {

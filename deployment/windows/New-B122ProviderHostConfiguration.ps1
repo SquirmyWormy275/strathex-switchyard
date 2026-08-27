@@ -64,9 +64,9 @@ $tlsIdentity=Tls-Identity $certificate $privateKey
 if($ListenHost -cnotin @('127.0.0.1','::1')){throw 'ListenHost must be one exact loopback address.'}
 
 $plan=Get-Content -LiteralPath $planPath -Raw|ConvertFrom-Json
-if(-not(Exact-Keys $plan @('schema','version','providers')) -or $plan.schema -cne 'sxsy-b122.provider-host-backend-plan' -or $plan.version -ne 1){throw 'The provider-host backend plan schema is invalid.'}
+if(-not(Exact-Keys $plan @('schema','version','providers') @('effectDrivers')) -or $plan.schema -cne 'sxsy-b122.provider-host-backend-plan' -or $plan.version -ne 1){throw 'The provider-host backend plan schema is invalid.'}
 $entries=@($plan.providers);if($entries.Count -lt 1 -or $entries.Count -gt 2){throw 'The provider-host backend plan must contain one or two providers.'}
-$providers=@();$seen=@{};$protectedFiles=New-Object Collections.Generic.List[string];$protectedFiles.Add($privateKey);$protectedFiles.Add($tokenEnvelope);$protectedFiles.Add($journalEnvelope);$protectedFiles.Add($dispatchLeaseEnvelope)
+$providers=@();$seen=@{};$providerModules=@{};$protectedFiles=New-Object Collections.Generic.List[string];$protectedFiles.Add($privateKey);$protectedFiles.Add($tokenEnvelope);$protectedFiles.Add($journalEnvelope);$protectedFiles.Add($dispatchLeaseEnvelope)
 foreach($entry in $entries){
   if($entry.provider -cnotin @('claude','codex') -or $entry.kind -cnotin @('fixture','module') -or $seen.ContainsKey([string]$entry.provider)){throw 'The provider-host backend plan has an invalid or duplicate provider.'};$seen[[string]$entry.provider]=$true
   if($entry.kind -ceq 'fixture'){
@@ -78,9 +78,21 @@ foreach($entry in $entries){
   Assert-NoReparseSegments $module;Assert-NoReparseSegments $credential
   if(-not(Inside $protectedRoot $credential)){throw 'Provider credential envelopes must remain beneath ProtectedStateRoot.'};Assert-RegularFile $module 'Provider module';Assert-Envelope $credential 'Provider credential envelope';$protectedFiles.Add($credential)
   if((Sha $module) -cne [string]$entry.moduleSha256){throw 'The provider module does not match its reviewed SHA-256 pin.'}
-  $options=[ordered]@{};if($null -ne $entry.options){foreach($property in @($entry.options.PSObject.Properties)){if($property.Name -notmatch '^[A-Za-z0-9_.-]{1,80}$' -or $property.Value -isnot [string] -or ([string]$property.Value).Length -gt 1024 -or [string]$property.Value -match '[\0\r\n]'){throw 'Provider module options are invalid.'};$options[$property.Name]=[string]$property.Value}}
-  $provider=[ordered]@{provider=[string]$entry.provider;kind='module';modulePath=$module;moduleSha256=[string]$entry.moduleSha256;credentialEnvelopeFile=$credential};if($options.Count){$provider.options=$options};$providers+=,$provider
+  $options=[ordered]@{};if(@($entry.PSObject.Properties.Name)-contains'options'){foreach($property in @($entry.options.PSObject.Properties)){if($property.Name -notmatch '^[A-Za-z0-9_.-]{1,80}$' -or $property.Value -isnot [string] -or ([string]$property.Value).Length -gt 1024 -or [string]$property.Value -match '[\0\r\n]'){throw 'Provider module options are invalid.'};$options[$property.Name]=[string]$property.Value}}
+  $provider=[ordered]@{provider=[string]$entry.provider;kind='module';modulePath=$module;moduleSha256=[string]$entry.moduleSha256;credentialEnvelopeFile=$credential};if($options.Count){$provider.options=$options};$providers+=,$provider;$providerModules[[string]$entry.provider]=$provider
 }
+$driverEntries=@();if(@($plan.PSObject.Properties.Name)-contains'effectDrivers'){$driverEntries=@($plan.effectDrivers)};if($driverEntries.Count -gt 2){throw 'The provider-host backend plan contains too many host effect drivers.'}
+$effectDrivers=@();$seenDrivers=@{}
+foreach($entry in $driverEntries){
+  if(-not(Exact-Keys $entry @('provider','kind','modulePath','moduleSha256')) -or $entry.provider -cnotin @('claude','codex') -or $entry.kind -cne 'module' -or $seenDrivers.ContainsKey([string]$entry.provider) -or [string]$entry.moduleSha256 -cnotmatch '^[a-f0-9]{64}$'){throw 'A host effect driver plan entry must contain one exact provider, module kind, canonical path, and SHA-256 pin.'}
+  $seenDrivers[[string]$entry.provider]=$true;$provider=$providerModules[[string]$entry.provider]
+  if($null-eq$provider){throw 'A host effect driver requires the exact configured module provider identity.'}
+  $driverModule=Absolute ([string]$entry.modulePath) 'Host effect driver modulePath';Assert-NoReparseSegments $driverModule;Assert-RegularFile $driverModule 'Host effect driver module'
+  if($driverModule-ceq[string]$provider.modulePath -or [string]$entry.moduleSha256-ceq[string]$provider.moduleSha256){throw 'The host effect driver must be independently selected and pinned from the provider runtime module.'}
+  if((Sha $driverModule)-cne[string]$entry.moduleSha256){throw 'The host effect driver module does not match its reviewed SHA-256 pin.'}
+  $effectDrivers+=,[ordered]@{provider=[string]$entry.provider;kind='module';modulePath=$driverModule;moduleSha256=[string]$entry.moduleSha256}
+}
+$effectDrivers=@($effectDrivers|Sort-Object{[string]$_.provider})
 Assert-ProtectedAcl (@($protectedRoot)+@($protectedFiles))
 $document=[ordered]@{
   schema='sxsy-b122.provider-host-config';version=1;protectedStateRoot=$protectedRoot;listen=[ordered]@{host=$ListenHost.ToLowerInvariant();port=$ListenPort}
@@ -88,9 +100,10 @@ $document=[ordered]@{
   authenticationTokenEnvelopeFile=$tokenEnvelope;journalAuthenticationEnvelopeFile=$journalEnvelope;dispatchLeaseAuthenticationEnvelopeFile=$dispatchLeaseEnvelope;stateFile=$state;providers=$providers
 }
 if($AllowFixtureBackends){$document.allowFixtureBackends=$true}
+if($effectDrivers.Count){$document.effectDrivers=$effectDrivers}
 $parent=Split-Path -Parent $output;if(-not(Inside $protectedRoot $parent)){throw 'The configuration parent escaped ProtectedStateRoot.'};New-Item -ItemType Directory -Force -Path $parent|Out-Null
 if((Test-Path -LiteralPath $output) -and -not $Replace){throw 'The provider-host configuration already exists; use -Replace for an atomic rollback-preserving update.'}
 $temporary=Join-Path $parent ('.provider-host-config-'+[guid]::NewGuid().ToString('N')+'.tmp');$backup=$output+'.previous'
 try{[IO.File]::WriteAllText($temporary,($document|ConvertTo-Json -Depth 10),$utf8NoBom);if(Test-Path -LiteralPath $output){Copy-Item -LiteralPath $output -Destination $backup -Force};Move-Item -LiteralPath $temporary -Destination $output -Force}finally{if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}}
 Assert-ProtectedAcl (@($protectedRoot,$output,$privateKey,$tokenEnvelope,$journalEnvelope,$dispatchLeaseEnvelope)+@($protectedFiles))
-[ordered]@{schema='sxsy-b122.provider-host-configuration-created';version=1;status='created';configurationPath=$output;configurationSha256=(Sha $output);protectedStateRoot=$protectedRoot;providerCount=$providers.Count;fixtureAuthorized=[bool]$AllowFixtureBackends;authenticationKeyRolesDistinct=$true;cleartextCredentialRead=$false;previousPreserved=(Test-Path -LiteralPath $backup -PathType Leaf)}|ConvertTo-Json -Compress
+[ordered]@{schema='sxsy-b122.provider-host-configuration-created';version=1;status='created';configurationPath=$output;configurationSha256=(Sha $output);protectedStateRoot=$protectedRoot;providerCount=$providers.Count;effectDriverCount=$effectDrivers.Count;mediatedConfigurationPresent=($effectDrivers.Count-gt0);fixtureAuthorized=[bool]$AllowFixtureBackends;authenticationKeyRolesDistinct=$true;cleartextCredentialRead=$false;previousPreserved=(Test-Path -LiteralPath $backup -PathType Leaf)}|ConvertTo-Json -Compress

@@ -55,3 +55,16 @@ test("every provider-backed agent command receives a final complete-target effec
     assert.equal(definition.requiresCompleteTargetSnapshot, true, `${action} must receive a final effect guard`);
   }
 });
+
+test("every installed GitHub and hosted Pipeline observation declares the complete target required by its final effect guard", () => {
+  for (const action of [
+    "github_home", "github_pr", "github_issues", "github_actions", "pipeline_status", "pipeline_failure_trace"
+  ] as const) {
+    const definition = commandForAction(action);
+    assert.equal(definition.requiresTarget, true, `${action} must remain bound to the selected repository`);
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${action} must receive the final exact TargetSnapshot guard required by its installed adapter`);
+  }
+  for (const definition of [...commandCatalog, ...administrativeCommands].filter((entry) => entry.requiresTarget)) {
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${definition.action} cannot define a weaker unguarded repository target`);
+  }
+});

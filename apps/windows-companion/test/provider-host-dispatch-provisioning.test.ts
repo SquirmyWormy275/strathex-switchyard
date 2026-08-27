@@ -36,7 +36,7 @@ test("authenticated companion provisioning transfers two sealed references and o
   const temporary = await mkdtemp(join(tmpdir(), "b122-dispatch-provisioning-"));
   context.after(async () => { await rm(temporary, { recursive: true, force: true }); });
   const bundle = join(temporary, "bundle");
-  const extension = join(bundle, "extension", "dist");
+  const extension = join(bundle, "extension", "dist", "apps", "vscode-extension", "src");
   await mkdir(extension, { recursive: true });
   await writeFile(join(bundle, "package.json"), JSON.stringify({ type: "module" }), "utf8");
   await writeFile(join(extension, "named-pipe-transport.js"), `

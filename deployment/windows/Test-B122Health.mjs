@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } = require(join(root, "extension", "dist", "named-pipe-transport.js"));
+const { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } = require(join(root, "extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js"));
 const args = process.argv.slice(2);
 let configurationPath;
 let shutdown = false;

@@ -1,14 +1,16 @@
 # System Architecture
 
-> **Status:** This is the project-level architecture. The software-only
+> **Status:** This is the project-level architecture. The hardware-independent
 > implementation uses the TypeScript protocol, Windows companion, VS Code
 > bridge, and durable control-plane packages described in
 > [software-only-completion-audit.md](software-only-completion-audit.md). It
-> does not claim that the physical or provider layers are commissioned.
+> does not claim that the physical or provider layers are commissioned. The
+> remaining external prerequisites and acceptance boundaries are recorded in
+> that audit and [software-residual-ledger.md](software-residual-ledger.md).
 
 ## Layers
 
-| Layer | Responsibility | Planned artifacts |
+| Layer | Responsibility | Source and evidence artifacts |
 |---|---|---|
 | Physical | B122 switches, relegendable caps, solenoid, controller | hardware inventory, photos, fit tests |
 | Firmware/configuration | Unique physical signals and base layers | Vial export, signal map, firmware source if modified |
@@ -40,7 +42,15 @@ sequenceDiagram
 
 ## Durable intents
 
-The physical labels should describe stable operator goals, not brittle implementation details. A `HALT` key may send Ctrl+C to a known terminal, use an agent-specific interrupt action in a supported client, or refuse to act when the foreground context is unknown. The legend remains `HALT`; the adapter owns the implementation.
+The physical labels should describe stable operator goals, not brittle
+implementation details. The accepted 22-control map has no standalone `HALT`
+key. Agent interruption belongs to Re-anchor, which requests a cooperative safe
+stop and returns a discrepancy report without silently resuming or rolling work
+back. Process interruption belongs to Alt-Run, which may stop only an exact
+managed target launched for the active workspace. The installed path supports
+exact reviewed VS Code debug stop and exact managed Run process-tree stop.
+Unknown or unmediated targets remain unavailable rather than receiving a
+guessed Ctrl+C or kill.
 
 ## Safety model
 
@@ -50,6 +60,10 @@ The physical labels should describe stable operator goals, not brittle implement
 - Context transition: re-evaluate at execution time, not only key-down time.
 - Logging: record intent, adapter, outcome, and error without storing secrets or captured prompt content by default.
 - Recovery: every installation step must have a documented rollback.
+
+The complete per-control preconditions, confirmation rules, capability needs,
+and gate bindings are printed in
+[`SXSY-B122-operator-technical-manual.md`](SXSY-B122-operator-technical-manual.md).
 
 ## Trust boundaries
 

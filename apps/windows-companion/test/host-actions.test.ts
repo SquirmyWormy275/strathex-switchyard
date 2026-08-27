@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import type { ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import { companionBridgeVersion } from "../src/bridge.ts";
 import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
@@ -64,14 +64,66 @@ test("GitHub host actions preserve the exact canonical GitHub Enterprise host", 
   assert.equal(result.data?.hostActionUrl, "https://ghe.example.test/acme/switchyard/actions/runs/9");
 });
 
-test("Voice Center queues only the native host action and never a browser fallback", async (context) => {
+test("venv host actions durably preserve the exact protected interpreter identity and reject idempotency-field substitution", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-venv-identity-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
+  const pythonInterpreter = `${target.repositoryRoot}\\.venv\\Scripts\\python.exe`;
+  const pythonInterpreterIdentity = {
+    canonicalPath: pythonInterpreter, sha256: "7".repeat(64), device: "1", inode: "2", size: 42, modifiedMs: 1_777_000_000_000
+  };
+  const request = { definition: commandForAction("venv"), operationId: "operation-venv-identity", target };
+  const intent = await queue.enqueue(request, { hostAction: "configure_python_venv", pythonInterpreter, pythonInterpreterIdentity });
+  assert.deepEqual(intent.pythonInterpreterIdentity, pythonInterpreterIdentity);
+  assert.deepEqual((await queue.listPending())[0]?.pythonInterpreterIdentity, pythonInterpreterIdentity);
+  await assert.rejects(
+    queue.enqueue(request, { hostAction: "configure_python_venv", pythonInterpreter, pythonInterpreterIdentity: { ...pythonInterpreterIdentity, sha256: "8".repeat(64) } }),
+    /different intent|operation/i
+  );
+  await assert.rejects(
+    queue.enqueue({ definition: commandForAction("github_home"), operationId: "operation-invalid-identity", target }, { hostAction: "open_external_url", url: "https://github.com/acme/switchyard", pythonInterpreterIdentity } as never),
+    /only the exact Python-environment host action/i
+  );
+});
+
+test("all four Voice chords queue one durable extension-owned host-action lifecycle and never a browser or workflow fallback", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-voice-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }));
-  const result = await new DurableHostActionAdapter(queue).execute({ definition: commandForAction("open_voice"), operationId: "operation-voice-center", target });
-  assert.equal(result.status, "running");
-  assert.equal(result.data?.hostActionKind, "show_voice_center");
-  assert.equal(result.data?.hostActionUrl, undefined);
+  const adapter = new DurableHostActionAdapter(queue);
+  for (const [index, action] of (["open_voice", "switch_voice_provider", "bind_voice_session", "voice_session_picker"] as const).entries()) {
+    const result = await adapter.execute({ definition: commandForAction(action), operationId: `operation-voice-${index}`, target });
+    assert.equal(result.status, "running");
+    assert.equal(result.data?.hostActionKind, "show_voice_center");
+    assert.equal(result.data?.hostActionUrl, undefined);
+  }
+  assert.deepEqual((await queue.listPending()).map((intent) => [intent.commandAction, intent.hostAction]), [
+    ["open_voice", "show_voice_center"],
+    ["switch_voice_provider", "show_voice_center"],
+    ["bind_voice_session", "show_voice_center"],
+    ["voice_session_picker", "show_voice_center"]
+  ]);
+});
+
+test("targeted Voice actions can be claimed only by a registered window containing their exact repository root", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-actions-voice-root-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const queue = new DurableHostActionQueue(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator }), {
+    now: () => new Date("2026-08-25T12:00:00.000Z"),
+    claimTokenFactory: () => "target-aware-voice-claim-token"
+  });
+  const source: ManagedSession = {
+    id: "voice-provider-source", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "running",
+    workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, plannedFiles: [], lastHeartbeat: "2026-08-25T12:00:00.000Z", adapterVersion: "provider-1", metadata: {}
+  };
+  await queue.enqueue({ definition: commandForAction("bind_voice_session"), operationId: "operation-targeted-voice", target, session: source }, { hostAction: "show_voice_center" });
+  assert.equal(await queue.claim({ windowSessionId: "wrong-window", workspaceRoots: ["C:/isolated/other"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined);
+  const claim = await queue.claim({ windowSessionId: "exact-window", workspaceRoots: ["C:/isolated/repo", "C:/isolated/second"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
+  assert.ok(claim);
+  assert.equal(claim.workspaceRoot, target.repositoryRoot);
+  assert.equal(claim.targetSnapshotId, target.id);
+  assert.equal(claim.sessionId, source.id);
+  assert.equal(claim.commandAction, "bind_voice_session");
 });
 
 test("Voice Center claims are durable, single-consumer, and never replayed after an ambiguous or expired lease", async (context) => {
@@ -88,19 +140,19 @@ test("Voice Center claims are durable, single-consumer, and never replayed after
   } as const;
   const queue = new DurableHostActionQueue(store, options);
   const intent = await queue.enqueue({ definition: commandForAction("open_voice"), operationId: "operation-voice-claim" }, { hostAction: "show_voice_center" });
-  const first = await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
+  const first = await queue.claim({ windowSessionId: "vscode-window-one", workspaceRoots: [target.repositoryRoot], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
   assert.ok(first);
   assert.equal(first.hostActionId, intent.id);
   assert.equal(first.hostActionKind, "show_voice_center");
   assert.equal(first.claimToken, "voice-claim-token-1");
 
-  assert.equal(await queue.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined);
-  assert.equal(await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a lost claim response must not be replayed even to the same window");
+  assert.equal(await queue.claim({ windowSessionId: "vscode-window-two", workspaceRoots: [target.repositoryRoot], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined);
+  assert.equal(await queue.claim({ windowSessionId: "vscode-window-one", workspaceRoots: [target.repositoryRoot], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a lost claim response must not be replayed even to the same window");
 
   const restarted = new DurableHostActionQueue(store, options);
-  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a queued claim remains single-consumer across restart");
+  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", workspaceRoots: [target.repositoryRoot], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "a queued claim remains single-consumer across restart");
   now = new Date("2026-08-25T12:00:01.001Z");
-  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "an expired claim is reconciliation work, not replay authority");
+  assert.equal(await restarted.claim({ windowSessionId: "vscode-window-two", workspaceRoots: [target.repositoryRoot], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }), undefined, "an expired claim is reconciliation work, not replay authority");
   await assert.rejects(restarted.authorize({
     hostActionId: first.hostActionId,
     adapterVersion: first.adapterVersion,
@@ -120,7 +172,7 @@ test("a claimed Voice Center action authorizes and settles only through its exac
     finalAuthorizer: { async authorize() { return { allowed: true, reason: "current" }; } }
   });
   await queue.enqueue({ definition: commandForAction("open_voice"), operationId: "operation-voice-settle" }, { hostAction: "show_voice_center" });
-  const claim = await queue.claim({ windowSessionId: "vscode-window-one", adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
+  const claim = await queue.claim({ windowSessionId: "vscode-window-one", workspaceRoots: ["C:/isolated/ui"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true });
   assert.ok(claim);
   await assert.rejects(queue.authorize({ hostActionId: claim.hostActionId, adapterVersion: claim.adapterVersion }), /claim/i);
   await assert.rejects(queue.authorize({ ...claim, hostActionId: claim.hostActionId, claimToken: "substituted-token" }), /claim/i);
@@ -212,6 +264,45 @@ test("host actions fail closed on target churn, missing authorization, and autho
   assert.equal(settled.status, "completed");
 });
 
+test("split debug-stop intent durably preserves separate source/effect bindings and rejects field confusion across restart", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-debug-split-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const queue = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:00.000Z") });
+  const source: ManagedSession = {
+    id: "provider-source", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-debug", planRevision: "plan-debug",
+    plannedFiles: [], lastHeartbeat: "2026-08-24T12:00:00.000Z", adapterVersion: "provider-1", metadata: { "sxsy-b122.providerHandshake": "exact-route-v1" }
+  };
+  const plan = {
+    hostAction: "stop_vscode_debug" as const, debugConfiguration: "Launch test", debugSessionId: "debug-1",
+    debugEffectSessionId: "debug-effect", debugEffectSessionBindingDigest: "a".repeat(64), debugSourceSessionBindingDigest: "b".repeat(64),
+    debugBindingId: "debug-binding-1", debugOriginOperationId: "operation-debug-origin"
+  };
+  const intent = await queue.enqueue({ definition: commandForAction("stop_managed_run"), operationId: "operation-debug-stop", target, session: source }, plan);
+  assert.equal(intent.sessionId, source.id);
+  assert.equal(intent.debugEffectSessionId, "debug-effect");
+  assert.equal(intent.debugSourceSessionBindingDigest, "b".repeat(64));
+  assert.equal(intent.debugEffectSessionBindingDigest, "a".repeat(64));
+  assert.equal(intent.debugBindingId, "debug-binding-1");
+  assert.equal(intent.debugOriginOperationId, "operation-debug-origin");
+
+  const restarted = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:01.000Z") });
+  assert.deepEqual(await restarted.listPending(), [intent], "restart recovery must retain the sealed split binding without a new bridge selection");
+  await assert.rejects(
+    restarted.enqueue({ definition: commandForAction("stop_managed_run"), operationId: "operation-debug-stop", target, session: source }, { ...plan, debugEffectSessionId: "substituted-effect" }),
+    /different intent data/i
+  );
+  await assert.rejects(
+    restarted.enqueue({ definition: commandForAction("github_home"), operationId: "operation-non-debug", target, session: source }, { hostAction: "open_external_url", url: "https://github.com/acme/switchyard", debugEffectSessionId: "debug-effect" }),
+    /only the exact VS Code debug host actions/i
+  );
+  await assert.rejects(
+    restarted.enqueue({ definition: commandForAction("stop_managed_run"), operationId: "operation-missing-debug-binding", target, session: source }, { ...plan, debugBindingId: undefined }),
+    /requires one exact configuration.*protected source\/effect.*debug binding/i
+  );
+});
+
 test("expired authorization and post-effect uncertainty remain incomplete and non-replayable", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-uncertain-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
@@ -274,9 +365,82 @@ test("host-owned cancellation settles only exact queued operation intents and is
   assert.equal(await queue.cancelQueuedForRepository(target.repositoryRoot, "containment"), 1);
 
   const restarted = new DurableHostActionQueue(store, { now: () => new Date("2026-08-24T12:00:01.000Z") });
-  assert.deepEqual(await restarted.observeOperation("operation-cancel", "focus_vscode"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
-  assert.deepEqual(await restarted.observeOperation("operation-keep", "focus_terminal"), { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." });
+  assert.deepEqual(await restarted.observeOperation("operation-cancel", "focus_vscode", target.id, target.repositoryRoot), {
+    outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion.",
+    binding: { action: "focus_vscode", targetSnapshotId: target.id, repositoryRoot: target.repositoryRoot }
+  });
+  assert.deepEqual(await restarted.observeOperation("operation-keep", "focus_terminal", target.id, target.repositoryRoot), {
+    outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion.",
+    binding: { action: "focus_terminal", targetSnapshotId: target.id, repositoryRoot: target.repositoryRoot }
+  });
+  assert.equal((await restarted.observeOperation("operation-cancel", "focus_vscode", "wrong-target", target.repositoryRoot)).outcome, "unresolved");
+  assert.equal((await restarted.observeOperation("operation-cancel", "focus_vscode", target.id, "C:\\wrong-repository")).outcome, "unresolved");
   assert.deepEqual(await restarted.listSettled(), []);
+});
+
+test("an authorized host action remains ambiguous during cancellation and can still report its exact late effect", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-authorized-cancel-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const queue = new DurableHostActionQueue(store, {
+    now: () => new Date("2026-08-24T12:00:00.000Z"),
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact target remains current" }; } }
+  });
+  const intent = await queue.enqueue(
+    { definition: commandForAction("github_home"), operationId: "operation-authorized-cancel", target },
+    { hostAction: "open_external_url", url: "https://github.com/acme/switchyard" }
+  );
+  const authorization = await queue.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" });
+
+  assert.equal(await queue.cancelPendingByOperation(intent.operationId, "Operator requested cancellation after authorization."), 0);
+  assert.equal(await queue.cancelQueuedForRepository(target.repositoryRoot, "Containment requested after authorization."), 0);
+  assert.equal((await queue.observeOperation(intent.operationId, intent.commandAction, target.id, target.repositoryRoot)).outcome, "unresolved");
+  assert.deepEqual((await queue.listPending()).map((candidate) => candidate.id), [intent.id]);
+
+  const late = await queue.settle({
+    hostActionId: intent.id,
+    succeeded: true,
+    effectDisposition: "committed",
+    summary: "The authorized native host effect completed before cancellation could be proven.",
+    adapterVersion: "extension-1",
+    authorizationToken: authorization.authorizationToken
+  });
+  assert.equal(late.status, "completed");
+  assert.equal((await new DurableHostActionQueue(store).observeOperation(intent.operationId, intent.commandAction, target.id, target.repositoryRoot)).outcome, "committed");
+});
+
+test("an authorized plus cancelled legacy journal remains ambiguous until authenticated settlement", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-host-action-authorized-legacy-cancel-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const queue = new DurableHostActionQueue(store, {
+    now: () => new Date("2026-08-24T12:00:00.000Z"),
+    finalAuthorizer: { async authorize() { return { allowed: true, reason: "exact target remains current" }; } }
+  });
+  const intent = await queue.enqueue(
+    { definition: commandForAction("github_home"), operationId: "operation-authorized-legacy-cancel", target },
+    { hostAction: "open_external_url", url: "https://github.com/acme/switchyard" }
+  );
+  await queue.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" });
+  await store.transaction(async (transaction) => {
+    await transaction.append("host_action", {
+      version: 1,
+      event: "cancelled",
+      hostActionId: intent.id,
+      operationId: intent.operationId,
+      reason: "legacy concurrent cancellation",
+      at: "2026-08-24T12:00:00.000Z"
+    });
+  });
+
+  const observed = await new DurableHostActionQueue(store).observeOperation(
+    intent.operationId,
+    intent.commandAction,
+    target.id,
+    target.repositoryRoot
+  );
+  assert.equal(observed.outcome, "unresolved", "authorization proves the host effect may have started, so cancellation cannot become not_started truth");
+  assert.match(observed.note, /authorized|ambiguous|settlement|unresolved|may have started/i);
 });
 
 test("restart recovery sanitizes legacy host completions so UI evidence can never become a gate receipt", async (context) => {
@@ -301,6 +465,7 @@ test("restart recovery sanitizes legacy host completions so UI evidence can neve
   assert.equal("evidenceDigest" in recovered, false);
   assert.equal("toolVersions" in recovered, false);
   assert.deepEqual(await queue.observeOperation(intent.operationId, intent.commandAction), {
-    outcome: "committed", note: "The authenticated host completion is durable for the exact operation."
+    outcome: "committed", note: "The authenticated host completion is durable for the exact operation.",
+    binding: { action: intent.commandAction, targetSnapshotId: intent.targetSnapshotId, repositoryRoot: intent.workspaceRoot }
   });
 });

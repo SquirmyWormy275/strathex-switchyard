@@ -18,14 +18,22 @@ execution, cancellation, and Council effects with HTTP 503. The repository's
 effectful fixture is constructible only by tests and is not an installed
 configuration kind.
 
-A digest-pinned in-process provider module receives its DPAPI-opened provider
-credential during construction. That boundary is not independently mediated:
-the host removes `mediated` from its handshake and observation, regardless of
-what the module returns, and Automatic Council fails closed. A live provider
-connector can become Mediated only through a separately installed, host-owned
-effects contract whose enforcement and attestation are outside the
-credential-bearing module. No such proprietary connector or its acceptance
-evidence is bundled or claimed by this repository.
+A provider module never receives a DPAPI-opened credential, bearer value, host
+endpoint, or broker implementation. It supplies only bounded provider-neutral
+decisions and observations. Effectful work belongs to a separately configured,
+digest-pinned host effect driver that is isolated from the provider module. The
+driver receives only its fixed host identity and the companion-issued bounded
+decision for the exact operation; the module cannot select or replace the
+driver, endpoint, credential, target, authority, or final-current check.
+
+The host advertises `mediated` only when both the separately installed effect
+driver and a companion-authenticated final-current callback are present and
+valid for the exact operation, action, provider session, authority, target,
+repository root, lease, and deadline/cancellation state. Otherwise the host
+caps the capability regardless of what a provider module returns, and every
+effectful or Automatic Council path that requires Mediation fails closed. No
+proprietary driver/module pair or its live acceptance evidence is bundled or
+claimed by this repository.
 
 ## Capability handshake
 
@@ -212,11 +220,14 @@ configuration digest, TLS pinning, and authentication. The host health body is
 `sxsy-b122.provider-host-shutdown-ack` v1 only after all lifecycle bindings
 match.
 
-Generate all companion routes with
+Generate the currently supported route inventory with
 [`New-B122NetworkPolicy.ps1`](../deployment/windows/New-B122NetworkPolicy.ps1)
 and an exact `-ProviderBaseUri`. The generated policy retains fixed HTTPS URLs,
 one DPAPI-backed bearer credential reference, bounded request/response sizes,
-and no provider redirect behavior.
+and no provider redirect behavior. It includes the exact provider-specific
+Re-anchor apply/observe routes and all four proposal-only automation routes.
+Provider-owned automation effect routes remain deliberately absent: reviewed
+automation effects execute only through companion-owned typed brokers.
 
 ## Executable release payload
 

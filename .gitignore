@@ -3,6 +3,9 @@ dist/
 *.log
 .env
 .venv/
+__pycache__/
+*.pyc
+tmp/
 .sxsy-verification/
 .npm-cache/
 .npm-cache*/

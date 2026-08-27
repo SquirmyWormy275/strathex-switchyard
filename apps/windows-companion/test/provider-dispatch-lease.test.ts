@@ -8,6 +8,16 @@ import { ProviderDispatchLeaseAuthority } from "../../provider-adapter-host/src/
 import { createLoopbackTlsFixture } from "../../provider-adapter-host/test/support/tls-fixture.ts";
 import { commandActionIds, commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import {
+  automationEffectLeaseArtifact,
+  createAutomationIntent,
+  type AutomationEnvelope
+} from "../../../packages/control-plane/src/automation-protocol.ts";
+import {
+  automationManifestReviewScopeDigest,
+  createAutomationManifestApproval,
+  createAutomationOperationManifest
+} from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, type JournalAuthenticator, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { DurableCredentialReferenceVault, type CredentialAdapterPort, type CredentialLease, type CredentialLeaseRequest } from "../src/durable-credentials.ts";
@@ -52,6 +62,71 @@ const profileIdentity = {
 } as const;
 const profile: ProviderDispatchLeaseProfile = { ...profileIdentity, profileDigest: providerDispatchProfileIdentityDigest(profileIdentity) };
 
+function reviewedAutomationEnvelope(operationId = "automation-operation-capture"): AutomationEnvelope {
+  const captureBytes = Buffer.from("# Dispatch lease capture\n", "utf8");
+  const publicSession = {
+    id: session.id,
+    provider: "codex",
+    surface: session.surface,
+    capabilities: session.capabilities,
+    taskId: session.taskId!,
+    planRevision: session.planRevision!,
+    plannedFiles: session.plannedFiles
+  } as const;
+  const publicTarget = {
+    id: target.id,
+    repositoryRoot,
+    policyVersion: target.policyVersion,
+    trackedManifest: "a".repeat(64),
+    untrackedManifest: "b".repeat(64)
+  } as const;
+  const manifest = createAutomationOperationManifest({
+    repositoryRoot,
+    targetSnapshotId: target.id,
+    sessionId: session.id,
+    authorityId: "authority-automation",
+    taskId: session.taskId!,
+    planRevision: session.planRevision!,
+    provider: "codex",
+    createdAt: "2026-08-25T18:00:00.000Z",
+    expiresAt: "2026-08-25T18:10:00.000Z"
+  }, {
+    kind: "compound_capture",
+    solvedProblemEvidenceDigest: "1".repeat(64),
+    verifiedOutcomeEvidenceDigest: "2".repeat(64),
+    nonTrivialRationale: "The exact reviewed lease-bound result is reusable.",
+    documents: [{
+      path: "docs/solutions/dispatch-lease.md", mutation: "create", beforeDigest: null,
+      afterDigest: sha256(captureBytes.toString("utf8")),
+      content: { encoding: "base64", byteLength: captureBytes.length, data: captureBytes.toString("base64") }
+    }],
+    instructionFileMutation: { kind: "none" }
+  });
+  const approval = createAutomationManifestApproval({
+    manifest,
+    confirmationToken: `confirm-${operationId}`,
+    confirmationScopeDigest: automationManifestReviewScopeDigest(manifest),
+    confirmedAt: "2026-08-25T18:00:01.000Z",
+    expiresAt: "2026-08-25T18:09:00.000Z"
+  });
+  const intent = createAutomationIntent("compound_capture", {
+    digest: approval.confirmationDigest,
+    scopeDigest: approval.reviewScopeDigest
+  }, undefined, { manifest, approval });
+  return {
+    schema: "sxsy-b122.compound-capture-request",
+    version: 1,
+    action: "compound_capture",
+    operationId,
+    target: publicTarget,
+    session: publicSession,
+    authorityId: "authority-automation",
+    manifest,
+    approval,
+    intent
+  };
+}
+
 test("credential-backed issuer signs one <=60s exact lease after two final-current barriers and one key redemption", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-lease-"));
   context.after(async () => { await rm(root, { recursive: true, force: true }); });
@@ -72,6 +147,7 @@ test("credential-backed issuer signs one <=60s exact lease after two final-curre
   const profiles = new PinnedProviderDispatchLeaseProfileSource(registry, lifecycle);
   const credentials = new SingleRedemptionCredential(key);
   const checks: string[] = [];
+  const armed: unknown[] = [];
   const finalCurrent: ProviderDispatchLeaseFinalCurrent = {
     async assertCurrent(binding) {
       checks.push(binding.operationId);
@@ -93,7 +169,13 @@ test("credential-backed issuer signs one <=60s exact lease after two final-curre
     now: () => new Date(now),
     ttlMs: 30_000,
     idFactory: () => "lease-1",
-    nonceFactory: () => "6".repeat(64)
+    nonceFactory: () => "6".repeat(64),
+    mediatedFinalCurrent: {
+      async armFromIssuedLease(input) {
+        armed.push(input);
+        return { authorizationId: "armed-authorization" };
+      }
+    }
   });
   const lease = await issuer.issue({
     routeId: "provider.plan_approval",
@@ -111,6 +193,8 @@ test("credential-backed issuer signs one <=60s exact lease after two final-curre
   });
 
   assert.equal(credentials.redemptions, 1);
+  assert.equal(armed.length, 1);
+  assert.deepEqual(armed[0], { lease, target, session, authority, guardOperationId: "operation-1", guardAction: "plan_approval" });
   assert.deepEqual(checks, ["operation-1", "operation-1"]);
   assert.equal(Date.parse(lease.expiresAt) - Date.parse(lease.issuedAt), 30_000);
   assert.equal(lease.authority.grantDigest, sha256(stableJson(authority)));
@@ -142,6 +226,36 @@ test("credential-backed issuer signs one <=60s exact lease after two final-curre
     provider: "codex", routeId: "provider.plan_approval", action: "plan_approval", operationId: "operation-1",
     authorityId: authority.id, target, session: lease.session, artifact, confirmation, module: lease.module
   }), /already consumed|replay/i);
+});
+
+test("Re-anchor lease is bound to the dedicated provider route, deterministic request operation, reviewed artifact, and one-use confirmation", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "b122-provider-reanchor-lease-"));
+  context.after(async () => { await rm(root, { recursive: true, force: true }); });
+  const registry = new DurableProviderDispatchProfileRegistry(authenticatedStore(join(root, "journal.jsonl")));
+  await registry.install(profile);
+  const profiles = new PinnedProviderDispatchLeaseProfileSource(registry, {
+    async current() { return { configurationPath: profile.configurationPath, configurationSha256: profile.configurationSha256, lifecycleNonceSha256: "5".repeat(64), tlsSpkiSha256: profile.tlsSpkiSha256 }; }
+  });
+  const credentials = new SingleRedemptionCredential(key);
+  const issuer = new CredentialBackedProviderDispatchLeaseIssuer({
+    credentials, profiles, finalCurrent: { async assertCurrent() { return { allowed: true, reason: "both exact targets are current" }; } }, now: () => new Date(now)
+  });
+  const requestId = `reanchor:${"a".repeat(64)}`;
+  const operationId = `reanchor-operation:${sha256(requestId)}`;
+  const reanchor = {
+    ...baseIssue(), routeId: "provider.reanchor.codex", action: "reanchor", guardAction: "reanchor" as const,
+    operationId, guardOperationId: operationId,
+    authority: { ...authority, allowedActions: ["reanchor"] },
+    artifact: { id: requestId, digest: "d".repeat(64), coordinatorContextDigest: null, coordinatorContextRevision: null },
+    confirmation: { digest: "e".repeat(64), scopeDigest: "f".repeat(64) }
+  };
+  const lease = await issuer.issue(reanchor);
+  assert.deepEqual(lease.dispatch, { routeId: "provider.reanchor.codex", action: "reanchor", operationId });
+  assert.equal(lease.artifact?.id, requestId);
+  assert.equal(credentials.redemptions, 1);
+  await assert.rejects(() => issuer.issue({ ...reanchor, routeId: "provider.reanchor" }), /dedicated|route|protocol/i);
+  await assert.rejects(() => issuer.issue({ ...reanchor, artifact: { ...reanchor.artifact, id: `reanchor:${"b".repeat(64)}` } }), /artifact|operation|binding/i);
+  assert.equal(credentials.redemptions, 1, "route/artifact substitution must fail before key redemption");
 });
 
 test("issuer fails closed before redemption on cancellation, stale binding, invalid authority, or an overlong lease", async (context) => {
@@ -224,7 +338,7 @@ test("issuer derives the exact hierarchical capability floor from the host-owned
   assert.equal(credentials.redemptions, 1);
 });
 
-test("issuer closes provider, automation, and automatic Council protocol routes before credential redemption", async (context) => {
+test("issuer closes provider and automatic Council routes while refusing automation effects before credential redemption", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-lease-routes-"));
   context.after(async () => { await rm(root, { recursive: true, force: true }); });
   const registry = new DurableProviderDispatchProfileRegistry(authenticatedStore(join(root, "journal.jsonl")));
@@ -276,45 +390,21 @@ test("issuer closes provider, automation, and automatic Council protocol routes 
     confirmation: null
   });
   assert.deepEqual(assignmentLease.artifact, assignmentArtifact);
-  const automationLease = await issuer.issue({
-    ...baseIssue(),
-    routeId: "automation.compound_capture",
-    action: "compound_capture",
-    guardAction: "compound_capture",
-    operationId: "automation-operation",
-    guardOperationId: "automation-operation",
-    authority: { ...authority, allowedActions: ["compound_capture"] },
-    artifact: null,
-    confirmation: null
-  });
-  assert.equal(automationLease.dispatch.routeId, "automation.compound_capture");
-  const confirmedAutomationLease = await issuer.issue({
-    ...baseIssue(),
-    routeId: "automation.lfg",
-    action: "lfg",
-    guardAction: "lfg",
-    operationId: "automation-lfg-operation",
-    guardOperationId: "automation-lfg-operation",
-    authority: { ...authority, allowedActions: ["lfg"] },
-    artifact: null,
-    confirmation
-  });
-  assert.equal(confirmedAutomationLease.dispatch.routeId, "automation.lfg");
-  assert.deepEqual(confirmedAutomationLease.confirmation, confirmation);
-  assert.equal(credentials.redemptions, 4);
-
+  const automationArtifact = { id: "automation-approval-capture", digest: "1".repeat(64), coordinatorContextDigest: null, coordinatorContextRevision: null } as const;
   const rejected = [
+    { ...baseIssue(), routeId: "automation.compound_capture", action: "compound_capture", guardAction: "compound_capture" as const, operationId: "automation-operation", guardOperationId: "automation-operation", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: automationArtifact, confirmation },
+    { ...baseIssue(), routeId: "automation.lfg", action: "lfg", guardAction: "lfg" as const, operationId: "automation-lfg-operation", guardOperationId: "automation-lfg-operation", authority: { ...authority, allowedActions: ["lfg"] }, artifact: { id: "automation-approval-lfg", digest: "2".repeat(64), coordinatorContextDigest: null, coordinatorContextRevision: null }, confirmation },
     { ...baseIssue(), routeId: "automation.proof", action: "proof", authority: { ...authority, allowedActions: ["proof"] } },
-    { ...baseIssue(), routeId: "provider.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: null, confirmation: null },
-    { ...baseIssue(), routeId: "automation.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: null },
+    { ...baseIssue(), routeId: "provider.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: automationArtifact, confirmation },
+    { ...baseIssue(), routeId: "automation.compound_capture", action: "compound_capture", authority: { ...authority, allowedActions: ["compound_capture"] }, artifact: automationArtifact, confirmation: null },
     { ...baseIssue(), routeId: "council.claude", action: "council_pause", operationId: "council:epoch-1:pause", authority: councilAuthority, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_pause", operationId: "council:epoch-1:resume", authority: councilAuthority, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_pause", guardAction: "council_automatic" as const, guardOperationId: "council-parent-operation", operationId: "council:epoch-1:pause", authority: { ...authority, allowedActions: ["council_automatic"] }, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_pause", operationId: "council:epoch-1:pause", authority: { ...authority, allowedActions: ["council_pause"] }, artifact: null, confirmation: null },
     { ...baseIssue(), routeId: "council.codex", action: "council_assignment", operationId: "council:epoch-1:assignment", authority: councilAuthority, artifact: null, confirmation: null }
   ];
-  for (const request of rejected) await assert.rejects(() => issuer.issue(request), /route|Council|authority|artifact|protocol|confirmation|guard/i);
-  assert.equal(credentials.redemptions, 4);
+  for (const request of rejected) await assert.rejects(() => issuer.issue(request), /route|Council|authority|artifact|protocol|confirmation|guard|host-local|proposal-only/i);
+  assert.equal(credentials.redemptions, 2);
 });
 
 test("issuer applies one bounded cancellation epoch and refuses late profile, lifecycle, final-current, or credential settlement", async (context) => {
@@ -461,6 +551,109 @@ test("last-boundary transport injects only a companion-minted lease and rechecks
   await assert.rejects(() => transport.request({ routeId: "provider.health", repositoryRoot, body: "{}", trustedDispatch }), /non-effect route/i);
 });
 
+test("last-boundary transport refuses automation effects before lease issuance or provider forwarding", async () => {
+  const issued: Parameters<CredentialBackedProviderDispatchLeaseIssuer["issue"]>[0][] = [];
+  const forwarded: ProviderCommandTransportRequest[] = [];
+  const issuer = {
+    async issue(request: Parameters<CredentialBackedProviderDispatchLeaseIssuer["issue"]>[0]) {
+      issued.push(request);
+      return { schema: "sxsy-b122.provider-dispatch-lease", version: 1, leaseId: "lease-reviewed-automation" };
+    }
+  } as unknown as CredentialBackedProviderDispatchLeaseIssuer;
+  const transport = new LeaseInjectingProviderCommandTransport({
+    async request(input) {
+      forwarded.push(input);
+      return { outcome: "passed", routeId: input.routeId, detail: "fixture", effectDisposition: "ambiguous", body: Buffer.from("{}") };
+    }
+  }, issuer, new DurableProviderDispatchContainmentSource({ async get() { return undefined; } }));
+  const envelope = reviewedAutomationEnvelope();
+  const exactArtifact = automationEffectLeaseArtifact(envelope);
+  const exactConfirmation = {
+    digest: envelope.approval.confirmationDigest,
+    scopeDigest: envelope.approval.reviewScopeDigest
+  } as const;
+  let guardChecks = 0;
+  const automationAuthority: AuthorityGrant = {
+    ...authority,
+    id: envelope.authorityId,
+    allowedActions: ["compound_capture"]
+  };
+  const trustedDispatch = {
+    action: "compound_capture",
+    guardAction: "compound_capture",
+    operationId: envelope.operationId,
+    guardOperationId: envelope.operationId,
+    target,
+    session,
+    authority: automationAuthority,
+    artifact: exactArtifact,
+    confirmation: exactConfirmation,
+    effectGuard: { async assertCurrent() { guardChecks += 1; return { allowed: true, reason: "current" }; } }
+  } as const;
+
+  await assert.rejects(() => transport.request({
+    routeId: "automation.compound_capture", repositoryRoot, body: JSON.stringify(envelope), trustedDispatch
+  }), /host-local|proposal-only|automation effect/i);
+
+  const rejects = [
+    { ...trustedDispatch, confirmation: { ...exactConfirmation, digest: "0".repeat(64) } },
+    { ...trustedDispatch, artifact: { ...exactArtifact, digest: "0".repeat(64) } },
+    { ...trustedDispatch, action: "lfg" as const, guardAction: "lfg" as const },
+    { ...trustedDispatch, session: { ...session, id: "substituted-session" } },
+    { ...trustedDispatch, target: { ...target, id: "0".repeat(64) } }
+  ];
+  for (const substituted of rejects) {
+    await assert.rejects(() => transport.request({
+      routeId: "automation.compound_capture",
+      repositoryRoot,
+      body: JSON.stringify(envelope),
+      trustedDispatch: substituted
+    }), /host-local|proposal-only|automation effect/i);
+  }
+  await assert.rejects(() => transport.request({
+    routeId: "automation.compound_capture",
+    repositoryRoot,
+    body: JSON.stringify({ ...envelope, dispatchLease: { leaseId: "body-supplied" } }),
+    trustedDispatch
+  }), /host-local|proposal-only|automation effect/i);
+  assert.equal(issued.length, 0, "no automation effect request may reach the lease issuer");
+  assert.equal(forwarded.length, 0);
+  assert.equal(guardChecks, 0);
+});
+
+test("last-boundary transport forwards no-effect automation proposals without minting an effect lease", async () => {
+  let issuances = 0;
+  const forwarded: ProviderCommandTransportRequest[] = [];
+  const transport = new LeaseInjectingProviderCommandTransport({
+    async request(input) {
+      forwarded.push(input);
+      return { outcome: "passed", routeId: input.routeId, detail: "proposal forwarded", effectDisposition: "ambiguous", body: Buffer.from("{}") };
+    }
+  }, {
+    async issue() {
+      issuances += 1;
+      throw new Error("proposal must not mint a lease");
+    }
+  } as unknown as CredentialBackedProviderDispatchLeaseIssuer, new DurableProviderDispatchContainmentSource({ async get() { return undefined; } }));
+
+  const proposal = await transport.request({
+    routeId: "automation.proposal.compound_refresh",
+    repositoryRoot,
+    body: "{}"
+  });
+  assert.equal(proposal.outcome, "passed");
+  assert.equal(issuances, 0);
+  assert.equal(forwarded.length, 1);
+  assert.equal(forwarded[0]!.trustedDispatch, undefined);
+  await assert.rejects(() => transport.request({
+    routeId: "automation.proposal.compound_refresh",
+    repositoryRoot,
+    body: "{}",
+    trustedDispatch: {} as never
+  }), /proposal.*trusted effect dispatch/i);
+  assert.equal(forwarded.length, 1);
+});
+
 test("installed final-current guard rejects operation, session, authority, profile, containment, or target churn", async () => {
   let operation = { action: "plan_approval", targetSnapshotId: target.id, state: "executing" };
   let currentSession = session;
@@ -512,6 +705,101 @@ test("installed final-current guard rejects operation, session, authority, profi
   assert.equal((await finalCurrent.assertCurrent(binding)).allowed, false);
 });
 
+test("installed final-current permits only exact verified-blocked Authority recovery sessions", async () => {
+  const blockedSession: ManagedSession = { ...session, status: "verified_blocked" };
+  let currentSession: ManagedSession = blockedSession;
+  let operation = { action: "authority_broadcast", targetSnapshotId: target.id, state: "executing" };
+  const currentAuthority: AuthorityGrant = { ...authority, allowedActions: ["authority_broadcast"] };
+  const currentProfile = await immediateResolvedProfile().current();
+  const containment = new DurableProviderDispatchContainmentSource({ async get() { return undefined; } });
+  const clear = await containment.currentClear(repositoryRoot);
+  const verifier = new InstalledProviderDispatchFinalCurrent({
+    operations: { async get() { return operation; } },
+    sessions: { async get() { return currentSession; } },
+    authorities: { async get() { return currentAuthority; } },
+    profiles: { async current() { return currentProfile; } },
+    containment
+  });
+  const binding = {
+    action: "authority_broadcast",
+    guardAction: "authority_broadcast" as const,
+    operationId: "operation-authority-broadcast",
+    guardOperationId: "operation-authority-broadcast",
+    routeId: "provider.authority_broadcast",
+    target,
+    session: blockedSession,
+    authority: currentAuthority,
+    artifact,
+    confirmation,
+    containment: clear,
+    host: currentProfile.host,
+    module: currentProfile.module,
+    credentialReference: currentProfile.credentialReference,
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
+  };
+
+  assert.equal((await verifier.assertCurrent(binding)).allowed, true);
+  currentSession = { ...blockedSession, status: "running" };
+  assert.equal((await verifier.assertCurrent(binding)).allowed, false, "status churn must invalidate the exact Authority binding");
+  currentSession = blockedSession;
+  operation = { action: "proof", targetSnapshotId: target.id, state: "executing" };
+  assert.equal((await verifier.assertCurrent({
+    ...binding,
+    action: "proof",
+    guardAction: "proof",
+    operationId: "operation-proof",
+    guardOperationId: "operation-proof"
+  })).allowed, false, "ordinary provider work must remain running-only");
+});
+
+test("installed final-current guard delegates only dedicated Re-anchor operations to the executing lifecycle", async () => {
+  let active = true;
+  let reanchorChecks = 0;
+  const containment = new DurableProviderDispatchContainmentSource({ async get() { return undefined; } });
+  const clear = await containment.currentClear(repositoryRoot);
+  const currentProfile = await immediateResolvedProfile().current();
+  const verifier = new InstalledProviderDispatchFinalCurrent({
+    operations: { async get() { return undefined; } },
+    sessions: { async get() { return session; } },
+    authorities: { async get() { return { ...authority, allowedActions: ["reanchor"] }; } },
+    profiles: { async current() { return currentProfile; } },
+    containment,
+    reanchor: {
+      async assertCurrent(binding) {
+        reanchorChecks += 1;
+        assert.equal(binding.action, "reanchor");
+        return active
+          ? { allowed: true, reason: "The exact Re-anchor lifecycle is executing." }
+          : { allowed: false, reason: "The Re-anchor lifecycle is settled." };
+      }
+    }
+  });
+  const requestId = `reanchor:${"a".repeat(64)}`;
+  const operationId = `reanchor-operation:${sha256(requestId)}`;
+  const binding = {
+    action: "reanchor",
+    guardAction: "reanchor" as const,
+    operationId,
+    guardOperationId: operationId,
+    routeId: "provider.reanchor.codex",
+    target,
+    session,
+    authority: { ...authority, allowedActions: ["reanchor"] },
+    artifact: { id: requestId, digest: "d".repeat(64), coordinatorContextDigest: null, coordinatorContextRevision: null },
+    confirmation: { digest: "e".repeat(64), scopeDigest: "f".repeat(64) },
+    containment: clear,
+    host: currentProfile.host,
+    module: currentProfile.module,
+    credentialReference: currentProfile.credentialReference,
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "both exact targets remain current" }; } }
+  };
+  assert.equal((await verifier.assertCurrent(binding)).allowed, true);
+  assert.equal(reanchorChecks, 1);
+  active = false;
+  assert.equal((await verifier.assertCurrent(binding)).allowed, false);
+  assert.equal(reanchorChecks, 2);
+});
+
 test("attested profile installation binds the exact scoped policy, TLS identity, and two credential roles", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-profile-install-"));
   context.after(async () => { await rm(root, { recursive: true, force: true }); });
@@ -527,12 +815,13 @@ test("attested profile installation binds the exact scoped policy, TLS identity,
   const installProfile = { ...identity, profileDigest: providerDispatchProfileIdentityDigest(identity) } as const;
   const routeIds = new Set<string>(["provider.health", "provider.reconcile"]);
   for (const action of commandActionIds) {
+    if (action === "reanchor") continue;
     const executor = commandForAction(action).executor;
     if (executor === "agent") routeIds.add(`provider.${action}`);
-    if (executor === "automation") routeIds.add(`automation.${action}`);
   }
   for (const provider of ["claude", "codex"] as const) {
-    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "cancel"] as const) routeIds.add(`provider.${prefix}.${provider}`);
+    routeIds.add(`provider.reanchor.${provider}`);
+    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "observe-reanchor", "cancel"] as const) routeIds.add(`provider.${prefix}.${provider}`);
   }
   const policy = {
     version: 1,

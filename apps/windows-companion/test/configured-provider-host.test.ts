@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
-import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
-import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
-import { ConfiguredProviderHostClient, type ConfiguredProviderOperationIdentity } from "../src/configured-provider-host.ts";
+import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import {
+  reanchorApplyArtifactDigest,
+  reanchorRequiredRereads,
+  type ReanchorApplyRequest
+} from "../../../packages/control-plane/src/reanchor.ts";
+import { ProtectedJsonStore, sha256, stableJson, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
+import {
+  ConfiguredProviderHostClient,
+  ConfiguredProviderReanchorApplyPort,
+  DurableConfiguredProviderOperationControl,
+  type ConfiguredProviderOperationIdentity
+} from "../src/configured-provider-host.ts";
 import type { ProviderCommandTransport } from "../src/remote-adapters.ts";
 
 const target = "b".repeat(64);
@@ -17,8 +30,88 @@ const session: ManagedSession = {
 };
 const operation: ConfiguredProviderOperationIdentity = {
   operationId: "operation-1", externalId: "operation-1", routeId: "provider.proof", sessionId: session.id,
-  provider: "codex", targetSnapshotId: target, repositoryRoot
+  provider: "codex", action: "proof", authorityId: "authority-provider-host", targetSnapshotId: target, repositoryRoot
 };
+const isolatedAuthenticator: JournalAuthenticator = {
+  provider: "isolated-provider-operation-test",
+  async seal(hash) { return `sealed:${hash}`; },
+  async verify(hash, tag) { return tag === `sealed:${hash}`; }
+};
+
+test("configured provider Re-anchor uses only the dedicated route and exact reviewed artifact binding", async () => {
+  const input = reanchorRequest();
+  const routes: string[] = [];
+  let body: Record<string, unknown> | undefined;
+  let trusted: Record<string, unknown> | undefined;
+  const guardedTargets: string[] = [];
+  const port = new ConfiguredProviderReanchorApplyPort({ async request(request) {
+    routes.push(request.routeId);
+    body = JSON.parse(Buffer.from(request.body!).toString("utf8")) as Record<string, unknown>;
+    trusted = request.trustedDispatch as unknown as Record<string, unknown>;
+    return passed(request.routeId, reanchorAcknowledgement(input));
+  } }, { async assertCurrent(request) {
+    guardedTargets.push(request.target.id);
+    return { allowed: true, reason: "The exact old and new targets are current." };
+  } });
+
+  const result = await port.apply(input);
+  assert.equal(result.disposition, "committed");
+  assert.deepEqual(routes, ["provider.reanchor.codex"]);
+  assert.equal(body?.schema, "sxsy-b122.provider-reanchor-request");
+  assert.equal(body?.artifactDigest, input.artifactDigest);
+  assert.equal((body?.contextEvidence as Record<string, unknown>).contextDigest, input.contextEvidence.contextDigest);
+  assert.equal((trusted?.artifact as Record<string, unknown>).digest, input.artifactDigest);
+  assert.equal((trusted?.confirmation as Record<string, unknown>).scopeDigest, input.confirmationScopeDigest);
+  assert.deepEqual(guardedTargets, [input.oldTarget.id, input.newTarget.id]);
+});
+
+test("configured provider Re-anchor rejects artifact substitution, final target denial, and stop-only acknowledgements before success", async () => {
+  const input = reanchorRequest();
+  let calls = 0;
+  const transport: ProviderCommandTransport = { async request(request) {
+    calls += 1;
+    return passed(request.routeId, {
+      schema: "sxsy-b122.reanchor-acknowledgement", version: 1,
+      requestId: input.requestId, operationId: input.operationId,
+      externalEffectId: "provider-effect-stop-only", sessionId: input.sessionId,
+      authorityId: input.authorityId, oldTargetSnapshotId: input.oldTargetSnapshotId,
+      newTargetSnapshotId: input.newTargetSnapshotId, cooperativeStopAcknowledged: true, resumed: false
+    });
+  } };
+  const allowed = { async assertCurrent() { return { allowed: true, reason: "Current." }; } };
+  assert.equal((await new ConfiguredProviderReanchorApplyPort(transport, allowed).apply({ ...input, artifactDigest: "0".repeat(64) })).disposition, "not_started");
+  assert.equal(calls, 0);
+
+  const denied = new ConfiguredProviderReanchorApplyPort(transport, { async assertCurrent(request) {
+    return request.target.id === input.newTarget.id
+      ? { allowed: false, reason: "The new target changed." }
+      : { allowed: true, reason: "Current." };
+  } });
+  assert.equal((await denied.apply(input)).disposition, "not_started");
+  assert.equal(calls, 0);
+
+  await assert.rejects(() => new ConfiguredProviderReanchorApplyPort(transport, allowed).apply(input), /acknowledgement|reread|report|malformed/i);
+  assert.equal(calls, 1);
+});
+
+test("configured provider Re-anchor resolves a lost effect response through exact observation without replay", async () => {
+  const input = reanchorRequest();
+  const routes: string[] = [];
+  const trusted: unknown[] = [];
+  const port = new ConfiguredProviderReanchorApplyPort({ async request(request) {
+    routes.push(request.routeId);
+    trusted.push(request.trustedDispatch);
+    if (request.routeId === "provider.reanchor.codex") {
+      return { outcome: "unavailable", routeId: request.routeId, detail: "effect response lost", effectDisposition: "ambiguous" };
+    }
+    assert.equal(request.routeId, "provider.observe-reanchor.codex");
+    return passed(request.routeId, reanchorAcknowledgement(input));
+  } }, { async assertCurrent() { return { allowed: true, reason: "Current." }; } });
+  assert.equal((await port.apply(input)).disposition, "committed");
+  assert.deepEqual(routes, ["provider.reanchor.codex", "provider.observe-reanchor.codex"]);
+  assert.notEqual(trusted[0], undefined);
+  assert.equal(trusted[1], undefined, "observation cannot receive a new dispatch lease or effect authority");
+});
 
 test("configured provider-host client uses exact observe, cancel, and reconcile routes", async () => {
   const routes: string[] = [];
@@ -26,19 +119,170 @@ test("configured provider-host client uses exact observe, cancel, and reconcile 
     routes.push(input.routeId);
     const body = input.body ? JSON.parse(Buffer.from(input.body).toString("utf8")) as Record<string, unknown> : {};
     if (input.routeId === "provider.observe-session.codex") return passed(input.routeId, { schema: "sxsy-b122.provider-session-observation", version: 1, sessionId: session.id, provider: "codex", targetSnapshotId: target, repositoryRoot, status: "verified_finished", capabilities: ["registered", "observable"], adapterVersion: "codex-live-v2" });
-    if (input.routeId === "provider.observe-operation.codex") return passed(input.routeId, { schema: "sxsy-b122.provider-operation-observation", version: 1, operationId: body.operationId, externalId: body.externalId, routeId: body.routeId, sessionId: body.sessionId, provider: body.provider, targetSnapshotId: body.targetSnapshotId, repositoryRoot: body.repositoryRoot, outcome: "committed", summary: "Observed exact committed effect." });
-    if (input.routeId === "provider.cancel.codex") return passed(input.routeId, { schema: "sxsy-b122.provider-cancellation-ack", version: 1, operationId: operation.operationId, externalId: operation.externalId, sessionId: operation.sessionId, provider: operation.provider, targetSnapshotId: target, accepted: true, summary: "Cancellation acknowledged." });
+    if (input.routeId === "provider.observe-operation.codex") return passed(input.routeId, { schema: "sxsy-b122.provider-operation-observation", version: 1, operationId: body.operationId, externalId: body.externalId, routeId: body.routeId, sessionId: body.sessionId, provider: body.provider, action: body.action, authorityId: body.authorityId, targetSnapshotId: body.targetSnapshotId, repositoryRoot: body.repositoryRoot, outcome: "committed", effectDisposition: "committed", summary: "Observed exact committed effect." });
+    if (input.routeId === "provider.cancel.codex") return passed(input.routeId, { schema: "sxsy-b122.provider-cancellation-ack", version: 1, ...operation, accepted: true, summary: "Cancellation acknowledged." });
     return passed(input.routeId, { schema: "sxsy-b122.provider-host-reconciliation", version: 1, operationsInspected: 1, operationsSettled: 1, councilsInspected: 0, councilsSettled: 0 });
   } };
   const client = new ConfiguredProviderHostClient(transport, () => "2026-08-25T12:01:00.000Z");
   assert.equal(client.recoveryExternalId({ routeId: operation.routeId, operationId: operation.operationId, provider: "codex" }), operation.operationId);
+  assert.equal(client.recoveryExternalId({ routeId: "automation.compound_capture", operationId: "legacy-automation", provider: "codex" }), undefined);
+  await assert.rejects(() => client.observeOperation({
+    ...operation, operationId: "legacy-automation", externalId: "legacy-automation",
+    routeId: "automation.compound_capture", action: "compound_capture"
+  }), /identity/i);
+  assert.deepEqual(routes, [], "legacy automation identities must be rejected before provider observation");
   const refreshed = await client.refreshSession(session);
   assert.equal(refreshed.status, "verified_finished");
   assert.deepEqual(refreshed.capabilities, ["registered", "observable"]);
-  assert.equal((await client.observeOperation(operation)).outcome, "committed");
+  const observedOperation = await client.observeOperation(operation);
+  assert.equal(observedOperation.outcome, "committed");
+  assert.equal(observedOperation.effectDisposition, "committed");
   assert.equal((await client.cancelOperation(operation, "operator cancellation")).accepted, true);
   assert.equal((await client.reconcile(repositoryRoot)).operationsSettled, 1);
   assert.deepEqual(routes, ["provider.observe-session.codex", "provider.observe-operation.codex", "provider.cancel.codex", "provider.reconcile"]);
+});
+
+test("durable configured-provider control observes, cancels, and reconciles an exact restarted operation without redispatch", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-provider-operation-"));
+  context.after(async () => rm(directory, { recursive: true, force: true }));
+  const filePath = join(directory, "protected.jsonl");
+  let effectDispatches = 0;
+  let observations = 0;
+  let cancellations = 0;
+  let reconciliations = 0;
+  let cancelledIdentity: Record<string, unknown> | undefined;
+  const transport: ProviderCommandTransport = { async request(input) {
+    const body = input.body ? JSON.parse(Buffer.from(input.body).toString("utf8")) as Record<string, unknown> : {};
+    if (input.routeId === operation.routeId) {
+      effectDispatches += 1;
+      return { outcome: "unavailable", routeId: input.routeId, detail: "response lost after dispatch", effectDisposition: "ambiguous" };
+    }
+    if (input.routeId === "provider.observe-operation.codex") {
+      observations += 1;
+      return passed(input.routeId, {
+        ...body, schema: "sxsy-b122.provider-operation-observation", version: 1,
+        outcome: "committed", effectDisposition: "committed", summary: "Observed exact committed provider effect."
+      });
+    }
+    if (input.routeId === "provider.cancel.codex") {
+      cancellations += 1;
+      cancelledIdentity = body;
+      return passed(input.routeId, {
+        schema: "sxsy-b122.provider-cancellation-ack", version: 1,
+        operationId: body.operationId, externalId: body.externalId, routeId: body.routeId,
+        sessionId: body.sessionId, provider: body.provider, action: body.action,
+        authorityId: body.authorityId, targetSnapshotId: body.targetSnapshotId,
+        repositoryRoot: body.repositoryRoot, accepted: true, summary: "Exact cancellation accepted."
+      });
+    }
+    if (input.routeId === "provider.reconcile") {
+      reconciliations += 1;
+      return passed(input.routeId, {
+        schema: "sxsy-b122.provider-host-reconciliation", version: 1,
+        operationsInspected: 1, operationsSettled: 1, councilsInspected: 0, councilsSettled: 0
+      });
+    }
+    throw new Error(`unexpected route ${input.routeId}`);
+  } };
+  const store = new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator });
+  const first = new DurableConfiguredProviderOperationControl({
+    store,
+    transport,
+    host: new ConfiguredProviderHostClient(transport)
+  });
+  const oldTarget = reanchorRequest().oldTarget;
+  const authority: AuthorityGrant = {
+    id: operation.authorityId, repositoryRoot, sessionId: session.id, taskId: session.taskId!, planRevision: session.planRevision!,
+    allowedActions: ["proof"], prohibitedActions: [], issuedAt: "2026-08-25T11:55:00.000Z",
+    expiresAt: "2026-08-25T12:10:00.000Z", issuedBy: "TEST\\Reviewer"
+  };
+  const trustedDispatch = {
+    action: "proof" as const, guardAction: "proof" as const, operationId: operation.operationId,
+    guardOperationId: operation.operationId, target: oldTarget, session, authority,
+    artifact: null, confirmation: null,
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
+  };
+  assert.equal(first.recoveryExternalId({ routeId: operation.routeId, operationId: operation.operationId, provider: "codex" }), operation.externalId);
+  await first.request({ routeId: operation.routeId, repositoryRoot, body: "{}", trustedDispatch });
+  assert.equal(effectDispatches, 1);
+
+  const restarted = new DurableConfiguredProviderOperationControl({
+    store: new ProtectedJsonStore({ filePath, authenticator: isolatedAuthenticator }),
+    transport,
+    host: new ConfiguredProviderHostClient(transport)
+  });
+  const binding = {
+    operationId: operation.operationId, action: operation.action, targetSnapshotId: operation.targetSnapshotId,
+    repositoryRoot, sessionId: operation.sessionId, authorityId: operation.authorityId
+  };
+  const observed = await restarted.observeBoundOperation(binding);
+  assert.deepEqual(observed, {
+    state: "terminal", ...binding, status: "completed", effectDisposition: "committed",
+    summary: "Observed exact committed provider effect."
+  });
+  assert.equal(effectDispatches, 1, "restart observation must never redispatch the provider effect");
+  assert.equal((await restarted.observeBoundOperation({ ...binding, sessionId: "wrong-session" })).state, "not_owner");
+  assert.equal((await restarted.observeBoundOperation({ ...binding, authorityId: "wrong-authority" })).state, "not_owner");
+  assert.equal(observations, 1, "wrong protected identities must be rejected before provider observation");
+  assert.equal(await restarted.observeProviderOperation({ ...operation, sessionId: "wrong-session" }), undefined);
+  assert.equal(observations, 1, "a substituted provider-recovery identity must be rejected before host observation");
+  assert.deepEqual(await restarted.observeProviderOperation(operation), {
+    outcome: "committed",
+    note: "Observed exact committed provider effect.",
+    details: { provider: "codex", externalId: operation.externalId, effectDisposition: "committed" }
+  });
+  assert.equal(observations, 2);
+
+  assert.equal(await restarted.cancelByOperation(operation.operationId, "operator cancellation"), 1);
+  assert.equal(cancellations, 1);
+  assert.equal(cancelledIdentity?.sessionId, operation.sessionId);
+  assert.equal(cancelledIdentity?.authorityId, operation.authorityId);
+  await restarted.recoverAfterRestart();
+  assert.equal(reconciliations, 1);
+  assert.equal(effectDispatches, 1);
+
+  await assert.rejects(
+    () => restarted.request({ routeId: operation.routeId, repositoryRoot, body: "{}", trustedDispatch: { ...trustedDispatch, session: { ...session, id: "substituted-session" } } }),
+    /different|binding|conflict/i
+  );
+  assert.equal(effectDispatches, 1, "a conflicting durable operation identity must fail before provider dispatch");
+});
+
+test("durable configured-provider control passes proposal-only automation without creating an effect recovery binding", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-provider-proposal-"));
+  context.after(async () => rm(directory, { recursive: true, force: true }));
+  const forwarded: string[] = [];
+  const transport: ProviderCommandTransport = {
+    async request(input) {
+      forwarded.push(input.routeId);
+      return { outcome: "passed", routeId: input.routeId, detail: "proposal forwarded", effectDisposition: "ambiguous", body: Buffer.from("{}") };
+    }
+  };
+  const control = new DurableConfiguredProviderOperationControl({
+    store: new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    transport,
+    host: new ConfiguredProviderHostClient(transport)
+  });
+  const proposal = await control.request({
+    routeId: "automation.proposal.compound_capture",
+    repositoryRoot,
+    body: "{}"
+  });
+  assert.equal(proposal.outcome, "passed");
+  assert.deepEqual(forwarded, ["automation.proposal.compound_capture"]);
+  await assert.rejects(() => control.request({
+    routeId: "automation.proposal.compound_capture",
+    repositoryRoot,
+    body: "{}",
+    trustedDispatch: {} as never
+  }), /proposal.*trusted effect dispatch/i);
+  await assert.rejects(() => control.request({
+    routeId: "automation.compound_capture",
+    repositoryRoot,
+    body: "{}"
+  }), /host-local|proposal-only|automation effect/i);
+  assert.deepEqual(forwarded, ["automation.proposal.compound_capture"]);
+  assert.equal(control.recoveryExternalId({ routeId: "automation.proposal.compound_capture", operationId: "proposal", provider: "codex" }), undefined);
 });
 
 test("configured provider-host client rejects target churn, unsupported providers, and malformed exact evidence", async () => {
@@ -48,6 +292,42 @@ test("configured provider-host client rejects target churn, unsupported provider
   await assert.rejects(() => client.refreshSession(unsupported), /Claude|Codex/i);
   assert.equal(client.recoveryExternalId({ routeId: "provider.proof", operationId: operation.operationId, provider: "generic" }), undefined);
   await assert.rejects(() => client.observeOperation({ ...operation, repositoryRoot: "relative" }), /identity/i);
+});
+
+test("configured provider-host client rejects missing, conflicting, and semantically inconsistent operation evidence", async (context) => {
+  const canonical = {
+    schema: "sxsy-b122.provider-operation-observation", version: 1,
+    ...operation, outcome: "committed", effectDisposition: "committed", summary: "Exact provider effect committed."
+  } as const;
+  const mutations: ReadonlyArray<readonly [string, (value: Record<string, unknown>) => Record<string, unknown>]> = [
+    ["missing action", (value) => { const { action: _action, ...rest } = value; return rest; }],
+    ["wrong action", (value) => ({ ...value, action: "plan_expander" })],
+    ["missing authority", (value) => { const { authorityId: _authority, ...rest } = value; return rest; }],
+    ["wrong authority", (value) => ({ ...value, authorityId: "authority-confused" })],
+    ["missing disposition", (value) => { const { effectDisposition: _disposition, ...rest } = value; return rest; }],
+    ["conflicting disposition", (value) => ({ ...value, effectDisposition: "not_started" })],
+    ["wrong root", (value) => ({ ...value, repositoryRoot: "C:\\other" })]
+  ];
+  for (const [label, mutate] of mutations) {
+    await context.test(label, async () => {
+      const client = new ConfiguredProviderHostClient({ async request(input) { return passed(input.routeId, mutate({ ...canonical })); } });
+      await assert.rejects(() => client.observeOperation(operation), /malformed|bound|evidence/i);
+    });
+  }
+
+  const cancellationMutations: ReadonlyArray<readonly [string, (value: Record<string, unknown>) => Record<string, unknown>]> = [
+    ["missing action", (value) => { const { action: _action, ...rest } = value; return rest; }],
+    ["wrong authority", (value) => ({ ...value, authorityId: "authority-confused" })],
+    ["wrong route", (value) => ({ ...value, routeId: "provider.plan_expander" })],
+    ["wrong root", (value) => ({ ...value, repositoryRoot: "C:\\other" })]
+  ];
+  for (const [label, mutate] of cancellationMutations) {
+    await context.test(`cancellation ${label}`, async () => {
+      const canonicalAck = { schema: "sxsy-b122.provider-cancellation-ack", version: 1, ...operation, accepted: true, summary: "Exact cancellation accepted." };
+      const client = new ConfiguredProviderHostClient({ async request(input) { return passed(input.routeId, mutate(canonicalAck)); } });
+      await assert.rejects(() => client.cancelOperation(operation, "operator cancellation"), /malformed|bound|evidence/i);
+    });
+  }
 });
 
 test("configured provider-host client requests and validates one exact non-authorizing workflow context", async () => {
@@ -156,7 +436,8 @@ function workflowContextResponse(request: Record<string, unknown>, sourceRevisio
     revision: request.planRevision, originSessionId: request.sessionId, taskId: request.taskId,
     objective: "Execute the exact protected plan.",
     steps: [{ id: "step-1", summary: "Inspect the target.", ownedFiles: ["src/example.ts"], dependencies: [], status: "approved" }],
-    decisions: ["Use the exact target snapshot."]
+    decisions: ["Use the exact target snapshot."],
+    expectedTargetTransition: { beforeTargetSnapshotId: request.targetSnapshotId, expectedAfterTargetSnapshotId: request.targetSnapshotId, expectation: "unchanged" }
   };
   const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
   const evidenceMaterial = {
@@ -185,6 +466,83 @@ function workflowContextResponse(request: Record<string, unknown>, sourceRevisio
     contextDigest: sha256(stableJson(contextMaterial))
   };
   return { ...unsigned, envelopeDigest: sha256(stableJson(unsigned)) };
+}
+
+function reanchorRequest(): ReanchorApplyRequest {
+  const oldTarget: TargetSnapshot = {
+    id: target, repositoryRoot, canonicalRemote: "https://github.com/example/provider-host.git",
+    branch: "feature/provider-host", upstream: "origin/feature/provider-host", head: "b".repeat(40),
+    indexTree: "tree-old", trackedManifest: "tracked-old", untrackedManifest: "untracked-clean", submodules: {},
+    policyVersion: "policy-v1", environmentFingerprint: "environment-v1", completeness: "complete", reasons: [],
+    capturedAt: "2026-08-25T11:59:00.000Z"
+  };
+  const newTarget: TargetSnapshot = {
+    ...oldTarget, id: "a".repeat(64), head: "a".repeat(40), indexTree: "tree-new", trackedManifest: "tracked-new",
+    capturedAt: "2026-08-25T12:00:00.000Z"
+  };
+  const authority: AuthorityGrant = {
+    id: "authority-provider-reanchor", repositoryRoot, sessionId: session.id,
+    taskId: session.taskId!, planRevision: session.planRevision!, allowedActions: ["reanchor"],
+    prohibitedActions: ["credential.read", "network.open"], issuedAt: "2026-08-25T11:55:00.000Z",
+    expiresAt: "2026-08-25T12:10:00.000Z", issuedBy: "TEST\\Reviewer"
+  };
+  const planMaterial = {
+    revision: session.planRevision!, originSessionId: session.id, taskId: session.taskId!,
+    objective: "Reread the exact protected task brief.",
+    steps: [{ id: "step-one", summary: "Inspect current work.", ownedFiles: ["src/example.ts"], dependencies: [], status: "approved" as const }],
+    decisions: ["Automatic resume is forbidden."],
+    expectedTargetTransition: { beforeTargetSnapshotId: oldTarget.id, expectedAfterTargetSnapshotId: oldTarget.id, expectation: "unchanged" as const }
+  };
+  const evidenceMaterial = {
+    instructions: [{ id: "instructions-one", digest: sha256("protected instructions"), source: "protected_context" as const, summary: "Original instructions." }],
+    plan: { digest: sha256(stableJson(planMaterial)), ...planMaterial },
+    documentation: [{ id: "documentation-one", digest: sha256("documentation"), source: "repository" as const, summary: "Project documentation." }],
+    diff: { id: "diff-one", digest: sha256("current diff"), source: "target_snapshot" as const, summary: "Current diff." },
+    files: [{ id: "file-one", digest: sha256("src/example.ts"), source: "repository" as const, summary: "Current file." }],
+    tests: [{ id: "test-one", digest: sha256("test receipt"), source: "receipt" as const, summary: "Current tests.", status: "passed" as const }]
+  };
+  const contextEvidence = { contextDigest: sha256(stableJson(evidenceMaterial)), ...evidenceMaterial };
+  const rereadEvidence = {
+    contextDigest: contextEvidence.contextDigest,
+    authorityDigest: sha256(stableJson(authority)),
+    instructionDigests: contextEvidence.instructions.map((item) => item.digest),
+    planDigest: contextEvidence.plan.digest,
+    documentationDigests: contextEvidence.documentation.map((item) => item.digest),
+    currentWorkDigest: sha256(stableJson({
+      diffDigest: contextEvidence.diff.digest,
+      fileDigests: contextEvidence.files.map((item) => item.digest),
+      testDigests: contextEvidence.tests.map((item) => item.digest),
+      newTarget
+    })),
+    inspectedTargetSnapshotId: newTarget.id
+  };
+  const material = {
+    version: 1 as const, requestId: `reanchor:${"1".repeat(64)}`, operationId: `reanchor-operation:${"2".repeat(64)}`,
+    oldTargetSnapshotId: oldTarget.id, newTargetSnapshotId: newTarget.id, sessionId: session.id,
+    authorityId: authority.id, reason: "Reread protected context and inspect current work.",
+    previewDigest: "3".repeat(64), confirmationDigest: "4".repeat(64), confirmationScopeDigest: "5".repeat(64),
+    provider: "codex" as const, session, repositoryRoot, taskId: session.taskId!, planRevision: session.planRevision!,
+    plannedFiles: [...session.plannedFiles], authority, oldTarget, newTarget, contextEvidence,
+    requiredRereads: reanchorRequiredRereads, rereadEvidence,
+    cooperativeStopRequested: true as const, resumeAuthorized: false as const
+  };
+  return { ...material, artifactDigest: reanchorApplyArtifactDigest(material) };
+}
+
+function reanchorAcknowledgement(input: ReanchorApplyRequest) {
+  return {
+    schema: "sxsy-b122.reanchor-acknowledgement", version: 1,
+    requestId: input.requestId, operationId: input.operationId, externalEffectId: "provider-effect-reanchor",
+    sessionId: input.sessionId, authorityId: input.authorityId,
+    oldTargetSnapshotId: input.oldTargetSnapshotId, newTargetSnapshotId: input.newTargetSnapshotId,
+    cooperativeStopAcknowledged: true, resumed: false, artifactDigest: input.artifactDigest,
+    rereadEvidence: input.rereadEvidence,
+    report: {
+      summary: "Stopped, reread the task brief and documentation, inspected current work, and reported without resuming.",
+      discrepancies: ["The protected target changed."], risks: ["The session remains stopped."],
+      questions: ["Should a separate authority resume it?"], result: "reanchored_without_resume"
+    }
+  };
 }
 
 function passed(routeId: string, value: unknown) { return { outcome: "passed" as const, routeId, detail: "ok", effectDisposition: "ambiguous" as const, body: Buffer.from(JSON.stringify(value)) }; }

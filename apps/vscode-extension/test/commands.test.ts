@@ -18,7 +18,8 @@ test("the installed extension activates after startup so a focused window can cl
   const packagePath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
   const manifest = JSON.parse(await readFile(packagePath, "utf8")) as { activationEvents?: readonly string[]; contributes?: { commands?: readonly { command?: string }[] } };
   assert.ok(manifest.activationEvents?.includes("onStartupFinished"));
-  for (const command of ["sxsy-b122.showQuickReference", "sxsy-b122.installRawHid", "sxsy-b122.listRawHid", "sxsy-b122.showRawHidStatus", "sxsy-b122.revokeRawHid"]) {
+  assert.ok(manifest.activationEvents?.includes("onCommand:sxsy-b122.chord.reanchor.normal"));
+  for (const command of ["sxsy-b122.showQuickReference", "sxsy-b122.installRawHid", "sxsy-b122.listRawHid", "sxsy-b122.showRawHidStatus", "sxsy-b122.revokeRawHid", "sxsy-b122.chord.reanchor.normal"]) {
     assert.ok(manifest.contributes?.commands?.some((entry) => entry.command === command), command);
   }
 });

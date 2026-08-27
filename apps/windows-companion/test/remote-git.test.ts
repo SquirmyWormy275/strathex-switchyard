@@ -61,6 +61,22 @@ test("reviewed Git policies may raise the bounded push cap above the old four Mi
   assert.throws(() => configuredGitHostFromPolicy(gitPolicy("github.com", 256 * 1024 * 1024 + 1)), /bounded range/i);
 });
 
+test("configured Git rejects dot-segment and noncanonical repository identities before use", () => {
+  const policyWith = (owner: string, name: string): ConfiguredNetworkPolicy => ({
+    version: 1,
+    proxy: "direct",
+    routes: [
+      { id: "github.graphql", method: "POST", url: "https://api.github.com/graphql", redirects: "deny" },
+      { id: "github.repository", method: "HEAD", url: `https://github.com/${owner}/${name}`, redirects: "deny" },
+      { id: "git.receive-pack.advertise", method: "GET", url: `https://github.com/${owner}/${name}.git/info/refs?service=git-receive-pack`, redirects: "deny" },
+      { id: "git.receive-pack", method: "POST", url: `https://github.com/${owner}/${name}.git/git-receive-pack`, redirects: "deny" }
+    ]
+  });
+  for (const [owner, name] of [[".owner", "project"], ["owner.", "project"], ["owner", ".project"], ["owner", "project."], [".", "project"], ["owner", ".."]]) {
+    assert.throws(() => configuredGitHostFromPolicy(policyWith(owner!, name!)), /canonical.*owner\/repository/i, `${owner}/${name}`);
+  }
+});
+
 test("reviewed remote Git handler pushes and upserts only the bound branch and head", async () => {
   const effects: string[] = [];
   const pusher: ReviewedRemotePusher = { async push(input) { effects.push(`push:${input.destinationBranch}:${input.sourceHead}`); return { status: "completed", summary: "pushed" }; } };

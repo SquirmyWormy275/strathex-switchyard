@@ -6,12 +6,20 @@ import test from "node:test";
 
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter } from "../src/pipeline-adapters.ts";
+import {
+  CompositePipelineStatusAdapter,
+  ConfiguredGitHubPipelineAdapter,
+  DurablePipelineFailureCursor,
+  LocalPipelineFailureTraceAdapter,
+  PipelineFailureFallbackAdapter,
+  PipelineFailurePresentationAdapter,
+  PipelineStatusFailureSelectionAdapter
+} from "../src/pipeline-adapters.ts";
 import { configuredGitHostFromPolicy } from "../src/remote-git.ts";
 import type { DynamicConfiguredNetworkClient } from "../src/remote-adapters.ts";
 
 const target: TargetSnapshot = {
-  id: "target-pipeline",
+  id: "f".repeat(64),
   repositoryRoot: "C:\\repo",
   branch: "feature/pipeline",
   head: "a".repeat(40),
@@ -131,10 +139,11 @@ test("pipeline adapter binds GitHub status to the exact target head and protecte
         targetSnapshotId: target.id,
         result: "passed",
         completeness: "complete",
-        summary: "Local gate passed.",
-        evidence: {},
+        evidenceDigest: "9".repeat(64),
+        policyVersion: "test",
         toolVersions: {},
-        createdAt: "2026-08-24T00:00:00.000Z"
+        createdAt: "2026-08-24T00:00:00.000Z",
+        hash: "8".repeat(64)
       }] as never;
     }
   }, hostResolver);
@@ -216,6 +225,11 @@ test("failure trace retrieves bounded authenticated output, diagnoses it, and cy
     return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(log) };
   } } as unknown as DynamicConfiguredNetworkClient;
   const receipts = { async list() { return []; } };
+  const status = await new ConfiguredGitHubPipelineAdapter(network, receipts, hostResolver, new DurablePipelineFailureCursor(store)).execute(request("pipeline_status"));
+  assert.equal(status.status, "completed");
+  assert.equal(status.data?.selectedIndex, 0);
+  assert.equal((status.data?.selectedFailure as { name: string }).name, "unit");
+
   const first = await new ConfiguredGitHubPipelineAdapter(network, receipts, hostResolver, new DurablePipelineFailureCursor(store)).execute(request("pipeline_failure_trace"));
   assert.equal(first.status, "completed");
   assert.equal((first.data?.selectedFailure as { name: string }).name, "unit");
@@ -229,6 +243,81 @@ test("failure trace retrieves bounded authenticated output, diagnoses it, and cy
   assert.ok(String(restarted.data?.logExcerpt).length <= 64 * 1024);
   assert.equal(restarted.data?.repeatAvailable, true);
   assert.deepEqual(selectedJobs, ["2", "3"]);
+});
+
+test("protected local failures supply the same durable Normal/Alt series when no hosted route exists", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-pipeline-local-trace-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const authenticator: JournalAuthenticator = { provider: "pipeline-local-trace-test", async seal(hash) { return `test:${hash}`; }, async verify(hash, tag) { return tag === `test:${hash}`; } };
+  const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator });
+  const receipts = [{
+    id: "receipt:local-gate-failed", operationId: "operation-local-gate", action: "pipeline_local_gate", targetSnapshotId: target.id,
+    result: "failed", completeness: "complete", evidenceDigest: "1".repeat(64), policyVersion: "test", toolVersions: { node: "22.0.0" },
+    createdAt: "2026-08-24T00:00:00.000Z", hash: "2".repeat(64)
+  }, {
+    id: "receipt:clean-reproduction-failed", operationId: "operation-clean-reproduction", action: "pipeline_clean_reproduction", targetSnapshotId: target.id,
+    result: "failed", completeness: "complete", evidenceDigest: "3".repeat(64), policyVersion: "test", toolVersions: { node: "22.0.0" },
+    createdAt: "2026-08-24T00:01:00.000Z", hash: "4".repeat(64)
+  }] as never;
+  const reader = { async list() { return receipts; } };
+  const cursor = new DurablePipelineFailureCursor(store, () => new Date("2026-08-24T00:02:00.000Z"));
+  const localStatus = new PipelineStatusFailureSelectionAdapter({
+    id: "local-status", kind: "generic", async execute() {
+      return { status: "completed", summary: "Protected local receipt evidence is available.", effectDisposition: "committed" as const, data: {
+        localReceiptState: "current",
+        localReceipts: [
+          { id: "receipt:local-gate-failed", action: "pipeline_local_gate", targetSnapshotId: target.id, result: "failed", completeness: "complete", evidenceDigest: "1".repeat(64), createdAt: "2026-08-24T00:00:00.000Z", freshness: "current", gateFresh: false },
+          { id: "receipt:clean-reproduction-failed", action: "pipeline_clean_reproduction", targetSnapshotId: target.id, result: "failed", completeness: "complete", evidenceDigest: "3".repeat(64), createdAt: "2026-08-24T00:01:00.000Z", freshness: "current", gateFresh: false }
+        ]
+      } };
+    }
+  }, cursor);
+  const trace = new LocalPipelineFailureTraceAdapter(reader, cursor, () => "2026-08-24T00:02:00.000Z");
+
+  const normal = await localStatus.execute(request("pipeline_status"));
+  assert.equal(normal.status, "completed");
+  assert.equal(normal.data?.selectedIndex, 0);
+  assert.equal((normal.data?.selectedFailure as { name: string }).name, "local:pipeline_local_gate");
+
+  const firstAlt = await trace.execute(request("pipeline_failure_trace"));
+  assert.equal(firstAlt.status, "completed");
+  assert.equal(firstAlt.data?.selectedIndex, 0, "first Alt diagnoses the failure selected by Normal instead of advancing an independent cursor");
+  assert.equal(firstAlt.data?.logSource, "protected-local-receipt");
+  assert.match(String(firstAlt.data?.logExcerpt), /receipt:local-gate-failed.*111111/i);
+
+  const secondAlt = await new LocalPipelineFailureTraceAdapter(reader, new DurablePipelineFailureCursor(store), () => "2026-08-24T00:03:00.000Z").execute(request("pipeline_failure_trace"));
+  assert.equal(secondAlt.data?.selectedIndex, 1);
+  assert.equal((secondAlt.data?.selectedFailure as { name: string }).name, "local:pipeline_clean_reproduction");
+});
+
+test("Pipeline Alt falls back only to protected local evidence and never queues a no-route placeholder", async () => {
+  const failedReceipt = {
+    id: "receipt:local-only", operationId: "operation-local-only", action: "pipeline_local_gate", targetSnapshotId: target.id,
+    result: "failed", completeness: "complete", evidenceDigest: "5".repeat(64), policyVersion: "test", toolVersions: {},
+    createdAt: "2026-08-24T00:00:00.000Z", hash: "6".repeat(64)
+  } as never;
+  let localCalls = 0;
+  const local = new LocalPipelineFailureTraceAdapter({ async list() { localCalls += 1; return [failedReceipt]; } });
+  const noRoute = new PipelineFailureFallbackAdapter(
+    { id: "hosted", kind: "generic", async execute() { return { status: "unavailable", summary: "No exact hosted route.", effectDisposition: "not_started" as const }; } },
+    local
+  );
+  const fallback = await noRoute.execute(request("pipeline_failure_trace"));
+  assert.equal(fallback.status, "completed");
+  assert.equal(fallback.data?.logSource, "protected-local-receipt");
+  assert.equal(localCalls, 1);
+
+  const noEvidence = new PipelineFailureFallbackAdapter(
+    { id: "hosted", kind: "generic", async execute() { return { status: "unavailable", summary: "No exact hosted route.", effectDisposition: "not_started" as const }; } },
+    new LocalPipelineFailureTraceAdapter({ async list() { return []; } })
+  );
+  assert.equal((await noEvidence.execute(request("pipeline_failure_trace"))).status, "unavailable");
+
+  const blocked = new PipelineFailureFallbackAdapter(
+    { id: "hosted", kind: "generic", async execute() { return { status: "blocked", summary: "Configured host does not match the target.", effectDisposition: "not_started" as const }; } },
+    { id: "must-not-run", kind: "generic", async execute() { throw new Error("blocked host/target guards must dominate fallback"); } }
+  );
+  assert.equal((await blocked.execute(request("pipeline_failure_trace"))).status, "blocked");
 });
 
 test("failure trace fails closed when selected job logs are retained elsewhere, oversized, or the target changes", async () => {

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SXSY-B122 simulated safe demo</title>
+  <style>
+    body { margin: 0; background: #f2f4f7; color: #111827; font: 18px Arial, sans-serif; }
+    main { max-width: 980px; margin: 48px auto; padding: 32px; }
+    .warning { color: #b91c1c; font-weight: 700; letter-spacing: .03em; }
+    .card { min-height: 280px; margin-top: 28px; padding: 30px; background: white; border: 6px solid #2563eb; border-radius: 18px; }
+    code { font: 700 28px Consolas, monospace; }
+    button { padding: 12px 20px; border: 0; border-radius: 8px; background: #111827; color: white; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SXSY-B122 deterministic fail-closed demo</h1>
+    <p class="warning">SIMULATED - NO HARDWARE OR PROVIDER EVIDENCE</p>
+    <p>This offline page plays four fixed frames. It performs no network, credential, Git, provider, or hardware action.</p>
+    <button id="next" type="button">Next simulated frame</button>
+    <section id="card" class="card" aria-live="polite"></section>
+  </main>
+  <script>
+    const frames = [{"sequence":1,"chord":"PROOF:normal","action":"proof","result":"preview","message":"Read-only proof packet is bound to one simulated exact target."},{"sequence":2,"chord":"PROOF:normal","action":"proof","result":"unavailable","message":"No attested provider is installed; no provider request is sent."},{"sequence":3,"chord":"COMMIT:alt","action":"pr_merge","result":"blocked","message":"Exact-head merge is blocked because required gates are NOT ACCEPTED."},{"sequence":4,"chord":"PIPELINE:normal","action":"pipeline_status","result":"preserved","message":"Typed outcomes remain visible; no external effect or retry occurred."}];
+    let index = 0;
+    const card = document.getElementById('card');
+    function render() {
+      const frame = frames[index];
+      card.style.borderColor = frame.result === 'blocked' ? '#b91c1c' : frame.result === 'preserved' ? '#166534' : frame.result === 'unavailable' ? '#6b7280' : '#2563eb';
+      card.textContent = '';
+      const heading = document.createElement('h2'); heading.textContent = `Step ${frame.sequence} - ${frame.result}`;
+      const chord = document.createElement('code'); chord.textContent = frame.chord;
+      const action = document.createElement('p'); action.textContent = `Action: ${frame.action}`;
+      const message = document.createElement('p'); message.textContent = frame.message;
+      card.append(heading, chord, action, message);
+    }
+    document.getElementById('next').addEventListener('click', () => { index = (index + 1) % frames.length; render(); });
+    render();
+  </script>
+</body>
+</html>

@@ -13,6 +13,8 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Readable } from "node:stream";
 
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import type { EffectDisposition } from "../../../packages/control-plane/src/contracts.ts";
+import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
 
 export const repositoryRuntimeManifestSchema = "sxsy-b122.repository-runtime" as const;
 export const repositoryRuntimeManifestVersion = 1 as const;
@@ -82,7 +84,7 @@ export interface RepositoryRuntimeManifest {
   readonly recipes: Readonly<Partial<Record<RepositoryRuntimeAction, RepositoryRuntimeRecipe>>>;
 }
 
-interface ExecutableIdentity {
+export interface RepositoryExecutableIdentity {
   readonly canonicalPath: string;
   readonly sha256: string;
   readonly device: string;
@@ -98,7 +100,7 @@ export interface VerifiedRepositoryRuntimeManifest {
   readonly digest: string;
   readonly canonicalRepositoryRoot: string;
   readonly [verifiedBrand]: true;
-  readonly executableIdentities: ReadonlyMap<RepositoryProcessAction, ExecutableIdentity>;
+  readonly executableIdentities: ReadonlyMap<RepositoryProcessAction, RepositoryExecutableIdentity>;
 }
 
 export interface LoadRepositoryRuntimeManifestOptions {
@@ -139,6 +141,8 @@ export type RepositoryRuntimeStatus = "completed" | "running" | "failed" | "bloc
 export interface RepositoryRuntimeResult {
   readonly status: RepositoryRuntimeStatus;
   readonly summary: string;
+  /** Exact host-owned truth about whether the repository/process effect began. */
+  readonly effectDisposition?: EffectDisposition;
   readonly managedProcessId?: string;
   readonly pid?: number;
   readonly exitCode?: number;
@@ -147,11 +151,17 @@ export interface RepositoryRuntimeResult {
   readonly url?: string;
   readonly debugConfiguration?: string;
   readonly pythonInterpreter?: string;
+  readonly pythonInterpreterIdentity?: RepositoryExecutableIdentity;
 }
 
 export interface RepositoryRuntimeExecuteOptions {
   readonly managedProcessId?: string;
   readonly operationId?: string;
+  /** Protected dispatch target; every new process identity is durably bound to this exact snapshot. */
+  readonly targetSnapshotId?: string;
+  /** Exact managed-session and authority identities admitted for this durable operation. */
+  readonly sessionId?: string;
+  readonly authorityId?: string;
   readonly signal?: AbortSignal;
   /** Exact dispatch-bound final barrier; the constructor guard remains the fail-closed default. */
   readonly effectGuard?: RuntimeEffectGuard;
@@ -160,6 +170,9 @@ export interface RepositoryRuntimeExecuteOptions {
 export interface RepositoryProcessStartRequest {
   readonly action: RepositoryProcessAction;
   readonly operationId: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
   readonly repositoryRoot: string;
   readonly manifestSha256: string;
   readonly executable: string;
@@ -178,17 +191,33 @@ export interface RepositoryProcessRecoveryScope {
   readonly manifestSha256: string;
 }
 
+export interface RepositoryProcessObservationRequest extends OperationReconciliationBinding {
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly manifestSha256: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
+}
+
 export interface RepositorySupervisedProcess {
   /** Opaque, durable supervisor identity. It is never a caller-selected PID. */
   readonly supervisorId: string;
   readonly action: RepositoryProcessAction;
   readonly operationId: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
   readonly pid: number;
   readonly startedAt: string;
   readonly stdout: Readable;
   readonly stderr: Readable;
   readonly recovered: boolean;
-  wait(): Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
+  wait(): Promise<{
+    readonly code: number;
+    readonly signal: NodeJS.Signals | null;
+    /** Restart observation may prove only inactivity, not a semantic terminal result. */
+    readonly terminalEvidence?: "trusted" | "ambiguous";
+  }>;
   isAlive(): Promise<boolean>;
   /** Must terminate the entire supervisor-owned process tree. */
   terminateTree(gracefulTimeoutMs: number, forceTimeoutMs: number): Promise<void>;
@@ -197,6 +226,8 @@ export interface RepositorySupervisedProcess {
 export interface RepositoryProcessSupervisor {
   start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess>;
   recover(scope: RepositoryProcessRecoveryScope): Promise<readonly RepositorySupervisedProcess[]>;
+  /** Reads only durable supervisor state; it never starts or retries a process. */
+  observeOperation(request: RepositoryProcessObservationRequest): Promise<OperationControllerObservation>;
 }
 
 export interface ManagedRepositoryProcess {
@@ -205,7 +236,7 @@ export interface ManagedRepositoryProcess {
   readonly action: "run_target" | "debug_target" | "launch_web_app";
   readonly pid: number;
   readonly startedAt: string;
-  readonly state: "running" | "stopping" | "completed" | "failed" | "timed_out" | "cancelled";
+  readonly state: "running" | "stopping" | "unknown" | "completed" | "failed" | "timed_out" | "cancelled";
   readonly exitCode?: number;
   readonly outputTruncated: boolean;
 }
@@ -246,10 +277,10 @@ export async function loadVerifiedRepositoryRuntimeManifest(options: LoadReposit
   const declaredRoot = await realpath(manifest.repositoryRoot).catch(() => "");
   if (!samePath(canonicalRepositoryRoot, declaredRoot)) throw new Error("Repository runtime manifest root does not match the canonical selected repository.");
 
-  const executableIdentities = new Map<RepositoryProcessAction, ExecutableIdentity>();
+  const executableIdentities = new Map<RepositoryProcessAction, RepositoryExecutableIdentity>();
   for (const [action, recipe] of Object.entries(manifest.recipes)) {
     if (!recipe || recipe.kind !== "process") continue;
-    executableIdentities.set(action as RepositoryProcessAction, await captureExecutableIdentity(recipe.executable));
+    executableIdentities.set(action as RepositoryProcessAction, await captureRepositoryExecutableIdentity(recipe.executable));
   }
   return {
     manifest: deepFreeze(manifest),
@@ -456,7 +487,7 @@ function isExactSafeWebUrl(value: string, allowlistedHttpsUrls: readonly string[
   } catch { return false; }
 }
 
-async function captureExecutableIdentity(executable: string): Promise<ExecutableIdentity> {
+export async function captureRepositoryExecutableIdentity(executable: string): Promise<RepositoryExecutableIdentity> {
   const canonicalPath = await realpath(executable).catch(() => { throw new Error("Repository runtime executable does not exist."); });
   const metadata = await stat(canonicalPath, { bigint: true });
   if (!metadata.isFile()) throw new Error("Repository runtime executable is not a regular file.");
@@ -465,8 +496,8 @@ async function captureExecutableIdentity(executable: string): Promise<Executable
   return { canonicalPath, sha256, device: metadata.dev.toString(10), inode: metadata.ino.toString(10), size: Number(metadata.size), modifiedMs: Number(metadata.mtimeMs) };
 }
 
-async function assertExecutableUnchanged(expected: ExecutableIdentity): Promise<string> {
-  const current = await captureExecutableIdentity(expected.canonicalPath);
+async function assertExecutableUnchanged(expected: RepositoryExecutableIdentity): Promise<string> {
+  const current = await captureRepositoryExecutableIdentity(expected.canonicalPath);
   if (!samePath(current.canonicalPath, expected.canonicalPath) || current.sha256 !== expected.sha256 || current.device !== expected.device || current.inode !== expected.inode || current.size !== expected.size || current.modifiedMs !== expected.modifiedMs) {
     throw new Error("Repository runtime executable changed after manifest verification.");
   }
@@ -526,7 +557,7 @@ interface ManagedRecord {
   };
   readonly process: RepositorySupervisedProcess;
   readonly output: ExactEnvironmentOutput;
-  readonly exit: Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
+  readonly exit: ReturnType<RepositorySupervisedProcess["wait"]>;
   readonly lease: RepositoryExecutionRootLease;
   timeout?: ReturnType<typeof setTimeout>;
   abortCleanup?: () => void;
@@ -559,7 +590,25 @@ const defaultHealthProbe: RuntimeHealthProbe = {
  * Installed Windows composition supplies the Job-Object supervisor instead.
  */
 class DirectChildProcessSupervisor implements RepositoryProcessSupervisor {
+  private readonly owned = new Map<string, Readonly<{
+    request: RepositoryProcessStartRequest;
+    process: RepositorySupervisedProcess;
+    state: { value: "running" | "completed" | "failed" | "cancelled"; exitCode?: number };
+  }>>();
+
   async recover(): Promise<readonly RepositorySupervisedProcess[]> { return []; }
+
+  async observeOperation(request: RepositoryProcessObservationRequest): Promise<OperationControllerObservation> {
+    const matches = [...this.owned.values()].filter((entry) => entry.request.operationId === request.operationId && entry.request.action === request.action
+      && entry.request.targetSnapshotId === request.targetSnapshotId && samePath(entry.request.repositoryRoot, request.repositoryRoot)
+      && entry.request.manifestSha256 === request.manifestSha256 && entry.request.sessionId === request.sessionId
+      && entry.request.authorityId === request.authorityId);
+    if (matches.length === 0) return { state: "not_owner", operationId: request.operationId, summary: "The compatibility process supervisor does not own this exact operation." };
+    if (matches.length !== 1) return processActive(request, "More than one compatibility process identity claimed this operation; terminal state remains ambiguous.");
+    const match = matches[0]!;
+    if (match.state.value === "running") return processActive(request, "The exact compatibility child remains active.");
+    return processTerminal(request, match.process, match.state.value, match.state.exitCode);
+  }
 
   async start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess> {
     let child: ChildProcessWithoutNullStreams;
@@ -584,10 +633,14 @@ class DirectChildProcessSupervisor implements RepositoryProcessSupervisor {
     let settled = false;
     child.once("close", (code, closeSignal) => { if (!settled) { settled = true; settle({ code: code ?? -1, signal: closeSignal }); } });
     child.once("error", () => { if (!settled) { settled = true; settle({ code: -1, signal: null }); } });
-    return {
+    const state: { value: "running" | "completed" | "failed" | "cancelled"; exitCode?: number } = { value: "running" };
+    const process: RepositorySupervisedProcess = {
       supervisorId,
       action: request.action,
       operationId: request.operationId,
+      targetSnapshotId: request.targetSnapshotId,
+      ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+      ...(request.authorityId ? { authorityId: request.authorityId } : {}),
       pid: child.pid,
       startedAt: new Date().toISOString(),
       stdout: child.stdout,
@@ -601,8 +654,15 @@ class DirectChildProcessSupervisor implements RepositoryProcessSupervisor {
           child.kill("SIGKILL");
           if (!await settledWithin(exit, forceTimeoutMs)) throw new Error("The direct child did not stop within the bounded termination window.");
         }
+        state.value = "cancelled";
       }
     };
+    this.owned.set(supervisorId, { request, process, state });
+    void exit.then(({ code }) => {
+      state.exitCode = code;
+      if (state.value === "running") state.value = code === 0 ? "completed" : "failed";
+    });
+    return process;
   }
 }
 
@@ -684,34 +744,52 @@ export class RepositoryRuntime {
     return records.filter((record) => record.public.state === "cancelled").length;
   }
 
-  async reconcileOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
-    const records = [...this.managed.values()].filter((record) => record.public.operationId === operationId);
-    if (records.length === 0) return { settled: false, summary: "No exact durable repository supervisor identity is known for this operation; no process was replayed or killed." };
-    const alive = await Promise.all(records.map((record) => record.process.isAlive().catch(() => true)));
-    return alive.some(Boolean)
-      ? { settled: false, summary: `${alive.filter(Boolean).length} exact supervisor-owned process tree(s) remain active for the operation.` }
-      : { settled: true, summary: "Every exact supervisor-owned process tree for the operation is terminal; no work was replayed." };
+  async reconcileOperation(binding: OperationReconciliationBinding): Promise<OperationControllerObservation> {
+    const protectedBinding = binding as OperationReconciliationBinding & Readonly<{ sessionId?: string; authorityId?: string }>;
+    if (!binding.targetSnapshotId || !binding.repositoryRoot || !/^[a-f0-9]{64}$/.test(binding.targetSnapshotId)) {
+      return processActive({ ...binding, targetSnapshotId: binding.targetSnapshotId ?? "0".repeat(64), repositoryRoot: binding.repositoryRoot ?? this.verified.canonicalRepositoryRoot, manifestSha256: this.verified.digest }, "The repository process target binding is partial or invalid; terminal state remains ambiguous.");
+    }
+    if (!samePath(binding.repositoryRoot, this.verified.canonicalRepositoryRoot)) {
+      return { state: "not_owner", operationId: binding.operationId, summary: "This verified repository runtime does not own the bound repository target." };
+    }
+    if (!processActionSet.has(binding.action)) {
+      return { state: "not_owner", operationId: binding.operationId, summary: "This verified repository runtime does not own the bound non-process action." };
+    }
+    const request: RepositoryProcessObservationRequest = {
+      operationId: binding.operationId,
+      action: binding.action,
+      targetSnapshotId: binding.targetSnapshotId,
+      repositoryRoot: this.verified.canonicalRepositoryRoot,
+      manifestSha256: this.verified.digest,
+      ...(protectedBinding.sessionId ? { sessionId: protectedBinding.sessionId } : {}),
+      ...(protectedBinding.authorityId ? { authorityId: protectedBinding.authorityId } : {})
+    };
+    try { return await this.processSupervisor.observeOperation(request); }
+    catch { return processActive(request, "The exact repository supervisor state could not be observed; terminal state remains ambiguous and no work was replayed."); }
   }
 
   async execute(action: RepositoryRuntimeAction, options: RepositoryRuntimeExecuteOptions = {}): Promise<RepositoryRuntimeResult> {
     const effectGuard = options.effectGuard ?? this.effectGuard;
     const recipe = this.verified.manifest.recipes[action];
-    if (!recipe) return { status: "unavailable", summary: `No verified repository runtime recipe is declared for ${action}.` };
+    if (!recipe) return { status: "unavailable", summary: `No verified repository runtime recipe is declared for ${action}.`, effectDisposition: "not_started" };
     if (action === "stop_managed_run") {
-      if (recipe.kind !== "stop") return { status: "blocked", summary: "The verified stop recipe has an invalid type." };
+      if (recipe.kind !== "stop") return { status: "blocked", summary: "The verified stop recipe has an invalid type.", effectDisposition: "not_started" };
       return this.stopManaged(recipe, options.managedProcessId, effectGuard);
     }
     if (action === "debug_target") {
-      if (recipe.kind !== "vscode_debug") return { status: "blocked", summary: "The verified debug recipe has an invalid type." };
-      if (options.signal?.aborted) return { status: "cancelled", summary: "debug_target was cancelled before the host action." };
+      if (recipe.kind !== "vscode_debug") return { status: "blocked", summary: "The verified debug recipe has an invalid type.", effectDisposition: "not_started" };
+      if (options.signal?.aborted) return { status: "cancelled", summary: "debug_target was cancelled before the host action.", effectDisposition: "not_started" };
       const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
-      if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
+      if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason), effectDisposition: "not_started" };
       const finalGuard = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
-      if (!finalGuard.allowed) return { status: "blocked", summary: untrustedSummary(finalGuard.reason) };
-      return { status: "running", summary: "The exact verified VS Code debug configuration is ready for authenticated host execution.", debugConfiguration: recipe.configuration };
+      if (!finalGuard.allowed) return { status: "blocked", summary: untrustedSummary(finalGuard.reason), effectDisposition: "not_started" };
+      return { status: "running", summary: "The exact verified VS Code debug configuration is ready for authenticated host execution.", effectDisposition: "not_started", debugConfiguration: recipe.configuration };
     }
-    if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type." };
-    return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`);
+    if (recipe.kind !== "process" || !processActionSet.has(action)) return { status: "blocked", summary: "The verified process recipe has an invalid type.", effectDisposition: "not_started" };
+    if (!options.targetSnapshotId || !/^[a-f0-9]{64}$/.test(options.targetSnapshotId)) {
+      return { status: "blocked", summary: "Repository process execution requires an exact protected TargetSnapshot identity.", effectDisposition: "not_started" };
+    }
+      return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`, options.targetSnapshotId, options.sessionId, options.authorityId);
   }
 
   allowsManagedStop(action: "run_target" | "debug_target" | "launch_web_app"): boolean {
@@ -719,19 +797,20 @@ export class RepositoryRuntime {
     return recipe?.kind === "stop" && recipe.managedActions.includes(action);
   }
 
-  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string): Promise<RepositoryRuntimeResult> {
-    if (!operationId.trim() || operationId.length > 256 || /[\0\r\n]/.test(operationId)) return { status: "blocked", summary: "Repository runtime operation identity is invalid." };
-    if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.` };
+  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string, targetSnapshotId: string, sessionId?: string, authorityId?: string): Promise<RepositoryRuntimeResult> {
+    if (!operationId.trim() || operationId.length > 256 || /[\0\r\n]/.test(operationId)) return { status: "blocked", summary: "Repository runtime operation identity is invalid.", effectDisposition: "not_started" };
+    if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.`, effectDisposition: "not_started" };
     const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
-    if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason) };
+    if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason), effectDisposition: "not_started" };
     let lease: RepositoryExecutionRootLease;
     try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation }); }
     catch (error) {
       return error instanceof RuntimeUnavailableError
-        ? { status: "unavailable", summary: untrustedSummary(error.message) }
-        : { status: "failed", summary: untrustedSummary((error as Error).message) };
+        ? { status: "unavailable", summary: untrustedSummary(error.message), effectDisposition: "not_started" }
+        : { status: "failed", summary: untrustedSummary((error as Error).message), effectDisposition: "not_started" };
     }
     let transferredLease = false;
+    let effectStarted = false;
     try {
       const executionRoot = await realpath(lease.root);
       if (lease.isolation !== recipe.isolation) return { status: "blocked", summary: "Execution-root isolation does not match the verified recipe." };
@@ -751,17 +830,22 @@ export class RepositoryRuntime {
       const finalCwd = await realpath(cwd);
       if (!samePath(finalRoot, executionRoot) || !inside(finalCwd, finalRoot)) return { status: "blocked", summary: "Execution root changed during the final effect check." };
       const executable = await assertExecutableUnchanged(expectedExecutable);
-      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal, operationId);
+      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal, operationId, targetSnapshotId, sessionId, authorityId);
       if ("result" in started) return started.result;
+      effectStarted = true;
       transferredLease = recipe.lifecycle === "managed";
       if (recipe.lifecycle === "foreground") {
         const result = await this.waitForeground(action, recipe, started.record, signal);
         if (result.status === "completed" && (action === "venv" || action === "rebuild_venv")) {
           const interpreter = await realpath(resolve(this.verified.canonicalRepositoryRoot, recipe.python!.interpreter)).catch(() => "");
           if (!interpreter || !inside(interpreter, this.verified.canonicalRepositoryRoot) || !(await stat(interpreter).catch(() => undefined))?.isFile()) {
-            return { status: "failed", summary: `${action} exited successfully but did not produce the exact verified repo-local Python interpreter.` };
+            return { status: "failed", summary: `${action} exited successfully but did not produce the exact verified repo-local Python interpreter.`, effectDisposition: "committed" };
           }
-          return { ...result, pythonInterpreter: interpreter };
+          const pythonInterpreterIdentity = await captureRepositoryExecutableIdentity(interpreter);
+          if (!samePath(pythonInterpreterIdentity.canonicalPath, interpreter)) {
+            return { status: "failed", summary: `${action} produced an interpreter whose canonical file identity changed during verification.`, effectDisposition: "committed" };
+          }
+          return { ...result, pythonInterpreter: interpreter, pythonInterpreterIdentity };
         }
         return result;
       }
@@ -771,13 +855,13 @@ export class RepositoryRuntime {
         const healthy = await this.waitForHealth(record, web, signal, effectGuard);
         if (!healthy.healthy) {
           await this.terminateRecord(record, 250, 1_000, signal?.aborted ? "cancelled" : "failed");
-          return { status: signal?.aborted ? "cancelled" : "failed", summary: untrustedSummary(healthy.detail), managedProcessId: record.public.id, pid: record.public.pid, output: record.output.text(), outputTruncated: record.output.truncated };
+          return { status: signal?.aborted ? "cancelled" : "failed", summary: untrustedSummary(healthy.detail), effectDisposition: "committed", managedProcessId: record.public.id, pid: record.public.pid, output: record.output.text(), outputTruncated: record.output.truncated };
         }
-        return { status: "running", summary: "Managed web application passed its exact configured health probe.", managedProcessId: record.public.id, pid: record.public.pid, url: web.url };
+        return { status: "running", summary: "Managed web application passed its exact configured health probe.", effectDisposition: "committed", managedProcessId: record.public.id, pid: record.public.pid, url: web.url };
       }
-      return { status: "running", summary: `Managed ${action} process started.`, managedProcessId: record.public.id, pid: record.public.pid };
+      return { status: "running", summary: `Managed ${action} process started.`, effectDisposition: "committed", managedProcessId: record.public.id, pid: record.public.pid };
     } catch (error) {
-      return { status: "blocked", summary: untrustedSummary((error as Error).message) };
+      return { status: "blocked", summary: untrustedSummary((error as Error).message), effectDisposition: effectStarted ? "committed" : "not_started" };
     } finally {
       if (!transferredLease) await lease.release().catch(() => undefined);
     }
@@ -790,19 +874,25 @@ export class RepositoryRuntime {
     cwd: string,
     lease: RepositoryExecutionRootLease,
     signal: AbortSignal | undefined,
-    operationId: string
+    operationId: string,
+    targetSnapshotId: string,
+    sessionId?: string,
+    authorityId?: string
   ): Promise<{ readonly record: ManagedRecord } | { readonly result: RepositoryRuntimeResult }> {
     if (recipe.lifecycle === "managed" && [...this.managed.values()].some((item) => item.public.action === action && item.public.state === "running")) {
-      return { result: { status: "blocked", summary: `A managed ${action} process is already running for this repository.` } };
+      return { result: { status: "blocked", summary: `A managed ${action} process is already running for this repository.`, effectDisposition: "not_started" } };
     }
     const output = new ExactEnvironmentOutput(recipe.maxOutputBytes);
     const expectedExecutable = this.verified.executableIdentities.get(action);
-    if (!expectedExecutable) return { result: { status: "blocked", summary: "Verified executable identity is missing at supervisor launch." } };
+    if (!expectedExecutable) return { result: { status: "blocked", summary: "Verified executable identity is missing at supervisor launch.", effectDisposition: "not_started" } };
     let process: RepositorySupervisedProcess;
     try {
       process = await this.processSupervisor.start({
         action,
         operationId,
+        targetSnapshotId,
+        ...(sessionId ? { sessionId } : {}),
+        ...(authorityId ? { authorityId } : {}),
         repositoryRoot: this.verified.canonicalRepositoryRoot,
         manifestSha256: this.verified.digest,
         executable,
@@ -814,10 +904,12 @@ export class RepositoryRuntime {
         timeoutMs: recipe.timeoutMs,
         maxOutputBytes: recipe.maxOutputBytes
       });
-    } catch (error) { return { result: { status: "failed", summary: untrustedSummary((error as Error).message) } }; }
-    if (process.action !== action || !/^managed:[a-f0-9]{64}$/.test(process.supervisorId) || !Number.isSafeInteger(process.pid) || process.pid <= 0) {
+    } catch (error) { return { result: { status: "failed", summary: untrustedSummary((error as Error).message), effectDisposition: "not_started" } }; }
+    if (process.action !== action || process.operationId !== operationId || process.targetSnapshotId !== targetSnapshotId
+      || process.sessionId !== sessionId || process.authorityId !== authorityId
+      || !/^managed:[a-f0-9]{64}$/.test(process.supervisorId) || !Number.isSafeInteger(process.pid) || process.pid <= 0) {
       await process.terminateTree(0, 1_000).catch(() => undefined);
-      return { result: { status: "failed", summary: "The process supervisor returned an invalid or confused durable identity." } };
+      return { result: { status: "failed", summary: "The process supervisor returned an invalid or confused durable identity.", effectDisposition: "committed" } };
     }
     process.stdout.on("data", (chunk: Buffer | string) => output.collect(chunk));
     process.stderr.on("data", (chunk: Buffer | string) => output.collect(chunk));
@@ -852,11 +944,11 @@ export class RepositoryRuntime {
     clearTimeout(timeout);
     signal?.removeEventListener("abort", abort);
     const output = record.output.text();
-    if (terminal === "timed_out") return { status: "timed_out", summary: `${action} exceeded its verified timeout and was terminated.`, exitCode: code, output, outputTruncated: record.output.truncated };
-    if (terminal === "cancelled") return { status: "cancelled", summary: `${action} was cancelled and its exact child was terminated.`, exitCode: code, output, outputTruncated: record.output.truncated };
+    if (terminal === "timed_out") return { status: "timed_out", summary: `${action} exceeded its verified timeout and was terminated.`, effectDisposition: "committed", exitCode: code, output, outputTruncated: record.output.truncated };
+    if (terminal === "cancelled") return { status: "cancelled", summary: `${action} was cancelled and its exact child was terminated.`, effectDisposition: "committed", exitCode: code, output, outputTruncated: record.output.truncated };
     return code === 0
-      ? { status: "completed", summary: `${action} completed through the verified repository runtime.`, exitCode: code, output, outputTruncated: record.output.truncated }
-      : { status: "failed", summary: untrustedSummary(output || `${action} exited with code ${code}.`), exitCode: code, output, outputTruncated: record.output.truncated };
+      ? { status: "completed", summary: `${action} completed through the verified repository runtime.`, effectDisposition: "committed", exitCode: code, output, outputTruncated: record.output.truncated }
+      : { status: "failed", summary: untrustedSummary(output || `${action} exited with code ${code}.`), effectDisposition: "committed", exitCode: code, output, outputTruncated: record.output.truncated };
   }
 
   private async waitForHealth(record: ManagedRecord, web: RepositoryWebRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard): Promise<{ healthy: boolean; detail: string }> {
@@ -902,6 +994,7 @@ export class RepositoryRuntime {
     return {
       status: record.public.state === "completed" ? "completed" : "failed",
       summary: record.public.state === "completed" ? "The exact managed child was stopped." : "The exact managed child did not stop within the bounded termination window.",
+      effectDisposition: "committed",
       managedProcessId: record.public.id,
       pid: record.public.pid,
       exitCode: record.public.exitCode,
@@ -917,18 +1010,26 @@ export class RepositoryRuntime {
       await record.process.terminateTree(gracefulMs, forceMs);
       if (!await settledWithin(record.exit, Math.max(10, gracefulMs + forceMs))) throw new Error("Supervisor did not report a terminal state.");
     } catch {
-      record.public.state = "failed";
+      // A rejected/uncertain terminate request proves neither that the child
+      // is still live nor that it reached a semantic failure. In particular,
+      // a recovered Job may have become inactive before this host acquired an
+      // exact handle. Preserve ambiguity instead of manufacturing a terminal.
+      record.public.state = "unknown";
       return;
     }
     record.public.state = terminal;
   }
 
   private async observeManagedExit(record: ManagedRecord): Promise<void> {
-    const { code } = await record.exit;
+    const { code, terminalEvidence } = await record.exit;
     if (record.timeout) clearTimeout(record.timeout);
     record.abortCleanup?.();
-    if (record.public.state === "running" || record.public.state === "stopping") record.public.state = code === 0 ? "completed" : "failed";
-    record.public.exitCode = code;
+    if (terminalEvidence === "ambiguous") {
+      if (record.public.state === "running" || record.public.state === "stopping") record.public.state = "unknown";
+    } else {
+      if (record.public.state === "running" || record.public.state === "stopping") record.public.state = code === 0 ? "completed" : "failed";
+      record.public.exitCode = code;
+    }
     record.public.outputTruncated = record.output.truncated;
     await record.lease.release().catch(() => undefined);
     this.pruneManagedHistory();
@@ -938,6 +1039,64 @@ export class RepositoryRuntime {
     const settled = [...this.managed.values()].filter((record) => record.public.state !== "running" && record.public.state !== "stopping");
     for (const record of settled.slice(0, Math.max(0, settled.length - 64))) this.managed.delete(record.public.id);
   }
+}
+
+function processActive(request: RepositoryProcessObservationRequest, summary: string): Extract<OperationControllerObservation, { state: "active" }> {
+  return {
+    state: "active",
+    operationId: request.operationId,
+    action: request.action,
+    targetSnapshotId: request.targetSnapshotId,
+    repositoryRoot: request.repositoryRoot,
+    ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+    ...(request.authorityId ? { authorityId: request.authorityId } : {}),
+    effectDisposition: "ambiguous",
+    summary
+  };
+}
+
+function processTerminal(
+  request: RepositoryProcessObservationRequest,
+  process: Pick<RepositorySupervisedProcess, "supervisorId" | "pid" | "startedAt">,
+  state: "completed" | "failed" | "cancelled",
+  exitCode?: number
+): Extract<OperationControllerObservation, { state: "terminal" }> {
+  const status = state === "completed" ? "completed" as const : state === "cancelled" ? "cancelled" as const : "failed" as const;
+  const effectDisposition = "committed" as const;
+  const summary = state === "completed"
+    ? "The exact compatibility-supervised process exited successfully."
+    : state === "cancelled"
+      ? "The exact compatibility-supervised process tree was stopped; prior repository or network effects were not rolled back."
+      : "The exact compatibility-supervised process exited unsuccessfully after its effect began.";
+  const evidenceDigest = createHash("sha256").update(JSON.stringify({
+    operationId: request.operationId,
+    action: request.action,
+    targetSnapshotId: request.targetSnapshotId,
+    sessionId: request.sessionId,
+    authorityId: request.authorityId,
+    repositoryRoot: request.repositoryRoot,
+    manifestSha256: request.manifestSha256,
+    supervisorId: process.supervisorId,
+    pid: process.pid,
+    startedAt: process.startedAt,
+    state,
+    exitCode: exitCode ?? null,
+    effectDisposition
+  })).digest("hex");
+  return {
+    state: "terminal",
+    operationId: request.operationId,
+    action: request.action,
+    targetSnapshotId: request.targetSnapshotId,
+    repositoryRoot: request.repositoryRoot,
+    ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+    ...(request.authorityId ? { authorityId: request.authorityId } : {}),
+    status,
+    effectDisposition,
+    summary,
+    evidenceDigest,
+    toolVersions: { repositorySupervisor: "direct-child-v1" }
+  };
 }
 
 async function settledWithin<T>(promise: Promise<T>, timeoutMs: number): Promise<boolean> {

@@ -3,6 +3,7 @@ import test from "node:test";
 import { companionBridgeVersion, InProcessCompanionBridge, isCompanionMethod, UnavailableCompanionBridge } from "../src/bridge.ts";
 import { CompanionService, type CompanionServiceOptions, type MediatedCommandExecutor } from "../src/service.ts";
 import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
+import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact, type WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 
 const session = (id = "vscode-window"): ManagedSession => ({
   id,
@@ -187,6 +188,73 @@ test("cancellation and confirmation requests cross only their dedicated mediator
   assert.equal(malformed.error?.code, "invalid_request");
 });
 
+test("Authority Broadcast confirmation is minted only for one exact protected reviewed recipient artifact", async () => {
+  const exactSession: ManagedSession = {
+    ...session("authority-source"), provider: "codex", surface: "vscode_terminal", status: "verified_blocked",
+    capabilities: ["registered", "observable", "controllable", "mediated"], targetSnapshotId: "b".repeat(64),
+    taskId: "task-authority", planRevision: "plan-authority", adapterVersion: "provider-host"
+  };
+  const artifact = {
+    id: "artifact-authority-broadcast", digest: "c".repeat(64), action: "authority_broadcast",
+    repositoryRoot: exactSession.workspaceRoot!, targetSnapshotId: exactSession.targetSnapshotId!, sessionId: exactSession.id,
+    taskId: exactSession.taskId, planRevision: exactSession.planRevision, authorityId: "authority-broadcast",
+    payload: {
+      kind: "authority", mode: "broadcast", acknowledgementRequired: true,
+      packets: [{
+        recipientSessionId: "recipient-blocked", grantId: "recipient-authority", actions: ["proof"], prohibitions: [],
+        expiresAt: "2026-08-24T00:00:00.000Z", matchDigest: "d".repeat(64),
+        pendingRequest: { requestId: "pending-proof", targetSnapshotId: "b".repeat(64), planRevision: "plan-authority", planDigest: "e".repeat(64), action: "proof" }
+      }]
+    },
+    status: "prepared", executionAuthorized: false, createdAt: "2026-08-23T00:00:00.000Z", updatedAt: "2026-08-23T00:00:00.000Z"
+  } as WorkflowArtifact;
+  const artifacts = { get: async (id: string) => id === artifact.id ? artifact : undefined } as unknown as WorkflowArtifactStore;
+  const confirmationRequests: unknown[] = [];
+  const executor = {
+    execute: async () => ({ status: "unavailable" as const, summary: "not used" }),
+    prepareCommand: async () => { throw new Error("reviewed Authority Broadcast must not re-enter generic command preparation"); },
+    requestConfirmation: async (input: unknown) => {
+      confirmationRequests.push(input);
+      return { status: "issued", summary: "Exact reviewed broadcast confirmed.", token: "confirmation-authority", expiresAt: "2026-08-23T00:05:00.000Z" };
+    }
+  };
+  const service = new CompanionService({ executor, workflowArtifacts: artifacts });
+  service.installTrustedSession(exactSession);
+  const reviewScopeDigest = authorityBroadcastReviewScopeDigest(artifact);
+  const reviewedPayload = {
+    control: "AUTHORITY_REFRESH", modifier: "shift", sessionId: exactSession.id, reason: "Send these exact reviewed recipient packets.",
+    reviewScopeDigest, reviewArtifactId: artifact.id, reviewArtifactDigest: artifact.digest
+  };
+
+  const confirmed = await service.handle(request("authority-reviewed", "command.prepare", reviewedPayload));
+  assert.equal(confirmed.ok, true);
+  const preparation = (confirmed.result as { preparation: { status: string; confirmationToken?: string; confirmationScopeDigest?: string; authorityId?: string } }).preparation;
+  assert.equal(preparation.status, "prepared");
+  assert.equal(preparation.authorityId, artifact.authorityId);
+  assert.equal(preparation.confirmationToken, "confirmation-authority");
+  assert.equal(preparation.confirmationScopeDigest, reviewScopeDigest);
+  assert.deepEqual(confirmationRequests, [{
+    action: "authority_broadcast", sessionId: exactSession.id, authorityId: artifact.authorityId,
+    reason: reviewedPayload.reason, confirmationScopeDigest: reviewScopeDigest
+  }]);
+
+  for (const [id, changed] of [
+    ["wrong-id", { reviewArtifactId: "artifact-other" }],
+    ["wrong-artifact-digest", { reviewArtifactDigest: "f".repeat(64) }],
+    ["wrong-review-digest", { reviewScopeDigest: "a".repeat(64) }],
+    ["wrong-session", { sessionId: "session-other" }]
+  ] as const) {
+    const rejected = await service.handle(request(id, "command.prepare", { ...reviewedPayload, ...changed }));
+    assert.equal(rejected.ok, true);
+    assert.notEqual((rejected.result as { preparation: { status: string } }).preparation.status, "prepared");
+  }
+  const partial = await service.handle(request("partial-artifact-reference", "command.prepare", {
+    ...reviewedPayload, reviewArtifactDigest: undefined
+  }));
+  assert.equal(partial.ok, false);
+  assert.equal(confirmationRequests.length, 1, "changed or partial reviewed artifacts must never reach the confirmation attestor");
+});
+
 test("host-action claims require the exact Registered extension window version and closed Voice Center capability", async () => {
   const claims: unknown[] = [];
   const authorizations: unknown[] = [];
@@ -223,29 +291,36 @@ test("host-action claims require the exact Registered extension window version a
     metadata: {
       "sxsy-b122.kind": "window",
       "sxsy-b122.extensionVersion": "1.2.3",
-      "sxsy-b122.hostActionCapabilities": JSON.stringify(["show_voice_center"])
+      "sxsy-b122.hostActionCapabilities": JSON.stringify(["show_voice_center"]),
+      "sxsy-b122.workspaceRoots": JSON.stringify(["C:\\repo"])
     }
   };
   assert.equal((await service.handle(request("register-voice-window", "session.register", { session: extension }))).ok, true);
   const accepted = await service.handle(request("claim-voice", "host-action.claim", {
     windowSessionId: extension.id,
+    workspaceRoots: ["C:\\repo"],
     adapterVersion: "1.2.3",
     capabilities: ["show_voice_center"],
     focused: true
   }));
   assert.equal(accepted.ok, true);
-  assert.deepEqual(claims, [{ windowSessionId: extension.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }]);
+  assert.deepEqual(claims, [{ windowSessionId: extension.id, workspaceRoots: ["C:\\repo"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true }]);
 
   const wrongVersion = await service.handle(request("claim-wrong-version", "host-action.claim", {
-    windowSessionId: extension.id, adapterVersion: "1.2.4", capabilities: ["show_voice_center"], focused: true
+    windowSessionId: extension.id, workspaceRoots: ["C:\\repo"], adapterVersion: "1.2.4", capabilities: ["show_voice_center"], focused: true
   }));
   assert.equal(wrongVersion.ok, false);
   assert.equal(wrongVersion.error?.code, "capability_denied");
   const broadened = await service.handle(request("claim-broadened", "host-action.claim", {
-    windowSessionId: extension.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center", "open_external_url"], focused: true
+    windowSessionId: extension.id, workspaceRoots: ["C:\\repo"], adapterVersion: "1.2.3", capabilities: ["show_voice_center", "open_external_url"], focused: true
   }));
   assert.equal(broadened.ok, false);
   assert.equal(broadened.error?.code, "invalid_request");
+  const wrongRoots = await service.handle(request("claim-wrong-roots", "host-action.claim", {
+    windowSessionId: extension.id, workspaceRoots: ["D:\\other"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true
+  }));
+  assert.equal(wrongRoots.ok, false);
+  assert.equal(wrongRoots.error?.code, "capability_denied");
 
   assert.equal((await service.handle(request("stale-voice-window", "session.status", { sessionId: extension.id, status: "stale" }))).ok, true);
   const staleAuthorization = await service.handle(request("authorize-stale-voice", "host-action.authorize", {

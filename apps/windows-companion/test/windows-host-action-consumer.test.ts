@@ -153,16 +153,47 @@ test("the companion consumes only exact targetless VS Code and terminal focus in
   assert.equal(vscode.processOwner, "current-user");
   assert.equal(vscode.processSession, "current-session");
   assert.equal(vscode.windowSurface, "visible-top-level");
+  assert.equal(vscode.windowCycleOrdinal, 0);
   assert.equal(vscode.shell, false);
   assert.equal("workspaceRoot" in vscode, false);
   assert.equal("url" in vscode, false);
 
   const terminal = setup.effects.requests[1]!;
   assert.equal(terminal.application, "terminal");
+  assert.equal(terminal.windowCycleOrdinal, 0);
   assert.equal(terminal.executable.productId, "microsoft.windows-terminal");
   assert.deepEqual(terminal.fixedArguments, []);
   assert.ok(setup.executor.records.every((record) => record.status === "completed"));
   assert.equal((await setup.queue.listPending()).length, 0);
+});
+
+test("repeated VS Code focus durably advances the exact native window ordinal across consumer restart and resets after the repeat window", async (context) => {
+  const setup = await fixture(context);
+  await queueAction(setup.queue, "focus_vscode", "operation-focus-vscode-cycle-1");
+  const first = setup.create();
+  await first.start();
+  await waitFor(() => setup.executor.records.length === 1, "first VS Code focus cycle");
+  await first.stop();
+
+  setup.setClock("2026-08-25T17:00:01.000Z");
+  await queueAction(setup.queue, "focus_vscode", "operation-focus-vscode-cycle-2");
+  const restarted = setup.create();
+  await restarted.start();
+  await waitFor(() => setup.executor.records.length === 2, "second VS Code focus cycle");
+  await restarted.stop();
+
+  setup.setClock("2026-08-25T17:00:10.000Z");
+  await queueAction(setup.queue, "focus_vscode", "operation-focus-vscode-cycle-reset");
+  const afterTimeout = setup.create();
+  await afterTimeout.start();
+  await waitFor(() => setup.executor.records.length === 3, "reset VS Code focus cycle");
+  await afterTimeout.stop();
+
+  assert.deepEqual(setup.effects.requests.map((request) => request.windowCycleOrdinal), [0, 1, 0]);
+  const claims = (await setup.store.readEntries())
+    .filter((entry) => entry.kind === "b122.windows-host-action.claimed.v1")
+    .map((entry) => (entry.payload as { windowCycleOrdinal?: unknown }).windowCycleOrdinal);
+  assert.deepEqual(claims, [0, 1, 0], "the repeat cursor must be protected durable claim state, not process-local UI state");
 });
 
 test("Voice Center remains extension-owned and is never confused with launching or focusing Code", async (context) => {

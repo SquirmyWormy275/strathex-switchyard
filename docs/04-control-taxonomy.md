@@ -18,7 +18,7 @@ These families guide observation; they do not reserve keys:
 | Context | send selected context, copy path/reference, open task instructions |
 | Repository | status, worktree selection, branch/PR navigation |
 | Authority | bounded approve, deny, guarded consequential action |
-| Recovery | halt, retry safely, reopen lost session, restore known layout |
+| Recovery | re-anchor safely, reconcile before retry, reopen lost session, restore known layout |
 
 ## Admission criteria
 
@@ -34,7 +34,8 @@ A permanent control must have:
 
 ## Legend rules
 
-- Main face: durable intent (`HALT`, `REVIEW`, `RESUME`).
+- Main face: durable intent (`RE-ANCHOR`, `PROOF`, `HANDOFF`). The historical
+  `HALT` example is superseded; no standalone HALT control was accepted.
 - Front face: optional native shortcut, signal identifier, or mode cue.
 - No fabricated command language solely to make the board look thematic.
 - Avoid tool brand names unless the key truly remains dedicated to that tool.

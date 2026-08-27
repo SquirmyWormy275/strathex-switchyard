@@ -2,6 +2,9 @@
 export { AllowlistedEvidenceAuthorizer, DenyEvidenceAuthorizer, GateEvidenceError, GateEvidenceLedger } from "./acceptance-evidence.ts";
 export type { EvidenceArtifactVerifier, EvidenceAuthorizationRequest, EvidenceAuthorizer, GateEvidence, GateEvidenceInput, GateEvidenceStatus as AcceptanceEvidenceStatus } from "./acceptance-evidence.ts";
 export * from "./adapters.ts";
+export * from "./automation-operation-manifest.ts";
+export * from "./automation-proposal-protocol.ts";
+export * from "./automation-protocol.ts";
 export * from "./authority.ts";
 export * from "./brokers.ts";
 export * from "./budgets.ts";
@@ -20,6 +23,7 @@ export * from "./operations.ts";
 export * from "./policy.ts";
 export * from "./receipts.ts";
 export * from "./recipes.ts";
+export * from "./reanchor.ts";
 export * from "./redaction.ts";
 export * from "./runtime.ts";
 export * from "./session-registry.ts";

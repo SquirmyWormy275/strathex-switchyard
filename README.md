@@ -14,8 +14,8 @@ operator and provisioning surfaces; durable mediation, receipts, recovery,
 containment, and Council; host-attested repository recipes; DPAPI credential
 references; exact-route HTTPS; configured provider, GitHub/Git/CI and scanner
 adapters; the Windows Sandbox guest-worker/host-lifecycle boundary; an exhaustive
-hardware-independent 176-chord Raw-HID product simulator; and reproducible
-per-user release tooling. Source availability is **not** production, hardware, provider,
+hardware-independent 176-chord Raw-HID product simulator; and content-verified,
+transactional per-user release tooling. Source availability is **not** production, hardware, provider,
 or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
 
 The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
@@ -60,10 +60,17 @@ safe and available in the current context.
   exercises all 65 assigned and 111 deliberately unassigned chord combinations,
   replay/epoch recovery, and corrupt framing without opening hardware or the
   network.
+- `apps/provider-adapter-host/` — an authenticated, TLS-pinned loopback host for
+  the closed Claude/Codex command, observation, cancellation, Council, and
+  reconciliation ports. It packages deterministic fixture backends for isolated
+  verification; it does not bundle, infer, or claim live vendor authorization.
 - `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It reads
   only the companion-created sealed endpoint record, may identify/focus
   approved local surfaces and route a canonical request, and does not use
   direct Run/Debug APIs as a bypass around mediation.
+- `deployment/windows/` — content-verified per-user build, install, update,
+  rollback, start, health, and uninstall tooling with exact-root ownership,
+  crash-recovery receipts, and authenticated companion/provider shutdown.
 - `docs/` — the accepted specification, reconstructed interview history,
   adversarial review, project charter, attribution records, operational safety
   model, and source-linked software-only completion audit.
@@ -111,6 +118,8 @@ npm ci
 npm test
 npm run typecheck
 npm run build:vscode
+npm run build:companion
+npm run build:provider-host
 ```
 
 `npm run start:companion` starts the reviewed per-user companion, not a Windows
@@ -153,6 +162,7 @@ particular:
 - [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
 - [Software-only completion audit](docs/software-only-completion-audit.md)
 - [Local companion and VS Code guide](docs/local-companion.md)
+- [Windows release, installation, recovery, and uninstall guide](docs/windows-release-and-installation.md)
 - [Operational safety model](docs/operational-safety-model.md)
 - [Acceptance-gate ledger](docs/acceptance-gates.md)
 - [Project charter](docs/01-project-charter.md)

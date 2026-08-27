@@ -1,0 +1,340 @@
+{
+  "acceptanceClaimed": false,
+  "actionIds": [
+    "reanchor",
+    "proof",
+    "proof_adversarial",
+    "option_provider",
+    "option_packet",
+    "plan_expander",
+    "plan_approval",
+    "handoff",
+    "handoff_queue",
+    "handoff_immediate",
+    "handoff_routing_default",
+    "focus_blocked_agent",
+    "blocker_queue",
+    "focus_finished_agent",
+    "done_queue",
+    "authority_refresh",
+    "authority_broadcast",
+    "council_report",
+    "council_automatic",
+    "council_recommend",
+    "open_claude",
+    "fresh_claude",
+    "open_managed_claude_terminal",
+    "open_chatgpt",
+    "fresh_chatgpt",
+    "open_managed_codex_terminal",
+    "focus_vscode",
+    "new_vscode",
+    "focus_terminal",
+    "focus_vscode_terminal",
+    "local_commit",
+    "pr_upsert",
+    "pr_merge",
+    "direct_main",
+    "github_home",
+    "github_pr",
+    "github_issues",
+    "github_actions",
+    "compound_capture",
+    "compound_refresh",
+    "compound_palette",
+    "lfg",
+    "run_target",
+    "debug_target",
+    "stop_managed_run",
+    "launch_web_app",
+    "open_voice",
+    "switch_voice_provider",
+    "bind_voice_session",
+    "voice_session_picker",
+    "pipeline_status",
+    "pipeline_local_gate",
+    "pipeline_failure_trace",
+    "pipeline_clean_reproduction",
+    "repair_mission",
+    "shield_change_scan",
+    "shield_codebase_audit",
+    "shield_supply_chain",
+    "release_shield",
+    "emergency_containment",
+    "venv",
+    "rebuild_venv",
+    "full_sandbox",
+    "rebuild_full_sandbox",
+    "quarantine"
+  ],
+  "allAcceptanceGates": [
+    {
+      "gate": 1,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 2,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 3,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 4,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 5,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 6,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 7,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 8,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 9,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 10,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 11,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 12,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 13,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 14,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 15,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 16,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 17,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 18,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 19,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 20,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 21,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 22,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 23,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 24,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 25,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 26,
+      "status": "NOT ACCEPTED"
+    },
+    {
+      "gate": 27,
+      "status": "NOT ACCEPTED"
+    }
+  ],
+  "assignmentCount": 65,
+  "assignmentIds": [
+    "REANCHOR:normal",
+    "PROOF:normal",
+    "PROOF:shift",
+    "OPTION_PROVIDER:normal",
+    "OPTION_PROVIDER:shift",
+    "PLAN_EXPANDER:normal",
+    "PLAN_APPROVAL:normal",
+    "HANDOFF:normal",
+    "HANDOFF:shift",
+    "HANDOFF:alt",
+    "HANDOFF:shift_alt",
+    "FIND_BLOCKED_AGENT:normal",
+    "FIND_BLOCKED_AGENT:shift",
+    "FIND_FINISHED_AGENT:normal",
+    "FIND_FINISHED_AGENT:shift",
+    "AUTHORITY_REFRESH:normal",
+    "AUTHORITY_REFRESH:shift",
+    "COUNCIL:normal",
+    "COUNCIL:shift",
+    "COUNCIL:alt",
+    "CLAUDE:normal",
+    "CLAUDE:shift",
+    "CLAUDE:alt",
+    "CHATGPT:normal",
+    "CHATGPT:shift",
+    "CHATGPT:alt",
+    "VSCODE:normal",
+    "VSCODE:shift",
+    "TERMINAL:normal",
+    "TERMINAL:shift",
+    "COMMIT:normal",
+    "COMMIT:shift",
+    "COMMIT:alt",
+    "COMMIT:shift_alt",
+    "GITHUB:normal",
+    "GITHUB:shift",
+    "GITHUB:alt",
+    "GITHUB:shift_alt",
+    "COMPOUND:normal",
+    "COMPOUND:shift",
+    "COMPOUND:alt",
+    "COMPOUND:shift_alt",
+    "RUN:normal",
+    "RUN:shift",
+    "RUN:alt",
+    "RUN:shift_alt",
+    "VOICE:normal",
+    "VOICE:shift",
+    "VOICE:alt",
+    "VOICE:shift_alt",
+    "PIPELINE:normal",
+    "PIPELINE:shift",
+    "PIPELINE:alt",
+    "PIPELINE:shift_alt",
+    "PIPELINE:ctrl_shift_alt",
+    "SHIELD:normal",
+    "SHIELD:shift",
+    "SHIELD:alt",
+    "SHIELD:shift_alt",
+    "SHIELD:ctrl_shift_alt",
+    "SANDBOX:normal",
+    "SANDBOX:shift",
+    "SANDBOX:alt",
+    "SANDBOX:shift_alt",
+    "SANDBOX:ctrl_shift_alt"
+  ],
+  "controlCount": 22,
+  "handlerIds": [
+    "b122.REANCHOR:normal",
+    "b122.PROOF:normal",
+    "b122.PROOF:shift",
+    "b122.OPTION_PROVIDER:normal",
+    "b122.OPTION_PROVIDER:shift",
+    "b122.PLAN_EXPANDER:normal",
+    "b122.PLAN_APPROVAL:normal",
+    "b122.HANDOFF:normal",
+    "b122.HANDOFF:shift",
+    "b122.HANDOFF:alt",
+    "b122.HANDOFF:shift_alt",
+    "b122.FIND_BLOCKED_AGENT:normal",
+    "b122.FIND_BLOCKED_AGENT:shift",
+    "b122.FIND_FINISHED_AGENT:normal",
+    "b122.FIND_FINISHED_AGENT:shift",
+    "b122.AUTHORITY_REFRESH:normal",
+    "b122.AUTHORITY_REFRESH:shift",
+    "b122.COUNCIL:normal",
+    "b122.COUNCIL:shift",
+    "b122.COUNCIL:alt",
+    "b122.CLAUDE:normal",
+    "b122.CLAUDE:shift",
+    "b122.CLAUDE:alt",
+    "b122.CHATGPT:normal",
+    "b122.CHATGPT:shift",
+    "b122.CHATGPT:alt",
+    "b122.VSCODE:normal",
+    "b122.VSCODE:shift",
+    "b122.TERMINAL:normal",
+    "b122.TERMINAL:shift",
+    "b122.COMMIT:normal",
+    "b122.COMMIT:shift",
+    "b122.COMMIT:alt",
+    "b122.COMMIT:shift_alt",
+    "b122.GITHUB:normal",
+    "b122.GITHUB:shift",
+    "b122.GITHUB:alt",
+    "b122.GITHUB:shift_alt",
+    "b122.COMPOUND:normal",
+    "b122.COMPOUND:shift",
+    "b122.COMPOUND:alt",
+    "b122.COMPOUND:shift_alt",
+    "b122.RUN:normal",
+    "b122.RUN:shift",
+    "b122.RUN:alt",
+    "b122.RUN:shift_alt",
+    "b122.VOICE:normal",
+    "b122.VOICE:shift",
+    "b122.VOICE:alt",
+    "b122.VOICE:shift_alt",
+    "b122.PIPELINE:normal",
+    "b122.PIPELINE:shift",
+    "b122.PIPELINE:alt",
+    "b122.PIPELINE:shift_alt",
+    "b122.PIPELINE:ctrl_shift_alt",
+    "b122.SHIELD:normal",
+    "b122.SHIELD:shift",
+    "b122.SHIELD:alt",
+    "b122.SHIELD:shift_alt",
+    "b122.SHIELD:ctrl_shift_alt",
+    "b122.SANDBOX:normal",
+    "b122.SANDBOX:shift",
+    "b122.SANDBOX:alt",
+    "b122.SANDBOX:shift_alt",
+    "b122.SANDBOX:ctrl_shift_alt"
+  ],
+  "intentionallyUnassignedCount": 111,
+  "outputDigests": {
+    "docs/SXSY-B122-operator-technical-manual.md": "069973dea29bb5e8bc44d39994be20276adc0ce93ad599b740485ac41e7e1278",
+    "docs/demo/README.md": "a588394bc4c545a4740fff1cde4974011b0f5bcd12e998e02dcec9e637577eb8",
+    "docs/demo/SXSY-B122-safe-demo.html": "9a81349eca64097e1c8f34a7d299e377a821eb15f1b9fe73c819450ec0fc11fb",
+    "docs/demo/SXSY-B122-safe-demo.json": "46c12e084f476836a1f088e3b0dc420cae4efbfbbe6cebe78941d859b6785b6d",
+    "docs/demo/SXSY-B122-safe-demo.png": "86625b570e66ccf0947b75c7cd3834451a961995cd9abd12983311f4b49e2275",
+    "docs/demo/SXSY-B122-safe-demo.svg": "22560a4f3ecf0ed81ca85f180142977c70b9520bbfa5470200e69f4641ee5637",
+    "docs/generated/SXSY-B122-65-chord-reference.md": "cfc9bb6725f25b02ff1ae8827615eab8a4328d2db6d518acfd6058462c377569"
+  },
+  "schema": "sxsy-b122.documentation-manifest/v1",
+  "simulationOnly": true,
+  "sourceDigests": {
+    "docs/SXSY-B122-complete-key-specification-and-audit.md": "a90fbb888855f33393d379fc6863e8c7149d622e5780653cbbfe1434c96a6d27",
+    "docs/acceptance-gates.md": "9ee321a0f0b1a050d08e84ff5146cbb4d9e911f86217d6c4f6dd387e4d39816c",
+    "docs/adversarial-review.md": "fa438e3fca69143ad323968319c2d61518bcba889abe3d3a58a4504879b37377",
+    "docs/historical-interview-notes-reconstructed.md": "43d0ac4af6285d591232d88987a3be02e844b6143ffbe8999cded2cefb10a243",
+    "docs/templates/SXSY-B122-operator-technical-manual.template.md": "7fa50317c70651054b6d55359553dd703e54139b17e9c25ff4898e6a7d3b91a7",
+    "packages/control-plane/src/command-catalog.ts": "d1901b6176da1c50e1a52e8c423be277798b9beb58a7c704a7a22922c7c7f025",
+    "packages/protocol/generated/b122-control-map.json": "9a6c7fe24b1c4d0be68a926c16b9b10d0addc3ae0f4d5cd9e36887d127abb534",
+    "scripts/build_b122_manual_pdf.py": "82723bc3a898cd91710313bcace3a4a65cd9b97eb3075972c930346a772d4ddb",
+    "scripts/generate_b122_documentation.py": "1c5175c6e7f58812b77178688dccbac9f3ccb3a6303bf4c698bb39277cfc2260"
+  },
+  "version": "1.0.0"
+}

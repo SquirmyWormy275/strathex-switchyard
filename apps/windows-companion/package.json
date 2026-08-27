@@ -7,6 +7,7 @@
   "type": "module",
   "bin": {
     "sxsy-b122-companion": "dist/apps/windows-companion/src/main.js",
+    "sxsy-b122-containment-remote-evaluator": "dist/apps/windows-companion/src/containment-remote-evaluator-main.js",
     "sxsy-b122-council-participant": "dist/apps/windows-companion/src/council-participant-main.js",
     "sxsy-b122-hid-simulator": "dist/apps/windows-companion/src/raw-hid-simulator.js"
   },

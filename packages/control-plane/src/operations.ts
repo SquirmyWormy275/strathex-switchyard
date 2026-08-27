@@ -93,7 +93,7 @@ export type ChildOperationOutcome = "completed" | "failed" | "cancelled" | "ambi
  */
 export interface ChildOperationSaga {
   begin(input: ChildOperationStart): Promise<ChildOperationLease>;
-  markExecuting(lease: ChildOperationLease): Promise<void>;
+  markExecuting(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void>;
   markExternalCommitted(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void>;
   markCancelling(lease: ChildOperationLease): Promise<void>;
   markCompensating(lease: ChildOperationLease): Promise<void>;
@@ -116,6 +116,7 @@ export interface DurableOperationClaim {
   readonly action: string;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
+  readonly authorityId?: string;
 }
 
 export interface DurableOperationResult {
@@ -686,11 +687,14 @@ class DurableChildOperationSaga implements ChildOperationSaga {
     return childLeaseFor(begun.operation, begun.reused);
   }
 
-  async markExecuting(lease: ChildOperationLease): Promise<void> {
+  async markExecuting(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void> {
     const child = await this.requireNewChild(lease);
-    if (child.state === "executing") return;
+    if (child.state === "executing") {
+      if (details && Object.keys(details).length > 0) await this.operations.advance(child.id, "executing", details);
+      return;
+    }
     if (child.state !== "prepared") throw new OperationSagaError(`Child ${child.id} cannot begin provider execution from ${child.state}.`);
-    await this.operations.advance(child.id, "executing");
+    await this.operations.advance(child.id, "executing", details);
   }
 
   async markExternalCommitted(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void> {
@@ -909,12 +913,12 @@ export class DurableOperationCoordinator {
   async claim(input: DurableOperationClaim): Promise<DurableCommandOperationLease> {
     const action = nonEmpty(input.action, "dispatch action");
     const targetSnapshotId = input.targetSnapshotId ?? `<no-target:${input.sessionId ?? "host"}>`;
-    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none" });
+    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none" });
     const claimed = await this.operations.claimScope({
       scope,
       action,
       targetSnapshotId,
-      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
+      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
     });
     return {
       operationId: claimed.operation.id,

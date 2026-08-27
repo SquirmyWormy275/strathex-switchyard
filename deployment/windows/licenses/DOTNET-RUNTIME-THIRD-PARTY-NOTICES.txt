@@ -1270,5 +1270,3 @@ Licensed under the Apache License, Version 2.0.
 
 Available at
 https://github.com/SixLabors/ImageSharp/blob/f4f689ce67ecbcc35cebddba5aacb603e6d1068a/LICENSE
-
-

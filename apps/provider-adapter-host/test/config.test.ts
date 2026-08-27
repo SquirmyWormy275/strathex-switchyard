@@ -89,6 +89,90 @@ test("configuration requires digest-pinned modules and DPAPI-shaped protected cr
   await assert.rejects(() => loadProviderHostConfiguration(configPath, options(root)), /schema|credential/i);
 });
 
+test("configured Mediated effect drivers are separate digest-pinned host modules", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "b122-provider-effect-driver-config-"));
+  context.after(async () => rm(root, { recursive: true, force: true }));
+  const paths = {
+    config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"),
+    dispatchLease: join(root, "dispatch-lease.json"), credential: join(root, "credential.json"),
+    cert: join(root, "cert.pem"), key: join(root, "key.pem"), provider: join(root, "provider.mjs"), driver: join(root, "driver.mjs")
+  };
+  const providerSource = `export function createB122ProviderRuntimePort(input){
+    globalThis.__b122ProviderFactoryKeys = Object.keys(input).sort();
+    const observation = (request) => ({ ...request, capabilities:["registered","observable","controllable","mediated"], status:"running", adapterVersion:"provider-v1" });
+    return { provider: input.provider,
+      async handshake(request){ return observation(request); }, async observeSession(request){ return observation(request); },
+      async prepareMediatedEffect(request,binding){ return {schema:"sxsy-b122.provider-mediated-effect-intent",version:1,authorizationId:binding.authorizationId,requestDigest:"0".repeat(64),operation:"execute_exact_request"}; },
+      async prepareMediatedCouncilEffect(request,binding){ return {schema:"sxsy-b122.provider-mediated-council-intent",version:1,authorizationId:binding.authorizationId,requestDigest:"0".repeat(64),operation:"acknowledge_exact_phase"}; },
+      async execute(){ throw new Error("mediated effect must not call provider execute"); }, async observeWorkflowContext(){}, async reanchor(){}, async observeReanchor(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(){} };
+  }`;
+  const driverSource = `export function createB122ProviderMediatedEffectDriver(input){
+    globalThis.__b122EffectDriverFactoryKeys = Object.keys(input).sort();
+    globalThis.__b122EffectDriverAllowedSurfaces = input.allowedSurfaces;
+    return { async executeCommand(){ throw new Error("not invoked"); }, async executeCouncil(){ throw new Error("not invoked"); },
+      async observeCommand(){ throw new Error("not invoked"); }, async cancelCommand(){ throw new Error("not invoked"); }, async observeCouncil(){ throw new Error("not invoked"); } };
+  }`;
+  await Promise.all([
+    envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.dispatchLease, "c".repeat(64)),
+    envelope(paths.credential, "provider-secret"), writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem),
+    writeFile(paths.provider, providerSource), writeFile(paths.driver, driverSource)
+  ]);
+  const configuration = {
+    schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root,
+    listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key),
+    authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal,
+    dispatchLeaseAuthenticationEnvelopeFile: paths.dispatchLease, stateFile: join(root, "state.jsonl"),
+    providers: [{ provider: "codex", kind: "module", modulePath: paths.provider, moduleSha256: createHash("sha256").update(providerSource).digest("hex"), credentialEnvelopeFile: paths.credential }],
+    effectDrivers: [{ provider: "codex", kind: "module", modulePath: paths.driver, moduleSha256: createHash("sha256").update(driverSource).digest("hex") }]
+  };
+  await writeFile(paths.config, JSON.stringify({ ...configuration, effectDrivers: [{ ...configuration.effectDrivers[0], moduleSha256: "0".repeat(64) }] }));
+  await assert.rejects(() => loadProviderHostConfiguration(paths.config, options(root)), /effect driver.*digest|digest.*effect driver/i);
+
+  await writeFile(paths.config, JSON.stringify({
+    ...configuration,
+    effectDrivers: [{ ...configuration.effectDrivers[0], automation: true }]
+  }));
+  await assert.rejects(
+    () => loadProviderHostConfiguration(paths.config, options(root)),
+    /effect driver.*invalid|effect driver list/i,
+    "automation-specific effect-driver configuration must never be accepted"
+  );
+
+  await writeFile(paths.config, JSON.stringify(configuration));
+  const loaded = await loadProviderHostConfiguration(paths.config, options(root));
+  assert.equal(loaded.effectDrivers.length, 1);
+  assert.deepEqual({
+    provider: loaded.effectDrivers[0]?.provider,
+    kind: loaded.effectDrivers[0]?.kind,
+    modulePath: loaded.effectDrivers[0]?.modulePath,
+    moduleSha256: loaded.effectDrivers[0]?.moduleSha256
+  }, {
+    provider: "codex", kind: "module", modulePath: paths.driver,
+    moduleSha256: createHash("sha256").update(driverSource).digest("hex")
+  });
+  assert.equal(Buffer.from(loaded.effectDrivers[0]!.moduleSource).toString("utf8"), driverSource);
+  const runtime = await loadProviderBackendRuntime(loaded, {
+    mediatedFinalCurrent: { async assertCurrent() { throw new Error("not invoked during handshake"); } }
+  });
+  const handshake = await runtime.backends[0]!.handshake({
+    sessionId: "session-configured-driver", provider: "codex", targetSnapshotId: "a".repeat(64), repositoryRoot: "C:\\repo",
+    branch: "feat/driver", head: "b".repeat(40)
+  }, new AbortController().signal);
+  assert.deepEqual(handshake.capabilities, ["registered", "observable", "controllable", "mediated"]);
+  assert.deepEqual((globalThis as Record<string, unknown>).__b122ProviderFactoryKeys, ["councilResources", "options", "provider"]);
+  assert.deepEqual((globalThis as Record<string, unknown>).__b122EffectDriverFactoryKeys, [
+    "adapterId", "allowedSurfaces", "configurationSha256", "driverModuleSha256", "provider", "providerModuleSha256"
+  ]);
+  assert.deepEqual((globalThis as Record<string, unknown>).__b122EffectDriverAllowedSurfaces, ["provider", "council"]);
+  delete (globalThis as Record<string, unknown>).__b122ProviderFactoryKeys;
+  delete (globalThis as Record<string, unknown>).__b122EffectDriverFactoryKeys;
+  delete (globalThis as Record<string, unknown>).__b122EffectDriverAllowedSurfaces;
+  await runtime.close();
+  loaded.effectDrivers[0]!.moduleSource.fill(0);
+  loaded.authenticationToken.fill(0); loaded.journalAuthenticationKey.fill(0); loaded.dispatchLeaseAuthenticationKey.fill(0);
+  if (loaded.providers[0]?.kind === "module") { loaded.providers[0].credential.fill(0); loaded.providers[0].moduleSource.fill(0); }
+});
+
 test("credential-free fixture mode is loopback diagnostic-only and all owned paths are fenced", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-host-fixture-config-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
@@ -130,7 +214,7 @@ test("credential-free fixture mode is loopback diagnostic-only and all owned pat
   await assert.rejects(() => loadProviderHostConfiguration(configPath, options(root)), /protected provider-host root/i);
 });
 
-test("digest-pinned modules receive only an opened protected credential and source bytes are zeroed", async (context) => {
+test("digest-pinned modules never receive the raw protected credential or an ambient effect capability", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-module-config-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
   const configPath = join(root, "config.json");
@@ -141,7 +225,7 @@ test("digest-pinned modules receive only an opened protected credential and sour
   const certPath = join(root, "cert.pem");
   const keyPath = join(root, "key.pem");
   const modulePath = join(root, "backend.mjs");
-  const moduleSource = `export async function createB122ProviderRuntimePort(input) { if (new TextDecoder().decode(input.credential) !== "provider-secret") throw new Error("credential missing"); return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(signal){ globalThis.__b122ProviderShutdown = signal.aborted ? "aborted" : "clean"; } }; }`;
+  const moduleSource = `export async function createB122ProviderRuntimePort(input) { if (Object.hasOwn(input, "credential") || Object.hasOwn(input, "environment") || Object.hasOwn(input, "effectPort")) throw new Error("raw credential or ambient effect capability exposed"); if (Object.keys(input).sort().join(",") !== "councilResources,options,provider") throw new Error("unexpected module factory capability"); return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async reanchor(){}, async observeReanchor(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(signal){ globalThis.__b122ProviderShutdown = signal.aborted ? "aborted" : "clean"; } }; }`;
   await Promise.all([
     envelope(tokenPath, "a".repeat(64)), envelope(journalPath, "b".repeat(64)), envelope(dispatchLeasePath, "c".repeat(64)), envelope(credentialPath, "provider-secret"),
     writeFile(certPath, tlsFixture.certificatePem), writeFile(keyPath, tlsFixture.privateKeyPem), writeFile(modulePath, moduleSource)
@@ -164,11 +248,11 @@ test("digest-pinned modules receive only an opened protected credential and sour
   loaded.dispatchLeaseAuthenticationKey.fill(0);
 });
 
-test("module providers must expose the typed shutdown contract", async (context) => {
+test("module providers must expose the typed Re-anchor observation contract", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-module-shutdown-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
   const paths = { config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"), dispatchLease: join(root, "dispatch-lease.json"), credential: join(root, "credential.json"), cert: join(root, "cert.pem"), key: join(root, "key.pem"), module: join(root, "backend.mjs") };
-  const source = `export function createB122ProviderRuntimePort(input){ return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){} }; }`;
+  const source = `export function createB122ProviderRuntimePort(input){ return { provider: input.provider, async handshake(){}, async execute(){}, async observeSession(){}, async observeWorkflowContext(){}, async observeOperation(){}, async cancelOperation(){}, async council(){}, async observeCouncil(){}, async shutdown(){} }; }`;
   await Promise.all([envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.dispatchLease, "c".repeat(64)), envelope(paths.credential, "provider-secret"), writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem), writeFile(paths.module, source)]);
   await writeFile(paths.config, JSON.stringify({ schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root, listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key), authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal, dispatchLeaseAuthenticationEnvelopeFile: paths.dispatchLease, stateFile: join(root, "state.jsonl"), providers: [{ provider: "codex", kind: "module", modulePath: paths.module, moduleSha256: createHash("sha256").update(source).digest("hex"), credentialEnvelopeFile: paths.credential }] }));
   const loaded = await loadProviderHostConfiguration(paths.config, options(root));

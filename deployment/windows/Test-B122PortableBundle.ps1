@@ -10,12 +10,14 @@ $health = Join-Path $root 'scripts\Test-B122Health.mjs'
 $sandboxHelper = Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper\b122-sandbox-worker.exe'
 $sandboxLifecycleHelper = Join-Path $root 'app\dist\apps\windows-companion\sandbox-helper\b122-sandbox-lifecycle.exe'
 $repositoryRuntimeHelper = Join-Path $root 'app\dist\apps\windows-companion\repository-runtime\b122-repository-runner.exe'
+$companionLifecycleHelper = Join-Path $root 'app\dist\apps\windows-companion\companion-lifecycle\b122-companion-supervisor.exe'
 $rawHidHelper = Join-Path $root 'app\dist\apps\windows-companion\raw-hid\strathex-b122-hid-helper.exe'
 $rawHidSimulator = Join-Path $root 'app\dist\apps\windows-companion\src\raw-hid-simulator.js'
 $councilParticipant = Join-Path $root 'app\dist\apps\windows-companion\src\council-participant-main.js'
+$containmentRemoteEvaluator = Join-Path $root 'app\dist\apps\windows-companion\src\containment-remote-evaluator-main.js'
 $providerDesktopHelper = Join-Path $root 'app\dist\apps\windows-companion\provider-desktop\sxsy-b122-provider-desktop-helper.exe'
 $voiceHelper = Join-Path $root 'app\dist\apps\windows-companion\voice\sxsy-b122-voice-helper.exe'
-foreach ($file in @($node, $main, $providerHostMain, $health, $sandboxHelper, $sandboxLifecycleHelper, $repositoryRuntimeHelper, $rawHidHelper, $rawHidSimulator, $councilParticipant, $providerDesktopHelper, $voiceHelper)) {
+foreach ($file in @($node, $main, $providerHostMain, $health, $sandboxHelper, $sandboxLifecycleHelper, $repositoryRuntimeHelper, $companionLifecycleHelper, $rawHidHelper, $rawHidSimulator, $councilParticipant, $containmentRemoteEvaluator, $providerDesktopHelper, $voiceHelper)) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Portable SXSY-B122 file is missing: $file" }
   if ($file.Contains('"')) { throw 'Portable bundle paths containing quotation marks are unsupported.' }
 }
@@ -225,6 +227,15 @@ Assert-B122PortableCommandSucceeded $repositoryRuntimeCommand 'The portable repo
 $repositoryRuntimeSelfTestRaw = $repositoryRuntimeCommand.stdout
 $repositoryRuntimeSelfTest = $repositoryRuntimeSelfTestRaw | ConvertFrom-Json
 if ($repositoryRuntimeSelfTest.schema -cne 'sxsy-b122.repository-runner-self-test' -or $repositoryRuntimeSelfTest.childTreeTerminated -ne $true -or $repositoryRuntimeSelfTest.noSurvivors -ne $true) { throw 'The portable repository runtime helper returned an invalid containment receipt.' }
+$companionLifecycleCommand = Invoke-B122PortableBoundedProcess -Executable $companionLifecycleHelper -ArgumentValues @('--self-test') -TimeoutSeconds 30 -Label 'The portable companion lifecycle helper self-test'
+Assert-B122PortableCommandSucceeded $companionLifecycleCommand 'The portable companion lifecycle helper self-test'
+$companionLifecycleSelfTestRaw = $companionLifecycleCommand.stdout
+$companionLifecycleSelfTest = $companionLifecycleSelfTestRaw | ConvertFrom-Json
+if (
+  $companionLifecycleSelfTest.schema -cne 'sxsy-b122.companion-supervisor-self-test' -or $companionLifecycleSelfTest.version -ne 1 -or
+  $companionLifecycleSelfTest.status -cne 'passed' -or [int]$companionLifecycleSelfTest.capturedProcesses -ne 2 -or
+  [int]$companionLifecycleSelfTest.activeProcesses -ne 0 -or $companionLifecycleCommand.processTreeSurvivors -ne 0
+) { throw 'The portable companion lifecycle helper returned an invalid no-survivor self-test receipt.' }
 $providerDesktopCommand = Invoke-B122PortableBoundedProcess -Executable $providerDesktopHelper -ArgumentValues @('--self-test') -TimeoutSeconds 30 -Label 'The portable provider-desktop helper self-test'
 Assert-B122PortableCommandSucceeded $providerDesktopCommand 'The portable provider-desktop helper self-test'
 $providerDesktopSelfTestRaw = $providerDesktopCommand.stdout
@@ -240,6 +251,9 @@ Assert-B122PortableCommandSucceeded $providerHostCommand 'The portable provider-
 $providerHostSelfTestRaw = $providerHostCommand.stdout
 $providerHostSelfTest = $providerHostSelfTestRaw | ConvertFrom-Json
 if ($providerHostSelfTest.schema -cne 'sxsy-b122.provider-host-self-test' -or $providerHostSelfTest.version -ne 1 -or $providerHostSelfTest.status -cne 'ok' -or $providerHostSelfTest.authenticatedState -ne $true -or $providerHostSelfTest.fixtureBackend -ne $true -or $providerHostSelfTest.proprietaryCredentialAccessed -ne $false -or $providerHostSelfTest.networkAccessed -ne $false) { throw 'The portable provider-adapter host returned an invalid credential-free self-test receipt.' }
+$containmentRemoteEvaluatorCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @($containmentRemoteEvaluator,'--help') -TimeoutSeconds 10 -Label 'The portable signed containment remote evaluator help probe'
+Assert-B122PortableCommandSucceeded $containmentRemoteEvaluatorCommand 'The portable signed containment remote evaluator help probe'
+if ($containmentRemoteEvaluatorCommand.stdout -cnotmatch '^Usage: sxsy-b122-containment-remote-evaluator --challenge <absolute-json> --private-key <absolute-pem> --output <absolute-json> --git-executable <absolute-pinned-git>\s*$') { throw 'The portable signed containment remote evaluator returned an invalid help contract.' }
 
 $temporaryBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
 $testRoot = [IO.Path]::GetFullPath((Join-Path $temporaryBase ("sxsy-b122-portable-smoke-" + [guid]::NewGuid().ToString('N'))))
@@ -323,7 +337,7 @@ setInterval(() => {}, 1000);
       if ($survivors.Count) { throw 'The portable companion graceful shutdown left one or more captured process-tree survivors.' }
       $nodeVersionCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @('-p','process.version') -TimeoutSeconds 10 -Label 'The portable Node version probe'
       Assert-B122PortableCommandSucceeded $nodeVersionCommand 'The portable Node version probe'
-      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=$nodeVersionCommand.stdout.Trim(); sandboxHelperPresent=$true; sandboxLifecycleHelperPresent=$true; sandboxLifecycleSelfTest=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; rawHidHelperPresent=$true; rawHidSimulatorPresent=$true; rawHidSimulationSelfTest=$true; rawHidChordsExercised=[int]$rawHidSimulation.chordsExercised; rawHidAssignedChords=[int]$rawHidSimulation.assignedChords; rawHidUnassignedChords=[int]$rawHidSimulation.unassignedChords; councilParticipantPresent=$true; councilParticipantAutoLaunched=$false; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true; providerHostPresent=$true; providerHostSelfTest=$true; voiceHelperPresent=$true; voiceHelperSelfTest=$true; microphoneAccessed=$false; providerNetworkAccessed=$false; proprietaryProviderCredentialAccessed=$false; physicalRawHidHardwareAccessed=$false; authenticatedGracefulShutdown=$true; boundedProcessControlSelfTest=$true; boundedProcessOutputCharacters=[long]$processControlReceipt.outputCharacters; capturedProcessTree=$capturedTree.Count; processTreeSurvivors=0 } | ConvertTo-Json -Compress
+      [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=$nodeVersionCommand.stdout.Trim(); sandboxHelperPresent=$true; sandboxLifecycleHelperPresent=$true; sandboxLifecycleSelfTest=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; companionLifecycleHelperPresent=$true; companionLifecycleSelfTest=$true; companionLifecycleCapturedProcesses=[int]$companionLifecycleSelfTest.capturedProcesses; companionLifecycleActiveProcesses=[int]$companionLifecycleSelfTest.activeProcesses; rawHidHelperPresent=$true; rawHidSimulatorPresent=$true; rawHidSimulationSelfTest=$true; rawHidChordsExercised=[int]$rawHidSimulation.chordsExercised; rawHidAssignedChords=[int]$rawHidSimulation.assignedChords; rawHidUnassignedChords=[int]$rawHidSimulation.unassignedChords; councilParticipantPresent=$true; councilParticipantAutoLaunched=$false; containmentRemoteEvaluatorPresent=$true; containmentRemoteEvaluatorHelp=$true; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true; providerHostPresent=$true; providerHostSelfTest=$true; voiceHelperPresent=$true; voiceHelperSelfTest=$true; microphoneAccessed=$false; providerNetworkAccessed=$false; proprietaryProviderCredentialAccessed=$false; physicalRawHidHardwareAccessed=$false; authenticatedGracefulShutdown=$true; boundedProcessControlSelfTest=$true; boundedProcessOutputCharacters=[long]$processControlReceipt.outputCharacters; capturedProcessTree=$capturedTree.Count; processTreeSurvivors=0 } | ConvertTo-Json -Compress
       return
     }
   } while ([DateTime]::UtcNow -lt $deadline)

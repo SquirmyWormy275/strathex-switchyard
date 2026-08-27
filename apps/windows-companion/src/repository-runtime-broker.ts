@@ -7,14 +7,17 @@ import { commandForAction, type CommandAction } from "../../../packages/control-
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { createDurableAbortControl } from "../../../packages/control-plane/src/execution-cancellation.ts";
 import { untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
+import { sessionBindingDigest } from "../../../packages/control-plane/src/session-registry.ts";
 import {
   repositoryProcessActions,
   type RepositoryRuntime,
   type RepositoryRuntimeAction,
   type RepositoryRuntimeResult,
+  type RepositoryExecutableIdentity,
   type RuntimeEffectGuard
 } from "./repository-runtime.ts";
 import type { DurableHostActionQueue } from "./host-actions.ts";
+import type { EffectTargetTransitionPort } from "./effect-target-transition.ts";
 
 const recipePrefix = "sxsy-b122.repository-runtime:";
 const markerExecutable = "@sxsy-b122/host-pinned-runtime";
@@ -28,6 +31,7 @@ export interface SandboxRepositoryRecipeRunner { runRecipe(request: IsolationReq
 export interface RepositoryRuntimeExecutionBrokerOptions {
   readonly containment?: ContainmentGuard;
   readonly hostActions?: Pick<DurableHostActionQueue, "enqueue">;
+  readonly targetTransitions?: EffectTargetTransitionPort;
 }
 
 export interface RepositoryRecipeCoverage {
@@ -217,11 +221,13 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
   private readonly runtimes: RepositoryRuntimeResolver;
   private readonly containment?: ContainmentGuard;
   private readonly hostActions?: Pick<DurableHostActionQueue, "enqueue">;
+  private readonly targetTransitions?: EffectTargetTransitionPort;
 
   constructor(runtimes: RepositoryRuntimeResolver, options: RepositoryRuntimeExecutionBrokerOptions = {}) {
     this.runtimes = runtimes;
     this.containment = options.containment;
     this.hostActions = options.hostActions;
+    this.targetTransitions = options.targetTransitions;
   }
 
   async execute(request: ExecutionRequest): Promise<BrokerOutcome> {
@@ -266,11 +272,28 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
           });
         }
       };
-      if (action === "stop_managed_run" && request.session?.metadata["sxsy-b122.kind"] === "debug-session") {
-        if (!this.hostActions) return { status: "unavailable", summary: "The authenticated VS Code host-action queue is unavailable for the exact debug session." };
+      if (action === "stop_managed_run") {
+        // Alt-Run is a split-identity command: `session` is the protected
+        // provider/authority source and `effectSession` is recovered only by
+        // the one-use reviewed debug-stop binding.  A legacy/raw request that
+        // puts the debug session in `session` (or omits the protected effect)
+        // must never fall through to the repository process runtime.
+        const effectKind = request.effectSession?.metadata["sxsy-b122.kind"];
+        if (effectKind !== "debug-session" && effectKind !== "managed-run") {
+          return { status: "blocked", summary: "Managed stop requires the exact protected reviewed source/effect binding.", effectDisposition: "not_started" };
+        }
+        if (effectKind === "managed-run") return this.executeVerifiedManagedRunStop(request, runtime, effectGuard, operationControl.signal);
+        if (!this.hostActions) return { status: "unavailable", summary: "The authenticated VS Code host-action queue is unavailable for the exact debug session.", effectDisposition: "not_started" };
         return this.queueVerifiedDebugStop(request, runtime);
       }
-      const result = await runtime.execute(action as RepositoryRuntimeAction, { operationId: request.operationId, signal: operationControl.signal, effectGuard });
+      const result = await runtime.execute(action as RepositoryRuntimeAction, {
+        operationId: request.operationId,
+        targetSnapshotId: request.target.id,
+        ...(request.session ? { sessionId: request.session.id } : {}),
+        ...(request.authority ? { authorityId: request.authority.id } : {}),
+        signal: operationControl.signal,
+        effectGuard
+      });
       if (action === "debug_target" && result.status === "running" && result.debugConfiguration && this.hostActions) {
         return this.queueVerifiedDebug(request, result.debugConfiguration);
       }
@@ -280,37 +303,81 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       if (action === "launch_web_app" && result.status === "running" && result.url && this.hostActions) {
         return this.queueVerifiedWebOpen(request, runtime, result);
       }
-      return mapResult(result);
+      const mapped = mapResult(result);
+      if (action === "run_target" && result.status === "running") {
+        if (!request.session || !request.session.workspaceRoot || request.session.targetSnapshotId !== request.target.id
+          || !samePath(request.session.workspaceRoot, request.target.repositoryRoot)
+          || !result.managedProcessId || !/^managed:[a-f0-9]{64}$/.test(result.managedProcessId)) {
+          if (result.managedProcessId) await runtime.terminateManagedForContainment(result.managedProcessId).catch(() => false);
+          return { status: "failed", summary: "The managed Run child started without one exact durable source/process/target binding and was contained; reconciliation is required if containment could not be confirmed.", effectDisposition: "committed", data: mapped.data };
+        }
+        return {
+          ...mapped,
+          data: {
+            ...(mapped.data ?? {}),
+            managedRun: {
+              version: 1,
+              kind: "managed-run",
+              managedProcessId: result.managedProcessId,
+              originOperationId: request.operationId,
+              originSessionId: request.session.id,
+              workspaceRoot: request.target.repositoryRoot,
+              targetSnapshotId: request.target.id
+            }
+          }
+        };
+      }
+      return mapped;
     } catch (error) {
       return { status: "failed", summary: `The verified repository runtime failed safely: ${untrustedSummary((error as Error).message)}` };
     } finally { operationControl.dispose(); }
   }
 
   private async queueVerifiedPythonEnvironment(request: ExecutionRequest, interpreter: string, result: RepositoryRuntimeResult): Promise<BrokerOutcome> {
-    if (!samePath(interpreter, `${request.target.repositoryRoot}\\.venv\\Scripts\\python.exe`)) return { status: "blocked", summary: "The runtime produced a Python interpreter outside the exact repo-local .venv boundary." };
+    if (!samePath(interpreter, `${request.target.repositoryRoot}\\.venv\\Scripts\\python.exe`)) return { status: "blocked", summary: "The runtime produced a Python interpreter outside the exact repo-local .venv boundary.", effectDisposition: "committed" };
+    const pythonInterpreterIdentity: RepositoryExecutableIdentity | undefined = result.pythonInterpreterIdentity;
+    if (!pythonInterpreterIdentity || !samePath(pythonInterpreterIdentity.canonicalPath, interpreter)) return { status: "incomplete", summary: "The runtime did not preserve the exact post-build Python interpreter identity; VS Code configuration was not queued.", effectDisposition: "committed" };
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;
-    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason };
-    const current = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-    if (!current.allowed) return { status: "incomplete", summary: current.reason };
+    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "committed" };
+    if (!request.session || !this.targetTransitions) {
+      return { status: "unavailable", summary: "The Python environment was created, but no durable post-effect TargetSnapshot transition boundary is installed; interpreter selection was not queued.", effectDisposition: "committed" };
+    }
+    let transitioned: Awaited<ReturnType<EffectTargetTransitionPort["captureAndAccept"]>>;
+    try {
+      transitioned = await this.targetTransitions.captureAndAccept({
+        action: request.action,
+        operationId: request.operationId,
+        previousTarget: request.target,
+        session: request.session,
+        allowUnchanged: true
+      });
+    } catch (error) {
+      return { status: "incomplete", summary: `The Python environment changed the repository, but its exact post-effect TargetSnapshot transition could not be accepted: ${untrustedSummary((error as Error).message)}`, effectDisposition: "committed" };
+    }
+    if (!samePath(transitioned.target.repositoryRoot, request.target.repositoryRoot)
+      || transitioned.session.id !== request.session.id
+      || transitioned.session.targetSnapshotId !== transitioned.target.id) {
+      return { status: "incomplete", summary: "The accepted Python-environment transition changed its exact repository, session, or target binding.", effectDisposition: "committed" };
+    }
     try {
       const intent = await this.hostActions!.enqueue({
-        definition: commandForAction(request.action), operationId: request.operationId, target: request.target,
-        ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}),
-        ...(request.executionControl ? { executionControl: request.executionControl } : {}), effectGuard: request.effectGuard
-      }, { hostAction: "configure_python_venv", pythonInterpreter: interpreter });
+        definition: commandForAction(request.action), operationId: request.operationId, target: transitioned.target,
+        session: transitioned.session, ...(request.authority ? { authority: request.authority } : {}),
+        ...(request.executionControl ? { executionControl: request.executionControl } : {})
+      }, { hostAction: "configure_python_venv", pythonInterpreter: interpreter, pythonInterpreterIdentity });
       const mapped = mapResult(result);
-      return { status: "running", summary: "The repo-local Python environment is ready; exact VS Code selection and terminal creation await authenticated host acknowledgement.", data: { ...(mapped.data ?? {}), hostActionId: intent.id, hostActionKind: intent.hostAction, hostActionExpiresAt: intent.expiresAt, hostActionWorkspaceRoot: intent.workspaceRoot, hostActionPythonInterpreter: intent.pythonInterpreter } };
+      return { status: "running", summary: "The repo-local Python environment and its exact post-effect TargetSnapshot are accepted; VS Code selection and terminal creation await authenticated host acknowledgement.", effectDisposition: "committed", data: { ...(mapped.data ?? {}), previousTargetSnapshotId: request.target.id, acceptedTargetSnapshotId: transitioned.target.id, targetTransitionStatus: transitioned.status, hostActionId: intent.id, hostActionKind: intent.hostAction, hostActionExpiresAt: intent.expiresAt, hostActionWorkspaceRoot: intent.workspaceRoot, hostActionPythonInterpreter: intent.pythonInterpreter, hostActionPythonInterpreterIdentity: intent.pythonInterpreterIdentity } };
     } catch {
-      return { status: "failed", summary: "The verified Python environment could not be durably queued for the authenticated VS Code host." };
+      return { status: "failed", summary: "The verified Python environment could not be durably queued for the authenticated VS Code host.", effectDisposition: "committed" };
     }
   }
 
   private async queueVerifiedDebug(request: ExecutionRequest, configuration: string): Promise<BrokerOutcome> {
-    if (!configuration.trim() || configuration.length > 256 || /[\r\n\0]/.test(configuration)) return { status: "blocked", summary: "The verified runtime returned an invalid VS Code debug configuration." };
+    if (!configuration.trim() || configuration.length > 256 || /[\r\n\0]/.test(configuration)) return { status: "blocked", summary: "The verified runtime returned an invalid VS Code debug configuration.", effectDisposition: "not_started" };
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;
-    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason };
+    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "not_started" };
     const current = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-    if (!current.allowed) return { status: "incomplete", summary: current.reason };
+    if (!current.allowed) return { status: "incomplete", summary: current.reason, effectDisposition: "not_started" };
     try {
       const intent = await this.hostActions!.enqueue({
         definition: commandForAction(request.action), operationId: request.operationId, target: request.target,
@@ -320,6 +387,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       return {
         status: "running",
         summary: "Starting the exact verified launch configuration awaits an authenticated VS Code acknowledgement.",
+        effectDisposition: "committed",
         data: {
           hostActionId: intent.id,
           hostActionKind: intent.hostAction,
@@ -329,41 +397,58 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
         }
       };
     } catch {
-      return { status: "failed", summary: "The verified debug configuration could not be durably queued for the authenticated VS Code host." };
+      return { status: "failed", summary: "The verified debug configuration could not be durably queued for the authenticated VS Code host.", effectDisposition: "not_started" };
     }
   }
 
   private async queueVerifiedDebugStop(request: ExecutionRequest, runtime: RepositoryRuntime): Promise<BrokerOutcome> {
-    const session = request.session;
-    if (!session || session.status !== "running" || session.metadata["sxsy-b122.kind"] !== "debug-session"
-      || !session.workspaceRoot || !samePath(session.workspaceRoot, request.target.repositoryRoot)
-      || !runtime.allowsManagedStop("debug_target")) return { status: "blocked", summary: "The selected debug session is not an active exact target allowed by the verified stop recipe." };
+    const source = request.session;
+    const effect = request.effectSession;
+    if (!source || !effect || source.id === effect.id || source.status !== "running" || effect.status !== "running"
+      || effect.metadata["sxsy-b122.kind"] !== "debug-session"
+      || !source.workspaceRoot || !effect.workspaceRoot || !samePath(source.workspaceRoot, request.target.repositoryRoot)
+      || !samePath(effect.workspaceRoot, request.target.repositoryRoot)
+      || !runtime.allowsManagedStop("debug_target")) return { status: "blocked", summary: "The selected debug session is not an active exact target allowed by the verified stop recipe.", effectDisposition: "not_started" };
     let debugSessionId: string;
     let originOperationId: string;
     let originSessionId: string;
+    let debugBindingId: string;
     let configuration: string;
     try {
-      debugSessionId = boundedDebugIdentity(session.metadata["sxsy-b122.debugSessionId"], "VS Code debug session ID");
-      originOperationId = boundedDebugIdentity(session.metadata["sxsy-b122.debugOriginOperationId"], "VS Code debug origin operation ID");
-      originSessionId = boundedDebugIdentity(session.metadata["sxsy-b122.debugOriginSessionId"], "VS Code debug origin session ID");
-      configuration = boundedDebugIdentity(session.metadata["sxsy-b122.debugConfiguration"], "VS Code debug configuration");
+      debugSessionId = boundedDebugIdentity(effect.metadata["sxsy-b122.debugSessionId"], "VS Code debug session ID");
+      originOperationId = boundedDebugIdentity(effect.metadata["sxsy-b122.debugOriginOperationId"], "VS Code debug origin operation ID");
+      originSessionId = boundedDebugIdentity(effect.metadata["sxsy-b122.debugOriginSessionId"], "VS Code debug origin session ID");
+      debugBindingId = boundedDebugIdentity(effect.metadata["sxsy-b122.debugBindingId"], "VS Code debug binding ID");
+      configuration = boundedDebugIdentity(effect.metadata["sxsy-b122.debugConfiguration"], "VS Code debug configuration");
     } catch {
-      return { status: "blocked", summary: "The selected debug session has invalid or incomplete durable identity metadata." };
+      return { status: "blocked", summary: "The selected debug session has invalid or incomplete durable identity metadata.", effectDisposition: "not_started" };
     }
-    const workspaceRoot = session.metadata["sxsy-b122.debugWorkspaceRoot"];
-    if (!workspaceRoot || !samePath(workspaceRoot, request.target.repositoryRoot) || originSessionId === session.id) return { status: "blocked", summary: "The selected debug session changed its exact durable origin or workspace binding." };
+    const workspaceRoot = effect.metadata["sxsy-b122.debugWorkspaceRoot"];
+    if (!workspaceRoot || !samePath(workspaceRoot, request.target.repositoryRoot) || originSessionId !== source.id
+      || effect.targetSnapshotId !== undefined && effect.targetSnapshotId !== request.target.id
+      || source.targetSnapshotId !== request.target.id) return { status: "blocked", summary: "The selected debug session changed its exact durable provider origin, target, or workspace binding.", effectDisposition: "not_started" };
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;
-    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason };
-    const current = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session, ...(request.authority ? { authority: request.authority } : {}) });
-    if (!current.allowed) return { status: "incomplete", summary: current.reason };
+    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "not_started" };
+    const current = await request.effectGuard!.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, session: source, ...(request.authority ? { authority: request.authority } : {}) });
+    if (!current.allowed) return { status: "incomplete", summary: current.reason, effectDisposition: "not_started" };
     try {
       const intent = await this.hostActions!.enqueue({
-        definition: commandForAction(request.action), operationId: request.operationId, target: request.target, session,
+        definition: commandForAction(request.action), operationId: request.operationId, target: request.target, session: source,
         ...(request.authority ? { authority: request.authority } : {}), ...(request.executionControl ? { executionControl: request.executionControl } : {}), effectGuard: request.effectGuard
-      }, { hostAction: "stop_vscode_debug", debugConfiguration: configuration, debugSessionId, debugOriginOperationId: originOperationId });
+      }, {
+        hostAction: "stop_vscode_debug",
+        debugConfiguration: configuration,
+        debugSessionId,
+        debugEffectSessionId: effect.id,
+        debugEffectSessionBindingDigest: sessionBindingDigest(effect),
+        debugSourceSessionBindingDigest: sessionBindingDigest(source),
+        debugBindingId,
+        debugOriginOperationId: originOperationId
+      });
       return {
         status: "running",
         summary: "Stopping the exact durable VS Code debug session awaits authenticated host acknowledgement.",
+        effectDisposition: "committed",
         data: {
           hostActionId: intent.id,
           hostActionKind: intent.hostAction,
@@ -371,12 +456,79 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
           hostActionWorkspaceRoot: intent.workspaceRoot,
           hostActionDebugConfiguration: intent.debugConfiguration,
           hostActionDebugSessionId: intent.debugSessionId,
+          hostActionDebugEffectSessionId: intent.debugEffectSessionId,
+          hostActionDebugBindingId: intent.debugBindingId,
           hostActionDebugOriginOperationId: intent.debugOriginOperationId
         }
       };
     } catch {
-      return { status: "failed", summary: "The exact VS Code debug stop could not be durably queued for authenticated host execution." };
+      return { status: "failed", summary: "The exact VS Code debug stop could not be durably queued for authenticated host execution.", effectDisposition: "not_started" };
     }
+  }
+
+  private async executeVerifiedManagedRunStop(
+    request: ExecutionRequest,
+    runtime: RepositoryRuntime,
+    effectGuard: RuntimeEffectGuard,
+    signal: AbortSignal
+  ): Promise<BrokerOutcome> {
+    const source = request.session;
+    const effect = request.effectSession;
+    if (!source || !effect || source.id === effect.id || source.status !== "running" || effect.status !== "running"
+      || effect.metadata["sxsy-b122.kind"] !== "managed-run"
+      || !source.workspaceRoot || !effect.workspaceRoot || !samePath(source.workspaceRoot, request.target.repositoryRoot)
+      || !samePath(effect.workspaceRoot, request.target.repositoryRoot)
+      || !runtime.allowsManagedStop("run_target")) {
+      return { status: "blocked", summary: "The selected managed Run process is not one active exact target allowed by the verified stop recipe.", effectDisposition: "not_started" };
+    }
+    let managedProcessId: string;
+    let originOperationId: string;
+    let originSessionId: string;
+    try {
+      managedProcessId = boundedDebugIdentity(effect.metadata["sxsy-b122.managedProcessId"], "managed Run process ID");
+      originOperationId = boundedDebugIdentity(effect.metadata["sxsy-b122.runOriginOperationId"], "managed Run origin operation ID");
+      originSessionId = boundedDebugIdentity(effect.metadata["sxsy-b122.runOriginSessionId"], "managed Run origin session ID");
+    } catch {
+      return { status: "blocked", summary: "The selected managed Run process has invalid or incomplete durable identity metadata.", effectDisposition: "not_started" };
+    }
+    if (!/^managed:[a-f0-9]{64}$/.test(managedProcessId)
+      || originOperationId.length > 256
+      || effect.metadata["sxsy-b122.runWorkspaceRoot"] === undefined
+      || !samePath(effect.metadata["sxsy-b122.runWorkspaceRoot"]!, request.target.repositoryRoot)
+      || originSessionId !== source.id
+      || effect.targetSnapshotId !== request.target.id
+      || source.targetSnapshotId !== request.target.id) {
+      return { status: "blocked", summary: "The selected managed Run process changed its exact durable provider origin, target, or workspace binding.", effectDisposition: "not_started" };
+    }
+    const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
+    if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "not_started" };
+    const current = await request.effectGuard!.assertCurrent({
+      action: request.action,
+      operationId: request.operationId,
+      target: request.target,
+      session: source,
+      ...(request.authority ? { authority: request.authority } : {})
+    });
+    if (!current.allowed) return { status: "incomplete", summary: current.reason, effectDisposition: "not_started" };
+    const result = await runtime.execute("stop_managed_run", {
+      operationId: request.operationId,
+      targetSnapshotId: request.target.id,
+      sessionId: source.id,
+      ...(request.authority ? { authorityId: request.authority.id } : {}),
+      managedProcessId,
+      signal,
+      effectGuard
+    });
+    const mapped = mapResult(result);
+    return {
+      ...mapped,
+      data: {
+        ...(mapped.data ?? {}),
+        managedProcessId,
+        managedRunEffectSessionId: effect.id,
+        managedRunOriginOperationId: originOperationId
+      }
+    };
   }
 
   private async queueVerifiedWebOpen(request: ExecutionRequest, runtime: RepositoryRuntime, result: RepositoryRuntimeResult): Promise<BrokerOutcome> {
@@ -385,12 +537,12 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
     };
     if (!result.url || !trustedRuntimeUrl(result.url)) {
       await cleanup();
-      return { status: "blocked", summary: "The verified web runtime returned a host URL outside the exact HTTPS or loopback boundary; its managed child was stopped." };
+      return { status: "blocked", summary: "The verified web runtime returned a host URL outside the exact HTTPS or loopback boundary; its managed child was stopped.", effectDisposition: "committed" };
     }
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;
     if (fence && !fence.allowed) {
       await cleanup();
-      return { status: "blocked", summary: `${fence.reason} The managed web child was stopped before any host action was queued.` };
+      return { status: "blocked", summary: `${fence.reason} The managed web child was stopped before any host action was queued.`, effectDisposition: "committed" };
     }
     const current = await request.effectGuard!.assertCurrent({
       action: request.action,
@@ -401,7 +553,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
     });
     if (!current.allowed) {
       await cleanup();
-      return { status: "incomplete", summary: `${current.reason} The managed web child was stopped before any host action was queued.` };
+      return { status: "incomplete", summary: `${current.reason} The managed web child was stopped before any host action was queued.`, effectDisposition: "committed" };
     }
     try {
       const adapterRequest: AdapterRequest = {
@@ -418,6 +570,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       return {
         status: "running",
         summary: "The managed web application passed its health probe; opening its exact URL awaits an authenticated VS Code acknowledgement.",
+        effectDisposition: "committed",
         data: {
           ...(mapped.data ?? {}),
           hostActionId: intent.id,
@@ -428,7 +581,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       };
     } catch {
       await cleanup();
-      return { status: "failed", summary: "The verified web runtime could not durably queue its authenticated host action; its managed child was stopped." };
+      return { status: "failed", summary: "The verified web runtime could not durably queue its authenticated host action; its managed child was stopped.", effectDisposition: "committed" };
     }
   }
 
@@ -514,7 +667,12 @@ function mapResult(result: RepositoryRuntimeResult): BrokerOutcome {
     data.outputBytes = Buffer.byteLength(result.output, "utf8");
     data.outputTruncated = result.outputTruncated ?? false;
   }
-  return { status: result.status, summary: untrustedSummary(result.summary), ...(Object.keys(data).length ? { data } : {}) };
+  return {
+    status: result.status,
+    summary: untrustedSummary(result.summary),
+    ...(result.effectDisposition ? { effectDisposition: result.effectDisposition } : {}),
+    ...(Object.keys(data).length ? { data } : {})
+  };
 }
 
 function samePath(left: string, right: string): boolean {

@@ -19,6 +19,7 @@ export interface PipelineLocalReceiptSummary {
   readonly targetSnapshotId: string;
   readonly result: ProtectedReceipt["result"];
   readonly completeness: ProtectedReceipt["completeness"];
+  readonly evidenceDigest: string;
   readonly createdAt: string;
   readonly freshness: "current" | "stale";
   readonly staleReason?: "target_mismatch" | "invalidated" | "expired";
@@ -70,6 +71,7 @@ export async function readPipelineLocalReceipts(
       targetSnapshotId: receipt.targetSnapshotId,
       result: receipt.result,
       completeness: receipt.completeness,
+      evidenceDigest: receipt.evidenceDigest,
       createdAt: receipt.createdAt,
       freshness,
       ...(staleReason ? { staleReason } : {}),
@@ -126,13 +128,23 @@ interface PipelineContext {
   readonly jobId?: string;
 }
 
+interface PipelineFailureEvidence {
+  readonly context: PipelineContext;
+  readonly logExcerpt: string;
+  readonly logSource: "actions-job-log" | "check-output" | "protected-local-receipt";
+  readonly diagnosis: string;
+}
+
 interface PipelineObservation {
   readonly oid: string;
   readonly state: string | null;
   readonly contexts: readonly PipelineContext[];
 }
 
-export interface PipelineFailureCursor { select(targetSnapshotId: string, orderedFailureFingerprints: readonly string[]): Promise<number>; }
+export type PipelineFailureInteraction = "status" | "trace";
+export interface PipelineFailureCursor {
+  select(targetSnapshotId: string, orderedFailureFingerprints: readonly string[], interaction?: PipelineFailureInteraction): Promise<number>;
+}
 
 export interface PipelineFailurePresentationQueue {
   enqueue(request: AdapterRequest, plan: Readonly<{ hostAction: "show_pipeline_failure_trace" }>): Promise<Readonly<{
@@ -181,19 +193,135 @@ export class PipelineFailurePresentationAdapter implements CommandAdapter {
   }
 }
 
-interface PipelineFailureCursorEvent { readonly version: 1; readonly targetSnapshotId: string; readonly seriesDigest: string; readonly index: number; readonly selectedAt: string; }
+/**
+ * Adds one protected failure selection to Pipeline Normal without inventing a
+ * second cursor in the UI host. The same cursor instance is consumed by Alt:
+ * the first Alt after Normal diagnoses that exact selection; repeated Normal
+ * or Alt advances the bounded series.
+ */
+export class PipelineStatusFailureSelectionAdapter implements CommandAdapter {
+  readonly id = "pipeline-status-failure-selection-v1";
+  readonly kind = "generic" as const;
+  constructor(private readonly status: CommandAdapter, private readonly cursor: PipelineFailureCursor) {}
+
+  async execute(request: AdapterRequest): Promise<AdapterOutcome> {
+    if (request.definition.action !== "pipeline_status") return { status: "unavailable", summary: "The Pipeline status selection adapter handles Normal only.", effectDisposition: "not_started" };
+    const observed = await this.status.execute(request);
+    if (["blocked", "cancelled", "timed_out", "failed"].includes(observed.status)) return observed;
+    const failures = localReceiptFailures(observed.data?.localReceipts);
+    if (!failures.length) return { ...observed, data: { ...(observed.data ?? {}), contexts: [], failureSeries: [], failureCount: 0, repeatAvailable: false } };
+    let selectedIndex: number;
+    try { selectedIndex = await this.cursor.select(request.target?.id ?? "", failures.map((failure) => failureFingerprint(failure.context)), "status"); }
+    catch { return { status: "failed", summary: "The protected local Pipeline failure cursor could not be advanced; no failure identity was guessed.", effectDisposition: "ambiguous" }; }
+    const selected = failures[selectedIndex];
+    if (!selected) return { status: "failed", summary: "The protected local Pipeline failure cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
+    return {
+      ...observed,
+      data: {
+        ...(observed.data ?? {}),
+        head: request.target?.head,
+        hostedState: "not configured",
+        contexts: failures.map((failure) => failure.context),
+        failureSeries: failures.map((failure) => failure.context),
+        selectedIndex,
+        failureCount: failures.length,
+        repeatAvailable: failures.length > 1,
+        selectedFailure: selected.context
+      }
+    };
+  }
+}
+
+/** Read-only protected local receipt fallback for Pipeline Alt. */
+export class LocalPipelineFailureTraceAdapter implements CommandAdapter {
+  readonly id = "protected-local-pipeline-failure-trace-v1";
+  readonly kind = "generic" as const;
+  constructor(
+    private readonly receipts: PipelineReceiptReader,
+    private readonly cursor: PipelineFailureCursor = new FirstPipelineFailureCursor(),
+    private readonly now: () => string = () => new Date().toISOString()
+  ) {}
+
+  async execute(request: AdapterRequest): Promise<AdapterOutcome> {
+    if (request.definition.action !== "pipeline_failure_trace" || !request.operationId || !request.target?.head
+      || !/^[a-f0-9]{40}$/i.test(request.target.head) || !/^[a-f0-9]{64}$/.test(request.target.id)) {
+      return { status: "unavailable", summary: "Local Pipeline failure trace requires an exact durable operation, target snapshot, and HEAD.", effectDisposition: "not_started" };
+    }
+    if (!request.effectGuard) return { status: "blocked", summary: "Local Pipeline failure trace requires a final target guard.", effectDisposition: "not_started" };
+    let current;
+    try { current = await request.effectGuard.assertCurrent(guardInput(request)); }
+    catch { return { status: "unavailable", summary: "The exact local Pipeline target could not be verified before protected receipt observation.", effectDisposition: "not_started" }; }
+    if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
+    let observed: PipelineLocalReceiptObservation;
+    try { observed = await readPipelineLocalReceipts(this.receipts, request.target.id, this.now()); }
+    catch { return { status: "failed", summary: "The protected local Pipeline receipt ledger is malformed or unavailable; no local failure was inferred.", effectDisposition: "ambiguous" }; }
+    try { current = await request.effectGuard.assertCurrent(guardInput(request)); }
+    catch { return { status: "unavailable", summary: "The exact Pipeline target could not be revalidated after local receipt observation; observed evidence was discarded.", effectDisposition: "not_started" }; }
+    if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
+    const failures = localReceiptFailures(observed.receipts);
+    if (!failures.length) return { status: "unavailable", summary: "No current protected local Pipeline failure receipt exists for the exact target; no trace was invented.", effectDisposition: "committed" };
+    let selectedIndex: number;
+    try { selectedIndex = await this.cursor.select(request.target.id, failures.map((failure) => failureFingerprint(failure.context)), "trace"); }
+    catch { return { status: "failed", summary: "The protected local Pipeline failure cursor could not be advanced; no failure identity was guessed.", effectDisposition: "ambiguous" }; }
+    const selected = failures[selectedIndex];
+    if (!selected) return { status: "failed", summary: "The protected local Pipeline failure cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
+    return failureOutcome(request.target.head, selectedIndex, failures.length, selected);
+  }
+}
+
+/**
+ * Uses local evidence only when the hosted observer is explicitly unavailable.
+ * A blocked, failed, cancelled, timed-out, or ambiguous hosted boundary always
+ * dominates and can never be hidden by fallback evidence.
+ */
+export class PipelineFailureFallbackAdapter implements CommandAdapter {
+  readonly id = "pipeline-failure-hosted-local-fallback-v1";
+  readonly kind = "generic" as const;
+  constructor(private readonly hosted: CommandAdapter, private readonly local: CommandAdapter) {}
+  async execute(request: AdapterRequest): Promise<AdapterOutcome> {
+    if (request.definition.action !== "pipeline_failure_trace") return { status: "unavailable", summary: "The Pipeline failure fallback handles Alt only.", effectDisposition: "not_started" };
+    let hosted: AdapterOutcome;
+    try { hosted = await this.hosted.execute(request); }
+    catch { return { status: "failed", summary: "The hosted Pipeline observer failed before a safe fallback decision could be made.", effectDisposition: "ambiguous" }; }
+    if (hosted.status !== "unavailable") return hosted;
+    if (hosted.effectDisposition !== "not_started" && hosted.effectDisposition !== "committed") return hosted;
+    const local = await this.local.execute(request);
+    if (local.status === "completed") {
+      return {
+        ...local,
+        summary: `${local.summary} Hosted exact-head evidence was unavailable and remains a separate non-claim.`.slice(0, 512),
+        effectDisposition: combineDisposition(hosted, local),
+        data: { ...(local.data ?? {}), hostedFallback: { status: hosted.status, summary: hosted.summary, effectDisposition: hosted.effectDisposition } }
+      };
+    }
+    if (["blocked", "failed", "cancelled", "timed_out"].includes(local.status)) return local;
+    return {
+      status: "unavailable",
+      summary: "Neither exact-head hosted evidence nor a current protected local failure receipt is available; no placeholder presentation was queued.",
+      effectDisposition: combineDisposition(hosted, local),
+      data: { hosted: observationData(hosted), local: observationData(local) }
+    };
+  }
+}
+
+interface PipelineFailureCursorEvent { readonly version: 2; readonly targetSnapshotId: string; readonly seriesDigest: string; readonly index: number; readonly interaction: PipelineFailureInteraction; readonly selectedAt: string; }
 
 /** Protected restart-durable repeat cursor. A changed failure set starts again at the first item. */
 export class DurablePipelineFailureCursor implements PipelineFailureCursor {
   constructor(private readonly store: ProtectedJsonStore, private readonly now: () => Date = () => new Date()) {}
-  async select(targetSnapshotId: string, orderedFailureFingerprints: readonly string[]): Promise<number> {
+  async select(targetSnapshotId: string, orderedFailureFingerprints: readonly string[], interaction: PipelineFailureInteraction = "trace"): Promise<number> {
     if (!orderedFailureFingerprints.length || orderedFailureFingerprints.length > 50 || !targetSnapshotId || targetSnapshotId.length > 512) throw new Error("A bounded exact failure series is required.");
+    if (interaction !== "status" && interaction !== "trace") throw new Error("A canonical Pipeline interaction is required.");
     const seriesDigest = digest(JSON.stringify(orderedFailureFingerprints));
     return this.store.transaction(async (transaction) => {
       const events = (await transaction.readEntries<PipelineFailureCursorEvent>()).filter((entry) => entry.kind === "pipeline_failure_cursor").map((entry) => entry.payload).filter(validCursorEvent);
       const prior = [...events].reverse().find((event) => event.targetSnapshotId === targetSnapshotId);
-      const index = prior?.seriesDigest === seriesDigest ? (prior.index + 1) % orderedFailureFingerprints.length : 0;
-      await transaction.append("pipeline_failure_cursor", { version: 1, targetSnapshotId, seriesDigest, index, selectedAt: this.now().toISOString() });
+      const index = prior?.seriesDigest === seriesDigest
+        ? interaction === "trace" && prior.interaction === "status"
+          ? prior.index
+          : (prior.index + 1) % orderedFailureFingerprints.length
+        : 0;
+      await transaction.append("pipeline_failure_cursor", { version: 2, targetSnapshotId, seriesDigest, index, interaction, selectedAt: this.now().toISOString() });
       return index;
     });
   }
@@ -247,30 +375,60 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
     try { observation = parseObservation(response.body, request.target.head, host.host, repository.owner, repository.name); }
     catch { return { status: "failed", summary: "GitHub returned an invalid exact-head pipeline response; no state was inferred.", effectDisposition: "ambiguous" }; }
 
-    const local = (await this.receipts.list())
-      .filter((receipt) => receipt.targetSnapshotId === request.target!.id && ["pipeline_local_gate", "pipeline_clean_reproduction", "release_shield"].includes(receipt.action))
-      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
-      .slice(0, 8)
-      .map((receipt) => ({ action: receipt.action, result: receipt.result, completeness: receipt.completeness, createdAt: receipt.createdAt, expired: !!receipt.expiresAt && Date.parse(receipt.expiresAt) <= Date.now(), invalidated: !!receipt.invalidatedBy }));
+    let localObservation: PipelineLocalReceiptObservation;
+    try { localObservation = await readPipelineLocalReceipts(this.receipts, request.target.id); }
+    catch { return { status: "failed", summary: "The protected local Pipeline receipt ledger is malformed or unavailable; no combined failure series was inferred.", effectDisposition: "ambiguous" }; }
+    const local = localObservation.receipts;
+    const hostedFailures: PipelineFailureEvidence[] = observation.contexts.filter(failedContext).map((context) => ({
+      context,
+      logExcerpt: context.summary ?? "The provider supplied no bounded check output for this failed context.",
+      logSource: "check-output",
+      diagnosis: diagnoseFailure(context, context.summary ?? "")
+    }));
+    const failures = [...hostedFailures, ...localReceiptFailures(local)];
     if (request.definition.action === "pipeline_status") {
       const state = observation.state ?? "NONE";
-      const failing = observation.contexts.filter(failedContext);
+      let selectedIndex: number | undefined;
+      if (failures.length) {
+        try { selectedIndex = await this.cursor.select(request.target.id, failures.map((failure) => failureFingerprint(failure.context)), "status"); }
+        catch { return { status: "failed", summary: "The protected Pipeline failure cursor could not be advanced; no Normal selection was guessed.", effectDisposition: "ambiguous" }; }
+        if (!failures[selectedIndex]) return { status: "failed", summary: "The protected Pipeline failure cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
+      }
       return {
         status: "completed",
-        summary: state === "NONE" ? `No hosted check rollup exists for exact head ${observation.oid}; ${local.length} protected local receipt(s) are available.` : `Exact head ${observation.oid} has hosted pipeline state ${state}, ${failing.length} failing context(s), and ${local.length} protected local receipt(s).`,
+        summary: state === "NONE" ? `No hosted check rollup exists for exact head ${observation.oid}; ${local.length} protected local receipt(s) are available.` : `Exact head ${observation.oid} has hosted pipeline state ${state}, ${hostedFailures.length} hosted failure(s), ${failures.length - hostedFailures.length} current local failure receipt(s), and ${local.length} protected local receipt(s).`,
         effectDisposition: "committed",
-        data: { head: observation.oid, hostedState: state, failingCount: failing.length, contexts: observation.contexts, localReceipts: local }
+        data: {
+          head: observation.oid,
+          hostedState: state,
+          failingCount: failures.length,
+          contexts: [...observation.contexts, ...failures.slice(hostedFailures.length).map((failure) => failure.context)],
+          failureSeries: failures.map((failure) => failure.context),
+          localReceiptState: localObservation.state,
+          localReceipts: local,
+          ...(selectedIndex === undefined ? { failureCount: 0, repeatAvailable: false } : {
+            selectedIndex,
+            failureCount: failures.length,
+            repeatAvailable: failures.length > 1,
+            selectedFailure: failures[selectedIndex]!.context
+          })
+        }
       };
     }
-    const failures = observation.contexts.filter(failedContext);
     if (!failures.length) return { status: "unavailable", summary: "No failed hosted context exists on the exact target head; no failure was invented.", effectDisposition: "committed" };
     let selectedIndex: number;
-    try { selectedIndex = await this.cursor.select(request.target.id, failures.map(failureFingerprint)); }
+    try { selectedIndex = await this.cursor.select(request.target.id, failures.map((failure) => failureFingerprint(failure.context)), "trace"); }
     catch { return { status: "failed", summary: "The protected failure-trace cursor could not be advanced; no failure identity was guessed.", effectDisposition: "ambiguous" }; }
-    const selected = failures[selectedIndex];
-    if (!selected) return { status: "failed", summary: "The protected failure-trace cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
-    let logExcerpt = selected.summary ?? "The provider supplied no bounded check output for this failed context.";
-    let logSource: "actions-job-log" | "check-output" = "check-output";
+    const selectedEvidence = failures[selectedIndex];
+    if (!selectedEvidence) return { status: "failed", summary: "The protected failure-trace cursor selected an invalid bounded identity.", effectDisposition: "ambiguous" };
+    const selected = selectedEvidence.context;
+    if (selectedEvidence.logSource === "protected-local-receipt") {
+      const afterLocal = await request.effectGuard.assertCurrent(guardInput(request));
+      if (!afterLocal.allowed) return { status: "blocked", summary: "The exact target changed while the selected local receipt was being read; the protected evidence was discarded.", effectDisposition: "not_started" };
+      return failureOutcome(observation.oid, selectedIndex, failures.length, selectedEvidence);
+    }
+    let logExcerpt = selectedEvidence.logExcerpt;
+    let logSource: PipelineFailureEvidence["logSource"] = selectedEvidence.logSource;
     if (selected.kind === "check" && selected.jobId) {
       const logGuard = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
       if (!logGuard.allowed) return { status: "blocked", summary: logGuard.reason, effectDisposition: "not_started" };
@@ -292,13 +450,7 @@ export class ConfiguredGitHubPipelineAdapter implements CommandAdapter {
       if (!afterLog.allowed) return { status: "blocked", summary: "The exact target changed while the selected hosted log was being read; the downloaded output was discarded.", effectDisposition: "ambiguous" };
       logSource = "actions-job-log";
     }
-    const diagnosis = diagnoseFailure(selected, logExcerpt);
-    return {
-      status: "completed",
-      summary: `Failure ${selectedIndex + 1} of ${failures.length}: ${selected.name}=${selected.conclusion ?? selected.state}. ${diagnosis}`.slice(0, 512),
-      effectDisposition: "committed",
-      data: { head: observation.oid, selectedIndex, failureCount: failures.length, repeatAvailable: failures.length > 1, selectedFailure: selected, logExcerpt, logSource, diagnosis }
-    };
+    return failureOutcome(observation.oid, selectedIndex, failures.length, { ...selectedEvidence, logExcerpt, logSource, diagnosis: diagnoseFailure(selected, logExcerpt) });
   }
 }
 
@@ -337,6 +489,57 @@ function parseContext(value: unknown, host: string, owner: string, name: string)
 }
 
 function failedContext(value: PipelineContext): boolean { return ["ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STARTUP_FAILURE", "STALE"].includes(value.conclusion ?? value.state); }
+function localReceiptFailures(value: unknown): readonly PipelineFailureEvidence[] {
+  if (!Array.isArray(value) || value.length > localReceiptActions.length) return [];
+  const failures: PipelineFailureEvidence[] = [];
+  for (const candidate of value) {
+    if (!record(candidate) || typeof candidate.id !== "string" || !boundedReceiptReference(candidate.id, 512)
+      || !(localReceiptActions as readonly string[]).includes(String(candidate.action)) || typeof candidate.targetSnapshotId !== "string" || !/^[a-f0-9]{64}$/.test(candidate.targetSnapshotId)
+      || candidate.result !== "failed" || (candidate.completeness !== "complete" && candidate.completeness !== "incomplete")
+      || typeof candidate.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/.test(candidate.evidenceDigest)
+      || candidate.freshness !== "current" || !boundedReceiptTimestamp(candidate.createdAt)) continue;
+    const context: PipelineContext = {
+      kind: "status",
+      name: `local:${candidate.action}`,
+      state: "COMPLETED",
+      conclusion: "FAILURE",
+      summary: `Protected local ${candidate.action} receipt ${candidate.id} recorded ${candidate.completeness} failed evidence ${candidate.evidenceDigest} at ${candidate.createdAt}.`
+    };
+    failures.push({
+      context,
+      logExcerpt: context.summary!,
+      logSource: "protected-local-receipt",
+      diagnosis: "The protected local gate receipt records a failure for this exact target; inspect the receipt-bound local gate output and reproduce only in the declared isolated environment."
+    });
+  }
+  return failures;
+}
+function failureOutcome(head: string, selectedIndex: number, failureCount: number, selected: PipelineFailureEvidence): AdapterOutcome {
+  return {
+    status: "completed",
+    summary: `Failure ${selectedIndex + 1} of ${failureCount}: ${selected.context.name}=${selected.context.conclusion ?? selected.context.state}. ${selected.diagnosis}`.slice(0, 512),
+    effectDisposition: "committed",
+    data: {
+      head,
+      selectedIndex,
+      failureCount,
+      repeatAvailable: failureCount > 1,
+      selectedFailure: selected.context,
+      logExcerpt: selected.logExcerpt,
+      logSource: selected.logSource,
+      diagnosis: selected.diagnosis
+    }
+  };
+}
+function guardInput(request: AdapterRequest) {
+  return {
+    action: request.definition.action,
+    operationId: request.operationId ?? "pipeline-failure-trace",
+    target: request.target!,
+    ...(request.session ? { session: request.session } : {}),
+    ...(request.authority ? { authority: request.authority } : {})
+  };
+}
 function requiredRecord(value: Record<string, unknown>, key: string): Record<string, unknown> { const result = value[key]; if (!record(result)) throw new Error("missing record"); return result; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function bounded(value: string, maximum: number): boolean { return !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value); }
@@ -364,7 +567,7 @@ function diagnoseFailure(value: PipelineContext, excerpt: string): string {
   if (/lint|format|style|typecheck|type error/.test(source)) return "The bounded output indicates a static-analysis gate failure; run the repository-declared local gate against the exact head.";
   return "The provider confirms a failed exact-head context, but the bounded output is insufficient for a narrower diagnosis.";
 }
-function validCursorEvent(value: PipelineFailureCursorEvent): boolean { return value?.version === 1 && typeof value.targetSnapshotId === "string" && value.targetSnapshotId.length <= 512 && /^[a-f0-9]{64}$/.test(value.seriesDigest) && Number.isSafeInteger(value.index) && value.index >= 0 && validTimestamp(value.selectedAt); }
+function validCursorEvent(value: PipelineFailureCursorEvent): boolean { return value?.version === 2 && typeof value.targetSnapshotId === "string" && value.targetSnapshotId.length <= 512 && /^[a-f0-9]{64}$/.test(value.seriesDigest) && Number.isSafeInteger(value.index) && value.index >= 0 && (value.interaction === "status" || value.interaction === "trace") && validTimestamp(value.selectedAt); }
 function validFailurePresentation(value: Readonly<Record<string, unknown>> | undefined, expectedHead: string | undefined): boolean {
   if (!value || !expectedHead || value.head !== expectedHead || typeof value.selectedIndex !== "number" || !Number.isSafeInteger(value.selectedIndex) || value.selectedIndex < 0
     || typeof value.failureCount !== "number" || !Number.isSafeInteger(value.failureCount) || value.failureCount < 1 || value.failureCount > 50 || value.selectedIndex >= value.failureCount
@@ -374,7 +577,7 @@ function validFailurePresentation(value: Readonly<Record<string, unknown>> | und
     || typeof value.selectedFailure.state !== "string" || !bounded(value.selectedFailure.state, 64)
     || (value.selectedFailure.conclusion !== undefined && (typeof value.selectedFailure.conclusion !== "string" || !bounded(value.selectedFailure.conclusion, 64)))
     || typeof value.logExcerpt !== "string" || !value.logExcerpt.trim() || value.logExcerpt.length > 64 * 1024 || value.logExcerpt.includes("\0")
-    || !["actions-job-log", "check-output"].includes(String(value.logSource))
+    || !["actions-job-log", "check-output", "protected-local-receipt"].includes(String(value.logSource))
     || typeof value.diagnosis !== "string" || !value.diagnosis.trim() || value.diagnosis.length > 512 || value.diagnosis.includes("\0")) return false;
   return true;
 }
@@ -395,6 +598,7 @@ function requireLocalReceipt(receipt: ProtectedReceipt): void {
   if (!boundedReceiptReference(receipt.id, 512) || !/^[a-f0-9]{64}$/.test(receipt.targetSnapshotId)
     || !["passed", "failed", "unavailable", "incomplete", "not_run"].includes(receipt.result)
     || (receipt.completeness !== "complete" && receipt.completeness !== "incomplete")
+    || !/^[a-f0-9]{64}$/.test(receipt.evidenceDigest)
     || !boundedReceiptTimestamp(receipt.createdAt)
     || (receipt.expiresAt !== undefined && !boundedReceiptTimestamp(receipt.expiresAt))
     || (receipt.invalidatedBy !== undefined && !boundedReceiptReference(receipt.invalidatedBy, 512))) {

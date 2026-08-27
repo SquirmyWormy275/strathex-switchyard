@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import type { ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { sessionBindingDigest } from "../../../packages/control-plane/src/session-registry.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { ProtectedJsonStore, sha256, stableJson, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import { JsonLineCompanionBridge } from "../../vscode-extension/src/companion-bridge.ts";
@@ -55,7 +57,7 @@ const isolatedAuthenticator: JournalAuthenticator = {
 };
 
 function proofPayload(sessionId: string, taskId: string, planRevision: string, backend: string) {
-  const planMaterial = { revision: planRevision, originSessionId: sessionId, taskId, objective: "Verify the exact workflow.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
+  const planMaterial = { revision: planRevision, originSessionId: sessionId, taskId, objective: "Verify the exact workflow.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[], expectedTargetTransition: { beforeTargetSnapshotId: target.id, expectedAfterTargetSnapshotId: target.id, expectation: "unchanged" as const } };
   const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
   const material = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
   return { kind: "proof" as const, evidence: { contextDigest: sha256(stableJson(material)), ...material }, claims: ["claim"], requiredBackends: [backend], independentBackendRequired: false };
@@ -110,6 +112,84 @@ test("bootstrap wires a protected registry and durable executor while a missing 
   await workflowArtifacts.claimForDispatch({ action: "proof", targetSnapshotId: target.id, sessionId: "trusted", operationId: "provider-operation" });
   assert.equal((await companion.operationControl.cancel({ operationId: "provider-operation", reason: "operator cancelled" })).accepted, true);
   assert.equal((await workflowArtifacts.get("provider-artifact"))?.status, "cancelling");
+});
+
+test("bootstrap never treats the hardware trigger envelope as terminal command-effect evidence", async (context) => {
+  const folder = await mkdtemp(join(tmpdir(), "sxsy-b122-bootstrap-hardware-control-"));
+  context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+  const companion = createDurableWindowsCompanion({
+    store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+    policyVersion: "policy-1",
+    targetResolver: { resolve: async () => target }
+  });
+  const hardware = companion.hardwareSignals as unknown as {
+    observeOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>>;
+  };
+  hardware.observeOperation = async () => ({ settled: true, summary: "The outer hardware signal was durably handled." });
+  const observed = await companion.operationControl.observe({
+    operationId: "hardware-trigger-only",
+    action: "proof",
+    targetSnapshotId: target.id,
+    repositoryRoot: target.repositoryRoot,
+    sessionId: "hardware-provider-source",
+    authorityId: "hardware-authority"
+  });
+  assert.equal(observed.state, "not_owner");
+});
+
+test("installed final debug-stop authorization rereads both protected sessions and rejects every split-binding substitution", async (context) => {
+  const scenarios = ["exact", "missing_source", "stale_source", "source_digest", "missing_effect", "stale_effect", "effect_digest", "target", "config", "binding", "origin"] as const;
+  for (const scenario of scenarios) {
+    const folder = await mkdtemp(join(tmpdir(), `sxsy-b122-debug-authorizer-${scenario}-`));
+    context.after(async () => { await rm(folder, { recursive: true, force: true }); });
+    let currentTarget = target;
+    const companion = createDurableWindowsCompanion({
+      store: new ProtectedJsonStore({ filePath: join(folder, "protected.jsonl"), authenticator: isolatedAuthenticator }),
+      policyVersion: "policy-1", targetResolver: { resolve: async () => currentTarget }
+    });
+    const source: ManagedSession = {
+      id: `provider-source-${scenario}`, provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+      status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-debug", planRevision: "plan-debug", plannedFiles: [],
+      lastHeartbeat: "2026-08-26T12:00:00.000Z", adapterVersion: "provider-1", metadata: { "sxsy-b122.providerHandshake": "exact-route-v1" }
+    };
+    const effect: ManagedSession = {
+      id: `debug-effect-${scenario}`, provider: "generic", surface: "vscode_window", capabilities: ["registered"], status: "running",
+      workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, plannedFiles: [], lastHeartbeat: "2026-08-26T12:00:00.000Z", adapterVersion: "extension-1",
+      metadata: {
+        "sxsy-b122.kind": "debug-session", "sxsy-b122.debugSessionId": "debug-1", "sxsy-b122.debugBindingId": "debug-binding-1",
+        "sxsy-b122.debugOriginSessionId": source.id, "sxsy-b122.debugOriginOperationId": "operation-debug-origin",
+        "sxsy-b122.debugConfiguration": "Launch test", "sxsy-b122.debugWorkspaceRoot": target.repositoryRoot
+      }
+    };
+    await companion.registerTrustedSession(source);
+    if (scenario !== "missing_effect") await companion.registerTrustedSession(effect);
+    const requestSource = scenario === "missing_source" ? { ...source, id: `${source.id}-absent` } : source;
+    const plan = {
+      hostAction: "stop_vscode_debug" as const,
+      debugConfiguration: scenario === "config" ? "Substituted launch" : "Launch test",
+      debugSessionId: "debug-1",
+      debugEffectSessionId: effect.id,
+      debugEffectSessionBindingDigest: scenario === "effect_digest" ? "0".repeat(64) : sessionBindingDigest(effect),
+      debugSourceSessionBindingDigest: scenario === "source_digest" ? "1".repeat(64) : sessionBindingDigest(requestSource),
+      debugBindingId: scenario === "binding" ? "substituted-binding" : "debug-binding-1",
+      debugOriginOperationId: scenario === "origin" ? "substituted-origin" : "operation-debug-origin"
+    };
+    const intent = await companion.hostActions.enqueue({ definition: commandForAction("stop_managed_run"), operationId: `operation-debug-stop-${scenario}`, target, session: requestSource }, plan);
+    if (scenario === "stale_source") await companion.sessions.upsert({ ...source, status: "stale" });
+    if (scenario === "stale_effect") await companion.sessions.upsert({ ...effect, status: "stale" });
+    if (scenario === "target") currentTarget = { ...target, id: "f".repeat(64) };
+
+    if (scenario === "exact") {
+      const authorization = await companion.hostActions.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" });
+      assert.equal(authorization.operationId, intent.operationId);
+    } else {
+      await assert.rejects(
+        companion.hostActions.authorize({ hostActionId: intent.id, adapterVersion: "extension-1" }),
+        /managed session|provider-source|debug effect|TargetSnapshot|revalidate/i,
+        scenario
+      );
+    }
+  }
 });
 
 test("installed containment aborts durable Council work for only the exact repository", async (context) => {

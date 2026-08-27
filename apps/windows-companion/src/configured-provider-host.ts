@@ -1,9 +1,18 @@
 import { randomBytes } from "node:crypto";
 
 import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import type { Capability, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
+import type { EffectGuard } from "../../../packages/control-plane/src/brokers.ts";
+import type { Capability, EffectDisposition, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
+import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
+import {
+  canonicalReanchorProviderAcknowledgement,
+  reanchorApplyArtifactDigest,
+  type ReanchorApplyOutcome,
+  type ReanchorApplyPort,
+  type ReanchorApplyRequest
+} from "../../../packages/control-plane/src/reanchor.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
-import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson, type JsonValue } from "../../../packages/control-plane/src/store.ts";
 import type {
   AuthorityPendingRequest,
   CoordinatorEvidenceBundle,
@@ -23,23 +32,27 @@ export interface ConfiguredProviderOperationIdentity {
   readonly routeId: string;
   readonly sessionId: string;
   readonly provider: ConfiguredProviderIdentity;
+  readonly action: CommandAction;
+  readonly authorityId: string;
   readonly targetSnapshotId: string;
   readonly repositoryRoot: string;
 }
 
 export interface ConfiguredProviderOperationObservation extends ConfiguredProviderOperationIdentity {
   readonly outcome: "committed" | "failed" | "cancelled" | "unresolved";
+  readonly effectDisposition: EffectDisposition;
   readonly summary: string;
 }
 
-export interface ConfiguredProviderCancellationAcknowledgement {
-  readonly operationId: string;
-  readonly externalId: string;
-  readonly sessionId: string;
-  readonly provider: ConfiguredProviderIdentity;
-  readonly targetSnapshotId: string;
+export interface ConfiguredProviderCancellationAcknowledgement extends ConfiguredProviderOperationIdentity {
   readonly accepted: boolean;
   readonly summary: string;
+}
+
+export interface ConfiguredProviderRecoveryObservation {
+  readonly outcome: ConfiguredProviderOperationObservation["outcome"];
+  readonly note: string;
+  readonly details?: Readonly<Record<string, string>>;
 }
 
 export interface ConfiguredProviderHostReconciliationReceipt {
@@ -103,6 +116,81 @@ export interface ConfiguredProviderHostClientOptions {
   readonly observationDeadlineMs?: number;
 }
 
+/** Dedicated one-effect Re-anchor port. It never falls back to generic provider.execute. */
+export class ConfiguredProviderReanchorApplyPort implements ReanchorApplyPort {
+  constructor(private readonly network: ProviderCommandTransport, private readonly effectGuard: EffectGuard) {}
+
+  async apply(input: ReanchorApplyRequest): Promise<ReanchorApplyOutcome> {
+    const { artifactDigest, ...unsigned } = input;
+    if (reanchorApplyArtifactDigest(unsigned) !== artifactDigest) {
+      return { disposition: "not_started", summary: "The protected Re-anchor artifact digest changed before provider dispatch." };
+    }
+    const guard: EffectGuard = {
+      assertCurrent: async () => {
+        const oldCurrent = await this.effectGuard.assertCurrent({
+          action: "reanchor", operationId: input.operationId, target: input.oldTarget, session: input.session, authority: input.authority
+        });
+        if (!oldCurrent.allowed) return oldCurrent;
+        return this.effectGuard.assertCurrent({
+          action: "reanchor", operationId: input.operationId, target: input.newTarget, session: input.session, authority: input.authority
+        });
+      }
+    };
+    const final = await guard.assertCurrent({ action: "reanchor", operationId: input.operationId, target: input.oldTarget, session: input.session, authority: input.authority });
+    if (!final.allowed) return { disposition: "not_started", summary: redactText(final.reason) };
+    const body = JSON.stringify({ schema: "sxsy-b122.provider-reanchor-request", ...input });
+    let result;
+    try {
+      result = await this.network.request({
+        routeId: `provider.reanchor.${input.provider}`,
+        repositoryRoot: input.repositoryRoot,
+        body,
+        trustedDispatch: {
+          action: "reanchor",
+          guardAction: "reanchor",
+          operationId: input.operationId,
+          guardOperationId: input.operationId,
+          target: input.oldTarget,
+          session: input.session,
+          authority: input.authority,
+          artifact: { id: input.requestId, digest: input.artifactDigest, coordinatorContextDigest: null, coordinatorContextRevision: null },
+          confirmation: { digest: input.confirmationDigest, scopeDigest: input.confirmationScopeDigest },
+          effectGuard: guard
+        }
+      });
+    } catch {
+      return this.observeAmbiguous(input, body);
+    }
+    if (result.outcome !== "passed") {
+      if (result.effectDisposition === "not_started") return { disposition: "not_started", summary: redactText(result.detail) };
+      return this.observeAmbiguous(input, body);
+    }
+    return {
+      disposition: "committed",
+      acknowledgement: canonicalReanchorProviderAcknowledgement(responseRecord(result, "provider Re-anchor"), input)
+    };
+  }
+
+  private async observeAmbiguous(input: ReanchorApplyRequest, body: string): Promise<ReanchorApplyOutcome> {
+    try {
+      const observed = await this.network.request({
+        routeId: `provider.observe-reanchor.${input.provider}`,
+        repositoryRoot: input.repositoryRoot,
+        body
+      });
+      if (observed.outcome === "passed") {
+        return {
+          disposition: "committed",
+          acknowledgement: canonicalReanchorProviderAcknowledgement(responseRecord(observed, "observed provider Re-anchor"), input)
+        };
+      }
+      return { disposition: "ambiguous", summary: redactText(observed.detail) };
+    } catch {
+      return { disposition: "ambiguous", summary: "The provider Re-anchor may have committed, but exact observation is unavailable; it was not replayed." };
+    }
+  }
+}
+
 /**
  * Read-only/cancellation client for the separately packaged provider host.
  * Every request carries the complete provider/session/target/operation binding;
@@ -124,7 +212,7 @@ export class ConfiguredProviderHostClient {
   }
 
   recoveryExternalId(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined {
-    return supportedProvider(input.provider) && safeId(input.operationId) && safeRoute(input.routeId) && (input.routeId.startsWith("provider.") || input.routeId.startsWith("automation."))
+    return supportedProvider(input.provider) && safeId(input.operationId) && safeRoute(input.routeId) && input.routeId.startsWith("provider.")
       ? input.operationId
       : undefined;
   }
@@ -208,10 +296,11 @@ export class ConfiguredProviderHostClient {
       ...(signal ? { signal } : {})
     });
     const value = responseRecord(result, "provider operation observation");
-    const keys = ["schema", "version", "operationId", "externalId", "routeId", "sessionId", "provider", "targetSnapshotId", "repositoryRoot", "outcome", "summary"];
+    const keys = ["schema", "version", "operationId", "externalId", "routeId", "sessionId", "provider", "action", "authorityId", "targetSnapshotId", "repositoryRoot", "outcome", "effectDisposition", "summary"];
     if (!exact(value, keys) || value.schema !== "sxsy-b122.provider-operation-observation" || value.version !== 1 || !sameOperation(value, identity)
-      || !operationOutcome(value.outcome) || !summary(value.summary)) throw rejected();
-    return Object.freeze({ ...identity, outcome: value.outcome, summary: value.summary });
+      || !operationOutcome(value.outcome) || !effectDisposition(value.effectDisposition)
+      || !consistentOperationEffect(value.outcome, value.effectDisposition) || !summary(value.summary)) throw rejected();
+    return Object.freeze({ ...identity, outcome: value.outcome, effectDisposition: value.effectDisposition, summary: value.summary });
   }
 
   async cancelOperation(identity: ConfiguredProviderOperationIdentity, reason: string, signal?: AbortSignal): Promise<ConfiguredProviderCancellationAcknowledgement> {
@@ -224,11 +313,10 @@ export class ConfiguredProviderHostClient {
       ...(signal ? { signal } : {})
     });
     const value = responseRecord(result, "provider cancellation acknowledgement");
-    const keys = ["schema", "version", "operationId", "externalId", "sessionId", "provider", "targetSnapshotId", "accepted", "summary"];
+    const keys = ["schema", "version", "operationId", "externalId", "routeId", "sessionId", "provider", "action", "authorityId", "targetSnapshotId", "repositoryRoot", "accepted", "summary"];
     if (!exact(value, keys) || value.schema !== "sxsy-b122.provider-cancellation-ack" || value.version !== 1
-      || value.operationId !== identity.operationId || value.externalId !== identity.externalId || value.sessionId !== identity.sessionId
-      || value.provider !== identity.provider || value.targetSnapshotId !== identity.targetSnapshotId || typeof value.accepted !== "boolean" || !summary(value.summary)) throw rejected();
-    return Object.freeze({ operationId: identity.operationId, externalId: identity.externalId, sessionId: identity.sessionId, provider: identity.provider, targetSnapshotId: identity.targetSnapshotId, accepted: value.accepted, summary: value.summary });
+      || !sameOperation(value, identity) || typeof value.accepted !== "boolean" || !summary(value.summary)) throw rejected();
+    return Object.freeze({ ...identity, accepted: value.accepted, summary: value.summary });
   }
 
   async reconcile(repositoryRoot: string, signal?: AbortSignal): Promise<ConfiguredProviderHostReconciliationReceipt> {
@@ -250,6 +338,196 @@ export class ConfiguredProviderHostClient {
     if (!exact(value, ["schema", "version", "epochId", "sessionId", "targetSnapshotId", "resourceHostDigest", "outcome", "closed"])
       || value.schema !== "sxsy-b122.council-resource-cleanup-ack" || value.version !== 1 || value.epochId !== input.epochId || value.sessionId !== input.sessionId
       || value.targetSnapshotId !== input.targetSnapshotId || value.resourceHostDigest !== input.resourceHostDigest || value.outcome !== input.outcome || value.closed !== true) throw rejected();
+  }
+}
+
+const providerOperationBindingKind = "b122.configured-provider.operation-binding.v1";
+
+interface StoredProviderOperationBinding {
+  readonly schema: "sxsy-b122.configured-provider-operation-binding";
+  readonly version: 1;
+  readonly identity: ConfiguredProviderOperationIdentity;
+}
+
+export interface DurableConfiguredProviderOperationControlOptions {
+  readonly store: ProtectedJsonStore;
+  readonly transport: ProviderCommandTransport;
+  readonly host: Pick<ConfiguredProviderHostClient, "recoveryExternalId" | "observeOperation" | "cancelOperation" | "reconcile">;
+}
+
+/**
+ * Persists the companion-known provider identity before the effect transport
+ * is invoked. Restart observation and cancellation use only this authenticated
+ * binding and never reconstruct identity from a provider response or replay
+ * the original request.
+ */
+export class DurableConfiguredProviderOperationControl implements ProviderCommandTransport {
+  private readonly store: ProtectedJsonStore;
+  private readonly transport: ProviderCommandTransport;
+  private readonly host: DurableConfiguredProviderOperationControlOptions["host"];
+
+  constructor(options: DurableConfiguredProviderOperationControlOptions) {
+    if (!options.store.hasAuthenticatedProtection) throw new Error("Configured provider operation recovery requires authenticated durable storage.");
+    this.store = options.store;
+    this.transport = options.transport;
+    this.host = options.host;
+  }
+
+  recoveryExternalId(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined {
+    if (input.routeId.startsWith("automation.")) return undefined;
+    const protectedIdentity = this.host.recoveryExternalId(input);
+    const transportIdentity = this.transport.recoveryExternalId?.(input);
+    return transportIdentity !== undefined && protectedIdentity !== transportIdentity ? undefined : transportIdentity ?? protectedIdentity;
+  }
+
+  handshakeCapabilityCeiling(input: Readonly<{ routeId: string; provider: ManagedSession["provider"]; repositoryRoot: string }>): Promise<readonly Capability[]> | readonly Capability[] {
+    return this.transport.handshakeCapabilityCeiling?.(input) ?? ["registered"];
+  }
+
+  async request(input: Parameters<ProviderCommandTransport["request"]>[0]): ReturnType<ProviderCommandTransport["request"]> {
+    if (input.routeId.startsWith("automation.proposal.")) {
+      if (input.trustedDispatch) throw new Error("Automation proposal routes cannot carry a trusted effect dispatch binding.");
+      return this.transport.request(input);
+    }
+    if (input.routeId.startsWith("automation.")) {
+      throw new Error("Automation effect routes are proposal-only at the provider boundary; reviewed effects execute only through the host-local broker.");
+    }
+    const identity = this.dispatchIdentity(input);
+    if (identity) await this.claim(identity);
+    return this.transport.request(input);
+  }
+
+  async cancelByOperation(operationId: string, reason: string): Promise<number> {
+    if (!safeId(operationId) || !summary(reason, 1_024)) throw new Error("The configured provider cancellation binding is invalid.");
+    return this.cancel(this.uniqueBindings((await this.bindings()).filter((identity) => identity.operationId === operationId)), reason);
+  }
+
+  async cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number> {
+    const root = requireRoot(repositoryRoot);
+    if (!summary(reason, 1_024)) throw new Error("The configured provider cancellation reason is invalid.");
+    return this.cancel(this.uniqueBindings((await this.bindings()).filter((identity) => rootKey(identity.repositoryRoot) === rootKey(root))), reason);
+  }
+
+  async observeOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
+    if (!safeId(operationId)) throw new Error("The configured provider operation ID is invalid.");
+    const identities = this.uniqueBindings((await this.bindings()).filter((identity) => identity.operationId === operationId));
+    if (identities.length === 0) return { settled: false, summary: "No exact durable configured-provider operation is bound to this operation." };
+    if (identities.length !== 1) return { settled: false, summary: "More than one configured-provider identity claims this operation; terminal state remains ambiguous." };
+    const identity = identities[0]!;
+    const observed = await this.observeBoundOperation(bindingFromProviderIdentity(identity));
+    return { settled: observed.state === "terminal", summary: observed.summary };
+  }
+
+  async observeProviderOperation(identity: ConfiguredProviderOperationIdentity): Promise<ConfiguredProviderRecoveryObservation | undefined> {
+    validateOperationIdentity(identity);
+    const identities = this.uniqueBindings((await this.bindings()).filter((candidate) => stableJson(candidate) === stableJson(identity)));
+    if (identities.length !== 1) return undefined;
+    try {
+      const observed = await this.host.observeOperation(identities[0]!);
+      return {
+        outcome: observed.outcome,
+        note: observed.summary,
+        details: {
+          provider: observed.provider,
+          externalId: observed.externalId,
+          effectDisposition: observed.effectDisposition
+        }
+      };
+    } catch {
+      return {
+        outcome: "unresolved",
+        note: "The configured provider operation could not be observed through its exact authenticated identity; no work was replayed.",
+        details: { provider: identity.provider, externalId: identity.externalId, effectDisposition: "ambiguous" }
+      };
+    }
+  }
+
+  async observeBoundOperation(binding: OperationReconciliationBinding): Promise<OperationControllerObservation> {
+    const identities = this.uniqueBindings((await this.bindings()).filter((identity) => providerIdentityMatchesBinding(identity, binding)));
+    if (identities.length === 0) return { state: "not_owner", operationId: binding.operationId, summary: "No exact durable configured-provider identity owns this protected operation binding." };
+    if (identities.length !== 1) return providerActive(binding, "More than one configured-provider identity claims this protected operation; terminal state remains ambiguous.");
+    let observed: ConfiguredProviderOperationObservation;
+    try { observed = await this.host.observeOperation(identities[0]!); }
+    catch { return providerActive(binding, "The configured provider operation could not be observed through its exact authenticated identity; no work was replayed."); }
+    if (observed.outcome === "unresolved") return providerActive(binding, observed.summary);
+    return {
+      state: "terminal",
+      ...binding,
+      status: observed.outcome === "committed" ? "completed" : observed.outcome,
+      effectDisposition: observed.effectDisposition,
+      summary: observed.summary
+    };
+  }
+
+  /** Lets the provider host settle its own durable unknowns before exact operation observation. */
+  async recoverAfterRestart(): Promise<void> {
+    const roots = [...new Set((await this.bindings()).map((identity) => rootKey(identity.repositoryRoot)))];
+    const identities = await this.bindings();
+    for (const root of roots) {
+      const repositoryRoot = identities.find((identity) => rootKey(identity.repositoryRoot) === root)?.repositoryRoot;
+      if (!repositoryRoot) continue;
+      await this.host.reconcile(repositoryRoot).catch(() => undefined);
+    }
+  }
+
+  private dispatchIdentity(input: Parameters<ProviderCommandTransport["request"]>[0]): ConfiguredProviderOperationIdentity | undefined {
+    const binding = input.trustedDispatch;
+    if (!binding || !supportedProvider(binding.session.provider) || !commandAction(binding.action)
+      || !providerRouteMatchesAction(input.routeId, binding.action, binding.session.provider)) return undefined;
+    const externalId = this.recoveryExternalId({ routeId: input.routeId, operationId: binding.operationId, provider: binding.session.provider });
+    if (!externalId) throw new Error("The configured provider effect lacks a host-known recovery identity.");
+    const identity: ConfiguredProviderOperationIdentity = {
+      operationId: binding.operationId,
+      externalId,
+      routeId: input.routeId,
+      sessionId: binding.session.id,
+      provider: binding.session.provider,
+      action: binding.action,
+      authorityId: binding.authority.id,
+      targetSnapshotId: binding.target.id,
+      repositoryRoot: binding.target.repositoryRoot
+    };
+    if (rootKey(input.repositoryRoot) !== rootKey(identity.repositoryRoot)) throw new Error("The configured provider transport root changed from its protected dispatch binding.");
+    validateOperationIdentity(identity);
+    return Object.freeze(identity);
+  }
+
+  private async claim(identity: ConfiguredProviderOperationIdentity): Promise<void> {
+    await this.store.transaction(async (transaction) => {
+      const existing = (await transaction.readEntries<JsonValue>())
+        .filter((entry) => entry.kind === providerOperationBindingKind)
+        .map((entry) => parseStoredProviderBinding(entry.payload).identity)
+        .filter((candidate) => candidate.operationId === identity.operationId);
+      if (existing.length === 0) {
+        await transaction.append<StoredProviderOperationBinding>(providerOperationBindingKind, {
+          schema: "sxsy-b122.configured-provider-operation-binding",
+          version: 1,
+          identity
+        });
+        return;
+      }
+      if (existing.length !== 1 || stableJson(existing[0]) !== stableJson(identity)) {
+        throw new Error("The durable configured-provider operation ID is already bound to a different exact identity.");
+      }
+    });
+  }
+
+  private async bindings(): Promise<readonly ConfiguredProviderOperationIdentity[]> {
+    return (await this.store.readEntries<JsonValue>())
+      .filter((entry) => entry.kind === providerOperationBindingKind)
+      .map((entry) => parseStoredProviderBinding(entry.payload).identity);
+  }
+
+  private uniqueBindings(identities: readonly ConfiguredProviderOperationIdentity[]): readonly ConfiguredProviderOperationIdentity[] {
+    const unique = new Map<string, ConfiguredProviderOperationIdentity>();
+    for (const identity of identities) unique.set(stableJson(identity), identity);
+    return [...unique.values()];
+  }
+
+  private async cancel(identities: readonly ConfiguredProviderOperationIdentity[], reason: string): Promise<number> {
+    let accepted = 0;
+    for (const identity of identities) if ((await this.host.cancelOperation(identity, reason)).accepted) accepted += 1;
+    return accepted;
   }
 }
 
@@ -365,7 +643,7 @@ function normalizeCoordinatorEvidence(value: unknown, request: WorkflowContextBi
 }
 
 function normalizePlan(value: unknown, request: WorkflowContextBinding): ExistingPlanBinding {
-  if (!record(value) || !exact(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions"])
+  if (!record(value) || !exact(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions", "expectedTargetTransition"])
     || !digest(value.digest) || value.revision !== request.planRevision || value.originSessionId !== request.sessionId || value.taskId !== request.taskId
     || !safeText(value.objective, 16_384) || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 256
     || !Array.isArray(value.decisions) || value.decisions.length > 512) throw rejected();
@@ -379,6 +657,7 @@ function normalizePlan(value: unknown, request: WorkflowContextBinding): Existin
   const known = new Set(steps.map((step) => step.id));
   if (steps.some((step) => step.dependencies.some((dependency) => dependency === step.id || !known.has(dependency)))) throw rejected();
   if (!value.decisions.every((entry) => safeText(entry, 16_384)) || new Set(value.decisions).size !== value.decisions.length) throw rejected();
+  const expectedTargetTransition = normalizeReviewedTargetTransition(value.expectedTargetTransition, request.targetSnapshotId);
   const normalized = Object.freeze({
     digest: value.digest,
     revision: value.revision,
@@ -386,11 +665,20 @@ function normalizePlan(value: unknown, request: WorkflowContextBinding): Existin
     taskId: value.taskId,
     objective: value.objective.trim(),
     steps: Object.freeze(steps),
-    decisions: Object.freeze(value.decisions.map((entry) => (entry as string).trim()))
+    decisions: Object.freeze(value.decisions.map((entry) => (entry as string).trim())),
+    expectedTargetTransition
   });
   const { digest: _digest, ...material } = normalized;
   if (sha256(stableJson(material)) !== normalized.digest) throw rejected();
   return normalized;
+}
+
+function normalizeReviewedTargetTransition(value: unknown, beforeTargetSnapshotId: string): ExistingPlanBinding["expectedTargetTransition"] {
+  if (!record(value) || !exact(value, ["beforeTargetSnapshotId", "expectedAfterTargetSnapshotId", "expectation"])
+    || value.beforeTargetSnapshotId !== beforeTargetSnapshotId || !digest(value.expectedAfterTargetSnapshotId)
+    || (value.expectation !== "unchanged" && value.expectation !== "changed")
+    || ((value.expectation === "unchanged") !== (value.expectedAfterTargetSnapshotId === beforeTargetSnapshotId))) throw rejected();
+  return Object.freeze({ beforeTargetSnapshotId, expectedAfterTargetSnapshotId: value.expectedAfterTargetSnapshotId, expectation: value.expectation });
 }
 
 function evidenceReferenceList(value: unknown, minimum: number, maximum: number, testEvidence: boolean): readonly (WorkflowEvidenceReference | WorkflowTestEvidence)[] {
@@ -481,10 +769,40 @@ function responseRecord(result: Awaited<ReturnType<ProviderCommandTransport["req
   if (!record(value)) throw rejected();
   return value;
 }
-function validateOperationIdentity(value: ConfiguredProviderOperationIdentity): void {
-  if (!safeId(value.operationId) || !safeId(value.externalId) || !safeRoute(value.routeId) || !safeId(value.sessionId) || !supportedProvider(value.provider) || !digest(value.targetSnapshotId) || !absoluteRoot(value.repositoryRoot)) throw new Error("The exact provider operation identity is invalid.");
+function parseStoredProviderBinding(value: JsonValue): StoredProviderOperationBinding {
+  if (!record(value) || !exact(value, ["schema", "version", "identity"])
+    || value.schema !== "sxsy-b122.configured-provider-operation-binding" || value.version !== 1 || !record(value.identity)
+    || !exact(value.identity, ["operationId", "externalId", "routeId", "sessionId", "provider", "action", "authorityId", "targetSnapshotId", "repositoryRoot"])) {
+    throw new Error("The authenticated configured-provider operation binding is malformed.");
+  }
+  const identity = value.identity as unknown as ConfiguredProviderOperationIdentity;
+  validateOperationIdentity(identity);
+  return Object.freeze({ schema: "sxsy-b122.configured-provider-operation-binding", version: 1, identity: Object.freeze({ ...identity }) });
 }
-function sameOperation(value: Record<string, unknown>, expected: ConfiguredProviderOperationIdentity): boolean { return value.operationId === expected.operationId && value.externalId === expected.externalId && value.routeId === expected.routeId && value.sessionId === expected.sessionId && value.provider === expected.provider && value.targetSnapshotId === expected.targetSnapshotId && rootKey(value.repositoryRoot) === rootKey(expected.repositoryRoot); }
+function bindingFromProviderIdentity(identity: ConfiguredProviderOperationIdentity): OperationReconciliationBinding {
+  return {
+    operationId: identity.operationId,
+    action: identity.action,
+    targetSnapshotId: identity.targetSnapshotId,
+    repositoryRoot: identity.repositoryRoot,
+    sessionId: identity.sessionId,
+    authorityId: identity.authorityId
+  };
+}
+function providerIdentityMatchesBinding(identity: ConfiguredProviderOperationIdentity, binding: OperationReconciliationBinding): boolean {
+  return identity.operationId === binding.operationId && identity.action === binding.action
+    && identity.targetSnapshotId === binding.targetSnapshotId && rootKey(identity.repositoryRoot) === rootKey(binding.repositoryRoot)
+    && identity.sessionId === binding.sessionId && identity.authorityId === binding.authorityId;
+}
+function providerActive(binding: OperationReconciliationBinding, summary: string): Extract<OperationControllerObservation, { state: "active" }> {
+  return { state: "active", ...binding, effectDisposition: "ambiguous", summary };
+}
+function validateOperationIdentity(value: ConfiguredProviderOperationIdentity): void {
+  if (!safeId(value.operationId) || !safeId(value.externalId) || !safeRoute(value.routeId) || !safeId(value.sessionId) || !supportedProvider(value.provider)
+    || !commandAction(value.action) || !providerRouteMatchesAction(value.routeId, value.action, value.provider)
+    || !safeId(value.authorityId) || !digest(value.targetSnapshotId) || !absoluteRoot(value.repositoryRoot)) throw new Error("The exact provider operation identity is invalid.");
+}
+function sameOperation(value: Record<string, unknown>, expected: ConfiguredProviderOperationIdentity): boolean { return value.operationId === expected.operationId && value.externalId === expected.externalId && value.routeId === expected.routeId && value.sessionId === expected.sessionId && value.provider === expected.provider && value.action === expected.action && value.authorityId === expected.authorityId && value.targetSnapshotId === expected.targetSnapshotId && rootKey(value.repositoryRoot) === rootKey(expected.repositoryRoot); }
 function requireHostHandshake(session: ManagedSession): void { if (!hasHostHandshake(session)) throw new Error("The managed session lacks an exact provider-host handshake binding."); }
 function hasHostHandshake(session: ManagedSession): boolean { return session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1" && session.metadata["sxsy-b122.providerHandshakeTarget"] === session.targetSnapshotId; }
 function requireProvider(value: ManagedSession["provider"]): ConfiguredProviderIdentity { if (!supportedProvider(value)) throw new Error("The provider host supports only Claude and Codex."); return value; }
@@ -521,6 +839,15 @@ function commandAction(value: unknown): value is CommandAction { return typeof v
 function sessionStatus(value: unknown): value is SessionStatus { return value === "running" || value === "verified_blocked" || value === "verified_finished" || value === "unreachable" || value === "stale" || value === "unknown"; }
 function capabilityList(value: unknown): value is readonly Capability[] { return Array.isArray(value) && value.length <= 4 && new Set(value).size === value.length && value.every((entry) => entry === "registered" || entry === "observable" || entry === "controllable" || entry === "mediated"); }
 function operationOutcome(value: unknown): value is ConfiguredProviderOperationObservation["outcome"] { return value === "committed" || value === "failed" || value === "cancelled" || value === "unresolved"; }
+function providerRouteMatchesAction(routeId: string, action: CommandAction, provider: ConfiguredProviderIdentity): boolean {
+  return routeId === `provider.${action}` || (action === "reanchor" && routeId === `provider.reanchor.${provider}`);
+}
+function effectDisposition(value: unknown): value is EffectDisposition { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
+function consistentOperationEffect(outcome: unknown, disposition: unknown): boolean {
+  if (outcome === "unresolved") return disposition === "ambiguous";
+  if (outcome === "committed") return disposition === "committed";
+  return (outcome === "failed" || outcome === "cancelled") && (disposition === "not_started" || disposition === "committed" || disposition === "compensated");
+}
 function boundedCount(value: unknown): boolean { return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 1_000_000; }
 function timestamp(value: string): string { if (!Number.isFinite(Date.parse(value))) throw new Error("The provider-host client clock is invalid."); return value; }
 function timestampString(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }

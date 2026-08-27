@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +12,8 @@ import {
   type ExtensionSessionStatus,
   type ForwardedCommand,
   type ForwardedCommandResult,
+  type AutomationManifestReview,
+  type DebugStopReview,
   type LocalHostAction,
   type PreparedCommand,
   type GitReviewResult,
@@ -40,6 +42,8 @@ import {
   type HardwareSignalDispatchResult,
   type HardwareSignalPreparationResult,
   type HardwareSignalCompletionResult,
+  type ExtensionReanchorAuthority,
+  type ExtensionReanchorStatus,
   type ExtensionHandoffPackage,
   type ExtensionWorkflowAction,
   type ExtensionWorkflowArtifact,
@@ -52,6 +56,13 @@ import {
   type HostActionClaimReference,
   UnavailableExtensionCompanionBridge
 } from "../src/companion-bridge.ts";
+import {
+  automationManifestReviewScopeDigest,
+  automationMutationScopeDigest,
+  createAutomationOperationManifest,
+  type AutomationOperationProposal
+} from "../../../packages/control-plane/src/automation-operation-manifest.ts";
+import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, workflowResultPresentation } from "../src/controller.ts";
 import { chordFor, type B122Control, type B122Modifier } from "../src/commands.ts";
 import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
@@ -59,7 +70,7 @@ import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, Extensio
 test("reviewed source and extracted VSIX package identities share exact release version", async () => {
   const root = await mkdtemp(join(tmpdir(), "b122-vsix-identity-"));
   try {
-    const writeIdentity = async (name: string, publisher = "SquirmyWormy275", main = "./dist/extension.js") => {
+    const writeIdentity = async (name: string, publisher = "SquirmyWormy275", main = "./dist/apps/vscode-extension/src/extension.js") => {
       await writeFile(join(root, "package.json"), JSON.stringify({ name, publisher, main, version: "1.2.3-test.4" }), "utf8");
     };
     await writeIdentity("@strathex/switchyard-vscode");
@@ -155,6 +166,7 @@ class FakeVscode {
   readonly executedCommands: string[] = [];
   readonly information: string[] = [];
   readonly warnings: string[] = [];
+  readonly warningSurfaces: Array<{ readonly message: string; readonly modal: boolean; readonly choices: readonly string[] }> = [];
   readonly createdTerminals: FakeTerminal[] = [];
   readonly started: Array<{ folder: WorkspaceFolderLike | undefined; configuration: DebugConfigurationLike; noDebug?: boolean }> = [];
   readonly stopped: DebugSessionLike[] = [];
@@ -169,6 +181,7 @@ class FakeVscode {
   activeDebugSession?: DebugSessionLike;
   publishDebugStart = true;
   publishDebugStop = true;
+  onConfigurationUpdate?: () => Promise<void>;
   focused = true;
   private readonly openListeners: Array<(terminal: TerminalLike) => unknown> = [];
   private readonly closeListeners: Array<(terminal: TerminalLike) => unknown> = [];
@@ -177,6 +190,7 @@ class FakeVscode {
   private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly focusListeners: Array<(state: { readonly focused: boolean }) => unknown> = [];
   private readonly quickPickValues: string[] = [];
+  private readonly warningValues: string[] = [];
   private readonly inputValues: string[] = [];
   private readonly openDialogPaths: string[] = [];
   readonly api: VscodeLike;
@@ -207,7 +221,12 @@ class FakeVscode {
           return terminal;
         },
         async showInformationMessage(message): Promise<string | undefined> { self.information.push(message); return undefined; },
-        async showWarningMessage(message): Promise<string | undefined> { self.warnings.push(message); return undefined; },
+        async showWarningMessage(message: string, options?: unknown, ...choices: string[]): Promise<string | undefined> {
+          self.warnings.push(message);
+          const modal = typeof options === "object" && options !== null && (options as { modal?: unknown }).modal === true;
+          self.warningSurfaces.push({ message, modal, choices });
+          return self.warningValues.shift();
+        },
         async showQuickPick<T extends string | QuickPickItemLike>(items: readonly T[], options?: { readonly placeHolder?: string }): Promise<T | undefined> {
           self.quickPickSurfaces.push({ items, ...(options?.placeHolder ? { placeHolder: options.placeHolder } : {}) });
           const wanted = self.quickPickValues.shift();
@@ -225,7 +244,10 @@ class FakeVscode {
         getConfiguration(section = ""): { get<T>(key: string): T | undefined; update(key: string, value: unknown, target?: boolean | number | null): Promise<void> } {
           return {
             get: <T>(key: string): T | undefined => section === "launch" && key === "configurations" ? self.debugConfigurations as T : undefined,
-            update: async (key, value, target) => { self.configurationUpdates.push({ section, key, value, ...(target !== undefined ? { target } : {}) }); }
+            update: async (key, value, target) => {
+              self.configurationUpdates.push({ section, key, value, ...(target !== undefined ? { target } : {}) });
+              await self.onConfigurationUpdate?.();
+            }
           };
         },
         onDidChangeWorkspaceFolders(listener): DisposableLike { self.workspaceListeners.push(listener); return new FakeDisposable(); }
@@ -267,6 +289,7 @@ class FakeVscode {
   async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); if (this.activeDebugSession === session) this.activeDebugSession = undefined; }
   async fireFocus(focused: boolean): Promise<void> { this.focused = focused; for (const listener of this.focusListeners) await listener({ focused }); }
   choose(value: string): void { this.quickPickValues.push(value); }
+  confirmWarning(value: string): void { this.warningValues.push(value); }
   input(value: string): void { this.inputValues.push(value); }
   file(value: string): void { this.openDialogPaths.push(value); }
 }
@@ -281,11 +304,22 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly completedHostActions: Array<{ id: string; succeeded: boolean; summary: string; adapterVersion: string; effectDisposition?: "not_started" | "committed" | "ambiguous"; claimId?: string }> = [];
   readonly authorizedHostActions: Array<{ id: string; adapterVersion: string; selectionId?: string; claimId?: string }> = [];
   readonly hostActionClaims: ExtensionHostActionClaim[] = [];
-  readonly hostActionClaimBindings: Array<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }> = [];
-  readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; reason: string; reviewScopeDigest?: string }> = [];
+  readonly deliveredHostActionClaims: ExtensionHostActionClaim[] = [];
+  readonly hostActionClaimBindings: Array<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }> = [];
+  readonly prepared: Array<{ control: string; modifier: string; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }> = [];
+  reanchorAuthorities: ExtensionReanchorAuthority[] = [];
+  readonly reanchorAuthorityQueries: string[] = [];
+  readonly reanchorBegins: Array<{ sessionId: string; authorityId: string; reason: string }> = [];
+  readonly hardwareReanchorBegins: Array<{ claim: HardwareSignalClaim; input: { sessionId: string; authorityId: string; reason: string } }> = [];
+  readonly reanchorConfirmations: string[] = [];
+  readonly reanchorGets: string[] = [];
+  reanchorBeginStatus?: ExtensionReanchorStatus;
+  reanchorFinalStatus?: ExtensionReanchorStatus;
   readonly gitReviews: Array<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }> = [];
   readonly hardwarePrepared: HardwareSignalClaim[] = [];
+  readonly hardwarePreparationEffectSessions: Array<string | undefined> = [];
   readonly hardwarePreparationReviewScopes: Array<string | undefined> = [];
+  readonly hardwarePreparationReviewArtifacts: Array<{ reviewArtifactId?: string; reviewArtifactDigest?: string }> = [];
   readonly hardwareDispatched: HardwareSignalClaim[] = [];
   readonly hardwareDispatchCommands: Array<Omit<ForwardedCommand, "control" | "modifier">> = [];
   readonly hardwareCompleted: Array<{ claim: HardwareSignalClaim; outcome: string; dispatchReceiptId?: string }> = [];
@@ -312,6 +346,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   readonly acknowledgedHandoffs: Array<{ handoffId: string; recipientSessionId: string }> = [];
   readonly workflowPrepared: Array<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }> = [];
   readonly workflowCancelled: Array<{ artifactId: string; sessionId: string; authorityId: string }> = [];
+  onPrepareWorkflow?: (artifact: ExtensionWorkflowArtifact) => void;
   readonly voiceBindingSequence: string[] = [];
   readonly voiceBinds: Array<{ bindingId: string; managedSessionId: string }> = [];
   readonly voiceStarts: Array<{ consentId: string; voiceSessionId: string; managedSessionId?: string }> = [];
@@ -323,15 +358,20 @@ class FakeBridge implements ExtensionCompanionBridge {
   listedWorkflows?: readonly ExtensionWorkflowArtifact[];
   listedHandoffs?: readonly ExtensionHandoffPackage[];
   currentVoiceValue?: ExtensionVoiceBinding;
+  nextVoiceBind?: ExtensionVoiceBinding;
   nextDispatch?: ForwardedCommandResult;
   nextPreparation?: PreparedCommand;
   readonly preparationSequence: PreparedCommand[] = [];
+  onPrepareCommand?: (command: { control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }) => void;
   hardwareClaimGate?: Promise<void>;
   listedProviderDesktops?: readonly ProviderInstallationSummary[];
   onHardwareClaim?: () => void;
+  onPrepareHardwareSignal?: (review: { reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }) => void;
+  hardwarePreparationFailureAt?: number;
   registerGate?: Promise<void>;
   healthGate?: Promise<void>;
   authorizeGate?: Promise<void>;
+  dispatchReturnGate?: Promise<void>;
   healthCalls = 0;
   registerCalls = 0;
   registerFailure = false;
@@ -357,23 +397,72 @@ class FakeBridge implements ExtensionCompanionBridge {
   async updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>> {
     this.statuses.push({ sessionId, status });
     const existing = this.registered.find((session) => session.id === sessionId);
-    return existing ? { ok: true, value: { ...existing, status } } : { ok: false, code: "not_found", message: "missing" };
+    if (!existing) return { ok: false, code: "not_found", message: "missing" };
+    const updated = { ...existing, status };
+    this.registered.splice(this.registered.indexOf(existing), 1, updated);
+    return { ok: true, value: updated };
   }
   async heartbeat(session: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>> {
     this.heartbeats.push({ sessionId: session, ...(at ? { at } : {}) });
     const existing = this.registered.find((record) => record.id === session);
     return existing ? { ok: true, value: { ...existing, lastHeartbeat: at ?? existing.lastHeartbeat } } : { ok: false, code: "not_found", message: "missing" };
   }
+  async listReanchorAuthorities(sessionId: string): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>> {
+    this.reanchorAuthorityQueries.push(sessionId);
+    return { ok: true, value: this.reanchorAuthorities };
+  }
+  async beginReanchor(input: { sessionId: string; authorityId: string; reason: string }): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    this.reanchorBegins.push(input);
+    return this.reanchorBeginStatus ? { ok: true, value: this.reanchorBeginStatus } : { ok: false, code: "unavailable", message: "No fake Re-anchor preview." };
+  }
+  async beginHardwareReanchor(claim: HardwareSignalClaim, input: { sessionId: string; authorityId: string; reason: string }) {
+    this.hardwareReanchorBegins.push({ claim, input });
+    return this.reanchorBeginStatus
+      ? { ok: true as const, value: { reanchor: this.reanchorBeginStatus, dispatchReceiptId: `hardware-dispatch:${"f".repeat(64)}` } }
+      : { ok: false as const, code: "unavailable", message: "No fake hardware Re-anchor preview." };
+  }
+  async confirmReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    this.reanchorConfirmations.push(requestId);
+    return this.reanchorFinalStatus ? { ok: true, value: this.reanchorFinalStatus } : { ok: false, code: "unavailable", message: "No fake Re-anchor result." };
+  }
+  async getReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    this.reanchorGets.push(requestId);
+    return this.reanchorFinalStatus ? { ok: true, value: this.reanchorFinalStatus } : { ok: false, code: "not_found", message: "No fake Re-anchor result." };
+  }
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
     this.dispatched.push(command);
-    if (this.nextDispatch) return { ok: true, value: this.nextDispatch };
     const action = directAction(command);
-    return action
+    const raw = this.nextDispatch ?? (action
       ? { ok: true, value: { status: "running", summary: "Awaiting host acknowledgement.", data: { hostActionId: `host-action:${"a".repeat(64)}`, hostActionKind: action, hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } } }
-      : { ok: true, value: { status: "completed", summary: "Routed by fake companion." } };
+      : { ok: true, value: { status: "completed", summary: "Routed by fake companion." } }).value as ForwardedCommandResult;
+    const result: ForwardedCommandResult = { ...raw, operationId: raw.operationId ?? `operation-fake-${this.dispatched.length}` };
+    if (result.data?.hostActionKind === "show_voice_center" && typeof result.data.hostActionId === "string") {
+      const source = command.sessionId ? (this.listedSessions ?? this.registered).find((session) => session.id === command.sessionId) ?? this.registered.find((session) => session.id === command.sessionId) : undefined;
+      const window = this.registered.find((session) => session.metadata["sxsy-b122.kind"] === "window");
+      const commandAction = command.modifier === "normal" ? "open_voice" : command.modifier === "shift" ? "switch_voice_provider" : command.modifier === "alt" ? "bind_voice_session" : "voice_session_picker";
+      if (window && command.control === "VOICE") this.hostActionClaims.push({
+        version: 1,
+        claimId: `host-action-claim:${this.dispatched.length}`,
+        claimToken: `host-action-claim-token-${this.dispatched.length}`,
+        hostActionId: result.data.hostActionId,
+        operationId: result.operationId!,
+        commandAction,
+        hostActionKind: "show_voice_center",
+        ...(source?.targetSnapshotId && source.workspaceRoot ? { targetSnapshotId: source.targetSnapshotId, sessionId: source.id, workspaceRoot: source.workspaceRoot } : {}),
+        windowSessionId: window.id,
+        adapterVersion: "unpackaged-test",
+        capabilities: ["show_voice_center"],
+        claimedAt: "2026-08-24T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+        actionExpiresAt: "2099-01-01T00:00:00.000Z"
+      });
+    }
+    await this.dispatchReturnGate;
+    return { ok: true, value: result };
   }
-  async prepareCommand(command: { control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }): Promise<BridgeResult<PreparedCommand>> {
+  async prepareCommand(command: { control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }): Promise<BridgeResult<PreparedCommand>> {
     this.prepared.push(command);
+    this.onPrepareCommand?.(command);
     return { ok: true, value: this.preparationSequence.shift() ?? this.nextPreparation ?? { status: "prepared", summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" } };
   }
   async inspectGitReview(sessionId: string) {
@@ -499,9 +588,13 @@ class FakeBridge implements ExtensionCompanionBridge {
   async revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return { ok: false, code: "not_found", message: "none" }; }
   async rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> { return { ok: true, value: { supervisor: { state: "unprovisioned", generation: 0, detail: "none" }, inbox: { pending: 0, claimed: 0, completed: 0, needsReconciliation: 0 }, installations: [] } }; }
   async claimHardwareSignal(binding: { windowSessionId: string; workspaceRoots: readonly string[]; focused: true }): Promise<BridgeResult<HardwareSignalClaim | undefined>> { this.hardwareClaimBindings.push(binding); this.onHardwareClaim?.(); await this.hardwareClaimGate; return { ok: true, value: this.hardwareClaims.shift() }; }
-  async prepareHardwareSignal(claim: HardwareSignalClaim, _sessionId?: string, _reason?: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+  async prepareHardwareSignal(claim: HardwareSignalClaim, _sessionId?: string, _reason?: string, reviewScopeDigest?: string, reviewArtifactId?: string, reviewArtifactDigest?: string, effectSessionId?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
     this.hardwarePrepared.push(claim);
+    this.hardwarePreparationEffectSessions.push(effectSessionId);
     this.hardwarePreparationReviewScopes.push(reviewScopeDigest);
+    this.hardwarePreparationReviewArtifacts.push({ ...(reviewArtifactId ? { reviewArtifactId } : {}), ...(reviewArtifactDigest ? { reviewArtifactDigest } : {}) });
+    this.onPrepareHardwareSignal?.({ ...(reviewScopeDigest ? { reviewScopeDigest } : {}), ...(reviewArtifactId ? { reviewArtifactId } : {}), ...(reviewArtifactDigest ? { reviewArtifactDigest } : {}) });
+    if (this.hardwarePreparationFailureAt === this.hardwarePrepared.length) return { ok: false, code: "unavailable", message: "simulated exact hardware preparation transport failure" };
     const preparation = this.preparationSequence.shift() ?? this.nextPreparation ?? { status: "prepared" as const, summary: "Prepared by fake companion.", authorityId: "authority-test", confirmationToken: "confirmation-test" };
     return { ok: true, value: { preparation, ...(preparation.status === "prepared" || preparation.workflowReview ? {} : { dispositionReceiptId: `hardware-dispatch:${"d".repeat(64)}` }) } };
   }
@@ -514,9 +607,11 @@ class FakeBridge implements ExtensionCompanionBridge {
     this.hardwareCompleted.push({ claim, outcome: completion.outcome, ...(completion.dispatchReceiptId ? { dispatchReceiptId: completion.dispatchReceiptId } : {}) });
     return { ok: true, value: { signalId: claim.signalId, outcome: completion.outcome } };
   }
-  async claimHostAction(binding: { windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
+  async claimHostAction(binding: { windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
     this.hostActionClaimBindings.push(binding);
-    return { ok: true, value: this.hostActionClaims.shift() };
+    const value = this.hostActionClaims.shift();
+    if (value) this.deliveredHostActionClaims.push(value);
+    return { ok: true, value };
   }
   async createHandoff(input: { sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate" }): Promise<BridgeResult<ExtensionHandoffPackage>> {
     const session = this.registered.find((value) => value.id === input.sessionId);
@@ -537,14 +632,19 @@ class FakeBridge implements ExtensionCompanionBridge {
   async prepareWorkflow(input: { action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
     if (input.action === "bind_voice_session") this.voiceBindingSequence.push("prepare");
     this.workflowPrepared.push(input);
-    if (this.nextWorkflowArtifact) return { ok: true, value: this.nextWorkflowArtifact };
+    if (this.nextWorkflowArtifact) {
+      this.onPrepareWorkflow?.(this.nextWorkflowArtifact);
+      return { ok: true, value: this.nextWorkflowArtifact };
+    }
     const session = this.registered.find((candidate) => candidate.id === input.sessionId);
-    return { ok: true, value: {
+    const artifact: ExtensionWorkflowArtifact = {
       id: "workflow-test", digest: "b".repeat(64), action: input.action, repositoryRoot: session?.workspaceRoot ?? "C:\\repo",
       targetSnapshotId: session?.targetSnapshotId ?? "snapshot-test", sessionId: input.sessionId, authorityId: input.authorityId,
       payload: { kind: "test" }, status: "prepared", executionAuthorized: false,
       createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
-    } };
+    };
+    this.onPrepareWorkflow?.(artifact);
+    return { ok: true, value: artifact };
   }
   async cancelWorkflow(input: { artifactId: string; sessionId: string; authorityId: string }): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
     this.workflowCancelled.push(input);
@@ -557,7 +657,7 @@ class FakeBridge implements ExtensionCompanionBridge {
   async startVoice(input: { consentId: string; voiceSessionId: string; managedSessionId?: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceStarts.push(input); this.currentVoiceValue = { id: "voice-binding-test", consentId: input.consentId, voiceSessionId: input.voiceSessionId, ...(input.managedSessionId ? { managedSessionId: input.managedSessionId } : {}), repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
   async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return { ok: true, value: this.currentVoiceValue }; }
   async switchVoice(input: { bindingId: string; consentId: string; voiceSessionId: string }): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceSwitches.push(input); this.currentVoiceValue = { id: input.bindingId, consentId: input.consentId, voiceSessionId: input.voiceSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
-  async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceBindingSequence.push("bind"); this.voiceBinds.push({ bindingId, managedSessionId }); this.currentVoiceValue = { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
+  async bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceBindingSequence.push("bind"); this.voiceBinds.push({ bindingId, managedSessionId }); this.currentVoiceValue = this.nextVoiceBind ?? { id: bindingId, consentId: "voice-consent-test", voiceSessionId: "voice-session-test", managedSessionId, repositoryRoot: "C:\\repo", targetSnapshotId: "snapshot-test", contextPackageId: "handoff-test", contextDigest: "c".repeat(64), provider: this.lastVoiceProvider, transcript: "off", retentionMinutes: 0, status: "active" }; return { ok: true, value: this.currentVoiceValue }; }
   async muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceMutes.push(bindingId); return this.voiceState(bindingId, "muted"); }
   async resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { this.voiceResumes.push(bindingId); return this.voiceState(bindingId, "active"); }
   async interruptVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceState(bindingId, "interrupted"); }
@@ -598,6 +698,422 @@ class FakeBridge implements ExtensionCompanionBridge {
     return { ok: true, value: { status: succeeded ? "completed" : "failed", summary } };
   }
 }
+
+function fakeReanchorStatus(sessionId: string, authorityId: string, state: "pending_confirmation" | "recorded"): ExtensionReanchorStatus {
+  const requestId = `reanchor:${"a".repeat(64)}`;
+  const operationId = `reanchor-operation:${"b".repeat(64)}`;
+  const oldTargetSnapshotId = "c".repeat(64);
+  const newTargetSnapshotId = "d".repeat(64);
+  const report = {
+    summary: "Provider reread the protected instructions, documentation, authority, and current work; it remains stopped.",
+    discrepancies: ["The repository head changed after the old target."],
+    risks: ["The managed provider remains stopped until a separate operator action."],
+    questions: ["Should the revised task boundary be accepted?"],
+    result: "reanchored_without_resume" as const
+  };
+  const status = {
+    schema: "sxsy-b122.installed-reanchor-status" as const,
+    version: 1 as const,
+    requestId,
+    operationId,
+    sessionId,
+    authorityId,
+    oldTargetSnapshotId,
+    newTargetSnapshotId,
+    state,
+    summary: state === "recorded" ? report.summary : "Review the exact old-to-new target transition.",
+    discrepancies: ["The repository head changed after the old target."],
+    risks: ["The participant will remain stopped."],
+    questions: ["Confirm the reviewed task boundary?"],
+    confirmationScopeDigest: "e".repeat(64),
+    confirmationExpiresAt: "2099-01-01T00:02:00.000Z"
+  };
+  if (state !== "recorded") return status;
+  return {
+    ...status,
+    receipt: {
+      version: 1,
+      id: `reanchor-receipt:${"f".repeat(64)}`,
+      requestId,
+      operationId,
+      oldTargetSnapshotId,
+      newTargetSnapshotId,
+      sessionId,
+      authorityId,
+      previewDigest: "1".repeat(64),
+      confirmationDigest: "2".repeat(64),
+      confirmationScopeDigest: status.confirmationScopeDigest,
+      externalEffectId: "provider-effect-1",
+      acknowledgementDigest: "3".repeat(64),
+      artifactDigest: "4".repeat(64),
+      rereadEvidence: {
+        contextDigest: "5".repeat(64), authorityDigest: "6".repeat(64), instructionDigests: ["7".repeat(64)],
+        planDigest: "8".repeat(64), documentationDigests: ["9".repeat(64)], currentWorkDigest: "a".repeat(64), inspectedTargetSnapshotId: newTargetSnapshotId
+      },
+      report,
+      sessionRebindOutcome: "rebound",
+      resultingBindingDigest: "b".repeat(64),
+      resumed: false,
+      evidenceDigest: "c".repeat(64),
+      result: "reanchored_without_resume",
+      createdAt: "2026-08-26T00:01:00.000Z"
+    }
+  };
+}
+
+async function readyReanchorController(vscode: FakeVscode, bridge: FakeBridge) {
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/reanchor" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const managed: ExtensionManagedSession = {
+    ...exactProviderSession(target, target.id, "codex", "C:\\repo", "c".repeat(64)),
+    taskId: "task-reanchor",
+    planRevision: "plan-reanchor"
+  };
+  bridge.listedSessions = [managed];
+  await controller.refreshSessionNotifications();
+  return { controller, managed };
+}
+
+function exactProviderSession(
+  seed: ExtensionManagedSession,
+  id: string,
+  provider: "claude" | "codex" = "codex",
+  repositoryRoot = "C:\\repo",
+  targetSnapshotId = "a".repeat(64)
+): ExtensionManagedSession {
+  return {
+    ...seed,
+    id,
+    provider,
+    surface: "vscode_terminal",
+    capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running",
+    workspaceRoot: repositoryRoot,
+    targetSnapshotId,
+    taskId: seed.taskId ?? `task-${id}`,
+    planRevision: seed.planRevision ?? `plan-${id}`,
+    metadata: {
+      ...seed.metadata,
+      "sxsy-b122.kind": "terminal",
+      "sxsy-b122.providerHandshake": "exact-route-v1",
+      "sxsy-b122.providerHandshakeTarget": targetSnapshotId
+    }
+  };
+}
+
+async function installExactProviderSession(
+  controller: ManagedSessionController,
+  bridge: FakeBridge,
+  seed?: ExtensionManagedSession,
+  provider: "claude" | "codex" = "codex"
+): Promise<ExtensionManagedSession> {
+  const source = seed ?? controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root");
+  assert.ok(source?.workspaceRoot);
+  const exact = exactProviderSession(source, source.id, provider, source.workspaceRoot, source.targetSnapshotId ?? "a".repeat(64));
+  bridge.registered.splice(0, bridge.registered.length, ...bridge.registered.filter((session) => session.id !== exact.id), exact);
+  const listed = bridge.listedSessions ?? controller.listKnownSessions();
+  const replaced = listed.map((session) => session.id === exact.id ? exact : session);
+  bridge.listedSessions = replaced.some((session) => session.id === exact.id) ? replaced : [...replaced, exact];
+  await controller.refreshSessionNotifications();
+  return exact;
+}
+
+function reviewedAutomationContent(value: string) {
+  const bytes = Buffer.from(value, "utf8");
+  return { afterDigest: createHash("sha256").update(bytes).digest("hex"), content: { encoding: "base64" as const, byteLength: bytes.length, data: bytes.toString("base64") } };
+}
+const reviewedCaptureDocument = { path: "docs/solutions/boundary.md", mutation: "create" as const, beforeDigest: null, ...reviewedAutomationContent("# Boundary\n") };
+const reviewedRefreshMutation = { path: "docs/solutions/current.md", mutation: "update" as const, beforeDigest: "4".repeat(64), ...reviewedAutomationContent("# Current\n") };
+const reviewedLfgMutation = { path: "apps/companion/src/main.ts", mutation: "replace" as const, beforeDigest: "5".repeat(64), ...reviewedAutomationContent("export const ready = true;\n") };
+const reviewedRepairMutation = { path: "apps/companion/src/main.ts", mutation: "update" as const, beforeDigest: "6".repeat(64), ...reviewedAutomationContent("export const repaired = true;\n") };
+
+const reviewedAutomationProposals: Readonly<Record<AutomationOperationProposal["kind"], AutomationOperationProposal>> = {
+  compound_capture: {
+    kind: "compound_capture", solvedProblemEvidenceDigest: "1".repeat(64), verifiedOutcomeEvidenceDigest: "2".repeat(64),
+    nonTrivialRationale: "A complete reviewed evidence packet demonstrates the reusable boundary.",
+    documents: [reviewedCaptureDocument], instructionFileMutation: { kind: "none" }
+  },
+  compound_refresh: {
+    kind: "compound_refresh", audit: ["drift", "overlap", "supersession", "contradiction"],
+    mutations: [reviewedRefreshMutation], commit: { planned: false }
+  },
+  lfg: {
+    kind: "lfg", requirementsSources: [{ path: "docs/requirements.md", digest: "6".repeat(64) }], approvedScopePaths: ["apps/companion/src/main.ts"],
+    mutations: [reviewedLfgMutation], effectPlan: [
+      { order: 0, kind: "plan", scopeDigest: "1".repeat(64) }, { order: 1, kind: "filesystem_mutation", scopeDigest: automationMutationScopeDigest([reviewedLfgMutation]) },
+      { order: 2, kind: "simplify", scopeDigest: "2".repeat(64) }, { order: 3, kind: "review", scopeDigest: "3".repeat(64) },
+      { order: 4, kind: "test", scopeDigest: "4".repeat(64) }, { order: 5, kind: "git_commit", scopeDigest: "5".repeat(64) },
+      { order: 6, kind: "git_push", scopeDigest: "6".repeat(64) }, { order: 7, kind: "pull_request", scopeDigest: "7".repeat(64) },
+      { order: 8, kind: "ci_watch", scopeDigest: "8".repeat(64) }
+    ],
+    authorizedActions: ["filesystem_mutation", "git_commit", "git_push", "pull_request", "ci_watch"], deployAuthorized: false
+  },
+  repair_mission: {
+    kind: "repair_mission", failingGateId: "gate-typecheck", reproductionCommandDigest: "7".repeat(64), approvedScopePaths: ["apps/companion/src/main.ts"],
+    mutations: [reviewedRepairMutation],
+    affectedChecks: ["test:main"], fullChecks: ["test", "typecheck"], testEnvironment: { id: "test-environment-1", digest: "8".repeat(64), egress: "deny", databaseName: "b122_test_1" },
+    effectPlan: [
+      { order: 0, kind: "sandbox_bind", scopeDigest: "8".repeat(64) }, { order: 1, kind: "reproduce", scopeDigest: "7".repeat(64) },
+      { order: 2, kind: "filesystem_mutation", scopeDigest: automationMutationScopeDigest([reviewedRepairMutation]) },
+      { order: 3, kind: "test_affected", scopeDigest: "9".repeat(64) }, { order: 4, kind: "test_full", scopeDigest: "a".repeat(64) },
+      { order: 5, kind: "review_diff", scopeDigest: "b".repeat(64) }
+    ],
+    pushAuthorized: false, mergeAuthorized: false, deployAuthorized: false, hostedRerunAuthorized: false, productionDataAuthorized: false
+  }
+};
+
+function automationManifestReview(session: ExtensionManagedSession, action: AutomationOperationProposal["kind"], proposal = reviewedAutomationProposals[action]): AutomationManifestReview {
+  assert.ok(session.workspaceRoot && session.targetSnapshotId && session.taskId && session.planRevision);
+  const manifest = createAutomationOperationManifest({
+    repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, authorityId: "authority-automation",
+    taskId: session.taskId, planRevision: session.planRevision, provider: session.provider,
+    createdAt: "2026-08-26T12:00:00.000Z", expiresAt: "2026-08-26T12:10:00.000Z"
+  }, proposal);
+  return { action, manifest, reviewScopeDigest: automationManifestReviewScopeDigest(manifest) };
+}
+
+function debugStopReview(source: ExtensionManagedSession, effect: ExtensionManagedSession): DebugStopReview {
+  assert.ok(source.targetSnapshotId && effect.workspaceRoot);
+  const debugSessionId = effect.metadata["sxsy-b122.debugSessionId"];
+  const debugBindingId = effect.metadata["sxsy-b122.debugBindingId"];
+  const debugConfiguration = effect.metadata["sxsy-b122.debugConfiguration"];
+  const originOperationId = effect.metadata["sxsy-b122.debugOriginOperationId"];
+  assert.ok(debugSessionId && debugBindingId && debugConfiguration && originOperationId);
+  return {
+    schema: "sxsy-b122.debug-stop-review", version: 1, action: "stop_managed_run", bindingId: `debug-stop:${"9".repeat(64)}`,
+    bindingDigest: "a".repeat(64), reviewScopeDigest: "b".repeat(64), sourceSessionId: source.id, authorityId: "authority-debug",
+    targetSnapshotId: source.targetSnapshotId, repositoryRoot: effect.workspaceRoot, originOperationId, effectKind: "debug_session",
+    debugSessionId, debugBindingId, debugConfiguration, managedProcessId: null,
+    createdAt: "2026-08-26T12:00:00.000Z", expiresAt: "2099-01-01T00:00:00.000Z"
+  };
+}
+
+function queueReviewedDebugStop(bridge: FakeBridge, source: ExtensionManagedSession, effect: ExtensionManagedSession): DebugStopReview {
+  const review = debugStopReview(source, effect);
+  bridge.preparationSequence.push(
+    { status: "incomplete", summary: "Review exact split binding.", session: source, authorityId: review.authorityId, debugStopReview: review },
+    { status: "prepared", summary: "Exact split binding confirmed.", session: source, authorityId: review.authorityId, confirmationToken: "confirmation-debug", confirmationScopeDigest: review.reviewScopeDigest, confirmationExpiresAt: "2099-01-01T00:00:00.000Z" }
+  );
+  return review;
+}
+
+function managedRunStopReview(source: ExtensionManagedSession, effect: ExtensionManagedSession): DebugStopReview {
+  assert.ok(source.targetSnapshotId && effect.workspaceRoot);
+  const managedProcessId = effect.metadata["sxsy-b122.managedProcessId"];
+  const originOperationId = effect.metadata["sxsy-b122.runOriginOperationId"];
+  assert.ok(managedProcessId && originOperationId);
+  return {
+    schema: "sxsy-b122.debug-stop-review", version: 1, action: "stop_managed_run", bindingId: `debug-stop:${"8".repeat(64)}`,
+    bindingDigest: "7".repeat(64), reviewScopeDigest: "6".repeat(64), sourceSessionId: source.id, authorityId: "authority-managed-run",
+    targetSnapshotId: source.targetSnapshotId, repositoryRoot: effect.workspaceRoot, originOperationId, effectKind: "managed_run",
+    debugSessionId: null, debugBindingId: null, debugConfiguration: null, managedProcessId,
+    createdAt: "2026-08-26T12:00:00.000Z", expiresAt: "2099-01-01T00:00:00.000Z"
+  };
+}
+
+function queueReviewedManagedRunStop(bridge: FakeBridge, source: ExtensionManagedSession, effect: ExtensionManagedSession): DebugStopReview {
+  const review = managedRunStopReview(source, effect);
+  bridge.preparationSequence.push(
+    { status: "incomplete", summary: "Review the exact managed Run child.", session: source, authorityId: review.authorityId, debugStopReview: review },
+    { status: "prepared", summary: "Exact managed Run child confirmed.", session: source, authorityId: review.authorityId, confirmationToken: "confirmation-managed-run", confirmationScopeDigest: review.reviewScopeDigest, confirmationExpiresAt: "2099-01-01T00:00:00.000Z" }
+  );
+  return review;
+}
+
+function physicalClaim(windowSessionId: string, control: B122Control, modifier: B122Modifier, counter = 1): HardwareSignalClaim {
+  return {
+    signalId: `hardware-signal:${counter.toString(16).padStart(64, "0")}`, claimToken: `claim-token-${counter}`,
+    deviceId: "f".repeat(64), connectionEpoch: 1, bootNonce: 2, counter, control, modifier,
+    acceptedAt: "2026-08-26T12:00:00.000Z", claimedAt: "2026-08-26T12:00:01.000Z", attempt: 1,
+    windowSessionId, workspaceRoots: ["C:\\repo"]
+  };
+}
+
+function authorityBroadcastArtifact(
+  source: ExtensionManagedSession,
+  recipients: readonly ExtensionManagedSession[]
+): ExtensionWorkflowArtifact {
+  const packets = recipients.map((recipient, index) => ({
+    recipientSessionId: recipient.id,
+    grantId: `authority-recipient-${index + 1}`,
+    actions: ["proof", "authority_broadcast"],
+    prohibitions: [],
+    expiresAt: "2099-01-01T00:10:00.000Z",
+    pendingRequest: {
+      requestId: `pending-request-${index + 1}`,
+      targetSnapshotId: recipient.targetSnapshotId,
+      planRevision: recipient.planRevision,
+      planDigest: String(index + 3).repeat(64),
+      action: "proof"
+    },
+    matchDigest: String(index + 5).repeat(64),
+    providerEffect: {
+      role: "authority_recipient",
+      provider: recipient.provider,
+      session: { ...recipient, metadata: {} },
+      authority: {
+        id: `authority-recipient-${index + 1}`,
+        repositoryRoot: recipient.workspaceRoot,
+        sessionId: recipient.id,
+        taskId: recipient.taskId,
+        planRevision: recipient.planRevision,
+        allowedActions: ["proof", "authority_broadcast"],
+        prohibitedActions: [],
+        expiresAt: "2099-01-01T00:10:00.000Z",
+        issuedAt: "2026-08-25T00:00:00.000Z",
+        issuedBy: "TEST\\Reviewer"
+      },
+      adapterId: `adapter-${recipient.id}`,
+      adapterVersion: recipient.adapterVersion,
+      moduleSha256: (index === 0 ? "7" : "8").repeat(64),
+      providerContextDigest: (index === 0 ? "9" : "a").repeat(64),
+      bindingDigest: (index === 0 ? "b" : "c").repeat(64)
+    }
+  }));
+  return {
+    id: "workflow-authority-broadcast",
+    digest: "e".repeat(64),
+    action: "authority_broadcast",
+    repositoryRoot: source.workspaceRoot!,
+    targetSnapshotId: source.targetSnapshotId!,
+    sessionId: source.id,
+    taskId: source.taskId,
+    planRevision: source.planRevision,
+    authorityId: "authority-broadcast",
+    coordinatorContextDigest: "f".repeat(64),
+    coordinatorContextRevision: 1,
+    payload: { kind: "authority", mode: "broadcast", packets, acknowledgementRequired: true },
+    status: "prepared",
+    executionAuthorized: false,
+    createdAt: "2026-08-25T00:00:00.000Z",
+    updatedAt: "2026-08-25T00:00:00.000Z"
+  };
+}
+
+test("Re-anchor uses only eligible existing authority and the dedicated preview/confirm lifecycle", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller, managed } = await readyReanchorController(vscode, bridge);
+  bridge.reanchorAuthorities = [{ id: "authority-existing", issuedBy: "TEST\\Reviewer", expiresAt: "2099-01-01T00:10:00.000Z" }];
+  bridge.reanchorBeginStatus = fakeReanchorStatus(managed.id, "authority-existing", "pending_confirmation");
+  bridge.reanchorFinalStatus = fakeReanchorStatus(managed.id, "authority-existing", "recorded");
+  vscode.confirmWarning("Confirm exact Re-anchor without resuming");
+
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!);
+
+  assert.deepEqual(bridge.reanchorAuthorityQueries, [managed.id]);
+  assert.deepEqual(bridge.reanchorBegins, [{ sessionId: managed.id, authorityId: "authority-existing", reason: "Operator requested SXSY-B122: Re-anchor through the installed SXSY-B122 extension." }]);
+  assert.deepEqual(bridge.reanchorConfirmations, [`reanchor:${"a".repeat(64)}`]);
+  assert.equal(bridge.prepared.length, 0);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(vscode.warningSurfaces.some((surface) => surface.modal && surface.choices.includes("Confirm exact Re-anchor without resuming")), true);
+  assert.equal(vscode.quickPickSurfaces.some((surface) => /read-only Re-anchor preview/i.test(surface.placeHolder ?? "")), true);
+  assert.equal(vscode.quickPickSurfaces.some((surface) => /post-stop provider report/i.test(surface.placeHolder ?? "")), true);
+  assert.match(vscode.information.at(-1) ?? "", /reanchored_without_resume.*remains stopped/i);
+  await controller.stop();
+});
+
+test("Re-anchor stops before begin when no existing grant is eligible", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller } = await readyReanchorController(vscode, bridge);
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!);
+  assert.equal(bridge.reanchorBegins.length, 0);
+  assert.equal(bridge.prepared.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /no eligible existing Re-anchor authority/i);
+  await controller.stop();
+});
+
+test("Re-anchor authority choice is bounded and operator cancellation never confirms or dispatches", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller, managed } = await readyReanchorController(vscode, bridge);
+  bridge.reanchorAuthorities = [
+    { id: "authority-one", issuedBy: "Reviewer One", expiresAt: "2099-01-01T00:10:00.000Z" },
+    { id: "authority-two", issuedBy: "Reviewer Two", expiresAt: "2099-01-01T00:11:00.000Z" }
+  ];
+  bridge.reanchorBeginStatus = fakeReanchorStatus(managed.id, "authority-two", "pending_confirmation");
+  vscode.choose("authority-two");
+
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!);
+
+  assert.equal(vscode.quickPickSurfaces[0]?.items.length, 2);
+  assert.equal(bridge.reanchorBegins[0]?.authorityId, "authority-two");
+  assert.equal(bridge.reanchorConfirmations.length, 0);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /cancelled.*no confirmation.*no resume/i);
+  await controller.stop();
+});
+
+test("Re-anchor refuses a malformed or resume-claiming final report", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller, managed } = await readyReanchorController(vscode, bridge);
+  bridge.reanchorAuthorities = [{ id: "authority-existing", issuedBy: "Reviewer", expiresAt: "2099-01-01T00:10:00.000Z" }];
+  bridge.reanchorBeginStatus = fakeReanchorStatus(managed.id, "authority-existing", "pending_confirmation");
+  const malformed = fakeReanchorStatus(managed.id, "authority-existing", "recorded");
+  bridge.reanchorFinalStatus = { ...malformed, receipt: { ...malformed.receipt!, resumed: true } } as unknown as ExtensionReanchorStatus;
+  vscode.confirmWarning("Confirm exact Re-anchor without resuming");
+
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!);
+
+  assert.match(vscode.warnings.at(-1) ?? "", /rejected.*malformed.*no-resume/i);
+  assert.equal(vscode.quickPickSurfaces.some((surface) => /post-stop provider report/i.test(surface.placeHolder ?? "")), false);
+  assert.equal(bridge.dispatched.length, 0);
+  await controller.stop();
+});
+
+test("a physical Re-anchor claim uses the same dedicated UI lifecycle and settles once with the server receipt", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller, managed } = await readyReanchorController(vscode, bridge);
+  bridge.reanchorAuthorities = [{ id: "authority-existing", issuedBy: "Reviewer", expiresAt: "2099-01-01T00:10:00.000Z" }];
+  bridge.reanchorBeginStatus = fakeReanchorStatus(managed.id, "authority-existing", "pending_confirmation");
+  bridge.reanchorFinalStatus = fakeReanchorStatus(managed.id, "authority-existing", "recorded");
+  vscode.confirmWarning("Confirm exact Re-anchor without resuming");
+  const claim: HardwareSignalClaim = {
+    signalId: `hardware-signal:${"1".repeat(64)}`, claimToken: "claim-token-reanchor", deviceId: "2".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3,
+    control: "REANCHOR", modifier: "normal", acceptedAt: "2026-08-26T00:00:00.000Z", claimedAt: "2026-08-26T00:00:01.000Z", attempt: 1,
+    windowSessionId: "window-one", workspaceRoots: ["C:\\repo"]
+  };
+
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!, undefined, claim);
+
+  assert.equal(bridge.reanchorBegins.length, 0);
+  assert.deepEqual(bridge.hardwareReanchorBegins, [{ claim, input: { sessionId: managed.id, authorityId: "authority-existing", reason: "Operator requested SXSY-B122: Re-anchor through the installed SXSY-B122 extension." } }]);
+  assert.equal(bridge.hardwarePrepared.length, 0);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((completion) => ({ outcome: completion.outcome, dispatchReceiptId: completion.dispatchReceiptId })), [
+    { outcome: "handled", dispatchReceiptId: `hardware-dispatch:${"f".repeat(64)}` }
+  ]);
+  await controller.stop();
+});
+
+test("a cancelled physical Re-anchor preview consumes its exact server dispatch once without confirmation or replay", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const { controller, managed } = await readyReanchorController(vscode, bridge);
+  bridge.reanchorAuthorities = [{ id: "authority-existing", issuedBy: "Reviewer", expiresAt: "2099-01-01T00:10:00.000Z" }];
+  bridge.reanchorBeginStatus = fakeReanchorStatus(managed.id, "authority-existing", "pending_confirmation");
+  const claim: HardwareSignalClaim = {
+    signalId: `hardware-signal:${"3".repeat(64)}`, claimToken: "claim-token-cancel", deviceId: "4".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 4,
+    control: "REANCHOR", modifier: "normal", acceptedAt: "2026-08-26T00:00:00.000Z", claimedAt: "2026-08-26T00:00:01.000Z", attempt: 1,
+    windowSessionId: "window-one", workspaceRoots: ["C:\\repo"]
+  };
+
+  await controller.dispatchChord(chordFor("REANCHOR", "normal")!, undefined, claim);
+
+  assert.equal(bridge.reanchorConfirmations.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((completion) => ({ outcome: completion.outcome, dispatchReceiptId: completion.dispatchReceiptId })), [
+    { outcome: "handled", dispatchReceiptId: `hardware-dispatch:${"f".repeat(64)}` }
+  ]);
+  await controller.stop();
+});
 
 test("registers VS Code window, workspace, terminals, and debug configurations without claiming mediation", async () => {
   const vscode = new FakeVscode();
@@ -988,12 +1504,41 @@ test("provider connection command installs only capabilities returned by the com
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, context, bridge, { idFactory: (() => { let id = 0; return () => `session-${++id}`; })(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feat/test" }] });
   await controller.start();
-  const candidate = controller.listKnownSessions()[0]!;
+  const local = controller.listKnownSessions();
+  const candidate: ExtensionManagedSession = { ...local[0]!, id: "claude-current", provider: "claude", surface: "vscode_terminal", capabilities: ["registered"] };
+  bridge.registered.push(candidate);
+  bridge.listedSessions = [...local, candidate];
+  await controller.refreshSessionNotifications();
   vscode.choose(`${candidate.provider}: ${candidate.id}`);
   await vscode.invoke("sxsy-b122.connectProviderAdapter");
   const connected = controller.listKnownSessions().find((session) => session.id === candidate.id)!;
   assert.deepEqual(connected.capabilities, ["registered", "observable", "controllable", "mediated"]);
   assert.equal(connected.workspaceRoot, "C:\\repo");
+});
+
+test("provider connection picker offers only current reachable Claude and Codex sessions", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feat/provider-filter" }] });
+  await controller.start();
+  const seed = controller.listKnownSessions()[0]!;
+  const sessions: ExtensionManagedSession[] = [
+    { ...seed, id: "generic-current", provider: "generic", capabilities: ["registered"] },
+    { ...seed, id: "voice-current", provider: "voice", capabilities: ["registered"] },
+    { ...seed, id: "claude-current", provider: "claude", capabilities: ["registered"], status: "running" },
+    { ...seed, id: "codex-current", provider: "codex", capabilities: ["registered"], status: "running" },
+    { ...seed, id: "claude-stale", provider: "claude", capabilities: ["registered"], status: "stale" },
+    { ...seed, id: "codex-unreachable", provider: "codex", capabilities: ["registered"], status: "unreachable" }
+  ];
+  bridge.listedSessions = sessions;
+  await controller.refreshSessionNotifications();
+
+  await vscode.invoke("sxsy-b122.connectProviderAdapter");
+
+  const surface = vscode.quickPickSurfaces.at(-1);
+  assert.match(surface?.placeHolder ?? "", /provider route/i);
+  assert.deepEqual(surface?.items.map((item) => typeof item === "string" ? item : item.label), ["claude: claude-current", "codex: codex-current"]);
+  controller.stop();
 });
 
 test("heartbeats local extension sessions but never renews provider-observed proof", async () => {
@@ -1006,9 +1551,14 @@ test("heartbeats local extension sessions but never renews provider-observed pro
     heartbeatIntervalMs: 20
   });
   await controller.start();
-  const provider = controller.listKnownSessions()[0]!;
+  const local = controller.listKnownSessions();
+  const provider: ExtensionManagedSession = { ...local[0]!, id: "codex-current", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"] };
+  bridge.registered.push(provider);
+  bridge.listedSessions = [...local, provider];
+  await controller.refreshSessionNotifications();
   vscode.choose(`${provider.provider}: ${provider.id}`);
   await vscode.invoke("sxsy-b122.connectProviderAdapter");
+  bridge.listedSessions = [...local, controller.listKnownSessions().find((session) => session.id === provider.id)!];
   bridge.heartbeats.length = 0;
   await new Promise((resolve) => setTimeout(resolve, 55));
   controller.stop();
@@ -1018,22 +1568,289 @@ test("heartbeats local extension sessions but never renews provider-observed pro
   assert.equal(bridge.heartbeats.every((heartbeat) => heartbeat.at === "2026-08-24T00:00:10.000Z"), true);
 });
 
-test("provider chords prepare one exact typed workflow artifact before durable dispatch", async () => {
+test("provider chords prepare through one exact provider-managed session instead of the synthetic Git-root session", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/workflow" }] });
   await controller.start();
-  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  bridge.nextPreparation = { status: "prepared", summary: "Exact workflow prepared.", authorityId: "authority-test", session: { ...target, targetSnapshotId: "snapshot-test", taskId: "task-test", planRevision: "plan-test" } };
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const provider = exactProviderSession(gitRoot, "codex-proof", "codex", "C:\\repo", "a".repeat(64));
+  bridge.registered.push(provider);
+  bridge.listedSessions = [...local, provider];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Exact workflow prepared.", authorityId: "authority-test", session: provider };
   const command = chordFor("PROOF", "normal");
   assert.ok(command);
   await controller.dispatchChord(command);
 
   assert.equal(bridge.workflowPrepared.length, 1);
   assert.deepEqual(bridge.workflowPrepared[0], {
-    action: "proof", sessionId: target.id, authorityId: "authority-test", intent: { kind: "none" }
+    action: "proof", sessionId: provider.id, authorityId: "authority-test", intent: { kind: "none" }
   });
+  assert.equal(bridge.prepared.at(-1)?.sessionId, provider.id);
+  assert.notEqual(bridge.prepared.at(-1)?.sessionId, gitRoot.id);
   assert.equal(bridge.dispatched.length, 1);
+});
+
+test("every Handoff route selects an exact registered-only Claude or Codex source instead of the Git-root pseudo-session", async () => {
+  for (const modifier of ["normal", "shift", "alt"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(),
+      resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/handoff-${modifier}-source` }]
+    });
+    await controller.start();
+    const gitRoot = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const provider = {
+      ...exactProviderSession(gitRoot, `${modifier}-handoff-source`, modifier === "shift" ? "claude" : "codex"),
+      capabilities: ["registered"] as const
+    };
+    bridge.listedSessions = [gitRoot, provider];
+    await controller.refreshSessionNotifications();
+    bridge.nextPreparation = { status: "blocked", summary: "Selection-only Handoff proof; no workflow effect." };
+
+    await vscode.invoke(`sxsy-b122.chord.handoff.${modifier}`);
+
+    assert.equal(bridge.prepared.length, 1, `${modifier} must reach preparation after selecting its exact provider source`);
+    assert.equal(bridge.prepared[0]?.sessionId, provider.id, `${modifier} must use the exact registered-only provider source`);
+    assert.notEqual(bridge.prepared[0]?.sessionId, gitRoot.id, `${modifier} must never substitute the Git-root pseudo-session`);
+    assert.deepEqual(provider.capabilities, ["registered"]);
+    assert.equal(bridge.workflowPrepared.length, 0);
+    assert.equal(bridge.dispatched.length, 0);
+    await controller.stop();
+  }
+});
+
+test("every Handoff route stops before preparation when exact provider-source selection is cancelled", async () => {
+  for (const modifier of ["normal", "shift", "alt"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(),
+      resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/handoff-${modifier}-cancel` }]
+    });
+    await controller.start();
+    const gitRoot = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const codex = { ...exactProviderSession(gitRoot, `${modifier}-codex-source`, "codex"), capabilities: ["registered"] as const };
+    const claude = { ...exactProviderSession(gitRoot, `${modifier}-claude-source`, "claude"), capabilities: ["registered"] as const };
+    bridge.listedSessions = [gitRoot, codex, claude];
+    await controller.refreshSessionNotifications();
+
+    await vscode.invoke(`sxsy-b122.chord.handoff.${modifier}`);
+
+    const selection = vscode.quickPickSurfaces.find((surface) => /provider-managed session/i.test(surface.placeHolder ?? ""));
+    assert.deepEqual(selection?.items.map((item) => typeof item === "string" ? item : item.label), [
+      `codex: ${codex.id}`,
+      `claude: ${claude.id}`
+    ]);
+    assert.match(selection?.placeHolder ?? "", /generic window and Git-root sessions are ineligible/i);
+    assert.equal(bridge.prepared.length, 0, `${modifier} cancellation must stop before preparation`);
+    assert.equal(bridge.workflowPrepared.length, 0);
+    assert.equal(bridge.dispatched.length, 0);
+    assert.match(vscode.warnings.at(-1) ?? "", /no exact managed target was selected/i);
+    await controller.stop();
+  }
+});
+
+test("every Handoff route rejects the Git-root pseudo-session and every ineligible provider source before preparation", async () => {
+  for (const modifier of ["normal", "shift", "alt"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(),
+      resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/handoff-${modifier}-no-provider` }]
+    });
+    await controller.start();
+    const gitRoot = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const staleCodex = {
+      ...exactProviderSession(gitRoot, `${modifier}-stale-codex`, "codex"),
+      capabilities: ["registered"] as const,
+      status: "stale" as const
+    };
+    const blockedClaude = {
+      ...exactProviderSession(gitRoot, `${modifier}-blocked-claude`, "claude"),
+      capabilities: ["registered"] as const,
+      status: "verified_blocked" as const
+    };
+    const generic = {
+      ...exactProviderSession(gitRoot, `${modifier}-generic-source`, "codex"),
+      provider: "generic" as const,
+      capabilities: ["registered"] as const
+    };
+    const badAttestation = {
+      ...exactProviderSession(gitRoot, `${modifier}-bad-attestation`, "codex"),
+      capabilities: ["registered"] as const,
+      metadata: {
+        ...exactProviderSession(gitRoot, `${modifier}-bad-attestation`, "codex").metadata,
+        "sxsy-b122.providerHandshakeTarget": "f".repeat(64)
+      }
+    };
+    bridge.listedSessions = [gitRoot, staleCodex, blockedClaude, generic, badAttestation];
+    await controller.refreshSessionNotifications();
+
+    await vscode.invoke(`sxsy-b122.chord.handoff.${modifier}`);
+
+    assert.equal(bridge.prepared.length, 0, `${modifier} must not prepare against the Git-root pseudo-session`);
+    assert.equal(bridge.workflowPrepared.length, 0);
+    assert.equal(bridge.dispatched.length, 0);
+    assert.equal(vscode.quickPickSurfaces.some((surface) => /provider-managed session/i.test(surface.placeHolder ?? "")), false);
+    assert.match(vscode.warnings.at(-1) ?? "", /no exact managed target was selected/i);
+    await controller.stop();
+  }
+});
+
+test("provider workflow selection is bounded to exact current managed sessions on this window's Git roots", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/provider-session" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const codex = exactProviderSession(gitRoot, "codex-exact", "codex");
+  const claude = exactProviderSession(gitRoot, "claude-exact", "claude");
+  const otherRoot = exactProviderSession(gitRoot, "codex-other-root", "codex", "C:\\other");
+  const belowProofFloor = { ...exactProviderSession(gitRoot, "codex-registered-only", "codex"), capabilities: ["registered"] as const };
+  bridge.registered.push(codex, claude, otherRoot, belowProofFloor);
+  bridge.listedSessions = [...local, codex, claude, otherRoot, belowProofFloor];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Exact workflow prepared.", authorityId: "authority-test", session: claude };
+  vscode.choose(`claude: ${claude.id}`);
+
+  await vscode.invoke("sxsy-b122.chord.proof.normal");
+
+  const surface = vscode.quickPickSurfaces.find((item) => /provider-managed session/i.test(item.placeHolder ?? ""));
+  assert.deepEqual(surface?.items.map((item) => typeof item === "string" ? item : item.label), [`codex: ${codex.id}`, `claude: ${claude.id}`]);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, claude.id);
+  assert.equal(bridge.prepared.some((item) => item.sessionId === otherRoot.id || item.sessionId === belowProofFloor.id || item.sessionId === gitRoot.id), false);
+});
+
+test("provider workflow stops when no exact current provider-managed session matches the workspace target", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/provider-stop" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const otherRoot = exactProviderSession(gitRoot, "codex-other-root", "codex", "C:\\other");
+  bridge.registered.push(otherRoot);
+  bridge.listedSessions = [...local, otherRoot];
+  await controller.refreshSessionNotifications();
+
+  await vscode.invoke("sxsy-b122.chord.proof.normal");
+
+  assert.equal(bridge.prepared.length, 0);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /no exact managed target was selected/i);
+});
+
+test("catalog capability floors select the exact provider session for Git, automation, execution, tests, security, isolation, and Council", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/catalog-selector" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const provider = exactProviderSession(gitRoot, "codex-catalog", "codex");
+  bridge.registered.push(provider);
+  bridge.listedSessions = [...local, provider];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "blocked", summary: "Focused selector proof; no effect." };
+
+  const representatives = [
+    chordFor("COMMIT", "normal")!,
+    chordFor("COMPOUND", "normal")!,
+    chordFor("RUN", "normal")!,
+    chordFor("PIPELINE", "shift")!,
+    chordFor("SHIELD", "normal")!,
+    chordFor("SANDBOX", "alt")!,
+    chordFor("COUNCIL", "normal")!
+  ];
+  for (const command of representatives) await controller.dispatchChord(command);
+
+  assert.deepEqual(bridge.prepared.slice(-representatives.length).map((request) => request.sessionId), representatives.map(() => provider.id));
+  assert.equal(bridge.prepared.some((request) => request.sessionId === gitRoot.id), false);
+  assert.equal(bridge.dispatched.length, 0);
+  await controller.stop();
+});
+
+test("Council source selection applies per-action floors and never substitutes generic, wrong-root, stale, under-capability, or unproven sessions", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/council-selector" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const observable = { ...exactProviderSession(gitRoot, "codex-observable"), capabilities: ["registered", "observable"] as const };
+  const mediated = exactProviderSession(gitRoot, "claude-mediated", "claude");
+  const wrongRoot = exactProviderSession(gitRoot, "codex-wrong-root", "codex", "C:\\other");
+  const stale = { ...exactProviderSession(gitRoot, "codex-stale"), status: "stale" as const };
+  const underFloor = { ...exactProviderSession(gitRoot, "codex-registered"), capabilities: ["registered"] as const };
+  const unproven = { ...exactProviderSession(gitRoot, "codex-unproven"), metadata: { "sxsy-b122.kind": "terminal" } };
+  bridge.registered.push(observable, mediated, wrongRoot, stale, underFloor, unproven);
+  bridge.listedSessions = [...local, observable, mediated, wrongRoot, stale, underFloor, unproven];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "blocked", summary: "Focused Council selector proof; no effect." };
+
+  vscode.choose(`codex: ${observable.id}`);
+  await controller.dispatchChord(chordFor("COUNCIL", "normal")!);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, observable.id);
+  const normalSurface = vscode.quickPickSurfaces.find((surface) => /Council Conflict Report/i.test(surface.placeHolder ?? ""));
+  assert.deepEqual(normalSurface?.items.map((item) => typeof item === "string" ? item : item.label), [`codex: ${observable.id}`, `claude: ${mediated.id}`]);
+
+  vscode.choose(`claude: ${mediated.id}`);
+  await controller.dispatchChord(chordFor("COUNCIL", "alt")!);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, mediated.id);
+
+  await controller.dispatchChord(chordFor("COUNCIL", "shift")!);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, mediated.id, "automatic Council still selects the exact mediated source before its gate blocks");
+  assert.equal(bridge.dispatched.length, 0);
+  await controller.stop();
+});
+
+test("Authority Refresh may select an exact verified-blocked provider session while ordinary provider actions remain running-only", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/authority-source" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const blocked = { ...exactProviderSession(gitRoot, "codex-blocked"), status: "verified_blocked" as const };
+  bridge.registered.push(blocked);
+  bridge.listedSessions = [...local, blocked];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "blocked", summary: "Protected pending approval was not available in this fixture." };
+
+  await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "normal")!);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, blocked.id);
+  const prepared = bridge.prepared.length;
+  await controller.dispatchChord(chordFor("PROOF", "normal")!);
+  assert.equal(bridge.prepared.length, prepared, "ordinary provider work cannot reuse a verified-blocked session");
+  assert.match(vscode.warnings.at(-1) ?? "", /no exact managed target/i);
+  await controller.stop();
+});
+
+test("exact provider selection is revalidated after preparation and stops status churn before dispatch", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/final-selector-guard" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const provider = exactProviderSession(gitRoot, "codex-churn");
+  bridge.registered.push(provider);
+  bridge.listedSessions = [...local, provider];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Prepared before provider churn.", authorityId: "authority-churn", confirmationToken: "confirmation-churn", session: provider };
+  bridge.onPrepareCommand = () => { bridge.listedSessions = [...local, { ...provider, status: "stale" }]; };
+
+  await controller.dispatchChord(chordFor("RUN", "normal")!);
+
+  assert.equal(bridge.prepared.at(-1)?.sessionId, provider.id);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /changed|stale|current.*session/i);
+  await controller.stop();
 });
 
 test("Council Normal presents bounded exact participant and conflict detail instead of counts", async () => {
@@ -1041,8 +1858,8 @@ test("Council Normal presents bounded exact participant and conflict detail inst
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/council-report" }] });
   await controller.start();
-  const selected = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  bridge.nextPreparation = { status: "prepared", summary: "Council report prepared.", session: { ...selected, targetSnapshotId: "a".repeat(64) } };
+  const selected = await installExactProviderSession(controller, bridge, { ...controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!, targetSnapshotId: "a".repeat(64) });
+  bridge.nextPreparation = { status: "prepared", summary: "Council report prepared.", session: selected };
   bridge.nextDispatch = { status: "completed", summary: "Council report persisted.", data: {
     reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64), repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64),
     collectedAt: "2026-08-25T00:00:00.000Z", participants: 2, atomic: false, executionAuthorized: false,
@@ -1072,8 +1889,8 @@ test("Council Alt prepares then requires a distinct exact-digest VS Code approva
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/council-recommend" }] });
   await controller.start();
-  const selected = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  bridge.nextPreparation = { status: "prepared", summary: "Council recommendation prepared.", confirmationToken: "confirmation-review", session: { ...selected, targetSnapshotId: "a".repeat(64) } };
+  const selected = await installExactProviderSession(controller, bridge, { ...controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!, targetSnapshotId: "a".repeat(64) });
+  bridge.nextPreparation = { status: "prepared", summary: "Council recommendation prepared.", confirmationToken: "confirmation-review", session: selected };
   bridge.nextDispatch = { status: "completed", summary: "Recommendation prepared for review.", data: {
     recommendationId: "recommendation-1", recommendationDigest: "c".repeat(64), reportId: `council-report:${"b".repeat(64)}`, reportDigest: "b".repeat(64),
     repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64), participantSessionIds: [selected.id],
@@ -1094,6 +1911,196 @@ test("Council Alt prepares then requires a distinct exact-digest VS Code approva
   assert.match(vscode.information.at(-1) ?? "", /approved.*no execution authority/i);
 });
 
+test("Shift Authority reviews an editable exact blocked-recipient set and immutable packet summaries before fresh scoped confirmation", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/authority-review" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = exactProviderSession(gitRoot, "codex-authority-source");
+  const recipients = ["blocked-one", "blocked-two"].map((id, index) => ({
+    ...exactProviderSession({ ...gitRoot, taskId: `task-${index + 1}`, planRevision: `plan-${index + 1}` }, id, index === 0 ? "claude" : "codex"),
+    status: "verified_blocked" as const
+  }));
+  bridge.registered.push(source, ...recipients);
+  bridge.listedSessions = [...local, source, ...recipients];
+  await controller.refreshSessionNotifications();
+  const artifact = authorityBroadcastArtifact(source, recipients);
+  bridge.nextWorkflowArtifact = artifact;
+  bridge.preparationSequence.push({ status: "incomplete", summary: "Initial exact authority context prepared without confirmation.", authorityId: artifact.authorityId, session: source });
+  bridge.onPrepareCommand = (command) => {
+    if (command.reviewScopeDigest) bridge.nextPreparation = {
+      status: "prepared", summary: "Fresh exact packet review confirmed.", authorityId: artifact.authorityId,
+      confirmationToken: "fresh-packet-token", confirmationScopeDigest: command.reviewScopeDigest, session: source
+    };
+  };
+  vscode.choose("Edit exact recipient set");
+  vscode.input(recipients.map((recipient) => recipient.id).join(", "));
+  vscode.choose("Use exact recipient set");
+  vscode.choose("Accept exact packet review");
+
+  await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!);
+
+  assert.deepEqual(bridge.workflowPrepared.at(-1)?.intent, { kind: "authority_broadcast", recipientSessionIds: recipients.map((recipient) => recipient.id) });
+  assert.equal(bridge.prepared.length, 2);
+  assert.match(bridge.prepared[1]?.reviewScopeDigest ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(bridge.prepared[1]?.reviewArtifactId, artifact.id);
+  assert.equal(bridge.prepared[1]?.reviewArtifactDigest, artifact.digest);
+  assert.equal(bridge.dispatched.length, 1);
+  assert.equal(bridge.dispatched[0]?.confirmationToken, "fresh-packet-token");
+  assert.equal(bridge.dispatched[0]?.confirmationScopeDigest, bridge.prepared[1]?.reviewScopeDigest);
+  const candidateReview = vscode.quickPickSurfaces.find((surface) => /protected blocked recipients/i.test(surface.placeHolder ?? ""));
+  assert.match(JSON.stringify(candidateReview?.items ?? []), /blocked-one/);
+  assert.match(JSON.stringify(candidateReview?.items ?? []), /blocked-two/);
+  const packetReview = vscode.quickPickSurfaces.find((surface) => /immutable Authority Broadcast packets/i.test(surface.placeHolder ?? ""));
+  const rendered = JSON.stringify(packetReview?.items ?? []);
+  for (const recipient of recipients) {
+    assert.match(rendered, new RegExp(recipient.id));
+    assert.match(rendered, new RegExp(recipient.taskId!));
+    assert.match(rendered, new RegExp(recipient.planRevision!));
+  }
+  assert.match(rendered, /pending-request-1/);
+  assert.match(rendered, /proof/);
+  await controller.stop();
+});
+
+test("Shift Authority cancellation sends nothing and leaves the exact prepared artifact reconcilable", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/authority-cancel" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = exactProviderSession(gitRoot, "codex-authority-source");
+  const recipient = { ...exactProviderSession(gitRoot, "blocked-cancel"), status: "verified_blocked" as const };
+  bridge.registered.push(source, recipient);
+  bridge.listedSessions = [...local, source, recipient];
+  await controller.refreshSessionNotifications();
+  const artifact = authorityBroadcastArtifact(source, [recipient]);
+  bridge.nextWorkflowArtifact = artifact;
+  bridge.nextPreparation = { status: "incomplete", summary: "Initial exact authority context prepared without confirmation.", authorityId: artifact.authorityId, session: source };
+  vscode.choose("Use exact recipient set");
+
+  await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!);
+
+  assert.equal(bridge.workflowPrepared.length, 1);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.equal(bridge.workflowCancelled.length, 0);
+  assert.equal(bridge.prepared.length, 1, "cancellation never requests fresh confirmation");
+  assert.match(vscode.information.at(-1) ?? "", /kept.*prepared.*reconcil/i);
+  await controller.stop();
+});
+
+test("Shift Authority rejects a prematurely confirmed initial preparation before artifact creation", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/authority-premature" }] });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = exactProviderSession(gitRoot, "codex-authority-source");
+  const recipient = { ...exactProviderSession(gitRoot, "blocked-premature"), status: "verified_blocked" as const };
+  bridge.registered.push(source, recipient);
+  bridge.listedSessions = [...local, source, recipient];
+  await controller.refreshSessionNotifications();
+  bridge.nextWorkflowArtifact = authorityBroadcastArtifact(source, [recipient]);
+  bridge.nextPreparation = {
+    status: "prepared",
+    summary: "A malformed first phase already carried confirmation.",
+    authorityId: "authority-broadcast",
+    confirmationToken: "premature-token",
+    confirmationScopeDigest: "0".repeat(64),
+    session: source
+  };
+  vscode.choose("Use exact recipient set");
+  vscode.choose("Accept exact packet review");
+
+  await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!);
+
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(bridge.dispatched.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /initial.*unconfirmed|prematurely confirmed/i);
+  await controller.stop();
+});
+
+test("Shift Authority rejects duplicate, unknown, cross-target, and non-blocked recipients before artifact preparation", async () => {
+  const cases = [
+    { name: "duplicate", input: "blocked-valid, blocked-valid" },
+    { name: "unknown", input: "blocked-valid, unknown-session" },
+    { name: "cross-target", input: "blocked-valid, blocked-other-target" },
+    { name: "status", input: "blocked-valid, running-recipient" }
+  ] as const;
+  for (const scenario of cases) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/authority-${scenario.name}` }] });
+    await controller.start();
+    const local = controller.listKnownSessions();
+    const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const source = exactProviderSession(gitRoot, "codex-authority-source");
+    const valid = { ...exactProviderSession(gitRoot, "blocked-valid"), status: "verified_blocked" as const };
+    const otherTarget = { ...exactProviderSession(gitRoot, "blocked-other-target", "codex", "C:\\repo", "b".repeat(64)), status: "verified_blocked" as const };
+    const running = exactProviderSession(gitRoot, "running-recipient");
+    bridge.registered.push(source, valid, otherTarget, running);
+    bridge.listedSessions = [...local, source, valid, otherTarget, running];
+    await controller.refreshSessionNotifications();
+    bridge.nextPreparation = { status: "incomplete", summary: "Initial exact authority context prepared without confirmation.", authorityId: "authority-broadcast", session: source };
+    vscode.choose("Edit exact recipient set");
+    vscode.input(scenario.input);
+
+    await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!);
+
+    assert.equal(bridge.workflowPrepared.length, 0, scenario.name);
+    assert.equal(bridge.dispatched.length, 0, scenario.name);
+    assert.match(vscode.warnings.at(-1) ?? "", /duplicate|unknown|target|verified.blocked|eligible/i, scenario.name);
+    await controller.stop();
+  }
+});
+
+test("Shift Authority stops recipient status, source binding, authority, and confirmation-scope churn after immutable artifact preparation", async () => {
+  for (const scenario of ["status", "source", "authority", "scope"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/authority-churn-${scenario}` }] });
+    await controller.start();
+    const local = controller.listKnownSessions();
+    const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const source = exactProviderSession(gitRoot, "codex-authority-source");
+    const recipient = { ...exactProviderSession(gitRoot, "blocked-churn"), status: "verified_blocked" as const };
+    bridge.registered.push(source, recipient);
+    bridge.listedSessions = [...local, source, recipient];
+    await controller.refreshSessionNotifications();
+    const artifact = authorityBroadcastArtifact(source, [recipient]);
+    bridge.nextWorkflowArtifact = artifact;
+    bridge.preparationSequence.push({ status: "incomplete", summary: "Initial exact authority context prepared without confirmation.", authorityId: artifact.authorityId, session: source });
+    bridge.onPrepareWorkflow = () => {
+      if (scenario === "status") bridge.listedSessions = [...local, source, { ...recipient, status: "running" }];
+    };
+    bridge.onPrepareCommand = (command) => {
+      if (!command.reviewScopeDigest) return;
+      bridge.nextPreparation = {
+        status: "prepared", summary: "Fresh confirmation attempt.",
+        authorityId: scenario === "authority" ? "authority-substituted" : artifact.authorityId,
+        confirmationToken: "fresh-token",
+        confirmationScopeDigest: scenario === "scope" ? "0".repeat(64) : command.reviewScopeDigest,
+        session: scenario === "source"
+          ? { ...source, targetSnapshotId: "b".repeat(64), metadata: { ...source.metadata, "sxsy-b122.providerHandshakeTarget": "b".repeat(64) } }
+          : source
+      };
+    };
+    vscode.choose("Use exact recipient set");
+    vscode.choose("Accept exact packet review");
+
+    await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!);
+
+    assert.equal(bridge.dispatched.length, 0, scenario);
+    assert.equal(bridge.workflowCancelled.length, 0, scenario);
+    assert.match(vscode.warnings.at(-1) ?? "", /changed|authority|scope|recipient|current/i, scenario);
+    await controller.stop();
+  }
+});
+
 test("completed provider workflows render the exact artifact-bound durable result and reject substituted artifacts", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
@@ -1101,6 +2108,7 @@ test("completed provider workflows render the exact artifact-bound durable resul
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const boundTarget = { ...target, targetSnapshotId: "a".repeat(64), taskId: "task-result", planRevision: "plan-result" };
+  await installExactProviderSession(controller, bridge, boundTarget);
   const artifact: ExtensionWorkflowArtifact = {
     id: "workflow-proof-result", digest: "b".repeat(64), action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: boundTarget.targetSnapshotId,
     sessionId: boundTarget.id, authorityId: "authority-result", payload: { kind: "proof" }, status: "prepared", executionAuthorized: false,
@@ -1129,7 +2137,8 @@ test("Option Provider collects only one question and context while the provider 
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/options" }] });
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  bridge.nextPreparation = { status: "prepared", summary: "Exact decision prepared.", authorityId: "authority-test", session: { ...target, targetSnapshotId: "a".repeat(64), taskId: "task-test", planRevision: "plan-test" } };
+  const providerTarget = await installExactProviderSession(controller, bridge, { ...target, targetSnapshotId: "a".repeat(64), taskId: "task-test", planRevision: "plan-test" });
+  bridge.nextPreparation = { status: "prepared", summary: "Exact decision prepared.", authorityId: "authority-test", session: providerTarget };
   vscode.input("Which implementation should we use?");
   vscode.input("The exact target must remain fail closed.");
 
@@ -1162,7 +2171,8 @@ function exactPlanReview(session: ExtensionManagedSession, scopeDigest = "5".rep
         { id: "step-review", summary: "Review the immutable plan.", ownedFiles: ["src/review.ts"], dependencies: [], status: "approved" },
         { id: "step-dispatch", summary: "Dispatch only the reviewed scope.", ownedFiles: ["src/dispatch.ts"], dependencies: ["step-review"], status: "proposed" }
       ],
-      decisions: ["Use the exact provider-observed plan revision."]
+      decisions: ["Use the exact provider-observed plan revision."],
+      expectedTargetTransition: { beforeTargetSnapshotId: session.targetSnapshotId!, expectedAfterTargetSnapshotId: session.targetSnapshotId!, expectation: "unchanged" }
     },
     scopeDigest,
     summary: "Provider-observed plan revision 7 is bound to the current target.",
@@ -1179,7 +2189,15 @@ test("Plan Approval presents the full protected plan then forwards one exact rev
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const confirmationScopeDigest = "5".repeat(64);
   const bound = { ...target, provider: "codex" as const, targetSnapshotId: "b".repeat(64), taskId: "task-plan", planRevision: "revision-7" };
-  const workflowReview = exactPlanReview(bound, confirmationScopeDigest);
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
+  const unchangedReview = exactPlanReview(bound, confirmationScopeDigest);
+  const expectedAfterTargetSnapshotId = "d".repeat(64);
+  const workflowReview = {
+    ...unchangedReview,
+    plan: { ...unchangedReview.plan, expectedTargetTransition: {
+      beforeTargetSnapshotId: unchangedReview.targetSnapshotId, expectedAfterTargetSnapshotId, expectation: "changed" as const
+    } }
+  };
   bridge.preparationSequence.push(
     { status: "incomplete", summary: "Review the exact protected plan.", session: bound, workflowReview },
     { status: "prepared", summary: "Current user confirmed the unchanged bound plan.", authorityId: "authority-plan", confirmationToken: "confirmation-plan", confirmationScopeDigest, session: bound }
@@ -1201,7 +2219,7 @@ test("Plan Approval presents the full protected plan then forwards one exact rev
   const reviewSurface = vscode.quickPickSurfaces.find((surface) => surface.placeHolder?.includes(confirmationScopeDigest));
   assert.ok(reviewSurface);
   const reviewText = reviewSurface.items.map((item) => typeof item === "string" ? item : [item.label, item.description, item.detail].filter(Boolean).join("\n")).join("\n");
-  for (const expected of [workflowReview.plan.objective, "step-review", "src/review.ts", "step-dispatch", "step-review", workflowReview.plan.decisions[0]!, "configured-provider-host@1.2.3", workflowReview.adapter.moduleSha256, workflowReview.providerContextDigest, workflowReview.targetSnapshotId, workflowReview.repositoryRoot, confirmationScopeDigest]) {
+  for (const expected of [workflowReview.plan.objective, "step-review", "src/review.ts", "step-dispatch", "step-review", workflowReview.plan.decisions[0]!, "configured-provider-host@1.2.3", workflowReview.adapter.moduleSha256, workflowReview.providerContextDigest, "Expected target transition • changed", workflowReview.targetSnapshotId, expectedAfterTargetSnapshotId, workflowReview.repositoryRoot, confirmationScopeDigest]) {
     assert.equal(reviewText.includes(expected), true, `protected plan review UI omitted ${expected}`);
   }
 });
@@ -1213,6 +2231,7 @@ test("Plan Approval cancel returns before a second preparation, confirmation, wo
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const bound = { ...target, provider: "claude" as const, targetSnapshotId: "b".repeat(64), taskId: "task-plan", planRevision: "revision-7" };
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
   bridge.preparationSequence.push({ status: "incomplete", summary: "Review the exact protected plan.", session: bound, workflowReview: exactPlanReview(bound) });
   vscode.choose("Cancel Plan Approval");
 
@@ -1231,6 +2250,7 @@ test("Plan Approval blocks when the protected review changes between presentatio
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const bound = { ...target, provider: "codex" as const, targetSnapshotId: "b".repeat(64), taskId: "task-plan", planRevision: "revision-7" };
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
   const review = exactPlanReview(bound);
   bridge.preparationSequence.push(
     { status: "incomplete", summary: "Review the exact protected plan.", session: bound, workflowReview: review },
@@ -1253,6 +2273,7 @@ test("Plan Approval refuses reuse when the token matches but the protected revie
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const bound = { ...target, provider: "codex" as const, targetSnapshotId: "b".repeat(64), taskId: "task-plan", planRevision: "revision-7" };
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
   const confirmationToken = "same-confirmation";
   const workflowReview = exactPlanReview(bound, "4".repeat(64));
   bridge.preparationSequence.push(
@@ -1280,6 +2301,7 @@ test("Plan Approval explicitly cancels an exact artifact bound to a different on
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const bound = { ...target, provider: "codex" as const, targetSnapshotId: "b".repeat(64), taskId: "task-plan", planRevision: "revision-7" };
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
   const workflowReview = exactPlanReview(bound);
   bridge.preparationSequence.push(
     { status: "incomplete", summary: "Review the exact protected plan.", session: bound, workflowReview },
@@ -1309,6 +2331,7 @@ test("multiple legacy prepared workflows present exact identities and cancel onl
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const bound = { ...target, targetSnapshotId: "c".repeat(64), taskId: "task-proof", planRevision: "revision-proof" };
+  await installExactProviderSession(controller, bridge, bound);
   bridge.nextPreparation = { status: "prepared", summary: "Exact workflow prepared.", authorityId: "authority-current", session: bound };
   const legacy = (id: string, digest: string, authorityId: string): ExtensionWorkflowArtifact => ({
     id, digest, action: "proof", repositoryRoot: "C:\\repo", targetSnapshotId: bound.targetSnapshotId!, sessionId: bound.id, authorityId,
@@ -1335,9 +2358,10 @@ test("Handoff normal delegates to the durable routing default while Alt remains 
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/handoff" }] });
   await controller.start();
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  const source = { ...target, targetSnapshotId: "c".repeat(64), taskId: "task-handoff", planRevision: "revision-3", capabilities: ["registered", "observable", "controllable", "mediated"] as const };
+  const source = { ...exactProviderSession(target, target.id, "codex", "C:\\repo", "c".repeat(64)), targetSnapshotId: "c".repeat(64), taskId: "task-handoff", planRevision: "revision-3", capabilities: ["registered"] as const };
   const recipient: ExtensionManagedSession = { ...source, id: "recipient-1", provider: "codex", surface: "vscode_window", metadata: { "sxsy-b122.kind": "recipient" } };
   bridge.listedSessions = [source, recipient];
+  await controller.refreshSessionNotifications();
   bridge.nextPreparation = { status: "prepared", summary: "Exact Handoff prepared.", authorityId: "authority-handoff", session: source };
   bridge.nextWorkflowArtifact = {
     id: "workflow-handoff", digest: "d".repeat(64), action: "handoff", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId!,
@@ -1345,9 +2369,31 @@ test("Handoff normal delegates to the durable routing default while Alt remains 
     status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
   };
 
+  bridge.nextDispatch = {
+    status: "completed", summary: "The exact recipient provider queued the immutable Handoff package.", data: {
+      artifactId: bridge.nextWorkflowArtifact.id,
+      artifactDigest: bridge.nextWorkflowArtifact.digest,
+      resultKind: "handoff",
+      workflowResult: { kind: "handoff", packageId: "handoff-default", recipientSessionId: recipient.id, acknowledged: false },
+      providerSummary: "The exact recipient provider queued the immutable Handoff package.",
+      externalId: "provider-handoff-queued"
+    }
+  };
   vscode.choose(`codex: ${recipient.id}`);
   await vscode.invoke("sxsy-b122.chord.handoff.normal");
+  assert.deepEqual(bridge.acknowledgedHandoffs, []);
+  assert.deepEqual(vscode.executedCommands, []);
   bridge.nextWorkflowArtifact = { ...bridge.nextWorkflowArtifact, action: "handoff_immediate", payload: { ...bridge.nextWorkflowArtifact.payload, packageId: "handoff-immediate", route: "immediate" } as never };
+  bridge.nextDispatch = {
+    status: "completed", summary: "The exact recipient provider accepted the immutable Handoff package.", data: {
+      artifactId: bridge.nextWorkflowArtifact.id,
+      artifactDigest: bridge.nextWorkflowArtifact.digest,
+      resultKind: "handoff",
+      workflowResult: { kind: "handoff", packageId: "handoff-immediate", recipientSessionId: recipient.id, acknowledged: true },
+      providerSummary: "The exact recipient provider accepted the immutable Handoff package.",
+      externalId: "provider-handoff-immediate"
+    }
+  };
   vscode.choose(`codex: ${recipient.id}`);
   await vscode.invoke("sxsy-b122.chord.handoff.alt");
 
@@ -1361,6 +2407,134 @@ test("Handoff normal delegates to the durable routing default while Alt remains 
   assert.equal(vscode.executedCommands.filter((command) => command === "workbench.action.focusActiveEditorGroup").length, 1);
 });
 
+test("Normal Handoff follows an immutable immediate default only after exact provider acknowledgement", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/handoff-default-immediate" }] });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = { ...exactProviderSession(target, target.id, "codex", "C:\\repo", "3".repeat(64)), targetSnapshotId: "3".repeat(64), taskId: "task-handoff-immediate-default", planRevision: "revision-immediate-default", capabilities: ["registered"] as const };
+  const recipient: ExtensionManagedSession = { ...source, id: "recipient-default-immediate", provider: "codex", surface: "vscode_window", metadata: { "sxsy-b122.kind": "recipient" } };
+  bridge.listedSessions = [source, recipient];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Exact default Handoff prepared.", authorityId: "authority-handoff", session: source };
+  bridge.nextWorkflowArtifact = {
+    id: "workflow-handoff-default-immediate", digest: "4".repeat(64), action: "handoff", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId,
+    sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: "handoff-default-immediate", route: "immediate", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
+    status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
+  };
+  bridge.nextDispatch = {
+    status: "completed", summary: "The exact provider accepted the default-immediate Handoff.", data: {
+      artifactId: bridge.nextWorkflowArtifact!.id, artifactDigest: bridge.nextWorkflowArtifact!.digest, resultKind: "handoff",
+      workflowResult: { kind: "handoff", packageId: "handoff-default-immediate", recipientSessionId: recipient.id, acknowledged: true },
+      providerSummary: "The exact provider accepted the default-immediate Handoff.", externalId: "provider-default-immediate"
+    }
+  };
+  vscode.choose(`codex: ${recipient.id}`);
+
+  await vscode.invoke("sxsy-b122.chord.handoff.normal");
+
+  assert.deepEqual(bridge.acknowledgedHandoffs, [{ handoffId: "handoff-default-immediate", recipientSessionId: recipient.id }]);
+  assert.deepEqual(vscode.executedCommands, ["workbench.action.focusActiveEditorGroup"]);
+  await controller.stop();
+});
+
+test("Normal queued Handoff rejects a provider acknowledgement claim and never focuses", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/handoff-queue-claim" }] });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = { ...exactProviderSession(target, target.id, "codex", "C:\\repo", "5".repeat(64)), targetSnapshotId: "5".repeat(64), taskId: "task-handoff-queue", planRevision: "revision-queue", capabilities: ["registered"] as const };
+  const recipient: ExtensionManagedSession = { ...source, id: "recipient-queue", provider: "codex", surface: "vscode_window", metadata: { "sxsy-b122.kind": "recipient" } };
+  bridge.listedSessions = [source, recipient];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Exact queued Handoff prepared.", authorityId: "authority-handoff", session: source };
+  bridge.nextWorkflowArtifact = {
+    id: "workflow-handoff-queue", digest: "6".repeat(64), action: "handoff", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId,
+    sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: "handoff-queue", route: "queue", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
+    status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
+  };
+  bridge.nextDispatch = {
+    status: "completed", summary: "A provider incorrectly claimed a queued package was acknowledged.", data: {
+      artifactId: bridge.nextWorkflowArtifact!.id, artifactDigest: bridge.nextWorkflowArtifact!.digest, resultKind: "handoff",
+      workflowResult: { kind: "handoff", packageId: "handoff-queue", recipientSessionId: recipient.id, acknowledged: true },
+      providerSummary: "A provider incorrectly claimed a queued package was acknowledged.", externalId: "provider-invalid-queue-ack"
+    }
+  };
+  vscode.choose(`codex: ${recipient.id}`);
+
+  await vscode.invoke("sxsy-b122.chord.handoff.normal");
+
+  assert.deepEqual(bridge.acknowledgedHandoffs, []);
+  assert.deepEqual(vscode.executedCommands, []);
+  assert.match(vscode.warnings.at(-1) ?? "", /queued.*reconciliation.*provider acknowledgement/i);
+  await controller.stop();
+});
+
+test("Alt Handoff leaves the immutable package unacknowledged and unfocused when the provider is unavailable or fails", async () => {
+  for (const providerStatus of ["unavailable", "failed"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/handoff-${providerStatus}` }] });
+    await controller.start();
+    const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const source = { ...exactProviderSession(target, target.id, "codex", "C:\\repo", "e".repeat(64)), targetSnapshotId: "e".repeat(64), taskId: "task-handoff-failure", planRevision: "revision-failure", capabilities: ["registered"] as const };
+    const recipient: ExtensionManagedSession = { ...source, id: `recipient-${providerStatus}`, provider: "codex", surface: "vscode_window", metadata: { "sxsy-b122.kind": "recipient" } };
+    const handoff: ExtensionHandoffPackage = {
+      id: `handoff-${providerStatus}`, digest: "f".repeat(64), repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId,
+      taskId: source.taskId, planRevision: source.planRevision, recipientSessionId: recipient.id, status: "immediate_focus_requested", executionAuthorized: false
+    };
+    bridge.listedSessions = [source, recipient];
+    await controller.refreshSessionNotifications();
+    bridge.listedHandoffs = [handoff];
+    bridge.nextPreparation = { status: "prepared", summary: "Exact immediate Handoff prepared.", authorityId: "authority-handoff", session: source };
+    bridge.nextWorkflowArtifact = {
+      id: `workflow-handoff-${providerStatus}`, digest: "a".repeat(64), action: "handoff_immediate", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId,
+      sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: handoff.id, route: "immediate", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
+      status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
+    };
+    bridge.nextDispatch = { status: providerStatus, summary: `The exact recipient provider is ${providerStatus}.`, effectDisposition: providerStatus === "failed" ? "ambiguous" : "not_started" };
+    vscode.choose(`codex: ${recipient.id}`);
+
+    await vscode.invoke("sxsy-b122.chord.handoff.alt");
+
+    assert.equal(bridge.dispatched.length, 1);
+    assert.deepEqual(bridge.acknowledgedHandoffs, []);
+    assert.deepEqual(vscode.executedCommands, []);
+    assert.equal(bridge.listedHandoffs[0]?.status, "immediate_focus_requested");
+    assert.match(vscode.warnings.at(-1) ?? "", new RegExp(providerStatus, "i"));
+    await controller.stop();
+  }
+});
+
+test("Alt Handoff rejects a bare completed dispatch without exact provider acknowledgement", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/handoff-bare" }] });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const source = { ...exactProviderSession(target, target.id, "codex", "C:\\repo", "1".repeat(64)), targetSnapshotId: "1".repeat(64), taskId: "task-handoff-bare", planRevision: "revision-bare", capabilities: ["registered"] as const };
+  const recipient: ExtensionManagedSession = { ...source, id: "recipient-bare", provider: "codex", surface: "vscode_window", metadata: { "sxsy-b122.kind": "recipient" } };
+  bridge.listedSessions = [source, recipient];
+  await controller.refreshSessionNotifications();
+  bridge.nextPreparation = { status: "prepared", summary: "Exact immediate Handoff prepared.", authorityId: "authority-handoff", session: source };
+  bridge.nextWorkflowArtifact = {
+    id: "workflow-handoff-bare", digest: "2".repeat(64), action: "handoff_immediate", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId,
+    sessionId: source.id, authorityId: "authority-handoff", payload: { kind: "handoff", packageId: "handoff-bare", route: "immediate", sourceSessionId: source.id, recipientSessionId: recipient.id, authorityId: "authority-handoff" },
+    status: "prepared", executionAuthorized: false, createdAt: "2026-08-25T00:00:00.000Z", updatedAt: "2026-08-25T00:00:00.000Z"
+  };
+  bridge.nextDispatch = { status: "completed", summary: "A route incorrectly claimed completion without provider evidence." };
+  vscode.choose(`codex: ${recipient.id}`);
+
+  await vscode.invoke("sxsy-b122.chord.handoff.alt");
+
+  assert.deepEqual(bridge.acknowledgedHandoffs, []);
+  assert.deepEqual(vscode.executedCommands, []);
+  assert.match(vscode.warnings.at(-1) ?? "", /reconciliation.*exact provider acknowledgement/i);
+  await controller.stop();
+});
+
 test("Find Blocked delivers the protected result and repeated presses focus the next exact session", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
@@ -1370,6 +2544,7 @@ test("Find Blocked delivers the protected result and repeated presses focus the 
   const source = { ...target, targetSnapshotId: "e".repeat(64), taskId: "task-focus", planRevision: "revision-2", capabilities: ["registered", "observable", "controllable", "mediated"] as const };
   const blocked = ["blocked-1", "blocked-2"].map((id, index): ExtensionManagedSession => ({ ...source, id, surface: "vscode_window", status: "verified_blocked", metadata: { "sxsy-b122.statusReason": `Blocked reason ${index + 1}` } }));
   bridge.listedSessions = [source, ...blocked];
+  await installExactProviderSession(controller, bridge, source);
   bridge.nextPreparation = { status: "prepared", summary: "Exact focus prepared.", authorityId: "authority-focus", session: source };
   const artifact = (selected: ExtensionManagedSession, index: number): ExtensionWorkflowArtifact => ({
     id: `workflow-focus-${index}`, digest: String(index + 1).repeat(64), action: "focus_blocked_agent", repositoryRoot: "C:\\repo", targetSnapshotId: source.targetSnapshotId!,
@@ -1437,7 +2612,7 @@ test("native voice start and provider switch bind an exact managed session witho
   vscode.choose(`${exactTarget.provider}: ${exactTarget.id}`);
   await vscode.invoke("sxsy-b122.chord.voice.normal");
 
-  bridge.nextDispatch = { status: "running", summary: "Native voice switch awaits host acknowledgement.", data: { hostActionId: `host-action:${"2".repeat(64)}`, hostActionKind: "switch_voice_provider", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  bridge.nextDispatch = { status: "running", summary: "Native voice switch awaits host acknowledgement.", data: { hostActionId: `host-action:${"2".repeat(64)}`, hostActionKind: "show_voice_center", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
   vscode.choose("chatgpt");
   vscode.choose("task-voice: handoff-test");
   vscode.choose("Transcripts off (recommended)");
@@ -1491,7 +2666,122 @@ test("repeated Voice Center presses toggle mute and resume while a reviewed cent
   assert.equal(vscode.quickPickSurfaces.some((surface) => surface.placeHolder?.includes("Native Voice Center")), true);
 });
 
-test("Alt Voice binds the active exact managed agent before protected workflow preparation", async () => {
+test("Shift+Alt Voice selects and binds one exact same-target managed session through the canonical durable host-action lifecycle", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-picker" }]
+  });
+  await controller.start();
+  const gitRoot = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const exactTarget = { ...gitRoot, targetSnapshotId: "a".repeat(64), taskId: "task-voice-picker", planRevision: "plan-voice-picker" };
+  const source: ExtensionManagedSession = {
+    ...exactProviderSession(exactTarget, "voice-picker-source"),
+    surface: "vscode_window",
+    metadata: { ...exactProviderSession(exactTarget, "voice-picker-source").metadata, "sxsy-b122.kind": "window" }
+  };
+  bridge.registered.splice(bridge.registered.findIndex((session) => session.id === gitRoot.id), 1, exactTarget);
+  bridge.registered.push(source);
+  bridge.listedSessions = [...controller.listKnownSessions().filter((session) => session.id !== gitRoot.id), exactTarget, source];
+  await controller.refreshSessionNotifications();
+  bridge.listedSessions = undefined;
+  bridge.currentVoiceValue = {
+    id: "voice-binding-picker", consentId: "voice-consent-picker", voiceSessionId: "voice-session-picker",
+    repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, contextPackageId: "handoff-picker", contextDigest: "c".repeat(64),
+    provider: "claude", transcript: "off", retentionMinutes: 0, status: "active"
+  };
+  vscode.choose(`${source.provider}: ${source.id}`);
+  await vscode.invoke("sxsy-b122.chord.voice.shift_alt");
+  assert.deepEqual(bridge.voiceBinds, [{ bindingId: "voice-binding-picker", managedSessionId: source.id }], JSON.stringify({ warnings: vscode.warnings, claims: bridge.deliveredHostActionClaims, bindings: bridge.hostActionClaimBindings, source, sessions: controller.listKnownSessions() }));
+  assert.equal(bridge.prepared.length, 1);
+  assert.equal(bridge.dispatched.length, 1);
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(bridge.authorizedHostActions.length, 1);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+  assert.equal(bridge.hostActionClaimBindings.at(-1)?.windowSessionId, controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")?.id);
+  await controller.stop();
+});
+
+test("synchronous Voice dispatch owns its queued claim while a competing poll waits, then settles exactly once", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  let releaseDispatch!: () => void;
+  bridge.dispatchReturnGate = new Promise<void>((resolve) => { releaseDispatch = resolve; });
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(), hostActionPollIntervalMs: 10,
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-race" }]
+  });
+  await controller.start();
+  const source = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+  bridge.currentVoiceValue = {
+    id: "voice-binding-race", consentId: "voice-consent-race", voiceSessionId: "voice-session-race", repositoryRoot: source.workspaceRoot!,
+    targetSnapshotId: source.targetSnapshotId!, contextPackageId: "handoff-race", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active"
+  };
+  vscode.choose("Bind active voice to exact selected session");
+  const dispatched = vscode.invoke("sxsy-b122.chord.voice.alt");
+  for (let attempt = 0; attempt < 20 && bridge.hostActionClaims.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 2));
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(bridge.hostActionClaims.length, 1, "the durable claim should remain queued while the dispatch response is gated");
+  assert.equal(bridge.authorizedHostActions.length, 0, "the background poll must not steal a claim owned by the active Voice dispatch");
+  releaseDispatch();
+  await dispatched;
+  assert.equal(bridge.voiceBinds.length, 1);
+  assert.equal(bridge.authorizedHostActions.length, 1);
+  assert.equal(bridge.completedHostActions.length, 1);
+  await controller.stop();
+});
+
+test("a durable targeted Voice claim survives restart for its exact window and rejects a different-window replay", async () => {
+  const context = new FakeContext();
+  const firstVscode = new FakeVscode([], ["C:\\repo"]);
+  firstVscode.focused = false;
+  const bridge = new FakeBridge();
+  const firstController = new ManagedSessionController(firstVscode.api, context, bridge, {
+    idFactory: sequenceFactory(), hostActionPollIntervalMs: 10, resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-restart" }]
+  });
+  await firstController.start();
+  const gitRoot = firstController.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const window = firstController.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const source = exactProviderSession(gitRoot, "voice-restart-source", "codex", "C:\\repo", "a".repeat(64));
+  bridge.registered.push(source);
+  bridge.hostActionClaims.push({
+    version: 1, claimId: "voice-restart-claim", claimToken: "voice-restart-token", hostActionId: `host-action:${"a".repeat(64)}`,
+    operationId: "operation-voice-restart", commandAction: "bind_voice_session", hostActionKind: "show_voice_center",
+    targetSnapshotId: source.targetSnapshotId!, sessionId: source.id, workspaceRoot: source.workspaceRoot!, windowSessionId: window.id,
+    adapterVersion: "unpackaged-test", capabilities: ["show_voice_center"], claimedAt: "2026-08-26T12:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z", actionExpiresAt: "2099-01-01T00:00:00.000Z"
+  });
+  await firstController.stop();
+
+  const restartedVscode = new FakeVscode([], ["C:\\repo"]);
+  restartedVscode.choose("Bind active voice to exact selected session");
+  bridge.currentVoiceValue = {
+    id: "voice-binding-restart", consentId: "voice-consent-restart", voiceSessionId: "voice-session-restart", repositoryRoot: source.workspaceRoot!,
+    targetSnapshotId: source.targetSnapshotId!, contextPackageId: "handoff-restart", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0, status: "active"
+  };
+  const restarted = new ManagedSessionController(restartedVscode.api, context, bridge, {
+    idFactory: sequenceFactory(), hostActionPollIntervalMs: 10, resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-restart" }]
+  });
+  await restarted.start();
+  for (let attempt = 0; attempt < 50 && bridge.completedHostActions.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 2));
+  assert.deepEqual(bridge.voiceBinds, [{ bindingId: "voice-binding-restart", managedSessionId: source.id }]);
+  assert.equal(bridge.completedHostActions[0]?.claimId, "voice-restart-claim");
+
+  bridge.hostActionClaims.push({
+    version: 1, claimId: "voice-wrong-window-claim", claimToken: "voice-wrong-window-token", hostActionId: `host-action:${"b".repeat(64)}`,
+    operationId: "operation-voice-wrong-window", commandAction: "bind_voice_session", hostActionKind: "show_voice_center",
+    targetSnapshotId: source.targetSnapshotId!, sessionId: source.id, workspaceRoot: source.workspaceRoot!, windowSessionId: "different-vscode-window",
+    adapterVersion: "unpackaged-test", capabilities: ["show_voice_center"], claimedAt: "2026-08-26T12:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z", actionExpiresAt: "2099-01-01T00:00:00.000Z"
+  });
+  for (let attempt = 0; attempt < 50 && !restartedVscode.warnings.some((message) => /changed its exact Registered window/i.test(message)); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 2));
+  assert.equal(bridge.authorizedHostActions.length, 1, "a different window must not authorize or replay the durable claim");
+  assert.equal(bridge.completedHostActions.length, 1);
+  await restarted.stop();
+});
+
+test("Alt Voice uses the canonical prepared dispatch, durable claim, authorization, exact bind, and settlement lifecycle", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const activeTerminal = new FakeTerminal("Focused Codex");
   vscode.terminals.push(activeTerminal);
@@ -1509,7 +2799,14 @@ test("Alt Voice binds the active exact managed agent before protected workflow p
     status: "running",
     targetSnapshotId: "snapshot-test",
     taskId: "task-voice",
-    planRevision: "revision-voice"
+    planRevision: "revision-voice",
+    capabilities: ["registered"],
+    metadata: {
+      ...registered.metadata,
+      "sxsy-b122.kind": "terminal",
+      "sxsy-b122.providerHandshake": "exact-route-v1",
+      "sxsy-b122.providerHandshakeTarget": "snapshot-test"
+    }
   };
   bridge.registered.splice(bridge.registered.indexOf(registered), 1, exactManaged);
   await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Focused Codex", provider: "codex" });
@@ -1527,20 +2824,90 @@ test("Alt Voice binds the active exact managed agent before protected workflow p
     status: "active"
   };
 
+  vscode.choose("Bind active voice to exact selected session");
   await vscode.invoke("sxsy-b122.chord.voice.alt");
 
   assert.deepEqual(bridge.voiceBinds, [{ bindingId: "voice-binding-test", managedSessionId: exactManaged.id }]);
-  assert.deepEqual(bridge.voiceBindingSequence, ["bind", "prepare"]);
-  assert.equal(bridge.workflowPrepared.at(-1)?.action, "bind_voice_session");
-  assert.equal(bridge.dispatched.at(-1)?.sessionId, exactManaged.id);
+  assert.deepEqual(bridge.voiceBindingSequence, ["bind"]);
+  assert.equal(bridge.prepared.length, 1);
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(bridge.dispatched.length, 1);
+  assert.equal(bridge.authorizedHostActions.length, 1);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+  assert.match(vscode.information.join(" "), /bound active.*exact/i);
 
-  const dispatched = bridge.dispatched.length;
   bridge.currentVoiceValue = { ...bridge.currentVoiceValue!, targetSnapshotId: "different-snapshot", managedSessionId: undefined };
   await vscode.invoke("sxsy-b122.chord.voice.alt");
   assert.equal(bridge.voiceBinds.length, 1);
-  assert.equal(bridge.workflowPrepared.length, 1);
-  assert.equal(bridge.dispatched.length, dispatched);
-  assert.match(vscode.warnings.at(-1) ?? "", /exact repository and TargetSnapshot/i);
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(bridge.dispatched.length, 2);
+  assert.match(vscode.warnings.at(-1) ?? "", /different exact targets|exact repository and TargetSnapshot/i);
+});
+
+test("Alt Voice rejects stale provider or inactive voice before bind and rejects a substituted acknowledgement without generic fallback", async () => {
+  const scenarios = ["stale", "inactive", "substituted"] as const;
+  for (const scenario of scenarios) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/voice-${scenario}` }] });
+    await controller.start();
+    const gitRoot = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const exact = { ...exactProviderSession(gitRoot, "voice-exact"), capabilities: ["registered"] as const, ...(scenario === "stale" ? { status: "stale" as const } : {}) };
+    bridge.registered.push(exact);
+    bridge.listedSessions = [...controller.listKnownSessions(), exact];
+    await controller.refreshSessionNotifications();
+    bridge.currentVoiceValue = {
+      id: "voice-binding-negative", consentId: "voice-consent-negative", voiceSessionId: "voice-session-negative",
+      managedSessionId: "previous-exact-session", repositoryRoot: "C:\\repo", targetSnapshotId: "a".repeat(64),
+      contextPackageId: "handoff-negative", contextDigest: "c".repeat(64), provider: "claude", transcript: "off", retentionMinutes: 0,
+      status: scenario === "inactive" ? "muted" : "active"
+    };
+    if (scenario === "substituted") bridge.nextVoiceBind = { ...bridge.currentVoiceValue, managedSessionId: "substituted-session" };
+    if (scenario === "substituted") vscode.choose("Bind active voice to exact selected session");
+
+    await controller.dispatchChord(chordFor("VOICE", "alt")!);
+
+    assert.equal(bridge.voiceBinds.length, scenario === "substituted" ? 1 : 0, scenario);
+    assert.equal(bridge.prepared.length, scenario === "stale" ? 0 : 1, scenario);
+    assert.equal(bridge.workflowPrepared.length, 0, scenario);
+    assert.equal(bridge.dispatched.length, scenario === "stale" ? 0 : 1, scenario);
+    if (scenario === "substituted") assert.match(vscode.warnings.at(-1) ?? "", /substituted|rejected.*binding|changed.*session/i);
+    await controller.stop();
+  }
+});
+
+test("Alt Voice cancellation preserves the prior exact binding and performs no mutation", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/voice-cancel" }] });
+  await controller.start();
+  const selected = await installExactProviderSession(controller, bridge);
+  bridge.currentVoiceValue = {
+    id: "voice-binding-cancel",
+    consentId: "voice-consent-cancel",
+    voiceSessionId: "voice-session-cancel",
+    managedSessionId: "prior-session",
+    repositoryRoot: selected.workspaceRoot!,
+    targetSnapshotId: selected.targetSnapshotId!,
+    contextPackageId: "handoff-cancel",
+    contextDigest: "c".repeat(64),
+    provider: "claude",
+    transcript: "off",
+    retentionMinutes: 0,
+    status: "active"
+  };
+  vscode.choose("Cancel without rebinding voice");
+
+  await controller.dispatchChord(chordFor("VOICE", "alt")!);
+
+  assert.equal(bridge.voiceBinds.length, 0);
+  assert.equal(bridge.currentVoiceValue.managedSessionId, "prior-session");
+  assert.equal(bridge.prepared.length, 1);
+  assert.equal(bridge.workflowPrepared.length, 0);
+  assert.equal(bridge.dispatched.length, 1);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
+  assert.match(vscode.information.join(" "), /cancelled.*prior.*binding/i);
+  await controller.stop();
 });
 
 test("local commit collects an exact structured Git review before dispatch", async () => {
@@ -1552,6 +2919,7 @@ test("local commit collects an exact structured Git review before dispatch", asy
     resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/review", changedPaths: ["src/safe.ts", "README.md"] }]
   });
   await controller.start();
+  await installExactProviderSession(controller, bridge);
   vscode.input("src/safe.ts");
   vscode.input("feat: reviewed local change");
 
@@ -1583,6 +2951,7 @@ test("PR upsert reviews title and body and opens only the companion-verified PR 
     openExternal: async (url) => { opened.push(url); return true; }
   });
   await controller.start();
+  await installExactProviderSession(controller, bridge);
   vscode.input("main");
   vscode.input("Reviewed PR title");
   vscode.input("Reviewed PR body");
@@ -1617,6 +2986,7 @@ test("refuses a dispatch URL that is not rebound by the final durable authorizat
     openExternal: async (url) => { opened.push(url); return true; }
   });
   await controller.start();
+  await installExactProviderSession(controller, bridge);
 
   await vscode.invoke("sxsy-b122.chord.run.shift_alt");
 
@@ -1664,21 +3034,142 @@ test("picker-or-stop selects one Git target and forwards only companion-prepared
     ]
   });
   await controller.start();
+  const roots = controller.listKnownSessions().filter((session) => session.metadata["sxsy-b122.kind"] === "git-root");
+  const providerA = exactProviderSession(roots.find((session) => session.workspaceRoot === "C:\\repo-a")!, "provider-a", "codex", "C:\\repo-a", "a".repeat(64));
+  const providerB = exactProviderSession(roots.find((session) => session.workspaceRoot === "C:\\repo-b")!, "provider-b", "codex", "C:\\repo-b", "b".repeat(64));
+  bridge.registered.push(providerA, providerB);
+  bridge.listedSessions = [...controller.listKnownSessions(), providerA, providerB];
+  await controller.refreshSessionNotifications();
+  bridge.listedSessions = undefined;
 
-  vscode.choose("C:\\repo-b");
+  vscode.choose(`codex: ${providerB.id}`);
   await vscode.invoke("sxsy-b122.chord.shield.normal");
-  const selected = bridge.registered.find((session) => session.workspaceRoot === "C:\\repo-b" && session.metadata["sxsy-b122.kind"] === "git-root");
-  assert.ok(selected);
-  assert.equal(bridge.prepared.at(-1)?.sessionId, selected.id);
-  assert.equal(bridge.dispatched.at(-1)?.sessionId, selected.id);
+  assert.equal(bridge.prepared.at(-1)?.sessionId, providerB.id);
+  assert.equal(bridge.dispatched.at(-1)?.sessionId, providerB.id);
   assert.equal(bridge.dispatched.at(-1)?.authorityId, "authority-test");
   assert.equal(bridge.dispatched.at(-1)?.confirmationToken, "confirmation-test");
 
   bridge.nextPreparation = { status: "blocked", summary: "User presence was denied." };
   const before = bridge.dispatched.length;
+  vscode.choose(`codex: ${providerB.id}`);
   await vscode.invoke("sxsy-b122.chord.shield.normal");
   assert.equal(bridge.dispatched.length, before);
   assert.match(vscode.warnings.at(-1) ?? "", /user presence was denied/i);
+});
+
+test("all four automation chords present the complete immutable manifest then dispatch only the reviewed provider binding", async () => {
+  const cases = [
+    { action: "compound_capture", command: "sxsy-b122.chord.compound.normal" },
+    { action: "compound_refresh", command: "sxsy-b122.chord.compound.shift" },
+    { action: "lfg", command: "sxsy-b122.chord.compound.shift_alt" },
+    { action: "repair_mission", command: "sxsy-b122.chord.pipeline.ctrl_shift_alt" }
+  ] as const;
+  for (const scenario of cases) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/automation-review" }]
+    });
+    await controller.start();
+    const source = await installExactProviderSession(controller, bridge);
+    bridge.listedSessions = undefined;
+    const instructionBytes = Buffer.from("# Exact reviewed project instructions\n", "utf8");
+    const instructionAfterDigest = createHash("sha256").update(instructionBytes).digest("hex");
+    const proposal = scenario.action === "compound_capture"
+      ? { ...(reviewedAutomationProposals.compound_capture as Extract<AutomationOperationProposal, { kind: "compound_capture" }>), nonTrivialRationale: "complete-manifest-segment-".repeat(120), instructionFileMutation: {
+          kind: "edit_existing" as const, path: "AGENTS.md", beforeDigest: "4".repeat(64), afterDigest: instructionAfterDigest,
+          content: { encoding: "base64" as const, byteLength: instructionBytes.length, data: instructionBytes.toString("base64") }
+        } }
+      : reviewedAutomationProposals[scenario.action];
+    const review = automationManifestReview(source, scenario.action, proposal);
+    bridge.preparationSequence.push(
+      { status: "incomplete", summary: "Review exact manifest.", session: source, authorityId: review.manifest.authorityId, automationReview: review },
+      { status: "prepared", summary: "Exact manifest confirmed.", session: source, authorityId: review.manifest.authorityId, confirmationToken: "confirmation-automation", confirmationScopeDigest: review.reviewScopeDigest, confirmationExpiresAt: "2026-08-26T12:09:00.000Z" }
+    );
+    vscode.choose(scenario.action === "compound_capture"
+      ? "Approve exact compound_capture manifest and instruction-file edit"
+      : `Approve exact ${scenario.action} manifest`);
+    await vscode.invoke(scenario.command);
+
+    assert.equal(bridge.prepared.length, 2, scenario.action);
+    assert.equal(bridge.prepared[0]?.sessionId, source.id, scenario.action);
+    assert.equal(bridge.prepared[0]?.effectSessionId, undefined, scenario.action);
+    assert.deepEqual({
+      reviewScopeDigest: bridge.prepared[1]?.reviewScopeDigest,
+      reviewArtifactId: bridge.prepared[1]?.reviewArtifactId,
+      reviewArtifactDigest: bridge.prepared[1]?.reviewArtifactDigest
+    }, { reviewScopeDigest: review.reviewScopeDigest, reviewArtifactId: review.manifest.id, reviewArtifactDigest: review.manifest.digest }, scenario.action);
+    assert.equal(bridge.dispatched.length, 1, `${scenario.action}: ${vscode.warnings.join(" | ")}`);
+    assert.equal(bridge.dispatched[0]?.sessionId, source.id, scenario.action);
+    assert.equal(bridge.dispatched[0]?.confirmationScopeDigest, review.reviewScopeDigest, scenario.action);
+    if (scenario.action === "compound_capture") {
+      const rendered = vscode.quickPickSurfaces.flatMap((surface) => surface.items)
+        .filter((item): item is QuickPickItemLike => typeof item !== "string" && item.label.startsWith("Exact proposal JSON"))
+        .map((item) => item.detail ?? "").join("");
+      assert.equal(rendered, JSON.stringify(review.manifest.proposal), "the UI must render every proposal character without truncation");
+      assert.ok(vscode.quickPickSurfaces.at(-1)!.items.filter((item) => typeof item !== "string" && item.label.startsWith("Exact proposal JSON")).length > 1);
+      const manifestSurface = vscode.quickPickSurfaces.find((surface) => surface.placeHolder?.includes("Review every field of compound_capture"));
+      assert.ok(manifestSurface);
+      const instructionRow = manifestSurface.items.find((item) => typeof item !== "string" && item.label === "Instruction-file edit • agents.md");
+      assert.ok(instructionRow && typeof instructionRow !== "string", JSON.stringify({ proposal: review.manifest.proposal, labels: manifestSurface.items.map((item) => typeof item === "string" ? item : item.label) }));
+      assert.match(`${instructionRow.description}\n${instructionRow.detail}`, new RegExp(`4{64}.*${instructionAfterDigest}`, "s"));
+      const approvalRow = manifestSurface.items.find((item) => typeof item !== "string" && item.label.startsWith("Approve") && item.label.includes("instruction-file edit"));
+      assert.match(typeof approvalRow === "string" ? approvalRow : approvalRow?.detail ?? "", /explicitly consent.*agents\.md/i);
+    }
+    await controller.stop();
+  }
+});
+
+test("Compound Capture instruction-file edit cancellation preserves the exact manifest without confirmation or dispatch", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/instruction-consent" }]
+  });
+  await controller.start();
+  const source = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+  const bytes = Buffer.from("# Cancelled instruction edit\n", "utf8");
+  const review = automationManifestReview(source, "compound_capture", {
+    ...(reviewedAutomationProposals.compound_capture as Extract<AutomationOperationProposal, { kind: "compound_capture" }>),
+    instructionFileMutation: {
+      kind: "edit_existing", path: "CLAUDE.md", beforeDigest: "1".repeat(64), afterDigest: createHash("sha256").update(bytes).digest("hex"),
+      content: { encoding: "base64", byteLength: bytes.length, data: bytes.toString("base64") }
+    }
+  });
+  bridge.preparationSequence.push({ status: "incomplete", summary: "Review exact instruction edit.", session: source, authorityId: review.manifest.authorityId, automationReview: review });
+  vscode.choose("Cancel automation review");
+  await vscode.invoke("sxsy-b122.chord.compound.normal");
+  assert.equal(bridge.prepared.length, 1);
+  assert.equal(bridge.dispatched.length, 0);
+  const surface = vscode.quickPickSurfaces.find((candidate) => candidate.placeHolder?.includes("Review every field of compound_capture"))!;
+  assert.equal(surface.items.some((item) => typeof item !== "string" && item.label === "Instruction-file edit • claude.md"), true, JSON.stringify({ proposal: review.manifest.proposal, labels: surface.items.map((item) => typeof item === "string" ? item : item.label) }));
+  assert.match(vscode.information.at(-1) ?? "", /did not approve.*no confirmation or dispatch/i);
+  await controller.stop();
+});
+
+test("automation cancel and expired final confirmation stop before dispatch", async () => {
+  for (const mode of ["cancel", "expired"] as const) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/automation-stop" }]
+    });
+    await controller.start();
+    const source = await installExactProviderSession(controller, bridge);
+    bridge.listedSessions = undefined;
+    const review = automationManifestReview(source, "repair_mission");
+    bridge.preparationSequence.push({ status: "incomplete", summary: "Review exact manifest.", session: source, authorityId: review.manifest.authorityId, automationReview: review });
+    if (mode === "expired") {
+      vscode.choose("Approve exact repair_mission manifest");
+      bridge.preparationSequence.push({ status: "prepared", summary: "Expired.", session: source, authorityId: review.manifest.authorityId, confirmationToken: "confirmation-expired", confirmationScopeDigest: review.reviewScopeDigest, confirmationExpiresAt: "2026-08-26T12:00:59.000Z" });
+    }
+    await vscode.invoke("sxsy-b122.chord.pipeline.ctrl_shift_alt");
+    assert.equal(bridge.dispatched.length, 0, mode);
+    assert.equal(bridge.prepared.length, mode === "cancel" ? 1 : 2, mode);
+    assert.match(mode === "cancel" ? vscode.information.at(-1) ?? "" : vscode.warnings.at(-1) ?? "", mode === "cancel" ? /did not approve.*no confirmation or dispatch/i : /final preparation changed or omitted/i);
+    await controller.stop();
+  }
 });
 
 test("forwards Run/Debug to the companion and performs only safe local host actions", async (context) => {
@@ -1742,6 +3233,9 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
   assert.equal(bridge.registered.find((session) => session.id === bridge.adopted.at(-1)?.sessionId)?.workspaceRoot, providerWorkspace);
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 
+  const providerSource = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+
   bridge.nextDispatch = { status: "unavailable", summary: "No verified execution broker is attached." };
   await vscode.invoke("sxsy-b122.chord.run.normal");
   assert.equal(bridge.dispatched.at(-1)?.control, "RUN");
@@ -1765,12 +3259,18 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
   assert.equal(vscode.started[0]?.noDebug, false);
   const boundDebugSession = bridge.registered.find((session) => session.metadata["sxsy-b122.debugOriginOperationId"] === "operation-debug-1" && session.workspaceRoot === "C:\\repo");
   assert.ok(boundDebugSession);
+  const stopReview = queueReviewedDebugStop(bridge, providerSource, boundDebugSession);
+  vscode.choose(`Stop exact debug session ${stopReview.debugSessionId}`);
   bridge.nextDispatch = { status: "running", summary: "Exact debug stop awaits host acknowledgement.", operationId: "operation-debug-stop-1", data: {
     hostActionId: `host-action:${"f".repeat(64)}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
-    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1", hostActionDebugOriginOperationId: "operation-debug-1"
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1",
+    hostActionDebugEffectSessionId: boundDebugSession.id, hostActionDebugBindingId: stopReview.debugBindingId, hostActionDebugOriginOperationId: "operation-debug-1"
   } };
   await vscode.invoke("sxsy-b122.chord.run.alt");
-  assert.equal(bridge.dispatched.at(-1)?.sessionId, boundDebugSession.id);
+  assert.equal(bridge.prepared.at(-2)?.sessionId, providerSource.id);
+  assert.equal(bridge.prepared.at(-2)?.effectSessionId, boundDebugSession.id);
+  assert.equal(bridge.prepared.at(-1)?.effectSessionId, undefined);
+  assert.equal(bridge.dispatched.at(-1)?.sessionId, providerSource.id);
   assert.equal(vscode.stopped.at(-1)?.id, "debug-1");
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
 
@@ -1781,14 +3281,77 @@ test("forwards Run/Debug to the companion and performs only safe local host acti
 
   bridge.nextDispatch = { status: "running", summary: "Venv awaits host acknowledgement.", data: { hostActionId: `host-action:${"2".repeat(64)}`, hostActionKind: "configure_python_venv", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo", hostActionPythonInterpreter: "C:\\repo\\.venv\\Scripts\\python.exe" } };
   await vscode.invoke("sxsy-b122.chord.sandbox.normal");
-  assert.deepEqual(vscode.configurationUpdates.at(-1), { section: "python", key: "defaultInterpreterPath", value: "C:\\repo\\.venv\\Scripts\\python.exe", target: 3 });
-  assert.equal(vscode.terminalOptions.at(-1)?.cwd, "C:\\repo");
-  assert.equal(vscode.terminalOptions.at(-1)?.env?.VIRTUAL_ENV, "C:\\repo\\.venv");
+  assert.equal(vscode.configurationUpdates.length, 0);
+  assert.match(vscode.warnings.at(-1) ?? "", /malformed host-action/i);
 
-  bridge.nextDispatch = { status: "blocked", summary: "Acceptance evidence is incomplete." };
+  bridge.nextPreparation = { status: "blocked", summary: "Acceptance evidence is incomplete." };
   await vscode.invoke("sxsy-b122.chord.pipeline.ctrl_shift_alt");
   assert.match(vscode.warnings.at(-1) ?? "", /blocked/i);
-  assert.equal(vscode.createdTerminals.length, 2);
+  assert.equal(vscode.createdTerminals.length, 1);
+});
+
+test("Python venv selection reattests exact path, digest, and file identity before configuration and again before terminal creation", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "sxsy-vscode-venv-identity-"));
+  context.after(async () => { await rm(root, { recursive: true, force: true }); });
+  const scripts = join(root, ".venv", "Scripts");
+  await mkdir(scripts, { recursive: true });
+  const requestedInterpreter = join(scripts, "python.exe");
+  await writeFile(requestedInterpreter, Buffer.from("verified test interpreter"));
+  const workspaceRoot = await realpath(root);
+  const interpreter = await realpath(requestedInterpreter);
+  const identity = async () => {
+    const metadata = await stat(interpreter);
+    const exact = await stat(interpreter, { bigint: true });
+    return {
+      canonicalPath: interpreter,
+      sha256: createHash("sha256").update(await readFile(interpreter)).digest("hex"),
+      device: exact.dev.toString(10), inode: exact.ino.toString(10), size: metadata.size, modifiedMs: metadata.mtimeMs
+    };
+  };
+  const vscode = new FakeVscode([], [workspaceRoot]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:00:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: workspaceRoot, branch: "feature/venv-identity" }]
+  });
+  await controller.start();
+  await installExactProviderSession(controller, bridge,
+    controller.listKnownSessions().find((session) => session.workspaceRoot === workspaceRoot));
+  bridge.listedSessions = undefined;
+  const exactIdentity = await identity();
+  bridge.nextDispatch = { status: "running", summary: "Exact venv awaits host acknowledgement.", data: {
+    hostActionId: `host-action:${"4".repeat(64)}`, hostActionKind: "configure_python_venv", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    hostActionWorkspaceRoot: workspaceRoot, hostActionPythonInterpreter: interpreter, hostActionPythonInterpreterIdentity: exactIdentity
+  } };
+  await vscode.invoke("sxsy-b122.chord.sandbox.normal");
+  assert.deepEqual(vscode.configurationUpdates.at(-1), { section: "python", key: "defaultInterpreterPath", value: interpreter, target: 3 }, vscode.warnings.join(" | "));
+  assert.equal(vscode.terminalOptions.at(-1)?.cwd, workspaceRoot);
+  assert.equal(vscode.terminalOptions.at(-1)?.env?.VIRTUAL_ENV, join(workspaceRoot, ".venv"));
+
+  await writeFile(interpreter, Buffer.from("substituted interpreter bytes are different"));
+  bridge.nextDispatch = { ...bridge.nextDispatch, data: { ...bridge.nextDispatch.data, hostActionId: `host-action:${"5".repeat(64)}` } };
+  const configuredBeforeSubstitution = vscode.configurationUpdates.length;
+  const terminalsBeforeSubstitution = vscode.createdTerminals.length;
+  await vscode.invoke("sxsy-b122.chord.sandbox.normal");
+  assert.equal(vscode.configurationUpdates.length, configuredBeforeSubstitution);
+  assert.equal(vscode.createdTerminals.length, terminalsBeforeSubstitution);
+  assert.match(vscode.warnings.at(-1) ?? "", /changed path, content, file identity, size, or modification time/i);
+
+  await writeFile(interpreter, Buffer.from("fresh exact interpreter for churn"));
+  const freshIdentity = await identity();
+  vscode.onConfigurationUpdate = async () => {
+    vscode.onConfigurationUpdate = undefined;
+    await writeFile(interpreter, Buffer.from("changed after exact configuration update"));
+  };
+  bridge.nextDispatch = { status: "running", summary: "Exact venv awaits final identity recheck.", data: {
+    hostActionId: `host-action:${"6".repeat(64)}`, hostActionKind: "configure_python_venv", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    hostActionWorkspaceRoot: workspaceRoot, hostActionPythonInterpreter: interpreter, hostActionPythonInterpreterIdentity: freshIdentity
+  } };
+  const terminalsBeforeChurn = vscode.createdTerminals.length;
+  await vscode.invoke("sxsy-b122.chord.sandbox.normal");
+  assert.equal(vscode.createdTerminals.length, terminalsBeforeChurn, "post-configuration interpreter churn must stop terminal creation");
+  assert.equal(bridge.completedHostActions.at(-1)?.effectDisposition, "ambiguous", "configuration may have committed before the second identity guard failed");
+  await controller.stop();
 });
 
 test("durable debug binding survives a lost start acknowledgement and extension restart before exact Alt-Run stop", async () => {
@@ -1801,6 +3364,8 @@ test("durable debug binding survives a lost start acknowledgement and extension 
     resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/debug-recovery" }]
   });
   await firstController.start();
+  await installExactProviderSession(firstController, firstBridge);
+  firstBridge.listedSessions = undefined;
   firstBridge.nextDispatch = { status: "running", summary: "Verified debug start awaits host acknowledgement.", operationId: "operation-debug-recovery", data: {
     hostActionId: `host-action:${"7".repeat(64)}`, hostActionKind: "start_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
     hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test"
@@ -1826,17 +3391,138 @@ test("durable debug binding survives a lost start acknowledgement and extension 
     resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/debug-recovery" }]
   });
   await restartedController.start();
+  const restartedProviderSource = await installExactProviderSession(restartedController, restartedBridge);
   const recovered = restartedBridge.registered.find((session) => session.metadata["sxsy-b122.debugOriginOperationId"] === "operation-debug-recovery");
   assert.ok(recovered);
+  const stopReview = queueReviewedDebugStop(restartedBridge, restartedProviderSource, recovered);
+  restartedVscode.choose(`Stop exact debug session ${stopReview.debugSessionId}`);
   restartedBridge.nextDispatch = { status: "running", summary: "Recovered exact debug stop awaits host acknowledgement.", operationId: "operation-debug-recovery-stop", data: {
     hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
-    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1", hostActionDebugOriginOperationId: "operation-debug-recovery"
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1",
+    hostActionDebugEffectSessionId: recovered.id, hostActionDebugBindingId: stopReview.debugBindingId, hostActionDebugOriginOperationId: "operation-debug-recovery"
   } };
   await restartedVscode.invoke("sxsy-b122.chord.run.alt");
-  assert.equal(restartedBridge.dispatched.at(-1)?.sessionId, recovered.id);
+  assert.equal(restartedBridge.prepared.at(-2)?.effectSessionId, recovered.id);
+  assert.equal(restartedBridge.prepared.at(-1)?.effectSessionId, undefined);
+  assert.equal(restartedBridge.dispatched.at(-1)?.sessionId, restartedProviderSource.id);
   assert.equal(restartedVscode.stopped.at(-1)?.id, "debug-1");
   assert.equal((context.values.get("sxsy-b122.debugBindings.v1") as unknown[]).length, 0);
   await restartedController.stop();
+});
+
+test("normal Run registers one exact durable managed child and committed Alt-Run stop retires it after restart without selecting another repository", async () => {
+  const context = new FakeContext();
+  const firstVscode = new FakeVscode([], ["C:\\repo", "D:\\other"]);
+  const firstBridge = new FakeBridge();
+  const firstController = new ManagedSessionController(firstVscode.api, context, firstBridge, {
+    now: () => "2026-08-26T12:00:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/managed-run" }, { gitRoot: "D:\\other", branch: "feature/other" }]
+  });
+  await firstController.start();
+  const source = await installExactProviderSession(firstController, firstBridge,
+    firstController.listKnownSessions().find((session) => session.workspaceRoot === "C:\\repo"));
+  firstBridge.listedSessions = undefined;
+  const managedProcessId = `managed:${"1".repeat(64)}`;
+  firstBridge.nextDispatch = {
+    status: "running", summary: "Exact managed Run child is running.", operationId: "operation-managed-run-origin",
+    data: { managedProcessId, managedRun: {
+      version: 1, kind: "managed-run", managedProcessId, originOperationId: "operation-managed-run-origin",
+      originSessionId: source.id, workspaceRoot: source.workspaceRoot, targetSnapshotId: source.targetSnapshotId
+    } }
+  };
+  await firstVscode.invoke("sxsy-b122.chord.run.normal");
+  const effect = firstBridge.registered.find((session) => session.metadata["sxsy-b122.managedProcessId"] === managedProcessId);
+  assert.ok(effect);
+  assert.equal(effect.provider, "generic");
+  assert.equal(effect.surface, "vscode_window");
+  assert.deepEqual(effect.capabilities, ["registered"]);
+  assert.equal(effect.metadata["sxsy-b122.runOriginSessionId"], source.id);
+  await firstController.stop();
+
+  const restartedVscode = new FakeVscode([], ["C:\\repo", "D:\\other"]);
+  const restartedBridge = new FakeBridge();
+  restartedBridge.registered.push(...firstBridge.registered);
+  const otherSource = exactProviderSession(source, "other-provider-source", "codex", "D:\\other", "2".repeat(64));
+  const otherEffect: ExtensionManagedSession = {
+    ...effect, id: "managed-run-effect:other", workspaceRoot: "D:\\other", targetSnapshotId: otherSource.targetSnapshotId,
+    metadata: { ...effect.metadata, "sxsy-b122.managedProcessId": `managed:${"2".repeat(64)}`, "sxsy-b122.runOriginSessionId": otherSource.id,
+      "sxsy-b122.runWorkspaceRoot": "D:\\other", "sxsy-b122.runOriginOperationId": "operation-other-run" }
+  };
+  restartedBridge.registered.push(otherSource, otherEffect);
+  const restartedController = new ManagedSessionController(restartedVscode.api, context, restartedBridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/managed-run" }]
+  });
+  await restartedController.start();
+  const restartedSource = await installExactProviderSession(restartedController, restartedBridge, source);
+  restartedBridge.listedSessions = undefined;
+  queueReviewedManagedRunStop(restartedBridge, restartedSource, effect);
+  restartedVscode.choose(`Stop exact managed Run process ${managedProcessId}`);
+  restartedBridge.nextDispatch = {
+    status: "completed", summary: "Exact managed Run child stopped.", operationId: "operation-managed-run-stop", effectDisposition: "committed",
+    data: { managedProcessId, managedRunEffectSessionId: effect.id, managedRunOriginOperationId: "operation-managed-run-origin" }
+  };
+  await restartedVscode.invoke("sxsy-b122.chord.run.alt");
+  assert.equal(restartedBridge.prepared.at(-2)?.sessionId, restartedSource.id);
+  assert.equal(restartedBridge.prepared.at(-2)?.effectSessionId, effect.id);
+  assert.equal(restartedBridge.prepared.at(-1)?.effectSessionId, undefined);
+  assert.equal(restartedBridge.dispatched.at(-1)?.sessionId, restartedSource.id);
+  assert.equal(restartedVscode.quickPickSurfaces.some((surface) => surface.items.some((item) => typeof item !== "string" && item.label.includes("operation-other-run"))), false);
+  assert.deepEqual(restartedBridge.statuses.at(-1), { sessionId: effect.id, status: "verified_finished" });
+  assert.equal(restartedController.listKnownSessions().find((session) => session.id === effect.id)?.status, "verified_finished");
+  assert.equal(restartedBridge.registered.find((session) => session.id === effect.id)?.status, "verified_finished", "retirement must survive a catalog reload");
+
+  const preparationCount = restartedBridge.prepared.length;
+  const dispatchCount = restartedBridge.dispatched.length;
+  await restartedVscode.invoke("sxsy-b122.chord.run.alt");
+  assert.equal(restartedBridge.prepared.length, preparationCount, "a verified-finished managed child is no longer eligible for Alt Run");
+  assert.equal(restartedBridge.dispatched.length, dispatchCount);
+  assert.match(restartedVscode.warnings.at(-1) ?? "", /no exact managed target was selected/i);
+  await restartedController.stop();
+});
+
+test("ambiguous Alt-Run stop keeps the exact managed child reconciliation-visible and selectable", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/managed-run-ambiguous" }]
+  });
+  await controller.start();
+  const source = await installExactProviderSession(controller, bridge);
+  const managedProcessId = `managed:${"4".repeat(64)}`;
+  const effect: ExtensionManagedSession = {
+    id: `managed-run-effect:${"5".repeat(64)}`, provider: "generic", surface: "vscode_window", capabilities: ["registered"], status: "running",
+    workspaceRoot: source.workspaceRoot, targetSnapshotId: source.targetSnapshotId, plannedFiles: [], lastHeartbeat: "2026-08-26T12:00:00.000Z",
+    adapterVersion: "unpackaged-test", metadata: {
+      "sxsy-b122.kind": "managed-run", "sxsy-b122.managedProcessId": managedProcessId,
+      "sxsy-b122.runOriginOperationId": "operation-managed-run-ambiguous-origin", "sxsy-b122.runOriginSessionId": source.id,
+      "sxsy-b122.runWorkspaceRoot": source.workspaceRoot!
+    }
+  };
+  bridge.registered.push(effect);
+  bridge.listedSessions = undefined;
+  await controller.refreshSessionNotifications();
+
+  const dispatchAmbiguousStop = async (): Promise<void> => {
+    queueReviewedManagedRunStop(bridge, source, effect);
+    vscode.choose(`Stop exact managed Run process ${managedProcessId}`);
+    bridge.nextDispatch = {
+      status: "failed", summary: "The exact managed child may have stopped; reconciliation is required.", operationId: "operation-managed-run-stop-ambiguous",
+      effectDisposition: "ambiguous", data: { managedProcessId, managedRunEffectSessionId: effect.id, managedRunOriginOperationId: "operation-managed-run-ambiguous-origin" }
+    };
+    await vscode.invoke("sxsy-b122.chord.run.alt");
+  };
+
+  await dispatchAmbiguousStop();
+  assert.equal(controller.listKnownSessions().find((session) => session.id === effect.id)?.status, "running");
+  assert.equal(bridge.statuses.some((entry) => entry.sessionId === effect.id), false, "an ambiguous effect must not be falsely retired");
+  const preparationCount = bridge.prepared.length;
+  await dispatchAmbiguousStop();
+  assert.equal(bridge.prepared.length, preparationCount + 2, "the ambiguous exact child remains available for an explicit reconciliation attempt");
+  assert.equal(bridge.prepared.at(-2)?.effectSessionId, effect.id);
+  assert.equal(controller.listKnownSessions().find((session) => session.id === effect.id)?.status, "running");
+  await controller.stop();
 });
 
 test("Alt-Run selects one exact durable debug session and retains ambiguous stop state when termination is not observed", async () => {
@@ -1854,6 +3540,8 @@ test("Alt-Run selects one exact durable debug session and retains ambiguous stop
     resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/debug-ambiguity" }]
   });
   await controller.start();
+  const providerSource = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
   bridge.nextDispatch = { status: "running", summary: "Debug A awaits host acknowledgement.", operationId: "operation-debug-a", data: {
     hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "start_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
     hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch A"
@@ -1868,13 +3556,18 @@ test("Alt-Run selects one exact durable debug session and retains ambiguous stop
   const selected = bridge.registered.find((session) => session.metadata["sxsy-b122.debugOriginOperationId"] === "operation-debug-b");
   assert.ok(selected);
   vscode.choose("Launch B — C:\\repo");
+  const stopReview = queueReviewedDebugStop(bridge, providerSource, selected);
+  vscode.choose(`Stop exact debug session ${stopReview.debugSessionId}`);
   vscode.publishDebugStop = false;
   bridge.nextDispatch = { status: "running", summary: "Exact Debug B stop awaits host acknowledgement.", operationId: "operation-debug-b-stop", data: {
     hostActionId: `host-action:${"b".repeat(64)}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
-    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch B", hostActionDebugSessionId: "debug-2", hostActionDebugOriginOperationId: "operation-debug-b"
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch B", hostActionDebugSessionId: "debug-2",
+    hostActionDebugEffectSessionId: selected.id, hostActionDebugBindingId: stopReview.debugBindingId, hostActionDebugOriginOperationId: "operation-debug-b"
   } };
   await vscode.invoke("sxsy-b122.chord.run.alt");
-  assert.equal(bridge.dispatched.at(-1)?.sessionId, selected.id);
+  assert.equal(bridge.prepared.at(-2)?.effectSessionId, selected.id);
+  assert.equal(bridge.prepared.at(-1)?.effectSessionId, undefined);
+  assert.equal(bridge.dispatched.at(-1)?.sessionId, providerSource.id);
   assert.equal(vscode.stopped.at(-1)?.id, "debug-2");
   assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
   assert.equal(bridge.completedHostActions.at(-1)?.effectDisposition, "ambiguous");
@@ -1884,13 +3577,52 @@ test("Alt-Run selects one exact durable debug session and retains ambiguous stop
   await controller.stop();
 });
 
+test("Alt-Run cannot stop a debugger when the authorized host action omits or substitutes the protected effect identity", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/debug-adversarial" }]
+  });
+  await controller.start();
+  const providerSource = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+  bridge.nextDispatch = { status: "running", summary: "Start exact debug.", operationId: "operation-debug-adversarial", data: {
+    hostActionId: `host-action:${"c".repeat(64)}`, hostActionKind: "start_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test"
+  } };
+  await vscode.invoke("sxsy-b122.chord.run.shift");
+  const effect = bridge.registered.find((session) => session.metadata["sxsy-b122.debugOriginOperationId"] === "operation-debug-adversarial");
+  assert.ok(effect);
+
+  for (const mode of ["missing", "substituted"] as const) {
+    const review = queueReviewedDebugStop(bridge, providerSource, effect);
+    vscode.choose(`Stop exact debug session ${review.debugSessionId}`);
+    const exactData: Record<string, unknown> = {
+      hostActionId: `host-action:${mode === "missing" ? "d".repeat(64) : "e".repeat(64)}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+      hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1",
+      hostActionDebugEffectSessionId: mode === "substituted" ? "different-debug-effect" : effect.id,
+      hostActionDebugBindingId: review.debugBindingId, hostActionDebugOriginOperationId: "operation-debug-adversarial"
+    };
+    if (mode === "missing") delete exactData.hostActionDebugEffectSessionId;
+    bridge.nextDispatch = { status: "running", summary: "Adversarial debug stop.", operationId: `operation-stop-${mode}`, data: exactData };
+    await vscode.invoke("sxsy-b122.chord.run.alt");
+    assert.equal(vscode.stopped.length, 0, mode);
+    assert.equal(bridge.dispatched.at(-1)?.sessionId, providerSource.id, mode);
+  }
+  assert.equal(vscode.activeDebugSession?.id, "debug-1");
+  assert.equal(vscode.warnings.some((message) => /malformed host-action/i.test(message)), true);
+  assert.equal(vscode.warnings.some((message) => /absent, stale, ambiguous, or bound to a different origin/i.test(message)), true, JSON.stringify(vscode.warnings));
+  await controller.stop();
+});
+
 test("a disconnected or malicious companion cannot cause a host action", async () => {
   const offlineVscode = new FakeVscode();
   const offlineController = new ManagedSessionController(offlineVscode.api, new FakeContext(), new UnavailableExtensionCompanionBridge("offline"), { idFactory: sequenceFactory() });
   await offlineController.start();
   await offlineVscode.invoke("sxsy-b122.chord.run.normal");
   assert.equal(offlineVscode.started.length, 0);
-  assert.match(offlineVscode.warnings.at(-1) ?? "", /offline/i);
+  assert.equal(offlineVscode.warnings.some((warning) => /offline/i.test(warning)), true);
 
   const vscode = new FakeVscode();
   const bridge = new FakeBridge();
@@ -1973,6 +3705,7 @@ test("public hardware dispatch traverses canonical prepare, authority, dispatch,
     resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }]
   });
   await controller.start();
+  await installExactProviderSession(controller, bridge);
   const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
   const claim: HardwareSignalClaim = { signalId: `hardware-signal:${"a".repeat(64)}`, claimToken: "claim-token-controller", deviceId: "b".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 3, control: "SHIELD", modifier: "normal", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] };
   const command = chordFor(claim.control, claim.modifier);
@@ -1994,6 +3727,7 @@ test("hardware Plan Approval forwards the exact companion-issued token and prote
   const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
   const confirmationScopeDigest = "8".repeat(64);
   const bound = { ...target, provider: "codex" as const, targetSnapshotId: "9".repeat(64), taskId: "task-hardware-plan", planRevision: "revision-hardware-plan" };
+  await installExactProviderSession(controller, bridge, bound, bound.provider);
   const workflowReview = exactPlanReview(bound, confirmationScopeDigest);
   bridge.preparationSequence.push(
     { status: "incomplete", summary: "Review the exact protected hardware plan.", session: bound, workflowReview },
@@ -2013,12 +3747,279 @@ test("hardware Plan Approval forwards the exact companion-issued token and prote
   assert.equal(bridge.dispatched.length, 0);
 });
 
+test("physical second-phase canonical Plan refusal settles exactly once with the companion disposition receipt", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware-refusal" }]
+  });
+  await controller.start();
+  const target = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const bound = { ...target, provider: "codex" as const, targetSnapshotId: "e".repeat(64), taskId: "task-refusal", planRevision: "plan-refusal" };
+  await installExactProviderSession(controller, bridge, bound);
+  const review = exactPlanReview(bound, "4".repeat(64));
+  bridge.preparationSequence.push(
+    { status: "incomplete", summary: "Review the exact protected plan.", session: bound, workflowReview: review },
+    { status: "blocked", summary: "Fresh user presence was refused." }
+  );
+  vscode.choose(`Approve exact protected scope ${review.scopeDigest}`);
+  await controller.dispatchChord(chordFor("PLAN_APPROVAL", "normal")!, undefined, physicalClaim(window.id, "PLAN_APPROVAL", "normal", 41));
+  assert.equal(bridge.hardwarePrepared.length, 2);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((entry) => ({ outcome: entry.outcome, receipt: entry.dispatchReceiptId })), [
+    { outcome: "handled", receipt: `hardware-dispatch:${"d".repeat(64)}` }
+  ]);
+  assert.match(vscode.warnings.at(-1) ?? "", /Fresh user presence was refused/i);
+  await controller.stop();
+});
+
+test("physical second-phase canonical automation refusal settles exactly once with the companion disposition receipt", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware-automation-refusal" }]
+  });
+  await controller.start();
+  const source = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const review = automationManifestReview(source, "compound_capture");
+  bridge.preparationSequence.push(
+    { status: "incomplete", summary: "Review the exact protected automation manifest.", session: source, authorityId: review.manifest.authorityId, automationReview: review },
+    { status: "blocked", summary: "Fresh automation confirmation was refused." }
+  );
+  vscode.choose("Approve exact compound_capture manifest");
+
+  await controller.dispatchChord(chordFor("COMPOUND", "normal")!, undefined, physicalClaim(window.id, "COMPOUND", "normal", 42));
+
+  assert.equal(bridge.hardwarePrepared.length, 2);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((entry) => ({ outcome: entry.outcome, receipt: entry.dispatchReceiptId })), [
+    { outcome: "handled", receipt: `hardware-dispatch:${"d".repeat(64)}` }
+  ]);
+  assert.match(vscode.warnings.at(-1) ?? "", /Fresh automation confirmation was refused/i);
+  await controller.stop();
+});
+
+test("physical second-phase canonical managed-stop refusal settles exactly once with the companion disposition receipt", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware-managed-stop-refusal" }]
+  });
+  await controller.start();
+  const source = await installExactProviderSession(controller, bridge);
+  const managedProcessId = `managed:${"6".repeat(64)}`;
+  const effect: ExtensionManagedSession = {
+    id: `managed-run-effect:${"7".repeat(64)}`, provider: "generic", surface: "vscode_window", capabilities: ["registered"], status: "running",
+    workspaceRoot: source.workspaceRoot, targetSnapshotId: source.targetSnapshotId, plannedFiles: [], lastHeartbeat: "2026-08-26T12:00:00.000Z",
+    adapterVersion: "unpackaged-test", metadata: {
+      "sxsy-b122.kind": "managed-run", "sxsy-b122.managedProcessId": managedProcessId,
+      "sxsy-b122.runOriginOperationId": "operation-hardware-managed-run-origin", "sxsy-b122.runOriginSessionId": source.id,
+      "sxsy-b122.runWorkspaceRoot": source.workspaceRoot!
+    }
+  };
+  bridge.registered.push(effect);
+  bridge.listedSessions = undefined;
+  await controller.refreshSessionNotifications();
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const review = managedRunStopReview(source, effect);
+  bridge.preparationSequence.push(
+    { status: "incomplete", summary: "Review the exact managed Run child.", session: source, authorityId: review.authorityId, debugStopReview: review },
+    { status: "blocked", summary: "Fresh managed-stop confirmation was refused." }
+  );
+  vscode.choose(`Stop exact managed Run process ${managedProcessId}`);
+
+  await controller.dispatchChord(chordFor("RUN", "alt")!, undefined, physicalClaim(window.id, "RUN", "alt", 43));
+
+  assert.deepEqual(bridge.hardwarePreparationEffectSessions, [effect.id, undefined]);
+  assert.equal(bridge.hardwareDispatched.length, 0);
+  assert.deepEqual(bridge.hardwareCompleted.map((entry) => ({ outcome: entry.outcome, receipt: entry.dispatchReceiptId })), [
+    { outcome: "handled", receipt: `hardware-dispatch:${"d".repeat(64)}` }
+  ]);
+  assert.match(vscode.warnings.at(-1) ?? "", /Fresh managed-stop confirmation was refused/i);
+  await controller.stop();
+});
+
+test("hardware Shift Authority binds fresh confirmation to the reviewed artifact identity and digest", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware-authority" }]
+  });
+  await controller.start();
+  const local = controller.listKnownSessions();
+  const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+  const window = local.find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const source = exactProviderSession(gitRoot, "codex-hardware-authority-source");
+  const recipient = { ...exactProviderSession(gitRoot, "blocked-hardware-authority"), status: "verified_blocked" as const };
+  bridge.registered.push(source, recipient);
+  bridge.listedSessions = [...local, source, recipient];
+  await controller.refreshSessionNotifications();
+  const artifact = authorityBroadcastArtifact(source, [recipient]);
+  bridge.nextWorkflowArtifact = artifact;
+  bridge.preparationSequence.push({
+    status: "incomplete",
+    summary: "Initial exact hardware Authority context prepared without confirmation.",
+    authorityId: artifact.authorityId,
+    session: source
+  });
+  bridge.onPrepareHardwareSignal = ({ reviewScopeDigest }) => {
+    if (!reviewScopeDigest) return;
+    bridge.nextPreparation = {
+      status: "prepared",
+      summary: "Fresh hardware Authority packet confirmation prepared.",
+      authorityId: artifact.authorityId,
+      confirmationToken: "fresh-hardware-authority-token",
+      confirmationScopeDigest: reviewScopeDigest,
+      session: source
+    };
+  };
+  vscode.choose("Use exact recipient set");
+  vscode.choose("Accept exact packet review");
+  const claim: HardwareSignalClaim = {
+    signalId: `hardware-signal:${"4".repeat(64)}`,
+    claimToken: "claim-token-hardware-authority",
+    deviceId: "5".repeat(64),
+    connectionEpoch: 1,
+    bootNonce: 2,
+    counter: 9,
+    control: "AUTHORITY_REFRESH",
+    modifier: "shift",
+    acceptedAt: "2026-08-24T00:00:00.000Z",
+    claimedAt: "2026-08-24T00:00:01.000Z",
+    attempt: 1,
+    windowSessionId: window.id,
+    workspaceRoots: ["C:\\repo"]
+  };
+
+  await controller.dispatchChord(chordFor(claim.control, claim.modifier)!, undefined, claim);
+
+  assert.equal(bridge.hardwarePrepared.length, 2);
+  assert.match(bridge.hardwarePreparationReviewScopes[1] ?? "", /^[a-f0-9]{64}$/);
+  assert.deepEqual(bridge.hardwarePreparationReviewArtifacts[1], {
+    reviewArtifactId: artifact.id,
+    reviewArtifactDigest: artifact.digest
+  });
+  assert.equal(bridge.hardwareDispatched.length, 1);
+  assert.equal(bridge.hardwareDispatchCommands[0]?.confirmationToken, "fresh-hardware-authority-token");
+  assert.equal(bridge.hardwareCompleted[0]?.outcome, "handled");
+  await controller.stop();
+});
+
+test("physical Shift Authority settles no-artifact, second-phase transport failure, and final-binding churn without dropping the claim", async () => {
+  for (const [index, mode] of (["no_artifact", "second_transport", "final_binding_churn"] as const).entries()) {
+    const vscode = new FakeVscode([], ["C:\\repo"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: `feature/authority-${mode}` }]
+    });
+    await controller.start();
+    const local = controller.listKnownSessions();
+    const gitRoot = local.find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const window = local.find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+    const source = exactProviderSession(gitRoot, `authority-source-${mode}`);
+    const recipient = { ...exactProviderSession(gitRoot, `authority-recipient-${mode}`), status: "verified_blocked" as const };
+    bridge.registered.push(source, recipient);
+    bridge.listedSessions = [...local, source, recipient];
+    await controller.refreshSessionNotifications();
+    const artifact = authorityBroadcastArtifact(source, [recipient]);
+    bridge.nextWorkflowArtifact = artifact;
+    bridge.preparationSequence.push({ status: "incomplete", summary: "Initial exact Authority context.", authorityId: artifact.authorityId, session: source });
+    vscode.choose("Use exact recipient set");
+    if (mode === "no_artifact") {
+      bridge.prepareWorkflow = async () => ({ ok: true, value: true as unknown as ExtensionWorkflowArtifact });
+    } else {
+      vscode.choose("Accept exact packet review");
+      if (mode === "second_transport") bridge.hardwarePreparationFailureAt = 2;
+      else bridge.preparationSequence.push({
+        status: "prepared", summary: "Substituted final provider binding.", authorityId: artifact.authorityId,
+        confirmationToken: "confirmation-authority-churn", confirmationScopeDigest: authorityBroadcastReviewScopeDigest(artifact as unknown as WorkflowArtifact),
+        session: { ...source, planRevision: "substituted-plan" }
+      });
+    }
+    await controller.dispatchChord(chordFor("AUTHORITY_REFRESH", "shift")!, undefined, physicalClaim(window.id, "AUTHORITY_REFRESH", "shift", 50 + index));
+    assert.equal(bridge.hardwareDispatched.length, 0, mode);
+    assert.deepEqual(bridge.hardwareCompleted.map((entry) => entry.outcome), ["failed_before_dispatch"], `${mode}: ${JSON.stringify(bridge.hardwareCompleted)}`);
+    assert.equal(bridge.hardwareCompleted[0]?.dispatchReceiptId, undefined, mode);
+    assert.equal(bridge.hardwareCompleted.length, 1, `${mode} must have one canonical terminal settlement`);
+    await controller.stop();
+  }
+});
+
+test("physical Alt-Run exposes the debug effect only to phase-one preparation and completes under the provider source", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    now: () => "2026-08-26T12:01:00.000Z", idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware-debug-stop" }]
+  });
+  await controller.start();
+  const providerSource = await installExactProviderSession(controller, bridge);
+  bridge.listedSessions = undefined;
+  bridge.nextDispatch = { status: "running", summary: "Start exact debug.", operationId: "operation-hardware-debug", data: {
+    hostActionId: `host-action:${"6".repeat(64)}`, hostActionKind: "start_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test"
+  } };
+  await vscode.invoke("sxsy-b122.chord.run.shift");
+  const effect = bridge.registered.find((session) => session.metadata["sxsy-b122.debugOriginOperationId"] === "operation-hardware-debug");
+  assert.ok(effect);
+  const review = queueReviewedDebugStop(bridge, providerSource, effect);
+  vscode.choose(`Stop exact debug session ${review.debugSessionId}`);
+  bridge.nextDispatch = { status: "running", summary: "Stop exact debug.", operationId: "operation-hardware-debug-stop", data: {
+    hostActionId: `host-action:${"7".repeat(64)}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2099-01-01T00:00:00.000Z",
+    hostActionWorkspaceRoot: "C:\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1",
+    hostActionDebugEffectSessionId: effect.id, hostActionDebugBindingId: review.debugBindingId, hostActionDebugOriginOperationId: "operation-hardware-debug"
+  } };
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  const claim: HardwareSignalClaim = {
+    signalId: `hardware-signal:${"8".repeat(64)}`, claimToken: "claim-token-hardware-debug", deviceId: "9".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 12,
+    control: "RUN", modifier: "alt", acceptedAt: "2026-08-26T12:00:00.000Z", claimedAt: "2026-08-26T12:00:01.000Z", attempt: 1,
+    windowSessionId: window.id, workspaceRoots: ["C:\\repo"]
+  };
+  await controller.dispatchChord(chordFor("RUN", "alt")!, undefined, claim);
+
+  assert.deepEqual(bridge.hardwarePreparationEffectSessions, [effect.id, undefined]);
+  assert.equal(bridge.hardwareDispatchCommands[0]?.sessionId, providerSource.id);
+  assert.equal(Object.hasOwn(bridge.hardwareDispatchCommands[0]!, "effectSessionId"), false);
+  assert.equal(bridge.hardwareCompleted[0]?.outcome, "handled");
+  assert.equal(vscode.stopped.at(-1)?.id, "debug-1");
+  await controller.stop();
+});
+
+test("generic physical post-authorization host failure is durably settled as ambiguous before the hardware claim closes", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/post-authorization" }],
+    openExternal: async () => false
+  });
+  await controller.start();
+  const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
+  bridge.nextDispatch = { status: "running", summary: "Exact GitHub destination awaits local host effect.", operationId: "operation-post-authorization", data: {
+    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "open_external_url", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionUrl: "https://github.com/acme/project"
+  } };
+  await controller.dispatchChord(chordFor("GITHUB", "normal")!, undefined, physicalClaim(window.id, "GITHUB", "normal", 61));
+  assert.equal(bridge.authorizedHostActions.length, 1);
+  assert.equal(bridge.completedHostActions.length, 1);
+  assert.equal(bridge.completedHostActions[0]?.succeeded, false);
+  assert.equal(bridge.completedHostActions[0]?.effectDisposition, "ambiguous");
+  assert.deepEqual(bridge.hardwareCompleted.map((entry) => ({ outcome: entry.outcome, receipt: entry.dispatchReceiptId })), [
+    { outcome: "handled", receipt: `hardware-dispatch:${"e".repeat(64)}` }
+  ]);
+  await controller.stop();
+});
+
 test("hardware high-consequence preparation remains blocked and closes only with the server disposition receipt", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
   bridge.nextPreparation = { status: "blocked", summary: "High-consequence acceptance gates are incomplete." };
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/hardware" }] });
   await controller.start();
+  await installExactProviderSession(controller, bridge);
   const window = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "window")!;
   const claim: HardwareSignalClaim = { signalId: `hardware-signal:${"c".repeat(64)}`, claimToken: "claim-token-high", deviceId: "d".repeat(64), connectionEpoch: 1, bootNonce: 2, counter: 4, control: "PIPELINE", modifier: "ctrl_shift_alt", acceptedAt: "2026-08-24T00:00:00.000Z", claimedAt: "2026-08-24T00:00:01.000Z", attempt: 1, windowSessionId: window.id, workspaceRoots: ["C:\\repo"] };
   const command = chordFor(claim.control, claim.modifier);
@@ -2038,7 +4039,8 @@ test("only a focused VS Code window with nonempty exact roots polls and atomical
   await controller.start();
   assert.equal(bridge.hardwareClaimBindings.length, 0);
   const targetSession = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
-  bridge.nextPreparation = { status: "prepared", summary: "Prepared by fake companion.", session: { ...targetSession, targetSnapshotId: "snapshot-test", taskId: "task-test", planRevision: "plan-test" }, authorityId: "authority-test", confirmationToken: "confirmation-test" };
+  const providerTarget = await installExactProviderSession(controller, bridge, { ...targetSession, targetSnapshotId: "snapshot-test", taskId: "task-test", planRevision: "plan-test" });
+  bridge.nextPreparation = { status: "prepared", summary: "Prepared by fake companion.", session: providerTarget, authorityId: "authority-test", confirmationToken: "confirmation-test" };
   vscode.input("The selected implementation satisfies the plan.");
   vscode.input("receipt:test");
   vscode.input("local");
@@ -2230,17 +4232,17 @@ test("stop drains credential sealing and fences the later credential bridge effe
   assert.deepEqual(bridge.credentialProvisionRequests, [], "a credential command crossed the bridge after stop began");
 });
 
-test("stop drains final host authorization and fences the later VS Code host effect", async () => {
+test("stop drains final host authorization and fences the later integrated-terminal host effect", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
-  bridge.nextDispatch = { status: "running", summary: "Focus awaits final authorization.", data: {
-    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_vscode", hostActionExpiresAt: "2099-01-01T00:00:00.000Z"
+  bridge.nextDispatch = { status: "running", summary: "Integrated terminal awaits final authorization.", data: {
+    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo"
   } };
   let releaseAuthorization!: () => void;
   bridge.authorizeGate = new Promise<void>((resolve) => { releaseAuthorization = resolve; });
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
   await controller.start();
-  const command = vscode.invoke("sxsy-b122.chord.vscode.normal");
+  const command = vscode.invoke("sxsy-b122.chord.terminal.shift");
   for (let attempt = 0; attempt < 40 && bridge.authorizedHostActions.length === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(bridge.authorizedHostActions.length, 1, "dispatch did not reach its deferred final host authorization");
   let stopped = false;
@@ -2252,32 +4254,24 @@ test("stop drains final host authorization and fences the later VS Code host eff
   assert.deepEqual(vscode.executedCommands, [], "a VS Code host effect ran after stop began");
 });
 
-test("repeated normal VS Code presses focus once then cycle the next open window", async () => {
-  let clock = Date.parse("2026-08-24T10:00:00.000Z");
-  const vscode = new FakeVscode();
+test("extension never claims or executes companion-owned VS Code/external-terminal focus while preserving integrated-terminal ownership", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();
-  bridge.nextDispatch = { status: "running", summary: "VS Code focus awaits host acknowledgement.", data: {
-    hostActionId: `host-action:${"7".repeat(64)}`, hostActionKind: "focus_vscode", hostActionExpiresAt: "2099-01-01T00:00:00.000Z"
-  } };
-  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
-    now: () => new Date(clock).toISOString(), idFactory: sequenceFactory(), repeatWindowMs: 1_500
-  });
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo" }] });
   await controller.start();
+  assert.equal(bridge.registered.some((session) => session.metadata["sxsy-b122.hostActionCapabilities"]?.includes("focus_vscode") || session.metadata["sxsy-b122.hostActionCapabilities"]?.includes("focus_external_terminal")), false);
 
+  bridge.nextDispatch = { status: "running", summary: "Companion-owned VS Code focus.", data: { hostActionId: `host-action:${"7".repeat(64)}`, hostActionKind: "focus_vscode", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
   await vscode.invoke("sxsy-b122.chord.vscode.normal");
-  assert.deepEqual(vscode.executedCommands, ["workbench.action.focusActiveEditorGroup"]);
+  bridge.nextDispatch = { status: "running", summary: "Companion-owned external terminal focus.", data: { hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_external_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z" } };
+  await vscode.invoke("sxsy-b122.chord.terminal.normal");
+  assert.equal(bridge.authorizedHostActions.length, 0);
+  assert.deepEqual(vscode.executedCommands, []);
 
-  clock += 500;
-  await vscode.invoke("sxsy-b122.chord.vscode.normal");
-  assert.deepEqual(vscode.executedCommands.slice(-3), [
-    "workbench.action.switchWindow",
-    "workbench.action.quickOpenNavigateNextInViewPicker",
-    "workbench.action.acceptSelectedQuickOpenItem"
-  ]);
-
-  clock += 2_000;
-  await vscode.invoke("sxsy-b122.chord.vscode.normal");
-  assert.equal(vscode.executedCommands.at(-1), "workbench.action.focusActiveEditorGroup");
+  bridge.nextDispatch = { status: "running", summary: "Extension-owned integrated terminal focus.", data: { hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo" } };
+  await vscode.invoke("sxsy-b122.chord.terminal.shift");
+  assert.equal(bridge.authorizedHostActions.length, 1);
+  assert.equal(vscode.createdTerminals.length, 1);
   controller.stop();
 });
 
@@ -2296,9 +4290,21 @@ test("normal Pipeline presents live local and hosted evidence and cycles failing
           { kind: "check", name: "lint", state: "COMPLETED", conclusion: "ACTION_REQUIRED", summary: "Formatting differs." },
           { kind: "check", name: "build", state: "COMPLETED", conclusion: "SUCCESS" }
         ],
-        localReceipts: [{ action: "pipeline_local_gate", result: "failed", completeness: "complete", createdAt: "2026-08-24T09:00:00.000Z", expired: false, invalidated: false }]
+        failureSeries: [
+          { kind: "check", name: "unit-tests", state: "COMPLETED", conclusion: "FAILURE", summary: "Two tests failed." },
+          { kind: "check", name: "lint", state: "COMPLETED", conclusion: "ACTION_REQUIRED", summary: "Formatting differs." }
+        ],
+        selectedIndex: 0,
+        failureCount: 2,
+        repeatAvailable: true,
+        selectedFailure: { kind: "check", name: "unit-tests", state: "COMPLETED", conclusion: "FAILURE", summary: "Two tests failed." }
       } },
-      completeness: "local_and_hosted"
+      completeness: "local_and_hosted",
+      localReceiptState: "current",
+      localReceipts: [{
+        id: `pipeline-local-receipt:${"3".repeat(64)}`, action: "pipeline_local_gate", targetSnapshotId: "snapshot-hosted",
+        result: "failed", completeness: "complete", createdAt: "2026-08-24T09:00:00.000Z", freshness: "current", gateFresh: true
+      }]
     }
   };
   const context = new FakeContext();
@@ -2312,9 +4318,70 @@ test("normal Pipeline presents live local and hosted evidence and cycles failing
   assert.match(vscode.warnings.at(-1) ?? "", /Failure 1 of 2: unit-tests=FAILURE/i);
   assert.match(vscode.warnings.at(-1) ?? "", /local pipeline_local_gate=failed/i);
   assert.match(vscode.warnings.at(-1) ?? "", /press Pipeline again.*Alt Pipeline/i);
+  assert.equal(context.values.has("sxsy-b122.pipelineFailureCursor"), false, "the installed UI must not own a competing Pipeline cursor");
 
+  const hosted = (bridge.nextDispatch.data?.hosted as { data: Record<string, unknown> }).data;
+  hosted.selectedIndex = 1;
+  hosted.selectedFailure = { kind: "check", name: "lint", state: "COMPLETED", conclusion: "ACTION_REQUIRED", summary: "Formatting differs." };
   await vscode.invoke("sxsy-b122.chord.pipeline.normal");
   assert.match(vscode.warnings.at(-1) ?? "", /Failure 2 of 2: lint=ACTION_REQUIRED/i);
+  controller.stop();
+});
+
+test("normal Pipeline presents current top-level local receipts when hosted CI is unavailable", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  bridge.nextDispatch = {
+    status: "completed",
+    summary: "Observed protected local pipeline evidence without hosted CI.",
+    data: {
+      local: { status: "completed", summary: "Local gate complete.", effectDisposition: "committed" },
+      hosted: { status: "unavailable", summary: "Hosted CI is not configured.", effectDisposition: "not_started", data: { hostedState: "UNAVAILABLE", contexts: [] } },
+      completeness: "local_only",
+      localReceiptState: "current",
+      localReceipts: [{
+        id: `pipeline-local-receipt:${"1".repeat(64)}`, action: "pipeline_local_gate", targetSnapshotId: "snapshot-local",
+        result: "passed", completeness: "complete", createdAt: "2026-08-24T10:00:00.000Z", freshness: "current", gateFresh: true
+      }]
+    }
+  };
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/local-only" }] });
+  await controller.start();
+
+  await vscode.invoke("sxsy-b122.chord.pipeline.normal");
+
+  assert.match(vscode.information.at(-1) ?? "", /hosted unavailable.*local pipeline_local_gate=passed \(complete\)/i);
+  controller.stop();
+});
+
+test("normal Pipeline distinguishes stale and absent top-level local receipt observations", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/receipt-state" }] });
+  await controller.start();
+  bridge.nextDispatch = {
+    status: "completed", summary: "Observed stale local evidence.", data: {
+      hosted: { status: "unavailable", summary: "Hosted CI unavailable.", effectDisposition: "not_started" },
+      localReceiptState: "stale",
+      localReceipts: [{
+        id: `pipeline-local-receipt:${"2".repeat(64)}`, action: "must_not_render_as_current", targetSnapshotId: "snapshot-old",
+        result: "passed", completeness: "complete", createdAt: "2026-08-23T10:00:00.000Z", freshness: "stale", staleReason: "target changed", gateFresh: false
+      }]
+    }
+  };
+
+  await vscode.invoke("sxsy-b122.chord.pipeline.normal");
+  assert.match(vscode.information.at(-1) ?? "", /local receipt ledger stale/i);
+  assert.doesNotMatch(vscode.information.at(-1) ?? "", /must_not_render_as_current/);
+
+  bridge.nextDispatch = {
+    status: "completed", summary: "No local evidence exists.", data: {
+      hosted: { status: "unavailable", summary: "Hosted CI unavailable.", effectDisposition: "not_started" },
+      localReceiptState: "absent", localReceipts: []
+    }
+  };
+  await vscode.invoke("sxsy-b122.chord.pipeline.normal");
+  assert.match(vscode.information.at(-1) ?? "", /local receipts absent/i);
   controller.stop();
 });
 
@@ -2363,8 +4430,9 @@ test("Compound palette is repository-bound and routes only canonical Compound ch
 });
 
 test("quick-reference command opens a searchable read-only overlay for all 65 settled chords", async () => {
-  const vscode = new FakeVscode();
-  const controller = new ManagedSessionController(vscode.api, new FakeContext(), new FakeBridge(), { idFactory: sequenceFactory() });
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\repo", branch: "feature/reference" }] });
   await controller.start();
   await vscode.invoke("sxsy-b122.showQuickReference");
 
@@ -2372,10 +4440,38 @@ test("quick-reference command opens a searchable read-only overlay for all 65 se
   assert.equal(overlay?.items.length, 65);
   assert.match(overlay?.placeHolder ?? "", /search.*read-only.*65/i);
   const labels = (overlay?.items ?? []).map((item) => typeof item === "string" ? item : item.label);
-  assert.equal(labels.includes("Pipeline · Normal — Pipeline Status"), true);
-  assert.equal(labels.includes("Sandbox · Ctrl+Shift+Alt — Quarantine"), true);
+  assert.equal(labels.includes("Upper row · Pipeline · Normal — Pipeline Status"), true);
+  assert.equal(labels.includes("Upper row · Sandbox · Ctrl+Shift+Alt — Quarantine"), true);
+  assert.equal(labels.some((label) => label.startsWith("Left bank · Re-anchor · Normal")), true);
+  const rows = (overlay?.items ?? []).filter((item): item is QuickPickItemLike => typeof item !== "string");
+  assert.equal(rows.every((row) => /Exact target C:\\repo|No target required/.test(row.description ?? "")), true);
+  assert.equal(rows.every((row) => /Consequence: .*Capability: .*Gates: .*Confirmation:/i.test(row.detail ?? "")), true);
+  assert.match(rows.find((row) => /Quarantine/.test(row.label))?.detail ?? "", /High.*5, 12, 19, 27.*required/i);
+  assert.match(rows.find((row) => /Local Commit/.test(row.label))?.detail ?? "", /Mediated.*required/i);
+  assert.equal(bridge.prepared.length, 0);
+  assert.equal(bridge.dispatched.length, 0);
   assert.equal(vscode.executedCommands.length, 0);
   controller.stop();
+});
+
+test("quick-reference reports ambiguous and absent targets without selecting or dispatching", async () => {
+  for (const scenario of ["ambiguous", "absent"] as const) {
+    const vscode = new FakeVscode([], scenario === "ambiguous" ? ["C:\\one", "C:\\two"] : []);
+    const bridge = new FakeBridge();
+    const roots = scenario === "ambiguous" ? [{ gitRoot: "C:\\one" }, { gitRoot: "C:\\two" }] : [];
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => roots });
+    await controller.start();
+
+    await vscode.invoke("sxsy-b122.showQuickReference");
+
+    const rows = (vscode.quickPickSurfaces.at(-1)?.items ?? []).filter((item): item is QuickPickItemLike => typeof item !== "string");
+    const targetRow = rows.find((row) => /Local Commit/.test(row.label));
+    assert.match(targetRow?.description ?? "", scenario === "ambiguous" ? /Ambiguous target.*2/i : /No exact target/i);
+    assert.equal(bridge.prepared.length, 0);
+    assert.equal(bridge.dispatched.length, 0);
+    assert.equal(vscode.executedCommands.length, 0);
+    controller.stop();
+  }
 });
 
 test("background registry refresh notifies each verified Blocked and Finished transition once", async () => {
@@ -2401,6 +4497,101 @@ test("background registry refresh notifies each verified Blocked and Finished tr
   controller.stop();
 });
 
+test("registry refresh and queue reads prune sessions removed by the current companion registry", async () => {
+  const vscode = new FakeVscode([], ["C:\\repo"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory() });
+  await controller.start();
+  const seed = bridge.registered[0]!;
+  const removed = { ...seed, id: "blocked-removed", provider: "claude" as const, status: "verified_blocked" as const, metadata: { "sxsy-b122.statusReason": "Removed from the protected registry." } };
+  const current = { ...seed, id: "blocked-current", provider: "codex" as const, status: "verified_blocked" as const, metadata: { "sxsy-b122.statusReason": `Waiting for token=must-not-render and an exact reviewed input. ${"x".repeat(800)}` } };
+  bridge.listedSessions = [removed, current];
+  await controller.refreshSessionNotifications();
+  assert.equal(controller.listKnownSessions().some((session) => session.id === removed.id), true);
+
+  bridge.listedSessions = [current];
+  bridge.nextDispatch = { status: "running", summary: "Blocker queue awaits host acknowledgement.", data: {
+    hostActionId: `host-action:${"5".repeat(64)}`, hostActionKind: "show_blocker_queue", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\repo"
+  } };
+  vscode.choose(`codex: ${current.id}`);
+  await vscode.invoke("sxsy-b122.chord.find_blocked_agent.shift");
+
+  assert.equal(controller.listKnownSessions().some((session) => session.id === removed.id), false);
+  const queue = [...vscode.quickPickSurfaces].reverse().find((surface) => /verified blocked sessions/i.test(surface.placeHolder ?? ""));
+  assert.deepEqual(queue?.items.map((item) => typeof item === "string" ? item : item.label), [`codex: ${current.id}`]);
+  const item = queue?.items[0];
+  const detail = typeof item === "string" ? undefined : item?.detail;
+  assert.match(detail ?? "", /Waiting for token=\[REDACTED\] and an exact reviewed input/i);
+  assert.doesNotMatch(detail ?? "", /must-not-render/);
+  assert.ok((detail?.length ?? 0) <= 512);
+  controller.stop();
+});
+
+test("blocked and finished queues expose only sessions from the exact host-action repository in a multi-root window", async () => {
+  for (const route of [
+    { control: "FIND_BLOCKED_AGENT" as const, modifier: "shift" as const, kind: "show_blocker_queue" as const, status: "verified_blocked" as const, label: "blocked" },
+    { control: "FIND_FINISHED_AGENT" as const, modifier: "shift" as const, kind: "show_done_queue" as const, status: "verified_finished" as const, label: "finished" }
+  ]) {
+    const vscode = new FakeVscode([], ["C:\\one", "C:\\two"]);
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\one" }, { gitRoot: "C:\\two" }]
+    });
+    await controller.start();
+    const seed = controller.listKnownSessions().find((session) => session.metadata["sxsy-b122.kind"] === "git-root")!;
+    const wrong = { ...seed, id: `${route.label}-wrong-root`, workspaceRoot: "C:\\one", status: route.status, provider: "claude" as const };
+    const exact = { ...seed, id: `${route.label}-exact-root`, workspaceRoot: "C:\\two", status: route.status, provider: "codex" as const };
+    bridge.listedSessions = [wrong, exact];
+    bridge.nextDispatch = { status: "running", summary: "Exact repository queue awaits host acknowledgement.", data: {
+      hostActionId: `host-action:${(route.label === "blocked" ? "6" : "7").repeat(64)}`,
+      hostActionKind: route.kind, hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\two"
+    } };
+    vscode.choose("C:\\two");
+    vscode.choose(`codex: ${exact.id}`);
+
+    await controller.dispatchChord(chordFor(route.control, route.modifier)!);
+
+    const surface = [...vscode.quickPickSurfaces].reverse().find((candidate) => /verified (?:blocked|finished) sessions for C:\\two/i.test(candidate.placeHolder ?? ""));
+    assert.deepEqual(surface?.items.map((item) => typeof item === "string" ? item : item.label), [`codex: ${exact.id}`]);
+    assert.equal(JSON.stringify(surface?.items).includes(wrong.id), false);
+    await controller.stop();
+  }
+});
+
+test("Shift Terminal never focuses an arbitrary active terminal and creates or reuses only the exact action workspace root", async () => {
+  const vscode = new FakeVscode(["Other root terminal"], ["C:\\one", "C:\\two"]);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\one" }, { gitRoot: "C:\\two" }]
+  });
+  await controller.start();
+  bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+    hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\two"
+  } };
+  vscode.choose("C:\\two");
+  await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+
+  assert.equal(vscode.terminals[0]?.shown, 0, "the arbitrary active terminal from another/unbound root must remain untouched");
+  assert.equal(vscode.createdTerminals.length, 1);
+  assert.equal(vscode.terminalOptions[0]?.cwd, "C:\\two");
+  assert.equal(vscode.createdTerminals[0]?.shown, 1);
+  const registered = bridge.registered.find((session) => session.metadata["sxsy-b122.terminalName"] === "SXSY-B122 Terminal");
+  assert.equal(registered?.workspaceRoot, "C:\\two");
+
+  await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+  assert.equal(vscode.createdTerminals.length, 1, "repeat must reuse the exact-root terminal rather than creating or focusing another root");
+  assert.equal(vscode.createdTerminals[0]?.shown, 2);
+
+  bridge.nextDispatch = { status: "running", summary: "Substituted root.", data: {
+    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\outside"
+  } };
+  await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+  assert.equal(vscode.createdTerminals.length, 1);
+  assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
+  assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /workspace.*no longer open/i);
+  await controller.stop();
+});
+
 test("Raw-HID provisioning UI collects only the exact device tuple and never a helper path or digest", async () => {
   const vscode = new FakeVscode();
   const bridge = new FakeBridge();
@@ -2422,7 +4613,8 @@ function directAction(command: ForwardedCommand): LocalHostAction | undefined {
   const actions: Partial<Record<string, LocalHostAction>> = {
     "CLAUDE:alt": "create_claude_terminal",
     "CHATGPT:alt": "create_codex_terminal",
-    "TERMINAL:shift": "focus_integrated_terminal"
+    "TERMINAL:shift": "focus_integrated_terminal",
+    "VOICE:normal": "show_voice_center", "VOICE:shift": "show_voice_center", "VOICE:alt": "show_voice_center", "VOICE:shift_alt": "show_voice_center"
   };
   return actions[`${command.control}:${command.modifier}`];
 }

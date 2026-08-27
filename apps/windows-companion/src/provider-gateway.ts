@@ -8,6 +8,12 @@ import type {
 } from "../../../packages/control-plane/src/contracts.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import {
+  canonicalReanchorApplyRequest,
+  canonicalReanchorProviderAcknowledgement,
+  type ReanchorApplyRequest,
+  type ReanchorProviderAcknowledgement
+} from "../../../packages/control-plane/src/reanchor.ts";
+import {
   sha256,
   stableJson,
   type JournalEntry,
@@ -30,7 +36,9 @@ import {
 } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { ConfiguredNetworkResult } from "./configured-network.ts";
 import { commandActionIds, commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import { automationResultSchema, parseAutomationEnvelope, parseAutomationProviderResult, type AutomationAction, type AutomationIntent, type AutomationProviderResult, type AutomationProviderResultPayload } from "../../../packages/control-plane/src/automation-protocol.ts";
+import type { AutomationAction, AutomationIntent, AutomationProviderResult } from "../../../packages/control-plane/src/automation-protocol.ts";
+import type { AutomationManifestApproval, AutomationOperationManifest } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
+import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
 
 const maximumBodyBytes = 64 * 1024;
 const maximumText = 4_096;
@@ -146,31 +154,50 @@ export interface ProviderGatewayAutomationCommand {
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
   readonly sessionId: string;
+  readonly authorityId: string;
   readonly provider: ProviderGatewayProvider;
+  readonly manifest: AutomationOperationManifest;
+  readonly approval: AutomationManifestApproval;
   readonly intent: AutomationIntent;
 }
 
+export interface ProviderGatewayReanchorCommand {
+  readonly kind: "reanchor";
+  readonly routeId: string;
+  readonly operationId: string;
+  readonly externalId: string;
+  readonly action: "reanchor";
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly provider: ProviderGatewayProvider;
+  readonly request: ReanchorApplyRequest;
+}
+
 export type ProviderGatewayCommand = ProviderGatewayWorkflowCommand | ProviderGatewayAutomationCommand;
+type LocalProviderGatewayCommand = ProviderGatewayWorkflowCommand | ProviderGatewayReanchorCommand;
 
 export type ProviderGatewayRemoteResult = AutomationProviderResult;
 
 export type ProviderGatewayCommandResult = WorkflowProviderResponse | WorkflowChildProviderResponse | ProviderGatewayRemoteResult;
+type LocalProviderGatewayCommandResult = ProviderGatewayCommandResult | ReanchorProviderAcknowledgement;
 export type ProviderGatewayOperationOutcome = "committed" | "failed" | "cancelled" | "unresolved";
 
 export interface ProviderGatewayOperationObservationRequest {
   readonly operationId: string;
   readonly externalId: string;
   readonly routeId: string;
+  readonly action: CommandAction;
+  readonly sessionId: string;
+  readonly authorityId: string;
   readonly targetSnapshotId: string;
   readonly repositoryRoot: string;
 }
 
-export interface ProviderGatewayOperationObservation {
-  readonly operationId: string;
-  readonly externalId: string;
-  readonly routeId: string;
-  readonly targetSnapshotId: string;
+export interface ProviderGatewayOperationObservation extends ProviderGatewayOperationObservationRequest {
   readonly outcome: ProviderGatewayOperationOutcome;
+  readonly effectDisposition: EffectDisposition;
   readonly summary: string;
 }
 
@@ -178,10 +205,7 @@ export interface ProviderGatewayCancellationRequest extends ProviderGatewayOpera
   readonly reason: string;
 }
 
-export interface ProviderGatewayCancellationAcknowledgement {
-  readonly operationId: string;
-  readonly externalId: string;
-  readonly targetSnapshotId: string;
+export interface ProviderGatewayCancellationAcknowledgement extends ProviderGatewayOperationObservationRequest {
   readonly accepted: boolean;
   readonly summary: string;
 }
@@ -193,6 +217,8 @@ export interface ProviderGatewayBackend {
   readonly dispatchIdentity: Readonly<{ adapterId: string; moduleSha256: string }>;
   handshake(request: ProviderGatewayHandshakeRequest, signal: AbortSignal): Promise<ProviderGatewayHandshakeResult>;
   execute(request: ProviderGatewayCommand, signal: AbortSignal): Promise<ProviderGatewayCommandResult>;
+  reanchor(request: ReanchorApplyRequest, signal: AbortSignal): Promise<ReanchorProviderAcknowledgement>;
+  observeReanchor(request: ReanchorApplyRequest, signal: AbortSignal): Promise<ReanchorProviderAcknowledgement | undefined>;
   observeSession(request: ProviderGatewaySessionObservationRequest, signal: AbortSignal): Promise<ProviderGatewaySessionObservation>;
   observeOperation(request: ProviderGatewayOperationObservationRequest, signal: AbortSignal): Promise<ProviderGatewayOperationObservation>;
   cancelOperation(request: ProviderGatewayCancellationRequest, signal: AbortSignal): Promise<ProviderGatewayCancellationAcknowledgement>;
@@ -206,8 +232,14 @@ interface SavedGatewayOperation {
   readonly sessionId: string;
   readonly repositoryRoot: string;
   readonly targetSnapshotId: string;
+  /** Missing only in legacy records, which remain reconciliation-only. */
+  readonly action?: CommandAction;
+  /** Missing only in legacy records, which remain reconciliation-only. */
+  readonly authorityId?: string;
   readonly requestDigest: string;
   readonly state: "submitted" | ProviderGatewayOperationOutcome;
+  /** Missing only in legacy/in-flight records; never inferred from status. */
+  readonly effectDisposition?: EffectDisposition;
   readonly responseBody?: string;
   readonly cancellationAcknowledged: boolean;
   readonly updatedAt: string;
@@ -225,8 +257,13 @@ export interface LocalProviderCommandGatewayOptions {
 
 export interface ProviderGatewayRecoveryObservation {
   readonly outcome: ProviderGatewayOperationOutcome;
+  readonly effectDisposition?: EffectDisposition;
   readonly note: string;
   readonly details?: Readonly<Record<string, string>>;
+}
+
+export interface ProviderGatewayRecoveryBinding extends ProviderGatewayOperationObservationRequest {
+  readonly provider: ProviderGatewayProvider;
 }
 
 export interface AuthenticatedProviderGatewayClient {
@@ -239,7 +276,8 @@ export interface AuthenticatedProviderGatewayClient {
   cancelByOperation(operationId: string, reason: string): Promise<number>;
   cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number>;
   observeOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>>;
-  observeProviderOperation(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<ProviderGatewayRecoveryObservation | undefined>;
+  observeBoundOperation(binding: OperationReconciliationBinding): Promise<OperationControllerObservation>;
+  observeProviderOperation(input: Readonly<ProviderGatewayRecoveryBinding>): Promise<ProviderGatewayRecoveryObservation | undefined>;
 }
 
 export interface ProviderGatewayFallbackTransport {
@@ -306,10 +344,14 @@ export class LocalProviderCommandGateway {
     const rejected = validateRouteRequest(input);
     if (rejected) return blocked(input.routeId, rejected);
     if (input.signal?.aborted) return blocked(input.routeId, "The provider gateway request was cancelled before local dispatch.");
+    if (legacyAutomationEffectRoute(input.routeId)) {
+      return blocked(input.routeId, "Automation effect routes are proposal-only at the provider boundary; reviewed effects execute only through the host-local broker.");
+    }
     try {
       if (input.routeId.startsWith("provider.handshake.")) return await this.handshake(input);
+      if (/^provider\.reanchor\.(claude|codex)$/u.test(input.routeId)) return await this.executeReanchor(input);
+      if (/^provider\.observe-reanchor\.(claude|codex)$/u.test(input.routeId)) return await this.observeReanchor(input);
       if (input.routeId.startsWith("provider.")) return await this.executeWorkflow(input);
-      if (input.routeId.startsWith("automation.")) return await this.executeAutomation(input);
       return unavailable(input.routeId, "The local provider gateway does not own this fixed route.");
     } catch {
       return unavailable(input.routeId, "The local provider gateway failed closed; no provider success was inferred.", "ambiguous");
@@ -318,7 +360,8 @@ export class LocalProviderCommandGateway {
 
   recoveryExternalId(authenticationToken: string, input: ProviderGatewayRecoveryIdentityRequest): string | undefined {
     this.authenticate(authenticationToken);
-    return this.supportsProvider(authenticationToken, input.provider) && safeOperationId(input.operationId) && safeRoute(input.routeId)
+    return input.routeId.startsWith("provider.") && this.supportsProvider(authenticationToken, input.provider)
+      && safeOperationId(input.operationId) && safeRoute(input.routeId)
       ? input.operationId
       : undefined;
   }
@@ -360,6 +403,7 @@ export class LocalProviderCommandGateway {
   private async cancelByOperationOnce(id: string, boundedReason: string): Promise<number> {
     const record = (await this.operationRecords()).get(id);
     if (!record || record.cancellationAcknowledged || terminal(record.state)) return 0;
+    if (legacyAutomationEffectRoute(record.routeId)) return 0;
     const backend = this.backends.get(record.provider);
     if (!backend) throw new Error("The exact provider cancellation backend is unavailable.");
     const signal = new AbortController().signal;
@@ -367,6 +411,9 @@ export class LocalProviderCommandGateway {
       operationId: record.operationId,
       externalId: record.externalId,
       routeId: record.routeId,
+      action: requireSavedAction(record),
+      sessionId: record.sessionId,
+      authorityId: requireSavedAuthority(record),
       targetSnapshotId: record.targetSnapshotId,
       repositoryRoot: record.repositoryRoot,
       reason: boundedReason
@@ -377,6 +424,7 @@ export class LocalProviderCommandGateway {
     const updated: SavedGatewayOperation = {
       ...record,
       state: observed?.outcome ?? "unresolved",
+      effectDisposition: observed?.effectDisposition ?? "ambiguous",
       cancellationAcknowledged: true,
       updatedAt: await this.monotonicHostTime()
     };
@@ -399,31 +447,88 @@ export class LocalProviderCommandGateway {
     this.authenticate(authenticationToken);
     const record = (await this.operationRecords()).get(safeIdentifier(operationId, "operation ID"));
     if (!record) return { settled: false, summary: "No exact provider gateway operation is bound to this durable operation." };
+    if (legacyAutomationEffectRoute(record.routeId)) {
+      return { settled: false, summary: "A legacy provider automation-effect record is recovery-only; host-local manual recovery is required and no provider effect was observed or replayed." };
+    }
     const observed = await this.observeProviderOperation(authenticationToken, {
+      operationId: record.operationId,
       repositoryRoot: record.repositoryRoot,
       routeId: record.routeId,
       externalId: record.externalId,
-      targetSnapshotId: record.targetSnapshotId
+      targetSnapshotId: record.targetSnapshotId,
+      action: requireSavedAction(record),
+      sessionId: record.sessionId,
+      provider: record.provider,
+      authorityId: requireSavedAuthority(record)
     });
     if (!observed) return { settled: false, summary: "The exact operation is not owned by this provider gateway." };
     return { settled: observed.outcome !== "unresolved", summary: observed.note };
   }
 
-  async observeProviderOperation(authenticationToken: string, input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<ProviderGatewayRecoveryObservation | undefined> {
+  async observeBoundOperation(authenticationToken: string, input: OperationReconciliationBinding): Promise<OperationControllerObservation> {
+    this.authenticate(authenticationToken);
+    const binding = exactGatewayReconciliationBinding(input);
+    let record = (await this.operationRecords()).get(binding.operationId);
+    if (!record) {
+      return { state: "not_owner", operationId: binding.operationId, summary: "No exact provider gateway operation is bound to this durable operation." };
+    }
+    if (!gatewayRecordMatchesBinding(record, binding)) {
+      return gatewayActive(binding, "The provider gateway operation does not match the exact protected action, TargetSnapshot, and repository binding.");
+    }
+    if (legacyAutomationEffectRoute(record.routeId)) {
+      return gatewayActive(binding, "A legacy provider automation-effect record is recovery-only; the provider backend was not entered and host-local manual recovery is required.");
+    }
+    if (!trustedGatewayTerminal(record) && (record.state === "submitted" || record.state === "unresolved")) {
+      await this.observeProviderOperation(authenticationToken, {
+        operationId: record.operationId,
+        repositoryRoot: record.repositoryRoot,
+        routeId: record.routeId,
+        externalId: record.externalId,
+        targetSnapshotId: record.targetSnapshotId,
+        action: requireSavedAction(record),
+        sessionId: record.sessionId,
+        provider: record.provider,
+        authorityId: requireSavedAuthority(record)
+      }).catch(() => undefined);
+      record = (await this.operationRecords()).get(binding.operationId) ?? record;
+      if (!gatewayRecordMatchesBinding(record, binding)) {
+        return gatewayActive(binding, "The provider gateway operation binding changed during exact observation; no terminal result was accepted.");
+      }
+    }
+    const terminalTruth = trustedGatewayTerminal(record);
+    if (!terminalTruth) {
+      return gatewayActive(binding, "The provider gateway lacks a complete, internally consistent durable effect disposition; the operation remains ambiguous and was not replayed.");
+    }
+    return {
+      state: "terminal",
+      ...binding,
+      status: terminalTruth.status,
+      effectDisposition: terminalTruth.effectDisposition,
+      summary: `The exact provider gateway operation has durable ${record.state} effect truth.`
+    };
+  }
+
+  async observeProviderOperation(authenticationToken: string, input: Readonly<ProviderGatewayRecoveryBinding>): Promise<ProviderGatewayRecoveryObservation | undefined> {
     this.authenticate(authenticationToken);
     const records = await this.operationRecords();
     const record = [...records.values()].find((candidate) => candidate.externalId === input.externalId);
     if (!record) return undefined;
-    if (record.routeId !== input.routeId || record.targetSnapshotId !== input.targetSnapshotId || rootKey(record.repositoryRoot) !== rootKey(input.repositoryRoot)) {
+    if (record.operationId !== input.operationId || record.routeId !== input.routeId || record.action !== input.action
+      || record.sessionId !== input.sessionId || record.provider !== input.provider || record.authorityId !== input.authorityId
+      || record.targetSnapshotId !== input.targetSnapshotId || rootKey(record.repositoryRoot) !== rootKey(input.repositoryRoot)) {
       return { outcome: "unresolved", note: "The provider gateway observation binding changed; no state was inferred." };
+    }
+    if (legacyAutomationEffectRoute(record.routeId)) {
+      return { outcome: "unresolved", note: "The legacy automation effect record is recovery-only; no provider observation or replay was attempted." };
     }
     const backend = this.backends.get(record.provider);
     if (!backend) return { outcome: "unresolved", note: "The exact provider observation backend is unavailable." };
     try {
       const observed = await this.observeBackendOperation(record, backend);
-      await this.saveOperation({ ...record, state: observed.outcome, updatedAt: await this.monotonicHostTime() });
+      await this.saveOperation({ ...record, state: observed.outcome, effectDisposition: observed.effectDisposition, updatedAt: await this.monotonicHostTime() });
       return {
         outcome: observed.outcome,
+        ...(observed.effectDisposition ? { effectDisposition: observed.effectDisposition } : {}),
         note: safeText(observed.summary, "provider observation summary", 512),
         details: { provider: record.provider, externalId: record.externalId }
       };
@@ -474,14 +579,44 @@ export class LocalProviderCommandGateway {
     return this.executeCommand(input, parsed);
   }
 
-  private async executeAutomation(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> {
-    let parsed: ProviderGatewayAutomationCommand;
-    try { parsed = parseAutomationCommand(parseBody(input.body), input.repositoryRoot, input.routeId); }
-    catch { return blocked(input.routeId, "The local provider gateway rejected an invalid automation envelope."); }
+  private async executeReanchor(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> {
+    let parsed: ProviderGatewayReanchorCommand;
+    try { parsed = parseReanchorCommand(parseBody(input.body), input.repositoryRoot, input.routeId); }
+    catch { return blocked(input.routeId, "The local provider gateway rejected an invalid dedicated Re-anchor envelope."); }
     return this.executeCommand(input, parsed);
   }
 
-  private async executeCommand(input: ProviderGatewayRouteRequest, command: ProviderGatewayCommand): Promise<ConfiguredNetworkResult> {
+  private async observeReanchor(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> {
+    let command: ProviderGatewayReanchorCommand;
+    try {
+      const provider = input.routeId.slice("provider.observe-reanchor.".length);
+      command = parseReanchorCommand(parseBody(input.body), input.repositoryRoot, `provider.reanchor.${provider}`);
+    } catch {
+      return blocked(input.routeId, "The local provider gateway rejected an invalid Re-anchor observation envelope.");
+    }
+    const record = (await this.operationRecords()).get(command.operationId);
+    const requestDigest = sha256(stableJson(command));
+    if (!record || record.provider !== command.provider || record.routeId !== command.routeId
+      || record.targetSnapshotId !== command.targetSnapshotId || record.requestDigest !== requestDigest
+      || rootKey(record.repositoryRoot) !== rootKey(command.repositoryRoot)) {
+      return blocked(input.routeId, "No exact protected Re-anchor operation matches this observation request.");
+    }
+    if (record.responseBody) return passedEncoded(input.routeId, record.responseBody);
+    const backend = this.backends.get(command.provider);
+    if (!backend) return unavailable(input.routeId, "The exact Re-anchor observation backend is unavailable.", "ambiguous");
+    try {
+      const acknowledgement = await backend.observeReanchor(command.request, signalFor(input));
+      if (!acknowledgement) return unavailable(input.routeId, "The provider cannot prove whether the exact Re-anchor committed.", "ambiguous");
+      canonicalReanchorProviderAcknowledgement(acknowledgement, command.request);
+      const responseBody = JSON.stringify(acknowledgement);
+      await this.saveOperation({ ...record, state: "committed", effectDisposition: "committed", responseBody, updatedAt: await this.monotonicHostTime() });
+      return passedEncoded(input.routeId, responseBody);
+    } catch {
+      return unavailable(input.routeId, "The exact Re-anchor observation is unavailable; the effect was not replayed.", "ambiguous");
+    }
+  }
+
+  private async executeCommand(input: ProviderGatewayRouteRequest, command: LocalProviderGatewayCommand): Promise<ConfiguredNetworkResult> {
     const backend = this.backends.get(command.provider);
     if (!backend) return unavailable(input.routeId, `No exact local ${command.provider} provider gateway backend is installed.`);
     if (command.kind === "workflow" && command.child && (command.child.effect.adapterId !== backend.dispatchIdentity.adapterId || command.child.effect.moduleSha256 !== backend.dispatchIdentity.moduleSha256)) {
@@ -505,7 +640,7 @@ export class LocalProviderCommandGateway {
     return result;
   }
 
-  private async executeCommandOnce(input: ProviderGatewayRouteRequest, command: ProviderGatewayCommand, backend: ProviderGatewayBackend, requestDigest: string): Promise<ConfiguredNetworkResult> {
+  private async executeCommandOnce(input: ProviderGatewayRouteRequest, command: LocalProviderGatewayCommand, backend: ProviderGatewayBackend, requestDigest: string): Promise<ConfiguredNetworkResult> {
     const existing = (await this.operationRecords()).get(command.operationId);
     if (existing) {
       if (existing.requestDigest !== requestDigest || existing.routeId !== command.routeId || existing.targetSnapshotId !== command.targetSnapshotId || existing.provider !== command.provider) {
@@ -522,6 +657,8 @@ export class LocalProviderCommandGateway {
       sessionId: command.sessionId,
       repositoryRoot: command.repositoryRoot,
       targetSnapshotId: command.targetSnapshotId,
+      action: command.action,
+      authorityId: command.authorityId,
       requestDigest,
       state: "submitted",
       cancellationAcknowledged: false,
@@ -530,15 +667,17 @@ export class LocalProviderCommandGateway {
     await this.saveOperation(submitted);
     const currentBeforeEffect = await this.sessions.get(command.sessionId);
     if (!currentBeforeEffect || !canExecuteProviderCommand(currentBeforeEffect, command, this.now(), this.automaticRefreshIntervalMs)) {
-      await this.saveOperation({ ...submitted, state: "failed", updatedAt: await this.monotonicHostTime() });
+      await this.saveOperation({ ...submitted, state: "failed", effectDisposition: "not_started", updatedAt: await this.monotonicHostTime() });
       return blocked(input.routeId, "The provider session or its catalog-derived capability floor changed before the final execution boundary.");
     }
     try {
-      const response = await backend.execute(command, signalFor(input));
+      const response = command.kind === "reanchor"
+        ? await backend.reanchor(command.request, signalFor(input))
+        : await backend.execute(command, signalFor(input));
       requireCommandResponse(command, response);
       const currentAfterEffect = await this.sessions.get(command.sessionId);
       if (!currentAfterEffect || !canExecuteProviderCommand(currentAfterEffect, command, this.now(), this.automaticRefreshIntervalMs)) {
-        await this.saveOperation({ ...submitted, state: "unresolved", updatedAt: await this.monotonicHostTime() });
+        await this.saveOperation({ ...submitted, state: "unresolved", effectDisposition: "ambiguous", updatedAt: await this.monotonicHostTime() });
         return unavailable(input.routeId, "The provider session changed while the effect was in flight; the result is ambiguous and requires exact observation.", "ambiguous");
       }
       const responseBody = JSON.stringify(response);
@@ -546,13 +685,14 @@ export class LocalProviderCommandGateway {
       await this.saveOperation({
         ...submitted,
         externalId: command.externalId,
-        state: outcomeForResponse(response),
+        state: command.kind === "reanchor" ? "committed" : outcomeForResponse(response as ProviderGatewayCommandResult),
+        effectDisposition: command.kind === "reanchor" ? "committed" : (response as ProviderGatewayCommandResult).effectDisposition,
         responseBody,
         updatedAt: await this.monotonicHostTime()
       });
       return passedEncoded(input.routeId, responseBody);
     } catch {
-      await this.saveOperation({ ...submitted, state: "unresolved", updatedAt: await this.monotonicHostTime() });
+      await this.saveOperation({ ...submitted, state: "unresolved", effectDisposition: "ambiguous", updatedAt: await this.monotonicHostTime() });
       return unavailable(input.routeId, "The provider gateway lost the exact command result; observation is required and the request was not replayed.", "ambiguous");
     }
   }
@@ -602,21 +742,60 @@ export class LocalProviderCommandGateway {
       operationId: record.operationId,
       externalId: record.externalId,
       routeId: record.routeId,
+      action: requireSavedAction(record),
+      sessionId: record.sessionId,
+      authorityId: requireSavedAuthority(record),
       targetSnapshotId: record.targetSnapshotId,
       repositoryRoot: record.repositoryRoot
     }, new AbortController().signal);
-    if (response.operationId !== record.operationId || response.externalId !== record.externalId || response.routeId !== record.routeId || response.targetSnapshotId !== record.targetSnapshotId || !operationOutcome(response.outcome)) {
+    if (response.operationId !== record.operationId || response.externalId !== record.externalId || response.routeId !== record.routeId
+      || response.action !== record.action || response.sessionId !== record.sessionId || response.authorityId !== record.authorityId
+      || response.targetSnapshotId !== record.targetSnapshotId || rootKey(response.repositoryRoot) !== rootKey(record.repositoryRoot) || !operationOutcome(response.outcome)) {
       throw new Error("The provider operation observation changed its exact binding.");
     }
-    safeText(response.summary, "provider operation observation", 512);
-    return response;
+    const summary = safeText(response.summary, "provider operation observation", 512);
+    const disposition = exactEffectDisposition(response.effectDisposition);
+    if (!providerObservationConsistent(response.outcome, disposition)) {
+      return {
+        operationId: record.operationId,
+        externalId: record.externalId,
+        routeId: record.routeId,
+        action: requireSavedAction(record),
+        sessionId: record.sessionId,
+        authorityId: requireSavedAuthority(record),
+        targetSnapshotId: record.targetSnapshotId,
+        repositoryRoot: record.repositoryRoot,
+        outcome: "unresolved",
+        effectDisposition: "ambiguous",
+        summary: "The provider observation lacks a complete, internally consistent effect disposition; no terminal state was inferred."
+      };
+    }
+    return { ...response, effectDisposition: disposition, summary };
   }
 
   private async operationRecords(): Promise<Map<string, SavedGatewayOperation>> {
     const result = new Map<string, SavedGatewayOperation>();
+    const conflicted = new Set<string>();
     for (const entry of await this.store.readEntries()) {
       if (entry.kind !== gatewayEventKind) continue;
       const operation = parseSavedOperation((entry.payload as { operation?: unknown } | undefined)?.operation);
+      if (conflicted.has(operation.operationId)) continue;
+      const prior = result.get(operation.operationId);
+      if (prior && !sameGatewayOperationIdentity(prior, operation)) {
+        result.set(operation.operationId, {
+          ...prior,
+          action: undefined,
+          authorityId: undefined,
+          state: "unresolved",
+          effectDisposition: "ambiguous",
+          responseBody: undefined,
+          cancellationAcknowledged: true,
+          updatedAt: operation.updatedAt
+        });
+        conflicted.add(operation.operationId);
+        continue;
+      }
+      if (prior && trustedGatewayTerminal(prior)) continue;
       result.set(operation.operationId, operation);
     }
     return result;
@@ -652,7 +831,8 @@ class GatewayClient implements AuthenticatedProviderGatewayClient {
   cancelByOperation(operationId: string, reason: string): Promise<number> { return this.gateway.cancelByOperation(this.token, operationId, reason); }
   cancelQueuedForRepository(repositoryRoot: string, reason: string): Promise<number> { return this.gateway.cancelQueuedForRepository(this.token, repositoryRoot, reason); }
   observeOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> { return this.gateway.observeOperation(this.token, operationId); }
-  observeProviderOperation(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<ProviderGatewayRecoveryObservation | undefined> { return this.gateway.observeProviderOperation(this.token, input); }
+  observeBoundOperation(binding: OperationReconciliationBinding): Promise<OperationControllerObservation> { return this.gateway.observeBoundOperation(this.token, binding); }
+  observeProviderOperation(input: Readonly<ProviderGatewayRecoveryBinding>): Promise<ProviderGatewayRecoveryObservation | undefined> { return this.gateway.observeProviderOperation(this.token, input); }
 }
 
 /**
@@ -664,6 +844,8 @@ export class ProviderGatewayRouteRouter implements ProviderGatewayFallbackTransp
   constructor(private readonly gateway: AuthenticatedProviderGatewayClient, private readonly fallback: ProviderGatewayFallbackTransport) {}
 
   async request(input: ProviderGatewayRouteRequest): Promise<ConfiguredNetworkResult> {
+    if (input.routeId.startsWith("automation.proposal.")) return this.fallback.request(input);
+    if (legacyAutomationEffectRoute(input.routeId)) return this.gateway.request(input);
     const hint = routeProviderHint(input);
     if (!hint.valid) return this.gateway.request(input);
     if (hint.provider && this.gateway.supportsProvider(hint.provider)) return this.gateway.request(input);
@@ -671,6 +853,7 @@ export class ProviderGatewayRouteRouter implements ProviderGatewayFallbackTransp
   }
 
   recoveryExternalId(input: ProviderGatewayRecoveryIdentityRequest): string | undefined {
+    if (input.routeId.startsWith("automation.")) return undefined;
     return this.gateway.supportsProvider(input.provider)
       ? this.gateway.recoveryExternalId(input)
       : this.fallback.recoveryExternalId?.(input);
@@ -691,6 +874,7 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
   readonly boundary: ProviderGatewayBoundary;
   readonly dispatchIdentity: Readonly<{ adapterId: string; moduleSha256: string }>;
   commandCalls = 0;
+  reanchorCalls = 0;
   cancelCalls = 0;
   sessionObservationCalls = 0;
   private unavailableState = false;
@@ -698,6 +882,7 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
   private readonly sessions = new Map<string, Omit<ProviderGatewaySessionObservation, "sessionId" | "provider">>();
   private readonly operations = new Map<string, ProviderGatewayOperationObservation>();
   private readonly responses = new Map<string, ProviderGatewayCommandResult>();
+  private readonly reanchorResponses = new Map<string, ReanchorProviderAcknowledgement>();
 
   constructor(provider: ProviderGatewayProvider, options: { readonly boundary?: ProviderGatewayBoundary } = {}) {
     this.provider = provider;
@@ -728,14 +913,14 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
 
   async execute(request: ProviderGatewayCommand): Promise<ProviderGatewayCommandResult> {
     this.available();
+    if (request.kind === "automation") throw new Error("Automation effects are host-local and cannot enter a provider backend.");
     const prior = this.responses.get(request.externalId);
     if (prior) return prior;
     this.commandCalls += 1;
     const status = this.nextStatus;
     this.nextStatus = "completed";
     const disposition: EffectDisposition = status === "completed" ? "committed" : status === "running" ? "ambiguous" : "not_started";
-    const response: ProviderGatewayCommandResult = request.kind === "workflow"
-      ? request.child
+    const response: ProviderGatewayCommandResult = request.child
         ? deterministicWorkflowChildResult(request, status, disposition, this.dispatchIdentity)
         : {
           schema: "sxsy-b122.workflow-result",
@@ -749,27 +934,72 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
           summary: `Deterministic ${this.provider} provider ${status}.`,
           externalId: request.externalId,
           result: deterministicWorkflowResult(request)
-        }
-      : {
-          schema: automationResultSchema(request.action),
-          version: 1,
-          action: request.action,
-          status,
-          effectDisposition: disposition,
-          summary: `Deterministic ${this.provider} automation ${status}.`,
-          externalId: request.externalId,
-          result: deterministicAutomationResult(request)
         };
     this.responses.set(request.externalId, response);
     this.operations.set(request.externalId, {
       operationId: request.operationId,
       externalId: request.externalId,
       routeId: request.routeId,
+      action: request.action,
+      sessionId: request.sessionId,
+      authorityId: request.authorityId,
       targetSnapshotId: request.targetSnapshotId,
+      repositoryRoot: request.repositoryRoot,
       outcome: status === "completed" ? "committed" : status === "running" ? "unresolved" : status === "cancelled" ? "cancelled" : "failed",
+      effectDisposition: disposition,
       summary: `Deterministic ${this.provider} operation is ${status}.`
     });
     return response;
+  }
+
+  async reanchor(request: ReanchorApplyRequest): Promise<ReanchorProviderAcknowledgement> {
+    this.available();
+    const prior = this.reanchorResponses.get(request.operationId);
+    if (prior) return canonicalReanchorProviderAcknowledgement(prior, request);
+    this.reanchorCalls += 1;
+    const response: ReanchorProviderAcknowledgement = {
+      schema: "sxsy-b122.reanchor-acknowledgement",
+      version: 1,
+      requestId: request.requestId,
+      operationId: request.operationId,
+      externalEffectId: request.operationId,
+      sessionId: request.sessionId,
+      authorityId: request.authorityId,
+      oldTargetSnapshotId: request.oldTargetSnapshotId,
+      newTargetSnapshotId: request.newTargetSnapshotId,
+      cooperativeStopAcknowledged: true,
+      resumed: false,
+      artifactDigest: request.artifactDigest,
+      rereadEvidence: request.rereadEvidence,
+      report: {
+        summary: `Deterministic ${this.provider} stopped, reread the protected instructions, task brief and project documentation, inspected current work, and did not resume.`,
+        discrepancies: [`Inspected the exact transition from ${request.oldTargetSnapshotId} to ${request.newTargetSnapshotId}.`],
+        risks: ["The managed session remains stopped until a separately authorized action."],
+        questions: ["Should the operator separately authorize a later resume?"],
+        result: "reanchored_without_resume"
+      }
+    };
+    this.reanchorResponses.set(request.operationId, response);
+    this.operations.set(request.operationId, {
+      operationId: request.operationId,
+      externalId: request.operationId,
+      routeId: `provider.reanchor.${request.provider}`,
+      action: "reanchor",
+      sessionId: request.sessionId,
+      authorityId: request.authorityId,
+      targetSnapshotId: request.oldTargetSnapshotId,
+      repositoryRoot: request.repositoryRoot,
+      outcome: "committed",
+      effectDisposition: "committed",
+      summary: `Deterministic ${this.provider} Re-anchor is committed without resume.`
+    });
+    return response;
+  }
+
+  async observeReanchor(request: ReanchorApplyRequest): Promise<ReanchorProviderAcknowledgement | undefined> {
+    this.available();
+    const response = this.reanchorResponses.get(request.operationId);
+    return response ? canonicalReanchorProviderAcknowledgement(response, request) : undefined;
   }
 
   async observeSession(request: ProviderGatewaySessionObservationRequest): Promise<ProviderGatewaySessionObservation> {
@@ -787,7 +1017,7 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
   async observeOperation(request: ProviderGatewayOperationObservationRequest): Promise<ProviderGatewayOperationObservation> {
     this.available();
     const operation = this.operations.get(request.externalId);
-    if (!operation) return { ...request, outcome: "unresolved", summary: "The deterministic provider has no exact operation." };
+    if (!operation) return { ...request, outcome: "unresolved", effectDisposition: "ambiguous", summary: "The deterministic provider has no exact operation." };
     return { ...operation };
   }
 
@@ -795,11 +1025,11 @@ export class DeterministicProviderGatewayBackend implements ProviderGatewayBacke
     this.available();
     this.cancelCalls += 1;
     const operation = this.operations.get(request.externalId);
-    if (!operation || operation.operationId !== request.operationId || operation.targetSnapshotId !== request.targetSnapshotId) {
-      return { operationId: request.operationId, externalId: request.externalId, targetSnapshotId: request.targetSnapshotId, accepted: false, summary: "No exact operation was found." };
+    if (!operation || !sameProviderOperation(operation, request)) {
+      return { ...request, accepted: false, summary: "No exact operation was found." };
     }
-    this.operations.set(request.externalId, { ...operation, outcome: "cancelled", summary: "The deterministic provider reports the exact operation cancelled." });
-    return { operationId: request.operationId, externalId: request.externalId, targetSnapshotId: request.targetSnapshotId, accepted: true, summary: "Cancellation acknowledged." };
+    this.operations.set(request.externalId, { ...operation, outcome: "unresolved", effectDisposition: "ambiguous", summary: "The deterministic provider confirms cancellation delivery but not the prior effect disposition." });
+    return { ...request, accepted: true, summary: "Cancellation acknowledged." };
   }
 
   private available(): void { if (this.unavailableState) throw new Error("The deterministic provider is unavailable."); }
@@ -967,24 +1197,26 @@ function approvalPayload(payload: WorkflowArtifactPayload): Extract<WorkflowArti
   return payload;
 }
 
-function parseAutomationCommand(value: Record<string, unknown>, repositoryRoot: string, routeId: string): ProviderGatewayAutomationCommand {
-  if (!routeId.startsWith("automation.")) throw new Error("The automation gateway request is invalid.");
-  const parsed = parseAutomationEnvelope(value);
-  if (routeId !== `automation.${parsed.action}`) throw new Error("The automation route and action differ.");
-  const target = object(parsed.target, "target");
-  const session = object(parsed.session, "session");
-  boundedJson(value);
+function parseReanchorCommand(value: Record<string, unknown>, repositoryRoot: string, routeId: string): ProviderGatewayReanchorCommand {
+  if (value.schema !== "sxsy-b122.provider-reanchor-request") throw new Error("The dedicated Re-anchor gateway schema is invalid.");
+  const unsigned = { ...value };
+  delete unsigned.schema;
+  const request = canonicalReanchorApplyRequest(unsigned);
+  if (routeId !== `provider.reanchor.${request.provider}` || rootKey(request.repositoryRoot) !== rootKey(safeRoot(repositoryRoot))) {
+    throw new Error("The dedicated Re-anchor route, provider, or repository binding changed.");
+  }
   return {
-    kind: "automation",
+    kind: "reanchor",
     routeId,
-    operationId: safeIdentifier(parsed.operationId, "operation ID"),
-    externalId: safeIdentifier(parsed.operationId, "operation ID"),
-    action: parsed.action,
-    repositoryRoot: exactRoot(target.repositoryRoot, repositoryRoot),
-    targetSnapshotId: digest(target.id, "target snapshot"),
-    sessionId: safeIdentifier(session.id, "session ID"),
-    provider: providerIdentity(session.provider),
-    intent: parsed.intent
+    action: "reanchor",
+    operationId: request.operationId,
+    externalId: request.operationId,
+    repositoryRoot: request.repositoryRoot,
+    targetSnapshotId: request.oldTargetSnapshotId,
+    sessionId: request.sessionId,
+    authorityId: request.authorityId,
+    provider: request.provider,
+    request
   };
 }
 
@@ -1021,17 +1253,20 @@ function validateRouteRequest(input: ProviderGatewayRouteRequest): string | unde
   return undefined;
 }
 
-function requireCommandResponse(command: ProviderGatewayCommand, response: ProviderGatewayCommandResult): void {
+function requireCommandResponse(command: LocalProviderGatewayCommand, response: LocalProviderGatewayCommandResult): void {
   boundedJson(response);
-  if (response.externalId !== command.externalId || response.status === undefined || response.effectDisposition === undefined || !safeSummary(response.summary)) throw new Error("The provider response is not exact or bounded.");
-  if (command.kind === "workflow") {
-    if (command.child) {
-      parseWorkflowChildProviderResponse(response, workflowArtifactForCommand(command), command.child.effect, command.operationId, command.child.role);
-    } else {
-      const workflowResponse = response as WorkflowProviderResponse;
-      if (workflowResponse.schema !== "sxsy-b122.workflow-result" || workflowResponse.version !== 1 || workflowResponse.operationId !== command.operationId || workflowResponse.action !== command.action || workflowResponse.artifactId !== command.artifact.id || workflowResponse.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
-    }
-  } else parseAutomationProviderResult(response, command.action, command.externalId);
+  if (command.kind === "reanchor") {
+    canonicalReanchorProviderAcknowledgement(response, command.request);
+    return;
+  }
+  const standardResponse = response as ProviderGatewayCommandResult;
+  if (standardResponse.externalId !== command.externalId || standardResponse.status === undefined || standardResponse.effectDisposition === undefined || !safeSummary(standardResponse.summary)) throw new Error("The provider response is not exact or bounded.");
+  if (command.child) {
+    parseWorkflowChildProviderResponse(standardResponse, workflowArtifactForCommand(command), command.child.effect, command.operationId, command.child.role);
+  } else {
+    const workflowResponse = standardResponse as WorkflowProviderResponse;
+    if (workflowResponse.schema !== "sxsy-b122.workflow-result" || workflowResponse.version !== 1 || workflowResponse.operationId !== command.operationId || workflowResponse.action !== command.action || workflowResponse.artifactId !== command.artifact.id || workflowResponse.artifactDigest !== command.artifact.digest) throw new Error("The workflow provider response changed its exact binding.");
+  }
 }
 
 function workflowArtifactForCommand(command: ProviderGatewayWorkflowCommand): WorkflowArtifact {
@@ -1056,13 +1291,27 @@ function validateHandshakeResult(value: ProviderGatewayHandshakeResult): void {
 }
 
 function requireCancellationAcknowledgement(record: SavedGatewayOperation, value: ProviderGatewayCancellationAcknowledgement): void {
-  if (value.operationId !== record.operationId || value.externalId !== record.externalId || value.targetSnapshotId !== record.targetSnapshotId || typeof value.accepted !== "boolean" || !safeSummary(value.summary)) throw new Error("The provider cancellation acknowledgement changed its exact binding.");
+  if (value.operationId !== record.operationId || value.externalId !== record.externalId || value.routeId !== record.routeId
+    || value.action !== record.action || value.sessionId !== record.sessionId || value.authorityId !== record.authorityId
+    || value.targetSnapshotId !== record.targetSnapshotId || rootKey(value.repositoryRoot) !== rootKey(record.repositoryRoot)
+    || typeof value.accepted !== "boolean" || !safeSummary(value.summary)) throw new Error("The provider cancellation acknowledgement changed its exact binding.");
 }
 
 function parseSavedOperation(value: unknown): SavedGatewayOperation {
   const record = object(value, "provider gateway operation");
+  if (!allowedExact(record,
+    ["operationId", "externalId", "routeId", "provider", "sessionId", "repositoryRoot", "targetSnapshotId", "requestDigest", "state", "cancellationAcknowledged", "updatedAt"],
+    ["action", "authorityId", "effectDisposition", "responseBody"])) {
+    throw new Error("The protected provider gateway operation schema is not closed.");
+  }
   const state = record.state;
   if (state !== "submitted" && !operationOutcome(state)) throw new Error("The protected provider gateway operation state is invalid.");
+  const action = record.action === undefined ? undefined : exactCommandAction(record.action);
+  const authorityId = record.authorityId === undefined ? undefined : safeIdentifier(record.authorityId, "authority ID");
+  const effectDisposition = record.effectDisposition === undefined ? undefined : exactEffectDisposition(record.effectDisposition);
+  if ((state === "submitted" || state === "unresolved") && effectDisposition !== undefined && effectDisposition !== "ambiguous") {
+    throw new Error("An in-flight provider gateway operation cannot claim terminal effect disposition.");
+  }
   return {
     operationId: safeIdentifier(record.operationId, "operation ID"),
     externalId: safeIdentifier(record.externalId, "external ID"),
@@ -1071,8 +1320,11 @@ function parseSavedOperation(value: unknown): SavedGatewayOperation {
     sessionId: safeIdentifier(record.sessionId, "session ID"),
     repositoryRoot: safeRoot(record.repositoryRoot),
     targetSnapshotId: digest(record.targetSnapshotId, "target snapshot"),
+    ...(action ? { action } : {}),
+    ...(authorityId ? { authorityId } : {}),
     requestDigest: digest(record.requestDigest, "request digest"),
     state,
+    ...(effectDisposition ? { effectDisposition } : {}),
     ...(record.responseBody === undefined ? {} : { responseBody: safeText(record.responseBody, "provider response", maximumBodyBytes) }),
     cancellationAcknowledged: boolean(record.cancellationAcknowledged, "cancellation acknowledgement"),
     updatedAt: timestamp(record.updatedAt, "operation update time")
@@ -1132,21 +1384,24 @@ function deterministicWorkflowResult(request: ProviderGatewayWorkflowCommand): W
     };
     case "plan": return payload.mode === "expand"
       ? { kind: "plan", mode: "expanded", planDigest: payload.plan.digest, alternatives: Array.from({ length: 15 }, (_, index) => ({ rank: index + 1, id: `alternative-${index + 1}`, summary: `Creative alternative ${index + 1}`, rationale: `Distinct reviewed approach ${index + 1}.`, risks: [] })) }
-      : { kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision, originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId, acknowledgementId: `ack:${request.operationId}`, executionStarted: true };
+      : {
+          kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision,
+          originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId,
+          acknowledgementId: `ack:${request.operationId}`, executionStarted: true,
+          targetTransition: payload.plan.expectedTargetTransition,
+          childEffects: [{
+            id: `deterministic-plan-child:${request.operationId}`,
+            action: "plan_execution",
+            status: "running",
+            effectDisposition: "committed",
+            summary: "The deterministic provider accepted the exact approved plan into one observable execution child.",
+            externalId: `ack:${request.operationId}`
+          }]
+        };
     case "handoff": return { kind: "handoff", packageId: payload.packageId, recipientSessionId: payload.recipientSessionId ?? request.sessionId, acknowledged: true };
     case "focus": return { kind: "focus", selectedSessionId: payload.selectedSessionId, status: payload.expectedStatus, queueCycleId: payload.queueCycleId, resultDelivered: true };
     case "authority": return { kind: "authority", acknowledgements: payload.packets.map((packet) => ({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true })) };
     case "voice_binding": return { kind: "voice_binding", bindingId: `binding:${request.artifact.id}`, active: true };
-  }
-}
-
-function deterministicAutomationResult(request: ProviderGatewayAutomationCommand): AutomationProviderResultPayload {
-  const evidence = (label: string): string => sha256(stableJson({ label, operationId: request.operationId, targetSnapshotId: request.targetSnapshotId }));
-  switch (request.action) {
-    case "compound_capture": return { kind: request.action, captureId: `capture:${request.operationId}`, learningDigest: evidence("learning"), verifiedProblemDigest: evidence("verified-problem"), documents: ["docs/solutions/deterministic-learning.md"] };
-    case "compound_refresh": return { kind: request.action, previewDigest: evidence("refresh-preview"), affectedPaths: [], creates: 0, updates: 0, deletes: 0, mutationApplied: false };
-    case "lfg": return { kind: request.action, runId: `lfg:${request.operationId}`, stages: request.intent.kind === "lfg" ? request.intent.lifecycle.map((name) => ({ name, status: "passed" as const, evidenceDigest: evidence(name) })) : [], pullRequestUrl: null, deploymentAttempted: false };
-    case "repair_mission": return { kind: request.action, reproduction: { commandDigest: evidence("reproduction-command"), status: "not_reproduced", logsDigest: evidence("reproduction-logs") }, approvedScopeDigest: evidence("approved-scope"), diffDigest: sha256(""), affectedChecks: [], fullChecks: [], risks: ["Deterministic diagnostics do not modify the repository."], nextAction: "Review the diagnostic receipt before authorizing any repair.", pushAttempted: false, mergeAttempted: false, deployAttempted: false, hostedRerunAttempted: false, productionDataUsed: false };
   }
 }
 
@@ -1178,7 +1433,7 @@ function hasGatewayProof(session: ManagedSession): boolean {
     && !!session.workspaceRoot;
 }
 
-function canExecuteProviderCommand(session: ManagedSession, command: ProviderGatewayCommand, now: string, refreshIntervalMs: number): boolean {
+function canExecuteProviderCommand(session: ManagedSession, command: LocalProviderGatewayCommand, now: string, refreshIntervalMs: number): boolean {
   const observedAt = Date.parse(session.lastHeartbeat);
   const current = Date.parse(now);
   const freshnessMs = Math.max(60_000, refreshIntervalMs * 2);
@@ -1193,14 +1448,18 @@ function canExecuteProviderCommand(session: ManagedSession, command: ProviderGat
   if (required.has("observable") || required.has("controllable") || required.has("mediated")) required.add("registered");
   if (required.has("mediated")) { required.add("observable"); required.add("controllable"); }
   const requiredCapabilities: readonly Capability[] = ["registered", "observable", "controllable", "mediated"].filter((capability): capability is Capability => required.has(capability as Capability));
+  const authorityRecovery = command.action === "authority_refresh" || command.action === "authority_broadcast";
+  const statusAllowed = session.status === "running" || (authorityRecovery && session.status === "verified_blocked");
   return hasGatewayProof(session)
     && session.provider === command.provider
-    && session.status === "running"
+    && statusAllowed
     && requiredCapabilities.every((capabilityValue) => session.capabilities.includes(capabilityValue))
     && Number.isFinite(observedAt) && Number.isFinite(current) && observedAt <= current + 30_000 && current - observedAt <= freshnessMs
     && session.targetSnapshotId === command.targetSnapshotId
     && !!session.workspaceRoot && rootKey(session.workspaceRoot) === rootKey(command.repositoryRoot)
-    && (command.kind !== "workflow" || (session.taskId === command.artifact.taskId && session.planRevision === command.artifact.planRevision));
+    && (command.kind !== "workflow" || (session.taskId === command.artifact.taskId && session.planRevision === command.artifact.planRevision))
+    && (command.kind !== "reanchor" || (session.taskId === command.request.taskId && session.planRevision === command.request.planRevision
+      && stableJson(session) === stableJson(command.request.session)));
 }
 
 function providerBackend(backends: ReadonlyMap<ProviderGatewayProvider, ProviderGatewayBackend>, provider: ManagedSession["provider"]): ProviderGatewayBackend | undefined {
@@ -1239,6 +1498,7 @@ function boolean(value: unknown, field: string): boolean { if (typeof value !== 
 function safeIdentifier(value: unknown, field: string): string { if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value)) throw new Error(`${field} is invalid.`); return value; }
 function safeOperationId(value: unknown): value is string { try { safeIdentifier(value, "operation ID"); return true; } catch { return false; } }
 function safeRoute(value: unknown): string { if (typeof value !== "string" || !/^[a-z][a-z0-9_.-]{0,127}$/.test(value)) throw new Error("The provider gateway route is invalid."); return value; }
+function legacyAutomationEffectRoute(routeId: string): boolean { return routeId.startsWith("automation.") && !routeId.startsWith("automation.proposal."); }
 function safeRoot(value: unknown): string { if (typeof value !== "string" || value.length > 4_096 || !/^(?:[A-Za-z]:[\\/]|\\\\)/.test(value) || /[\0\r\n]/.test(value)) throw new Error("The provider repository root is invalid."); return value; }
 function exactRoot(value: unknown, expected: string): string { const root = safeRoot(value); if (rootKey(root) !== rootKey(safeRoot(expected))) throw new Error("The provider repository root changed."); return expected; }
 function rootKey(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
@@ -1250,10 +1510,76 @@ function timestamp(value: unknown, field: string): string { if (typeof value !==
 function safeAdapterVersion(value: unknown): string { if (typeof value !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The provider adapter version is invalid."); return value; }
 function boundedStringList(values: readonly string[], maximumItems: number, maximumLength: number): void { if (!Array.isArray(values) || values.length > maximumItems || !values.every((value) => typeof value === "string" && !!value.trim() && value.length <= maximumLength && !/[\0\r\n]/.test(value))) throw new Error("The provider returned an invalid bounded list."); }
 function providerIdentity(value: unknown): ProviderGatewayProvider { if (value !== "claude" && value !== "codex") throw new Error("The local provider gateway requires an exact Claude or Codex provider."); return value; }
+function exactCommandAction(value: unknown): CommandAction {
+  if (typeof value !== "string" || !(commandActionIds as readonly string[]).includes(value)) throw new Error("The provider gateway command action is invalid.");
+  return value as CommandAction;
+}
+function exactEffectDisposition(value: unknown): EffectDisposition {
+  if (value !== "not_started" && value !== "committed" && value !== "ambiguous" && value !== "compensated") throw new Error("The provider gateway effect disposition is invalid.");
+  return value;
+}
 function capability(value: unknown): value is Capability { return value === "registered" || value === "observable" || value === "controllable" || value === "mediated"; }
 function sessionStatus(value: unknown): value is SessionStatus { return value === "running" || value === "verified_blocked" || value === "verified_finished" || value === "unreachable" || value === "stale" || value === "unknown"; }
 function operationOutcome(value: unknown): value is ProviderGatewayOperationOutcome { return value === "committed" || value === "failed" || value === "cancelled" || value === "unresolved"; }
 function terminal(value: SavedGatewayOperation["state"]): boolean { return value === "committed" || value === "failed" || value === "cancelled"; }
+
+function exactGatewayReconciliationBinding(input: OperationReconciliationBinding): OperationReconciliationBinding {
+  const operationId = safeIdentifier(input.operationId, "operation ID");
+  const action = exactCommandAction(input.action);
+  if ((input.targetSnapshotId === undefined) !== (input.repositoryRoot === undefined)) throw new Error("The provider gateway reconciliation binding is partial.");
+  if (!input.sessionId || !input.authorityId) throw new Error("The provider gateway reconciliation binding lacks an exact session or authority.");
+  const sessionId = safeIdentifier(input.sessionId, "session ID");
+  const authorityId = safeIdentifier(input.authorityId, "authority ID");
+  return input.targetSnapshotId === undefined
+    ? { operationId, action, sessionId, authorityId }
+    : { operationId, action, targetSnapshotId: digest(input.targetSnapshotId, "target snapshot"), repositoryRoot: safeRoot(input.repositoryRoot), sessionId, authorityId };
+}
+
+function gatewayRecordMatchesBinding(record: SavedGatewayOperation, binding: OperationReconciliationBinding): boolean {
+  return record.action === binding.action && record.targetSnapshotId === binding.targetSnapshotId
+    && record.sessionId === binding.sessionId && record.authorityId === binding.authorityId
+    && binding.repositoryRoot !== undefined && rootKey(record.repositoryRoot) === rootKey(binding.repositoryRoot);
+}
+
+function gatewayActive(binding: OperationReconciliationBinding, summary: string): Extract<OperationControllerObservation, { state: "active" }> {
+  return { state: "active", ...binding, effectDisposition: "ambiguous", summary };
+}
+
+function trustedGatewayTerminal(record: SavedGatewayOperation): Readonly<{
+  status: "completed" | "failed" | "cancelled";
+  effectDisposition: Exclude<EffectDisposition, "ambiguous">;
+}> | undefined {
+  const disposition = record.effectDisposition;
+  if (record.action === undefined || record.authorityId === undefined || !gatewayRouteMatchesAction(record.routeId, record.action, record.provider)
+    || disposition === undefined || disposition === "ambiguous") return undefined;
+  if (record.state === "committed" && disposition === "committed") return { status: "completed", effectDisposition: disposition };
+  if (record.state === "failed") return { status: "failed", effectDisposition: disposition };
+  if (record.state === "cancelled") return { status: "cancelled", effectDisposition: disposition };
+  return undefined;
+}
+
+function providerObservationConsistent(outcome: ProviderGatewayOperationOutcome, disposition: EffectDisposition | undefined): boolean {
+  if (outcome === "unresolved") return disposition === "ambiguous";
+  if (outcome === "committed") return disposition === "committed";
+  return disposition !== undefined && disposition !== "ambiguous";
+}
+
+function sameGatewayOperationIdentity(left: SavedGatewayOperation, right: SavedGatewayOperation): boolean {
+  return left.operationId === right.operationId && left.externalId === right.externalId && left.routeId === right.routeId
+    && left.provider === right.provider && left.sessionId === right.sessionId && left.requestDigest === right.requestDigest
+    && left.targetSnapshotId === right.targetSnapshotId && rootKey(left.repositoryRoot) === rootKey(right.repositoryRoot)
+    && left.action === right.action && left.authorityId === right.authorityId;
+}
+function requireSavedAction(record: SavedGatewayOperation): CommandAction { if (!record.action) throw new Error("The legacy provider operation lacks an exact action binding."); return record.action; }
+function requireSavedAuthority(record: SavedGatewayOperation): string { if (!record.authorityId) throw new Error("The legacy provider operation lacks an exact authority binding."); return record.authorityId; }
+function sameProviderOperation(left: ProviderGatewayOperationObservation, right: ProviderGatewayOperationObservationRequest): boolean {
+  return left.operationId === right.operationId && left.externalId === right.externalId && left.routeId === right.routeId
+    && left.action === right.action && left.sessionId === right.sessionId && left.authorityId === right.authorityId
+    && left.targetSnapshotId === right.targetSnapshotId && rootKey(left.repositoryRoot) === rootKey(right.repositoryRoot);
+}
+function gatewayRouteMatchesAction(routeId: string, action: CommandAction, provider: ProviderGatewayProvider): boolean {
+  return routeId === `provider.${action}` || (action === "reanchor" && routeId === `provider.reanchor.${provider}`);
+}
 function boundedDuration(value: number): number { if (!Number.isSafeInteger(value) || value < 0 || value > 15 * 60_000) throw new Error("The provider gateway refresh interval is invalid."); return value; }
 function signalFor(input: ProviderGatewayRouteRequest): AbortSignal { return input.signal ?? new AbortController().signal; }
 function tokenDigest(value: string): Buffer { if (!/^[a-f0-9]{64}$/i.test(value)) throw new Error("The provider gateway authentication token must be 256 bits."); return createHash("sha256").update(value.toLowerCase(), "ascii").digest(); }

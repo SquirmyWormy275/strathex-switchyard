@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { access, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { WindowsJobObjectProcessSupervisor } from "../src/windows-job-supervisor.ts";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -47,6 +48,8 @@ test("self-contained repository runner proves Job-Object child and grandchild co
   const helperDigest = createHash("sha256").update(await readFile(helper)).digest("hex");
   const selfTest = await command(helper, ["--self-test"], {}, 30_000);
   assert.equal(selfTest.code, 0, selfTest.stderr || selfTest.stdout);
+  const legacyHelperShape = await command(helper, ["--observe", join(root, "legacy.request.json"), join(root, "legacy.state.json")], {}, 5_000);
+  assert.equal(legacyHelperShape.code, 64, "a helper invocation without the immutable request digest must fail closed");
   const receipt = JSON.parse(selfTest.stdout) as Record<string, unknown>;
   assert.equal(receipt.schema, "sxsy-b122.repository-runner-self-test");
   assert.equal(receipt.jobObjectCreated, true);
@@ -160,6 +163,44 @@ test("self-contained repository runner proves Job-Object child and grandchild co
   assert.equal(recipeEvidence.toolSha256, recipeHelperDigest);
   assert.deepEqual(recipeEvidence.unavailableDimensions, []);
 
+  const linkedRepository = join(root, "linked-repository");
+  const linkedOutside = join(root, "linked-outside");
+  const linkedWorkingDirectory = join(linkedRepository, "working-link");
+  await Promise.all([mkdir(linkedRepository), mkdir(linkedOutside)]);
+  await symlink(linkedOutside, linkedWorkingDirectory, "junction");
+  const linkedStatePath = join(root, "linked-supervisor.state.json");
+  const linkedRequestPath = join(root, "linked-supervisor.request.json");
+  await writeFile(linkedRequestPath, JSON.stringify({
+    schema: "sxsy-b122.repository-supervisor-request",
+    version: 3,
+    supervisorId: `managed:${"e".repeat(64)}`,
+    operationId: "operation-linked-working-directory",
+    action: "run_target",
+    targetSnapshotId: "b".repeat(64),
+    sessionId: null,
+    authorityId: null,
+    repositoryRoot: linkedRepository,
+    manifestSha256: "a".repeat(64),
+    helperPath: helper,
+    helperSha256: helperDigest,
+    executable: process.execPath,
+    executableSha256: createHash("sha256").update(await readFile(process.execPath)).digest("hex"),
+    arguments: ["--version"],
+    workingDirectory: linkedWorkingDirectory,
+    environment: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" },
+    lifecycle: "foreground",
+    timeoutMs: 5_000,
+    maxOutputBytes: 4_096,
+    controlToken: "c".repeat(64),
+    statePath: linkedStatePath,
+    bindingAckPath: join(root, `${"e".repeat(64)}.binding-ack`),
+    terminalPath: join(root, `${"e".repeat(64)}.terminal.json`)
+  }), "utf8");
+  const linkedRequestDigest = createHash("sha256").update(await readFile(linkedRequestPath)).digest("hex");
+  const linkedLaunch = await command(helper, ["--supervise", linkedRequestPath, linkedStatePath, linkedRequestDigest], {}, 10_000);
+  assert.notEqual(linkedLaunch.code, 0, "the final native helper must reject a reparse-point working directory before CreateProcess");
+  assert.equal(await access(linkedStatePath).then(() => true).catch(() => false), false);
+
   const repository = join(root, "repository");
   const stateRoot = join(root, "state");
   const marker = join(repository, "grandchild.json");
@@ -172,10 +213,18 @@ test("self-contained repository runner proves Job-Object child and grandchild co
     "setInterval(()=>{},1000);"
   ].join("\n"), "utf8");
   const executableDigest = createHash("sha256").update(await readFile(process.execPath)).digest("hex");
-  const supervisor = new WindowsJobObjectProcessSupervisor({ helperPath: helper, helperSha256: helperDigest, stateRoot });
+  const protectedStore = new ProtectedJsonStore({
+    filePath: join(root, "protected.jsonl"),
+    authenticator: { provider: "native-test", async seal(hash) { return `sealed:${hash}`; }, async verify(hash, tag) { return tag === `sealed:${hash}`; } },
+    requireAuthenticatedProtection: true
+  });
+  const supervisor = new WindowsJobObjectProcessSupervisor({ helperPath: helper, helperSha256: helperDigest, stateRoot, protectedStore });
   const managed = await supervisor.start({
     action: "run_target",
     operationId: "operation-native-job-test",
+    targetSnapshotId: "b".repeat(64),
+    sessionId: "session-native-job-test",
+    authorityId: "authority-native-job-test",
     repositoryRoot: repository,
     manifestSha256: "a".repeat(64),
     executable: process.execPath,
@@ -184,20 +233,94 @@ test("self-contained repository runner proves Job-Object child and grandchild co
     cwd: repository,
     environment: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" },
     lifecycle: "managed",
-    timeoutMs: 30_000,
+    timeoutMs: 10_000,
     maxOutputBytes: 4_096
   });
+  let managedStderr = "";
+  managed.stderr.on("data", (chunk: Buffer | string) => { managedStderr += chunk.toString(); });
+  const requestPath = join(stateRoot, `${managed.supervisorId.slice("managed:".length)}.request.json`);
+  const statePath = join(stateRoot, `${managed.supervisorId.slice("managed:".length)}.state.json`);
+  const persistedRequest = JSON.parse(await readFile(requestPath, "utf8")) as Record<string, unknown>;
+  const boundHelperPath = String(persistedRequest.helperPath);
+  const boundStatePath = String(persistedRequest.statePath);
+  const persistedState = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>;
+  assert.equal(persistedRequest.version, 3);
+  assert.equal(persistedRequest.targetSnapshotId, "b".repeat(64));
+  assert.equal(persistedState.version, 3);
+  assert.equal(persistedState.targetSnapshotId, "b".repeat(64));
+
+  const legacyRoot = join(root, "legacy-state");
+  await mkdir(legacyRoot);
+  const legacyRequestPath = join(legacyRoot, `${"d".repeat(64)}.request.json`);
+  const legacyStatePath = join(legacyRoot, `${"d".repeat(64)}.state.json`);
+  const legacyRequest: Record<string, unknown> = {
+    ...persistedRequest,
+    version: 1,
+    supervisorId: `managed:${"d".repeat(64)}`,
+    operationId: "legacy-unbound-operation",
+    statePath: legacyStatePath
+  };
+  delete legacyRequest.targetSnapshotId;
+  await writeFile(legacyRequestPath, JSON.stringify(legacyRequest), "utf8");
+  const legacyRequestDigest = createHash("sha256").update(await readFile(legacyRequestPath)).digest("hex");
+  const legacy = await command(helper, ["--supervise", legacyRequestPath, legacyStatePath, legacyRequestDigest], {}, 5_000);
+  assert.notEqual(legacy.code, 0, "a v1 request without an exact target binding must fail closed");
+  assert.equal(await access(legacyStatePath).then(() => true).catch(() => false), false);
   const markerDeadline = Date.now() + 5_000;
   while (Date.now() < markerDeadline) {
     if (await access(marker).then(() => true).catch(() => false)) break;
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
   }
+  assert.equal(await access(marker).then(() => true).catch(() => false), true, managedStderr || "the signed native supervisor did not release its child after the protected binding acknowledgement");
   const grandchildPid = (JSON.parse(await readFile(marker, "utf8")) as { grandchildPid: number }).grandchildPid;
-  const recovered = await new WindowsJobObjectProcessSupervisor({ helperPath: helper, helperSha256: helperDigest, stateRoot }).recover({ repositoryRoot: repository, manifestSha256: "a".repeat(64) });
+  const originalRequestBytes = await readFile(requestPath);
+  const requestSha256 = createHash("sha256").update(originalRequestBytes).digest("hex");
+  const changedRequest = { ...persistedRequest, targetSnapshotId: "c".repeat(64) };
+  await writeFile(requestPath, JSON.stringify(changedRequest), "utf8");
+  const changedRequestObservation = await command(boundHelperPath, ["--observe", requestPath, boundStatePath, requestSha256], {}, 5_000);
+  assert.equal(changedRequestObservation.code, 65, "a same-user request rewrite must not change the helper's operation/action/target/root binding");
+  await writeFile(requestPath, originalRequestBytes);
+  const rawRunningState = await readFile(boundStatePath, "utf8");
+  const forgedTerminalState = rawRunningState.replace('"state":"running"', '"state":"completed"').replace('"exitCode":null', '"exitCode":0');
+  assert.notEqual(forgedTerminalState, rawRunningState, "native state fixture must actually forge both terminal fields");
+  await writeFile(boundStatePath, forgedTerminalState, "utf8");
+  const forgedObservation = await command(boundHelperPath, ["--observe", requestPath, boundStatePath, requestSha256], {}, 5_000);
+  assert.equal(forgedObservation.code, 0, `an active exact Job must override a same-user child-forged terminal state file: ${forgedObservation.stderr || forgedObservation.stdout}`);
+  const recovered = await new WindowsJobObjectProcessSupervisor({ helperPath: helper, helperSha256: helperDigest, stateRoot, protectedStore }).recover({ repositoryRoot: repository, manifestSha256: "a".repeat(64) });
   assert.equal(recovered.length, 1);
   assert.equal(recovered[0]?.supervisorId, managed.supervisorId);
+  assert.equal(recovered[0]?.targetSnapshotId, "b".repeat(64));
+  const live = await supervisor.observeOperation({ operationId: "operation-native-job-test", action: "run_target", targetSnapshotId: "b".repeat(64), repositoryRoot: repository, manifestSha256: "a".repeat(64), sessionId: "session-native-job-test", authorityId: "authority-native-job-test" });
+  assert.equal(live.state, "active");
+  assert.equal((await supervisor.observeOperation({ operationId: "operation-native-job-test", action: "run_target", targetSnapshotId: "c".repeat(64), repositoryRoot: repository, manifestSha256: "a".repeat(64), sessionId: "session-native-job-test", authorityId: "authority-native-job-test" })).state, "not_owner");
+  assert.equal((await supervisor.observeOperation({ operationId: "operation-native-job-test", action: "run_target", targetSnapshotId: "b".repeat(64), repositoryRoot: repository, manifestSha256: "a".repeat(64), sessionId: "wrong-session", authorityId: "authority-native-job-test" })).state, "not_owner");
   await recovered[0]!.terminateTree(50, 2_000);
   await managed.wait();
+  const terminalPath = String(persistedRequest.terminalPath);
+  const signingPublicKeySpki = String(persistedState.signingPublicKeySpki);
+  const signingPublicKeySha256 = String(persistedState.signingPublicKeySha256);
+  const verifiedTerminal = await command(helper, ["--verify-terminal", terminalPath, signingPublicKeySpki, signingPublicKeySha256], {}, 5_000);
+  assert.equal(verifiedTerminal.code, 0, verifiedTerminal.stderr || verifiedTerminal.stdout);
+  const originalTerminalBytes = await readFile(terminalPath);
+  const forgedTerminal = JSON.parse(originalTerminalBytes.toString("utf8")) as { signature: string };
+  forgedTerminal.signature = `${forgedTerminal.signature.slice(0, -2)}AA`;
+  await writeFile(terminalPath, JSON.stringify(forgedTerminal), "utf8");
+  const forgedTerminalVerification = await command(helper, ["--verify-terminal", terminalPath, signingPublicKeySpki, signingPublicKeySha256], {}, 5_000);
+  assert.notEqual(forgedTerminalVerification.code, 0, "a forged terminal signature must fail closed");
+  await writeFile(terminalPath, originalTerminalBytes);
+  const alternateKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).publicKey.export({ format: "der", type: "spki" });
+  const alternateSpki = alternateKey.toString("base64");
+  const alternateSpkiSha256 = createHash("sha256").update(alternateKey).digest("hex");
+  const substitutedKeyVerification = await command(helper, ["--verify-terminal", terminalPath, alternateSpki, alternateSpkiSha256], {}, 5_000);
+  assert.notEqual(substitutedKeyVerification.code, 0, "a substituted terminal signing key must fail closed");
+  const restartedTerminalSupervisor = new WindowsJobObjectProcessSupervisor({ helperPath: helper, helperSha256: helperDigest, stateRoot, protectedStore });
+  const terminalBinding = { operationId: "operation-native-job-test", action: "run_target" as const, targetSnapshotId: "b".repeat(64), repositoryRoot: repository, manifestSha256: "a".repeat(64), sessionId: "session-native-job-test", authorityId: "authority-native-job-test" };
+  const terminalAfterRestart = await restartedTerminalSupervisor.observeOperation(terminalBinding);
+  assert.equal(terminalAfterRestart.state, "terminal", "the native helper signature must preserve exact terminal truth after the companion disappears");
+  if (terminalAfterRestart.state !== "terminal") throw new Error("expected signed terminal recovery");
+  assert.equal(terminalAfterRestart.effectDisposition, "committed");
+  assert.deepEqual(await restartedTerminalSupervisor.observeOperation(terminalBinding), terminalAfterRestart, "repeated reconciliation must settle identically without redispatch");
+  assert.deepEqual(await restartedTerminalSupervisor.recover({ repositoryRoot: repository, manifestSha256: "a".repeat(64) }), [], "terminal processes must never be recovered as live work");
   const goneDeadline = Date.now() + 5_000;
   while (Date.now() < goneDeadline && (alive(managed.pid) || alive(grandchildPid))) await new Promise((resolveDelay) => setTimeout(resolveDelay, 25));
   assert.equal(alive(managed.pid), false);

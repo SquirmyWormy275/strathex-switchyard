@@ -14,7 +14,31 @@ This audit records software mechanisms now present in the repository and the loc
 
 The acceptance-evidence ledger defaults to a denying attestor: local code cannot promote a gate merely because a test produced text. See [acceptance-evidence.ts](../packages/control-plane/src/acceptance-evidence.ts) and [acceptance-evidence.test.ts](../packages/control-plane/test/acceptance-evidence.test.ts).
 
-The historical ledger and reconstructed interview notes remain traceability material. The complete specification supersedes them where they differ.
+The historical ledger and reconstructed interview notes remain traceability material. The complete specification supersedes them where they differ. The preserved [post-merge adversarial audit](post-merge-adversarial-audit.md), [software completion audit](software-completion-audit.md), and [implementation security review](implementation-security-review.md) are point-in-time records only; they do not override this current mechanism/evidence audit or the authoritative gate register.
+
+The repository remains `UNLICENSED`. Neither implementation nor local test
+evidence chooses a project license, resolves third-party redistribution and
+trademark questions, or authorizes a public distribution. Those decisions
+remain separate maintainer and legal work.
+
+## Ordinary software residual closure
+
+The nine previously recorded repository-owned gaps are closed in source and
+regression coverage: companion-owned automation proposals/effects, accepted
+target transitions, atomic Python-environment transition, managed Alt-Run stop,
+canonical Voice ownership, repository-scoped target routes, shared Pipeline
+failure selection, complete Re-anchor policy generation, and canonical refusal
+settlement. The mechanism inventory below is the evidence map for that closure.
+
+The verifier enumerates behavioral test files and records their terminal TAP
+counts; it does not collect line, branch, or function coverage and makes no
+claim that every source line or function executed. Closure is based on the
+accepted command/requirement trace, named mechanism tests, package/release
+checks, and fail-closed outcomes—not an inferred coverage percentage.
+
+This does not turn missing hardware, provider modules/accounts, credentials,
+Windows features, scanner feeds, or acceptance observations into software
+defects. Those prerequisites remain explicit fail-closed external edges.
 
 ## Closed command-map coverage
 
@@ -55,6 +79,8 @@ Containment release is deliberately **not** a keyboard chord. It is the separate
 | --- | --- | --- |
 | Protocol-to-command routing | A canonical assignment is matched before dispatch; forged/mismatched and intentionally unassigned chords are blocked. | [command-catalog.test.ts](../packages/control-plane/test/command-catalog.test.ts), [dispatch.test.ts](../packages/control-plane/test/dispatch.test.ts). This does not prove a physical keyboard emitted the signal. |
 | Windows companion transport and lifecycle | A versioned bridge handles registration, adoption, lifecycle updates, canonical command dispatch, confirmation requests, provisioning, and durable operation-ID cancellation requests. Standalone Windows startup uses a mutually authenticated bounded local named pipe, never TCP, and persists only a DPAPI CurrentUser-sealed endpoint token. A strict instance lease plus mutual health probe prevents two companions from serving the same state. The VS Code extension reads that canonical host-owned record only. | [authenticated-pipe.test.ts](../apps/windows-companion/test/authenticated-pipe.test.ts), [named-pipe-transport.test.ts](../apps/vscode-extension/test/named-pipe-transport.test.ts), [instance-lifecycle.test.ts](../apps/windows-companion/test/instance-lifecycle.test.ts), [packaged-runtime.test.ts](../apps/windows-companion/test/packaged-runtime.test.ts). This does not prove independent pipe ACLs, same-user adversary resistance, or service-account isolation. |
+| Provider adapter host | A packageable, authenticated TLS loopback host exposes the closed provider command, handshake, observation, cancellation, Council, cleanup, automation, health, shutdown, and reconciliation ports. Its lifecycle binds the exact process, configuration digest, DPAPI CurrentUser secrets, TLS identity, and one-use lifecycle nonce. | [service.ts](../apps/provider-adapter-host/src/service.ts), [state.ts](../apps/provider-adapter-host/src/state.ts), [tls-network-e2e.test.ts](../apps/provider-adapter-host/test/tls-network-e2e.test.ts), and [service.test.ts](../apps/provider-adapter-host/test/service.test.ts). Deterministic fixtures exercise the host protocol and lifecycle paths; they do not prove every action's provider semantics. A live proprietary/vendor module and live provider authorization are not bundled or claimed. |
+| Windows release lifecycle | The per-user bundle builder pins its tool inputs and complete payload identity. Install, update, rollback, start, health, and uninstall use an owned canonical root, protected pointer/manifest state, durable phase journals, exact process identity, authenticated shutdown, bounded process-tree fallback, and manifest-only cleanup. | [Build-B122Release.ps1](../deployment/windows/Build-B122Release.ps1), [B122InstallTools.psm1](../deployment/windows/B122InstallTools.psm1), [Test-B122InstallLifecycle.ps1](../deployment/windows/Test-B122InstallLifecycle.ps1), and [Test-B122ReleaseArtifact.ps1](../deployment/windows/Test-B122ReleaseArtifact.ps1). Local crash/kill/package receipts are not a signed distribution, independent Windows-host hardening review, or production acceptance. |
 | Raw-HID host boundary | The canonical 32-byte protocol implements manifest-bound hello/ack, connection epochs, counters, CRC, duplicate acknowledgement, and fail-closed status. The companion's digest-bound Windows helper transport discovers, reads, acknowledges, and reconnects without an ambient-device fallback; the fixed helper and firmware simulator have build/verification source. | [raw-hid.test.ts](../packages/protocol/test/raw-hid.test.ts), [raw-hid-protocol.test.ts](../apps/windows-companion/test/raw-hid-protocol.test.ts), and [firmware/verify.mjs](../firmware/verify.mjs). No physical keyboard, hot-plug, sleep/resume, Vial coexistence, VID/PID, or report-ID acceptance has been observed. |
 | VS Code lifecycle and operator surface | The extension registers workspace, Git-root, terminal, and debug identities; performs picker-or-stop target selection; executes fixed host actions; collects reviewed Git input; and installs/revokes runtime, sandbox, credential, network-policy, and provider-handshake state through the authenticated companion. Run, Debug, and managed Stop stay mediated rather than bypassing the companion. | [controller.test.ts](../apps/vscode-extension/test/controller.test.ts) and [companion-bridge.test.ts](../apps/vscode-extension/test/companion-bridge.test.ts). Tests use a VS Code-shaped fake plus packaged companion smoke, not end-user acceptance against every supported VS Code/provider build. |
 | Managed sessions | Registry records independent Registered, Observable, Controllable, and Mediated capabilities, heartbeat/staleness, and never infers verified blocked or finished status. | [session-registry.ts](../packages/control-plane/src/session-registry.ts), [session-authority.test.ts](../packages/control-plane/test/session-authority.test.ts). A real adapter must prove capabilities. |
@@ -68,8 +94,8 @@ Containment release is deliberately **not** a keyboard chord. It is the separate
 | Typed broker boundary | Execution, Git, credential, network, test-environment, automation, Council, and isolation interfaces accept typed requests and an exact permit binding (action, operation, target, session, and authority); they reject raw shell strings, force semantics, unsafe URLs, and permit replay. Consequential broker/adapter effects receive a final host-owned `EffectGuard`; refusal stops the handler. Composite broker calls receive a durable child-saga boundary. Missing trusted handlers are unavailable. | [brokers.ts](../packages/control-plane/src/brokers.ts), [dispatch.ts](../packages/control-plane/src/dispatch.ts), [runtime.ts](../packages/control-plane/src/runtime.ts), [brokers.test.ts](../packages/control-plane/test/brokers.test.ts), [child-saga-recovery.test.ts](../packages/control-plane/test/child-saga-recovery.test.ts). In-memory implementations are a safe test harness, not production adapters. |
 | Mediated Git and GitHub | Local commit accepts only operator-reviewed input behind exact authority, one-time confirmation, task-owned paths, containment, and a final target guard; it uses a private index, disables hooks, verifies the tree, and reconciles the clean shared index. Configured remote push, PR upsert, and PR merge bind exact refs/heads, scoped credentials, exact-route GitHub access, durable child operations, and final guards. Direct Main remains gate-disabled. | [mediated-git.ts](../apps/windows-companion/src/mediated-git.ts), [git-review.ts](../apps/windows-companion/src/git-review.ts), [remote-git.ts](../apps/windows-companion/src/remote-git.ts), [mediated-git.test.ts](../apps/windows-companion/test/mediated-git.test.ts), and [remote-git.test.ts](../apps/windows-companion/test/remote-git.test.ts). Source and deterministic tests are not live GitHub, branch-protection, or user acceptance evidence. |
 | Council | Reporting detects conflicts. Automatic epochs require cooperative pause, Observable+Controllable+Mediated participants, durable leases, acknowledgements for pause/assignment/resume, and abort on overlap, staleness, missing routes, or failure. Configured provider acknowledgements use the exact-route network boundary. | [council.ts](../packages/control-plane/src/council.ts), [council-runtime.ts](../apps/windows-companion/src/council-runtime.ts), [context-council.test.ts](../packages/control-plane/test/context-council.test.ts), and [council-runtime.test.ts](../apps/windows-companion/test/council-runtime.test.ts). Automatic mode remains gate-disabled without live mediated multi-agent acceptance evidence. |
-| Containment | Durable fence epochs persist before revocation/cancellation hooks. The wired Git, credential, network, execution, test-environment, automation, isolation, Council, and managed-adapter routes check the fence before their handlers; release requires explicit review inputs. | [containment.ts](../packages/control-plane/src/containment.ts), [brokers.ts](../packages/control-plane/src/brokers.ts), [adapters.ts](../packages/control-plane/src/adapters.ts), [durable-containment.test.ts](../packages/control-plane/test/durable-containment.test.ts), [brokers.test.ts](../packages/control-plane/test/brokers.test.ts), [adapters.test.ts](../packages/control-plane/test/adapters.test.ts), [dispatch.test.ts](../packages/control-plane/test/dispatch.test.ts). It cannot stop unmediated shells, other applications, or already-running remote jobs. |
-| Adapter degradation | Desktop/provider adapters and unregistered actions return unavailable rather than silently switching products or invoking a shell. | [adapters.ts](../packages/control-plane/src/adapters.ts), [adapters.test.ts](../packages/control-plane/test/adapters.test.ts). No proprietary desktop/provider integration is claimed. |
+| Containment | Durable fence epochs persist before revocation/cancellation hooks. The wired Git, credential, network, execution, test-environment, automation, isolation, Council, and managed-adapter routes check the fence before their handlers; release requires explicit review inputs. Local-history remediation preserves a verified bundle and rewrites the exact local heads/tags namespace under an attested permit. Remote release evidence comes from a separately run evaluator that verifies the host challenge and purpose-scoped P-256 key, rehashes a pinned Git executable, inventories every advertised ref before mirroring, after mirroring, and after all scans, rejects incomplete mirrors or namespace churn, scans all reachable history with a fixed detector manifest, and signs path-digest-only results. | [containment.ts](../packages/control-plane/src/containment.ts), [containment-history-remediation.ts](../apps/windows-companion/src/containment-history-remediation.ts), [containment-remote-evidence.ts](../apps/windows-companion/src/containment-remote-evidence.ts), [containment-remote-evaluator.ts](../apps/windows-companion/src/containment-remote-evaluator.ts), [durable-containment.test.ts](../packages/control-plane/test/durable-containment.test.ts), [containment-history-remediation.test.ts](../apps/windows-companion/test/containment-history-remediation.test.ts), and [containment-remote-evaluator.test.ts](../apps/windows-companion/test/containment-remote-evaluator.test.ts). It cannot stop unmediated shells, other applications, or already-running remote jobs; the packaged evaluator supports credential-free, DNS-pinned public HTTPS only. Private/authenticated remote adapters and an independent evaluator-host acceptance exercise remain external evidence. |
+| Adapter degradation | Desktop/provider adapters and unregistered actions return unavailable rather than silently switching products or invoking a shell. The generic provider host is packageable, but it cannot self-claim a live proprietary backend. | [adapters.ts](../packages/control-plane/src/adapters.ts), [adapters.test.ts](../packages/control-plane/test/adapters.test.ts), and [backends.ts](../apps/provider-adapter-host/src/backends.ts). No live proprietary desktop/provider integration is claimed. |
 
 ## High-consequence paths remain disabled
 
@@ -128,8 +154,8 @@ Every gate below is **NOT ACCEPTED**. A local mechanism means only that the repo
 The following are intentionally not represented as completed capabilities:
 
 - physical B122 firmware/Raw HID identity, device handshake, LEDs, key legends, ergonomics, and transport coexistence;
-- signed release/rollback acceptance, Windows service or service-account/NCrypt policy, independent named-pipe ACL/same-user adversary review, and protected-store operating-system access-control acceptance (the per-user CurrentUser DPAPI implementation and release tooling are locally tested only);
-- live authorization and parity evidence for the configured Claude, ChatGPT/Codex, browser, desktop, Voice, GitHub, CI, scanner, credential-reference, and Compound adapters;
+- signed distribution and release/rollback acceptance, Windows service or service-account/NCrypt policy, independent named-pipe ACL/same-user adversary review, and protected-store operating-system access-control acceptance (the per-user CurrentUser DPAPI implementation and transactional release tooling are locally tested only);
+- live vendor modules, authorization, and parity evidence for the configured Claude, ChatGPT/Codex, browser, desktop, Voice, GitHub, CI, scanner, credential-reference, and Compound adapters (the generic authenticated provider host and deterministic fixture modules are implemented);
 - observed Git/GitHub side effects under real branch protection and platform approval, plus live remote cancellation and provider-state reconciliation evidence;
 - target-host acceptance of the digest-pinned Windows Sandbox/helper boundary, including network, mount, credential, data, CPU, memory, time, cleanup, and quarantine behavior; and
 - production credentials, production databases, production data, or production endpoints. Local tests use fakes, in-memory brokers, and temporary stores.
@@ -138,12 +164,11 @@ Before any external edge is enabled, attach a concrete adapter only through the 
 
 ## Conclusion
 
-The repository contains the hardware-independent B122 implementation: canonical
-firmware/Raw-HID source, the installed companion/extension boundary, durable
-mediation and recovery, host-attested repository and sandbox runtimes, DPAPI
-credential references, exact-route networking, and configured provider,
-GitHub/Git/CI, scanner, and Council adapters. It is deliberately **not** an
-accepted hardware or production control system. Missing runtime configuration,
-external authorization, Windows features, or acceptance evidence remains
-unavailable, incomplete, or blocked; it is never converted into a successful
-high-consequence action. Every acceptance gate remains **NOT ACCEPTED**.
+The repository contains the hardware-independent B122 source implementation:
+canonical firmware/Raw-HID source, the companion/extension boundary, durable
+mediation and recovery, repository and sandbox runtimes, DPAPI credential
+references, exact-route networking, configured adapters, the provider host,
+and transactional release tooling. External configuration and acceptance
+evidence remain required where identified; the project is not an accepted
+hardware or production control system, and every acceptance gate remains
+**NOT ACCEPTED**.

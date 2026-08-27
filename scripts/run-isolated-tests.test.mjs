@@ -56,17 +56,22 @@ test("a TAP summary remains authoritative after more than the bounded output cap
 });
 test("receipt records failure, timeout, bounded output, and exited children", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const failed = await runVerification({ groups: [{ file: "inline-failure", args: ["-e", "process.stderr.write('x'.repeat(100000)); process.exit(7)"] }], outputDirectory: directory, executable }); assert.equal(failed.receipt.success, false); assert.equal(failed.receipt.children[0].exitCode, 7); assert.equal(failed.receipt.children[0].outputBytes <= 65536, true); const timed = await runVerification({ groups: [{ file: "inline-timeout", args: ["-e", "setInterval(() => {}, 1000)"] }], outputDirectory: directory, timeoutMs: 25, executable }); assert.equal(timed.receipt.success, false); assert.equal(timed.receipt.children[0].timeout, true); assert.equal(timed.receipt.children[0].signal !== null || timed.receipt.children[0].exitCode !== null, true); } finally { await rm(directory, { recursive: true, force: true }); } });
 
-test("only explicitly slow release groups extend the bounded default timeout and receipts record the effective bound", async () => {
+test("only explicitly slow integration or release groups extend the bounded default timeout and receipts record the effective bound", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-group-timeout-"));
   try {
     const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
-    assert.equal(tlsGroup?.timeoutMs, 75_000);
+    assert.equal(tlsGroup?.timeoutMs, 240_000);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     assert.deepEqual(overrides, new Map([
-      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 75_000],
+      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
-      ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 240_000],
-      ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 240_000]
+      ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
+      ["apps/windows-companion/test/installed-automation-e2e.test.ts", 240_000],
+      ["apps/windows-companion/test/repository-runner-helper.test.ts", 240_000],
+      ["deployment/windows/Test-B122InstallLifecycle.ps1", 240_000],
+      ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 240_000],
+      ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 300_000],
+      ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ]));
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });

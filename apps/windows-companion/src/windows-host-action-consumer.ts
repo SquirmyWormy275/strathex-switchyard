@@ -50,6 +50,8 @@ export interface WindowsHostActionEffectRequest {
   readonly processOwner: "current-user";
   readonly processSession: "current-session";
   readonly windowSurface: "visible-top-level";
+  /** Protected repeat cursor. VS Code cycles by this ordinal; Terminal is always zero. */
+  readonly windowCycleOrdinal: number;
   readonly shell: false;
   readonly signal: AbortSignal;
   /**
@@ -93,6 +95,7 @@ export interface CompanionWindowsHostActionConsumerOptions {
   }>;
   readonly pollIntervalMs?: number;
   readonly effectTimeoutMs?: number;
+  readonly repeatWindowMs?: number;
   readonly now?: () => string;
   readonly claimTokenFactory?: () => string;
 }
@@ -107,6 +110,7 @@ interface ConsumerClaim extends Record<string, JsonValue> {
   readonly hostAction: CompanionWindowsHostAction;
   readonly application: WindowsHostApplication;
   readonly executableIdentityDigest: string;
+  readonly windowCycleOrdinal: number;
   readonly claimedAt: string;
 }
 
@@ -162,6 +166,7 @@ export class CompanionWindowsHostActionConsumer {
   private readonly applications: Readonly<Record<WindowsHostApplication, FixedWindowsHostApplicationIdentity>>;
   private readonly pollIntervalMs: number;
   private readonly effectTimeoutMs: number;
+  private readonly repeatWindowMs: number;
   private readonly now: () => string;
   private readonly claimTokenFactory: () => string;
   private running = false;
@@ -190,6 +195,7 @@ export class CompanionWindowsHostActionConsumer {
     });
     this.pollIntervalMs = options.pollIntervalMs ?? 100;
     this.effectTimeoutMs = options.effectTimeoutMs ?? 10_000;
+    this.repeatWindowMs = options.repeatWindowMs ?? 1_500;
     this.now = options.now ?? (() => new Date().toISOString());
     this.claimTokenFactory = options.claimTokenFactory ?? (() => randomBytes(32).toString("base64url"));
     if (!Number.isSafeInteger(this.pollIntervalMs) || this.pollIntervalMs < 10 || this.pollIntervalMs > 60_000) {
@@ -197,6 +203,9 @@ export class CompanionWindowsHostActionConsumer {
     }
     if (!Number.isSafeInteger(this.effectTimeoutMs) || this.effectTimeoutMs < 50 || this.effectTimeoutMs > 60_000) {
       throw new Error("The Windows host-action effect timeout is outside safe bounds.");
+    }
+    if (!Number.isSafeInteger(this.repeatWindowMs) || this.repeatWindowMs < 50 || this.repeatWindowMs > 30_000) {
+      throw new Error("The Windows host-action repeat window is outside safe bounds.");
     }
   }
 
@@ -353,6 +362,7 @@ export class CompanionWindowsHostActionConsumer {
       processOwner: "current-user",
       processSession: "current-session",
       windowSurface: "visible-top-level",
+      windowCycleOrdinal: claim.windowCycleOrdinal,
       shell: false,
       signal: abort.signal,
       beforeEffect: async () => {
@@ -428,21 +438,29 @@ export class CompanionWindowsHostActionConsumer {
   private async claim(intent: HostActionIntent, plan: EffectPlan, identity: FixedWindowsHostApplicationIdentity): Promise<ConsumerClaim | undefined> {
     const claimToken = boundedClaimToken(this.claimTokenFactory());
     const claimedAt = exactTimestamp(this.now(), "Windows host-action claim time");
-    const claim: ConsumerClaim = {
-      version: 1,
-      claimId: `windows-host-action-claim:${digest(`${intent.id}:${identityDigest(identity)}`)}`,
-      claimToken,
-      hostActionId: intent.id,
-      operationId: intent.operationId,
-      commandAction: intent.commandAction,
-      hostAction: plan.action,
-      application: plan.application,
-      executableIdentityDigest: identityDigest(identity),
-      claimedAt
-    };
     return this.store.transaction(async (transaction) => {
       const states = await statesFrom(transaction);
       if (states.has(intent.id)) return undefined;
+      const prior = [...states.values()]
+        .map((state) => state.claim)
+        .filter((candidate) => candidate.hostAction === "focus_vscode" && Date.parse(candidate.claimedAt) <= Date.parse(claimedAt))
+        .sort((left, right) => right.claimedAt.localeCompare(left.claimedAt) || right.hostActionId.localeCompare(left.hostActionId))[0];
+      const repeated = plan.action === "focus_vscode" && prior !== undefined
+        && Date.parse(claimedAt) - Date.parse(prior.claimedAt) <= this.repeatWindowMs;
+      const windowCycleOrdinal = repeated ? (prior.windowCycleOrdinal + 1) % 65_536 : 0;
+      const claim: ConsumerClaim = {
+        version: 1,
+        claimId: `windows-host-action-claim:${digest(`${intent.id}:${identityDigest(identity)}`)}`,
+        claimToken,
+        hostActionId: intent.id,
+        operationId: intent.operationId,
+        commandAction: intent.commandAction,
+        hostAction: plan.action,
+        application: plan.application,
+        executableIdentityDigest: identityDigest(identity),
+        windowCycleOrdinal,
+        claimedAt
+      };
       await transaction.append(claimKind, claim);
       return claim;
     });
@@ -595,17 +613,19 @@ async function statesFrom(transaction: JsonStoreTransaction): Promise<Map<string
 }
 
 function parseClaim(value: JsonValue): ConsumerClaim {
-  const record = exactRecord(value, ["version", "claimId", "claimToken", "hostActionId", "operationId", "commandAction", "hostAction", "application", "executableIdentityDigest", "claimedAt"], "claim");
+  const record = exactRecord(value, ["version", "claimId", "claimToken", "hostActionId", "operationId", "commandAction", "hostAction", "application", "executableIdentityDigest", "windowCycleOrdinal", "claimedAt"], "claim");
   if (record.version !== 1 || typeof record.claimId !== "string" || !/^windows-host-action-claim:[a-f0-9]{64}$/.test(record.claimId)
     || typeof record.claimToken !== "string" || typeof record.hostActionId !== "string" || typeof record.operationId !== "string"
     || typeof record.commandAction !== "string" || typeof record.hostAction !== "string" || typeof record.application !== "string"
     || typeof record.executableIdentityDigest !== "string" || !digestPattern.test(record.executableIdentityDigest)
+    || !Number.isSafeInteger(record.windowCycleOrdinal) || (record.windowCycleOrdinal as number) < 0 || (record.windowCycleOrdinal as number) > 65_535
     || typeof record.claimedAt !== "string") throw new Error("The protected Windows host-action claim is malformed.");
   boundedClaimToken(record.claimToken);
   boundedHostActionId(record.hostActionId);
   boundedReference(record.operationId, "operation ID");
   const plan = effectPlans[record.commandAction as keyof typeof effectPlans];
   if (!plan || plan.action !== record.hostAction || plan.application !== record.application) throw new Error("The protected Windows host-action claim changed its closed action mapping.");
+  if (plan.action === "focus_external_terminal" && record.windowCycleOrdinal !== 0) throw new Error("The protected Windows Terminal host-action claim carried a forbidden cycle ordinal.");
   exactTimestamp(record.claimedAt, "Windows host-action claim time");
   return record as unknown as ConsumerClaim;
 }
@@ -706,7 +726,8 @@ function exactLiveClaim(state: ClaimState | undefined, claim: ConsumerClaim): vo
 function sameClaim(left: ConsumerClaim, right: ConsumerClaim): boolean {
   return left.claimId === right.claimId && left.claimToken === right.claimToken && left.hostActionId === right.hostActionId
     && left.operationId === right.operationId && left.commandAction === right.commandAction && left.hostAction === right.hostAction
-    && left.application === right.application && left.executableIdentityDigest === right.executableIdentityDigest;
+    && left.application === right.application && left.executableIdentityDigest === right.executableIdentityDigest
+    && left.windowCycleOrdinal === right.windowCycleOrdinal;
 }
 
 function identityDigest(identity: FixedWindowsHostApplicationIdentity): string {

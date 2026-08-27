@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import test from "node:test";
 
 import {
@@ -10,10 +12,13 @@ import {
   loadVerifiedRepositoryRuntimeManifest,
   type RepositoryExecutionRootLease,
   type RepositoryExecutionRootProvider,
+  type RepositoryProcessSupervisor,
   type RepositoryRuntimeManifest,
   type RuntimeEffectGuard,
   type RuntimeHealthProbe
 } from "../src/repository-runtime.ts";
+
+const targetSnapshotId = "a".repeat(64);
 
 const allowEffects: RuntimeEffectGuard = {
   async check() { return { allowed: true, reason: "isolated test permit" }; }
@@ -110,7 +115,7 @@ test("foreground recipes receive only declared environment and cap redacted outp
   process.env.SXSY_AMBIENT_SECRET = "must-not-cross-boundary";
   try {
     const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects });
-    const result = await runtime.execute("shield_change_scan");
+    const result = await runtime.execute("shield_change_scan", { targetSnapshotId });
     assert.equal(result.status, "completed");
     assert.equal(result.output?.includes("must-not-cross-boundary"), false);
     assert.equal(result.output?.includes("ghp_1234567890abcdef"), false);
@@ -129,7 +134,7 @@ test("disposable pipeline recipes require an injected disposable root and never 
     pipeline_local_gate: processRecipe({ isolation: "disposable", environment: { SXSY_TEST_DB: "isolated.sqlite" } })
   }), setup.repositoryRoot);
 
-  const unavailable = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("pipeline_local_gate");
+  const unavailable = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("pipeline_local_gate", { targetSnapshotId });
   assert.equal(unavailable.status, "unavailable");
 
   let released = false;
@@ -145,7 +150,7 @@ test("disposable pipeline recipes require an injected disposable root and never 
       };
     }
   };
-  const result = await new RepositoryRuntime(loaded, { effectGuard: allowEffects, executionRoots: roots }).execute("pipeline_local_gate");
+  const result = await new RepositoryRuntime(loaded, { effectGuard: allowEffects, executionRoots: roots }).execute("pipeline_local_gate", { targetSnapshotId });
   assert.equal(result.status, "completed");
   assert.match(result.output ?? "", /disposable.*isolated\.sqlite/i);
   assert.equal(released, true);
@@ -160,7 +165,7 @@ test("managed runs have opaque identities and stop never targets an arbitrary PI
     stop_managed_run: { kind: "stop", managedActions: ["run_target"], gracefulTimeoutMs: 100, forceTimeoutMs: 1_000 }
   }), setup.repositoryRoot);
   const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects });
-  const started = await runtime.execute("run_target");
+  const started = await runtime.execute("run_target", { targetSnapshotId });
   assert.equal(started.status, "running");
   assert.match(started.managedProcessId ?? "", /^managed:[a-f0-9]{64}$/);
   assert.ok((started.pid ?? 0) > 0);
@@ -174,6 +179,103 @@ test("managed runs have opaque identities and stop never targets an arbitrary PI
   assert.equal(stopped.status, "completed");
   assert.equal(stopped.managedProcessId, started.managedProcessId);
   assert.equal(runtime.listManagedProcesses().filter((item) => item.state === "running").length, 0);
+});
+
+test("restart-inactive process evidence remains unknown in the managed UI instead of becoming a false failed terminal", async (context) => {
+  const setup = await fixture(context);
+  await writeFile(join(setup.repositoryRoot, "task.mjs"), "setInterval(() => {}, 1000);", "utf8");
+  const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
+    run_target: processRecipe({ lifecycle: "managed", timeoutMs: 20_000 })
+  }), setup.repositoryRoot);
+  const operationId = "operation-restart-inactive";
+  const processSupervisor: RepositoryProcessSupervisor = {
+    async start() { throw new Error("not used"); },
+    async recover() {
+      return [{
+        supervisorId: `managed:${"d".repeat(64)}`,
+        operationId,
+        action: "run_target" as const,
+        targetSnapshotId,
+        pid: 41231,
+        startedAt: "2026-08-25T12:00:00.000Z",
+        stdout: Readable.from([]),
+        stderr: Readable.from([]),
+        recovered: true,
+        wait: async () => ({ code: -1, signal: null, terminalEvidence: "ambiguous" as const }),
+        isAlive: async () => true,
+        terminateTree: async () => { throw new Error("inactive exact Job cannot prove termination ownership"); }
+      }];
+    },
+    async observeOperation(request) {
+      return {
+        state: "active" as const,
+        operationId: request.operationId,
+        action: request.action,
+        targetSnapshotId: request.targetSnapshotId,
+        repositoryRoot: request.repositoryRoot,
+        effectDisposition: "ambiguous" as const,
+        summary: "The exact Job is inactive, but semantic terminal evidence is unavailable after restart."
+      };
+    }
+  };
+  const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects, processSupervisor });
+  await runtime.recoverManagedProcesses();
+  for (let attempt = 0; attempt < 20 && runtime.listManagedProcesses()[0]?.state !== "unknown"; attempt += 1) {
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
+  }
+  const [managed] = runtime.listManagedProcesses();
+  assert.equal(managed?.state, "unknown");
+  assert.equal(managed?.exitCode, undefined);
+  const observation = await runtime.reconcileOperation({ operationId, action: "run_target", targetSnapshotId, repositoryRoot: loaded.canonicalRepositoryRoot });
+  assert.equal(observation.state, "active", JSON.stringify(observation));
+  assert.equal(observation.state === "active" ? observation.effectDisposition : undefined, "ambiguous");
+});
+
+test("a failed stop of recovered work preserves unknown semantic state instead of relabelling it failed", async (context) => {
+  const setup = await fixture(context);
+  await writeFile(join(setup.repositoryRoot, "task.mjs"), "setInterval(() => {}, 1000);", "utf8");
+  const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
+    run_target: processRecipe({ lifecycle: "managed", timeoutMs: 20_000 }),
+    stop_managed_run: { kind: "stop", managedActions: ["run_target"], gracefulTimeoutMs: 100, forceTimeoutMs: 500 }
+  }), setup.repositoryRoot);
+  const operationId = "operation-recovered-stop-ambiguous";
+  let terminateAttempts = 0;
+  const processSupervisor: RepositoryProcessSupervisor = {
+    async start() { throw new Error("not used"); },
+    async recover() {
+      return [{
+        supervisorId: `managed:${"e".repeat(64)}`,
+        operationId,
+        action: "run_target" as const,
+        targetSnapshotId,
+        pid: 41232,
+        startedAt: "2026-08-25T12:00:00.000Z",
+        stdout: Readable.from([]),
+        stderr: Readable.from([]),
+        recovered: true,
+        wait: async () => new Promise<never>(() => undefined),
+        isAlive: async () => true,
+        terminateTree: async () => { terminateAttempts += 1; throw new Error("exact Job became inactive before termination could prove ownership"); }
+      }];
+    },
+    async observeOperation(request) {
+      return {
+        state: "active" as const,
+        operationId: request.operationId,
+        action: request.action,
+        targetSnapshotId: request.targetSnapshotId,
+        repositoryRoot: request.repositoryRoot,
+        effectDisposition: "ambiguous" as const,
+        summary: "The recovered Job has no independently trustworthy terminal evidence."
+      };
+    }
+  };
+  const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects, processSupervisor });
+  await runtime.recoverManagedProcesses();
+  assert.equal(runtime.listManagedProcesses()[0]?.state, "running");
+  assert.equal(await runtime.cancelOperation(operationId), 0);
+  assert.equal(terminateAttempts, 1);
+  assert.equal(runtime.listManagedProcesses()[0]?.state, "unknown", "an unproved stop cannot manufacture a failed terminal classification");
 });
 
 test("debug_target resolves only an exact attested VS Code configuration and never spawns a process", async (context) => {
@@ -195,9 +297,9 @@ test("timeouts terminate exact children and foreground failures stay bounded", a
   const setup = await fixture(context);
   await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('before-timeout'); setInterval(() => {}, 1000);", "utf8");
   const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
-    shield_codebase_audit: processRecipe({ timeoutMs: 100, maxOutputBytes: 32 })
+    shield_codebase_audit: processRecipe({ timeoutMs: 750, maxOutputBytes: 32 })
   }), setup.repositoryRoot);
-  const result = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("shield_codebase_audit");
+  const result = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("shield_codebase_audit", { targetSnapshotId });
   assert.equal(result.status, "timed_out");
   assert.match(result.output ?? "", /before-timeout/);
 });
@@ -219,7 +321,7 @@ test("web launch probes and returns only the exact configured safe URL, never st
     stop_managed_run: { kind: "stop", managedActions: ["launch_web_app"], gracefulTimeoutMs: 100, forceTimeoutMs: 1_000 }
   }), setup.repositoryRoot);
   const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects, healthProbe });
-  const result = await runtime.execute("launch_web_app");
+  const result = await runtime.execute("launch_web_app", { targetSnapshotId });
   assert.equal(result.status, "running");
   assert.equal(result.url, safeUrl);
   assert.deepEqual(probed, [safeUrl]);
@@ -261,7 +363,7 @@ test("the final effect guard and canonical root check run immediately before spa
       return checks >= 2 ? { allowed: false, reason: "containment changed" } : { allowed: true, reason: "clear" };
     }
   };
-  const result = await new RepositoryRuntime(loaded, { effectGuard: lateFence }).execute("venv");
+  const result = await new RepositoryRuntime(loaded, { effectGuard: lateFence }).execute("venv", { targetSnapshotId });
   assert.equal(result.status, "blocked");
   assert.match(result.summary, /containment changed/i);
   assert.equal(checks, 2);
@@ -277,11 +379,16 @@ test("each invocation may supply its exact dispatch effect guard without weakeni
   }), setup.repositoryRoot);
   const runtime = new RepositoryRuntime(loaded);
 
-  const denied = await runtime.execute("venv");
+  const denied = await runtime.execute("venv", { targetSnapshotId });
   assert.equal(denied.status, "blocked");
 
-  const allowed = await runtime.execute("venv", { effectGuard: allowEffects });
+  const allowed = await runtime.execute("venv", { effectGuard: allowEffects, targetSnapshotId });
   assert.equal(allowed.status, "completed");
   assert.equal(allowed.output, "guarded");
   assert.match((allowed.pythonInterpreter ?? "").replaceAll("\\", "/"), /\/repository\/\.venv\/Scripts\/python\.exe$/i);
+  assert.equal(allowed.pythonInterpreterIdentity?.sha256, createHash("sha256").update("isolated-test-interpreter").digest("hex"));
+  assert.equal(allowed.pythonInterpreterIdentity?.canonicalPath, allowed.pythonInterpreter);
+  assert.match(allowed.pythonInterpreterIdentity?.device ?? "", /^\d+$/);
+  assert.match(allowed.pythonInterpreterIdentity?.inode ?? "", /^\d+$/);
+  assert.equal(allowed.pythonInterpreterIdentity?.size, Buffer.byteLength("isolated-test-interpreter"));
 });

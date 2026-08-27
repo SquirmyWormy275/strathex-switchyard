@@ -1,5 +1,6 @@
 import type { OperationRecord } from "../../../packages/control-plane/src/contracts.ts";
 import type { OperationReconciler, ReconciliationDecision } from "../../../packages/control-plane/src/operations.ts";
+import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { hostActionCommandActions } from "./host-actions.ts";
 import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
 import type { DurableProviderDesktopEffectLedger } from "./provider-desktop-effects.ts";
@@ -17,11 +18,40 @@ export interface InstalledOperationObservation {
   readonly details?: Readonly<Record<string, string>>;
 }
 
+export interface ProviderOperationRecoveryBinding {
+  readonly operationId: string;
+  readonly action: CommandAction;
+  readonly sessionId: string;
+  readonly provider: "claude" | "codex";
+  readonly authorityId: string;
+  readonly repositoryRoot: string;
+  readonly routeId: string;
+  readonly externalId: string;
+  readonly targetSnapshotId: string;
+}
+
+type ProviderRecoveryObserver = Readonly<{
+  observeProviderOperation(input: Readonly<ProviderOperationRecoveryBinding>): Promise<InstalledOperationObservation | undefined>;
+}>;
+
+export function createExactProviderRecoveryRouter(options: Readonly<{
+  local: ProviderRecoveryObserver & Readonly<{ supportsProvider(provider: ProviderOperationRecoveryBinding["provider"]): boolean }>;
+  configured: ProviderRecoveryObserver;
+}>): ProviderRecoveryObserver {
+  return Object.freeze({
+    observeProviderOperation(input: Readonly<ProviderOperationRecoveryBinding>) {
+      return options.local.supportsProvider(input.provider)
+        ? options.local.observeProviderOperation(input)
+        : options.configured.observeProviderOperation(input);
+    }
+  });
+}
+
 export interface InstalledOperationObservationPort {
   localGit(input: Readonly<{ repositoryRoot: string; beforeHead: string; expectedTree: string }>): Promise<InstalledOperationObservation>;
   remoteRef(input: Readonly<{ repositoryRoot: string; remote: string; ref: string; expectedHead: string }>): Promise<InstalledOperationObservation>;
   pullRequest(input: Readonly<{ repositoryRoot: string; owner: string; name: string; headOwner: string; headName: string; number?: number; headBranch?: string; baseBranch: string; expectedHead: string; expectedState: "OPEN" | "MERGED" }>): Promise<InstalledOperationObservation>;
-  provider(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation>;
+  provider(input: Readonly<ProviderOperationRecoveryBinding>): Promise<InstalledOperationObservation>;
   council(input: Readonly<{ epochId: string; phase: "pause" | "assignment" | "resume"; sessionId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation>;
   hostAction(input: Readonly<{ operationId: string; action: string }>): Promise<InstalledOperationObservation>;
   providerDesktop?(input: Readonly<{ operationId: string; action: string }>): Promise<InstalledOperationObservation>;
@@ -69,9 +99,14 @@ export class HostOwnedOperationReconciler implements OperationReconciler {
       return repositoryRoot && owner && name && headOwner && headName && pullRequest && baseBranch && expectedHead && expectedState
         ? this.observations.pullRequest({ repositoryRoot, owner, name, headOwner, headName, number: pullRequest, baseBranch, expectedHead, expectedState }) : undefined;
     }
-    if (operation.action.startsWith("provider.") || operation.action.startsWith("automation.")) {
+    if (operation.action.startsWith("provider.")) {
       const repositoryRoot = detail(details, "repositoryRoot"); const routeId = detail(details, "routeId"); const externalId = detail(details, "externalId"); const targetSnapshotId = detail(details, "targetSnapshotId");
-      return repositoryRoot && routeId && externalId && targetSnapshotId ? this.observations.provider({ repositoryRoot, routeId, externalId, targetSnapshotId }) : undefined;
+      const operationId = detail(details, "providerOperationId"); const action = commandAction(details.providerAction); const sessionId = detail(details, "sessionId");
+      const provider = configuredProvider(details.provider); const authorityId = detail(details, "authorityId");
+      return repositoryRoot && routeId && externalId && targetSnapshotId && targetSnapshotId === operation.targetSnapshotId
+        && operationId && action && sessionId && provider && authorityId
+        ? this.observations.provider({ operationId, action, sessionId, provider, authorityId, repositoryRoot, routeId, externalId, targetSnapshotId })
+        : undefined;
     }
     if (operation.action === "council.pause" || operation.action === "council.assignment" || operation.action === "council.resume") {
       const epochId = detail(details, "epochId"); const phase = councilPhase(details.phase); const sessionId = detail(details, "sessionId"); const targetSnapshotId = detail(details, "target");
@@ -89,9 +124,7 @@ export class HostOwnedOperationReconciler implements OperationReconciler {
 export interface InstalledReadOnlyObservationOptions {
   readonly git: CheckpointGitRunner;
   readonly network?: Pick<DynamicConfiguredNetworkClient, "request">;
-  readonly providerOperations?: Readonly<{
-    observeProviderOperation(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation | undefined>;
-  }>;
+  readonly providerOperations?: ProviderRecoveryObserver;
   readonly networkPolicy?: Readonly<{ resolve(): Promise<ConfiguredNetworkPolicy> }>;
   readonly council?: Readonly<{ get(id: string): Promise<Readonly<{ status: string; targetSnapshotId: string; pauseAcknowledgedSessionIds: readonly string[]; assignmentAcknowledgedSessionIds: readonly string[] }> | undefined> }>;
   readonly hostActions?: Readonly<{ observeOperation(operationId: string, action?: string): Promise<Readonly<{ outcome: "committed" | "failed" | "cancelled" | "unresolved"; note: string }>> }>;
@@ -163,22 +196,17 @@ export class InstalledReadOnlyObservationPort implements InstalledOperationObser
     } catch { return unresolved("The configured pull-request observation failed safely."); }
   }
 
-  async provider(input: Readonly<{ repositoryRoot: string; routeId: string; externalId: string; targetSnapshotId: string }>): Promise<InstalledOperationObservation> {
+  async provider(input: Readonly<ProviderOperationRecoveryBinding>): Promise<InstalledOperationObservation> {
     try {
       const repositoryRoot = await this.exactRepositoryRoot(input.repositoryRoot);
       if (!repositoryRoot) return unresolved("The protected provider repository root no longer resolves to its exact canonical path.");
-      if (this.options.providerOperations) {
-        let local: InstalledOperationObservation | undefined;
-        try { local = await this.options.providerOperations.observeProviderOperation({ ...input, repositoryRoot }); }
-        catch { return unresolved("The authenticated local provider observation failed safely; no fallback duplicated the probe."); }
-        if (local) return { outcome: local.outcome, note: boundedNote(local.note), details: safeDetails(local.details) };
-      }
-      if (!this.options.network) return unresolved("No configured provider observation route is installed.");
-      const response = await this.options.network.request({ routeId: `${input.routeId}.observe`, repositoryRoot, body: JSON.stringify({ schema: "sxsy-b122.operation-observation-request", version: 1, externalId: input.externalId, targetSnapshotId: input.targetSnapshotId }) });
-      if (response.outcome !== "passed" || !response.body) return unresolved("The configured provider observation was unavailable.");
-      const value = JSON.parse(Buffer.from(response.body).toString("utf8")) as unknown;
-      if (!plain(value) || value.schema !== "sxsy-b122.operation-observation" || value.version !== 1 || value.externalId !== input.externalId || value.targetSnapshotId !== input.targetSnapshotId || !["committed", "failed", "cancelled", "unresolved"].includes(String(value.outcome))) return unresolved("The provider observation envelope did not bind the exact external operation.");
-      return { outcome: value.outcome as InstalledObservationOutcome, note: "The configured provider returned an exact read-only operation observation." };
+      if (!this.options.providerOperations) return unresolved("No authenticated durable provider-operation observer is installed.");
+      let local: InstalledOperationObservation | undefined;
+      try { local = await this.options.providerOperations.observeProviderOperation({ ...input, repositoryRoot }); }
+      catch { return unresolved("The authenticated local provider observation failed safely; no fallback duplicated the probe."); }
+      return local
+        ? { outcome: local.outcome, note: boundedNote(local.note), details: safeDetails(local.details) }
+        : unresolved("No exact authenticated provider-operation binding owns this operation; no fallback duplicated the probe.");
     } catch { return unresolved("The configured provider observation failed safely."); }
   }
 
@@ -220,7 +248,7 @@ function decision(observed: InstalledOperationObservation): ReconciliationDecisi
 
 function recognized(action: string): boolean {
   return action === "git.local-commit" || action === "git.push-reviewed-head" || action === "git.direct-main"
-    || action === "github.pr-upsert" || action === "github.pr-merge" || action.startsWith("provider.") || action.startsWith("automation.")
+    || action === "github.pr-upsert" || action === "github.pr-merge" || action.startsWith("provider.")
     || action === "council.pause" || action === "council.assignment" || action === "council.resume" || providerDesktopActions.has(action) || providerManagedTerminalActions.has(action) || hostActions.has(action);
 }
 function detail(details: Readonly<Record<string, string>>, name: string): string | undefined { const value = details[name]; return value && value.length <= 2_048 && !/[\0\r\n]/.test(value) ? value : undefined; }
@@ -231,6 +259,9 @@ function slug(value: string | undefined): string | undefined { return value && /
 function positiveInteger(value: string | undefined): number | undefined { const number = value && /^\d{1,10}$/.test(value) ? Number(value) : NaN; return Number.isSafeInteger(number) && number > 0 ? number : undefined; }
 function prState(value: string | undefined): "OPEN" | "MERGED" | undefined { return value === "OPEN" || value === "MERGED" ? value : undefined; }
 function councilPhase(value: string | undefined): "pause" | "assignment" | "resume" | undefined { return value === "pause" || value === "assignment" || value === "resume" ? value : undefined; }
+const commandActions = new Set<string>(commandActionIds);
+function commandAction(value: string | undefined): CommandAction | undefined { return value && commandActions.has(value) ? value as CommandAction : undefined; }
+function configuredProvider(value: string | undefined): "claude" | "codex" | undefined { return value === "claude" || value === "codex" ? value : undefined; }
 function boundedNote(value: string): string { const note = value.replace(/[\0\r\n]/g, " ").trim().slice(0, 512); return note || "Read-only observation returned no detail; operation remains fail-closed."; }
 function safeDetails(value: Readonly<Record<string, string>> | undefined): Readonly<Record<string, string>> { const result: Record<string, string> = {}; for (const [key, item] of Object.entries(value ?? {})) if (/^[A-Za-z0-9_.-]{1,80}$/.test(key) && item.length <= 512 && !/[\0\r\n]/.test(item)) result[key] = item; return result; }
 function ascii(value: Uint8Array): string { return Buffer.from(value).toString("ascii").trim(); }

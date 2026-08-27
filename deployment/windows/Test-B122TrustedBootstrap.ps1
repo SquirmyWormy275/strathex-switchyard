@@ -46,9 +46,8 @@ $bootstrap=Join-Path $PSScriptRoot 'Bootstrap-B122Install.ps1'
 $sourceCommit='1234567890abcdef1234567890abcdef12345678'
 $helperRelative='app/dist/apps/windows-companion/repository-runtime/b122-repository-runner.exe'
 $repositoryRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-if([string]::IsNullOrWhiteSpace($RepositoryRunnerPath)){$RepositoryRunnerPath=Join-Path $repositoryRoot 'apps\windows-companion\repository-runner-helper\bin\Release\net8.0\win-x64\b122-repository-runner.exe'}
-$RepositoryRunnerPath=[IO.Path]::GetFullPath($RepositoryRunnerPath)
-if(-not(Test-Path -LiteralPath $RepositoryRunnerPath -PathType Leaf)){throw 'Pass the exact built b122-repository-runner.exe to the trusted-bootstrap test.'}
+$buildRepositoryRunner=[string]::IsNullOrWhiteSpace($RepositoryRunnerPath)
+if(-not$buildRepositoryRunner){$RepositoryRunnerPath=[IO.Path]::GetFullPath($RepositoryRunnerPath)}
 $payload=@('scripts/Install-B122.ps1','scripts/B122InstallTools.psm1','scripts/B122ReleaseIntegrity.psm1','scripts/Test-B122ReleaseArtifact.ps1','scripts/receipt-mode.txt',$helperRelative)
 try{
   [IO.Directory]::CreateDirectory($scripts)|Out-Null
@@ -56,6 +55,15 @@ try{
   [IO.Directory]::CreateDirectory($stagingBase)|Out-Null
   [IO.Directory]::CreateDirectory($installRoot)|Out-Null
   [IO.Directory]::CreateDirectory($stateRoot)|Out-Null
+  if($buildRepositoryRunner){
+    $publish=Join-Path $testRoot 'repository-runner-publish';$project=Join-Path $repositoryRoot 'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj'
+    $dotnet=Join-Path $repositoryRoot '.tools\dotnet\dotnet.exe';if(-not(Test-Path -LiteralPath $dotnet -PathType Leaf)){$dotnet='dotnet.exe'}
+    $env:DOTNET_CLI_HOME=Join-Path $testRoot 'dotnet-home';$env:DOTNET_NOLOGO='1';$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1';$env:APPDATA=Join-Path $testRoot 'appdata';$env:NUGET_PACKAGES=Join-Path $repositoryRoot '.tools\nuget-packages'
+    & $dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $publish --configfile (Join-Path $repositoryRoot '.tools\NuGet.Config')|Out-Null
+    if($LASTEXITCODE-ne0){throw 'The trusted-bootstrap test could not build its exact repository-runner helper.'}
+    $RepositoryRunnerPath=Join-Path $publish 'b122-repository-runner.exe'
+  }
+  if(-not(Test-Path -LiteralPath $RepositoryRunnerPath -PathType Leaf)){throw 'Pass the exact built b122-repository-runner.exe to the trusted-bootstrap test.'}
   $installer=@'
 [CmdletBinding()]
 param(
@@ -106,9 +114,10 @@ switch($mode){
 
   if($null-eq('SxsyB122.NativeCommandLine'-as[type])){Add-Type -TypeDefinition 'namespace SxsyB122 { public static class NativeCommandLine { public static int Version { get { return 1; } } } }'}
   $currentHost=(Microsoft.PowerShell.Management\Get-Process -Id $PID).Path
-  function Invoke-Fixture([string]$Digest,[string]$Commit=$sourceCommit,[string]$CleanupMutation='none'){
+  function Invoke-Fixture([string]$Digest,[string]$Commit=$sourceCommit,[string]$CleanupMutation='none',[string]$TerminalMutation='none'){
     $parameters=@{BundleRoot=$bundle;ExpectedTrustDigest=$Digest;ExpectedSourceCommit=$Commit;InstallRoot=$installRoot;StateRoot=$stateRoot;SkipVsCode=$true;SkipAutostart=$true;OperationKindOverride='update';TestStagingRoot=$stagingBase;AllowTestStagingRoot=$true}
     if($CleanupMutation-cne'none'){$parameters.TestCleanupMutation=$CleanupMutation}
+    if($TerminalMutation-cne'none'){$parameters.TestTerminalMutation=$TerminalMutation}
     if([IO.Path]::GetFileName($currentHost)-ieq'pwsh.exe'){$parameters.ExpectedPowerShellSha256=Get-Sha256File $currentHost}
     return @(& $bootstrap @parameters)
   }
@@ -268,9 +277,15 @@ switch($mode){
     if($cleanupMode-ceq'replace-root-before-file-delete'){Assert-True (Test-Path -LiteralPath (Join-Path $retained[0].FullName 'scripts\Install-B122.ps1') -PathType Leaf) 'Cleanup deleted staged bytes after the final file-identity seam changed.'}
     Assert-True ([string]$cleanupReceipt.cleanup-ceq'retained'-and[string]$cleanupReceipt.error-match'filesystem identity') 'A replaced staging generation was not durably retained as an identity mismatch.'
   }
-  Assert-True (([IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt')))-ceq[string](6+$ReceiptModes.Count)) 'The preparation, crash, recovery, and cleanup-identity fixtures did not each execute exactly once.'
+  foreach($terminalMode in @('forged-signature','substituted-terminal-field','substituted-state-spki')){
+    $beforeTerminalMutation=[int][IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt'));$terminalRejected=$false
+    try{Invoke-Fixture $currentDigest $sourceCommit 'none' $terminalMode|Out-Null}catch{$terminalRejected=$_.Exception.Message-match'terminal|successful terminal state'}
+    Assert-True $terminalRejected "The trusted bootstrap accepted the $terminalMode terminal mutation."
+    Assert-True ([int][IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt'))-eq($beforeTerminalMutation+1)) "The $terminalMode fixture did not execute exactly once."
+  }
+  Assert-True (([IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt')))-ceq[string](9+$ReceiptModes.Count)) 'The preparation, crash, recovery, cleanup-identity, and terminal-integrity fixtures did not each execute exactly once.'
 
-  [ordered]@{schema='sxsy-b122.trusted-bootstrap-test';version=1;status='passed';checks=28;freshProcess=$true;jobContained=$true;immutableStaging=$true;environmentIsolated=$true;exactReceiptBound=$true;externalReceipts=$true;selfConsistentTamperRejected=$true;sourceCommitBound=$true;testOverrideBound=$true;cleanupIdentityBound=$true;fileDeleteSeamBound=$true;rootDeleteSeamBound=$true;replacementSentinelPreserved=$true;preparationIntentDurable=$true;preparationNoInstaller=$true;preparationInterruptionReconciled=$true;bootstrapHostAtomicallyContained=$true;crashTreeTerminated=$true;abandonedMutexRecovered=$true;interruptionReconciled=$true;interruptedStagingRetained=$true}|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress
+  [ordered]@{schema='sxsy-b122.trusted-bootstrap-test';version=1;status='passed';checks=31;freshProcess=$true;jobContained=$true;immutableStaging=$true;environmentIsolated=$true;exactReceiptBound=$true;externalReceipts=$true;selfConsistentTamperRejected=$true;sourceCommitBound=$true;testOverrideBound=$true;cleanupIdentityBound=$true;fileDeleteSeamBound=$true;rootDeleteSeamBound=$true;replacementSentinelPreserved=$true;preparationIntentDurable=$true;preparationNoInstaller=$true;preparationInterruptionReconciled=$true;bootstrapHostAtomicallyContained=$true;crashTreeTerminated=$true;abandonedMutexRecovered=$true;interruptionReconciled=$true;interruptedStagingRetained=$true;terminalSignatureVerified=$true;terminalFieldBound=$true;terminalSpkiPinned=$true}|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress
 }finally{
   $resolved=[IO.Path]::GetFullPath($testRoot);$temporary=[IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')+'\'
   if($resolved.StartsWith($temporary,[StringComparison]::OrdinalIgnoreCase)-and[IO.Path]::GetFileName($resolved).StartsWith('sxsy-b122-trusted-bootstrap-',[StringComparison]::Ordinal)){

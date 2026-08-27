@@ -18,7 +18,7 @@ import type { TargetResolver } from "../../../packages/control-plane/src/runtime
 import { sessionBindingDigest, SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { TargetSnapshotLedger } from "../../../packages/control-plane/src/snapshot-ledger.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
-import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { stableJson, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
 export interface InstalledReanchorBeginInput {
@@ -48,6 +48,17 @@ export interface InstalledReanchorStatus {
   readonly confirmationScopeDigest?: string;
   readonly confirmationExpiresAt?: string;
   readonly receipt?: ReanchorReceipt;
+}
+
+export interface InstalledReanchorDispatchBinding {
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly oldTarget: TargetSnapshot;
+  readonly session: ManagedSession;
+  readonly authority: import("../../../packages/control-plane/src/contracts.ts").AuthorityGrant;
+  readonly artifactDigest: string;
+  readonly confirmationDigest: string;
+  readonly confirmationScopeDigest: string;
 }
 
 export interface InstalledDurableReanchorRuntimeOptions extends DurableReanchorCoordinatorOptions {
@@ -161,6 +172,25 @@ export class InstalledDurableReanchorRuntime {
   async get(requestId: string): Promise<InstalledReanchorStatus | undefined> {
     const lifecycle = await this.coordinator.get(exactRequestId(requestId));
     return lifecycle ? statusFromLifecycle(lifecycle) : undefined;
+  }
+
+  async assertProviderDispatchCurrent(input: InstalledReanchorDispatchBinding): Promise<Readonly<{ allowed: boolean; reason: string }>> {
+    try {
+      const current = await this.coordinator.executingApplyRequest(input.requestId);
+      if (!current
+        || current.operationId !== input.operationId
+        || current.artifactDigest !== input.artifactDigest
+        || current.confirmationDigest !== input.confirmationDigest
+        || current.confirmationScopeDigest !== input.confirmationScopeDigest
+        || stableJson(current.oldTarget) !== stableJson(input.oldTarget)
+        || stableJson(current.session) !== stableJson(input.session)
+        || stableJson(current.authority) !== stableJson(input.authority)) {
+        return { allowed: false, reason: "The exact executing Re-anchor dispatch binding is absent, settled, or changed." };
+      }
+      return { allowed: true, reason: "The exact Re-anchor lifecycle is executing with the reviewed provider-dispatch binding." };
+    } catch {
+      return { allowed: false, reason: "The exact Re-anchor dispatch binding could not be revalidated." };
+    }
   }
 
   async recover(): Promise<readonly InstalledReanchorStatus[]> {

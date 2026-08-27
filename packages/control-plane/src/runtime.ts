@@ -1,11 +1,11 @@
 import { AdapterRegistry } from "./adapters.ts";
 import { GateEvidenceLedger } from "./acceptance-evidence.ts";
 import { AuthorityLedger } from "./authority.ts";
-import { DurableBudgetManager, type BudgetConfiguration, type CommandBudget } from "./budgets.ts";
+import { DurableBudgetManager, type BudgetClaim, type BudgetConfiguration, type CommandBudget } from "./budgets.ts";
 import { CheckpointLedger, type CheckpointArtifact, type CheckpointWorkflow, type RecoveryArtifactVerifier, type RecoveryGuideInput } from "./checkpoints.ts";
 import { commandActionIds, commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
 import { DurableConfirmationLedger } from "./confirmations.ts";
-import type { AuthorityGrant, CommandRequest, CommandResult, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, CommandRequest, CommandResult, EffectDisposition, ManagedSession, OperationRecord, TargetSnapshot } from "./contracts.ts";
 import {
   CommandDispatcher,
   type ContainmentReleaseCommandRequest,
@@ -21,9 +21,9 @@ import { ExecutionControlRegistry, type ExecutionControl, type OperationControlA
 import type { EffectGuard } from "./brokers.ts";
 import { PolicyEngine } from "./policy.ts";
 import { ReceiptLedger } from "./receipts.ts";
-import { SessionRegistry } from "./session-registry.ts";
+import { SessionRegistry, sessionBindingDigest } from "./session-registry.ts";
 import { TargetSnapshotLedger } from "./snapshot-ledger.ts";
-import { ProtectedJsonStore, sha256 } from "./store.ts";
+import { ProtectedJsonStore, sha256, stableJson } from "./store.ts";
 import type { ExistingPlanBinding } from "./workflow-artifacts.ts";
 import type { CouncilRecommendation } from "./council.ts";
 
@@ -187,9 +187,65 @@ export interface ExternalOperationCompletion {
   readonly action: CommandAction;
   readonly targetSnapshotId?: string;
   readonly status: "completed" | "failed" | "cancelled" | "incomplete";
+  /** Exact trusted effect truth. Completed implies committed; every other terminal status must supply this explicitly. */
+  readonly effectDisposition?: EffectDisposition;
   readonly summary: string;
   readonly evidenceDigest?: string;
   readonly toolVersions?: Readonly<Record<string, string>>;
+}
+
+export interface OperationReconciliationBinding {
+  readonly operationId: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly repositoryRoot?: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
+}
+
+export type TerminalOperationStatus = "completed" | "failed" | "timed_out" | "cancelled" | "incomplete";
+
+export type OperationControllerObservation =
+  | Readonly<{
+      state: "not_owner";
+      operationId: string;
+      summary: string;
+    }>
+  | Readonly<{
+      state: "active";
+      operationId: string;
+      action: CommandAction;
+      targetSnapshotId?: string;
+      repositoryRoot?: string;
+      sessionId?: string;
+      authorityId?: string;
+      effectDisposition: "ambiguous";
+      summary: string;
+    }>
+  | Readonly<{
+      state: "terminal";
+      operationId: string;
+      action: CommandAction;
+      targetSnapshotId?: string;
+      repositoryRoot?: string;
+      sessionId?: string;
+      authorityId?: string;
+      status: TerminalOperationStatus;
+      effectDisposition: EffectDisposition;
+      summary: string;
+      evidenceDigest?: string;
+      toolVersions?: Readonly<Record<string, string>>;
+    }>;
+
+/** Installed controllers may prove a terminal result only against this exact protected binding. */
+export interface RuntimeOperationControlAdapter extends OperationControlAdapter {
+  observe?(binding: OperationReconciliationBinding): Promise<OperationControllerObservation>;
+}
+
+export interface BudgetedOperationReconciliation {
+  readonly operationId: string;
+  readonly status: "running" | "cancelling" | "timed_out" | "completed" | "failed" | "cancelled";
+  readonly summary: string;
 }
 
 export interface DeadlineSchedule {
@@ -229,7 +285,7 @@ export interface DurableMediatedExecutorOptions {
   /** Installed provider-host context refresh and local authority binding for agent workflows. */
   readonly workflowContextPreparation?: WorkflowContextPreparationPort;
   /** Optional host process/provider control. Omission leaves timeout/cancel work visibly unresolved. */
-  readonly operationControl?: OperationControlAdapter;
+  readonly operationControl?: RuntimeOperationControlAdapter;
   /** Action-specific observation adapters used only during no-replay startup recovery. */
   readonly operationReconcilers?: Readonly<Record<string, OperationReconciler>>;
   readonly deadlineScheduler?: DeadlineScheduler;
@@ -280,6 +336,10 @@ export class DurableMediatedExecutor {
   private readonly options: DurableMediatedExecutorOptions;
   private readonly now: () => Date;
   private readonly executionControls = new ExecutionControlRegistry();
+  private readonly deadlineSchedules = new Map<string, DeadlineSchedule>();
+  private recoveryPoll?: DeadlineSchedule;
+  private recoveryPollRunning = false;
+  private recoveryPollingEnabled = false;
 
   constructor(options: DurableMediatedExecutorOptions) {
     this.options = options;
@@ -376,23 +436,19 @@ export class DurableMediatedExecutor {
     const configured = this.options.dependencies?.(context) ?? { adapters: new AdapterRegistry() };
     const governance = new DurableRuntimeGovernance({
       budgets: this.budgets,
-       checkpoints: this.checkpoints,
-       checkpointCapture: this.options.checkpointCapture,
-       checkpointVerifier: this.options.checkpointVerifier,
+      checkpoints: this.checkpoints,
+      checkpointCapture: this.options.checkpointCapture,
+      checkpointVerifier: this.options.checkpointVerifier,
       policyVersion: this.options.policyVersion,
-       revalidator: {
-        revalidate: async ({ definition: candidate, target: expected, session: selectedSession }) => {
-          const actual = await this.resolveTarget(candidate, selectedSession);
-          if (!actual) return false;
-          const recorded = await this.snapshots.record(actual);
-          return recorded.completeness === "complete" && recorded.id === expected.id;
-        }
-       },
-       controls: this.executionControls,
-       operationControl: this.options.operationControl,
-       operationCoordinator: this.operationCoordinator,
-       now: this.now,
-       deadlineScheduler: this.options.deadlineScheduler ?? systemDeadlineScheduler,
+      revalidator: this.finalTargetRevalidator(),
+      sessions: this.sessions,
+      authorities: this.authorities,
+      controls: this.executionControls,
+      operationControl: this.options.operationControl,
+      operationCoordinator: this.operationCoordinator,
+      now: this.now,
+      deadlineScheduler: this.options.deadlineScheduler ?? systemDeadlineScheduler,
+      deadlineSchedules: this.deadlineSchedules,
       ...(this.options.budgetConfiguration ? { budgetConfiguration: this.options.budgetConfiguration } : {})
     });
     const dispatcher = new CommandDispatcher({
@@ -417,6 +473,9 @@ export class DurableMediatedExecutor {
       confirmationDigest: trustedConfirmationDigest,
       ...(request.confirmationScopeDigest ? { confirmationScopeDigest: request.confirmationScopeDigest } : {})
     } : {});
+    if (result.operationId && (result.status === "running" || result.status === "cancelling")) {
+      this.enableLiveOperationReconciliation();
+    }
     return result.operationId ? result : this.auditWithoutOperation(definition, result, target);
   }
 
@@ -437,6 +496,7 @@ export class DurableMediatedExecutor {
       return { status: "unavailable", summary: "Budget cancellation intent was recorded, but the durable operation could not be marked cancelling; no host cancellation was sent.", operationId };
     }
     this.executionControls.request(operationId, reason);
+    this.enableLiveOperationReconciliation();
     if (!this.options.operationControl) {
       return { status: "cancelling", summary: "Cancellation intent is durable, but no host operation-control adapter is configured; reconciliation is required and no process was guessed.", operationId };
     }
@@ -497,15 +557,23 @@ export class DurableMediatedExecutor {
     if (!operation) return { status: "unavailable", summary: "The durable external operation is unavailable and was not fabricated.", operationId: completion.operationId };
     if (operation.action !== completion.action) return { status: "blocked", summary: "The external acknowledgement action does not match its durable operation.", operationId: operation.id };
     const targetSnapshotId = operation.targetSnapshotId.startsWith("<no-target:") ? undefined : operation.targetSnapshotId;
-    if (completion.targetSnapshotId && completion.targetSnapshotId !== targetSnapshotId) {
+    if (completion.targetSnapshotId !== targetSnapshotId) {
       return { status: "blocked", summary: "The external acknowledgement target does not match its durable operation.", operationId: operation.id };
+    }
+    const priorTruth = protectedTerminalTruth(operation);
+    if (priorTruth) return this.settleProtectedExternalTruth(operation, priorTruth);
+    const effectDisposition = completion.effectDisposition ?? (completion.status === "completed" ? "committed" : "ambiguous");
+    if (!externalCompletionConsistent(completion.status, effectDisposition)) {
+      return { status: "incomplete", summary: "The external acknowledgement lacks an exact consistent effect disposition; the durable operation remains unresolved and was not replayed.", operationId: operation.id };
     }
     const lease = { operationId: operation.id, existing: false } as const;
     try {
+      if (effectDisposition === "committed") await this.preserveCommittedCancellationTruth(operation.id, completion.status);
       const recorded = await this.operationCoordinator.recordResult(lease, {
         action: completion.action,
         ...(targetSnapshotId ? { targetSnapshotId } : {}),
         status: completion.status,
+        effectDisposition,
         summary: completion.summary,
         ...(targetSnapshotId && completion.evidenceDigest && completion.toolVersions ? {
           policyVersion: this.options.policyVersion,
@@ -513,9 +581,56 @@ export class DurableMediatedExecutor {
           toolVersions: completion.toolVersions
         } : {})
       });
-      return { status: completion.status, summary: completion.summary, operationId: operation.id, ...(recorded.receiptId ? { receiptId: recorded.receiptId } : {}) };
+      const terminal = await this.operations.get(operation.id);
+      if (!terminal || !["recorded", "failed", "cancelled"].includes(terminal.state)) {
+        return { status: "incomplete", summary: "The external effect was acknowledged, but its durable root remains unresolved and no budget or control was released.", operationId: operation.id };
+      }
+      const protectedTruth = protectedTerminalTruth(terminal);
+      if (!protectedTruth) {
+        return { status: "incomplete", summary: "The external root is terminal, but its protected terminal status is malformed; budget and control remain unresolved.", operationId: operation.id };
+      }
+      const result = await this.settleProtectedExternalTruth(terminal, protectedTruth, protectedTruth.status === completion.status ? completion.summary : undefined);
+      const receiptId = recorded.receiptId ?? terminal.details.receiptId;
+      return receiptId && !result.receiptId ? { ...result, receiptId } : result;
     } catch {
       return { status: "incomplete", summary: "The external effect was acknowledged, but its durable final result requires reconciliation.", operationId: operation.id };
+    }
+  }
+
+  private async settleProtectedExternalTruth(
+    operation: OperationRecord,
+    truth: ProtectedTerminalTruth,
+    acceptedSummary?: string
+  ): Promise<CommandResult> {
+    const claims = (await this.budgets.list()).filter((claim) => claim.operationId === operation.id && ["claimed", "running", "cancelling", "timed_out"].includes(claim.state));
+    const budgetOutcome = truth.status === "completed" ? "completed" : truth.status === "cancelled" ? "cancelled" : "failed";
+    const summary = acceptedSummary ?? protectedTerminalSummary(truth.status);
+    for (const claim of claims) {
+      const settled = await this.budgets.settle(claim.id, budgetOutcome, summary);
+      if (!settled.allowed) {
+        return { status: "incomplete", summary: "The protected external root is terminal, but its durable budget settlement conflicts and control remains unresolved.", operationId: operation.id };
+      }
+    }
+    this.releaseOperationControl(operation.id, claims);
+    await this.cancelRecoveryPollIfIdle();
+    const receiptId = operation.details.receiptId;
+    return { status: truth.status, summary, operationId: operation.id, ...(receiptId ? { receiptId } : {}) };
+  }
+
+  private async preserveCommittedCancellationTruth(operationId: string, status: TerminalOperationStatus | ExternalOperationCompletion["status"]): Promise<void> {
+    let current = await this.operations.get(operationId);
+    if (current?.state === "cancelling") {
+      await this.operations.advance(operationId, "compensating", {
+        commandStatus: status,
+        cancellationDidNotCompensate: "true"
+      });
+      current = await this.operations.get(operationId);
+    }
+    if (current?.state === "compensating") {
+      await this.operations.advance(operationId, "external_committed", {
+        commandStatus: status,
+        effectDisposition: "committed"
+      });
     }
   }
 
@@ -523,23 +638,40 @@ export class DurableMediatedExecutor {
    * Startup/recovery sweep observes expired work and asks an optional host
    * controller to probe it. It never replays a broker action.
    */
-  async reconcileBudgetedOperations(): Promise<ReadonlyArray<Readonly<{ operationId: string; status: "timed_out" | "running" | "cancelling"; summary: string }>>> {
+  async reconcileBudgetedOperations(): Promise<readonly BudgetedOperationReconciliation[]> {
     await this.budgets.expireDue(this.now().toISOString());
     const active = (await this.budgets.list()).filter((claim) => ["running", "cancelling", "timed_out"].includes(claim.state));
     const seen = new Set<string>();
-    const results: Array<Readonly<{ operationId: string; status: "timed_out" | "running" | "cancelling"; summary: string }>> = [];
+    const results: BudgetedOperationReconciliation[] = [];
     for (const claim of active) {
       if (seen.has(claim.operationId)) continue;
       seen.add(claim.operationId);
       const status = claim.state === "timed_out" ? "timed_out" : claim.state === "cancelling" ? "cancelling" : "running";
       if (claim.state === "timed_out") this.executionControls.request(claim.operationId, "Durable budget deadline elapsed.");
-      if (!this.options.operationControl?.reconcile) {
-        results.push({ operationId: claim.operationId, status, summary: "No host reconciliation probe is configured; operation remains unresolved and was not replayed." });
+      const controller = this.options.operationControl;
+      if (!controller?.observe) {
+        let summary = "No exact bound host reconciliation probe is configured; operation remains unresolved and was not replayed.";
+        if (controller?.reconcile) {
+          try { summary = (await controller.reconcile(claim.operationId)).summary; }
+          catch { summary = "Host reconciliation probe failed; operation remains unresolved and was not replayed."; }
+        }
+        results.push({ operationId: claim.operationId, status, summary });
         continue;
       }
       try {
-        const observed = await this.options.operationControl.reconcile(claim.operationId);
-        results.push({ operationId: claim.operationId, status, summary: observed.summary });
+        const binding = await this.reconciliationBinding(claim.operationId);
+        if (!binding) {
+          results.push({ operationId: claim.operationId, status, summary: "The durable operation or exact target binding is unavailable; controller observation was not accepted." });
+          continue;
+        }
+        const observed = await controller.observe(binding);
+        const mismatch = observationMismatch(binding, observed);
+        if (mismatch || observed.state !== "terminal" || observed.effectDisposition === "ambiguous" || observed.status === "incomplete") {
+          results.push({ operationId: claim.operationId, status, summary: mismatch ?? observed.summary });
+          continue;
+        }
+        const settled = await this.settleControllerTerminal(binding, observed, active.filter((candidate) => candidate.operationId === claim.operationId));
+        results.push(settled ?? { operationId: claim.operationId, status, summary: "The controller result could not be durably reconciled; operation remains unresolved and was not replayed." });
       } catch {
         results.push({ operationId: claim.operationId, status, summary: "Host reconciliation probe failed; operation remains unresolved and was not replayed." });
       }
@@ -547,10 +679,146 @@ export class DurableMediatedExecutor {
     return results;
   }
 
+  private async reconciliationBinding(operationId: string): Promise<OperationReconciliationBinding | undefined> {
+    const operation = await this.operations.get(operationId);
+    if (!operation || !(commandActionIds as readonly string[]).includes(operation.action)) return undefined;
+    const sessionId = protectedOperationReference(operation.details.sessionId);
+    const authorityId = protectedOperationReference(operation.details.authorityId);
+    if ((operation.details.sessionId !== undefined && !sessionId) || (operation.details.authorityId !== undefined && !authorityId)) return undefined;
+    const protectedScope = { ...(sessionId ? { sessionId } : {}), ...(authorityId ? { authorityId } : {}) };
+    const targetSnapshotId = operation.targetSnapshotId.startsWith("<no-target:") ? undefined : operation.targetSnapshotId;
+    if (!targetSnapshotId) return { operationId: operation.id, action: operation.action as CommandAction, ...protectedScope };
+    const target = await this.snapshots.get(targetSnapshotId);
+    if (!target || target.id !== targetSnapshotId) return undefined;
+    return { operationId: operation.id, action: operation.action as CommandAction, targetSnapshotId, repositoryRoot: target.repositoryRoot, ...protectedScope };
+  }
+
+  private async settleControllerTerminal(
+    binding: OperationReconciliationBinding,
+    observed: Extract<OperationControllerObservation, { state: "terminal" }>,
+    claims: readonly BudgetClaim[]
+  ): Promise<BudgetedOperationReconciliation | undefined> {
+    if (observed.status === "incomplete" || !terminalDispositionConsistent(observed)) return undefined;
+    const before = await this.operations.get(binding.operationId);
+    const beforeTruth = before ? protectedTerminalTruth(before) : undefined;
+    const lease = { operationId: binding.operationId, existing: false } as const;
+    if (!beforeTruth) {
+      if (observed.effectDisposition === "committed") await this.preserveCommittedCancellationTruth(binding.operationId, observed.status);
+      await this.operationCoordinator.recordResult(lease, {
+        action: binding.action,
+        ...(binding.targetSnapshotId ? { targetSnapshotId: binding.targetSnapshotId } : {}),
+        status: observed.status,
+        effectDisposition: observed.effectDisposition,
+        summary: observed.summary,
+        ...(binding.targetSnapshotId && observed.evidenceDigest && observed.toolVersions ? {
+          policyVersion: this.options.policyVersion,
+          evidenceDigest: observed.evidenceDigest,
+          toolVersions: observed.toolVersions
+        } : {})
+      });
+    }
+    const operation = await this.operations.get(binding.operationId);
+    if (!operation || !["recorded", "failed", "cancelled"].includes(operation.state)) return undefined;
+    const truth = protectedTerminalTruth(operation);
+    if (!truth) return undefined;
+    const protectedStatus = truth.status;
+    const protectedSummary = protectedStatus === observed.status ? observed.summary : protectedTerminalSummary(protectedStatus);
+    const budgetOutcome = protectedStatus === "completed" ? "completed" : protectedStatus === "cancelled" ? "cancelled" : "failed";
+    for (const claim of claims) {
+      const settled = await this.budgets.settle(claim.id, budgetOutcome, protectedSummary);
+      if (!settled.allowed) return undefined;
+    }
+    this.releaseOperationControl(binding.operationId, claims);
+    await this.cancelRecoveryPollIfIdle();
+    return { operationId: binding.operationId, status: protectedStatus, summary: protectedSummary };
+  }
+
+  private releaseOperationControl(operationId: string, claims: readonly BudgetClaim[]): void {
+    for (const claim of claims) {
+      const timer = this.deadlineSchedules.get(claim.id);
+      timer?.cancel();
+      this.deadlineSchedules.delete(claim.id);
+    }
+    this.executionControls.release(operationId);
+  }
+
+  private async resumeRecoveredBudgetLifecycle(): Promise<void> {
+    const active = (await this.budgets.list()).filter((claim) => ["running", "cancelling", "timed_out"].includes(claim.state));
+    for (const claim of active) {
+      this.executionControls.bind(claim.operationId, claim.expiresAt, claim.id);
+      if (claim.state === "running" && !this.deadlineSchedules.has(claim.id)) this.scheduleRecoveredDeadline(claim);
+      if (claim.state === "cancelling" || claim.state === "timed_out") {
+        const reason = claim.cancellationReason ?? (claim.state === "timed_out" ? "Durable budget deadline elapsed before companion restart." : "Durable cancellation intent survived companion restart.");
+        this.executionControls.request(claim.operationId, reason);
+        try { await this.options.operationControl?.cancel({ operationId: claim.operationId, reason }); }
+        catch { /* exact cancellation remains durable and is retried only by bounded reconciliation */ }
+      }
+    }
+    if (active.length === 0) {
+      this.recoveryPoll?.cancel();
+      this.recoveryPoll = undefined;
+      return;
+    }
+    this.scheduleRecoveryPoll();
+  }
+
+  private scheduleRecoveredDeadline(claim: BudgetClaim): void {
+    const delay = Math.max(0, Date.parse(claim.expiresAt) - this.now().getTime());
+    const schedule = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(delay, () => {
+      this.deadlineSchedules.delete(claim.id);
+      void this.handleRecoveredDeadline(claim.operationId, claim.id);
+    });
+    this.deadlineSchedules.set(claim.id, schedule);
+  }
+
+  private async handleRecoveredDeadline(operationId: string, claimId: string): Promise<void> {
+    this.executionControls.request(operationId, "Durable budget deadline elapsed after companion restart.");
+    try { await this.budgets.expireDue(this.now().toISOString()); } catch { return; }
+    try { await this.operationCoordinator.requestCancellation(operationId, "Durable budget deadline elapsed after companion restart."); } catch { return; }
+    try { await this.options.operationControl?.cancel({ operationId, reason: "Durable budget deadline elapsed after companion restart." }); }
+    catch { /* the durable timed-out claim remains occupied for bounded reconciliation */ }
+    void claimId;
+  }
+
+  private scheduleRecoveryPoll(): void {
+    if (!this.recoveryPollingEnabled || this.recoveryPoll || this.recoveryPollRunning || !this.options.operationControl?.observe) return;
+    this.recoveryPoll = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(250, () => {
+      this.recoveryPoll = undefined;
+      void this.runRecoveryPoll();
+    });
+  }
+
+  private enableLiveOperationReconciliation(): void {
+    if (!this.options.operationControl?.observe) return;
+    this.recoveryPollingEnabled = true;
+    this.scheduleRecoveryPoll();
+  }
+
+  private async runRecoveryPoll(): Promise<void> {
+    if (this.recoveryPollRunning) return;
+    this.recoveryPollRunning = true;
+    try { await this.reconcileBudgetedOperations(); }
+    catch { /* malformed or unavailable protected state stays unresolved */ }
+    finally {
+      this.recoveryPollRunning = false;
+      try { await this.resumeRecoveredBudgetLifecycle(); } catch { /* one bounded poll is enough when protected state is unavailable */ }
+    }
+  }
+
+  private async cancelRecoveryPollIfIdle(): Promise<void> {
+    if (!this.recoveryPoll) return;
+    const active = (await this.budgets.list()).some((claim) => ["running", "cancelling", "timed_out"].includes(claim.state));
+    if (active) return;
+    this.recoveryPoll.cancel();
+    this.recoveryPoll = undefined;
+  }
+
   /** Recovery entry point for companion startup. It observes durable state and never replays a side effect. */
-  async recoverAfterRestart(): Promise<Readonly<{ operations: readonly ReconciliationResult[]; budgets: ReadonlyArray<Readonly<{ operationId: string; status: "timed_out" | "running" | "cancelling"; summary: string }>> }>> {
+  async recoverAfterRestart(): Promise<Readonly<{ operations: readonly ReconciliationResult[]; budgets: readonly BudgetedOperationReconciliation[] }>> {
+    this.recoveryPollingEnabled = true;
     const operations = await this.recovery.recoverPending();
     const budgets = await this.reconcileBudgetedOperations();
+    await this.resumeRecoveredBudgetLifecycle();
     return { operations, budgets };
   }
 
@@ -748,6 +1016,34 @@ export class DurableMediatedExecutor {
       }
     }
 
+    // Shift Authority is a two-phase ceremony. The first phase establishes
+    // exact current authority so the trusted coordinator can build immutable
+    // individualized recipient packets. Confirmation is intentionally absent
+    // until the companion validates the operator-reviewed stored artifact.
+    if (definition.action === "authority_broadcast") {
+      return {
+        status: "incomplete",
+        summary: "Authority Broadcast requires trusted UI review of the exact protected recipient packets before confirmation.",
+        ...(session ? { session } : {}),
+        ...(authority ? { authorityId: authority.id } : {})
+      };
+    }
+
+    // Automation and Alt-Run are protected two-phase ceremonies. This first
+    // phase may establish mediation and exact authority, but it never issues
+    // a confirmation until the installed UI has presented the immutable
+    // host-owned review packet produced by the companion.
+    if (definition.executor === "automation" || definition.action === "stop_managed_run") {
+      return {
+        status: "incomplete",
+        summary: definition.executor === "automation"
+          ? "Automation requires trusted UI review of one exact inert operation manifest before confirmation."
+          : "Debug stop requires trusted UI review of one exact protected source/effect binding before confirmation.",
+        ...(session ? { session } : {}),
+        ...(authority ? { authorityId: authority.id } : {})
+      };
+    }
+
     let confirmationToken: string | undefined;
     let confirmationExpiresAt: string | undefined;
     const confirmationScopeDigest = workflowReview?.scopeDigest ?? request.confirmationScopeDigest;
@@ -830,6 +1126,17 @@ export class DurableMediatedExecutor {
       sessionId: session.id,
       authorityId: authority.id,
       confirmationToken: ephemeral.token,
+      effectGuardFactory: (operationId) => createRuntimeEffectGuard({
+        definition,
+        operationId,
+        target,
+        session,
+        authority,
+        revalidator: this.finalTargetRevalidator(),
+        sessions: this.sessions,
+        authorities: this.authorities,
+        now: this.now
+      }),
       review: {
         reauthenticated: true,
         reason: request.reason,
@@ -849,6 +1156,17 @@ export class DurableMediatedExecutor {
     } catch {
       return undefined;
     }
+  }
+
+  private finalTargetRevalidator(): TargetSnapshotRevalidator {
+    return {
+      revalidate: async ({ definition, target, session }) => {
+        const actual = await this.resolveTarget(definition, session);
+        if (!actual) return false;
+        const recorded = await this.snapshots.record(actual);
+        return recorded.completeness === "complete" && recorded.id === target.id;
+      }
+    };
   }
 
   private async createPolicy(target: TargetSnapshot | undefined): Promise<PolicyEngine> {
@@ -884,6 +1202,79 @@ function isLocalGitRootSession(session: ManagedSession | undefined, target: Targ
   if (!session || !target || session.provider !== "generic" || session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "git-root" || !session.workspaceRoot) return false;
   const normalized = (value: string) => value.replaceAll("\\", "/").replace(/^\/\/\?\//, "").replace(/\/+$/, "").toLowerCase();
   return normalized(session.workspaceRoot) === normalized(target.repositoryRoot);
+}
+
+function observationMismatch(binding: OperationReconciliationBinding, observed: OperationControllerObservation): string | undefined {
+  if (!observed || typeof observed !== "object" || !["not_owner", "active", "terminal"].includes(observed.state)) {
+    return "The host controller observation is malformed or ambiguous; no terminal result was accepted.";
+  }
+
+  if (observed.operationId !== binding.operationId) return "The host controller operation binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (typeof observed.summary !== "string" || !observed.summary.trim() || observed.summary.length > 4_096 || /[\0]/.test(observed.summary)) {
+    return "The host controller summary is invalid or ambiguous; no terminal result was accepted.";
+  }
+  if (observed.state === "not_owner") return undefined;
+  if (observed.action !== binding.action) return "The host controller action binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (observed.targetSnapshotId !== binding.targetSnapshotId) return "The host controller target binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (observed.repositoryRoot !== binding.repositoryRoot) return "The host controller repository binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (observed.sessionId !== binding.sessionId) return "The host controller session binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (observed.authorityId !== binding.authorityId) return "The host controller authority binding mismatched the protected durable operation; no terminal result was accepted.";
+  if (observed.state === "active") return observed.effectDisposition === "ambiguous"
+    ? undefined
+    : "The active host controller observation has an invalid effect disposition and remains ambiguous.";
+  if (!(["completed", "failed", "timed_out", "cancelled", "incomplete"] as readonly string[]).includes(observed.status)
+    || !(["not_started", "committed", "ambiguous", "compensated"] as readonly string[]).includes(observed.effectDisposition)) {
+    return "The terminal host controller status or effect disposition is invalid and remains ambiguous.";
+  }
+  if ((observed.evidenceDigest === undefined) !== (observed.toolVersions === undefined)) {
+    return "The terminal host controller evidence binding is partial and remains ambiguous.";
+  }
+  if (observed.evidenceDigest !== undefined && !/^[a-f0-9]{64}$/.test(observed.evidenceDigest)) {
+    return "The terminal host controller evidence digest is invalid and remains ambiguous.";
+  }
+  if (observed.toolVersions !== undefined && (Object.keys(observed.toolVersions).length === 0
+    || Object.entries(observed.toolVersions).some(([tool, version]) => !tool || !version || tool.length > 256 || version.length > 512 || /[\0\r\n]/.test(`${tool}${version}`)))) {
+    return "The terminal host controller tool binding is invalid and remains ambiguous.";
+  }
+  return undefined;
+}
+
+function protectedOperationReference(value: string | undefined): string | undefined {
+  return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value) ? value : undefined;
+}
+
+function terminalDispositionConsistent(observed: Extract<OperationControllerObservation, { state: "terminal" }>): boolean {
+  if (observed.status === "incomplete" || observed.effectDisposition === "ambiguous") return false;
+  if (observed.status === "completed") return observed.effectDisposition === "committed";
+  if (observed.status === "cancelled" || observed.status === "timed_out") {
+    return observed.effectDisposition === "committed" || observed.effectDisposition === "compensated" || observed.effectDisposition === "not_started";
+  }
+  return true;
+}
+
+function externalCompletionConsistent(status: ExternalOperationCompletion["status"], disposition: EffectDisposition): boolean {
+  if (status === "incomplete" || disposition === "ambiguous") return false;
+  if (status === "completed") return disposition === "committed";
+  if (status === "cancelled") return disposition === "committed" || disposition === "compensated" || disposition === "not_started";
+  return true;
+}
+
+interface ProtectedTerminalTruth {
+  readonly status: Exclude<TerminalOperationStatus, "incomplete">;
+}
+
+function protectedTerminalTruth(operation: OperationRecord): ProtectedTerminalTruth | undefined {
+  if (!["recorded", "failed", "cancelled"].includes(operation.state)) return undefined;
+  const status = operation.details.commandStatus;
+  if (status === "completed" || status === "failed" || status === "timed_out" || status === "cancelled") return { status };
+  if (status === "incomplete") return { status: "failed" };
+  if (operation.state === "cancelled") return { status: "cancelled" };
+  if (operation.state === "failed") return { status: "failed" };
+  return { status: "completed" };
+}
+
+function protectedTerminalSummary(status: ProtectedTerminalTruth["status"]): string {
+  return `The protected durable operation is already ${status}; a later acknowledgement cannot replace its terminal truth.`;
 }
 
 function policyStatus(status: "allowed" | "awaiting_confirmation" | "blocked" | "unavailable" | "incomplete"): "blocked" | "unavailable" | "incomplete" {
@@ -951,6 +1342,8 @@ interface DurableRuntimeGovernanceOptions {
   readonly checkpointCapture?: CheckpointCaptureAdapter;
   readonly checkpointVerifier?: RecoveryArtifactVerifier;
   readonly revalidator: TargetSnapshotRevalidator;
+  readonly sessions: SessionRegistry;
+  readonly authorities: AuthorityLedger;
   readonly policyVersion: string;
   readonly budgetConfiguration?: BudgetConfiguration;
   readonly controls: ExecutionControlRegistry;
@@ -958,6 +1351,98 @@ interface DurableRuntimeGovernanceOptions {
   readonly operationCoordinator: DurableOperationCoordinator;
   readonly now: () => Date;
   readonly deadlineScheduler: DeadlineScheduler;
+  readonly deadlineSchedules: Map<string, DeadlineSchedule>;
+}
+
+interface RuntimeEffectGuardInput {
+  readonly definition: CommandDefinition;
+  readonly operationId: string;
+  readonly target: TargetSnapshot;
+  readonly session?: ManagedSession;
+  readonly authority?: AuthorityGrant;
+  readonly revalidator: TargetSnapshotRevalidator;
+  readonly sessions: SessionRegistry;
+  readonly authorities: AuthorityLedger;
+  readonly now: () => Date;
+}
+
+/**
+ * One operation-bound final barrier shared by ordinary consequential dispatch
+ * and the administrative containment-release route. Heartbeats may advance,
+ * but task/capability/target/status and authority bindings may not.
+ */
+function createRuntimeEffectGuard(expected: RuntimeEffectGuardInput): EffectGuard {
+  const targetDigest = sha256(stableJson(expected.target));
+  const expectedSessionBinding = expected.session ? sessionBindingDigest(expected.session) : undefined;
+  const expectedSessionStatus = expected.session?.status;
+  const expectedAuthorityDigest = expected.authority ? sha256(stableJson(expected.authority)) : undefined;
+  return {
+    assertCurrent: async (effect) => {
+      if (effect.action !== expected.definition.action || effect.operationId !== expected.operationId
+        || sha256(stableJson(effect.target)) !== targetDigest) {
+        return { allowed: false, reason: "The broker effect does not match its admitted operation, action, or complete target." };
+      }
+
+      const councilParticipant = expected.definition.action === "council_automatic";
+      if (!councilParticipant) {
+        if ((expected.session === undefined) !== (effect.session === undefined)
+          || effect.session && (sessionBindingDigest(effect.session) !== expectedSessionBinding || effect.session.status !== expectedSessionStatus)) {
+          return { allowed: false, reason: "The selected managed-session binding changed after admission." };
+        }
+      } else if (effect.session && (effect.session.targetSnapshotId !== expected.target.id
+        || runtimeRootKey(effect.session.workspaceRoot) !== runtimeRootKey(expected.target.repositoryRoot))) {
+        return { allowed: false, reason: "The Council participant is not bound to the admitted complete target." };
+      }
+
+      if ((expected.authority === undefined) !== (effect.authority === undefined)
+        || effect.authority && sha256(stableJson(effect.authority)) !== expectedAuthorityDigest) {
+        return { allowed: false, reason: "The scoped authority changed after admission." };
+      }
+
+      try {
+        if (!await expected.revalidator.revalidate({
+          definition: expected.definition,
+          target: expected.target,
+          ...(effect.session ? { session: effect.session } : expected.session ? { session: expected.session } : {})
+        })) {
+          return { allowed: false, reason: "The TargetSnapshot changed after admission; the broker effect was not started." };
+        }
+
+        const sessionToVerify = effect.session ?? expected.session;
+        if (sessionToVerify) {
+          const currentSession = await expected.sessions.get(sessionToVerify.id);
+          if (!currentSession || sessionBindingDigest(currentSession) !== sessionBindingDigest(sessionToVerify)
+            || currentSession.status !== sessionToVerify.status) {
+            return { allowed: false, reason: "The protected managed-session binding or lifecycle status changed before the broker effect." };
+          }
+        }
+
+        if (expected.authority) {
+          const decision = await expected.authorities.evaluate({
+            authorityId: expected.authority.id,
+            repositoryRoot: expected.target.repositoryRoot,
+            ...(expected.session ? { sessionId: expected.session.id } : {}),
+            ...(expected.session?.taskId ? { taskId: expected.session.taskId } : {}),
+            ...(expected.session?.planRevision ? { planRevision: expected.session.planRevision } : {}),
+            action: expected.definition.action,
+            now: expected.now().toISOString()
+          });
+          if (!decision.allowed || !decision.grant || sha256(stableJson(decision.grant)) !== expectedAuthorityDigest) {
+            return { allowed: false, reason: "The scoped authority expired, was revoked, or changed before the broker effect." };
+          }
+        }
+        return { allowed: true, reason: "The exact operation, TargetSnapshot, managed session, and authority remain current immediately before the broker effect." };
+      } catch {
+        return { allowed: false, reason: "The exact target, session, or authority could not be revalidated immediately before the broker effect." };
+      }
+    }
+  };
+}
+
+function runtimeRootKey(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 /**
@@ -969,7 +1454,6 @@ interface DurableRuntimeGovernanceOptions {
 class DurableRuntimeGovernance implements DispatchGovernance {
   private readonly options: DurableRuntimeGovernanceOptions;
   private configurationReady?: Promise<void>;
-  private readonly timers = new Map<string, DeadlineSchedule>();
 
   constructor(options: DurableRuntimeGovernanceOptions) {
     this.options = options;
@@ -1023,31 +1507,17 @@ class DurableRuntimeGovernance implements DispatchGovernance {
         if (!await this.options.revalidator.revalidate({ definition: input.definition, target: input.target, ...(input.session ? { session: input.session } : {}) })) {
           return { allowed: false, status: "incomplete", summary: "The TargetSnapshot changed, became incomplete, or could not be revalidated immediately before broker dispatch." };
         }
-        const expectedDefinition = input.definition;
-        const expectedTarget = input.target;
-        const expectedSessionId = input.session?.id;
-        effectGuard = {
-          assertCurrent: async (effect) => {
-            const sessionMatches = expectedDefinition.action === "council_automatic"
-              ? true
-              : effect.session?.id === expectedSessionId;
-            if (effect.action !== expectedDefinition.action || effect.target.id !== expectedTarget.id || !sessionMatches) {
-              return { allowed: false, reason: "The broker effect does not match its admitted command, target, or selected session." };
-            }
-            try {
-              const current = await this.options.revalidator.revalidate({
-                definition: expectedDefinition,
-                target: expectedTarget,
-                ...(input.session ? { session: input.session } : {})
-              });
-              return current
-                ? { allowed: true, reason: "TargetSnapshot remains current immediately before the broker effect." }
-                : { allowed: false, reason: "The TargetSnapshot changed after admission; the broker effect was not started." };
-            } catch {
-              return { allowed: false, reason: "The TargetSnapshot could not be revalidated immediately before the broker effect." };
-            }
-          }
-        };
+        effectGuard = createRuntimeEffectGuard({
+          definition: input.definition,
+          operationId: input.operationId,
+          target: input.target,
+          ...(input.session ? { session: input.session } : {}),
+          ...(input.authority ? { authority: input.authority } : {}),
+          revalidator: this.options.revalidator,
+          sessions: this.options.sessions,
+          authorities: this.options.authorities,
+          now: this.options.now
+        });
       } catch {
         return { allowed: false, status: "unavailable", summary: "The TargetSnapshot could not be revalidated immediately before broker dispatch; no broker was called." };
       }
@@ -1097,11 +1567,11 @@ class DurableRuntimeGovernance implements DispatchGovernance {
   }
 
   private scheduleDeadline(operationId: string, claimId: string, expiresAt: string): void {
-    const delay = Math.max(0, Date.parse(expiresAt) - Date.now());
+    const delay = Math.max(0, Date.parse(expiresAt) - this.options.now().getTime());
     const timer = this.options.deadlineScheduler.schedule(delay, () => {
       void this.handleDeadline(operationId, claimId);
     });
-    this.timers.set(claimId, timer);
+    this.options.deadlineSchedules.set(claimId, timer);
   }
 
   private async handleDeadline(operationId: string, claimId: string): Promise<void> {
@@ -1114,9 +1584,9 @@ class DurableRuntimeGovernance implements DispatchGovernance {
   }
 
   private releaseControl(operationId: string, claimId: string): void {
-    const timer = this.timers.get(claimId);
+    const timer = this.options.deadlineSchedules.get(claimId);
     timer?.cancel();
-    this.timers.delete(claimId);
+    this.options.deadlineSchedules.delete(claimId);
     this.options.controls.release(operationId);
   }
 

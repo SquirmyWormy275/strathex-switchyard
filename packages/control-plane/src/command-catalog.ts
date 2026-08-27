@@ -75,7 +75,10 @@ const definition = (
   requiresCapabilities: options.requiresCapabilities ?? [],
   requiresAuthority: options.requiresAuthority ?? false,
   requiresTarget: options.requiresTarget ?? false,
-  requiresCompleteTargetSnapshot: options.requiresCompleteTargetSnapshot ?? false,
+  // A repository-targeted installed action must receive the final exact-target
+  // guard its broker/adapter relies on. There is no weaker "target only"
+  // category: partial snapshots may be displayed, but never dispatched.
+  requiresCompleteTargetSnapshot: options.requiresCompleteTargetSnapshot ?? options.requiresTarget ?? false,
   requiresConfirmation: options.requiresConfirmation ?? false,
   highConsequence: options.highConsequence ?? false,
   acceptanceGates: options.acceptanceGates ?? [],
@@ -136,7 +139,7 @@ export const commandCatalog: readonly CommandDefinition[] = [
   definition("github_pr", "GITHUB", "shift", "Current branch PR", "adapter", { requiresTarget: true }),
   definition("github_issues", "GITHUB", "alt", "Repository issues", "adapter", { requiresTarget: true }),
   definition("github_actions", "GITHUB", "shift_alt", "Current branch Actions", "adapter", { requiresTarget: true }),
-  definition("compound_capture", "COMPOUND", "normal", "Capture durable learning", "automation", consequential),
+  definition("compound_capture", "COMPOUND", "normal", "Capture durable learning", "automation", confirmed),
   definition("compound_refresh", "COMPOUND", "shift", "Preview learning refresh", "automation", { ...confirmed }),
   definition("compound_palette", "COMPOUND", "alt", "Open Compound palette", "adapter", { requiresTarget: true }),
   definition("lfg", "COMPOUND", "shift_alt", "Guarded full lfg loop", "automation", { ...confirmed, outbound: true, highConsequence: true, acceptanceGates: gates.lfg }),

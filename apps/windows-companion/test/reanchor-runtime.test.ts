@@ -10,7 +10,8 @@ import type { ReanchorApplyRequest, ReanchorLifecyclePhase } from "../../../pack
 import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { TargetSnapshotLedger } from "../../../packages/control-plane/src/snapshot-ledger.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
-import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
+import type { CoordinatorEvidenceBundle } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { InstalledDurableReanchorRuntime } from "../src/reanchor-runtime.ts";
 
 const now = "2026-08-25T12:00:00.000Z";
@@ -78,9 +79,38 @@ function committed(input: ReanchorApplyRequest, id = "installed-reanchor-effect"
       newTargetSnapshotId: input.newTargetSnapshotId,
       cooperativeStopAcknowledged: true as const,
       resumed: false as const,
-      summary: "The provider stopped and reported the exact reviewed context."
+      artifactDigest: input.artifactDigest,
+      rereadEvidence: input.rereadEvidence,
+      report: {
+        summary: "The provider stopped, reread the protected context and documentation, inspected current work, and reported without resuming.",
+        discrepancies: ["The provider observed the exact old-to-new target transition."],
+        risks: ["The managed session remains stopped."],
+        questions: ["Should a separately authorized action resume the managed work?"],
+        result: "reanchored_without_resume" as const
+      }
     }
   };
+}
+
+function contextEvidence(): CoordinatorEvidenceBundle {
+  const planMaterial = {
+    revision: registeredSession.planRevision!,
+    originSessionId: registeredSession.id,
+    taskId: registeredSession.taskId!,
+    objective: "Reread the exact installed task brief and reconcile current work.",
+    steps: [{ id: "step-one", summary: "Inspect the current work.", ownedFiles: ["src/exact.ts"], dependencies: [], status: "approved" as const }],
+    decisions: ["Automatic resume is forbidden."],
+    expectedTargetTransition: { beforeTargetSnapshotId: oldTarget.id, expectedAfterTargetSnapshotId: oldTarget.id, expectation: "unchanged" as const }
+  };
+  const material = {
+    instructions: [{ id: "instructions-one", digest: sha256("protected instructions"), source: "protected_context" as const, summary: "Original protected instructions." }],
+    plan: { digest: sha256(stableJson(planMaterial)), ...planMaterial },
+    documentation: [{ id: "documentation-one", digest: sha256("project documentation"), source: "repository" as const, summary: "Repository documentation." }],
+    diff: { id: "diff-one", digest: sha256("current diff"), source: "target_snapshot" as const, summary: "Current worktree diff." },
+    files: [{ id: "file-one", digest: sha256("src/exact.ts"), source: "repository" as const, summary: "Current planned file." }],
+    tests: [{ id: "test-one", digest: sha256("test result"), source: "receipt" as const, summary: "Current test evidence.", status: "passed" as const }]
+  };
+  return { contextDigest: sha256(stableJson(material)), ...material };
 }
 
 async function harness(store: ProtectedJsonStore, options: {
@@ -88,7 +118,7 @@ async function harness(store: ProtectedJsonStore, options: {
   readonly resolve?: (call: number, session: ManagedSession | undefined) => TargetSnapshot | undefined;
   readonly presenceVerified?: boolean;
   readonly lifecycleProbe?: (phase: ReanchorLifecyclePhase) => Promise<void> | void;
-  readonly onApply?: (input: ReanchorApplyRequest) => void;
+  readonly onApply?: (input: ReanchorApplyRequest) => void | Promise<void>;
   readonly expectedPresenceNewTargetId?: string;
 } = {}) {
   const sessions = new SessionRegistry(store, { clock: () => now });
@@ -133,10 +163,21 @@ async function harness(store: ProtectedJsonStore, options: {
         return options.presenceVerified === false ? { verified: false } : { verified: true, operator: "TEST\\Reviewer" };
       }
     },
+    previewer: {
+      async preview() {
+        return {
+          summary: "Stop, reread the exact protected context and project documentation, inspect current work, and report without resuming.",
+          discrepancies: ["The protected target changed."],
+          risks: ["The managed session will remain stopped."],
+          questions: ["Should the operator authorize a separate later action?"],
+          contextEvidence: contextEvidence()
+        };
+      }
+    },
     applier: {
       async apply(input) {
         applyCalls += 1;
-        options.onApply?.(input);
+        await options.onApply?.(input);
         return committed(input);
       }
     },
@@ -147,6 +188,62 @@ async function harness(store: ProtectedJsonStore, options: {
   });
   return { runtime, sessions, snapshots, authorities, authority, counts: { get resolve() { return resolveCalls; }, get presence() { return presenceCalls; }, get apply() { return applyCalls; } } };
 }
+
+test("installed Re-anchor exposes an exact executing-only dispatch binding for the final lease boundary", async () => {
+  await withStore(async (store) => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let entered!: (input: ReanchorApplyRequest) => void;
+    const enteredApply = new Promise<ReanchorApplyRequest>((resolve) => { entered = resolve; });
+    const context = await harness(store, {
+      async onApply(input) {
+        entered(input);
+        await held;
+      }
+    });
+    const review = await context.runtime.begin({
+      sessionId: registeredSession.id,
+      authorityId: context.authority.id,
+      reason: "Prove the exact final provider-dispatch binding."
+    });
+    const applying = context.runtime.confirmAndApply({ requestId: review.requestId });
+    const request = await enteredApply;
+    const exact = await context.runtime.assertProviderDispatchCurrent({
+      requestId: request.requestId,
+      operationId: request.operationId,
+      oldTarget: request.oldTarget,
+      session: request.session,
+      authority: request.authority,
+      artifactDigest: request.artifactDigest,
+      confirmationDigest: request.confirmationDigest,
+      confirmationScopeDigest: request.confirmationScopeDigest
+    });
+    assert.equal(exact.allowed, true, exact.reason);
+    const substituted = await context.runtime.assertProviderDispatchCurrent({
+      requestId: request.requestId,
+      operationId: request.operationId,
+      oldTarget: request.oldTarget,
+      session: request.session,
+      authority: request.authority,
+      artifactDigest: "f".repeat(64),
+      confirmationDigest: request.confirmationDigest,
+      confirmationScopeDigest: request.confirmationScopeDigest
+    });
+    assert.equal(substituted.allowed, false);
+    release();
+    assert.equal((await applying).state, "recorded");
+    assert.equal((await context.runtime.assertProviderDispatchCurrent({
+      requestId: request.requestId,
+      operationId: request.operationId,
+      oldTarget: request.oldTarget,
+      session: request.session,
+      authority: request.authority,
+      artifactDigest: request.artifactDigest,
+      confirmationDigest: request.confirmationDigest,
+      confirmationScopeDigest: request.confirmationScopeDigest
+    })).allowed, false, "a settled Re-anchor cannot mint another provider lease");
+  });
+});
 
 test("installed Re-anchor derives both targets and authority from protected host state, confirms presence, and never resumes", async () => {
   await withStore(async (store) => {
@@ -165,6 +262,11 @@ test("installed Re-anchor derives both targets and authority from protected host
     assert.equal(providerRequest?.newTargetSnapshotId, newTarget.id);
     assert.equal(providerRequest?.cooperativeStopRequested, true);
     assert.equal(providerRequest?.resumeAuthorized, false);
+    assert.deepEqual(providerRequest?.requiredRereads, ["original_instructions", "task_brief", "project_documentation", "authority", "current_work"]);
+    assert.equal(providerRequest?.contextEvidence.documentation.length, 1);
+    assert.equal(providerRequest?.rereadEvidence.inspectedTargetSnapshotId, newTarget.id);
+    assert.match(result.receipt?.report.summary ?? "", /reread.*context.*documentation.*current work/i);
+    assert.equal(result.receipt?.result, "reanchored_without_resume");
     const rebound = await context.sessions.get(registeredSession.id);
     assert.equal(rebound?.targetSnapshotId, newTarget.id);
     assert.equal(rebound?.status, "unknown");

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -8,6 +9,197 @@ import {
   type ExtensionManagedSession,
   type JsonLineTransport
 } from "../src/companion-bridge.ts";
+import {
+  automationManifestReviewScopeDigest,
+  automationMutationScopeDigest,
+  createAutomationOperationManifest,
+  type AutomationOperationProposal
+} from "../../../packages/control-plane/src/automation-operation-manifest.ts";
+
+const automationDigest = (character: string): string => character.repeat(64);
+const reviewedMutation = (path: string, mutation: "create" | "update" | "replace", beforeDigest: string | null, text: string) => {
+  const bytes = Buffer.from(text, "utf8");
+  return {
+    path, mutation, beforeDigest, afterDigest: createHash("sha256").update(bytes).digest("hex"),
+    content: { encoding: "base64" as const, byteLength: bytes.length, data: bytes.toString("base64") }
+  };
+};
+const captureMutation = reviewedMutation("docs/solutions/boundary.md", "create", null, "# Boundary\n");
+const refreshMutation = reviewedMutation("docs/solutions/current.md", "update", automationDigest("5"), "# Current\n");
+const lfgMutation = reviewedMutation("apps/companion/src/main.ts", "replace", automationDigest("6"), "export const ready = true;\n");
+const repairMutation = reviewedMutation("apps/companion/src/main.ts", "update", automationDigest("7"), "export const repaired = true;\n");
+const automationProposals: Readonly<Record<AutomationOperationProposal["kind"], AutomationOperationProposal>> = {
+  compound_capture: {
+    kind: "compound_capture", solvedProblemEvidenceDigest: automationDigest("2"), verifiedOutcomeEvidenceDigest: automationDigest("3"),
+    nonTrivialRationale: "The verified boundary is reusable.",
+    documents: [captureMutation],
+    instructionFileMutation: { kind: "none" }
+  },
+  compound_refresh: {
+    kind: "compound_refresh", audit: ["drift", "overlap", "supersession", "contradiction"],
+    mutations: [refreshMutation],
+    commit: { planned: false }
+  },
+  lfg: {
+    kind: "lfg", requirementsSources: [{ path: "docs/requirements.md", digest: automationDigest("7") }], approvedScopePaths: ["apps/companion/src/main.ts"],
+    mutations: [lfgMutation], effectPlan: [
+      { order: 0, kind: "plan", scopeDigest: automationDigest("1") }, { order: 1, kind: "filesystem_mutation", scopeDigest: automationMutationScopeDigest([lfgMutation]) },
+      { order: 2, kind: "simplify", scopeDigest: automationDigest("2") }, { order: 3, kind: "review", scopeDigest: automationDigest("3") },
+      { order: 4, kind: "test", scopeDigest: automationDigest("4") }, { order: 5, kind: "git_commit", scopeDigest: automationDigest("5") },
+      { order: 6, kind: "git_push", scopeDigest: automationDigest("6") }, { order: 7, kind: "pull_request", scopeDigest: automationDigest("7") },
+      { order: 8, kind: "ci_watch", scopeDigest: automationDigest("8") }
+    ], authorizedActions: ["filesystem_mutation", "git_commit", "git_push", "pull_request", "ci_watch"], deployAuthorized: false
+  },
+  repair_mission: {
+    kind: "repair_mission", failingGateId: "gate-typecheck", reproductionCommandDigest: automationDigest("8"),
+    approvedScopePaths: ["apps/companion/src/main.ts"], mutations: [repairMutation], affectedChecks: ["test:main"], fullChecks: ["test", "typecheck"],
+    testEnvironment: { id: "test-environment-1", digest: automationDigest("9"), egress: "deny", databaseName: "b122_test_1" },
+    effectPlan: [
+      { order: 0, kind: "sandbox_bind", scopeDigest: automationDigest("9") }, { order: 1, kind: "reproduce", scopeDigest: automationDigest("8") },
+      { order: 2, kind: "filesystem_mutation", scopeDigest: automationMutationScopeDigest([repairMutation]) },
+      { order: 3, kind: "test_affected", scopeDigest: automationDigest("a") }, { order: 4, kind: "test_full", scopeDigest: automationDigest("b") },
+      { order: 5, kind: "review_diff", scopeDigest: automationDigest("c") }
+    ],
+    pushAuthorized: false, mergeAuthorized: false, deployAuthorized: false, hostedRerunAuthorized: false, productionDataAuthorized: false
+  }
+};
+
+function automationReview(action: AutomationOperationProposal["kind"]) {
+  const manifest = createAutomationOperationManifest({
+    repositoryRoot: "C:\\isolated\\repo", targetSnapshotId: automationDigest("1"), sessionId: "provider-session", authorityId: "authority-automation",
+    taskId: "task-automation", planRevision: "plan-automation", provider: "codex",
+    createdAt: "2026-08-26T12:00:00.000Z", expiresAt: "2026-08-26T12:05:00.000Z"
+  }, automationProposals[action]);
+  return { action, manifest, reviewScopeDigest: automationManifestReviewScopeDigest(manifest) } as const;
+}
+
+function reanchorStatus(state: "pending_confirmation" | "recorded") {
+  const requestId = `reanchor:${"a".repeat(64)}`;
+  const operationId = `reanchor-operation:${"b".repeat(64)}`;
+  const oldTargetSnapshotId = "c".repeat(64);
+  const newTargetSnapshotId = "d".repeat(64);
+  const report = {
+    summary: "Provider reread the exact protected context and remains stopped.",
+    discrepancies: ["The reviewed target changed."],
+    risks: ["The provider remains stopped."],
+    questions: ["Should the revised task boundary be accepted?"],
+    result: "reanchored_without_resume" as const
+  };
+  const status = {
+    schema: "sxsy-b122.installed-reanchor-status" as const,
+    version: 1 as const,
+    requestId,
+    operationId,
+    sessionId: "session-reanchor",
+    authorityId: "authority-existing",
+    oldTargetSnapshotId,
+    newTargetSnapshotId,
+    state,
+    summary: state === "recorded" ? report.summary : "Read-only Re-anchor preview.",
+    discrepancies: [...report.discrepancies],
+    risks: [...report.risks],
+    questions: [...report.questions],
+    confirmationScopeDigest: "e".repeat(64),
+    confirmationExpiresAt: "2026-08-26T12:02:00.000Z"
+  };
+  if (state !== "recorded") return status;
+  return {
+    ...status,
+    receipt: {
+      version: 1 as const,
+      id: `reanchor-receipt:${"f".repeat(64)}`,
+      requestId,
+      operationId,
+      oldTargetSnapshotId,
+      newTargetSnapshotId,
+      sessionId: status.sessionId,
+      authorityId: status.authorityId,
+      previewDigest: "1".repeat(64),
+      confirmationDigest: "2".repeat(64),
+      confirmationScopeDigest: status.confirmationScopeDigest,
+      externalEffectId: "provider-effect-1",
+      acknowledgementDigest: "3".repeat(64),
+      artifactDigest: "4".repeat(64),
+      rereadEvidence: {
+        contextDigest: "5".repeat(64),
+        authorityDigest: "6".repeat(64),
+        instructionDigests: ["7".repeat(64)],
+        planDigest: "8".repeat(64),
+        documentationDigests: ["9".repeat(64)],
+        currentWorkDigest: "a".repeat(64),
+        inspectedTargetSnapshotId: newTargetSnapshotId
+      },
+      report,
+      sessionRebindOutcome: "rebound" as const,
+      resultingBindingDigest: "b".repeat(64),
+      resumed: false as const,
+      evidenceDigest: "c".repeat(64),
+      result: "reanchored_without_resume" as const,
+      createdAt: "2026-08-26T12:01:00.000Z"
+    }
+  };
+}
+
+test("the Re-anchor bridge uses only dedicated closed routes and exact-parses the no-resume report", async () => {
+  const seen: Array<{ method: string; payload: unknown }> = [];
+  const final = reanchorStatus("recorded");
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: unknown };
+      seen.push({ method: request.method, payload: request.payload });
+      const result = request.method === "reanchor.authority.list"
+        ? { authorities: [{ id: "authority-existing", issuedBy: "TEST\\Reviewer", expiresAt: "2026-08-26T12:10:00.000Z" }] }
+        : request.method === "reanchor.hardware.begin"
+          ? { reanchor: reanchorStatus("pending_confirmation"), dispatchReceiptId: `hardware-dispatch:${"f".repeat(64)}` }
+        : { reanchor: request.method === "reanchor.begin" ? reanchorStatus("pending_confirmation") : final };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+    }
+  }, "reanchor-vscode");
+
+  const authorities = await bridge.listReanchorAuthorities("session-reanchor");
+  assert.ok(authorities.ok && authorities.value.length === 1);
+  const begun = await bridge.beginReanchor({ sessionId: "session-reanchor", authorityId: "authority-existing", reason: "Reread the exact protected context." });
+  assert.ok(begun.ok && begun.value.state === "pending_confirmation");
+  const claim = {
+    signalId: `hardware-signal:${"1".repeat(64)}`, claimToken: "claim-token-reanchor", deviceId: "device-one", connectionEpoch: 1, bootNonce: 1, counter: 1,
+    control: "REANCHOR" as const, modifier: "normal" as const, acceptedAt: "2026-08-26T12:00:00.000Z", claimedAt: "2026-08-26T12:00:01.000Z", attempt: 1,
+    windowSessionId: "window-one", workspaceRoots: ["C:/isolated/repo"]
+  };
+  const hardwareBegun = await bridge.beginHardwareReanchor(claim, { sessionId: "session-reanchor", authorityId: "authority-existing", reason: "Reread the exact protected context." });
+  assert.ok(hardwareBegun.ok && hardwareBegun.value.dispatchReceiptId === `hardware-dispatch:${"f".repeat(64)}`);
+  const confirmed = await bridge.confirmReanchor(`reanchor:${"a".repeat(64)}`);
+  assert.ok(confirmed.ok && confirmed.value.receipt?.result === "reanchored_without_resume" && confirmed.value.receipt.resumed === false);
+  const inspected = await bridge.getReanchor(`reanchor:${"a".repeat(64)}`);
+  assert.ok(inspected.ok && inspected.value.state === "recorded");
+
+  assert.deepEqual(seen.map(({ method }) => method), ["reanchor.authority.list", "reanchor.begin", "reanchor.hardware.begin", "reanchor.confirm-apply", "reanchor.get"]);
+  assert.deepEqual(seen.map(({ payload }) => payload), [
+    { sessionId: "session-reanchor" },
+    { sessionId: "session-reanchor", authorityId: "authority-existing", reason: "Reread the exact protected context." },
+    { signalId: claim.signalId, claimToken: claim.claimToken, windowSessionId: claim.windowSessionId, workspaceRoots: claim.workspaceRoots, sessionId: "session-reanchor", authorityId: "authority-existing", reason: "Reread the exact protected context." },
+    { requestId: `reanchor:${"a".repeat(64)}` },
+    { requestId: `reanchor:${"a".repeat(64)}` }
+  ]);
+  assert.equal(JSON.stringify(seen).includes("confirmationToken"), false);
+  assert.equal(JSON.stringify(seen).includes("TargetSnapshot"), false);
+});
+
+test("the Re-anchor bridge rejects malformed reports and any resumed final receipt", async () => {
+  const valid = reanchorStatus("recorded") as ReturnType<typeof reanchorStatus> & { receipt: Record<string, unknown> };
+  let response: unknown = { ...valid, receipt: { ...valid.receipt, report: { ...(valid.receipt.report as object), extra: true } } };
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { reanchor: response } });
+    }
+  }, "reanchor-negative");
+
+  assert.equal((await bridge.confirmReanchor(`reanchor:${"a".repeat(64)}`)).ok, false);
+  response = { ...valid, receipt: { ...valid.receipt, resumed: true } };
+  assert.equal((await bridge.confirmReanchor(`reanchor:${"a".repeat(64)}`)).ok, false);
+  response = { ...valid, receipt: { ...valid.receipt, report: { ...(valid.receipt.report as object), result: "stopped_without_reread" } } };
+  assert.equal((await bridge.confirmReanchor(`reanchor:${"a".repeat(64)}`)).ok, false);
+});
 
 const session: ExtensionManagedSession = {
   id: "vscode-window-1",
@@ -92,7 +284,8 @@ test("Plan Approval preparation exact-parses the protected review packet and ech
       digest: "3".repeat(64), revision: boundSession.planRevision, originSessionId: "origin-session", taskId: boundSession.taskId,
       objective: "Execute only the immutable reviewed plan.",
       steps: [{ id: "step-1", summary: "Review and execute.", ownedFiles: ["src/plan.ts"], dependencies: [], status: "approved" }],
-      decisions: ["Keep the protected target unchanged."]
+      decisions: ["Keep the protected target unchanged."],
+      expectedTargetTransition: { beforeTargetSnapshotId: boundSession.targetSnapshotId, expectedAfterTargetSnapshotId: boundSession.targetSnapshotId, expectation: "unchanged" }
     },
     scopeDigest: "4".repeat(64),
     summary: "Exact provider-observed plan scope.",
@@ -122,6 +315,108 @@ test("Plan Approval preparation exact-parses the protected review packet and ech
   final = false;
   corrupt = true;
   assert.equal((await bridge.prepareCommand({ control: "PLAN_APPROVAL", modifier: "normal", sessionId: boundSession.id, reason: "Review exact plan" })).ok, false);
+  corrupt = false;
+  const transitioned = { ...workflowReview, plan: { ...workflowReview.plan, expectedTargetTransition: { ...workflowReview.plan.expectedTargetTransition, expectedAfterTargetSnapshotId: "9".repeat(64) } } };
+  const tampered = new JsonLineCompanionBridge({ async request(line) { const request = JSON.parse(line) as { id: string }; return JSON.stringify({ version: 1, id: request.id, ok: true, result: { preparation: { status: "incomplete", summary: "tampered", session: boundSession, workflowReview: transitioned } } }); } }, "plan-transition-tamper");
+  assert.equal((await tampered.prepareCommand({ control: "PLAN_APPROVAL", modifier: "normal", sessionId: boundSession.id, reason: "Review exact plan" })).ok, false);
+});
+
+test("automation preparation recomputes every manifest digest and review scope for all four protected actions", async () => {
+  const providerSession: ExtensionManagedSession = {
+    ...session, id: "provider-session", provider: "codex", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running",
+    workspaceRoot: "C:\\isolated\\repo", targetSnapshotId: automationDigest("1"), taskId: "task-automation", planRevision: "plan-automation"
+  };
+  let prepared: unknown;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result: { preparation: prepared } });
+    }
+  }, "automation-review-vscode");
+
+  for (const action of ["compound_capture", "compound_refresh", "lfg", "repair_mission"] as const) {
+    const review = automationReview(action);
+    prepared = { status: "incomplete", summary: "Review exact immutable automation manifest.", session: providerSession, authorityId: "authority-automation", automationReview: review };
+    const result = await bridge.prepareCommand({ control: action === "repair_mission" ? "PIPELINE" : "COMPOUND", modifier: action === "compound_capture" ? "normal" : "shift", sessionId: providerSession.id, reason: "review" });
+    assert.ok(result.ok && result.value.automationReview?.action === action, action);
+  }
+
+  const exact = automationReview("repair_mission");
+  for (const changed of [
+    { ...exact, manifest: { ...exact.manifest, digest: automationDigest("a"), id: `automation-manifest:${automationDigest("a")}` } },
+    { ...exact, reviewScopeDigest: automationDigest("b") },
+    { ...exact, manifest: { ...exact.manifest, proposal: { ...exact.manifest.proposal, extra: true } } },
+    { ...exact, manifest: { ...exact.manifest, sessionId: "substituted-session" } }
+  ]) {
+    prepared = { status: "incomplete", summary: "malicious substitution", session: providerSession, authorityId: "authority-automation", automationReview: changed };
+    assert.equal((await bridge.prepareCommand({ control: "PIPELINE", modifier: "ctrl_shift_alt", sessionId: providerSession.id, reason: "review" })).ok, false);
+  }
+});
+
+test("debug-stop preparation carries the effect only in phase one and dispatch carries only the provider source", async () => {
+  const providerSession: ExtensionManagedSession = {
+    ...session, id: "provider-source", provider: "codex", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running",
+    targetSnapshotId: automationDigest("1"), taskId: "task-debug", planRevision: "plan-debug"
+  };
+  const review = {
+    schema: "sxsy-b122.debug-stop-review" as const, version: 1 as const, action: "stop_managed_run" as const,
+    bindingId: `debug-stop:${automationDigest("2")}`, bindingDigest: automationDigest("3"), reviewScopeDigest: automationDigest("4"),
+    sourceSessionId: providerSession.id, authorityId: "authority-debug", targetSnapshotId: providerSession.targetSnapshotId!, repositoryRoot: providerSession.workspaceRoot!,
+    originOperationId: "operation-debug", effectKind: "debug_session", debugSessionId: "debug-1", debugBindingId: "debug-binding-1", debugConfiguration: "Launch test", managedProcessId: null,
+    createdAt: "2026-08-26T12:00:00.000Z", expiresAt: "2026-08-26T12:05:00.000Z"
+  };
+  const seen: Array<{ method: string; payload: Record<string, unknown> }> = [];
+  let phase = 0;
+  const bridge = new JsonLineCompanionBridge({
+    async request(line) {
+      const request = JSON.parse(line) as { id: string; method: string; payload: Record<string, unknown> };
+      seen.push({ method: request.method, payload: request.payload });
+      phase += 1;
+      const result = request.method === "command.dispatch"
+        ? { command: { status: "completed", summary: "Exact stop dispatched." } }
+        : { preparation: phase === 1
+            ? { status: "incomplete", summary: "Review exact split binding.", session: providerSession, authorityId: "authority-debug", debugStopReview: review }
+            : { status: "prepared", summary: "Exact split binding confirmed.", session: providerSession, authorityId: "authority-debug", confirmationToken: "confirmation-debug", confirmationScopeDigest: review.reviewScopeDigest, confirmationExpiresAt: "2026-08-26T12:04:00.000Z" } };
+      return JSON.stringify({ version: 1, id: request.id, ok: true, result });
+    }
+  }, "debug-stop-vscode");
+
+  assert.equal((await bridge.prepareCommand({ control: "RUN", modifier: "alt", sessionId: providerSession.id, effectSessionId: "debug-effect", reason: "stop" })).ok, true);
+  assert.equal((await bridge.prepareCommand({ control: "RUN", modifier: "alt", sessionId: providerSession.id, reason: "stop", reviewScopeDigest: review.reviewScopeDigest, reviewArtifactId: review.bindingId, reviewArtifactDigest: review.bindingDigest })).ok, true);
+  assert.equal((await bridge.dispatch({ control: "RUN", modifier: "alt", sessionId: providerSession.id, authorityId: "authority-debug", confirmationToken: "confirmation-debug", confirmationScopeDigest: review.reviewScopeDigest })).ok, true);
+  assert.equal(seen[0]?.payload.effectSessionId, "debug-effect");
+  assert.equal(Object.hasOwn(seen[1]!.payload, "effectSessionId"), false);
+  assert.equal(Object.hasOwn(seen[2]!.payload, "effectSessionId"), false);
+  assert.deepEqual(seen.map(({ method }) => method), ["command.prepare", "command.prepare", "command.dispatch"]);
+});
+
+test("stop-debug host effects require the exact public effect and protected binding while other actions forbid both", () => {
+  const base = {
+    hostActionId: `host-action:${automationDigest("c")}`, hostActionKind: "stop_vscode_debug", hostActionExpiresAt: "2026-08-26T12:05:00.000Z",
+    hostActionWorkspaceRoot: "C:\\isolated\\repo", hostActionDebugConfiguration: "Launch test", hostActionDebugSessionId: "debug-1",
+    hostActionDebugEffectSessionId: "debug-effect", hostActionDebugBindingId: "debug-binding-1", hostActionDebugOriginOperationId: "operation-debug"
+  } as const;
+  assert.equal(forwardedHostAction({ status: "running", summary: "stop", data: base })?.debugEffectSessionId, "debug-effect");
+  for (const missing of ["hostActionDebugEffectSessionId", "hostActionDebugBindingId"] as const) {
+    const data = { ...base } as Record<string, unknown>;
+    delete data[missing];
+    assert.equal(forwardedHostAction({ status: "running", summary: "stop", data }), undefined);
+  }
+  assert.equal(forwardedHostAction({ status: "running", summary: "start", data: { ...base, hostActionKind: "start_vscode_debug", hostActionDebugSessionId: undefined } }), undefined);
+  assert.equal(forwardedHostAction({ status: "running", summary: "terminal", data: { hostActionId: base.hostActionId, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: base.hostActionExpiresAt, hostActionDebugEffectSessionId: "debug-effect", hostActionDebugBindingId: "debug-binding-1" } }), undefined);
+});
+
+test("venv host-effect parsing requires one exact interpreter path plus digest and filesystem identity", () => {
+  const pythonInterpreter = "C:\\isolated\\repo\\.venv\\Scripts\\python.exe";
+  const identity = { canonicalPath: pythonInterpreter, sha256: automationDigest("7"), device: "1", inode: "2", size: 42, modifiedMs: 1_777_000_000_000 };
+  const base = {
+    hostActionId: `host-action:${automationDigest("8")}`, hostActionKind: "configure_python_venv", hostActionExpiresAt: "2026-08-26T12:05:00.000Z",
+    hostActionWorkspaceRoot: "C:\\isolated\\repo", hostActionPythonInterpreter: pythonInterpreter, hostActionPythonInterpreterIdentity: identity
+  } as const;
+  assert.deepEqual(forwardedHostAction({ status: "running", summary: "venv", data: base })?.pythonInterpreterIdentity, identity);
+  assert.equal(forwardedHostAction({ status: "running", summary: "missing identity", data: { ...base, hostActionPythonInterpreterIdentity: undefined } }), undefined);
+  assert.equal(forwardedHostAction({ status: "running", summary: "path substitution", data: { ...base, hostActionPythonInterpreterIdentity: { ...identity, canonicalPath: "C:\\isolated\\other\\python.exe" } } }), undefined);
+  assert.equal(forwardedHostAction({ status: "running", summary: "digest substitution", data: { ...base, hostActionPythonInterpreterIdentity: { ...identity, sha256: "not-a-digest" } } }), undefined);
 });
 
 test("containment IPC exact-parses the active fence inspection and carries both expected release bindings", async () => {
@@ -543,7 +838,7 @@ test("provider administration and managed-terminal host effects preserve only ex
 test("Voice Center claim transport is closed, exact, and carries one durable lease through authorization and settlement", async () => {
   const seen: Array<{ method: string; payload?: Record<string, unknown> }> = [];
   let corrupt = false;
-  const binding = { windowSessionId: session.id, adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true } as const;
+  const binding = { windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true } as const;
   const claim = {
     version: 1,
     claimId: `host-action-claim:${"a".repeat(64)}`,
@@ -592,6 +887,47 @@ test("Voice Center claim transport is closed, exact, and carries one durable lea
   if (!broadened.ok) assert.equal(broadened.code, "invalid_response");
 });
 
+test("targeted Voice claim transport preserves the exact command, target, source session, and workspace root", async () => {
+  const binding = { windowSessionId: session.id, workspaceRoots: ["C:/isolated/repo", "C:/isolated/second"], adapterVersion: "1.2.3", capabilities: ["show_voice_center"], focused: true } as const;
+  let commandAction: "switch_voice_provider" | "bind_voice_session" | "voice_session_picker" | "hostile" = "bind_voice_session";
+  let workspaceRoot = "C:/isolated/repo";
+  const bridge = new JsonLineCompanionBridge({ async request(line) {
+    const request = JSON.parse(line) as { id: string };
+    return JSON.stringify({ version: 1, id: request.id, ok: true, result: { claim: {
+      version: 1,
+      claimId: `host-action-claim:${"1".repeat(64)}`,
+      claimToken: "targeted-voice-claim-token",
+      hostActionId: `host-action:${"2".repeat(64)}`,
+      operationId: "operation-targeted-voice",
+      commandAction,
+      hostActionKind: "show_voice_center",
+      targetSnapshotId: "target-targeted-voice",
+      sessionId: "provider-session-targeted-voice",
+      workspaceRoot,
+      windowSessionId: session.id,
+      adapterVersion: "1.2.3",
+      capabilities: ["show_voice_center"],
+      claimedAt: "2026-08-25T12:00:00.000Z",
+      expiresAt: "2026-08-25T12:00:05.000Z",
+      actionExpiresAt: "2026-08-25T12:00:30.000Z"
+    } } });
+  } }, "targeted-voice-bridge");
+
+  const exact = await bridge.claimHostAction(binding);
+  assert.ok(exact.ok && exact.value);
+  if (exact.ok && exact.value) {
+    assert.equal(exact.value.commandAction, "bind_voice_session");
+    assert.equal(exact.value.targetSnapshotId, "target-targeted-voice");
+    assert.equal(exact.value.sessionId, "provider-session-targeted-voice");
+    assert.equal(exact.value.workspaceRoot, "C:/isolated/repo");
+  }
+  workspaceRoot = "C:/isolated/other";
+  assert.equal((await bridge.claimHostAction(binding)).ok, false, "a claim for a repository outside this VS Code window must be rejected");
+  workspaceRoot = "C:/isolated/repo";
+  commandAction = "hostile";
+  assert.equal((await bridge.claimHostAction(binding)).ok, false, "the closed Voice command set must reject broadened actions");
+});
+
 test("hardware bridge never sends a client-selected chord and carries the server dispatch receipt into completion", async () => {
   const seen: Array<{ method: string; payload: Record<string, unknown> | undefined }> = [];
   const signalId = `hardware-signal:${"a".repeat(64)}`;
@@ -612,7 +948,14 @@ test("hardware bridge never sends a client-selected chord and carries the server
   assert.equal(claim.ok, true);
   assert.ok(claim.ok && claim.value);
   if (!claim.ok || !claim.value) return;
-  const prepared = await bridge.prepareHardwareSignal(claim.value, session.id, "Focused physical chord", "d".repeat(64));
+  const prepared = await bridge.prepareHardwareSignal(
+    claim.value,
+    session.id,
+    "Focused physical chord",
+    "d".repeat(64),
+    "workflow-artifact-authority",
+    "e".repeat(64)
+  );
   assert.equal(prepared.ok, true);
   const dispatched = await bridge.dispatchHardwareSignal(claim.value, { sessionId: session.id, authorityId: "authority", confirmationToken: "confirmation", confirmationScopeDigest: "d".repeat(64) });
   assert.equal(dispatched.ok, true);
@@ -622,6 +965,8 @@ test("hardware bridge never sends a client-selected chord and carries the server
   const dispatchPayload = seen.find((entry) => entry.method === "hardware-signal.dispatch")?.payload;
   const preparationPayload = seen.find((entry) => entry.method === "hardware-signal.prepare")?.payload;
   assert.equal(preparationPayload?.reviewScopeDigest, "d".repeat(64));
+  assert.equal(preparationPayload?.reviewArtifactId, "workflow-artifact-authority");
+  assert.equal(preparationPayload?.reviewArtifactDigest, "e".repeat(64));
   assert.equal("control" in (dispatchPayload ?? {}), false);
   assert.equal("modifier" in (dispatchPayload ?? {}), false);
   assert.equal(dispatchPayload?.confirmationScopeDigest, "d".repeat(64));

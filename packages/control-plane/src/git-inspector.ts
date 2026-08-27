@@ -3,7 +3,7 @@ import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 
-import type { GitInspection, GitInspector, ManifestFile } from "./snapshot.ts";
+import { trackedMissingFileDigest, type GitInspection, type GitInspector, type ManifestFile } from "./snapshot.ts";
 
 export interface GitCommandResult {
   readonly exitCode: number;
@@ -18,6 +18,7 @@ export interface GitCommandRunner {
 
 export interface FileDigestReader {
   digest(repositoryRoot: string, relativePath: string): Promise<string>;
+  state(repositoryRoot: string, relativePath: string): Promise<"regular_file" | "missing">;
 }
 
 export type UntrackedClassification = "included" | "excluded" | "unknown";
@@ -95,16 +96,33 @@ export class NodeGitCommandRunner implements GitCommandRunner {
 /** Hashes files only beneath the resolved repository root and rejects symlink traversal. */
 export class NodeFileDigestReader implements FileDigestReader {
   async digest(repositoryRoot: string, relativePath: string): Promise<string> {
+    const candidate = this.candidate(repositoryRoot, relativePath);
+    const metadata = await lstat(candidate);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
+    const contents = await readFile(candidate);
+    return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+  }
+
+  async state(repositoryRoot: string, relativePath: string): Promise<"regular_file" | "missing"> {
+    const candidate = this.candidate(repositoryRoot, relativePath);
+    try {
+      const metadata = await lstat(candidate);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
+      return "regular_file";
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return "missing";
+      throw error;
+    }
+  }
+
+  private candidate(repositoryRoot: string, relativePath: string): string {
     const root = resolve(repositoryRoot);
     const candidate = resolve(root, relativePath);
     const relation = relative(root, candidate);
     if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || resolve(root, relation) !== candidate) {
       throw new Error("Path escapes the verified repository root.");
     }
-    const metadata = await lstat(candidate);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
-    const contents = await readFile(candidate);
-    return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+    return candidate;
   }
 }
 
@@ -167,6 +185,10 @@ export class GitCliInspector implements GitInspector {
     const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
     const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
     const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
+    const deleted = await this.paths(["ls-files", "--deleted", "-z"], repositoryRoot, "tracked deletion list", issues);
+    const trackedSet = new Set(tracked);
+    for (const path of deleted) if (!trackedSet.has(path)) issues.push(`Git reported tracked deletion ${path} outside the tracked file list.`);
+    const deletedSet = new Set(deleted.filter((path) => trackedSet.has(path)));
     const untracked = await this.paths(["ls-files", "--others", "--exclude-standard", "-z"], repositoryRoot, "untracked file list", issues);
     const ignored = await this.paths(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repositoryRoot, "ignored file list", issues);
     const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
@@ -181,7 +203,7 @@ export class GitCliInspector implements GitInspector {
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),
-      trackedFiles: await this.hashFiles(repositoryRoot, tracked, undefined, issues),
+      trackedFiles: await this.hashFiles(repositoryRoot, tracked, undefined, issues, undefined, deletedSet),
       untrackedFiles: await this.hashFiles(repositoryRoot, untracked, this.classifyUntracked, issues, "untracked"),
       ignoredFiles: await this.hashFiles(repositoryRoot, ignored, this.classifyIgnored, issues, "ignored"),
       submodules,
@@ -214,10 +236,25 @@ export class GitCliInspector implements GitInspector {
     paths: readonly string[],
     classifier: ((relativePath: string) => UntrackedClassification) | undefined,
     issues: string[],
-    source?: "untracked" | "ignored"
+    source?: "untracked" | "ignored",
+    trackedMissing: ReadonlySet<string> = new Set()
   ): Promise<readonly ManifestFile[]> {
     const output: ManifestFile[] = [];
     for (const path of paths) {
+      if (trackedMissing.has(path)) {
+        try {
+          if (await this.digestReader.state(repositoryRoot, path) !== "missing") {
+            issues.push(`Tracked deletion ${path} reappeared while the snapshot was captured.`);
+            output.push({ path });
+            continue;
+          }
+          output.push({ path, digest: trackedMissingFileDigest(path), state: "tracked_missing" });
+        } catch {
+          issues.push(`Unable to prove tracked deletion ${path} is exactly missing; snapshot is incomplete.`);
+          output.push({ path });
+        }
+        continue;
+      }
       try {
         const digest = await this.digestReader.digest(repositoryRoot, path);
         output.push(classifier ? { path, digest, classification: classifier(path), ...(source ? { source } : {}) } : { path, digest });

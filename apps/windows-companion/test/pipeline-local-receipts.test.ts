@@ -47,7 +47,7 @@ test("local Pipeline reports current, stale, and absent protected receipt states
   assert.equal(observed.data?.localReceiptState, "current");
   assert.deepEqual(observed.data?.localReceipts, [{
     id: "receipt:current", action: "pipeline_local_gate", targetSnapshotId: current.target.id,
-    result: "failed", completeness: "complete", createdAt: now, freshness: "current", gateFresh: false
+    result: "failed", completeness: "complete", evidenceDigest: "1".repeat(64), createdAt: now, freshness: "current", gateFresh: false
   }]);
 
   const stale = await harness(context);
@@ -60,7 +60,7 @@ test("local Pipeline reports current, stale, and absent protected receipt states
   assert.equal(staleObserved.data?.localReceiptState, "stale");
   assert.deepEqual(staleObserved.data?.localReceipts, [{
     id: "receipt:old-target", action: "pipeline_clean_reproduction", targetSnapshotId: "0".repeat(64),
-    result: "passed", completeness: "complete", createdAt: now, freshness: "stale", staleReason: "target_mismatch", gateFresh: false
+    result: "passed", completeness: "complete", evidenceDigest: "2".repeat(64), createdAt: now, freshness: "stale", staleReason: "target_mismatch", gateFresh: false
   }]);
 
   const absent = await harness(context);

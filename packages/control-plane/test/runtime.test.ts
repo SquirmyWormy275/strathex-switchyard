@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { InMemoryCommandAdapter, AdapterRegistry } from "../src/adapters.ts";
-import { InMemoryGitBroker } from "../src/brokers.ts";
+import { InMemoryExecutionBroker, InMemoryGitBroker } from "../src/brokers.ts";
 import { commandForAction } from "../src/command-catalog.ts";
 import type { ManagedSession, TargetSnapshot } from "../src/contracts.ts";
 import { AuthorityLedger } from "../src/authority.ts";
@@ -13,7 +13,7 @@ import { AllowlistedEvidenceAuthorizer, GateEvidenceLedger } from "../src/accept
 import { DurableBudgetManager } from "../src/budgets.ts";
 import { containmentReleaseScopeDigest, DurableContainmentManager } from "../src/containment.ts";
 import { containmentIncidentReviewDigest } from "../src/containment-incidents.ts";
-import { DurableMediatedExecutor } from "../src/runtime.ts";
+import { DurableMediatedExecutor, type OperationControllerObservation, type OperationReconciliationBinding } from "../src/runtime.ts";
 import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
 import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
@@ -67,6 +67,87 @@ async function eventually(assertion: () => void | Promise<void>, timeoutMs = 1_0
     }
   }
   throw lastError ?? new Error("Timed out waiting for the isolated deadline assertion.");
+}
+
+async function startRunningProof(
+  store: ProtectedJsonStore,
+  observe: (binding: OperationReconciliationBinding) => Promise<OperationControllerObservation>
+) {
+  const sessions = new SessionRegistry(store, { clock: () => now });
+  const session = await sessions.register({
+    id: "session-reconcile", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-reconcile", planRevision: "plan-reconcile",
+    plannedFiles: ["src/safe.ts"], adapterVersion: "trusted-adapter", metadata: {}
+  });
+  const authorities = new AuthorityLedger(store, { clock: () => now });
+  const authority = await authorities.issue({
+    repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+    allowedActions: ["proof"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+  });
+  const adapters = new AdapterRegistry();
+  const proof = new InMemoryCommandAdapter();
+  proof.register("proof", async () => ({
+    status: "running",
+    summary: "The exact proof child committed and is awaiting its terminal supervisor result.",
+    effectDisposition: "committed"
+  }));
+  adapters.register("proof", proof);
+  let cancelledSchedules = 0;
+  let observations = 0;
+  const runtime = new DurableMediatedExecutor({
+    store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+    deadlineScheduler: { schedule: () => ({ cancel: () => { cancelledSchedules += 1; } }) },
+    operationControl: {
+      cancel: async () => ({ accepted: true, summary: "exact cancellation delivered" }),
+      observe: async (binding) => { observations += 1; return observe(binding); }
+    },
+    dependencies: () => ({ adapters })
+  });
+  const assignment = commandForAction("proof").assignment!;
+  const started = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id });
+  assert.equal(started.status, "running");
+  assert.ok(started.operationId);
+  return { runtime, started, cancelledSchedules: () => cancelledSchedules, observations: () => observations };
+}
+
+async function startRunningExecution(
+  store: ProtectedJsonStore,
+  observe: (binding: OperationReconciliationBinding) => Promise<OperationControllerObservation>,
+  deadlineScheduler?: Readonly<{ schedule(delayMs: number, callback: () => void): Readonly<{ cancel(): void }> }>
+) {
+  const sessions = new SessionRegistry(store, { clock: () => now });
+  const session = await sessions.register({
+    id: "session-execution-reconcile", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+    status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-execution-reconcile", planRevision: "plan-execution-reconcile",
+    plannedFiles: ["src/safe.ts"], adapterVersion: "trusted-adapter", metadata: {}
+  });
+  const authorities = new AuthorityLedger(store, { clock: () => now });
+  const authority = await authorities.issue({
+    repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+    allowedActions: ["run_target"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+  });
+  let cancelledSchedules = 0;
+  const runtime = new DurableMediatedExecutor({
+    store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+    deadlineScheduler: deadlineScheduler ?? { schedule: () => ({ cancel: () => { cancelledSchedules += 1; } }) },
+    operationControl: { cancel: async () => ({ accepted: true, summary: "unused" }), observe },
+    dependencies: (context) => {
+      const execution = new InMemoryExecutionBroker(context.policy);
+      execution.register("run_target", async () => ({ status: "running", summary: "The exact supervised execution remains live.", effectDisposition: "committed" }));
+      return {
+        adapters: new AdapterRegistry(),
+        execution,
+        executionRecipeFactory: {
+          create: () => ({ id: "run_target", executable: "node", args: ["--version"], workingDirectory: target.repositoryRoot, environment: {} })
+        }
+      };
+    }
+  });
+  const assignment = commandForAction("run_target").assignment!;
+  const started = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id });
+  assert.equal(started.status, "running");
+  assert.ok(started.operationId);
+  return { runtime, started, cancelledSchedules: () => cancelledSchedules };
 }
 
 test("durable mediated executor resolves protected session/authority/target state before dispatch and records the result", async () => {
@@ -265,6 +346,44 @@ test("installed agent workflow preparation reuses only the protected exact autho
   });
 });
 
+test("Authority Broadcast preparation returns reviewed-artifact authority without minting an unreviewed confirmation", async () => {
+  await withStore(async (store) => {
+    const sessions = new SessionRegistry(store, { clock: () => now });
+    const session = await sessions.register({
+      id: "session-authority-broadcast", provider: "codex", surface: "vscode_terminal",
+      capabilities: ["registered", "observable", "controllable", "mediated"], status: "verified_blocked",
+      workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-authority", planRevision: "plan-authority",
+      plannedFiles: [], adapterVersion: "provider-host", metadata: {}
+    });
+    const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-broadcast" });
+    const authority = await authorities.issue({
+      repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+      allowedActions: ["authority_broadcast"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "reviewed-user"
+    });
+    let ceremonies = 0;
+    const runtime = new DurableMediatedExecutor({
+      store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      confirmationAttestor: { attest: async () => { ceremonies += 1; return { reauthenticated: true, operator: "windows-user-presence" }; } },
+      workflowContextPreparation: { prepare: async () => authority }
+    });
+
+    const prepared = await runtime.prepareCommand({ action: "authority_broadcast", sessionId: session.id, reason: "Prepare exact recipient packets for review" });
+    assert.equal(prepared.status, "incomplete");
+    assert.equal(prepared.authorityId, authority.id);
+    assert.equal(prepared.session?.id, session.id);
+    assert.equal(prepared.confirmationToken, undefined, "recipient review must happen before a confirmation token exists");
+    assert.equal(prepared.confirmationScopeDigest, undefined);
+    assert.equal(ceremonies, 1);
+
+    const forgedReviewEcho = await runtime.prepareCommand({
+      action: "authority_broadcast", sessionId: session.id, reason: "Bypass the protected artifact store", reviewScopeDigest: "a".repeat(64)
+    });
+    assert.equal(forgedReviewEcho.status, "blocked");
+    assert.match(forgedReviewEcho.summary, /protected review|plan approval|service artifact/i);
+    assert.equal(ceremonies, 1, "a public review echo must fail before another user-presence ceremony");
+  });
+});
+
 test("Plan Approval uses one current-user ceremony bound to the exact reviewed plan scope through final dispatch", async () => {
   await withStore(async (store) => {
     const sessions = new SessionRegistry(store, { clock: () => now });
@@ -280,7 +399,7 @@ test("Plan Approval uses one current-user ceremony bound to the exact reviewed p
     });
     const scopeDigest = "e".repeat(64);
     const reviewSummary = "Review exact plan plan-7 (digest) and its protected provider context before execution.";
-    const planMaterial = { revision: "plan-7", originSessionId: session.id, taskId: "task-plan", objective: "Execute the exact reviewed plan", steps: [{ id: "step-1", summary: "Perform exact work", ownedFiles: ["src/safe.ts"], dependencies: [] as string[], status: "approved" as const }], decisions: ["Use mediated execution."] };
+    const planMaterial = { revision: "plan-7", originSessionId: session.id, taskId: "task-plan", objective: "Execute the exact reviewed plan", steps: [{ id: "step-1", summary: "Perform exact work", ownedFiles: ["src/safe.ts"], dependencies: [] as string[], status: "approved" as const }], decisions: ["Use mediated execution."], expectedTargetTransition: { beforeTargetSnapshotId: target.id, expectedAfterTargetSnapshotId: target.id, expectation: "unchanged" as const } };
     const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
     const adapters = new AdapterRegistry();
     const adapter = new InMemoryCommandAdapter();
@@ -342,6 +461,10 @@ test("Plan Approval uses one current-user ceremony bound to the exact reviewed p
 
 test("containment release consumes a confirmation bound to the exact reviewed fence and transactionally rejects stale generations", async () => {
   await withStore(async (store) => {
+    const changedMaterial = { ...targetMaterial, head: "release-target-changed" };
+    const changedTarget: TargetSnapshot = { id: targetSnapshotDigest(changedMaterial), ...changedMaterial, capturedAt: now };
+    let churnAtFinalReleaseGuard = false;
+    let containmentReleaseResolves = 0;
     const sessions = new SessionRegistry(store, { clock: () => now });
     const session = await sessions.register({
       id: "session-containment-release", provider: "generic", surface: "vscode_window", capabilities: ["registered", "mediated"],
@@ -362,7 +485,12 @@ test("containment release consumes a confirmation bound to the exact reviewed fe
       revokeCredentialLeases: async () => undefined,
       cancelQueuedOperations: async () => undefined
     }, { clock: () => now });
-    const fence = await containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment-op-7", reason: "isolated incident" });
+    const fence = await containment.activate({
+      repositoryRoot: target.repositoryRoot,
+      targetSnapshotId: target.id,
+      operationId: "containment-op-7",
+      reason: "isolated incident"
+    });
     const assessed = await containment.incidents.assess(fence.incidentId!, {
       async execute(request) {
         return {
@@ -378,7 +506,14 @@ test("containment release consumes a confirmation bound to the exact reviewed fe
       incidentId: fence.incidentId!, expectedIncidentDigest: containmentIncidentReviewDigest(assessed), disposition: "not_required", evidenceReference: "isolated incident review", evidenceDigest: "c".repeat(64)
     });
     const runtime = new DurableMediatedExecutor({
-      store, sessions, gateEvidence: gates, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      store, sessions, gateEvidence: gates, policyVersion: "policy-runtime", now: () => new Date(now),
+      targetResolver: {
+        resolve: async ({ definition }) => {
+          if (definition.action !== "containment_release" || !churnAtFinalReleaseGuard) return target;
+          containmentReleaseResolves += 1;
+          return containmentReleaseResolves === 1 ? target : changedTarget;
+        }
+      },
       enabledHighConsequenceActions: ["containment_release"],
       confirmationAttestor: { attest: async () => ({ reauthenticated: true, operator: "windows-user-presence" }) },
       dependencies: () => ({ containment })
@@ -404,8 +539,27 @@ test("containment release consumes a confirmation bound to the exact reviewed fe
     assert.equal(stale.status, "blocked");
     assert.equal((await containment.get(target.repositoryRoot))?.active, true);
 
+    churnAtFinalReleaseGuard = true;
+    containmentReleaseResolves = 0;
+    const changed = await runtime.releaseContainment({
+      sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "target changed after review",
+      ...binding
+    });
+    assert.equal(changed.status, "incomplete", JSON.stringify(changed));
+    assert.match(changed.summary, /TargetSnapshot changed after admission/i);
+    assert.equal(containmentReleaseResolves, 2);
+    assert.equal((await containment.get(target.repositoryRoot))?.active, true);
+
+    churnAtFinalReleaseGuard = false;
+    const preparedAgain = await runtime.prepareCommand({
+      action: "containment_release", sessionId: session.id, reason: "review exact fence again",
+      confirmationScopeDigest: containmentReleaseScopeDigest(binding)
+    });
+    assert.equal(preparedAgain.status, "prepared");
+    assert.ok(preparedAgain.authorityId);
+    assert.ok(preparedAgain.confirmationToken);
     const released = await runtime.releaseContainment({
-      sessionId: session.id, authorityId: prepared.authorityId!, confirmationToken: prepared.confirmationToken!, reason: "incident resolved",
+      sessionId: session.id, authorityId: preparedAgain.authorityId!, confirmationToken: preparedAgain.confirmationToken!, reason: "incident resolved",
       ...binding
     });
     assert.equal(released.status, "completed", JSON.stringify(released));
@@ -478,9 +632,9 @@ test("a durable budget deadline invokes only the configured host cancellation ad
     const adapters = new AdapterRegistry();
     const proof = new InMemoryCommandAdapter();
     let control: { isCancellationRequested(): Promise<boolean> } | undefined;
-    proof.register("proof", async (request) => { control = request.executionControl; return { status: "running", summary: "isolated long agent work" }; });
+    proof.register("proof", async (request) => { control = request.executionControl; return { status: "running", summary: "isolated long agent work", effectDisposition: "committed" }; });
     adapters.register("proof", proof);
-    let fireDeadline: (() => void) | undefined;
+    const schedules: Array<{ callback: () => void; cancelled: boolean }> = [];
     let hostCancels = 0;
     const runtime = new DurableMediatedExecutor({
       store, sessions, authorities, budgets, policyVersion: "policy-runtime", now: () => new Date(clockValue), targetResolver: { resolve: async () => target },
@@ -489,20 +643,280 @@ test("a durable budget deadline invokes only the configured host cancellation ad
           proof: { maxConcurrent: 1, timeoutMs: 1, maxAttempts: 1, windowMs: 60_000, maxClaimsPerWindow: 1, maxCostUnitsPerWindow: 1, defaultCostUnits: 1 }
         }
       },
-      deadlineScheduler: { schedule: (_delay, callback) => { fireDeadline = callback; return { cancel: () => { fireDeadline = undefined; } }; } },
-      operationControl: { cancel: async () => { hostCancels += 1; return { accepted: true, summary: "isolated deadline cancellation accepted" }; } },
+      deadlineScheduler: { schedule: (_delay, callback) => {
+        const entry = { callback, cancelled: false };
+        schedules.push(entry);
+        return { cancel: () => { entry.cancelled = true; } };
+      } },
+      operationControl: {
+        cancel: async () => { hostCancels += 1; return { accepted: true, summary: "isolated deadline cancellation accepted" }; },
+        observe: async (binding) => ({
+          state: "terminal", ...binding, status: "timed_out", effectDisposition: "committed",
+          summary: "The exact timed-out process tree stopped, but its prior effects were not rolled back.", evidenceDigest: "8".repeat(64),
+          toolVersions: { repositorySupervisor: "deadline-test-v1" }
+        })
+      },
       dependencies: () => ({ adapters })
     });
     const assignment = commandForAction("proof").assignment!;
     const started = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id });
     assert.equal(started.status, "running");
-    assert.ok(fireDeadline);
+    assert.ok(schedules[0]);
     clockValue = "2026-08-23T12:00:01.000Z";
-    fireDeadline!();
+    schedules[0]!.callback();
     await eventually(() => assert.equal(hostCancels, 1));
     assert.equal(await control?.isCancellationRequested(), true);
     assert.equal((await budgets.get("deadline-claim"))?.state, "timed_out");
     assert.equal((await runtime.operations.get(started.operationId!))?.state, "cancelling");
+    const [terminal] = await runtime.reconcileBudgetedOperations();
+    assert.equal(terminal?.status, "timed_out");
+    const deadlineBudget = await budgets.get("deadline-claim");
+    const deadlineOperation = await runtime.operations.get(started.operationId!);
+    assert.equal(deadlineBudget?.state, "failed", JSON.stringify({ terminal, deadlineBudget, deadlineOperation }));
+    assert.equal(deadlineOperation?.state, "recorded", "a timed-out committed effect must remain terminal and non-replayable");
+    assert.equal(deadlineOperation?.details.effectDisposition, "committed", "deadline termination alone cannot claim compensation of prior effects");
+    assert.equal(schedules.every((entry) => entry.cancelled), true, "terminal reconciliation must release both the deadline and bounded recovery poll");
+  });
+});
+
+test("an exact terminal controller observation settles the root, receipt, budget, child boundary, and control exactly once", async () => {
+  await withStore(async (store) => {
+    const setup = await startRunningProof(store, async (binding) => ({
+      state: "terminal", ...binding, status: "completed", effectDisposition: "committed",
+      summary: "The exact supervised proof process exited successfully.", evidenceDigest: "e".repeat(64),
+      toolVersions: { repositorySupervisor: "job-object-v1" }
+    }));
+    const operationId = setup.started.operationId!;
+    const before = await setup.runtime.operations.get(operationId);
+    assert.equal(before?.state, "executing");
+    assert.equal(before?.childIds.length, 1);
+    assert.equal((await setup.runtime.operations.get(before!.childIds[0]!))?.state, "recorded", "terminal child truth must precede root settlement");
+
+    const reconciled = await setup.runtime.reconcileBudgetedOperations();
+    assert.deepEqual(reconciled, [{ operationId, status: "completed", summary: "The exact supervised proof process exited successfully." }]);
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "recorded");
+    assert.equal((await setup.runtime.budgets.list("proof"))[0]?.state, "completed");
+    const receipts = await setup.runtime.receipts.list();
+    assert.equal(receipts.length, 1);
+    assert.equal(receipts[0]?.operationId, operationId);
+    assert.equal(receipts[0]?.action, "proof");
+    assert.equal(setup.cancelledSchedules(), 2);
+    assert.equal(setup.observations(), 1);
+
+    assert.deepEqual(await setup.runtime.reconcileBudgetedOperations(), [], "terminal recovery must not replay or re-record the process effect");
+    assert.equal((await setup.runtime.receipts.list()).length, 1);
+    assert.equal(setup.observations(), 1);
+  });
+});
+
+test("a normal trusted external completion settles its root receipt budget and control without controller replay", async () => {
+  await withStore(async (store) => {
+    const setup = await startRunningExecution(store, async (binding) => ({
+      state: "active", ...binding, effectDisposition: "ambiguous", summary: "The controller should not be queried for direct host completion."
+    }));
+    const operationId = setup.started.operationId!;
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "executing");
+    assert.equal((await setup.runtime.budgets.list("run_target"))[0]?.state, "running");
+
+    const unbound = await setup.runtime.completeExternalOperation({
+      operationId, action: "run_target", status: "completed",
+      summary: "This acknowledgement omitted the protected target."
+    });
+    assert.equal(unbound.status, "blocked");
+    const ambiguousFailure = await setup.runtime.completeExternalOperation({
+      operationId, action: "run_target", targetSnapshotId: target.id, status: "failed",
+      summary: "The host cannot prove whether the effect began."
+    });
+    assert.equal(ambiguousFailure.status, "incomplete");
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "executing");
+    assert.equal((await setup.runtime.budgets.list("run_target"))[0]?.state, "running");
+
+    const completed = await setup.runtime.completeExternalOperation({
+      operationId, action: "run_target", targetSnapshotId: target.id, status: "completed",
+      summary: "The exact supervised execution exited successfully.", evidenceDigest: "7".repeat(64),
+      toolVersions: { repositorySupervisor: "host-completion-v1" }
+    });
+    assert.equal(completed.status, "completed");
+    assert.ok(completed.receiptId);
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "recorded");
+    assert.equal((await setup.runtime.budgets.list("run_target"))[0]?.state, "completed");
+    assert.equal(setup.cancelledSchedules(), 2);
+    assert.equal((await setup.runtime.receipts.list()).length, 1);
+
+    const repeated = await setup.runtime.completeExternalOperation({
+      operationId, action: "run_target", targetSnapshotId: target.id, status: "completed",
+      summary: "The exact supervised execution exited successfully.", evidenceDigest: "7".repeat(64),
+      toolVersions: { repositorySupervisor: "host-completion-v1" }
+    });
+    assert.equal(repeated.status, "completed");
+    assert.equal(repeated.receiptId, completed.receiptId);
+    assert.equal((await setup.runtime.receipts.list()).length, 1);
+    assert.equal(setup.cancelledSchedules(), 2);
+
+    const conflicting = await setup.runtime.completeExternalOperation({
+      operationId, action: "run_target", targetSnapshotId: target.id, status: "cancelled", effectDisposition: "committed",
+      summary: "A conflicting late caller tried to replace the protected successful terminal truth."
+    });
+    assert.equal(conflicting.status, "completed", "a conflicting replay must return the protected terminal status");
+    assert.equal(conflicting.receiptId, completed.receiptId);
+    assert.notEqual(conflicting.summary, "A conflicting late caller tried to replace the protected successful terminal truth.");
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "recorded");
+    assert.equal((await setup.runtime.budgets.list("run_target"))[0]?.state, "completed");
+    assert.equal((await setup.runtime.receipts.list()).length, 1);
+    assert.equal(setup.cancelledSchedules(), 2);
+  });
+});
+
+test("restart keeps exact live work active, then settles the same durable root from a terminal observation without replay", async () => {
+  await withStore(async (store) => {
+    const live = await startRunningExecution(store, async (binding) => ({
+      state: "active", ...binding, effectDisposition: "ambiguous", summary: "The exact supervisor-owned process remains live."
+    }));
+    const operationId = live.started.operationId!;
+    const firstRecovery = await live.runtime.recoverAfterRestart();
+    assert.equal(firstRecovery.budgets[0]?.status, "running");
+    assert.equal((await live.runtime.operations.get(operationId))?.state, "executing");
+    assert.equal((await live.runtime.budgets.list("run_target"))[0]?.state, "running");
+
+    const restarted = new DurableMediatedExecutor({
+      store, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
+      operationControl: {
+        cancel: async () => ({ accepted: true, summary: "unused" }),
+        observe: async (binding) => ({
+          state: "terminal", ...binding, status: "completed", effectDisposition: "committed",
+          summary: "Restart found the exact durable process terminal.", evidenceDigest: "f".repeat(64),
+          toolVersions: { repositorySupervisor: "job-object-v1" }
+        })
+      }
+    });
+    const secondRecovery = await restarted.recoverAfterRestart();
+    assert.equal(secondRecovery.budgets[0]?.status, "completed");
+    assert.equal((await restarted.operations.get(operationId))?.state, "recorded");
+    assert.equal((await restarted.budgets.list("run_target"))[0]?.state, "completed");
+  });
+});
+
+test("a newly started running operation is reconciled to terminal without waiting for a companion restart", async () => {
+  await withStore(async (store) => {
+    let terminal = false;
+    const schedules: Array<{ delayMs: number; callback: () => void; cancelled: boolean }> = [];
+    const setup = await startRunningExecution(
+      store,
+      async (binding) => terminal
+        ? {
+            state: "terminal", ...binding, status: "completed", effectDisposition: "committed",
+            summary: "The exact newly started process became terminal without a restart.", evidenceDigest: "5".repeat(64),
+            toolVersions: { repositorySupervisor: "live-poll-test-v1" }
+          }
+        : { state: "active", ...binding, effectDisposition: "ambiguous", summary: "The exact newly started process remains live." },
+      {
+        schedule: (delayMs, callback) => {
+          const entry = { delayMs, callback, cancelled: false };
+          schedules.push(entry);
+          return { cancel: () => { entry.cancelled = true; } };
+        }
+      }
+    );
+    const operationId = setup.started.operationId!;
+    const poll = schedules.find((entry) => entry.delayMs > 0 && entry.delayMs <= 1_000);
+    assert.ok(poll, "a live post-startup operation must immediately schedule bounded no-replay reconciliation");
+    terminal = true;
+    poll.callback();
+    await eventually(async () => {
+      assert.equal((await setup.runtime.operations.get(operationId))?.state, "recorded");
+      assert.equal((await setup.runtime.budgets.list("run_target"))[0]?.state, "completed");
+    });
+    assert.equal((await setup.runtime.receipts.list()).length, 1);
+  });
+});
+
+test("restart rebinds deadlines and performs bounded no-replay reconciliation until exact live work becomes terminal", async () => {
+  await withStore(async (store) => {
+    const live = await startRunningExecution(store, async (binding) => ({
+      state: "active", ...binding, effectDisposition: "ambiguous", summary: "The original runtime still sees exact live work."
+    }));
+    const operationId = live.started.operationId!;
+    let terminal = false;
+    const schedules: Array<{ delayMs: number; callback: () => void; cancelled: boolean }> = [];
+    const restarted = new DurableMediatedExecutor({
+      store,
+      policyVersion: "policy-runtime",
+      now: () => new Date(now),
+      targetResolver: { resolve: async () => target },
+      deadlineScheduler: {
+        schedule: (delayMs, callback) => {
+          const entry = { delayMs, callback, cancelled: false };
+          schedules.push(entry);
+          return { cancel: () => { entry.cancelled = true; } };
+        }
+      },
+      operationControl: {
+        cancel: async () => ({ accepted: true, summary: "exact recovered deadline cancellation accepted" }),
+        observe: async (binding) => terminal
+          ? {
+              state: "terminal", ...binding, status: "completed", effectDisposition: "committed",
+              summary: "The exact recovered process became terminal without replay.", evidenceDigest: "6".repeat(64),
+              toolVersions: { repositorySupervisor: "restart-poll-test-v1" }
+            }
+          : { state: "active", ...binding, effectDisposition: "ambiguous", summary: "The exact recovered process remains live." }
+      }
+    });
+
+    const recovered = await restarted.recoverAfterRestart();
+    assert.equal(recovered.budgets[0]?.status, "running");
+    assert.ok(schedules.some((entry) => entry.delayMs > 1_000), "the durable claim deadline must be rescheduled after restart");
+    const poll = schedules.find((entry) => entry.delayMs > 0 && entry.delayMs <= 1_000);
+    assert.ok(poll, "restart must schedule one bounded reconciliation poll while exact work remains active");
+    terminal = true;
+    poll.callback();
+    await eventually(async () => {
+      assert.equal((await restarted.operations.get(operationId))?.state, "recorded");
+      assert.equal((await restarted.budgets.list("run_target"))[0]?.state, "completed");
+    });
+    assert.equal(schedules.filter((entry) => !entry.cancelled && entry !== poll).length, 0, "terminal reconciliation must leave no outstanding recovered deadline or poll schedule");
+    assert.equal((await restarted.receipts.list()).length, 1);
+  });
+});
+
+test("wrong operation/action/target bindings and ambiguous dispositions never settle or release durable work", async () => {
+  const cases: readonly ((binding: OperationReconciliationBinding) => OperationControllerObservation)[] = [
+    (binding) => ({ state: "terminal", ...binding, operationId: "wrong-operation", status: "completed", effectDisposition: "committed", summary: "wrong operation" }),
+    (binding) => ({ state: "terminal", ...binding, action: "run_target", status: "completed", effectDisposition: "committed", summary: "wrong action" }),
+    (binding) => ({ state: "terminal", ...binding, targetSnapshotId: "0".repeat(64), status: "completed", effectDisposition: "committed", summary: "wrong target" }),
+    (binding) => ({ state: "terminal", ...binding, sessionId: "wrong-session", status: "completed", effectDisposition: "committed", summary: "wrong session" }),
+    (binding) => ({ state: "terminal", ...binding, authorityId: "wrong-authority", status: "completed", effectDisposition: "committed", summary: "wrong authority" }),
+    (binding) => ({ state: "terminal", ...binding, status: "incomplete", effectDisposition: "ambiguous", summary: "PID reuse or provider state is unknown" })
+  ];
+  for (const observation of cases) {
+    await withStore(async (store) => {
+      const setup = await startRunningProof(store, async (binding) => observation(binding));
+      const operationId = setup.started.operationId!;
+      const [result] = await setup.runtime.reconcileBudgetedOperations();
+      assert.equal(result?.status, "running");
+      assert.match(result?.summary ?? "", /mismatch|ambiguous|unresolved|unknown/i);
+      assert.equal((await setup.runtime.operations.get(operationId))?.state, "executing");
+      assert.equal((await setup.runtime.budgets.list("proof"))[0]?.state, "running");
+      assert.equal((await setup.runtime.receipts.list()).length, 0);
+      assert.equal(setup.cancelledSchedules(), 0);
+    });
+  }
+});
+
+test("explicit process cancellation preserves committed prior effects instead of claiming compensation", async () => {
+  await withStore(async (store) => {
+    const setup = await startRunningProof(store, async (binding) => ({
+      state: "terminal", ...binding, status: "cancelled", effectDisposition: "committed",
+      summary: "The exact supervisor-owned process tree stopped, but prior effects were not rolled back.", evidenceDigest: "9".repeat(64),
+      toolVersions: { repositorySupervisor: "job-object-v1" }
+    }));
+    const operationId = setup.started.operationId!;
+    assert.equal((await setup.runtime.cancelOperation(operationId, "operator stop" )).status, "cancelling");
+    const [result] = await setup.runtime.reconcileBudgetedOperations();
+    assert.equal(result?.status, "cancelled");
+    assert.equal((await setup.runtime.operations.get(operationId))?.state, "recorded", "process termination alone must preserve the committed/no-replay effect truth");
+    assert.equal((await setup.runtime.operations.get(operationId))?.details.effectDisposition, "committed");
+    assert.equal((await setup.runtime.budgets.list("proof"))[0]?.state, "cancelled");
+    assert.equal(setup.cancelledSchedules(), 2);
   });
 });
 
@@ -640,7 +1054,7 @@ test("consequential work is revalidated after checkpoint capture and does not ru
       authorities,
       policyVersion: "policy-runtime",
       now: () => new Date(now),
-      targetResolver: { resolve: async () => (++resolves === 1 ? target : changedTarget) },
+      targetResolver: { resolve: async () => (++resolves <= 2 ? target : changedTarget) },
       checkpointCapture: {
         capture: async () => ({
           reason: "Preserve state before the reviewed commit.",
@@ -664,13 +1078,77 @@ test("consequential work is revalidated after checkpoint capture and does not ru
     });
 
     assert.equal(result.status, "incomplete");
-    assert.match(result.summary, /revalid/i);
-    assert.equal(resolves, 2);
+    assert.match(result.summary, /changed after admission|revalid/i);
+    assert.equal(resolves, 3);
     assert.equal(brokerCalls, 0);
     assert.equal((await runtime.checkpoints.list()).length, 1);
-    assert.equal((await runtime.budgets.list()).length, 0);
+    const claims = await runtime.budgets.list("local_commit");
+    assert.equal(claims.length, 1);
+    assert.equal(claims[0]?.state, "failed");
     assert.equal((await runtime.snapshots.list()).length, 2);
   });
+});
+
+test("the final effect guard rejects managed-session or authority churn after admission", async () => {
+  for (const changed of ["session", "authority"] as const) {
+    await withStore(async (store) => {
+      const sessions = new SessionRegistry(store, { clock: () => now });
+      const session = await sessions.register({
+        id: `session-final-${changed}`, provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
+        status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: `task-final-${changed}`, planRevision: "plan-final",
+        plannedFiles: ["src/safe.ts"], adapterVersion: "trusted-adapter", metadata: {}
+      });
+      const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => `authority-final-${changed}` });
+      const authority = await authorities.issue({
+        repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
+        allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      });
+      let resolves = 0;
+      let brokerCalls = 0;
+      const runtime = new DurableMediatedExecutor({
+        store,
+        sessions,
+        authorities,
+        policyVersion: "policy-runtime",
+        now: () => new Date(now),
+        targetResolver: {
+          resolve: async () => {
+            resolves += 1;
+            if (resolves === 3) {
+              if (changed === "session") await sessions.updateBinding(session.id, { planRevision: "plan-changed-after-admission" });
+              else await authorities.revoke(authority.id, "revoked after admission");
+            }
+            return target;
+          }
+        },
+        checkpointCapture: {
+          capture: async () => ({
+            reason: "Preserve state before the reviewed commit.",
+            artifacts: [{ id: "manifest", kind: "workspace_manifest", reference: "host://checkpoint/manifest", sha256: "d".repeat(64) }],
+            recovery: { steps: ["Review the manifest manually."], artifactIds: ["manifest"] }
+          })
+        },
+        checkpointVerifier: { verify: async (artifact) => ({ available: true, sha256: artifact.sha256 }) },
+        dependencies: ({ policy }) => {
+          const git = new InMemoryGitBroker(policy);
+          git.register("local_commit", () => { brokerCalls += 1; return { status: "completed", summary: "must not run" }; });
+          return { git, gitMutationFactory: { create: () => ({ kind: "local_commit", paths: ["src/safe.ts"], message: "safe local change" }) } };
+        }
+      });
+      const assignment = commandForAction("local_commit").assignment!;
+      const confirmationToken = await reviewedLocalCommitToken(runtime, session, authority.id, target);
+
+      const result = await runtime.execute({
+        assignment, control: assignment.control, modifier: assignment.modifier,
+        sessionId: session.id, authorityId: authority.id, confirmationToken
+      });
+
+      assert.equal(result.status, "incomplete", `${changed}: ${JSON.stringify(result)}`);
+      assert.match(result.summary, changed === "session" ? /session/i : /authority/i);
+      assert.equal(resolves, 3);
+      assert.equal(brokerCalls, 0);
+    });
+  }
 });
 
 test("a checkpoint with an unavailable or mismatched recovery artifact blocks its risky broker", async () => {

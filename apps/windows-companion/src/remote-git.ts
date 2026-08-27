@@ -50,6 +50,7 @@ export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): Co
   const route = (id: string) => policy.routes.find((candidate) => candidate.id === id);
   const graphql = route("github.graphql"); const repositoryRoute = route("github.repository"); const advertise = route("git.receive-pack.advertise"); const receive = route("git.receive-pack");
   if (!graphql || !advertise || !receive) throw new Error("Configured Git requires exact GraphQL, advertise, and receive-pack routes.");
+  for (const value of [repositoryRoute?.url, advertise.url, receive.url]) if (value !== undefined) assertCanonicalRepositoryRouteRaw(value);
   const urls = [graphql.url, advertise.url, receive.url].map((value) => new URL(value));
   if (urls.some((value) => value.protocol !== "https:" || value.username || value.password || value.port)) throw new Error("Configured Git routes require credential-free default-port HTTPS URLs.");
   const apiHost = urls[0]!.hostname.toLowerCase();
@@ -75,6 +76,7 @@ export function configuredGitHostFromPolicy(policy: ConfiguredNetworkPolicy): Co
     }
     const match = /^\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\/?$/.exec(repositoryUrl.pathname);
     if (!match) throw new Error("Configured GitHub repository identity route must name one exact owner/repository.");
+    if (!canonicalRepositorySlug(match[1]!) || !canonicalRepositorySlug(match[2]!)) throw new Error("Configured GitHub repository identity must use canonical owner/repository slugs.");
     baseRepository = { owner: match[1]!, name: match[2]! };
   }
   return {
@@ -290,7 +292,7 @@ function gitRepository(remote: string, identity: ConfiguredGitHostIdentity): { r
   const escaped = identity.host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const cleaned = remote.trim().replace(/\.git$/i, "");
   const match = new RegExp(`^(?:https://${escaped}/|ssh://git@${escaped}/|git@${escaped}:)([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)$`, "i").exec(cleaned);
-  if (!match || match[1]!.toLowerCase() !== identity.headOwner.toLowerCase() || match[2]!.toLowerCase() !== identity.headName.toLowerCase()) return undefined;
+  if (!match || !canonicalRepositorySlug(match[1]!) || !canonicalRepositorySlug(match[2]!) || match[1]!.toLowerCase() !== identity.headOwner.toLowerCase() || match[2]!.toLowerCase() !== identity.headName.toLowerCase()) return undefined;
   return { owner: match[1]!, name: match[2]! };
 }
 function configuredRepository(url: URL, kind: "advertise" | "receive"): { readonly owner: string; readonly name: string } | undefined {
@@ -299,11 +301,19 @@ function configuredRepository(url: URL, kind: "advertise" | "receive"): { readon
     : /^\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\.git\/git-receive-pack$/;
   const match = pattern.exec(url.pathname);
   if (!match) return undefined;
+  if (!canonicalRepositorySlug(match[1]!) || !canonicalRepositorySlug(match[2]!)) throw new Error("Configured GitHub repository identity must use canonical owner/repository slugs.");
   if (kind === "advertise") {
     if (url.search !== "?service=git-receive-pack") return undefined;
   } else if (url.search) return undefined;
   return { owner: match[1]!, name: match[2]! };
 }
+function assertCanonicalRepositoryRouteRaw(value: string): void {
+  const match = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]+([^?#]*)/.exec(value);
+  if (!match || match[1]!.includes("%")) throw new Error("Configured GitHub repository identity must use canonical owner/repository slugs.");
+  const segments = match[1]!.split("/").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === ".." || segment.startsWith(".") || segment.endsWith("."))) throw new Error("Configured GitHub repository identity must use canonical owner/repository slugs.");
+}
+function canonicalRepositorySlug(value: string): boolean { return /^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?$/.test(value); }
 function boundedPushCap(value: number): number { if (!Number.isSafeInteger(value) || value < 1 || value > maximumSupportedPushBytes) throw new Error("Configured Git receive-pack cap is outside the supported bounded range."); return value; }
 function validBranch(value: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(value) && !value.includes("..") && !value.endsWith("/") && !value.startsWith("-"); }
 async function fixedExecutable(candidates: readonly string[]): Promise<string> { for (const candidate of candidates) try { if ((await stat(candidate)).isFile()) return realpath(candidate); } catch { /* continue */ } throw new Error("A trusted absolute Git executable is unavailable."); }

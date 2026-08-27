@@ -99,6 +99,7 @@ test("Plan Approval review binds the exact plan and refuses provider-context chu
   const definition = commandForAction("plan_approval");
   const review = await coordinator.review({ definition, target, session });
   assert.match(review.summary, new RegExp(observation().evidence.plan.digest));
+  assert.match(review.summary, new RegExp(`${target.id} -> ${target.id} \\(unchanged\\)`));
   assert.match(review.scopeDigest, /^[a-f0-9]{64}$/);
   const authority = await coordinator.prepare({ definition, target, session, operator: "operator", review });
   assert.equal(authority.allowedActions.includes("plan_approval"), true);
@@ -147,7 +148,8 @@ function coordinatorEvidence(): CoordinatorEvidenceBundle {
   const planMaterial = {
     revision: "plan-1", originSessionId: session.id, taskId: "task-1", objective: "Finish exact workflow preparation.",
     steps: [{ id: "step-1", summary: "Implement exact path", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }],
-    decisions: ["Use the protected local coordinator."]
+    decisions: ["Use the protected local coordinator."],
+    expectedTargetTransition: { beforeTargetSnapshotId: target.id, expectedAfterTargetSnapshotId: target.id, expectation: "unchanged" as const }
   };
   const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
   const material = {

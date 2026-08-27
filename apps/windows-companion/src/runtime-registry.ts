@@ -2,6 +2,7 @@
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
 import type { JournalEntry, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import {
   loadVerifiedRepositoryRuntimeManifest,
@@ -138,9 +139,10 @@ export class DurableRepositoryRuntimeRegistry {
   async cancelOperation(operationId: string, _reason: string): Promise<number> {
     bounded(operationId, "operation ID");
     bounded(_reason, "cancellation reason");
-    const runtimes = await this.activeRuntimes();
-    await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses()));
-    return sum(await Promise.all(runtimes.map((runtime) => runtime.cancelOperation(operationId))));
+    const runtimes = (await this.activeRuntimeResolutions()).flatMap((item) => item.runtime ? [item.runtime] : []);
+    await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses().catch(() => [])));
+    const cancelled = await Promise.all(runtimes.map((runtime) => runtime.cancelOperation(operationId).catch(() => 0)));
+    return sum(cancelled);
   }
 
   async cancelRepository(repositoryRoot: string, _reason: string): Promise<number> {
@@ -154,17 +156,39 @@ export class DurableRepositoryRuntimeRegistry {
     return this.cancelRepository(repositoryRoot, reason);
   }
 
-  async reconcileOperation(operationId: string): Promise<Readonly<{ settled: boolean; summary: string }>> {
-    bounded(operationId, "operation ID");
-    const runtimes = await this.activeRuntimes();
-    await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses()));
-    const observations = await Promise.all(runtimes.map((runtime) => runtime.reconcileOperation(operationId)));
-    if (observations.length === 0 || observations.every((observation) => !observation.settled && observation.summary.startsWith("No exact"))) {
-      return { settled: false, summary: "No exact durable repository supervisor identity is known for this operation; no process was replayed or killed." };
+  async reconcileOperation(bindingInput: OperationReconciliationBinding): Promise<OperationControllerObservation> {
+    const binding = reconciliationBinding(bindingInput);
+    if (!binding.targetSnapshotId || !binding.repositoryRoot) {
+      return activeObservation(binding, "The protected repository target binding is absent or partial; terminal process state remains ambiguous.");
     }
-    return observations.every((observation) => observation.settled || observation.summary.startsWith("No exact"))
-      ? { settled: true, summary: "Every exact durable repository process observation is terminal; no work was replayed." }
-      : { settled: false, summary: "At least one exact durable repository process tree remains active or unresolved; no work was replayed." };
+    const resolutions = await this.activeRuntimeResolutions();
+    const observations: OperationControllerObservation[] = [];
+    let poisonedTarget = false;
+    for (const resolution of resolutions) {
+      if (!resolution.runtime) {
+        if (binding.repositoryRoot && pathKey(resolution.pin.canonicalRepositoryRoot) === pathKey(binding.repositoryRoot)) {
+          poisonedTarget = true;
+          observations.push(activeObservation(binding, "The exact host-attested repository runtime pin or manifest is invalid; this scope remains ambiguous and no work was replayed."));
+        }
+        continue;
+      }
+      await resolution.runtime.recoverManagedProcesses().catch(() => []);
+      observations.push(await resolution.runtime.reconcileOperation(binding).catch(() =>
+        activeObservation(binding, "A pinned repository runtime could not prove the exact process live or terminal; no work was replayed.")));
+    }
+    const owners = observations.filter((observation) => observation.state !== "not_owner");
+    if (owners.length === 0) {
+      return { state: "not_owner", operationId: binding.operationId, summary: "No exact durable repository supervisor identity is known for this operation; no process was replayed or killed." };
+    }
+    if (owners.some((observation) => observation.state === "active")) {
+      return activeObservation(binding, poisonedTarget
+        ? "The exact host-attested repository runtime pin or manifest is invalid; this scope remains ambiguous and no work was replayed."
+        : "At least one exact durable repository process tree remains active or unresolved; no work was replayed.");
+    }
+    const terminals = owners.filter((observation): observation is Extract<OperationControllerObservation, { state: "terminal" }> => observation.state === "terminal");
+    return terminals.length === 1
+      ? terminals[0]!
+      : activeObservation(binding, "More than one pinned repository runtime claimed the same durable operation; terminal state remains ambiguous.");
   }
 
   /**
@@ -173,13 +197,17 @@ export class DurableRepositoryRuntimeRegistry {
    * replays a recipe or falls back to an ambient PID.
    */
   async recoverManagedProcesses(): Promise<readonly ManagedRepositoryProcess[]> {
-    const recovered = await Promise.all((await this.activeRuntimes()).map((runtime) => runtime.recoverManagedProcesses()));
+    const runtimes = (await this.activeRuntimeResolutions()).flatMap((item) => item.runtime ? [item.runtime] : []);
+    const recovered = await Promise.all(runtimes.map((runtime) => runtime.recoverManagedProcesses().catch(() => [])));
     return recovered.flat();
   }
 
-  private async activeRuntimes(): Promise<RepositoryRuntime[]> {
+  private async activeRuntimeResolutions(): Promise<readonly Readonly<{ pin: RepositoryRuntimePin; runtime?: RepositoryRuntime }>[] > {
     const pins = [...(await this.state()).values()].filter((pin) => pin.status === "active");
-    return Promise.all(pins.map((pin) => this.resolve(pin.canonicalRepositoryRoot)));
+    return Promise.all(pins.map(async (pin) => {
+      try { return { pin, runtime: await this.resolve(pin.canonicalRepositoryRoot) }; }
+      catch { return { pin }; }
+    }));
   }
 
   private async state(): Promise<Map<string, RepositoryRuntimePin>> {
@@ -253,4 +281,18 @@ function bounded(value: string, label: string): string {
 function sum(values: readonly number[]): number {
   if (values.some((value) => !Number.isSafeInteger(value) || value < 0)) throw new Error("Repository process cancellation returned an invalid count.");
   return values.reduce((total, value) => total + value, 0);
+}
+
+function reconciliationBinding(input: OperationReconciliationBinding): OperationReconciliationBinding {
+  const operationId = bounded(input.operationId, "operation ID");
+  const action = bounded(input.action, "operation action") as OperationReconciliationBinding["action"];
+  const targetSnapshotId = input.targetSnapshotId;
+  if (targetSnapshotId !== undefined && !/^[a-f0-9]{64}$/.test(targetSnapshotId)) throw new Error("The target snapshot ID is invalid.");
+  const repositoryRoot = input.repositoryRoot === undefined ? undefined : bounded(input.repositoryRoot, "repository root");
+  if ((targetSnapshotId === undefined) !== (repositoryRoot === undefined)) throw new Error("The protected repository target binding is partial.");
+  return { operationId, action, ...(targetSnapshotId ? { targetSnapshotId, repositoryRoot } : {}) };
+}
+
+function activeObservation(binding: OperationReconciliationBinding, summary: string): Extract<OperationControllerObservation, { state: "active" }> {
+  return { state: "active", ...binding, effectDisposition: "ambiguous", summary };
 }

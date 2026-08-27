@@ -377,7 +377,7 @@ test("the administration boundary requires current-user presence for every state
   const policy = {
     schema: "sxsy-b122.containment-remote-trust-policy", version: 2, purpose, authorityId, keyId, publicKeyPem,
     gitExecutableSha256, detectorManifestId: containmentRemoteDetectorManifest.id,
-    networkPolicy: "public-https-dns-pinned-no-redirect-v1", expiresAt: "2026-08-26T12:00:00.000Z"
+    networkPolicy: "public-https-dns-pinned-no-redirect-v1", expiresAt: "2026-08-27T12:00:00.000Z"
   } as const;
   const policyPath = join(root, "trust.json");
   await writeFile(policyPath, JSON.stringify(policy), "utf8");

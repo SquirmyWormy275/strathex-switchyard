@@ -11,7 +11,7 @@ export {
   type ConfirmationRequestPayload,
   type OperationCancellationPayload
 } from "./bridge.ts";
-export { CompanionService, type CompanionServiceOptions, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor } from "./service.ts";
+export { CompanionService, type CompanionServiceOptions, type MediatedCommandExecutor, type CancellableMediatedCommandExecutor, type ConfirmationCapableMediatedCommandExecutor, type ProviderMediatedFinalCurrentServicePort } from "./service.ts";
 export { DurableCompanionEndpoint, DurableCompanionEndpointError } from "./durable-endpoint.ts";
 export { WindowsDpapiJournalAuthenticator } from "./windows-authenticator.ts";
 export { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
@@ -79,7 +79,21 @@ export * from "./runtime-provisioning.ts";
 export * from "./sandbox-installation.ts";
 export * from "./host-provisioning.ts";
 export * from "./remote-adapters.ts";
+export * from "./automation-manifest-review.ts";
+export * from "./automation-manifest-coordinator.ts";
+export * from "./automation-proposal-source.ts";
+export * from "./automation-effect-executor.ts";
+export * from "./automation-child-effects.ts";
+export * from "./automation-high-consequence.ts";
+export * from "./automation-installed-runtime.ts";
+export * from "./automation-refresh-git.ts";
+export * from "./local-automation-broker.ts";
+export * from "./effect-target-transition.ts";
 export * from "./provider-gateway.ts";
+export * from "./configured-provider-host.ts";
+export * from "./provider-dispatch-lease.ts";
+export * from "./provider-mediated-final-current.ts";
+export * from "./reanchor-runtime.ts";
 export * from "./pipeline-adapters.ts";
 export * from "./repository-runtime-broker.ts";
 export * from "./windows-sandbox.ts";

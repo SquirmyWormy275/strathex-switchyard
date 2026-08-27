@@ -43,11 +43,11 @@ test("the Windows release packages, self-tests, inventories, and provenance-chec
   ]) assert.equal(artifact.includes(expected), true, `release validation is missing ${expected}`);
 });
 
-test("provider companion provisioning loads the flat packaged extension transport", async (context) => {
+test("provider companion provisioning loads the self-contained packaged extension transport", async (context) => {
   const fixture = await mkdtemp(join(tmpdir(), "b122-provider-provision-"));
   context.after(() => rm(fixture, { recursive: true, force: true }));
   const bundle = join(fixture, "bundle");
-  const transport = join(bundle, "extension", "dist", "named-pipe-transport.js");
+  const transport = join(bundle, "extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js");
   const artifactPath = join(fixture, "companion-provisioning.json");
   await mkdir(dirname(transport), { recursive: true });
   await writeFile(transport, `exports.ProvisionedNamedPipeJsonLineTransport = class {

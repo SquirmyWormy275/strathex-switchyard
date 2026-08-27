@@ -1,13 +1,15 @@
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { AuthorityLedger } from "../../../packages/control-plane/src/authority.ts";
+import type { AutomationRequest, EffectGuard, PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
 import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
-import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
+import { sessionBindingDigest, SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import { WorkspaceSnapshotResolver } from "../../../packages/control-plane/src/snapshot-resolver.ts";
-import { TargetSnapshotFactory, type SnapshotEnvironment } from "../../../packages/control-plane/src/snapshot.ts";
-import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
-import type { ManagedSession } from "../../../packages/control-plane/src/contracts.ts";
+import { TargetSnapshotFactory, targetSnapshotDigest, type SnapshotEnvironment } from "../../../packages/control-plane/src/snapshot.ts";
+import { ProtectedJsonStore, stableJson, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
+import type { AutomationEnvelope } from "../../../packages/control-plane/src/automation-protocol.ts";
+import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { randomBytes } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { createDefaultLocalComposition, type DefaultLocalComposition } from "./default-composition.ts";
@@ -17,8 +19,10 @@ import { DurableCompanionEndpoint } from "./durable-endpoint.ts";
 import { DurableHostActionQueue } from "./host-actions.ts";
 import { hostActionCommandActions } from "./host-actions.ts";
 import { CompanionService } from "./service.ts";
+import { DurableProviderMediatedFinalCurrent } from "./provider-mediated-final-current.ts";
 import type { ConfiguredNetworkPolicy } from "./configured-network.ts";
-import { ConfiguredProviderHostClient } from "./configured-provider-host.ts";
+import { ConfiguredProviderHostClient, ConfiguredProviderReanchorApplyPort, DurableConfiguredProviderOperationControl } from "./configured-provider-host.ts";
+import { InstalledDurableReanchorRuntime } from "./reanchor-runtime.ts";
 import { InstalledWorkflowContextPreparationCoordinator } from "./workflow-context-preparation.ts";
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableGitMutationReviewQueue } from "./git-review.ts";
@@ -30,7 +34,7 @@ import { DurableContainmentManager } from "../../../packages/control-plane/src/c
 import { containmentIncidentReviewDigest } from "../../../packages/control-plane/src/containment-incidents.ts";
 import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
 import { AttestedCredentialProvisioningCoordinator, AttestedNetworkPolicyCoordinator, DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
-import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, remoteAutomationActions, type ProviderCommandTransport, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, DynamicConfiguredNetworkClient, providerCommandActions, type ProviderCommandTransport, type ProviderHandshakeCoordinator } from "./remote-adapters.ts";
 import {
   AttestedProviderDispatchProfileCoordinator,
   ConfiguredProviderHostLifecycleIdentitySource,
@@ -53,8 +57,8 @@ import {
 } from "./raw-hid-installation.ts";
 import { WindowsRawHidTransport } from "./raw-hid-protocol.ts";
 import { LocalCheckpointCapture, LocalRecoveryArtifactVerifier } from "./local-checkpoints.ts";
-import { HostActionOperationQueueControl, InstalledOperationControl, UnavailableInstalledRepositoryProcessSupervisor, WorkflowArtifactOperationQueueControl } from "./operation-control.ts";
-import { HostOwnedOperationReconciler, InstalledReadOnlyObservationPort } from "./operation-recovery.ts";
+import { HardwareSignalTriggerOperationQueueControl, HostActionOperationQueueControl, InstalledOperationControl, UnavailableInstalledRepositoryProcessSupervisor, WorkflowArtifactOperationQueueControl, type ExactOperationQueueControl } from "./operation-control.ts";
+import { createExactProviderRecoveryRouter, HostOwnedOperationReconciler, InstalledReadOnlyObservationPort } from "./operation-recovery.ts";
 import { SpawnCheckpointGitRunner } from "./local-checkpoints.ts";
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
 import type { RepositoryProcessSupervisor } from "./repository-runtime.ts";
@@ -113,6 +117,31 @@ import { WindowsErasableVoiceTranscriptVault } from "./windows-voice-transcript-
 import { InstalledContainmentAssessmentPort, InstalledLocalContainmentAssessmentPort } from "./containment-assessment.ts";
 import { createContainmentRemoteEvidenceAdministration, DurableContainmentRemoteEvidenceRegistry } from "./containment-remote-evidence.ts";
 import { InstalledContainmentRemoteCoordinator } from "./containment-remote-host.ts";
+import { DurableAutomationManifestReviewQueue } from "./automation-manifest-review.ts";
+import { InstalledAutomationManifestCoordinator } from "./automation-manifest-coordinator.ts";
+import { ConfiguredAutomationManifestProposalSource } from "./automation-proposal-source.ts";
+import { DurableDebugStopBindingStore } from "./debug-stop.ts";
+import { LocalMediatedGitHandler } from "./mediated-git.ts";
+import {
+  AutomationEffectExecutionError,
+  createAutomationEffectRecoveryBinding,
+  LocalAutomationEffectExecutor,
+  NodeAutomationFilesystemPort,
+  ProtectedStoreAutomationEffectJournal,
+  type AutomationChildEffectPort,
+  type AutomationChildEffectPorts,
+  type AutomationEffectReceipt
+} from "./automation-effect-executor.ts";
+import {
+  createArtifactResolvingAutomationChildPorts,
+  type AutomationChildArtifactResolver,
+  type AutomationChildExecutionFence,
+  type AutomationTypedChildBackends
+} from "./automation-child-effects.ts";
+import { GitAutomationHostTargetObserver, InstalledAutomationEffectRuntime } from "./automation-installed-runtime.ts";
+import { DurableEffectTargetTransitionCoordinator } from "./effect-target-transition.ts";
+import { LedgerAutomationHighConsequenceAuthorization } from "./automation-high-consequence.ts";
+import { InstalledAutomationRefreshGitCommitObserver, InstalledAutomationRefreshGitCommitPort } from "./automation-refresh-git.ts";
 
 export interface DurableWindowsCompanionOptions {
   readonly policyVersion: string;
@@ -168,6 +197,10 @@ export interface DurableWindowsCompanionOptions {
   /** Isolated tests may replace the voice ports, never production IPC callers. */
   readonly voiceAudioPort?: VoiceAudioPort;
   readonly voiceProviderPorts?: readonly VoiceProviderPort[];
+  /** Separately reviewed host artifacts for gate-accepted LFG/Repair typed children. */
+  readonly automationChildArtifacts?: AutomationChildArtifactResolver;
+  /** Host-local typed backends only; no provider route is accepted as an effect backend. */
+  readonly automationChildBackends?: AutomationTypedChildBackends;
 }
 
 interface CouncilRepositoryCancellationControl {
@@ -224,6 +257,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   readonly scannerFixtures: DurableScannerFixtureRegistry;
   readonly scannerAdministration?: ScannerFixtureAdministration;
   readonly providerDesktopRegistry?: AttestedProviderDesktopRegistry;
+  readonly reanchor?: InstalledDurableReanchorRuntime;
+  readonly automationManifestReviews: DurableAutomationManifestReviewQueue;
+  readonly automationManifestCoordinator: InstalledAutomationManifestCoordinator;
+  readonly debugStops: DurableDebugStopBindingStore;
   registerTrustedSession(session: ManagedSession): Promise<ManagedSession>;
   registerTrustedWorkflowContext(input: WorkflowCoordinatorContextInput): Promise<WorkflowCoordinatorContext>;
 } {
@@ -239,6 +276,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
   });
   let executor!: DurableMediatedExecutor;
+  let reanchorRuntime: InstalledDurableReanchorRuntime | undefined;
   const sessionFreshness = new SessionFreshnessCoordinator(sessions);
   const providerGatewayToken = randomBytes(32).toString("hex");
   const providerGateway = new LocalProviderCommandGateway({
@@ -263,6 +301,15 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   let containmentManager!: DurableContainmentManager;
   let containmentRemote: InstalledContainmentRemoteCoordinator | undefined;
   let configuredNetwork!: DynamicConfiguredNetworkClient;
+  let configuredProviderOperations: DurableConfiguredProviderOperationControl | undefined;
+  const configuredProviderOperationQueue: ExactOperationQueueControl = {
+    cancelByOperation: (operationId, reason) => configuredProviderOperations?.cancelByOperation(operationId, reason) ?? Promise.resolve(0),
+    cancelQueuedForRepository: (repositoryRoot, reason) => configuredProviderOperations?.cancelQueuedForRepository(repositoryRoot, reason) ?? Promise.resolve(0),
+    observeOperation: (operationId) => configuredProviderOperations?.observeOperation(operationId)
+      ?? Promise.resolve({ settled: false, summary: "The configured-provider recovery controller is not initialized." }),
+    observeBoundOperation: (binding) => configuredProviderOperations?.observeBoundOperation(binding)
+      ?? Promise.resolve({ state: "not_owner", operationId: binding.operationId, summary: "The configured-provider recovery controller is not initialized." })
+  };
   let providerDesktopRegistry: AttestedProviderDesktopRegistry | undefined;
   const hostActions = new DurableHostActionQueue(store, {
     finalAuthorizer: {
@@ -293,6 +340,30 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           const actual = await targetResolver.resolve({ definition: commandForAction(intent.commandAction), session });
           if (!actual || actual.completeness !== "complete" || actual.id !== intent.targetSnapshotId || resolve(actual.repositoryRoot).toLowerCase() !== resolve(intent.workspaceRoot).toLowerCase()) {
             return { allowed: false, reason: "The exact TargetSnapshot changed before the VS Code host effect." };
+          }
+          if (intent.hostAction === "stop_vscode_debug") {
+            if (!intent.debugSessionId || !intent.debugEffectSessionId || !intent.debugEffectSessionBindingDigest
+              || !intent.debugSourceSessionBindingDigest || !intent.debugBindingId || !intent.debugOriginOperationId || !intent.debugConfiguration
+              || intent.debugEffectSessionId === session.id || session.status !== "running"
+              || sessionBindingDigest(session) !== intent.debugSourceSessionBindingDigest) {
+              return { allowed: false, reason: "The queued debug stop lost its exact protected provider-source binding." };
+            }
+            const effect = await sessions.get(intent.debugEffectSessionId);
+            if (!effect || effect.status !== "running" || effect.metadata["sxsy-b122.kind"] !== "debug-session"
+              || sessionBindingDigest(effect) !== intent.debugEffectSessionBindingDigest
+              || !effect.workspaceRoot || !sameRepositoryRoot(effect.workspaceRoot, intent.workspaceRoot)
+              || effect.targetSnapshotId !== undefined && effect.targetSnapshotId !== intent.targetSnapshotId
+              || effect.metadata["sxsy-b122.debugSessionId"] !== intent.debugSessionId
+              || effect.metadata["sxsy-b122.debugBindingId"] !== intent.debugBindingId
+              || effect.metadata["sxsy-b122.debugOriginSessionId"] !== session.id
+              || effect.metadata["sxsy-b122.debugOriginOperationId"] !== intent.debugOriginOperationId
+              || effect.metadata["sxsy-b122.debugConfiguration"] !== intent.debugConfiguration
+              || !sameRepositoryRoot(effect.metadata["sxsy-b122.debugWorkspaceRoot"] ?? "", intent.workspaceRoot)) {
+              return { allowed: false, reason: "The exact protected debug effect changed before final VS Code authorization." };
+            }
+          } else if (intent.debugEffectSessionId !== undefined || intent.debugEffectSessionBindingDigest !== undefined
+            || intent.debugSourceSessionBindingDigest !== undefined || intent.debugBindingId !== undefined) {
+            return { allowed: false, reason: "A non-stop host action carried protected debug-effect identity." };
           }
           return { allowed: true, reason: "The exact TargetSnapshot and containment boundary remain current." };
         } catch {
@@ -394,7 +465,13 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   let councilExecutorCancellation: CouncilRepositoryCancellationControl | undefined;
   let councilLifecycleCancellation: CouncilRepositoryCancellationControl | undefined;
   const operationControl = new InstalledOperationControl({
-    queues: [new HostActionOperationQueueControl(hostActions), new WorkflowArtifactOperationQueueControl(workflowArtifacts), hardwareSignals, providerGateway],
+    queues: [
+      new HostActionOperationQueueControl(hostActions),
+      new WorkflowArtifactOperationQueueControl(workflowArtifacts),
+      new HardwareSignalTriggerOperationQueueControl(hardwareSignals),
+      providerGateway,
+      configuredProviderOperationQueue
+    ],
     processes: repositoryRuntimes,
     repositoryEffects: [
       { cancelRepository: (repositoryRoot, reason) => voiceRuntime.cancelRepository(repositoryRoot, reason) },
@@ -458,7 +535,40 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     sessions,
     authorities: runtimeAuthorities,
     profiles: providerDispatchProfileSource,
-    containment: providerDispatchContainment
+    containment: providerDispatchContainment,
+    reanchor: {
+      async assertCurrent(binding) {
+        if (!reanchorRuntime || binding.action !== "reanchor" || !binding.artifact || !binding.confirmation) {
+          return { allowed: false, reason: "The dedicated installed Re-anchor lifecycle is unavailable or incomplete." };
+        }
+        return reanchorRuntime.assertProviderDispatchCurrent({
+          requestId: binding.artifact.id,
+          operationId: binding.operationId,
+          oldTarget: binding.target,
+          session: binding.session,
+          authority: binding.authority,
+          artifactDigest: binding.artifact.digest,
+          confirmationDigest: binding.confirmation.digest,
+          confirmationScopeDigest: binding.confirmation.scopeDigest
+        });
+      }
+    }
+  });
+  const providerMediatedFinalCurrent = new DurableProviderMediatedFinalCurrent({
+    store,
+    operations: { get: (id) => executor.operations.get(id) },
+    sessions,
+    authorities: runtimeAuthorities,
+    targets: {
+      async current({ action, session, signal }) {
+        if (signal.aborted) throw new Error("The provider mediated target check was cancelled.");
+        const current = await targetResolver.resolve({ definition: commandForAction(action as CommandAction), session });
+        if (signal.aborted) throw new Error("The provider mediated target check was cancelled.");
+        return current;
+      }
+    },
+    containment: providerDispatchContainment,
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
   });
   const leasedConfiguredNetwork = new LeaseInjectingProviderCommandTransport(
     configuredNetwork,
@@ -466,11 +576,17 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       credentials: credentialVault.createAdapter("provider-dispatch-lease-issuer"),
       profiles: providerDispatchProfileSource,
       finalCurrent: providerDispatchFinalCurrent,
+      mediatedFinalCurrent: providerMediatedFinalCurrent,
       ...(options.runtime?.now ? { now: options.runtime.now } : {})
     }),
     providerDispatchContainment
   );
   const configuredProviderHost = new ConfiguredProviderHostClient(configuredNetwork);
+  configuredProviderOperations = new DurableConfiguredProviderOperationControl({
+    store,
+    transport: leasedConfiguredNetwork,
+    host: configuredProviderHost
+  });
   const configuredProviderControl = {
     managesSession(session: ManagedSession) { return (session.provider === "claude" || session.provider === "codex") && !providerGateway.supportsProvider(session.provider); },
     managesProvider(provider: "claude" | "codex") { return !providerGateway.supportsProvider(provider); },
@@ -483,7 +599,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     providerControl: configuredProviderControl
   });
   councilLifecycleCancellation = councilLifecycle;
-  const providerTransport = new ProviderGatewayRouteRouter(providerGateway, leasedConfiguredNetwork);
+  const providerTransport = new ProviderGatewayRouteRouter(providerGateway, configuredProviderOperations);
   const runtimePins = options.runtimePinPresence
     ? new AttestedRuntimePinCoordinator(repositoryRuntimes, options.runtimePinPresence)
     : undefined;
@@ -531,6 +647,28 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     })),
     { policyVersion: options.policyVersion, ...(options.snapshotEnvironmentFor ? { environmentFor: options.snapshotEnvironmentFor } : {}) }
   );
+  const automationManifestReviews = new DurableAutomationManifestReviewQueue({
+    store,
+    sessions,
+    authorities: runtimeAuthorities,
+    targetResolver,
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
+  const automationManifestCoordinator = new InstalledAutomationManifestCoordinator({
+    sessions,
+    authorities: runtimeAuthorities,
+    targetResolver,
+    queue: automationManifestReviews,
+    containment: containmentManager,
+    source: new ConfiguredAutomationManifestProposalSource(providerTransport),
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
+  const debugStops = new DurableDebugStopBindingStore({
+    store,
+    sessions,
+    targetResolver,
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
   const containmentRemoteRegistry = new DurableContainmentRemoteEvidenceRegistry(store, {
     ...(options.runtime?.now ? { now: options.runtime.now } : {})
   });
@@ -569,7 +707,7 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const installedReconciler = new HostOwnedOperationReconciler(new InstalledReadOnlyObservationPort({
     git: new SpawnCheckpointGitRunner(),
     network: configuredNetwork,
-    providerOperations: providerGateway,
+    providerOperations: createExactProviderRecoveryRouter({ local: providerGateway, configured: configuredProviderOperations }),
     networkPolicy: networkPolicyRegistry,
     council,
     hostActions,
@@ -579,7 +717,6 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     "git.local-commit", "git.push-reviewed-head", "git.direct-main", "github.pr-upsert", "github.pr-merge",
     "council.pause", "council.assignment", "council.resume",
     ...providerCommandActions.map((action) => `provider.${action}`),
-    ...remoteAutomationActions.map((action) => `automation.${action}`),
     ...installedProviderDesktopActions,
     ...hostActionCommandActions
   ];
@@ -653,6 +790,98 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     : undefined;
   const gateEvidence = options.runtime?.gateEvidence ?? acceptanceAdministration?.ledger ?? new GateEvidenceLedger(store);
   const councilAutomaticGate = new LedgerCouncilAutomaticAcceptanceGate(gateEvidence);
+  const automationJournal = new ProtectedStoreAutomationEffectJournal(store);
+  const automationContainment = new DurableProviderDispatchContainmentSource(containmentManager);
+  const automationTargetObserver = new GitAutomationHostTargetObserver({
+    inspector: new GitCliInspector({ classifyUntracked: () => "included", classifyIgnored: () => "included" }),
+    captureOptionsFor: ({ action, session }) => ({
+      policyVersion: options.policyVersion,
+      environment: options.snapshotEnvironmentFor?.({ definition: commandForAction(action), session }) ?? {},
+      requireCanonicalRemote: true,
+      requireBranch: true
+    }),
+    clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
+  });
+  const automationRefreshGit = new LocalMediatedGitHandler({
+    stateDirectory: resolve(options.localGitStateDirectory ?? join(localStateDirectory, "git")),
+    remediation: containmentManager.incidents
+  });
+  const automationArtifacts = options.automationChildArtifacts ?? { resolve: async () => undefined };
+  const automationBackends = options.automationChildBackends ?? {};
+  const automationAuthorization = new LedgerAutomationHighConsequenceAuthorization({
+    policyVersion: options.policyVersion,
+    evidence: gateEvidence,
+    activations: acceptanceAdministration?.activations ?? { list: async () => [] },
+    ...(options.runtime?.now ? { now: options.runtime.now } : {})
+  });
+  const createInstalledAutomationExecutor = (request: AutomationRequest, envelope: AutomationEnvelope, policy: PermitVerifier): LocalAutomationEffectExecutor => {
+    const targetTransitions = new DurableEffectTargetTransitionCoordinator({
+      sessions,
+      targets: executor.snapshots,
+      targetResolver
+    });
+    const runtime = new InstalledAutomationEffectRuntime({
+      store,
+      request,
+      envelope,
+      operations: executor.operations,
+      sessions,
+      authorities: runtimeAuthorities,
+      policy,
+      containment: automationContainment,
+      targetResolver,
+      targetObserver: automationTargetObserver,
+      targetTransitions,
+      ...(options.runtime?.now ? { now: options.runtime.now } : {})
+    });
+    const fence: AutomationChildExecutionFence = {
+      assertContained: async (input) => {
+        await automationContainment.currentClear(input.binding.repositoryRoot);
+      },
+      assertFinalCurrent: async (input) => {
+        await runtime.guard.assertCurrent({
+          envelope,
+          boundary: "before_child",
+          expectedTargetSnapshotId: input.binding.currentTargetSnapshotId,
+          child: { order: input.binding.order, kind: input.binding.kind, scopeDigest: input.binding.scopeDigest }
+        });
+      }
+    };
+    const configuredChildren = createArtifactResolvingAutomationChildPorts({ artifacts: automationArtifacts, fence, backends: automationBackends });
+    const automationFilesystem = new NodeAutomationFilesystemPort();
+    const refreshGit = new InstalledAutomationRefreshGitCommitPort({
+      request,
+      envelope,
+      sessions,
+      targets: executor.snapshots,
+      guard: runtime.guard,
+      commitObserver: new InstalledAutomationRefreshGitCommitObserver({
+        git: new SpawnCheckpointGitRunner(),
+        canonicalizeRoot: (repositoryRoot) => automationFilesystem.canonicalizeRoot(repositoryRoot)
+      }),
+      handler: automationRefreshGit
+    });
+    const configuredGit = configuredChildren.git_commit!;
+    const gitCommit: AutomationChildEffectPort<"git_commit"> = {
+      execute: (input) => input.envelope.action === "compound_refresh" ? refreshGit.execute(input) : configuredGit.execute(input),
+      recover: async (input) => input.envelope.action === "compound_refresh" ? refreshGit.recover(input) : configuredGit.recover?.(input),
+      compensate: async (input) => {
+        if (input.envelope.action === "compound_refresh") throw new Error("A committed Compound Refresh Git ref update requires exact recovery and is never guessed at by automatic reset.");
+        if (!configuredGit.compensate) throw new Error("The reviewed LFG Git child has no exact compensation backend.");
+        return configuredGit.compensate(input);
+      }
+    };
+    const childPorts: AutomationChildEffectPorts = Object.freeze({ ...configuredChildren, git_commit: gitCommit });
+    return new LocalAutomationEffectExecutor({
+      journal: automationJournal,
+      guard: runtime.guard,
+      targetTransition: runtime.targetTransition,
+      childPorts,
+      highConsequenceAuthorization: automationAuthorization,
+      recoveryBinding: createAutomationEffectRecoveryBinding(request, envelope),
+      clock: () => (options.runtime?.now?.() ?? new Date()).toISOString()
+    });
+  };
   let localComponents: DefaultLocalComposition | undefined;
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
@@ -687,11 +916,17 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
           ...(installedSandbox ? { isolationRuntime: installedSandbox } : {}),
           ...(repositorySandbox ? { repositorySandbox } : {}),
           ...(providerDesktopAdapter ? { providerDesktopAdapter } : {}),
+          automationExecutorFactory: (request, envelope) => createInstalledAutomationExecutor(request, envelope, context.policy),
+          targetResolver,
           hostActions
         }
       );
       localComponents = composed.components;
-      defaultDependencies = composed.dependencies;
+      defaultDependencies = {
+        ...composed.dependencies,
+        automationManifestReviews,
+        debugStopReviews: debugStops
+      };
       const configuredCouncil = composed.dependencies.council as Partial<CouncilRepositoryCancellationControl> | undefined;
       if (typeof configuredCouncil?.cancelRepository === "function") councilExecutorCancellation = configuredCouncil as CouncilRepositoryCancellationControl;
     }
@@ -715,6 +950,106 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     dependencies,
     receiptEvidence: options.receiptEvidence
   });
+  const reanchorEffectGuard: EffectGuard = {
+    async assertCurrent(input) {
+      try {
+        if (input.action !== "reanchor" || !input.session || !input.authority) {
+          return { allowed: false, reason: "The installed Re-anchor guard requires its exact session and authority." };
+        }
+        const session = await sessions.get(input.session.id);
+        if (!session || (session.provider !== "claude" && session.provider !== "codex")
+          || session.status === "stale" || session.status === "unreachable"
+          || !session.capabilities.includes("controllable")
+          || sessionBindingDigest(session) !== sessionBindingDigest(input.session)) {
+          return { allowed: false, reason: "The exact protected Re-anchor session binding changed." };
+        }
+        const authority = await runtimeAuthorities.get(input.authority.id);
+        const now = options.runtime?.now?.() ?? new Date();
+        if (!authority || stableJson(authority) !== stableJson(input.authority) || authority.revokedAt
+          || !Number.isFinite(Date.parse(authority.issuedAt)) || Date.parse(authority.issuedAt) > now.getTime()
+          || !Number.isFinite(Date.parse(authority.expiresAt)) || Date.parse(authority.expiresAt) <= now.getTime()
+          || authority.sessionId !== session.id || authority.taskId !== session.taskId || authority.planRevision !== session.planRevision
+          || !sameRepositoryRoot(authority.repositoryRoot, input.target.repositoryRoot)
+          || !authority.allowedActions.includes("reanchor") || authority.prohibitedActions.includes("reanchor")) {
+          return { allowed: false, reason: "The exact scoped Re-anchor authority changed, expired, or no longer applies." };
+        }
+        const storedTarget = await executor.snapshots.get(input.target.id);
+        if (!storedTarget || storedTarget.completeness !== "complete" || stableJson(storedTarget) !== stableJson(input.target)
+          || !sameRepositoryRoot(storedTarget.repositoryRoot, session.workspaceRoot ?? "")) {
+          return { allowed: false, reason: "The protected Re-anchor target is absent, incomplete, or changed." };
+        }
+        const exactlyRebound = session.metadata["sxsy-b122.reanchor.newTargetSnapshotId"] === input.target.id
+          && session.metadata["sxsy-b122.reanchor.resumeAuthorized"] === "false";
+        const protectedOldBinding = session.targetSnapshotId === input.target.id && !exactlyRebound;
+        if (!protectedOldBinding) {
+          const resolved = await targetResolver.resolve({ definition: commandForAction("reanchor"), session });
+          if (!resolved || resolved.completeness !== "complete" || resolved.reasons.length !== 0
+            || targetSnapshotDigest(resolved) !== resolved.id || resolved.id !== input.target.id
+            || !sameRepositoryRoot(resolved.repositoryRoot, session.workspaceRoot ?? "")) {
+            return { allowed: false, reason: "The trusted current Re-anchor TargetSnapshot changed at the final effect boundary." };
+          }
+        }
+        const containment = await containmentManager.check(input.target.repositoryRoot, "adapter");
+        if (!containment.allowed) return containment;
+        return {
+          allowed: true,
+          reason: protectedOldBinding
+            ? "The exact protected old session target remains current."
+            : "The independently resolved new Re-anchor target remains current."
+        };
+      } catch {
+        return { allowed: false, reason: "The installed Re-anchor dual-target guard could not revalidate protected state." };
+      }
+    }
+  };
+  if (options.runtimePinPresence) {
+    reanchorRuntime = new InstalledDurableReanchorRuntime({
+      store,
+      sessions,
+      authorities: runtimeAuthorities,
+      snapshots: executor.snapshots,
+      targets: targetResolver,
+      containment: {
+        async inspect(repositoryRoot) {
+          const before = await containmentManager.get(repositoryRoot);
+          const decision = await containmentManager.check(repositoryRoot, "adapter");
+          const after = await containmentManager.get(repositoryRoot);
+          if (stableJson(before ?? null) !== stableJson(after ?? null)) {
+            return { allowed: false, fenceEpoch: after?.fenceEpoch ?? 0, reason: "The containment epoch changed during Re-anchor inspection." };
+          }
+          return { allowed: decision.allowed, fenceEpoch: after?.fenceEpoch ?? 0, reason: decision.reason };
+        }
+      },
+      effectGuard: reanchorEffectGuard,
+      presence: options.runtimePinPresence,
+      previewer: {
+        async preview(input) {
+          const context = await workflowContexts.current(input.session.id, input.oldTarget.id);
+          if (!context || context.authorityId !== input.authority.id
+            || !sameRepositoryRoot(context.repositoryRoot, input.oldTarget.repositoryRoot)
+            || context.evidence.plan.originSessionId !== input.session.id
+            || context.evidence.plan.taskId !== input.session.taskId
+            || context.evidence.plan.revision !== input.session.planRevision) {
+            throw new Error("Protected Re-anchor context, documentation, authority, task, or plan evidence is missing or stale.");
+          }
+          const targetChanged = input.oldTarget.id !== input.newTarget.id;
+          return {
+            summary: "Cooperatively stop the exact managed provider session, reread the protected instructions, task brief, authority, and project documentation, inspect current work, and return a structured report without resuming.",
+            discrepancies: [targetChanged
+              ? `The reviewed TargetSnapshot changed from ${input.oldTarget.id} to ${input.newTarget.id}.`
+              : "The repository TargetSnapshot identity is unchanged; the protected provider context will still be reread and reconciled."],
+            risks: ["The managed provider session will remain stopped and rebound to Unknown; Re-anchor never authorizes resume or rollback."],
+            questions: context.pendingDecisions.length
+              ? context.pendingDecisions.slice(0, 32).map((decision) => decision.question)
+              : ["Should a separate later action be reviewed if the managed work is to resume?"],
+            contextEvidence: context.evidence
+          };
+        }
+      },
+      applier: new ConfiguredProviderReanchorApplyPort(providerTransport, reanchorEffectGuard),
+      ...(options.runtime?.now ? { clock: () => options.runtime!.now!().toISOString() } : {})
+    });
+  }
   const hardwareSignalDispatcher = new CompanionHardwareSignalDispatcher(hardwareSignals, executor);
   const inspectContainmentSession = async (sessionId: string) => {
       const session = await sessions.get(sessionId);
@@ -811,7 +1146,114 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       })
     : undefined;
   const workflowCoordinator = new DurableWorkflowPreparationCoordinator(workflowContexts, sessions, executor.authorities, handoffs);
-  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, ...(containmentHistory ? { containmentHistory } : {}), ...(containmentRemote ? { containmentRemote } : {}), ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerDispatchProfileProvisioning ? { providerDispatchProfiles: providerDispatchProfileProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
+  const reanchorService = reanchorRuntime ? {
+    async eligibleAuthorities(sessionId: string, signal?: AbortSignal) {
+      if (signal?.aborted) throw new Error("The Re-anchor authority lookup was cancelled.");
+      const session = await sessions.get(sessionId);
+      if (!session || (session.provider !== "claude" && session.provider !== "codex")
+        || !session.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision
+        || session.status === "stale" || session.status === "unreachable"
+        || !session.capabilities.includes("controllable")) return [];
+      const now = options.runtime?.now?.() ?? new Date();
+      const eligible = (await runtimeAuthorities.list()).filter((grant) =>
+        !grant.revokedAt
+        && Number.isFinite(Date.parse(grant.issuedAt)) && Date.parse(grant.issuedAt) <= now.getTime()
+        && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now.getTime()
+        && sameRepositoryRoot(grant.repositoryRoot, session.workspaceRoot!)
+        && grant.sessionId === session.id && grant.taskId === session.taskId && grant.planRevision === session.planRevision
+        && grant.allowedActions.includes("reanchor") && !grant.prohibitedActions.includes("reanchor"));
+      if (signal?.aborted) throw new Error("The Re-anchor authority lookup was cancelled.");
+      return eligible
+        .sort((left, right) => left.expiresAt.localeCompare(right.expiresAt) || left.id.localeCompare(right.id))
+        .slice(0, 32)
+        .map((grant) => ({ id: grant.id, issuedBy: grant.issuedBy, expiresAt: grant.expiresAt }));
+    },
+    begin: (input: Parameters<InstalledDurableReanchorRuntime["begin"]>[0]) => reanchorRuntime!.begin(input),
+    confirmAndApply: (input: Parameters<InstalledDurableReanchorRuntime["confirmAndApply"]>[0]) => reanchorRuntime!.confirmAndApply(input),
+    get: (requestId: string) => reanchorRuntime!.get(requestId)
+  } : undefined;
+  const recoverInstalledAutomation = async (): Promise<void> => {
+    for (const state of await automationJournal.listRecoverable()) {
+      const recovery = state.recoveryBinding;
+      if (!recovery) continue;
+      if (!await automationManifestReviews.wasConsumed({ manifest: recovery.request.reviewedManifest, approval: recovery.request.manifestApproval })) continue;
+      const admitted = recovery.request;
+      const executionControl = {
+        operationId: admitted.executionControl.operationId,
+        ...(admitted.executionControl.budgetClaimId ? { budgetClaimId: admitted.executionControl.budgetClaimId } : {}),
+        deadline: admitted.executionControl.deadline,
+        async isCancellationRequested(): Promise<boolean> {
+          const operation = await executor.operations.get(admitted.operationId);
+          if (!operation || operation.action !== admitted.action || operation.targetSnapshotId !== admitted.target.id
+            || operation.details.sessionId !== admitted.session.id || operation.details.authorityId !== admitted.authority.id
+            || operation.state !== "executing" || Date.parse(admitted.executionControl.deadline) <= (options.runtime?.now?.() ?? new Date()).getTime()) return true;
+          if (!admitted.executionControl.budgetClaimId) return false;
+          const claim = (await executor.budgets.list()).find((candidate) => candidate.id === admitted.executionControl.budgetClaimId);
+          return !claim || claim.operationId !== admitted.operationId || claim.expiresAt !== admitted.executionControl.deadline || claim.state !== "running";
+        }
+      };
+      const request: AutomationRequest = {
+        action: admitted.action,
+        operationId: admitted.operationId,
+        target: admitted.target,
+        session: admitted.session,
+        authority: admitted.authority,
+        permit: admitted.permit,
+        confirmation: admitted.confirmation,
+        executionControl,
+        ...(admitted.testEnvironment ? { testEnvironment: admitted.testEnvironment } : {}),
+        reviewedManifest: admitted.reviewedManifest,
+        manifestApproval: admitted.manifestApproval,
+        effectGuard: {
+          async assertCurrent() {
+            return { allowed: false, reason: "Startup recovery cannot replay the already-consumed admission guard; authenticated runtime state is required." };
+          }
+        }
+      };
+      const recoveryPolicy: PermitVerifier = {
+        verifyPermit(permit, binding) {
+          return stableJson(permit) === stableJson(admitted.permit)
+            && binding.action === admitted.action && binding.operationId === admitted.operationId
+            && binding.targetSnapshotId === admitted.target.id && binding.sessionId === admitted.session.id
+            && binding.authorityId === admitted.authority.id;
+        }
+      };
+      let receipt: AutomationEffectReceipt | null = null;
+      try {
+        receipt = await createInstalledAutomationExecutor(request, recovery.envelope, recoveryPolicy).execute({
+          envelope: recovery.envelope,
+          currentManifestContext: {
+            repositoryRoot: recovery.envelope.manifest.repositoryRoot,
+            targetSnapshotId: recovery.envelope.manifest.targetSnapshotId,
+            sessionId: recovery.envelope.manifest.sessionId,
+            authorityId: recovery.envelope.manifest.authorityId,
+            taskId: recovery.envelope.manifest.taskId,
+            planRevision: recovery.envelope.manifest.planRevision,
+            provider: recovery.envelope.manifest.provider,
+            createdAt: recovery.envelope.manifest.createdAt,
+            expiresAt: recovery.envelope.manifest.expiresAt
+          },
+          ...(recovery.instructionFileConsent ? { instructionFileConsent: recovery.instructionFileConsent } : {})
+        });
+      } catch (error) {
+        if (error instanceof AutomationEffectExecutionError) receipt = error.receipt;
+      }
+      if (!receipt || receipt.status === "recovery_required") continue;
+      await executor.completeExternalOperation({
+        operationId: admitted.operationId,
+        action: admitted.action,
+        targetSnapshotId: admitted.target.id,
+        status: receipt.status === "committed" ? "completed" : "failed",
+        effectDisposition: receipt.status === "committed" ? "committed" : "compensated",
+        summary: receipt.status === "committed"
+          ? "Startup recovery observed the exact durable automation completion without replay."
+          : "Startup recovery durably compensated the interrupted automation operation.",
+        evidenceDigest: receipt.digest,
+        toolVersions: { "b122.automation-effect-executor": "1" }
+      });
+    }
+  };
+  const service = new CompanionService({ executor, hostActions, hardwareSignals, handoffs, workflowArtifacts, workflowCoordinator, voice, voiceRuntime, containmentRelease, councilResources, providerMediatedFinalCurrent, automationManifestCoordinator, automationManifestReviews, debugStops, ...(reanchorService ? { reanchor: reanchorService } : {}), ...(containmentHistory ? { containmentHistory } : {}), ...(containmentRemote ? { containmentRemote } : {}), ...(options.runtimePinPresence ? { voicePresence: options.runtimePinPresence } : {}), ...(gitReviews ? { gitReviews } : {}), ...(runtimePins ? { runtimePins } : {}), ...(sandboxInstallations ? { sandboxInstallations } : {}), ...(credentialProvisioning ? { credentialProvisioning } : {}), ...(networkPolicyProvisioning ? { networkPolicyProvisioning } : {}), ...(providerDispatchProfileProvisioning ? { providerDispatchProfiles: providerDispatchProfileProvisioning } : {}), ...(providerHandshakes ? { providerHandshakes } : {}), ...(rawHidInstallations ? { rawHidInstallations } : {}), ...(rawHidSupervisor ? { rawHidSupervisor } : {}), ...(acceptanceAdministration ? { acceptanceAdministration } : {}), ...(scannerAdministration ? { scannerAdministration } : {}), ...(providerDesktopRegistry ? { providerDesktopRegistry } : {}) });
   const endpoint = new DurableCompanionEndpoint(service, sessions, {
     refreshSessions: async () => {
       await providerGateway.refreshSessions();
@@ -824,6 +1266,9 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
       await repositoryRuntimes.recoverManagedProcesses();
       await councilIsolation.recoverPending();
       await councilLifecycle.start();
+      await reanchorRuntime?.recover();
+      await configuredProviderOperations?.recoverAfterRestart();
+      await recoverInstalledAutomation();
       await executor.recoverAfterRestart();
       await hardwareSignals.recoverAfterRestart();
     }
@@ -855,6 +1300,10 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
     councilIsolation,
     councilResources,
     councilLifecycle,
+    ...(reanchorRuntime ? { reanchor: reanchorRuntime } : {}),
+    automationManifestReviews,
+    automationManifestCoordinator,
+    debugStops,
     scannerFixtures,
     ...(acceptanceAdministration ? { acceptanceAdministration } : {}),
     ...(scannerAdministration ? { scannerAdministration } : {}),
@@ -895,4 +1344,12 @@ const unavailableCredentialProtector: UserSecretProtector = {
 function hostReceiptEvidenceIssuer(value: DispatchReceiptEvidenceFactory | undefined): HostReceiptEvidenceIssuer | undefined {
   const candidate = value as Partial<HostReceiptEvidenceIssuer> | undefined;
   return typeof candidate?.issueRepositoryRecipeEvidence === "function" ? candidate as HostReceiptEvidenceIssuer : undefined;
+}
+
+function sameRepositoryRoot(left: string, right: string): boolean {
+  const normalize = (value: string) => {
+    const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
+    return /^[a-z]:\//i.test(normalized) ? normalized.toLowerCase() : normalized;
+  };
+  return !!left && !!right && normalize(left) === normalize(right);
 }

@@ -29,6 +29,27 @@ export interface SessionTargetRebindResult {
   readonly session?: ManagedSession;
 }
 
+/**
+ * A host-observed effect may legitimately produce a new content-addressed
+ * TargetSnapshot. This binding is deliberately separate from Re-anchor:
+ * accepting the exact transition does not authorize resume or invent a
+ * lifecycle state change.
+ */
+export interface SessionEffectTargetTransitionRequest {
+  readonly sessionId: string;
+  readonly expectedBindingDigest: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly operationId: string;
+  readonly action: string;
+}
+
+export interface SessionEffectTargetTransitionResult {
+  readonly outcome: "transitioned" | "already_transitioned" | "unknown";
+  readonly reason: string;
+  readonly session?: ManagedSession;
+}
+
 export interface CapabilityDecision {
   readonly allowed: boolean;
   readonly missing: readonly Capability[];
@@ -138,6 +159,20 @@ function reboundSession(source: ManagedSession, input: SessionTargetRebindReques
       "sxsy-b122.reanchor.oldTargetSnapshotId": input.oldTargetSnapshotId,
       "sxsy-b122.reanchor.newTargetSnapshotId": input.newTargetSnapshotId,
       "sxsy-b122.reanchor.resumeAuthorized": "false"
+    }
+  };
+}
+
+function effectTransitionedSession(source: ManagedSession, input: SessionEffectTargetTransitionRequest): ManagedSession {
+  return {
+    ...source,
+    targetSnapshotId: input.newTargetSnapshotId,
+    metadata: {
+      ...source.metadata,
+      "sxsy-b122.effectTransition.action": input.action,
+      "sxsy-b122.effectTransition.operationId": input.operationId,
+      "sxsy-b122.effectTransition.oldTargetSnapshotId": input.oldTargetSnapshotId,
+      "sxsy-b122.effectTransition.newTargetSnapshotId": input.newTargetSnapshotId
     }
   };
 }
@@ -265,6 +300,38 @@ export class SessionRegistry {
     });
   }
 
+  /**
+   * Atomically accepts one exact host-observed target transition caused by a
+   * named durable operation. Binding churn loses the race and stays unknown;
+   * replay is idempotent only for the same operation/action/old/new tuple.
+   */
+  async compareAndSwapEffectTarget(input: SessionEffectTargetTransitionRequest): Promise<SessionEffectTargetTransitionResult> {
+    const exact = exactEffectTargetTransition(input);
+    return this.store.transaction(async (transaction) => {
+      const entries = await transaction.readEntries();
+      const sessions = sessionMap(entries);
+      const existing = sessions.get(exact.sessionId);
+      if (!existing) return { outcome: "unknown", reason: "The managed session disappeared before its effect target transition could be recorded." };
+      const historical = historicalSessionForEffectTransition(entries, exact);
+      const exactReplay = existing.metadata["sxsy-b122.effectTransition.action"] === exact.action
+        && existing.metadata["sxsy-b122.effectTransition.operationId"] === exact.operationId
+        && existing.metadata["sxsy-b122.effectTransition.oldTargetSnapshotId"] === exact.oldTargetSnapshotId
+        && existing.metadata["sxsy-b122.effectTransition.newTargetSnapshotId"] === exact.newTargetSnapshotId
+        && existing.targetSnapshotId === exact.newTargetSnapshotId
+        && !!historical
+        && sessionBindingDigest(existing) === sessionBindingDigest(effectTransitionedSession(historical, exact));
+      if (exactReplay) {
+        return { outcome: "already_transitioned", reason: "The exact effect operation already owns this protected target transition.", session: cloneSession(existing) };
+      }
+      if (existing.targetSnapshotId !== exact.oldTargetSnapshotId || sessionBindingDigest(existing) !== exact.expectedBindingDigest) {
+        return { outcome: "unknown", reason: "The managed session binding changed before the effect target compare-and-swap.", session: cloneSession(existing) };
+      }
+      const transitioned = effectTransitionedSession(existing, exact);
+      await transaction.append<SessionSavedEvent>("session.updated", { session: transitioned });
+      return { outcome: "transitioned", reason: "The exact host-observed effect target transition was recorded.", session: cloneSession(transitioned) };
+    });
+  }
+
   async markUnreachable(id: string): Promise<ManagedSession> {
     return this.setStatus(id, "unreachable");
   }
@@ -355,5 +422,40 @@ function exactTargetRebind(value: SessionTargetRebindRequest): SessionTargetRebi
     oldTargetSnapshotId: digest(value.oldTargetSnapshotId, "oldTargetSnapshotId"),
     newTargetSnapshotId: digest(value.newTargetSnapshotId, "newTargetSnapshotId"),
     operationId
+  };
+}
+
+function historicalSessionForEffectTransition(entries: readonly JournalEntry<unknown>[], input: SessionEffectTargetTransitionRequest): ManagedSession | undefined {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index]!;
+    if (entry.kind !== "session.registered" && entry.kind !== "session.updated") continue;
+    const candidate = (entry.payload as SessionSavedEvent | undefined)?.session;
+    if (!candidate || candidate.id !== input.sessionId || candidate.targetSnapshotId !== input.oldTargetSnapshotId) continue;
+    if (sessionBindingDigest(candidate) === input.expectedBindingDigest) return cloneSession(candidate);
+  }
+  return undefined;
+}
+
+function exactEffectTargetTransition(value: SessionEffectTargetTransitionRequest): SessionEffectTargetTransitionRequest {
+  const keys = ["sessionId", "expectedBindingDigest", "oldTargetSnapshotId", "newTargetSnapshotId", "operationId", "action"] as const;
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).length !== keys.length || keys.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
+    throw new SessionRegistryError("An effect target compare-and-swap requires one closed exact operation/action/session binding.");
+  }
+  const digest = (input: string, field: string): string => {
+    if (typeof input !== "string" || !/^[a-f0-9]{64}$/.test(input)) throw new SessionRegistryError(`${field} must be an exact SHA-256 digest.`);
+    return input;
+  };
+  const operationId = nonEmpty(value.operationId, "operationId");
+  const action = nonEmpty(value.action, "action");
+  if (operationId.length > 256 || /[\0\r\n]/u.test(operationId)) throw new SessionRegistryError("operationId must be one bounded durable operation identity.");
+  if (action.length > 128 || !/^[a-z][a-z0-9_]*$/u.test(action)) throw new SessionRegistryError("action must be one canonical command action.");
+  return {
+    sessionId: nonEmpty(value.sessionId, "sessionId"),
+    expectedBindingDigest: digest(value.expectedBindingDigest, "expectedBindingDigest"),
+    oldTargetSnapshotId: digest(value.oldTargetSnapshotId, "oldTargetSnapshotId"),
+    newTargetSnapshotId: digest(value.newTargetSnapshotId, "newTargetSnapshotId"),
+    operationId,
+    action
   };
 }

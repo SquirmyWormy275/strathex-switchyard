@@ -2,7 +2,10 @@
 
 > **Branch-local evidence, 2026-08-23.** This record covers the candidate
 > remediation only. It does not merge, accept, or supersede the 27 B122
-> acceptance gates.
+> acceptance gates. It is retained as a point-in-time candidate record, not a
+> current completion ledger. Current mechanism claims are controlled by
+> [`software-only-completion-audit.md`](software-only-completion-audit.md) and
+> [`software-residual-ledger.md`](software-residual-ledger.md).
 
 ## Scope closed in this candidate
 

@@ -133,6 +133,44 @@ test("session target compare-and-swap rebinds once, forces unknown state, and is
   });
 });
 
+test("effect target transition compare-and-swap preserves liveness and is idempotent only for one exact action", async () => {
+  await withStore(async (store) => {
+    const registry = new SessionRegistry(store);
+    const original = await registry.register({
+      id: "session-effect-transition", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "mediated"],
+      status: "running", workspaceRoot: "C:/repos/effect", targetSnapshotId: "5".repeat(64), taskId: "task-effect", planRevision: "plan-effect",
+      plannedFiles: ["src/effect.ts"], adapterVersion: "provider-v1", metadata: { source: "trusted-host" }
+    });
+    const expectedBindingDigest = sessionBindingDigest(original);
+    const input = {
+      sessionId: original.id,
+      expectedBindingDigest,
+      oldTargetSnapshotId: original.targetSnapshotId!,
+      newTargetSnapshotId: "6".repeat(64),
+      operationId: `operation:${"7".repeat(64)}`,
+      action: "venv"
+    } as const;
+
+    const transitioned = await registry.compareAndSwapEffectTarget(input);
+    assert.equal(transitioned.outcome, "transitioned");
+    assert.equal(transitioned.session?.targetSnapshotId, input.newTargetSnapshotId);
+    assert.equal(transitioned.session?.status, original.status, "an accepted effect transition does not invent a lifecycle change");
+    assert.equal(transitioned.session?.metadata["sxsy-b122.effectTransition.action"], "venv");
+    assert.equal(transitioned.session?.metadata["sxsy-b122.effectTransition.operationId"], input.operationId);
+
+    const replayed = await new SessionRegistry(store).compareAndSwapEffectTarget(input);
+    assert.equal(replayed.outcome, "already_transitioned");
+    assert.equal(replayed.session?.targetSnapshotId, input.newTargetSnapshotId);
+
+    const confused = await registry.compareAndSwapEffectTarget({ ...input, action: "plan_approval" });
+    assert.equal(confused.outcome, "unknown", "an operation/action pair cannot be reinterpreted as another transition");
+
+    await registry.updateBinding(original.id, { planRevision: "changed-after-transition" });
+    const changedReplay = await registry.compareAndSwapEffectTarget(input);
+    assert.equal(changedReplay.outcome, "unknown", "post-transition binding churn prevents replay from being treated as idempotent");
+  });
+});
+
 test("concurrent target compare-and-swap lets only one exact re-anchor operation own the binding", async () => {
   await withStore(async (store) => {
     const registry = new SessionRegistry(store);

@@ -143,11 +143,153 @@ test("authenticated emergency containment is an explicit broker fence, never a r
   });
   const confirmation = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: grant(definition.action).id, reason: "incident", reauthenticated: true });
   const containment = new InMemoryContainmentManager();
-  const controlPlane = new CommandDispatcher({ policy, sessions: { get: () => session }, authorities: { get: () => grant(definition.action) }, containment });
+  let finalGuardCalls = 0;
+  const controlPlane = new CommandDispatcher({
+    policy,
+    sessions: { get: () => session },
+    authorities: { get: () => grant(definition.action) },
+    containment,
+    governance: {
+      admit: async () => ({
+        allowed: true,
+        summary: "isolated final-current admission",
+        effectGuard: {
+          assertCurrent: async () => {
+            finalGuardCalls += 1;
+            return { allowed: true, reason: "The exact target, session, and authority remain current." };
+          }
+        }
+      }),
+      observeResult: async (_input, _admission, result) => result
+    }
+  });
   const assignment = definition.assignment!;
   const result = await controlPlane.dispatch({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, targetSnapshot: target, authorityId: grant(definition.action).id, confirmationToken: confirmation.token });
   assert.equal(result.status, "completed");
+  assert.equal(finalGuardCalls, 1);
   assert.equal(containment.check(target.repositoryRoot, "git").allowed, false);
+});
+
+test("emergency containment cannot activate after its final target guard refuses", async () => {
+  const definition = commandForAction("emergency_containment");
+  const policy = new PolicyEngine({
+    version: "policy-1", now: () => new Date(now), highConsequenceActions: [definition.action],
+    gateEvidence: Object.fromEntries(definition.acceptanceGates.map((gate) => [gate, "passed"]))
+  });
+  const authority = grant(definition.action);
+  const confirmation = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "incident", reauthenticated: true });
+  const containment = new InMemoryContainmentManager();
+  const controlPlane = new CommandDispatcher({
+    policy,
+    sessions: { get: () => session },
+    authorities: { get: () => authority },
+    containment,
+    governance: {
+      admit: async () => ({
+        allowed: true,
+        summary: "isolated final-current admission",
+        effectGuard: { assertCurrent: async () => ({ allowed: false, reason: "The protected target changed after admission." }) }
+      }),
+      observeResult: async (_input, _admission, result) => result
+    }
+  });
+  const assignment = definition.assignment!;
+
+  const result = await controlPlane.dispatch({
+    assignment, control: assignment.control, modifier: assignment.modifier,
+    sessionId: session.id, targetSnapshot: target, authorityId: authority.id, confirmationToken: confirmation.token
+  });
+
+  assert.equal(result.status, "incomplete");
+  assert.match(result.summary, /changed after admission/i);
+  assert.equal(containment.check(target.repositoryRoot, "git").allowed, true);
+});
+
+test("administrative containment release crosses one operation-bound final guard immediately before release", async () => {
+  const definition = commandForAction("containment_release");
+  const policy = new PolicyEngine({
+    version: "policy-1", now: () => new Date(now), highConsequenceActions: [definition.action],
+    gateEvidence: Object.fromEntries(definition.acceptanceGates.map((gate) => [gate, "passed"]))
+  });
+  const authority = grant(definition.action);
+  const confirmation = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "release reviewed fence", reauthenticated: true });
+  let releases = 0;
+  let guardedOperationId: string | undefined;
+  const containment = {
+    activate: () => { throw new Error("not used"); },
+    check: () => ({ allowed: false, reason: "active" }),
+    release: () => { releases += 1; return { status: "released" as const, reason: "The exact reviewed fence was released." }; }
+  };
+  const controlPlane = new CommandDispatcher({ policy, sessions: { get: () => session }, authorities: { get: () => authority }, containment });
+
+  const result = await controlPlane.dispatchContainmentRelease({
+    targetSnapshot: target,
+    sessionId: session.id,
+    authorityId: authority.id,
+    confirmationToken: confirmation.token,
+    effectGuardFactory: (operationId) => ({
+      assertCurrent: async (input) => {
+        guardedOperationId = operationId;
+        assert.equal(input.operationId, operationId);
+        assert.equal(input.action, "containment_release");
+        assert.equal(input.target.id, target.id);
+        assert.equal(input.session?.id, session.id);
+        assert.equal(input.authority?.id, authority.id);
+        return { allowed: true, reason: "The exact release binding remains current." };
+      }
+    }),
+    review: {
+      reauthenticated: true,
+      reason: "release reviewed fence",
+      expectedFenceEpoch: 1,
+      expectedActivationOperationId: "containment-activation-1",
+      expectedIncidentId: `containment-incident:${"a".repeat(64)}`,
+      expectedIncidentDigest: "b".repeat(64),
+      expectedAssessmentTargetSnapshotId: target.id
+    }
+  });
+
+  assert.equal(result.status, "completed");
+  assert.equal(releases, 1);
+  assert.equal(guardedOperationId, result.operationId);
+});
+
+test("administrative containment release remains active when its final guard refuses", async () => {
+  const definition = commandForAction("containment_release");
+  const policy = new PolicyEngine({
+    version: "policy-1", now: () => new Date(now), highConsequenceActions: [definition.action],
+    gateEvidence: Object.fromEntries(definition.acceptanceGates.map((gate) => [gate, "passed"]))
+  });
+  const authority = grant(definition.action);
+  const confirmation = policy.createConfirmation({ action: definition.action, targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "release reviewed fence", reauthenticated: true });
+  let releases = 0;
+  const containment = {
+    activate: () => { throw new Error("not used"); },
+    check: () => ({ allowed: false, reason: "active" }),
+    release: () => { releases += 1; return { status: "released" as const, reason: "must not run" }; }
+  };
+  const controlPlane = new CommandDispatcher({ policy, sessions: { get: () => session }, authorities: { get: () => authority }, containment });
+
+  const result = await controlPlane.dispatchContainmentRelease({
+    targetSnapshot: target,
+    sessionId: session.id,
+    authorityId: authority.id,
+    confirmationToken: confirmation.token,
+    effectGuardFactory: () => ({ assertCurrent: async () => ({ allowed: false, reason: "The authority changed after review." }) }),
+    review: {
+      reauthenticated: true,
+      reason: "release reviewed fence",
+      expectedFenceEpoch: 1,
+      expectedActivationOperationId: "containment-activation-1",
+      expectedIncidentId: `containment-incident:${"a".repeat(64)}`,
+      expectedIncidentDigest: "b".repeat(64),
+      expectedAssessmentTargetSnapshotId: target.id
+    }
+  });
+
+  assert.equal(result.status, "incomplete");
+  assert.match(result.summary, /authority changed/i);
+  assert.equal(releases, 0);
 });
 
 test("active containment blocks Council before the coordinator can receive a report request", async () => {

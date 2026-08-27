@@ -6,6 +6,7 @@ import type { ContainmentRemediationAction, ContainmentRemediationBinding } from
 import type { ExecutionControl } from "./execution-control.ts";
 import { readDurableCancellation } from "./execution-cancellation.ts";
 import type { ChildOperationSaga } from "./operations.ts";
+import type { AutomationManifestApproval, AutomationOperationManifest } from "./automation-operation-manifest.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 import type { PermitBinding, PolicyPermit } from "./policy.ts";
 import { validateRecipe, type RepositoryRecipe } from "./recipes.ts";
@@ -120,6 +121,12 @@ export interface ExecutionRecipe {
 
 export interface ExecutionRequest extends BrokerInvocation {
   readonly recipe: ExecutionRecipe;
+  /**
+   * Host-recovered effect target for split-identity controls such as Alt-Run.
+   * It is never copied from CommandRequest input; the provider session in
+   * `session` remains the policy and authority source.
+   */
+  readonly effectSession?: ManagedSession;
 }
 
 /** Runtime boundary for an allowlisted structured executor. */
@@ -507,6 +514,9 @@ export class InMemoryIsolationRuntime implements IsolationRuntime {
 
 export interface AutomationRequest extends BrokerInvocation {
   readonly testEnvironment?: TestEnvironment;
+  /** Exact protected proposal and one-use current-user approval. */
+  readonly reviewedManifest?: AutomationOperationManifest;
+  readonly manifestApproval?: AutomationManifestApproval;
 }
 export interface AutomationBroker { execute(request: AutomationRequest): Promise<BrokerOutcome>; }
 export type AutomationHandler = (request: AutomationRequest) => MaybePromise<BrokerOutcome>;

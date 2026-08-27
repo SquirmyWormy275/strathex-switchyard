@@ -1,18 +1,19 @@
 import type { AdapterOutcome, AdapterRequest, CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import { InMemoryAutomationBroker, type AutomationBroker, type AutomationRequest, type BrokerConfirmation, type BrokerOutcome, type ContainmentGuard, type EffectGuard, type PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
+import type { AutomationBroker, AutomationRequest, BrokerConfirmation, BrokerOutcome, ContainmentGuard, EffectGuard, PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { AuthorityGrant, Capability, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import { redactRecord, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
-import { parseWorkflowChildProviderResponse, parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowChildProviderResponse, type WorkflowProviderEffectBinding, type WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { parseWorkflowChildProviderResponse, parseWorkflowProviderResponse, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactStore, type WorkflowChildProviderResponse, type WorkflowProviderEffectBinding, type WorkflowProviderResponse, type WorkflowProviderResult } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
 import { createDirectConfiguredNetworkBroker, type ConfiguredNetworkResult, type NetworkContainmentFence } from "./configured-network.ts";
 import type { CredentialAdapterPort } from "./durable-credentials.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import type { EffectTargetTransitionPort, EffectTargetTransitionResult } from "./effect-target-transition.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import { createDurableAbortControl, type DurableAbortControl } from "./execution-cancellation.ts";
 import type { ProviderDispatchLeaseArtifactBinding } from "../../provider-adapter-host/src/dispatch-lease.ts";
-import { automationRequestSchema, createAutomationIntent, parseAutomationProviderResult, type AutomationAction, type AutomationConfirmationBinding } from "../../../packages/control-plane/src/automation-protocol.ts";
+import type { ChildOperationLease } from "../../../packages/control-plane/src/operations.ts";
 
 export interface DynamicConfiguredNetworkOptions {
   readonly registry: DurableNetworkPolicyRegistry;
@@ -175,7 +176,12 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
   readonly kind = "provider" as const;
   private readonly network: ProviderCommandTransport;
   private readonly artifacts?: WorkflowArtifactDispatchPort;
-  constructor(network: ProviderCommandTransport, artifacts?: WorkflowArtifactStore | WorkflowArtifactDispatchPort) { this.network = network; this.artifacts = artifacts; }
+  private readonly targetTransitions?: EffectTargetTransitionPort;
+  constructor(network: ProviderCommandTransport, artifacts?: WorkflowArtifactStore | WorkflowArtifactDispatchPort, targetTransitions?: EffectTargetTransitionPort) {
+    this.network = network;
+    this.artifacts = artifacts;
+    this.targetTransitions = targetTransitions;
+  }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const action = providerWorkflowAction(request.definition.action);
@@ -202,9 +208,22 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       if (action === "proof_adversarial" || action === "authority_broadcast") return await this.executeIndependentChildren(request as AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>, artifact, control.signal);
       const routeId = `provider.${request.definition.action}`;
       const recoveryExternalId = this.network.recoveryExternalId?.({ routeId, operationId: request.operationId, provider: request.session.provider });
-      const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest, ...(recoveryExternalId ? { externalId: recoveryExternalId } : {}) } }) : undefined;
+      const recoveryDetails = {
+        repositoryRoot: request.target.repositoryRoot,
+        routeId,
+        targetSnapshotId: request.target.id,
+        artifactId: artifact.id,
+        artifactDigest: artifact.digest,
+        providerOperationId: request.operationId,
+        providerAction: request.definition.action,
+        sessionId: request.session.id,
+        provider: request.session.provider,
+        authorityId: request.authority.id,
+        ...(recoveryExternalId ? { externalId: recoveryExternalId } : {})
+      };
+      const child = request.childSaga ? await request.childSaga.begin({ action: routeId, idempotencyScope: `${artifact.id}:${routeId}`, details: recoveryDetails }) : undefined;
       if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } };
-      if (child) await request.childSaga!.markExecuting(child);
+      if (child) await request.childSaga!.markExecuting(child, recoveryDetails);
       const finish = async (outcome: AdapterOutcome, response?: WorkflowProviderResponse): Promise<AdapterOutcome> => {
         if (!child || !request.childSaga) return outcome;
         const disposition = outcome.effectDisposition ?? "ambiguous";
@@ -263,15 +282,52 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       let response: WorkflowProviderResponse;
       try { response = parseWorkflowProviderResponse(value, artifact); }
       catch { return finish({ status: "failed", summary: "The configured provider returned a result that did not match the exact typed artifact; the effect remains ambiguous.", effectDisposition: "ambiguous", data: { artifactId: artifact.id, artifactDigest: artifact.digest } }); }
+      let acceptedTransition: EffectTargetTransitionResult | undefined;
+      if (request.definition.action === "plan_approval") {
+        if (response.result.kind !== "plan" || response.result.mode !== "execution_ack") {
+          return finish({ status: "failed", summary: "Plan Approval returned no exact execution acknowledgement; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
+        }
+        const childEvidence = await this.recordPlanExecutionChildren(
+          request as AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>,
+          response.result.childEffects
+        );
+        if (!childEvidence.ok) {
+          return finish({ status: "failed", summary: childEvidence.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
+        }
+        if (!this.targetTransitions) {
+          return finish({ status: "failed", summary: "The plan execution was acknowledged, but no durable post-effect TargetSnapshot transition coordinator is installed; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
+        }
+        try {
+          const reviewedTransition = artifact.payload.kind === "plan" && artifact.payload.mode === "approve"
+            ? artifact.payload.plan.expectedTargetTransition
+            : undefined;
+          if (!reviewedTransition) throw new Error("The protected Plan Approval artifact lacks a pre-effect reviewed target transition.");
+          acceptedTransition = await this.targetTransitions.captureAndAccept({
+            action: "plan_approval",
+            operationId: request.operationId,
+            previousTarget: request.target,
+            session: request.session,
+            expectedTargetSnapshotId: reviewedTransition.expectedAfterTargetSnapshotId,
+            allowUnchanged: reviewedTransition.expectation === "unchanged"
+          });
+        } catch (error) {
+          return finish({
+            status: "failed",
+            summary: `The provider plan effect did not match its reviewed expected TargetSnapshot transition: ${untrustedSummary((error as Error).message)} Reconciliation is required.`,
+            effectDisposition: response.effectDisposition,
+            data: workflowOutcomeData(artifact, response)
+          }, response);
+        }
+      }
       let postEffectDenial: string | undefined;
-      try {
-        if (control.signal.aborted) postEffectDenial = "The durable provider operation was cancelled after the external effect boundary.";
-        else {
+      if (control.signal.aborted) postEffectDenial = "The durable provider operation was cancelled after the external effect boundary.";
+      else if (!acceptedTransition) {
+        try {
           const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId, target: request.target, session: request.session, authority: request.authority });
           if (!current.allowed) postEffectDenial = current.reason;
           else if (control.signal.aborted) postEffectDenial = "The durable provider operation was cancelled during its post-effect target check.";
-        }
-      } catch { postEffectDenial = "The exact provider target could not be revalidated after the external effect boundary."; }
+        } catch { postEffectDenial = "The exact provider target could not be revalidated after the external effect boundary."; }
+      }
       if (postEffectDenial) return finish({
         status: "failed",
         summary: `${postEffectDenial} The provider result was not acknowledged and exact reconciliation is required.`,
@@ -280,8 +336,53 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
       }, response);
       try { await this.artifacts.acknowledge(response); }
       catch { return finish({ status: "failed", summary: "The provider result was valid but could not be durably acknowledged; reconciliation is required.", effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response); }
-      return finish({ status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data: workflowOutcomeData(artifact, response) }, response);
+      const data = {
+        ...workflowOutcomeData(artifact, response),
+        ...(acceptedTransition ? {
+          previousTargetSnapshotId: request.target.id,
+          acceptedTargetSnapshotId: acceptedTransition.target.id,
+          targetTransitionStatus: acceptedTransition.status
+        } : {})
+      };
+      return finish({ status: response.status, summary: response.summary, effectDisposition: response.effectDisposition, data }, response);
     } finally { control.dispose(); }
+  }
+
+  private async recordPlanExecutionChildren(
+    request: AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>,
+    effects: Extract<WorkflowProviderResult, { kind: "plan"; mode: "execution_ack" }>["childEffects"]
+  ): Promise<Readonly<{ ok: true } | { ok: false; summary: string }>> {
+    if (!request.childSaga) return { ok: false, summary: "Plan Approval returned provider child effects without a durable child-operation coordinator; reconciliation is required." };
+    for (const effect of effects) {
+      const details = {
+        repositoryRoot: request.target.repositoryRoot,
+        targetSnapshotId: request.target.id,
+        provider: request.session.provider,
+        sessionId: request.session.id,
+        authorityId: request.authority.id,
+        providerChildEffectId: effect.id,
+        providerChildStatus: effect.status,
+        providerChildDisposition: effect.effectDisposition,
+        ...(effect.externalId ? { externalId: effect.externalId } : {})
+      };
+      const lease = await request.childSaga.begin({
+        action: effect.action,
+        idempotencyScope: `${request.operationId}:plan-child:${effect.id}`,
+        details
+      });
+      if (!lease.mayExecute) return { ok: false, summary: "A previously observed plan child effect is non-terminal or ambiguous; it was not overwritten or replayed." };
+      await request.childSaga.markExecuting(lease, details);
+      if (effect.effectDisposition === "not_started") await request.childSaga.settle(lease, "failed", details);
+      else if (effect.effectDisposition === "committed") {
+        await request.childSaga.markExternalCommitted(lease, details);
+        if (effect.status === "completed") await request.childSaga.settle(lease, "completed", details);
+        else if (effect.status === "failed") await request.childSaga.settle(lease, "ambiguous", details);
+      } else if (effect.effectDisposition === "compensated") {
+        await request.childSaga.markCompensating(lease);
+        await request.childSaga.settle(lease, "cancelled", details);
+      } else await request.childSaga.settle(lease, "ambiguous", details);
+    }
+    return { ok: true };
   }
 
   private async executeIndependentChildren(request: AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>, initialArtifact: WorkflowArtifact, signal: AbortSignal): Promise<AdapterOutcome> {
@@ -294,14 +395,38 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
     for (const effect of effects) {
       const idempotencyScope = `${artifact.id}:${effect.role}:${effect.bindingDigest}`;
       const lease = await request.childSaga.begin({
-        action: `${routeId}.${effect.provider}`,
+        action: request.definition.action,
         idempotencyScope,
         details: { repositoryRoot: request.target.repositoryRoot, routeId, targetSnapshotId: request.target.id, artifactId: artifact.id, artifactDigest: artifact.digest, bindingDigest: effect.bindingDigest, provider: effect.provider }
       });
+      const recoveryExternalId = this.network.recoveryExternalId?.({ routeId, operationId: lease.operationId, provider: effect.provider });
+      const recoveryDetails = {
+        repositoryRoot: request.target.repositoryRoot,
+        routeId,
+        targetSnapshotId: request.target.id,
+        artifactId: artifact.id,
+        artifactDigest: artifact.digest,
+        bindingDigest: effect.bindingDigest,
+        providerOperationId: lease.operationId,
+        providerAction: request.definition.action,
+        sessionId: effect.session.id,
+        provider: effect.provider,
+        authorityId: effect.authority.id,
+        ...(recoveryExternalId ? { externalId: recoveryExternalId } : {})
+      };
+      let childGuard: EffectGuard;
+      try { childGuard = compositeChildEffectGuard(request, lease, effect); }
+      catch {
+        if (lease.mayExecute) {
+          await request.childSaga.markExecuting(lease, recoveryDetails).catch(() => undefined);
+          await request.childSaga.settle(lease, "failed", { bindingDigest: effect.bindingDigest, idempotencyScope, reason: "invalid-child-binding" }).catch(() => undefined);
+        }
+        return compositeIncomplete(artifact, results, "The durable provider child lease changed its exact parent, action, or target binding.", lease.existing ? "ambiguous" : "not_started");
+      }
       const durable = results.get(effect.bindingDigest);
       if (durable) {
         if (!lease.existing && lease.mayExecute) {
-          await request.childSaga.markExecuting(lease);
+          await request.childSaga.markExecuting(lease, recoveryDetails);
           if (durable.effectDisposition === "committed") await request.childSaga.markExternalCommitted(lease, compositeChildDetails(artifact, routeId, idempotencyScope, durable));
           await request.childSaga.settle(lease, durable.effectDisposition === "committed" ? "completed" : "failed", compositeChildDetails(artifact, routeId, idempotencyScope, durable));
         } else if (lease.state !== "recorded" && lease.state !== "failed") {
@@ -310,8 +435,8 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         continue;
       }
       if (!lease.mayExecute) return compositeIncomplete(artifact, results, "A prior provider child may have executed without a durable typed result and was not replayed.", "ambiguous");
-      await request.childSaga.markExecuting(lease);
-      const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority });
+      await request.childSaga.markExecuting(lease, recoveryDetails);
+      const current = await childGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority });
       if (!current.allowed || signal.aborted) {
         await request.childSaga.settle(lease, "failed", { bindingDigest: effect.bindingDigest, idempotencyScope, reason: current.reason });
         return { status: signal.aborted ? "cancelled" : "blocked", summary: current.reason, effectDisposition: "not_started", data: compositeData(artifact, results) };
@@ -329,7 +454,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
           body: JSON.stringify(providerChildDocument(request, artifact, effect, lease.operationId)),
           trustedDispatch: trustedProviderDispatch(request.definition.action, lease.operationId, request.target, effect.session, effect.authority, {
             id: artifact.id, digest: artifact.digest, coordinatorContextDigest: artifact.coordinatorContextDigest ?? null, coordinatorContextRevision: artifact.coordinatorContextRevision ?? null
-          }, request.confirmation, request.effectGuard)
+          }, request.confirmation, childGuard)
         });
       } catch {
         await request.childSaga.settle(lease, "ambiguous", { bindingDigest: effect.bindingDigest, idempotencyScope });
@@ -349,7 +474,7 @@ export class ConfiguredProviderCommandAdapter implements CommandAdapter {
         return compositeIncomplete(artifact, results, "An independent provider child returned a malformed, aliased, or cross-boundary result; it was not replayed.", "ambiguous");
       }
       let after;
-      try { after = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority }); }
+      try { after = await childGuard.assertCurrent({ action: request.definition.action, operationId: lease.operationId, target: request.target, session: effect.session, authority: effect.authority }); }
       catch { after = { allowed: false, reason: "The exact child provider target could not be revalidated after the effect." }; }
       if (response.effectDisposition === "committed") await request.childSaga.markExternalCommitted(lease, compositeChildDetails(artifact, routeId, idempotencyScope, response));
       try {
@@ -401,6 +526,40 @@ function providerChildDocument(request: AdapterRequest & Required<Pick<AdapterRe
   };
 }
 
+/**
+ * A durable child owns its own operation identity, but the admitted runtime
+ * guard is deliberately pinned to the parent command. This wrapper accepts
+ * only the one child lease and immutable provider-effect binding, then asks
+ * the parent guard to revalidate the original admitted operation. It cannot
+ * be used to bless another child, recipient, target, or authority.
+ */
+function compositeChildEffectGuard(
+  request: AdapterRequest & Required<Pick<AdapterRequest, "operationId" | "target" | "session" | "authority" | "effectGuard">>,
+  lease: ChildOperationLease,
+  effect: WorkflowProviderEffectBinding
+): EffectGuard {
+  if (lease.parentOperationId !== request.operationId || lease.action !== request.definition.action
+    || lease.targetSnapshotId !== request.target.id || !lease.operationId) {
+    throw new Error("The composite child lease changed its exact parent, action, target, or operation binding.");
+  }
+  return Object.freeze({
+    async assertCurrent(input: Parameters<EffectGuard["assertCurrent"]>[0]) {
+      const exactChild = input.action === request.definition.action && input.operationId === lease.operationId
+        && stableJson(input.target) === stableJson(request.target)
+        && stableJson(input.session) === stableJson(effect.session)
+        && stableJson(input.authority) === stableJson(effect.authority);
+      if (!exactChild) return { allowed: false, reason: "The provider child effect changed its exact operation, action, target, session, or authority binding." };
+      return request.effectGuard.assertCurrent({
+        action: request.definition.action,
+        operationId: request.operationId,
+        target: request.target,
+        session: request.session,
+        authority: request.authority
+      });
+    }
+  });
+}
+
 function compositeChildDetails(artifact: WorkflowArtifact, routeId: string, idempotencyScope: string, response: WorkflowChildProviderResponse): Readonly<Record<string, string>> {
   return { artifactId: artifact.id, routeId, idempotencyScope, bindingDigest: response.bindingDigest, provider: response.provider, ...(response.externalId ? { externalId: response.externalId } : {}) };
 }
@@ -445,123 +604,21 @@ function aggregateCompositeResponse(artifact: WorkflowArtifact, effects: readonl
 }
 
 export function createConfiguredAutomationBroker(policy: PermitVerifier, containment: ContainmentGuard, network: ProviderCommandTransport): AutomationBroker {
-  const broker = new InMemoryAutomationBroker(policy, containment);
-  for (const action of remoteAutomationActions) broker.register(action, async (request) => remoteAutomation(request, network));
-  return broker;
-}
-
-async function remoteAutomation(request: AutomationRequest, network: ProviderCommandTransport): Promise<BrokerOutcome> {
-  if (!request.effectGuard) return { status: "blocked", summary: "Configured automation requires a final dispatch-bound effect guard.", effectDisposition: "not_started" };
-  const current = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-  if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
-  const control = await operationAbort(request.executionControl);
-  try {
-    const routeId = `automation.${request.action}`;
-    const recoveryExternalId = request.session ? network.recoveryExternalId?.({ routeId, operationId: request.operationId, provider: request.session.provider }) : undefined;
-    const child = request.childSaga ? await request.childSaga.begin({
-      action: routeId,
-      idempotencyScope: `${request.operationId}:${routeId}`,
-      details: {
-        repositoryRoot: request.target.repositoryRoot,
-        routeId,
-        targetSnapshotId: request.target.id,
-        ...(recoveryExternalId ? { externalId: recoveryExternalId } : {})
-      }
-    }) : undefined;
-    if (child && !child.mayExecute) return { status: "failed", summary: "A prior provider automation effect requires exact reconciliation and was not replayed.", effectDisposition: "ambiguous" };
-    if (child) await request.childSaga!.markExecuting(child);
-    const finish = async (outcome: BrokerOutcome): Promise<BrokerOutcome> => {
-      if (!child || !request.childSaga) return outcome;
-      const details = { routeId, ...(recoveryExternalId ? { externalId: recoveryExternalId } : {}), ...externalIdDetails(outcome.data) };
-      const disposition = outcome.effectDisposition ?? "ambiguous";
-      if (disposition === "not_started") await request.childSaga.settle(child, "failed", details);
-      else if (disposition === "committed") {
-        await request.childSaga.markExternalCommitted(child, details);
-        if (outcome.status === "completed") await request.childSaga.settle(child, "completed", details);
-        else await request.childSaga.settle(child, "ambiguous", details);
-      } else if (disposition === "compensated") {
-        await request.childSaga.markCompensating(child);
-        await request.childSaga.settle(child, "cancelled", details);
-      } else await request.childSaga.settle(child, "ambiguous", details);
-      return outcome;
-    };
-    if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled before dispatch.", effectDisposition: "not_started" });
-    const action = request.action as AutomationAction;
-    const confirmationBinding: AutomationConfirmationBinding | undefined = request.confirmation ? {
-      digest: request.confirmation.confirmationDigest,
-      scopeDigest: request.confirmation.confirmationScopeDigest ?? ""
-    } : undefined;
-    let intent;
-    try {
-      intent = createAutomationIntent(action, confirmationBinding, request.testEnvironment ? { id: request.testEnvironment.id, egress: request.testEnvironment.egress, databaseName: request.testEnvironment.databaseName } : undefined);
-    } catch {
-      return finish({ status: "blocked", summary: "The action-specific automation intent lacks its exact confirmation or isolated-environment binding.", effectDisposition: "not_started" });
-    }
-    const document = {
-      schema: automationRequestSchema(action),
-      version: 1,
-      action,
-      operationId: request.operationId,
-      target: targetDocument(request.target),
-      session: request.session ? sessionDocument(request.session) : undefined,
-      authorityId: request.authority?.id,
-      intent
-    };
-    const final = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-    if (!final.allowed) return finish({ status: "blocked", summary: final.reason, effectDisposition: "not_started" });
-    if (control.signal.aborted) return finish({ status: "cancelled", summary: "Configured provider automation was cancelled immediately before dispatch.", effectDisposition: "not_started" });
-    let result: ConfiguredNetworkResult;
-    try {
-      if (!request.session || !request.authority) return finish({ status: "blocked", summary: "Configured provider automation requires one exact managed session and scoped authority.", effectDisposition: "not_started" });
-      result = await network.request({
-        routeId,
-        repositoryRoot: request.target.repositoryRoot,
-        body: JSON.stringify(document),
-        signal: control.signal,
-        trustedDispatch: trustedProviderDispatch(request.action, request.operationId, request.target, request.session, request.authority, null, request.confirmation, request.effectGuard)
-      });
-    }
-    catch { return finish({ status: "failed", summary: "The provider automation result was lost; exact observation is required.", effectDisposition: "ambiguous" }); }
-    let outcome: BrokerOutcome;
-    if (result.outcome !== "passed" || !result.body) {
-      const fallback = adapterOutcome(result);
-      outcome = { status: fallback.status === "awaiting_input" || fallback.status === "awaiting_confirmation" ? "incomplete" : fallback.status, summary: fallback.summary, effectDisposition: fallback.effectDisposition, ...(fallback.data ? { data: fallback.data } : {}) };
-    }
-    else {
-      try {
-        const parsed = parseAutomationProviderResult(JSON.parse(Buffer.from(result.body).toString("utf8")), action, request.operationId);
-        outcome = {
-          status: parsed.status === "awaiting_input" || parsed.status === "awaiting_confirmation" ? "incomplete" : parsed.status,
-          summary: untrustedSummary(parsed.summary),
-          effectDisposition: parsed.effectDisposition,
-          data: redactRecord({ externalId: parsed.externalId, action: parsed.action, result: parsed.result })
-        };
-      } catch {
-        outcome = { status: "failed", summary: "The configured automation provider returned a malformed or cross-action result; exact reconciliation is required.", effectDisposition: "ambiguous" };
-      }
-    }
-    let postEffectDenial: string | undefined;
-    try {
-      if (control.signal.aborted) postEffectDenial = "The durable automation operation was cancelled after the external effect boundary.";
-      else {
-        const currentAfter = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
-        if (!currentAfter.allowed) postEffectDenial = currentAfter.reason;
-        else if (control.signal.aborted) postEffectDenial = "The durable automation operation was cancelled during its post-effect target check.";
-      }
-    } catch { postEffectDenial = "The exact automation target could not be revalidated after the external effect boundary."; }
-    if (postEffectDenial) return finish({
-      status: "failed",
-      summary: `${postEffectDenial} Exact reconciliation is required.`,
-      effectDisposition: outcome.effectDisposition,
-      ...(outcome.data ? { data: outcome.data } : {})
-    });
-    return finish(outcome);
-  } finally { control.dispose(); }
-}
-
-function externalIdDetails(data: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, string>> {
-  const value = data?.externalId;
-  return typeof value === "string" && value.length <= 256 && !/[\0\r\n]/.test(value) ? { externalId: value } : {};
+  // Remote provider automation is intentionally not an installed execution
+  // boundary. Keep the historical factory signature for callers, but refuse
+  // before policy, containment, cancellation, effect guards, sagas, recovery,
+  // or any configured network transport can observe the request.
+  void policy;
+  void containment;
+  void network;
+  const unavailable: BrokerOutcome = Object.freeze({
+    status: "unavailable",
+    summary: "Remote provider automation is disabled; use the installed host-local automation executor. No remote effect was started.",
+    effectDisposition: "not_started"
+  });
+  return Object.freeze({
+    async execute(_request: AutomationRequest): Promise<BrokerOutcome> { return unavailable; }
+  });
 }
 
 function trustedProviderDispatch(action: CommandAction, operationId: string, target: TargetSnapshot, session: ManagedSession, authority: AuthorityGrant, artifact: ProviderDispatchLeaseArtifactBinding | null, confirmation: BrokerConfirmation | undefined, effectGuard: EffectGuard): TrustedProviderDispatchBinding {

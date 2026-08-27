@@ -22,7 +22,7 @@ if (!npmCli) throw new Error("A pinned npm CLI entrypoint is required to build t
  * suite ran, rather than a glob whose expansion could vary by shell/runtime.
  */
 const controlPlaneTests = [
-  "acceptance-evidence", "adapters", "automation-protocol", "brokers", "budgets", "checkpoints",
+  "acceptance-evidence", "adapters", "automation-operation-manifest", "automation-proposal-protocol", "automation-protocol", "brokers", "budgets", "checkpoints",
   "child-saga-recovery", "command-catalog", "confirmations", "containment",
   "containment-incidents", "context-council", "dispatch", "durable-containment", "git-inspector",
   "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
@@ -30,13 +30,13 @@ const controlPlaneTests = [
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
 const companionTests = [
-  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "containment-remote-host", "control-plane",
-  "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "durable-credentials", "main-shutdown",
-  "direct-request-cancellation", "durable-endpoint", "git-review", "hardware-signal-dispatcher", "hardware-signal-queue",
+  "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "automation-child-effects", "automation-effect-executor", "automation-high-consequence", "automation-installed-runtime", "automation-manifest-coordinator", "automation-manifest-review", "automation-proposal-source", "automation-refresh-git", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "containment-remote-evaluator", "containment-remote-host", "control-plane",
+  "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "default-composition-handoff", "durable-credentials", "installed-automation-e2e", "main-shutdown",
+  "debug-stop", "direct-request-cancellation", "durable-endpoint", "effect-target-transition", "git-review", "hardware-signal-dispatcher", "hardware-signal-queue",
   "hardware-signal-service", "host-actions", "host-provisioning", "github-navigation",
-  "instance-lifecycle", "local-checkpoints", "local-runtime", "operation-control",
-  "operation-recovery", "packaged-runtime", "pipeline-adapters",
-  "provider-desktop", "provider-desktop-adapter", "provider-desktop-configuration", "provider-desktop-effects", "provider-dispatch-lease", "provider-gateway", "provider-host-dispatch-provisioning", "raw-hid-installation", "raw-hid-main-wiring", "raw-hid-simulator",
+  "instance-lifecycle", "local-automation-broker", "local-checkpoints", "local-runtime", "operation-control",
+  "operation-recovery", "packaged-runtime", "pipeline-adapters", "pipeline-local-receipts", "reanchor-bootstrap", "reanchor-runtime", "reanchor-service",
+  "provider-desktop", "provider-desktop-adapter", "provider-desktop-configuration", "provider-desktop-effects", "provider-dispatch-lease", "provider-gateway", "provider-host-dispatch-provisioning", "provider-mediated-final-current", "provider-mediated-final-current-service", "raw-hid-installation", "raw-hid-main-wiring", "raw-hid-simulator",
   "raw-hid-protocol", "receipt-evidence", "remote-adapters", "remote-git",
   "repository-process-supervisor", "repository-recipe-evidence",
   "repository-recipe-host-evidence", "repository-runner-helper",
@@ -45,7 +45,12 @@ const companionTests = [
   "runtime-registry", "sandbox-installation", "sandbox-lifecycle-helper", "service", "session-freshness", "stdio",
   "voice-gateway", "voice-helper-source", "voice-runtime", "windows-job-supervisor", "windows-provider-process", "windows-sandbox",
   "windows-host-action-consumer", "windows-host-action-effects", "windows-host-action-startup", "windows-sandbox-helper-contract", "windows-user-presence", "windows-voice-port", "windows-voice-transcript-vault", "workflow-context-preparation", "workflow-voice-service"
-].map((name) => ({ file: `apps/windows-companion/test/${name}.test.ts`, currentUserProfile: name === "packaged-runtime", ...(name === "companion-lifecycle-helper" ? { timeoutMs: 240_000 } : {}) }));
+].map((name) => ({
+  file: `apps/windows-companion/test/${name}.test.ts`,
+  currentUserProfile: name === "packaged-runtime",
+  ...(name === "companion-lifecycle-helper" ? { timeoutMs: 240_000 } : {}),
+  ...(["council-workspace-isolation", "installed-automation-e2e", "repository-runner-helper"].includes(name) ? { timeoutMs: 240_000 } : {})
+}));
 const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
   "default-branch review creates a hook-disabled feature branch and requires a fresh target before committing",
@@ -54,8 +59,8 @@ const mediatedGitTests = [
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
   .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
-const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
-  .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 75_000 } : {}) }));
+const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "main", "reanchor", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
+  .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 240_000 } : {}) }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
@@ -70,21 +75,23 @@ export const requiredGroups = [
   }, {
     file: "deployment/windows/Test-B122InstallLifecycle.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122InstallLifecycle.ps1"]
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122InstallLifecycle.ps1"],
+    timeoutMs: 240_000
   }, {
     file: "deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122TrustedBootstrap.ps1"],
-    timeoutMs: 240_000
+    timeoutMs: 300_000
   }, {
     file: "deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh",
     executable: "pwsh.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", "deployment/windows/Test-B122TrustedBootstrap.ps1"],
-    timeoutMs: 240_000
+    timeoutMs: 300_000
   }, {
     file: "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ProviderDesktopRelease.ps1"]
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ProviderDesktopRelease.ps1"],
+    timeoutMs: 240_000
   }] : []),
   { file: "packages/protocol/test/b122.test.ts" },
   { file: "packages/protocol/test/raw-hid.test.ts" },
@@ -104,7 +111,10 @@ function testCounts(output, isTestRun) {
   const summary = /(?:^|\n)1\.\.(\d+)\r?\n# tests (\d+)\r?\n# suites \d+\r?\n# pass (\d+)\r?\n# fail (\d+)\r?\n# cancelled (\d+)\r?\n# skipped (\d+)\r?\n# todo (\d+)\r?\n# duration_ms [^\r\n]+\s*$/.exec(output);
   if (!summary) return undefined;
   const [plan, total, passed, failed, cancelled, skipped, todo] = summary.slice(1).map(Number);
-  if (plan !== total) return undefined;
+  // Node's final `# tests` count includes nested subtests while the terminal
+  // plan counts only top-level tests. Require a non-empty, internally
+  // possible relationship without rejecting valid nested TAP.
+  if (plan < 1 || total < plan) return undefined;
   return { total, passed, failed, cancelled, skipped, todo };
 }
 

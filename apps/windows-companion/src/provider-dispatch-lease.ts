@@ -290,6 +290,16 @@ export interface CredentialBackedProviderDispatchLeaseIssuerOptions {
   readonly idFactory?: () => string;
   readonly nonceFactory?: () => string;
   readonly issuanceTimeoutMs?: number;
+  readonly mediatedFinalCurrent?: Readonly<{
+    armFromIssuedLease(input: Readonly<{
+      lease: ProviderDispatchLease;
+      target: TargetSnapshot;
+      session: ManagedSession;
+      authority: AuthorityGrant;
+      guardOperationId: string;
+      guardAction: CommandAction;
+    }>): Promise<Readonly<{ authorizationId: string }>>;
+  }>;
 }
 
 /**
@@ -305,6 +315,7 @@ export class CredentialBackedProviderDispatchLeaseIssuer {
   private readonly idFactory: () => string;
   private readonly nonceFactory: () => string;
   private readonly issuanceTimeoutMs: number;
+  private readonly mediatedFinalCurrent?: CredentialBackedProviderDispatchLeaseIssuerOptions["mediatedFinalCurrent"];
 
   constructor(options: CredentialBackedProviderDispatchLeaseIssuerOptions) {
     this.credentials = options.credentials;
@@ -315,6 +326,7 @@ export class CredentialBackedProviderDispatchLeaseIssuer {
     this.idFactory = options.idFactory ?? randomUUID;
     this.nonceFactory = options.nonceFactory ?? (() => randomBytes(32).toString("hex"));
     this.issuanceTimeoutMs = boundedTtl(options.issuanceTimeoutMs ?? 10_000);
+    this.mediatedFinalCurrent = options.mediatedFinalCurrent;
   }
 
   async issue(request: ProviderDispatchLeaseIssueRequest): Promise<ProviderDispatchLease> {
@@ -375,7 +387,18 @@ export class CredentialBackedProviderDispatchLeaseIssuer {
           host: resolved.host,
           module: resolved.module
           };
-          return signProviderDispatchLease(unsigned, keyCopy.toString("ascii"));
+          const lease = signProviderDispatchLease(unsigned, keyCopy.toString("ascii"));
+          if (this.mediatedFinalCurrent && commandForAction(request.guardAction).requiresCapabilities.includes("mediated")) {
+            await boundary.wait(this.mediatedFinalCurrent.armFromIssuedLease({
+              lease,
+              target: request.target,
+              session: request.session,
+              authority: request.authority,
+              guardOperationId: request.guardOperationId,
+              guardAction: request.guardAction
+            }));
+          }
+          return lease;
         } finally { keyCopy.fill(0); }
       }));
     } finally { boundary.dispose(); }
@@ -401,6 +424,7 @@ export class InstalledProviderDispatchFinalCurrent implements ProviderDispatchLe
   private readonly authorities: Readonly<{ get(id: string): Promise<AuthorityGrant | undefined> }>;
   private readonly profiles: ProviderDispatchLeaseProfileSource;
   private readonly containment: DurableProviderDispatchContainmentSource;
+  private readonly reanchor?: ProviderDispatchLeaseFinalCurrent;
 
   constructor(options: Readonly<{
     operations: InstalledProviderDispatchFinalCurrent["operations"];
@@ -408,22 +432,31 @@ export class InstalledProviderDispatchFinalCurrent implements ProviderDispatchLe
     authorities: InstalledProviderDispatchFinalCurrent["authorities"];
     profiles: ProviderDispatchLeaseProfileSource;
     containment: DurableProviderDispatchContainmentSource;
+    /** Dedicated durable Re-anchor lifecycle verifier; never used for generic operations. */
+    reanchor?: ProviderDispatchLeaseFinalCurrent;
   }>) {
     this.operations = options.operations;
     this.sessions = options.sessions;
     this.authorities = options.authorities;
     this.profiles = options.profiles;
     this.containment = options.containment;
+    this.reanchor = options.reanchor;
   }
 
   async assertCurrent(binding: ProviderDispatchLeaseCurrentBinding): Promise<Readonly<{ allowed: boolean; reason: string }>> {
     try {
-      const operation = await this.operations.get(binding.guardOperationId);
-      if (!operation || operation.state !== "executing" || operation.action !== binding.guardAction || operation.targetSnapshotId !== binding.target.id) {
-        return { allowed: false, reason: "The durable provider operation is absent, changed, or no longer executing." };
+      if (binding.action === "reanchor") {
+        if (!this.reanchor) return { allowed: false, reason: "The dedicated durable Re-anchor lifecycle verifier is unavailable." };
+        const reanchor = await this.reanchor.assertCurrent(binding);
+        if (!reanchor.allowed) return reanchor;
+      } else {
+        const operation = await this.operations.get(binding.guardOperationId);
+        if (!operation || operation.state !== "executing" || operation.action !== binding.guardAction || operation.targetSnapshotId !== binding.target.id) {
+          return { allowed: false, reason: "The durable provider operation is absent, changed, or no longer executing." };
+        }
       }
       const session = await this.sessions.get(binding.session.id);
-      if (!session || !sameProviderSession(session, binding.session, binding.target)) {
+      if (!session || !sameProviderSession(session, binding.session, binding.target, binding.guardAction)) {
         return { allowed: false, reason: "The exact managed provider session changed before dispatch." };
       }
       const authority = await this.authorities.get(binding.authority.id);
@@ -466,6 +499,7 @@ export class LeaseInjectingProviderCommandTransport implements ProviderCommandTr
   }
 
   recoveryExternalId(input: Readonly<{ routeId: string; operationId: string; provider: ManagedSession["provider"] }>): string | undefined {
+    if (input.routeId.startsWith("automation.")) return undefined;
     return this.underlying.recoveryExternalId?.(input);
   }
 
@@ -474,6 +508,13 @@ export class LeaseInjectingProviderCommandTransport implements ProviderCommandTr
   }
 
   async request(input: ProviderCommandTransportRequest) {
+    if (input.routeId.startsWith("automation.proposal.")) {
+      if (input.trustedDispatch) throw new Error("Automation proposal routes cannot carry a trusted effect dispatch binding.");
+      return this.underlying.request(input);
+    }
+    if (input.routeId.startsWith("automation.")) {
+      throw new Error("Automation effect routes are proposal-only at the provider boundary; reviewed effects execute only through the host-local broker.");
+    }
     const effectRoute = providerEffectRoute(input.routeId);
     if (!effectRoute) {
       if (input.trustedDispatch) throw new Error("A trusted provider dispatch binding was supplied to a non-effect route.");
@@ -483,6 +524,8 @@ export class LeaseInjectingProviderCommandTransport implements ProviderCommandTr
     if (!binding) throw new Error("Provider-host effect routes require one trusted companion dispatch binding.");
     if (!sameRoot(input.repositoryRoot, binding.target.repositoryRoot)) throw new Error("The provider transport repository does not match the trusted TargetSnapshot.");
     const routeId = councilLeaseRoute(input.routeId, binding.session.provider, binding.action);
+    const document = parseDispatchDocument(input.body);
+    if (Object.hasOwn(document, "dispatchLease")) throw new Error("The provider request body cannot supply its own dispatch lease.");
     const containment = await this.containment.currentClear(binding.target.repositoryRoot);
     const lease = await this.issuer.issue({
       routeId,
@@ -499,8 +542,6 @@ export class LeaseInjectingProviderCommandTransport implements ProviderCommandTr
       effectGuard: binding.effectGuard,
       ...(input.signal ? { signal: input.signal } : {})
     });
-    const document = parseDispatchDocument(input.body);
-    if (Object.hasOwn(document, "dispatchLease")) throw new Error("The provider request body cannot supply its own dispatch lease.");
     const final = await binding.effectGuard.assertCurrent({
       action: binding.guardAction,
       operationId: binding.guardOperationId,
@@ -551,10 +592,10 @@ function validateDispatchBinding(request: ProviderDispatchLeaseIssueRequest, now
 
 function providerEffectRoute(routeId: string): boolean {
   if (/^provider\.council\.(claude|codex)$/u.test(routeId)) return true;
+  if (/^provider\.reanchor\.(claude|codex)$/u.test(routeId)) return true;
   for (const action of commandActionIds) {
     const executor = commandForAction(action).executor;
     if (executor === "agent" && routeId === `provider.${action}`) return true;
-    if (executor === "automation" && routeId === `automation.${action}`) return true;
   }
   return false;
 }
@@ -573,8 +614,10 @@ function parseDispatchDocument(body: string | Uint8Array | undefined): Record<st
   if (!record(value)) throw new Error("Provider-host effect dispatch requires one JSON object body.");
   return value;
 }
-function sameProviderSession(current: ManagedSession, expected: ManagedSession, target: TargetSnapshot): boolean {
-  return current.status === "running"
+function sameProviderSession(current: ManagedSession, expected: ManagedSession, target: TargetSnapshot, action: CommandAction): boolean {
+  const expectedStatusAllowed = expected.status === "running"
+    || ((action === "authority_refresh" || action === "authority_broadcast") && expected.status === "verified_blocked");
+  return expectedStatusAllowed && current.status === expected.status
     && current.id === expected.id && current.provider === expected.provider && current.surface === expected.surface
     && stableJson(current.capabilities) === stableJson(expected.capabilities)
     && current.workspaceRoot !== undefined && sameRoot(current.workspaceRoot, target.repositoryRoot)
@@ -734,6 +777,9 @@ export function providerDispatchProfileIdentityDigest(profile: Readonly<{
   return sha256(`sxsy-b122.provider-host-dispatch-profile\0v1\0${profilePath(profile.repositoryRoot)}\0${profilePath(profile.configurationPath)}\0${profile.configurationSha256}\0${profile.tlsSpkiSha256}\0${profile.bearerCredentialReference}\0${profile.dispatchLeaseCredentialReference}\0${providerMaterial}`);
 }
 function requireDispatchProtocolBinding(request: ProviderDispatchLeaseIssueRequest): CommandAction {
+  if (request.routeId.startsWith("automation.")) {
+    throw new Error("Automation effect routes are proposal-only at the provider boundary; reviewed effects execute only through the host-local broker.");
+  }
   if (request.action === "council_pause" || request.action === "council_assignment" || request.action === "council_resume") {
     const phase = request.action.slice("council_".length) as "pause" | "assignment" | "resume";
     const operation = /^council:([A-Za-z0-9][A-Za-z0-9._-]{0,127}):(pause|assignment|resume)$/u.exec(request.operationId);
@@ -753,13 +799,18 @@ function requireDispatchProtocolBinding(request: ProviderDispatchLeaseIssueReque
   if (!(commandActionIds as readonly string[]).includes(request.action)) throw new Error("Provider dispatch action is absent from the host-owned command catalog.");
   const action = request.action as CommandAction;
   const definition = commandForAction(action);
-  if (request.routeId === `provider.${action}`) {
+  if (action === "reanchor") {
+    const requestId = request.artifact?.id;
+    if (request.routeId !== `provider.reanchor.${request.session.provider}` || (request.session.provider !== "claude" && request.session.provider !== "codex")
+      || !request.artifact || typeof requestId !== "string" || !/^reanchor:[a-f0-9]{64}$/u.test(requestId)
+      || request.operationId !== `reanchor-operation:${sha256(requestId)}`
+      || request.artifact.coordinatorContextDigest !== null || request.artifact.coordinatorContextRevision !== null
+      || request.confirmation === null) {
+      throw new Error("Re-anchor requires its exact dedicated provider route, deterministic operation, reviewed artifact, and confirmation binding.");
+    }
+  } else if (request.routeId === `provider.${action}`) {
     if (definition.executor !== "agent" || request.artifact === null) {
       throw new Error("The provider workflow route requires one exact agent action and workflow artifact.");
-    }
-  } else if (request.routeId === `automation.${action}`) {
-    if (definition.executor !== "automation" || request.artifact !== null) {
-      throw new Error("The automation route requires one exact automation action without a workflow artifact binding.");
     }
   } else {
     throw new Error("The provider dispatch route does not exactly match its host-owned action protocol.");
@@ -794,12 +845,13 @@ function requireCatalogCapabilityFloor(session: ManagedSession, action: CommandA
 function requireProviderHostPolicy(profile: ProviderDispatchLeaseProfile, policy: ConfiguredNetworkPolicy): void {
   const expected = new Set<string>(["provider.health", "provider.reconcile"]);
   for (const action of commandActionIds) {
+    if (action === "reanchor") continue;
     const executor = commandForAction(action).executor;
     if (executor === "agent") expected.add(`provider.${action}`);
-    if (executor === "automation") expected.add(`automation.${action}`);
   }
   for (const entry of profile.providers) {
-    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "cancel"] as const) {
+    expected.add(`provider.reanchor.${entry.provider}`);
+    for (const prefix of ["handshake", "council", "council-cleanup", "observe-session", "observe-workflow-context", "observe-operation", "observe-reanchor", "cancel"] as const) {
       expected.add(`provider.${prefix}.${entry.provider}`);
     }
   }
@@ -810,6 +862,9 @@ function requireProviderHostPolicy(profile: ProviderDispatchLeaseProfile, policy
     requireProviderHostRoute(profile, route);
   }
   for (const route of policy.routes) {
+    if (route.id.startsWith("automation.") && !route.id.startsWith("automation.proposal.")) {
+      throw new Error(`The attested provider-host network policy exposes forbidden automation effect route ${route.id}.`);
+    }
     if (route.boundary === "provider-host-loopback") requireProviderHostRoute(profile, route);
   }
 }

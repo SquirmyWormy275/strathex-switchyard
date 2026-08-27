@@ -13,6 +13,7 @@ param(
   [string]$TestStagingRoot,
   [switch]$AllowTestStagingRoot,
   [ValidateSet('none','replace-root-before-file-delete','replace-root-before-root-delete')][string]$TestCleanupMutation='none',
+  [ValidateSet('none','forged-signature','substituted-terminal-field','substituted-state-spki')][string]$TestTerminalMutation='none',
   [string]$TestSupervisorRunningMarker,
   [string]$TestPreparationRunningMarker
 )
@@ -388,19 +389,29 @@ function Read-B122BootstrapOutput([string]$Path,[int]$MaximumBytes){
   $bytes=[IO.File]::ReadAllBytes($item.FullName);try{return [Text.Encoding]::UTF8.GetString($bytes)}finally{if($bytes.Length){[Array]::Clear($bytes,0,$bytes.Length)}}
 }
 
-function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath,[string]$StatePath,[System.Collections.IDictionary]$Environment,[int]$TimeoutSeconds,[string]$JobName,[string]$StdoutPath,[string]$StderrPath,[string]$RunningMarker){
-  $working=[IO.Path]::GetDirectoryName($RequestPath);$command=(@($HelperPath,'--supervise',$RequestPath,$StatePath)|ForEach-Object{ConvertTo-B122BootstrapWindowsArgument ([string]$_)})-join' '
+function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath,[string]$StatePath,[string]$BindingAckPath,[System.Collections.IDictionary]$Environment,[int]$TimeoutSeconds,[string]$JobName,[string]$StdoutPath,[string]$StderrPath,[string]$RunningMarker){
+  $working=[IO.Path]::GetDirectoryName($RequestPath);$requestSha256=(Get-FileHash -LiteralPath $RequestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if($requestSha256-cnotmatch'^[a-f0-9]{64}$'){throw 'The trusted-bootstrap supervisor request digest is invalid.'}
+  $command=(@($HelperPath,'--supervise',$RequestPath,$StatePath,$requestSha256)|ForEach-Object{ConvertTo-B122BootstrapWindowsArgument ([string]$_)})-join' '
   $environmentBlock=New-B122BootstrapEnvironmentBlock $Environment $working
   $process=$script:B122BootstrapIdentityType::StartSupervisor($HelperPath,$command,$working,$environmentBlock,$StdoutPath,$StderrPath,$JobName)
   try{
+    $deadline=[DateTime]::UtcNow.AddSeconds(15);$runningState=$null
+    do{
+      if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
+      if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}
+      [Threading.Thread]::Sleep(20)
+    }while([DateTime]::UtcNow-lt$deadline)
+    if($null-eq$runningState-or[string]$runningState.state-cne'running'){throw 'The trusted repository supervisor did not reach an exact running child state.'}
+    $requestBytes=Read-B122BootstrapBytes $RequestPath 262144;try{$request=([Text.Encoding]::UTF8.GetString($requestBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($requestBytes,0,$requestBytes.Length)}
+    $runningKeys=@($runningState.PSObject.Properties.Name);$expectedRunningKeys=@('schema','version','supervisorId','operationId','action','targetSnapshotId','sessionId','authorityId','repositoryRoot','manifestSha256','helperPath','helperSha256','requestSha256','signingPublicKeySpki','signingPublicKeySha256','jobName','supervisorPid','childPid','startedAt','state','exitCode','outputTruncated')
+    $runningSpkiBytes=$null;try{$runningSpkiBytes=[Convert]::FromBase64String([string]$runningState.signingPublicKeySpki);$runningSpkiSha=Get-B122BootstrapSha256Bytes $runningSpkiBytes}finally{if($null-ne$runningSpkiBytes-and$runningSpkiBytes.Length){[Array]::Clear($runningSpkiBytes,0,$runningSpkiBytes.Length)}}
+    $stem=([string]$request.supervisorId).Substring('managed:'.Length)
+    if($runningKeys.Count-ne$expectedRunningKeys.Count-or@($runningKeys|Where-Object{$_-cnotin$expectedRunningKeys}).Count-or[string]$runningState.schema-cne'sxsy-b122.repository-supervisor-state'-or$runningState.version-ne3-or[string]$runningState.supervisorId-cne[string]$request.supervisorId-or[string]$runningState.operationId-cne[string]$request.operationId-or[string]$runningState.action-cne[string]$request.action-or[string]$runningState.targetSnapshotId-cne[string]$request.targetSnapshotId-or[string]$runningState.sessionId-cne[string]$request.sessionId-or[string]$runningState.authorityId-cne[string]$request.authorityId-or[string]$runningState.repositoryRoot-cne[string]$request.repositoryRoot-or[string]$runningState.manifestSha256-cne[string]$request.manifestSha256-or[string]$runningState.helperPath-cne[string]$request.helperPath-or[string]$runningState.helperSha256-cne[string]$request.helperSha256-or[string]$runningState.requestSha256-cne$requestSha256-or[string]$runningState.signingPublicKeySha256-cne$runningSpkiSha-or[string]$runningState.jobName-cne("Local\SxsyB122-"+$stem)-or[int]$runningState.supervisorPid-ne[int]$process.ProcessId-or[int]$runningState.childPid-le0-or$null-ne$runningState.exitCode-or[bool]$runningState.outputTruncated){throw 'The pre-resume repository supervisor binding is stale, tampered, or confused.'}
+    $ackBytes=[Text.Encoding]::ASCII.GetBytes($requestSha256+"`n");$ackTemporary=$BindingAckPath+'.'+[guid]::NewGuid().ToString('N')+'.tmp';$ackStream=New-Object IO.FileStream($ackTemporary,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+    try{$ackStream.Write($ackBytes,0,$ackBytes.Length);$ackStream.Flush($true)}finally{$ackStream.Dispose();[Array]::Clear($ackBytes,0,$ackBytes.Length)}
+    [IO.File]::Move($ackTemporary,$BindingAckPath)
     if(-not[string]::IsNullOrWhiteSpace($RunningMarker)){
-      $deadline=[DateTime]::UtcNow.AddSeconds(15);$runningState=$null
-      do{
-        if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
-        if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}
-        [Threading.Thread]::Sleep(20)
-      }while([DateTime]::UtcNow-lt$deadline)
-      if($null-eq$runningState-or[string]$runningState.state-cne'running'){throw 'The supervisor crash probe did not reach an exact running child state.'}
       $markerBytes=[Text.Encoding]::UTF8.GetBytes(([ordered]@{schema='sxsy-b122.bootstrap-supervisor-running';version=1;bootstrapPid=$PID;supervisorPid=[int]$process.ProcessId;childPid=[int]$runningState.childPid;statePath=$StatePath}|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress))
       $markerStream=New-Object IO.FileStream($RunningMarker,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
       try{$markerStream.Write($markerBytes,0,$markerBytes.Length);$markerStream.Flush($true)}finally{$markerStream.Dispose();[Array]::Clear($markerBytes,0,$markerBytes.Length)}
@@ -414,7 +425,7 @@ function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath
   }finally{$process.Dispose();$environmentBlock=$null}
   $stdout=Read-B122BootstrapOutput $StdoutPath 262144;$stderr=Read-B122BootstrapOutput $StderrPath 262144
   if([Text.Encoding]::UTF8.GetByteCount($stdout)+[Text.Encoding]::UTF8.GetByteCount($stderr)-gt262144){throw 'The trusted installer exceeded its combined bootstrap output bound.'}
-  return [pscustomobject]@{exitCode=$exitCode;stdout=$stdout;stderr=$stderr}
+  return [pscustomobject]@{exitCode=$exitCode;stdout=$stdout;stderr=$stderr;runningState=$runningState}
 }
 
 function Assert-B122BootstrapInstallResult([string]$Raw,[string]$ExpectedOperation,[string]$ExpectedCommit,[string]$ExpectedDigest,[string]$ExpectedInstallRoot,[string]$ExpectedStateRoot){
@@ -579,7 +590,7 @@ function Write-B122BootstrapTestMarkerAndWait([string]$Path,[System.Collections.
 $bundle=[IO.Path]::GetFullPath($BundleRoot)
 if($bundle.IndexOfAny([char[]]@([char]0,[char]10,[char]13,[char]34))-ge0){throw 'The candidate bundle path contains unsafe characters.'}
 Get-B122BootstrapItem $bundle $true|Out-Null
-if($TestCleanupMutation-cne'none'-and(-not$AllowTestStagingRoot-or[string]::IsNullOrWhiteSpace($TestStagingRoot))){throw 'A cleanup-mutation probe requires the explicit temporary test staging boundary.'}
+if(($TestCleanupMutation-cne'none'-or$TestTerminalMutation-cne'none')-and(-not$AllowTestStagingRoot-or[string]::IsNullOrWhiteSpace($TestStagingRoot))){throw 'A mutation probe requires the explicit temporary test staging boundary.'}
 $testMarker=Get-B122BootstrapTestMarker $TestSupervisorRunningMarker 'supervisor' $TestStagingRoot ([bool]$AllowTestStagingRoot)
 $preparationMarker=Get-B122BootstrapTestMarker $TestPreparationRunningMarker 'preparation' $TestStagingRoot ([bool]$AllowTestStagingRoot)
 if($null-ne$testMarker-and$null-ne$preparationMarker-and$testMarker.Equals($preparationMarker,[StringComparison]::OrdinalIgnoreCase)){throw 'Bootstrap crash probes require distinct marker paths.'}
@@ -664,13 +675,13 @@ try{
   $arguments=[Collections.Generic.List[string]]::new()
   foreach($value in @('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$installer,'-BundleRoot',$staging,'-InstallRoot',$expectedInstall,'-StateRoot',$expectedState,'-TrustedBootstrapDigest',$expectedDigest,'-TrustedBootstrapSourceCommit',$expectedCommit,'-OperationKindOverride',$OperationKindOverride)){$arguments.Add($value)}
   if($SkipVsCode){$arguments.Add('-SkipVsCode')};if($SkipAutostart){$arguments.Add('-SkipAutostart')}
-  $controlToken=New-B122BootstrapHex;$requestPath=Join-Path $staging 'bootstrap-supervisor.request.json';$statePath=Join-Path $staging 'bootstrap-supervisor.state.json'
+  $controlToken=New-B122BootstrapHex;$requestPath=Join-Path $staging 'bootstrap-supervisor.request.json';$statePath=Join-Path $staging "$operationStem.state.json";$bindingAckPath=Join-Path $staging "$operationStem.binding-ack";$terminalPath=Join-Path $staging "$operationStem.terminal.json"
   $manifestIdentity=$trusted.files['SHA256SUMS.json'];$helperIdentity=$helperEntry[0]
   $request=[ordered]@{
-    schema='sxsy-b122.repository-supervisor-request';version=1;supervisorId="managed:$operationStem";operationId=$operationId;action='trusted_bootstrap'
+    schema='sxsy-b122.repository-supervisor-request';version=3;supervisorId="managed:$operationStem";operationId=$operationId;action='trusted_bootstrap';targetSnapshotId=$expectedDigest;sessionId=$null;authorityId=$null
     repositoryRoot=$staging;manifestSha256=[string]$manifestIdentity.sha256;helperPath=$helper;helperSha256=[string]$helperIdentity.sha256
     executable=[string]$hostIdentity.path;executableSha256=[string]$hostIdentity.sha256;arguments=$arguments.ToArray();workingDirectory=$staging;environment=$environment
-    lifecycle='foreground';timeoutMs=$InstallerTimeoutSeconds*1000;maxOutputBytes=262144;controlToken=$controlToken;statePath=$statePath
+    lifecycle='foreground';timeoutMs=$InstallerTimeoutSeconds*1000;maxOutputBytes=262144;controlToken=$controlToken;statePath=$statePath;bindingAckPath=$bindingAckPath;terminalPath=$terminalPath
   }
   $requestBytes=[Text.Encoding]::UTF8.GetBytes(($request|Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 8 -Compress))
   if($requestBytes.Length-lt2-or$requestBytes.Length-gt262144){throw 'The trusted supervisor request is outside its size bound.'}
@@ -680,9 +691,9 @@ try{
   [Array]::Clear($requestBytes,0,$requestBytes.Length);$locks.Add((Open-B122BootstrapVerifiedFile $requestPath $requestSha $requestLength))
 
   $stdoutName='bootstrap-supervisor.stdout.txt';$stderrName='bootstrap-supervisor.stderr.txt';$stdoutPath=Join-Path $staging $stdoutName;$stderrPath=Join-Path $staging $stderrName
-  try{$run=Invoke-B122BootstrapSupervisor $helper $requestPath $statePath $environment $InstallerTimeoutSeconds "Local\SxsyB122-BootstrapHost-$operationStem" $stdoutPath $stderrPath $testMarker}
+  try{$run=Invoke-B122BootstrapSupervisor $helper $requestPath $statePath $bindingAckPath $environment $InstallerTimeoutSeconds "Local\SxsyB122-BootstrapHost-$operationStem" $stdoutPath $stderrPath $testMarker}
   finally{
-    foreach($dynamic in @([pscustomobject]@{name=$stdoutName;path=$stdoutPath;minimum=0},[pscustomobject]@{name=$stderrName;path=$stderrPath;minimum=0},[pscustomobject]@{name='bootstrap-supervisor.state.json';path=$statePath;minimum=2})){
+    foreach($dynamic in @([pscustomobject]@{name=$stdoutName;path=$stdoutPath;minimum=0},[pscustomobject]@{name=$stderrName;path=$stderrPath;minimum=0},[pscustomobject]@{name="$operationStem.state.json";path=$statePath;minimum=2},[pscustomobject]@{name="$operationStem.binding-ack";path=$bindingAckPath;minimum=65},[pscustomobject]@{name="$operationStem.terminal.json";path=$terminalPath;minimum=2})){
       if(-not[IO.File]::Exists([string]$dynamic.path)){continue};$item=Get-B122BootstrapItem ([string]$dynamic.path) $false
       if($item.Length-lt[int]$dynamic.minimum-or$item.Length-gt262144){throw 'A dynamic trusted-supervisor artifact is outside its size bound.'}
       $stagedFiles[[string]$dynamic.name]=[pscustomobject]@{sha256=Get-B122BootstrapSha256File ([string]$dynamic.path);bytes=[long]$item.Length};$stagedRelative.Add([string]$dynamic.name)
@@ -691,11 +702,21 @@ try{
   $supervisorExit=[int]$run.exitCode
   if($run.exitCode-ne0){$diagnostic=([string]$run.stderr).Trim().Replace("`r",' ').Replace("`n",' ');if($diagnostic.Length-gt2048){$diagnostic=$diagnostic.Substring(0,2048)};throw "The independently verified B122 installer failed in its Job-contained host (exit $($run.exitCode)): $diagnostic"}
   if(-not[string]::IsNullOrWhiteSpace([string]$run.stderr)){throw 'The independently verified B122 installer emitted unexpected diagnostics on success.'}
+  if($TestTerminalMutation-cne'none'){
+    if($TestTerminalMutation-ceq'substituted-state-spki'){$mutated=([IO.File]::ReadAllText($statePath)|Microsoft.PowerShell.Utility\ConvertFrom-Json);$replacement=[Text.Encoding]::ASCII.GetBytes('substituted-state-key');try{$mutated.signingPublicKeySpki=[Convert]::ToBase64String($replacement);$mutated.signingPublicKeySha256=Get-B122BootstrapSha256Bytes $replacement}finally{[Array]::Clear($replacement,0,$replacement.Length)};[IO.File]::WriteAllText($statePath,($mutated|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))}
+    else{$mutated=([IO.File]::ReadAllText($terminalPath)|Microsoft.PowerShell.Utility\ConvertFrom-Json);if($TestTerminalMutation-ceq'forged-signature'){$mutated.signature=([string]$mutated.signature).Substring(0,([string]$mutated.signature).Length-2)+'AA'}else{$mutated.effectDisposition='rolled_back'};[IO.File]::WriteAllText($terminalPath,($mutated|Microsoft.PowerShell.Utility\ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))}
+  }
   $stateBytes=Read-B122BootstrapBytes $statePath 262144
   try{$supervisorState=([Text.Encoding]::UTF8.GetString($stateBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($stateBytes,0,$stateBytes.Length)}
-  $stateKeys=@($supervisorState.PSObject.Properties.Name);$expectedStateKeys=@('schema','version','supervisorId','operationId','action','repositoryRoot','manifestSha256','helperPath','helperSha256','requestSha256','controlTokenSha256','jobName','supervisorPid','childPid','startedAt','state','exitCode','outputTruncated')
+  $stateKeys=@($supervisorState.PSObject.Properties.Name);$expectedStateKeys=@('schema','version','supervisorId','operationId','action','targetSnapshotId','sessionId','authorityId','repositoryRoot','manifestSha256','helperPath','helperSha256','requestSha256','signingPublicKeySpki','signingPublicKeySha256','jobName','supervisorPid','childPid','startedAt','state','exitCode','outputTruncated')
   $controlBytes=[Text.Encoding]::UTF8.GetBytes($controlToken);try{$controlHash=Get-B122BootstrapSha256Bytes $controlBytes}finally{[Array]::Clear($controlBytes,0,$controlBytes.Length)}
-  if($stateKeys.Count-ne$expectedStateKeys.Count-or@($stateKeys|Where-Object{$_-cnotin$expectedStateKeys}).Count-or$supervisorState.schema-cne'sxsy-b122.repository-supervisor-state'-or$supervisorState.version-ne1-or[string]$supervisorState.supervisorId-cne"managed:$operationStem"-or[string]$supervisorState.operationId-cne$operationId-or[string]$supervisorState.action-cne'trusted_bootstrap'-or[string]$supervisorState.repositoryRoot-cne$staging-or[string]$supervisorState.manifestSha256-cne[string]$manifestIdentity.sha256-or[string]$supervisorState.helperPath-cne$helper-or[string]$supervisorState.helperSha256-cne[string]$helperIdentity.sha256-or[string]$supervisorState.requestSha256-cne$requestSha-or[string]$supervisorState.controlTokenSha256-cne$controlHash-or[string]$supervisorState.jobName-cne"Local\SxsyB122-$operationStem"-or[string]$supervisorState.state-cne'completed'-or[int]$supervisorState.exitCode-ne0-or[bool]$supervisorState.outputTruncated){throw 'The trusted process supervisor did not produce one exact successful terminal state.'}
+  $spkiBytes=$null;try{$spkiBytes=[Convert]::FromBase64String([string]$supervisorState.signingPublicKeySpki);$spkiSha=Get-B122BootstrapSha256Bytes $spkiBytes}finally{if($null-ne$spkiBytes-and$spkiBytes.Length){[Array]::Clear($spkiBytes,0,$spkiBytes.Length)}}
+  if($stateKeys.Count-ne$expectedStateKeys.Count-or@($stateKeys|Where-Object{$_-cnotin$expectedStateKeys}).Count-or$supervisorState.schema-cne'sxsy-b122.repository-supervisor-state'-or$supervisorState.version-ne3-or[string]$supervisorState.supervisorId-cne"managed:$operationStem"-or[string]$supervisorState.operationId-cne$operationId-or[string]$supervisorState.action-cne'trusted_bootstrap'-or[string]$supervisorState.targetSnapshotId-cne$expectedDigest-or$null-ne$supervisorState.sessionId-or$null-ne$supervisorState.authorityId-or[string]$supervisorState.repositoryRoot-cne$staging-or[string]$supervisorState.manifestSha256-cne[string]$manifestIdentity.sha256-or[string]$supervisorState.helperPath-cne$helper-or[string]$supervisorState.helperSha256-cne[string]$helperIdentity.sha256-or[string]$supervisorState.requestSha256-cne$requestSha-or[string]$supervisorState.signingPublicKeySpki-cne[string]$run.runningState.signingPublicKeySpki-or[string]$supervisorState.signingPublicKeySha256-cne[string]$run.runningState.signingPublicKeySha256-or[string]$supervisorState.signingPublicKeySha256-cne$spkiSha-or[string]$supervisorState.startedAt-cne[string]$run.runningState.startedAt-or[string]$supervisorState.jobName-cne"Local\SxsyB122-$operationStem"-or[string]$supervisorState.state-cne'completed'-or[int]$supervisorState.exitCode-ne0-or[bool]$supervisorState.outputTruncated){throw 'The trusted process supervisor did not produce one exact successful terminal state.'}
+  $terminalBytes=Read-B122BootstrapBytes $terminalPath 262144;try{$terminal=([Text.Encoding]::UTF8.GetString($terminalBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($terminalBytes,0,$terminalBytes.Length)}
+  $terminalKeys=@($terminal.PSObject.Properties.Name);$expectedTerminalKeys=@('schema','version','supervisorId','operationId','action','targetSnapshotId','sessionId','authorityId','repositoryRoot','manifestSha256','helperSha256','requestSha256','signingPublicKeySha256','startedAt','finishedAt','state','exitCode','outputTruncated','effectDisposition','signature')
+  if($terminalKeys.Count-ne$expectedTerminalKeys.Count-or@($terminalKeys|Where-Object{$_-cnotin$expectedTerminalKeys}).Count-or[string]$terminal.schema-cne'sxsy-b122.repository-supervisor-terminal'-or$terminal.version-ne1-or[string]$terminal.supervisorId-cne"managed:$operationStem"-or[string]$terminal.operationId-cne$operationId-or[string]$terminal.action-cne'trusted_bootstrap'-or[string]$terminal.targetSnapshotId-cne$expectedDigest-or$null-ne$terminal.sessionId-or$null-ne$terminal.authorityId-or[string]$terminal.repositoryRoot-cne$staging-or[string]$terminal.manifestSha256-cne[string]$manifestIdentity.sha256-or[string]$terminal.helperSha256-cne[string]$helperIdentity.sha256-or[string]$terminal.requestSha256-cne$requestSha-or[string]$terminal.signingPublicKeySha256-cne$spkiSha-or[string]$terminal.startedAt-cne[string]$supervisorState.startedAt-or[string]$terminal.state-cne'completed'-or[int]$terminal.exitCode-ne0-or[bool]$terminal.outputTruncated-or[string]$terminal.effectDisposition-cne'committed'-or[string]::IsNullOrWhiteSpace([string]$terminal.signature)){throw 'The trusted process supervisor terminal receipt is absent, stale, or confused.'}
+  $terminalVerification=@(& $helper '--verify-terminal' $terminalPath ([string]$run.runningState.signingPublicKeySpki) $spkiSha 2>&1);$terminalVerificationExit=$LASTEXITCODE
+  if($terminalVerificationExit-ne0-or$terminalVerification.Count-ne0){throw 'The trusted process supervisor terminal receipt failed its pinned ECDSA signature.'}
   $installResult=Assert-B122BootstrapInstallResult ([string]$run.stdout) $OperationKindOverride $expectedCommit $expectedDigest $expectedInstall $expectedState
   $resultBytes=[Text.Encoding]::UTF8.GetBytes(([string]$run.stdout).Trim());try{$resultSha=Get-B122BootstrapSha256Bytes $resultBytes}finally{[Array]::Clear($resultBytes,0,$resultBytes.Length)}
   Write-B122BootstrapOperationReceipt $stagingBase $operationStem 'outcome' ([ordered]@{schema='sxsy-b122.bootstrap-operation';version=1;operationId=$operationId;status='installer_succeeded';cleanup='pending';sourceCommit=$expectedCommit;trustDigest=$expectedDigest;operation=$OperationKindOverride;installRoot=$expectedInstall;stateRoot=$expectedState;stagingRoot=$staging;startedAt=$startedAt;completedAt=[DateTimeOffset]::UtcNow.ToString('O');childExitCode=0;resultSha256=$resultSha;error=$null})|Out-Null

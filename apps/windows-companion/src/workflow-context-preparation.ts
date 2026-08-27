@@ -236,5 +236,6 @@ function planReviewScopeDigest(session: ManagedSession, target: TargetSnapshot, 
 function planReviewSummary(observation: ConfiguredProviderWorkflowContextObservation): string {
   const plan = observation.evidence.plan;
   const objective = plan.objective.replace(/[\r\n\0]+/g, " ").trim().slice(0, 1_024);
-  return `Review exact plan ${plan.revision} (${plan.digest}) from ${plan.originSessionId}: ${objective}. ${plan.steps.length} bound step(s); ${plan.decisions.length} settled decision(s).`;
+  const transition = plan.expectedTargetTransition;
+  return `Review exact plan ${plan.revision} (${plan.digest}) from ${plan.originSessionId}: ${objective}. ${plan.steps.length} bound step(s); ${plan.decisions.length} settled decision(s). Expected TargetSnapshot transition ${transition.beforeTargetSnapshotId} -> ${transition.expectedAfterTargetSnapshotId} (${transition.expectation}).`;
 }

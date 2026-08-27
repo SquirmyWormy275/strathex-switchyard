@@ -25,6 +25,10 @@ provider or repository text as authority.
 - a digest-pinned, self-contained ESM module loader. The exact verified module
   bytes are imported from memory, so replacing the file after verification
   cannot change the evaluated code;
+- a separately configured and digest-pinned host effect-driver boundary. The
+  provider runtime module cannot access that driver, its credential, or the
+  companion callback; `mediated` is available only when the driver and the
+  companion-authenticated one-use final-current boundary are both installed;
 - an explicitly enabled, credential-free loopback fixture backend for tests and
   installation diagnostics. Fixture results are labelled and are never
   provider-acceptance evidence.
@@ -123,13 +127,17 @@ request bodies never select a module or credential.
 A provider module exports:
 
 ```js
-export async function createB122ProviderRuntimePort({ provider, credential, options }) {
+export async function createB122ProviderRuntimePort({ provider, options, councilResources }) {
   return {
     provider,
     handshake,
     execute,
+    prepareMediatedEffect,
+    prepareMediatedCouncilEffect,
     observeSession,
     observeWorkflowContext,
+    reanchor,
+    observeReanchor,
     observeOperation,
     cancelOperation,
     council,
@@ -149,14 +157,22 @@ matched `moduleSha256`. Every method must return the typed exact binding defined
 in [`src/backends.ts`](src/backends.ts), and `shutdown(signal)` must settle
 within the host's fixed deadline. Missing credentials, a digest mismatch, a
 malformed result, target churn, or an unavailable observation fails closed.
+The module never receives raw credential bytes, the authenticated companion
+endpoint, or an ambient effect callback, and it cannot self-assert `mediated`.
 
-An in-process module receives the provider credential needed to construct its
-runtime port. It therefore cannot attest the host's `mediated` capability.
-The host strips that capability from module handshakes and observations, and
-Automatic Council remains unavailable for those modules. A future live
-connector may become Mediated only behind a separate host-owned effects API
-whose enforcement and attestation do not trust provider-module claims; that
-external connector is not included or claimed here.
+An optional installed host effect-driver module is configured separately from
+the provider runtime module and must have its own exact path and SHA-256 pin. It
+exports `createB122ProviderMediatedEffectDriver` and the closed command/Council
+execute-observe-cancel methods defined in [`src/backends.ts`](src/backends.ts).
+Only that host-owned driver receives a short-lived copy of the scoped provider
+credential at an exact effect call. Immediately before the call, the host must
+obtain a one-use companion decision bound to configuration, both module
+identities, operation, action/route, session, TargetSnapshot, authority,
+dispatch lease, and containment fence. The decision is bounded and replay
+fails closed. Missing or invalid driver/callback configuration caps the module
+at `controllable`; no effect is inferred. Proprietary driver/provider software
+and live credentials remain separately installed inputs, and Automatic Council
+remains gate-disabled until its independent acceptance evidence exists.
 
 ## Fixture diagnostics
 

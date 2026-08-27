@@ -31,6 +31,8 @@ export interface ExistingPlanBinding {
   readonly objective: string;
   readonly steps: readonly PlanStepArtifact[];
   readonly decisions: readonly string[];
+  /** Provider-authored exact transition reviewed before any Plan Approval effect starts. */
+  readonly expectedTargetTransition: PlanExecutionTargetTransition;
 }
 export interface CoordinatorEvidenceBundle {
   readonly contextDigest: string;
@@ -200,12 +202,25 @@ export function canonicalWorkflowArtifact(input: WorkflowArtifactInput & { reado
 
 export interface DecisionProviderPacket { readonly decisionId: string; readonly options: readonly DecisionOption[]; readonly recommendationId: string; }
 export interface RankedPlanAlternative { readonly rank: number; readonly id: string; readonly summary: string; readonly rationale: string; readonly risks: readonly string[]; }
+export interface PlanExecutionTargetTransition {
+  readonly beforeTargetSnapshotId: string;
+  readonly expectedAfterTargetSnapshotId: string;
+  readonly expectation: "unchanged" | "changed";
+}
+export interface PlanExecutionChildEffect {
+  readonly id: string;
+  readonly action: "plan_execution";
+  readonly status: "running" | "completed" | "failed";
+  readonly effectDisposition: EffectDisposition;
+  readonly summary: string;
+  readonly externalId?: string;
+}
 export type WorkflowProviderResult =
   | { readonly kind: "anchor"; readonly anchorDigest: string; readonly discrepancies: readonly string[]; readonly questions: readonly string[]; readonly resumed: false }
   | { readonly kind: "proof"; readonly verifiedClaims: readonly string[]; readonly evidenceReferences: readonly string[]; readonly backendResults: readonly { readonly backend: string; readonly status: "passed" | "failed" | "unavailable" }[] }
   | { readonly kind: "decision"; readonly decisionPacketId: string; readonly decisions: readonly DecisionProviderPacket[]; readonly userSelectionRequired: true }
   | { readonly kind: "plan"; readonly mode: "expanded"; readonly planDigest: string; readonly alternatives: readonly RankedPlanAlternative[] }
-  | { readonly kind: "plan"; readonly mode: "execution_ack"; readonly planDigest: string; readonly planRevision: string; readonly originSessionId: string; readonly executorSessionId: string; readonly authorityId: string; readonly acknowledgementId: string; readonly executionStarted: true }
+  | { readonly kind: "plan"; readonly mode: "execution_ack"; readonly planDigest: string; readonly planRevision: string; readonly originSessionId: string; readonly executorSessionId: string; readonly authorityId: string; readonly acknowledgementId: string; readonly executionStarted: true; readonly targetTransition: PlanExecutionTargetTransition; readonly childEffects: readonly PlanExecutionChildEffect[] }
   | { readonly kind: "handoff"; readonly packageId: string; readonly recipientSessionId: string; readonly acknowledged: boolean }
   | { readonly kind: "focus"; readonly selectedSessionId: string; readonly status: Extract<SessionStatus, "verified_blocked" | "verified_finished">; readonly queueCycleId: string; readonly resultDelivered: boolean }
   | { readonly kind: "authority"; readonly acknowledgements: readonly { readonly recipientSessionId: string; readonly grantId: string; readonly matchDigest: string; readonly acknowledged: true }[] }
@@ -284,6 +299,31 @@ export function planApprovalReviewScopeDigest(input: PlanApprovalReviewScopeInpu
   }));
 }
 
+/**
+ * Canonical operator-review scope for Shift Authority. The scope contains only
+ * protected artifact identity plus the ordered recipient/match pairs that the
+ * trusted UI presents. Full packet bodies remain covered by artifactDigest.
+ */
+export function authorityBroadcastReviewScopeDigest(artifact: WorkflowArtifact): string {
+  if (artifact.action !== "authority_broadcast" || artifact.payload.kind !== "authority" || artifact.payload.mode !== "broadcast") {
+    throw new WorkflowArtifactError("Authority Broadcast review requires one exact protected broadcast artifact.");
+  }
+  const authorityId = identifier(artifact.authorityId, "authority broadcast review authority");
+  return sha256(stableJson({
+    action: "authority_broadcast",
+    artifactId: identifier(artifact.id, "authority broadcast review artifact"),
+    artifactDigest: digest(artifact.digest, "authority broadcast review artifact digest"),
+    sessionId: identifier(artifact.sessionId, "authority broadcast review session"),
+    authorityId,
+    repositoryRoot: text(artifact.repositoryRoot, "authority broadcast review repository"),
+    targetSnapshotId: digest(artifact.targetSnapshotId, "authority broadcast review target"),
+    packets: artifact.payload.packets.map((packet) => ({
+      recipientSessionId: identifier(packet.recipientSessionId, "authority broadcast review recipient"),
+      matchDigest: digest(packet.matchDigest, "authority broadcast review packet digest")
+    }))
+  }));
+}
+
 export interface WorkflowCoordinatorContext extends WorkflowCoordinatorContextInput {
   readonly digest: string;
   readonly capturedAt: string;
@@ -333,6 +373,7 @@ export class WorkflowArtifactStore {
   }
 
   async create(input: WorkflowArtifactInput): Promise<WorkflowArtifact> {
+    rejectLegacyReanchorWorkflow(input.action);
     const now = timestamp(this.clock(), "artifact clock");
     const immutable = normalizeInput({ ...input, id: input.id ?? this.idFactory() });
     const artifact: WorkflowArtifact = {
@@ -374,6 +415,7 @@ export class WorkflowArtifactStore {
   }
 
   async claimForDispatch(input: Readonly<{ action: WorkflowArtifactAction; targetSnapshotId: string; sessionId: string; operationId: string; authorityId?: string }>): Promise<WorkflowArtifact | undefined> {
+    rejectLegacyReanchorWorkflow(input.action);
     return this.store.transaction(async (transaction) => {
       const journal = await transaction.readEntries();
       const entries = artifactMap(journal);
@@ -409,6 +451,7 @@ export class WorkflowArtifactStore {
     operationId: string;
     authorityId: string;
   }>): Promise<WorkflowArtifact> {
+    rejectLegacyReanchorWorkflow(input.action);
     return this.store.transaction(async (transaction) => {
       const journal = await transaction.readEntries();
       const artifact = artifactMap(journal).get(text(input.artifactId, "artifact id"));
@@ -740,11 +783,15 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
         return this.prepared(context, authority, { kind: "authority", mode: "refresh", packets: [this.authorityPacket(context, session, authority)], acknowledgementRequired: true });
       case "authority_broadcast": {
         if (request.intent.kind !== "authority_broadcast" || request.intent.recipientSessionIds.length < 1 || request.intent.recipientSessionIds.length > 64) throw new WorkflowArtifactError("Authority broadcast requires a reviewed bounded recipient set.");
-        const recipients = [...new Set(request.intent.recipientSessionIds.map((id) => identifier(id, "authority recipient")))];
+        const recipients = request.intent.recipientSessionIds.map((id) => identifier(id, "authority recipient"));
+        if (new Set(recipients).size !== recipients.length) throw new WorkflowArtifactError("Authority broadcast recipients must be unique; duplicate session IDs are not silently collapsed.");
         const packets: AuthorityReplayPacket[] = [];
         for (const id of recipients) {
           const recipient = await this.sessions.get(id);
-          if (!recipient?.targetSnapshotId || !recipient.workspaceRoot) throw new WorkflowArtifactError("Authority broadcast recipient is not an exact current managed session.");
+          if (!recipient?.targetSnapshotId || !recipient.workspaceRoot || recipient.status !== "verified_blocked"
+            || recipient.targetSnapshotId !== session.targetSnapshotId || !sameRepositoryRoot(recipient.workspaceRoot, session.workspaceRoot!)) {
+            throw new WorkflowArtifactError("Authority broadcast requires an exact verified-blocked recipient on the source repository and TargetSnapshot.");
+          }
           const recipientContext = await this.contexts.current(id, recipient.targetSnapshotId);
           if (!recipientContext || !sameRepositoryRoot(recipientContext.repositoryRoot, recipient.workspaceRoot)) throw new WorkflowArtifactError("Authority broadcast recipient lacks protected individualized context.");
           const recipientAuthority = await this.requireAuthority(recipientContext, recipient, "authority_broadcast");
@@ -812,6 +859,7 @@ export class DurableWorkflowPreparationCoordinator implements WorkflowPreparatio
 }
 
 export function parseWorkflowProviderResponse(value: unknown, artifact: WorkflowArtifact): WorkflowProviderResponse {
+  rejectLegacyReanchorWorkflow(artifact.action);
   if (!record(value)) throw new WorkflowArtifactError("The provider workflow result is not a record.");
   const optional = value.externalId === undefined ? [] : ["externalId"];
   if (!exact(value, ["schema", "version", "artifactId", "artifactDigest", "operationId", "action", "status", "effectDisposition", "summary", "result", ...optional])
@@ -884,6 +932,7 @@ function normalizeInput(input: WorkflowArtifactInput & { readonly id: string }):
   if (payload.kind === "plan" && payload.mode === "approve") {
     if (payload.executorSessionId !== input.sessionId) throw new WorkflowArtifactError("Plan Approval must execute in the exact already-selected executor session while retaining the immutable plan origin.");
     if (!input.planRevision || payload.plan.revision !== input.planRevision || !input.taskId || payload.plan.taskId !== input.taskId) throw new WorkflowArtifactError("Plan Approval binding does not match the exact task and plan revision.");
+    if (payload.plan.expectedTargetTransition.beforeTargetSnapshotId !== input.targetSnapshotId) throw new WorkflowArtifactError("Plan Approval expected transition is not bound to the exact reviewed before-TargetSnapshot.");
   }
   if (payload.kind === "handoff" && payload.sourceSessionId !== input.sessionId) throw new WorkflowArtifactError("Handoff source does not match the selected managed session.");
   const hasCoordinatorDigest = input.coordinatorContextDigest !== undefined;
@@ -948,7 +997,7 @@ function normalizePayload(payload: WorkflowArtifactPayload, action: WorkflowArti
     case "handoff": {
       const route = payload.route === "queue" || payload.route === "immediate" ? payload.route : invalid("handoff route");
       if (action === "handoff_queue" && route !== "queue") throw new WorkflowArtifactError("Queued Handoff requires the queue route.");
-      if ((action === "handoff" || action === "handoff_immediate") && route !== "immediate") throw new WorkflowArtifactError("Normal or immediate Handoff requires immediate recipient focus.");
+      if (action === "handoff_immediate" && route !== "immediate") throw new WorkflowArtifactError("Immediate Handoff requires immediate recipient focus.");
       return { kind: "handoff", packageId: identifier(payload.packageId, "handoff package id"), route, sourceSessionId: identifier(payload.sourceSessionId, "handoff source"), recipientSessionId: identifier(payload.recipientSessionId, "handoff recipient"), authorityId: identifier(payload.authorityId, "handoff authority") };
     }
     case "focus": {
@@ -1004,16 +1053,29 @@ function normalizeProviderResult(value: unknown, artifact: WorkflowArtifact): Wo
         if (new Set(alternatives.map((alternative) => alternative.id)).size !== 15 || alternatives.some((alternative, index) => alternative.rank !== index + 1)) throw new WorkflowArtifactError("Plan Expander must return exactly fifteen uniquely ranked alternatives.");
         return { kind: "plan", mode: "expanded", planDigest: value.planDigest, alternatives };
       }
-      if (!exact(value, ["kind", "mode", "planDigest", "planRevision", "originSessionId", "executorSessionId", "authorityId", "acknowledgementId", "executionStarted"])
+      if (!exact(value, ["kind", "mode", "planDigest", "planRevision", "originSessionId", "executorSessionId", "authorityId", "acknowledgementId", "executionStarted", "targetTransition", "childEffects"])
         || value.mode !== "execution_ack" || value.executionStarted !== true || !bounded(value.acknowledgementId, 256)
         || value.planDigest !== artifact.payload.plan.digest || value.planRevision !== artifact.payload.plan.revision
         || value.originSessionId !== artifact.payload.plan.originSessionId || value.executorSessionId !== artifact.payload.executorSessionId
-        || value.authorityId !== artifact.payload.authorityId) break;
-      return { kind: "plan", mode: "execution_ack", planDigest: value.planDigest, planRevision: value.planRevision as string, originSessionId: value.originSessionId as string, executorSessionId: value.executorSessionId as string, authorityId: value.authorityId as string, acknowledgementId: value.acknowledgementId, executionStarted: true };
+        || value.authorityId !== artifact.payload.authorityId || !record(value.targetTransition) || !Array.isArray(value.childEffects)) break;
+      const targetTransition = normalizePlanTargetTransition(value.targetTransition, artifact.targetSnapshotId);
+      if (stableJson(targetTransition) !== stableJson(artifact.payload.plan.expectedTargetTransition)) {
+        throw new WorkflowArtifactError("Plan Approval provider acknowledgement changed the exact transition reviewed before execution.");
+      }
+      const childEffects = value.childEffects.map(normalizePlanChildEffect);
+      if (childEffects.length < 1 || childEffects.length > 64 || new Set(childEffects.map((effect) => effect.id)).size !== childEffects.length) {
+        throw new WorkflowArtifactError("Plan Approval must report one to 64 unique durable provider child effects.");
+      }
+      return { kind: "plan", mode: "execution_ack", planDigest: value.planDigest, planRevision: value.planRevision as string, originSessionId: value.originSessionId as string, executorSessionId: value.executorSessionId as string, authorityId: value.authorityId as string, acknowledgementId: value.acknowledgementId, executionStarted: true, targetTransition, childEffects };
     }
     case "handoff": {
-      if (artifact.payload.kind !== "handoff" || !exact(value, ["kind", "packageId", "recipientSessionId", "acknowledged"]) || value.packageId !== artifact.payload.packageId || value.recipientSessionId !== artifact.payload.recipientSessionId || typeof value.acknowledged !== "boolean"
-        || ((artifact.action === "handoff" || artifact.action === "handoff_immediate") && value.acknowledged !== true)) break;
+      if (artifact.payload.kind !== "handoff" || !exact(value, ["kind", "packageId", "recipientSessionId", "acknowledged"]) || value.packageId !== artifact.payload.packageId || value.recipientSessionId !== artifact.payload.recipientSessionId || typeof value.acknowledged !== "boolean") break;
+      const expectedAcknowledged = artifact.payload.route === "immediate";
+      if (value.acknowledged !== expectedAcknowledged) {
+        throw new WorkflowArtifactError(expectedAcknowledged
+          ? "An immediate Handoff provider result must acknowledge the exact recipient."
+          : "A queued Handoff provider result cannot claim recipient acknowledgement or focus.");
+      }
       return { kind: "handoff", packageId: value.packageId, recipientSessionId: value.recipientSessionId, acknowledged: value.acknowledged };
     }
     case "focus": {
@@ -1035,6 +1097,46 @@ function normalizeProviderResult(value: unknown, artifact: WorkflowArtifact): Wo
     case "voice_binding": if (exact(value, ["kind", "bindingId", "active"]) && bounded(value.bindingId, 256) && typeof value.active === "boolean") return { kind: "voice_binding", bindingId: value.bindingId, active: value.active }; break;
   }
   throw new WorkflowArtifactError("The provider workflow result is invalid for its action.");
+}
+
+function normalizePlanTargetTransition(value: Record<string, unknown>, beforeTargetSnapshotId: string): PlanExecutionTargetTransition {
+  if (!exact(value, ["beforeTargetSnapshotId", "expectedAfterTargetSnapshotId", "expectation"])
+    || value.beforeTargetSnapshotId !== beforeTargetSnapshotId || !digestLike(value.expectedAfterTargetSnapshotId)
+    || (value.expectation !== "unchanged" && value.expectation !== "changed")) {
+    throw new WorkflowArtifactError("Plan Approval returned an invalid expected TargetSnapshot transition.");
+  }
+  if ((value.expectation === "unchanged") !== (value.expectedAfterTargetSnapshotId === beforeTargetSnapshotId)) {
+    throw new WorkflowArtifactError("Plan Approval target-transition expectation conflicts with its before/after identities.");
+  }
+  return {
+    beforeTargetSnapshotId,
+    expectedAfterTargetSnapshotId: value.expectedAfterTargetSnapshotId,
+    expectation: value.expectation
+  };
+}
+
+function normalizePlanChildEffect(value: unknown): PlanExecutionChildEffect {
+  if (!record(value) || !allowedExact(value, ["id", "action", "status", "effectDisposition", "summary"], ["externalId"])
+    || value.action !== "plan_execution" || (value.status !== "running" && value.status !== "completed" && value.status !== "failed")
+    || !disposition(value.effectDisposition) || !bounded(value.summary, 1_024)) {
+    throw new WorkflowArtifactError("Plan Approval returned a malformed provider child effect.");
+  }
+  const id = identifier(value.id, "plan execution child effect id");
+  const externalId = value.externalId === undefined ? undefined : bounded(value.externalId, 256) ? value.externalId : invalid("plan execution child external id");
+  if ((value.status === "running" || value.status === "completed") && value.effectDisposition !== "committed") {
+    throw new WorkflowArtifactError("A running or completed plan child effect must be durably committed.");
+  }
+  if ((value.effectDisposition === "committed" || value.effectDisposition === "ambiguous") && !externalId) {
+    throw new WorkflowArtifactError("A committed or ambiguous plan child effect requires one exact provider observation identity.");
+  }
+  return {
+    id,
+    action: "plan_execution",
+    status: value.status,
+    effectDisposition: value.effectDisposition,
+    summary: redactText(value.summary.trim()),
+    ...(externalId ? { externalId } : {})
+  };
 }
 
 function normalizeWorkflowChildResult(value: unknown, artifact: WorkflowArtifact, effect: WorkflowProviderEffectBinding, role: WorkflowProviderEffectRole, status: WorkflowChildProviderResponse["status"]): WorkflowChildProviderResult {
@@ -1074,13 +1176,18 @@ function normalizeEvidence(value: CoordinatorEvidenceBundle): CoordinatorEvidenc
   return normalized;
 }
 
+/** Closed canonicalizer for host-owned context evidence reused by dedicated lifecycles. */
+export function canonicalCoordinatorEvidence(value: CoordinatorEvidenceBundle): CoordinatorEvidenceBundle {
+  return normalizeEvidence(value);
+}
+
 function normalizeEvidenceReference(value: WorkflowEvidenceReference): WorkflowEvidenceReference {
   if (!record(value) || !["protected_context", "repository", "target_snapshot", "receipt"].includes(String(value.source))) throw new WorkflowArtifactError("Workflow evidence reference is invalid.");
   return { id: identifier(value.id, "evidence id"), digest: digest(value.digest, "evidence digest"), source: value.source as WorkflowEvidenceReference["source"], summary: text(value.summary, "evidence summary") };
 }
 
 function normalizePlan(value: ExistingPlanBinding): ExistingPlanBinding {
-  if (!record(value) || !exact(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions"]) || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 256 || !Array.isArray(value.decisions)) throw new WorkflowArtifactError("An exact immutable existing plan is required.");
+  if (!record(value) || !exact(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions", "expectedTargetTransition"]) || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 256 || !Array.isArray(value.decisions) || !record(value.expectedTargetTransition)) throw new WorkflowArtifactError("An exact immutable existing plan is required.");
   const steps = value.steps.map((step: unknown) => {
     if (!record(step) || !exact(step, ["id", "summary", "ownedFiles", "dependencies", "status"]) || !Array.isArray(step.ownedFiles) || !Array.isArray(step.dependencies)) throw new WorkflowArtifactError("Plan step is invalid.");
     return { id: identifier(step.id, "plan step id"), summary: text(step.summary, "plan step summary"), ownedFiles: step.ownedFiles.map(safeOwnedFile), dependencies: step.dependencies.map((item: unknown) => identifier(item, "plan dependency")), status: planStepStatus(step.status) };
@@ -1095,11 +1202,26 @@ function normalizePlan(value: ExistingPlanBinding): ExistingPlanBinding {
     taskId: identifier(value.taskId, "plan task"),
     objective: text(value.objective, "plan objective"),
     steps,
-    decisions: list(value.decisions, "plan decision", true)
+    decisions: list(value.decisions, "plan decision", true),
+    expectedTargetTransition: normalizeReviewedPlanTargetTransition(value.expectedTargetTransition)
   };
-  const materialDigest = sha256(stableJson({ revision: normalized.revision, originSessionId: normalized.originSessionId, taskId: normalized.taskId, objective: normalized.objective, steps: normalized.steps, decisions: normalized.decisions }));
+  const materialDigest = sha256(stableJson({ revision: normalized.revision, originSessionId: normalized.originSessionId, taskId: normalized.taskId, objective: normalized.objective, steps: normalized.steps, decisions: normalized.decisions, expectedTargetTransition: normalized.expectedTargetTransition }));
   if (normalized.digest !== materialDigest) throw new WorkflowArtifactError("Plan digest does not match the exact immutable plan material.");
   return normalized;
+}
+
+function normalizeReviewedPlanTargetTransition(value: Record<string, unknown>): PlanExecutionTargetTransition {
+  if (!exact(value, ["beforeTargetSnapshotId", "expectedAfterTargetSnapshotId", "expectation"])
+    || !digestLike(value.beforeTargetSnapshotId) || !digestLike(value.expectedAfterTargetSnapshotId)
+    || (value.expectation !== "unchanged" && value.expectation !== "changed")
+    || ((value.expectation === "unchanged") !== (value.expectedAfterTargetSnapshotId === value.beforeTargetSnapshotId))) {
+    throw new WorkflowArtifactError("The existing plan lacks one internally consistent exact expected TargetSnapshot transition.");
+  }
+  return {
+    beforeTargetSnapshotId: value.beforeTargetSnapshotId,
+    expectedAfterTargetSnapshotId: value.expectedAfterTargetSnapshotId,
+    expectation: value.expectation
+  };
 }
 
 function normalizeProviderEffect(value: WorkflowProviderEffectBinding, role: WorkflowProviderEffectRole): WorkflowProviderEffectBinding {
@@ -1333,6 +1455,9 @@ function expectedKind(action: WorkflowArtifactAction): WorkflowArtifactPayload["
   return "voice_binding";
 }
 function workflowAction(value: unknown): WorkflowArtifactAction { if (typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value)) return value as WorkflowArtifactAction; return invalid("workflow action"); }
+function rejectLegacyReanchorWorkflow(action: WorkflowArtifactAction): void {
+  if (action === "reanchor") throw new WorkflowArtifactError("Generic Re-anchor artifacts are legacy audit evidence only; use the dedicated Re-anchor lifecycle.");
+}
 function commandAction(value: unknown): CommandAction { if (typeof value === "string" && (commandActionIds as readonly string[]).includes(value)) return value as CommandAction; return invalid("authority action"); }
 function voiceProvider(value: unknown): VoiceProvider { if (value === "claude" || value === "chatgpt" || value === "system") return value; return invalid("voice provider"); }
 function planStepStatus(value: unknown): PlanStepArtifact["status"] { if (value === "proposed" || value === "approved" || value === "completed" || value === "blocked") return value; return invalid("plan step status"); }
@@ -1343,6 +1468,10 @@ function workflowStatus(value: unknown): value is WorkflowArtifactStatus { retur
 function providerStatus(value: unknown): value is WorkflowProviderResponse["status"] { return typeof value === "string" && ["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value); }
 function disposition(value: unknown): value is EffectDisposition { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
 function exact(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+function allowedExact(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean {
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => Object.hasOwn(value, key)) && Object.keys(value).every((key) => allowed.has(key));
+}
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function bounded(value: unknown, maximum: number): value is string { return typeof value === "string" && !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value); }
 function digestLike(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value); }

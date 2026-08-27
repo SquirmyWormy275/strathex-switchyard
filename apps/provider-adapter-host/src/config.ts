@@ -6,9 +6,13 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { WindowsDpapiCurrentUserProtector, type UserSecretProtector } from "../../windows-companion/src/windows-secret.ts";
 import {
   ClaudeProviderAdapterBackend,
+  ConfiguredProviderMediatedEffectHostPort,
   CodexProviderAdapterBackend,
   FixtureProviderRuntimePort,
   type ProviderAdapterBackend,
+  type ProviderMediatedEffectDriver,
+  type ProviderMediatedEffectGuard,
+  type ProviderMediatedEffectHostPort,
   type ProviderRuntimePort
 } from "./backends.ts";
 import { openProviderHostSecretEnvelope } from "./secret-envelope.ts";
@@ -42,6 +46,16 @@ export interface ProviderHostModuleConfiguration {
 
 export type LoadedProviderConfiguration = ProviderHostFixtureConfiguration | ProviderHostModuleConfiguration;
 
+export interface LoadedProviderEffectDriverConfiguration {
+  /** Provider/Council effects only. Automation execution is companion-owned and cannot be configured here. */
+  readonly provider: "claude" | "codex";
+  readonly kind: "module";
+  readonly modulePath: string;
+  readonly moduleSha256: string;
+  /** Exact digest-verified host-driver source; never exposed to a provider runtime module. */
+  readonly moduleSource: Uint8Array;
+}
+
 export interface LoadedProviderHostConfiguration {
   readonly configurationPath: string;
   readonly configurationSha256: string;
@@ -57,6 +71,7 @@ export interface LoadedProviderHostConfiguration {
   readonly dispatchLeaseAuthenticationKeyText: string;
   readonly stateFile: string;
   readonly providers: readonly LoadedProviderConfiguration[];
+  readonly effectDrivers: readonly LoadedProviderEffectDriverConfiguration[];
 }
 
 export interface ProviderHostConfigurationLoadOptions {
@@ -74,9 +89,10 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); }
   finally { bytes.fill(0); }
   if (!record(value) || value.schema !== "sxsy-b122.provider-host-config" || value.version !== 1 || !record(value.listen) || !record(value.tls)
-    || !allowedKeys(value, ["schema", "version", "protectedStateRoot", "listen", "tls", "authenticationTokenEnvelopeFile", "journalAuthenticationEnvelopeFile", "dispatchLeaseAuthenticationEnvelopeFile", "stateFile", "providers"], ["allowFixtureBackends"])
+    || !allowedKeys(value, ["schema", "version", "protectedStateRoot", "listen", "tls", "authenticationTokenEnvelopeFile", "journalAuthenticationEnvelopeFile", "dispatchLeaseAuthenticationEnvelopeFile", "stateFile", "providers"], ["allowFixtureBackends", "effectDrivers"])
     || !exactKeys(value.listen, ["host", "port"]) || !exactKeys(value.tls, ["certificateFile", "privateKeyFile", "certificateSha256", "privateKeySha256", "tlsSpkiSha256"])
     || !Array.isArray(value.providers) || value.providers.length < 1 || value.providers.length > 2
+    || (value.effectDrivers !== undefined && (!Array.isArray(value.effectDrivers) || value.effectDrivers.length > 2))
     || typeof value.protectedStateRoot !== "string" || typeof value.authenticationTokenEnvelopeFile !== "string" || typeof value.journalAuthenticationEnvelopeFile !== "string" || typeof value.dispatchLeaseAuthenticationEnvelopeFile !== "string" || typeof value.stateFile !== "string"
     || !digest(value.tls.certificateSha256) || !digest(value.tls.privateKeySha256) || !digest(value.tls.tlsSpkiSha256)) {
     throw new Error("The provider host configuration schema is invalid.");
@@ -126,6 +142,30 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     const observedDigest = createHash("sha256").update(moduleBytes).digest("hex");
     if (observedDigest !== entry.moduleSha256) { moduleBytes.fill(0); throw new Error(`The ${entry.provider} provider module digest does not match the installed pin.`); }
     providers.push({ provider: entry.provider, kind: "module", modulePath, moduleSha256: entry.moduleSha256, credentialEnvelopeFile, credential: new Uint8Array(), moduleSource: moduleBytes, options: stringOptions(entry.options) });
+  }
+
+  const effectDrivers: LoadedProviderEffectDriverConfiguration[] = [];
+  const seenDrivers = new Set<string>();
+  for (const entry of value.effectDrivers ?? []) {
+    if (!record(entry) || (entry.provider !== "claude" && entry.provider !== "codex") || entry.kind !== "module"
+      || !exactKeys(entry, ["provider", "kind", "modulePath", "moduleSha256"]) || seenDrivers.has(entry.provider)) {
+      throw new Error("The provider host effect driver list is invalid or duplicated.");
+    }
+    seenDrivers.add(entry.provider);
+    const provider = providers.find((candidate) => candidate.provider === entry.provider);
+    if (!provider || provider.kind !== "module") throw new Error("A host effect driver requires the exact configured module provider identity.");
+    const modulePath = absolutePath(entry.modulePath, `${entry.provider} host effect driver module path`);
+    if (!digest(entry.moduleSha256)) throw new Error("The host effect driver module digest is invalid.");
+    if (resolve(modulePath) === resolve(provider.modulePath) || entry.moduleSha256 === provider.moduleSha256) {
+      throw new Error("The host effect driver must be independently installed and digest-pinned from the provider runtime module.");
+    }
+    const moduleBytes = await boundedFile(modulePath, maximumModuleBytes, `${entry.provider} host effect driver module`);
+    const observedDigest = createHash("sha256").update(moduleBytes).digest("hex");
+    if (observedDigest !== entry.moduleSha256) {
+      moduleBytes.fill(0);
+      throw new Error(`The ${entry.provider} host effect driver module digest does not match the installed pin.`);
+    }
+    effectDrivers.push({ provider: entry.provider, kind: "module", modulePath, moduleSha256: entry.moduleSha256, moduleSource: moduleBytes });
   }
 
   await pathSecurity.assertCurrentUserProtected(protectedStateRoot, protectedExistingPaths);
@@ -199,7 +239,7 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     authenticationToken: Buffer.from(token, "ascii"), authenticationTokenText: token,
     journalAuthenticationKey: Buffer.from(journalAuthenticationKey, "ascii"), journalAuthenticationKeyText: journalAuthenticationKey,
     dispatchLeaseAuthenticationKey: Buffer.from(dispatchLeaseAuthenticationKey, "ascii"), dispatchLeaseAuthenticationKeyText: dispatchLeaseAuthenticationKey,
-    stateFile, providers
+    stateFile, providers, effectDrivers
   };
 }
 
@@ -210,16 +250,30 @@ export interface LoadedProviderBackendRuntime {
 
 export interface LoadProviderBackendOptions {
   readonly councilResources?: ProviderCouncilResourceLifecycle;
+  /** Installed companion-authenticated final-current/containment decision port. */
+  readonly mediatedFinalCurrent?: ProviderMediatedEffectGuard;
+  /**
+   * Separately installed host-owned provider effect drivers. These are never
+   * passed to a digest-pinned module. Absence keeps that provider at or below
+   * Controllable even when the module self-asserts Mediated.
+   */
+  readonly mediatedEffects?: Partial<Record<"claude" | "codex", Readonly<{
+    guard: ProviderMediatedEffectGuard;
+    driver: ProviderMediatedEffectDriver;
+    driverModuleSha256: string;
+  }>>>;
 }
 
 export async function loadProviderBackendRuntime(configuration: LoadedProviderHostConfiguration, options: LoadProviderBackendOptions = {}): Promise<LoadedProviderBackendRuntime> {
   const result: ProviderAdapterBackend[] = [];
   const ports: ProviderRuntimePort[] = [];
+  const mediationPorts: ProviderMediatedEffectHostPort[] = [];
   const councilResources = options.councilResources ?? new InstalledProviderCouncilResourceLifecycle(configuration.companionStateDirectory);
   let closed = false;
   try {
     for (const provider of configuration.providers) {
       let port: ProviderRuntimePort;
+      let mediation: ProviderMediatedEffectHostPort | undefined;
       if (provider.kind === "fixture") {
         port = new FixtureProviderRuntimePort(provider.provider);
       } else {
@@ -229,23 +283,46 @@ export async function loadProviderBackendRuntime(configuration: LoadedProviderHo
           const imported = await import(sourceUrl) as Readonly<Record<string, unknown>>;
           const factory = imported.createB122ProviderRuntimePort;
           if (typeof factory !== "function") throw new Error("The provider backend module does not export createB122ProviderRuntimePort.");
-          port = await factory({ provider: provider.provider, credential, options: provider.options, councilResources: councilResources.callbacks }) as ProviderRuntimePort;
+          port = await factory({ provider: provider.provider, options: provider.options, councilResources: councilResources.callbacks }) as ProviderRuntimePort;
+          validateRuntimePort(port, provider.provider);
+          port = wrapProviderRuntimeCouncilLifecycle(port, councilResources);
+          const configuredDriver = configuration.effectDrivers.find((entry) => entry.provider === provider.provider);
+          const installedMediation = options.mediatedEffects?.[provider.provider]
+            ?? (configuredDriver && options.mediatedFinalCurrent
+              ? {
+                  guard: options.mediatedFinalCurrent,
+                  driver: await loadConfiguredEffectDriver(configuration, provider, configuredDriver),
+                  driverModuleSha256: configuredDriver.moduleSha256
+                }
+              : undefined);
+          if (installedMediation) {
+            mediation = new ConfiguredProviderMediatedEffectHostPort({
+              configurationSha256: configuration.configurationSha256,
+              provider: provider.provider,
+              adapterId: `sxsy-b122.module.${provider.provider}`,
+              moduleSha256: provider.moduleSha256,
+              driverModuleSha256: installedMediation.driverModuleSha256,
+              credential,
+              guard: installedMediation.guard,
+              driver: installedMediation.driver
+            });
+            mediationPorts.push(mediation);
+          }
         } finally {
           credential.fill(0);
           provider.credential.fill(0);
           provider.moduleSource.fill(0);
+          configuration.effectDrivers.find((entry) => entry.provider === provider.provider)?.moduleSource.fill(0);
         }
-        validateRuntimePort(port, provider.provider);
-        port = wrapProviderRuntimeCouncilLifecycle(port, councilResources);
       }
       ports.push(port);
       const identity = provider.kind === "module"
         ? { adapterId: `sxsy-b122.module.${provider.provider}`, moduleSha256: provider.moduleSha256 }
         : undefined;
-      result.push(provider.provider === "claude" ? new ClaudeProviderAdapterBackend(port, identity) : new CodexProviderAdapterBackend(port, identity));
+      result.push(provider.provider === "claude" ? new ClaudeProviderAdapterBackend(port, identity, mediation) : new CodexProviderAdapterBackend(port, identity, mediation));
     }
   } catch (error) {
-    await closeProviderRuntime(ports, councilResources).catch(() => undefined);
+    await closeProviderRuntime(ports, councilResources, mediationPorts).catch(() => undefined);
     throw error;
   }
   return Object.freeze({
@@ -253,9 +330,32 @@ export async function loadProviderBackendRuntime(configuration: LoadedProviderHo
     async close() {
       if (closed) return;
       closed = true;
-      await closeProviderRuntime(ports, councilResources);
+      await closeProviderRuntime(ports, councilResources, mediationPorts);
     }
   });
+}
+
+async function loadConfiguredEffectDriver(
+  configuration: LoadedProviderHostConfiguration,
+  provider: ProviderHostModuleConfiguration,
+  driver: LoadedProviderEffectDriverConfiguration
+): Promise<ProviderMediatedEffectDriver> {
+  const sourceUrl = `data:text/javascript;base64,${Buffer.from(driver.moduleSource).toString("base64")}`;
+  const imported = await import(sourceUrl) as Readonly<Record<string, unknown>>;
+  const factory = imported.createB122ProviderMediatedEffectDriver;
+  if (typeof factory !== "function") throw new Error("The host effect driver module does not export createB122ProviderMediatedEffectDriver.");
+  const value = await factory(Object.freeze({
+    provider: provider.provider,
+    allowedSurfaces: Object.freeze(["provider", "council"] as const),
+    configurationSha256: configuration.configurationSha256,
+    adapterId: `sxsy-b122.module.${provider.provider}`,
+    providerModuleSha256: provider.moduleSha256,
+    driverModuleSha256: driver.moduleSha256
+  })) as unknown;
+  if (!record(value) || !["executeCommand", "executeCouncil", "observeCommand", "cancelCommand", "observeCouncil"].every((name) => typeof value[name] === "function")) {
+    throw new Error("The host effect driver module did not return the exact closed driver contract.");
+  }
+  return value as unknown as ProviderMediatedEffectDriver;
 }
 
 export async function loadProviderBackends(configuration: LoadedProviderHostConfiguration, options: LoadProviderBackendOptions = {}): Promise<readonly ProviderAdapterBackend[]> {
@@ -263,18 +363,22 @@ export async function loadProviderBackends(configuration: LoadedProviderHostConf
 }
 
 function validateRuntimePort(value: unknown, provider: "claude" | "codex"): asserts value is ProviderRuntimePort {
-  if (!record(value) || value.provider !== provider || !["handshake", "execute", "observeSession", "observeWorkflowContext", "observeOperation", "cancelOperation", "council", "observeCouncil", "shutdown"].every((name) => typeof value[name] === "function")) {
+  if (!record(value) || value.provider !== provider || ![
+    "handshake", "execute", "observeSession", "observeWorkflowContext", "reanchor", "observeReanchor",
+    "observeOperation", "cancelOperation", "council", "observeCouncil", "shutdown"
+  ].every((name) => typeof value[name] === "function")) {
     throw new Error(`The ${provider} provider module did not return the exact runtime port contract.`);
   }
 }
 
-async function closeProviderRuntime(ports: readonly ProviderRuntimePort[], councilResources: ProviderCouncilResourceLifecycle): Promise<void> {
+async function closeProviderRuntime(ports: readonly ProviderRuntimePort[], councilResources: ProviderCouncilResourceLifecycle, mediationPorts: readonly ProviderMediatedEffectHostPort[] = []): Promise<void> {
   const controller = new AbortController();
   let expire!: () => void;
   const expired = new Promise<never>((_resolve, reject) => { expire = () => { controller.abort(); reject(new Error("Provider module shutdown exceeded its fixed deadline.")); }; });
   const timer = setTimeout(expire, 5_000);
   const results = await Promise.allSettled([
     ...ports.map((port) => Promise.race([Promise.resolve().then(() => port.shutdown(controller.signal)), expired])),
+    ...mediationPorts.map((port) => Promise.resolve().then(() => port.close())),
     councilResources.closeAll()
   ]).finally(() => clearTimeout(timer));
   if (results.some((result) => result.status === "rejected")) throw new Error("One or more provider runtime resources did not shut down cleanly.");

@@ -6,13 +6,14 @@ import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type 
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
 import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
 import type { CommandDispatcherDependencies, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
-import type { RuntimeDispatcherContext } from "../../../packages/control-plane/src/runtime.ts";
+import type { RuntimeDispatcherContext, TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
 import { commandForAction, type CommandDefinition } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import { ReceiptLedger } from "../../../packages/control-plane/src/receipts.ts";
 import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { TargetSnapshotLedger } from "../../../packages/control-plane/src/snapshot-ledger.ts";
 import { FilesystemBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
 import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
 import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
@@ -23,13 +24,15 @@ import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
 import { repositoryProcessActions, type RepositoryExecutionRootProvider, type RepositoryRuntimeAction } from "./repository-runtime.ts";
 import { RepositoryRuntimeExecutionBroker, SandboxedRepositoryExecutionBroker, repositoryRuntimeExecutionRecipe, type SandboxRepositoryRecipeRunner } from "./repository-runtime-broker.ts";
 import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
-import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, providerCommandActions, type ProviderCommandTransport } from "./remote-adapters.ts";
+import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, providerCommandActions, type ProviderCommandTransport } from "./remote-adapters.ts";
 import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
 import { DurableConfiguredCouncilExecutor, type CouncilAssignmentResourceVerifier, type CouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
 import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
-import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, PipelineFailurePresentationAdapter, readPipelineLocalReceipts, type PipelineReceiptReader } from "./pipeline-adapters.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, LocalPipelineFailureTraceAdapter, PipelineFailureFallbackAdapter, PipelineFailurePresentationAdapter, PipelineStatusFailureSelectionAdapter, readPipelineLocalReceipts, type PipelineFailureCursor, type PipelineReceiptReader } from "./pipeline-adapters.ts";
 import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
 import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
+import { DurableEffectTargetTransitionCoordinator } from "./effect-target-transition.ts";
+import { createHostLocalAutomationBroker, type HostLocalAutomationBrokerOptions } from "./local-automation-broker.ts";
 
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
@@ -110,6 +113,10 @@ export interface DefaultLocalCompositionOptions {
   readonly providerTransport?: ProviderCommandTransport;
   /** Installed fixed-path desktop/managed-terminal adapter; omitted means those exact desktop commands remain unavailable. */
   readonly providerDesktopAdapter?: CommandAdapter;
+  /** Trusted host-only TargetSnapshot resolver used for legitimate post-effect transitions. */
+  readonly targetResolver?: TargetResolver;
+  /** Request-bound installed host executor. Provider routes remain proposal-only. */
+  readonly automationExecutorFactory?: HostLocalAutomationBrokerOptions["createExecutor"];
 }
 export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
   let credentials: DurableCredentialReferenceVault | undefined = options.credentialVault;
@@ -127,25 +134,37 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   );
   const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
   const workflowArtifacts = new WorkflowArtifactStore(store);
+  const targetTransitions = options.targetResolver
+    ? new DurableEffectTargetTransitionCoordinator({ sessions: context.sessions, targets: new TargetSnapshotLedger(store), targetResolver: options.targetResolver })
+    : undefined;
   const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
   const receiptLedger = new ReceiptLedger(store);
+  const pipelineCursor: PipelineFailureCursor = new DurablePipelineFailureCursor(store);
   const localPipeline = new LocalPipelineStatusAdapter(receiptLedger);
-  const adapters = new AdapterRegistry(containment); adapters.register("pipeline_status", localPipeline);
+  const localPipelineTrace = new LocalPipelineFailureTraceAdapter(receiptLedger, pipelineCursor);
   const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
+  const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
+  const adapters = new AdapterRegistry(containment);
+  adapters.register("pipeline_status", dynamicNetwork ? localPipeline : new PipelineStatusFailureSelectionAdapter(localPipeline, pipelineCursor));
+  adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(localPipelineTrace, hostActions));
   const providerTransport = options.providerTransport ?? dynamicNetwork;
   if (providerTransport) {
-    const provider = new ConfiguredProviderCommandAdapter(providerTransport, workflowArtifacts);
+    const provider = new ConfiguredProviderCommandAdapter(providerTransport, workflowArtifacts, targetTransitions);
     for (const action of providerCommandActions) adapters.register(action, provider);
   }
-  const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
   const configuredGitHost = options.networkPolicyRegistry ? { resolve: async (repositoryRoot: string) => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve(repositoryRoot)) } : undefined;
   const hostActionAdapter = new DurableHostActionAdapter(hostActions, dynamicNetwork && configuredGitHost ? new ConfiguredGitHubNavigationResolver(dynamicNetwork, configuredGitHost) : undefined);
-  for (const action of hostActionCommandActions) adapters.register(action, hostActionAdapter);
+  for (const action of hostActionCommandActions) {
+    // Alt-Handoff is a provider workflow. Registering the legacy queue-view
+    // host action under the same action silently overwrote the exact provider
+    // adapter (and invented a local effect when no provider existed).
+    if (action !== "handoff_immediate" && action !== "pipeline_failure_trace") adapters.register(action, hostActionAdapter);
+  }
   if (options.providerDesktopAdapter) for (const action of installedProviderDesktopActions) adapters.register(action, options.providerDesktopAdapter);
   if (dynamicNetwork) {
-    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, receiptLedger, configuredGitHost!, new DurablePipelineFailureCursor(store));
+    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, receiptLedger, configuredGitHost!, pipelineCursor);
     adapters.register("pipeline_status", new CompositePipelineStatusAdapter(localPipeline, pipeline));
-    adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(pipeline, hostActions));
+    adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(new PipelineFailureFallbackAdapter(pipeline, localPipelineTrace), hostActions));
   }
   const git = new InMemoryGitBroker(context.policy, containment);
   if (options.localGitStateDirectory) {
@@ -186,6 +205,6 @@ export function createDefaultLocalComposition(context: RuntimeDispatcherContext,
   }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
   const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
-  const executionOptions = { containment, hostActions };
-  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: providerTransport ? createConfiguredAutomationBroker(context.policy, containment, providerTransport) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, providerTransport, Date.now, { ...(options.councilIsolation ? { isolation: options.councilIsolation } : {}), ...(options.councilAutomaticGate ? { automaticGate: options.councilAutomaticGate } : {}), ...(options.councilResources ? { resources: options.councilResources } : {}) }), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
+  const executionOptions = { containment, hostActions, ...(targetTransitions ? { targetTransitions } : {}) };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: options.automationExecutorFactory ? createHostLocalAutomationBroker(context.policy, containment, { createExecutor: options.automationExecutorFactory }) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, providerTransport, Date.now, { ...(options.councilIsolation ? { isolation: options.councilIsolation } : {}), ...(options.councilAutomaticGate ? { automaticGate: options.councilAutomaticGate } : {}), ...(options.councilResources ? { resources: options.councilResources } : {}) }), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

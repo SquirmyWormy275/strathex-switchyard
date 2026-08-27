@@ -1,4 +1,9 @@
 import { chordFor, type B122Control, type B122Modifier } from "./commands.ts";
+import {
+  automationManifestReviewScopeDigest,
+  parseAutomationOperationManifest,
+  type AutomationOperationManifest
+} from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 
 export type ExtensionCapability = "registered" | "observable" | "controllable" | "mediated";
 export type ExtensionSessionStatus = "running" | "verified_blocked" | "verified_finished" | "unreachable" | "stale" | "unknown";
@@ -48,6 +53,15 @@ export type LocalHostAction =
 
 export interface GitHubNavigationCandidate { readonly id: string; readonly label: string; readonly description: string; readonly url: string; }
 
+export interface RepositoryExecutableIdentitySummary {
+  readonly canonicalPath: string;
+  readonly sha256: string;
+  readonly device: string;
+  readonly inode: string;
+  readonly size: number;
+  readonly modifiedMs: number;
+}
+
 export interface ForwardedHostAction {
   readonly id: string;
   readonly kind: LocalHostAction;
@@ -56,8 +70,11 @@ export interface ForwardedHostAction {
   readonly workspaceRoot?: string;
   readonly debugConfiguration?: string;
   readonly debugSessionId?: string;
+  readonly debugEffectSessionId?: string;
+  readonly debugBindingId?: string;
   readonly debugOriginOperationId?: string;
   readonly pythonInterpreter?: string;
+  readonly pythonInterpreterIdentity?: RepositoryExecutableIdentitySummary;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly managedTerminalProfile?: ManagedTerminalProfileSummary;
 }
@@ -80,8 +97,11 @@ export interface ExtensionHostActionClaim extends HostActionClaimReference {
   readonly version: 1;
   readonly hostActionId: string;
   readonly operationId: string;
-  readonly commandAction: "open_voice";
+  readonly commandAction: "open_voice" | "switch_voice_provider" | "bind_voice_session" | "voice_session_picker";
   readonly hostActionKind: "show_voice_center";
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly workspaceRoot?: string;
   readonly adapterVersion: string;
   readonly capabilities: readonly ["show_voice_center"];
   readonly claimedAt: string;
@@ -98,6 +118,55 @@ export interface PreparedCommand {
   readonly confirmationScopeDigest?: string;
   readonly confirmationExpiresAt?: string;
   readonly workflowReview?: PlanApprovalWorkflowReview;
+  readonly automationReview?: AutomationManifestReview;
+  readonly debugStopReview?: DebugStopReview;
+}
+
+export type AutomationManifestAction = "compound_capture" | "compound_refresh" | "lfg" | "repair_mission";
+
+export interface ExtensionAutomationOperationManifest {
+  readonly schema: "sxsy-b122.automation-operation-manifest";
+  readonly version: 1;
+  readonly id: string;
+  readonly digest: string;
+  readonly action: AutomationManifestAction;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly taskId: string;
+  readonly planRevision: string;
+  readonly provider: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly proposal: Readonly<Record<string, unknown>>;
+}
+
+export interface AutomationManifestReview {
+  readonly action: AutomationManifestAction;
+  readonly manifest: ExtensionAutomationOperationManifest;
+  readonly reviewScopeDigest: string;
+}
+
+export interface DebugStopReview {
+  readonly schema: "sxsy-b122.debug-stop-review";
+  readonly version: 1;
+  readonly action: "stop_managed_run";
+  readonly bindingId: string;
+  readonly bindingDigest: string;
+  readonly reviewScopeDigest: string;
+  readonly sourceSessionId: string;
+  readonly authorityId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly originOperationId: string;
+  readonly effectKind: "debug_session" | "managed_run";
+  readonly debugSessionId: string | null;
+  readonly debugBindingId: string | null;
+  readonly debugConfiguration: string | null;
+  readonly managedProcessId: string | null;
+  readonly createdAt: string;
+  readonly expiresAt: string;
 }
 
 export interface PlanApprovalWorkflowReview {
@@ -117,6 +186,11 @@ export interface PlanApprovalWorkflowReview {
     readonly objective: string;
     readonly steps: readonly Readonly<{ readonly id: string; readonly summary: string; readonly ownedFiles: readonly string[]; readonly dependencies: readonly string[]; readonly status: "proposed" | "approved" | "completed" | "blocked" }>[];
     readonly decisions: readonly string[];
+    readonly expectedTargetTransition: Readonly<{
+      readonly beforeTargetSnapshotId: string;
+      readonly expectedAfterTargetSnapshotId: string;
+      readonly expectation: "unchanged" | "changed";
+    }>;
   }>;
   readonly scopeDigest: string;
   readonly summary: string;
@@ -236,6 +310,69 @@ export interface HardwareSignalClaim { readonly signalId: string; readonly claim
 export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
 export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
 export interface HardwareSignalCompletionResult { readonly signalId: string; readonly outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; }
+export interface ExtensionReanchorAuthority { readonly id: string; readonly issuedBy: string; readonly expiresAt: string; }
+export interface ExtensionReanchorReport {
+  readonly summary: string;
+  readonly discrepancies: readonly string[];
+  readonly risks: readonly string[];
+  readonly questions: readonly string[];
+  readonly result: "reanchored_without_resume";
+}
+export interface ExtensionReanchorRereadEvidence {
+  readonly contextDigest: string;
+  readonly authorityDigest: string;
+  readonly instructionDigests: readonly string[];
+  readonly planDigest: string;
+  readonly documentationDigests: readonly string[];
+  readonly currentWorkDigest: string;
+  readonly inspectedTargetSnapshotId: string;
+}
+export interface ExtensionReanchorReceipt {
+  readonly version: 1;
+  readonly id: string;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly previewDigest: string;
+  readonly confirmationDigest: string;
+  readonly confirmationScopeDigest: string;
+  readonly externalEffectId: string;
+  readonly acknowledgementDigest: string;
+  readonly artifactDigest: string;
+  readonly rereadEvidence: ExtensionReanchorRereadEvidence;
+  readonly report: ExtensionReanchorReport;
+  readonly sessionRebindOutcome: "rebound" | "already_rebound";
+  readonly resultingBindingDigest: string;
+  readonly resumed: false;
+  readonly evidenceDigest: string;
+  readonly result: "reanchored_without_resume";
+  readonly createdAt: string;
+}
+export interface ExtensionReanchorStatus {
+  readonly schema: "sxsy-b122.installed-reanchor-status";
+  readonly version: 1;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly state: "pending_preview" | "pending_confirmation" | "confirmed" | "executing" | "external_committed" | "session_rebound" | "ambiguous" | "rejected" | "recorded";
+  readonly summary?: string;
+  readonly discrepancies?: readonly string[];
+  readonly risks?: readonly string[];
+  readonly questions?: readonly string[];
+  readonly confirmationScopeDigest?: string;
+  readonly confirmationExpiresAt?: string;
+  readonly receipt?: ExtensionReanchorReceipt;
+}
+export interface ExtensionReanchorHardwareBeginResult {
+  readonly reanchor: ExtensionReanchorStatus;
+  readonly dispatchReceiptId: string;
+}
 export interface ExtensionHandoffPackage { readonly id: string; readonly digest: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly taskId: string; readonly planRevision: string; readonly recipientSessionId?: string; readonly status: "queued" | "immediate_focus_requested" | "acknowledged" | "cancelled" | "archived"; readonly executionAuthorized: false; }
 export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet" | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue" | "handoff_immediate" | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast" | "bind_voice_session";
 export type ExtensionWorkflowPreparationIntent =
@@ -301,7 +438,12 @@ export interface ExtensionCompanionBridge {
   adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>>;
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
-  prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<BridgeResult<PreparedCommand>>;
+  listReanchorAuthorities(sessionId: string): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>>;
+  beginReanchor(input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  beginHardwareReanchor(claim: HardwareSignalClaim, input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>>;
+  confirmReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  getReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }>): Promise<BridgeResult<PreparedCommand>>;
   inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>>;
   reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
   installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
@@ -355,10 +497,10 @@ export interface ExtensionCompanionBridge {
   revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
   rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>>;
   claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>>;
-  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
+  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string, reviewArtifactId?: string, reviewArtifactDigest?: string, effectSessionId?: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
   dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
   completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
-  claimHostAction(binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>>;
+  claimHostAction(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>>;
   createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>>;
   listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>>;
   acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
@@ -428,6 +570,37 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
 
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>> {
     return this.call("session.heartbeat", at ? { sessionId, at } : { sessionId });
+  }
+
+  async listReanchorAuthorities(sessionId: string): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>> {
+    const result = await this.call<unknown>("reanchor.authority.list", { sessionId });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["authorities"]) || !Array.isArray(result.value.authorities)
+      || result.value.authorities.length > 32 || !result.value.authorities.every(isExtensionReanchorAuthority)) return invalidResponse();
+    const ids = result.value.authorities.map((authority) => authority.id);
+    if (new Set(ids).size !== ids.length) return invalidResponse();
+    return { ok: true, value: result.value.authorities };
+  }
+
+  async beginReanchor(input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.begin", input);
+  }
+
+  async beginHardwareReanchor(claim: HardwareSignalClaim, input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>> {
+    const result = await this.call<unknown>("reanchor.hardware.begin", hardwareClaimPayload(claim, input));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["reanchor", "dispatchReceiptId"])
+      || !isExtensionReanchorStatus(result.value.reanchor) || result.value.reanchor.state !== "pending_confirmation"
+      || typeof result.value.dispatchReceiptId !== "string" || !/^hardware-dispatch:[a-f0-9]{64}$/.test(result.value.dispatchReceiptId)) return invalidResponse();
+    return { ok: true, value: { reanchor: result.value.reanchor, dispatchReceiptId: result.value.dispatchReceiptId } };
+  }
+
+  async confirmReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.confirm-apply", { requestId });
+  }
+
+  async getReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.get", { requestId });
   }
 
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
@@ -532,7 +705,7 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: recommendation };
   }
 
-  async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<BridgeResult<PreparedCommand>> {
+  async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }>): Promise<BridgeResult<PreparedCommand>> {
     const result = await this.call<unknown>("command.prepare", command);
     if (!result.ok) return result;
     if (!isRecord(result.value) || !exactKeys(result.value, ["preparation"]) || !isPreparedCommand(result.value.preparation)) return invalidResponse();
@@ -675,12 +848,20 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.claim };
   }
 
-  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
-    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, { ...(sessionId ? { sessionId } : {}), reason, ...(reviewScopeDigest ? { reviewScopeDigest } : {}) }));
+  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string, reviewArtifactId?: string, reviewArtifactDigest?: string, effectSessionId?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, {
+      ...(sessionId ? { sessionId } : {}),
+      reason,
+      ...(reviewScopeDigest ? { reviewScopeDigest } : {}),
+      ...(reviewArtifactId ? { reviewArtifactId } : {}),
+      ...(reviewArtifactDigest ? { reviewArtifactDigest } : {}),
+      ...(effectSessionId ? { effectSessionId } : {})
+    }));
     if (!result.ok) return result;
     if (!isRecord(result.value) || !allowedExactKeys(result.value, ["preparation"], ["dispositionReceiptId"]) || !isPreparedCommand(result.value.preparation)
       || (result.value.dispositionReceiptId !== undefined && !isHardwareDispatchReceipt(result.value.dispositionReceiptId))
       || (result.value.preparation.status === "prepared" || result.value.preparation.workflowReview !== undefined
+        || result.value.preparation.automationReview !== undefined || result.value.preparation.debugStopReview !== undefined
         ? result.value.dispositionReceiptId !== undefined
         : result.value.dispositionReceiptId === undefined)) return invalidResponse();
     return { ok: true, value: { preparation: result.value.preparation, ...(typeof result.value.dispositionReceiptId === "string" ? { dispositionReceiptId: result.value.dispositionReceiptId } : {}) } };
@@ -701,7 +882,7 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.completion };
   }
 
-  async claimHostAction(binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
+  async claimHostAction(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
     const result = await this.call<unknown>("host-action.claim", binding);
     if (!result.ok) return result;
     if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["claim"])) return invalidResponse();
@@ -837,6 +1018,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return { ok: true, value: result.value.binding };
   }
 
+  private async reanchorResult(method: "reanchor.begin" | "reanchor.confirm-apply" | "reanchor.get", payload: unknown): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["reanchor"]) || !isExtensionReanchorStatus(result.value.reanchor)) return invalidResponse();
+    return { ok: true, value: result.value.reanchor };
+  }
+
   private async call<T>(method: string, payload: unknown): Promise<BridgeResult<T>> {
     const id = `${this.idPrefix}-${++this.sequence}`;
     let line: string;
@@ -884,6 +1072,11 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   adoptTerminal(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  listReanchorAuthorities(): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>> { return this.unavailable(); }
+  beginReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
+  beginHardwareReanchor(): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>> { return this.unavailable(); }
+  confirmReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
+  getReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
   prepareCommand(): Promise<BridgeResult<PreparedCommand>> { return this.unavailable(); }
   inspectGitReview(): Promise<BridgeResult<GitReviewWorkspace>> { return this.unavailable(); }
   reviewGitMutation(): Promise<BridgeResult<GitReviewResult>> { return this.unavailable(); }
@@ -986,21 +1179,28 @@ function exactHostActionClaimReference(value: HostActionClaimReference): HostAct
 
 function isExtensionHostActionClaim(
   value: unknown,
-  binding: Readonly<{ windowSessionId: string; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>
+  binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>
 ): value is ExtensionHostActionClaim {
-  if (!isRecord(value) || !exactKeys(value, [
+  if (!isRecord(value) || !allowedExactKeys(value, [
     "version", "claimId", "claimToken", "hostActionId", "operationId", "commandAction", "hostActionKind",
     "windowSessionId", "adapterVersion", "capabilities", "claimedAt", "expiresAt", "actionExpiresAt"
-  ]) || value.version !== 1 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+  ], ["targetSnapshotId", "sessionId", "workspaceRoot"]) || value.version !== 1 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
     || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
     || typeof value.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(value.hostActionId)
     || typeof value.operationId !== "string" || !boundedText(value.operationId, 512)
-    || value.commandAction !== "open_voice" || value.hostActionKind !== "show_voice_center"
+    || !["open_voice", "switch_voice_provider", "bind_voice_session", "voice_session_picker"].includes(String(value.commandAction)) || value.hostActionKind !== "show_voice_center"
+    || (value.targetSnapshotId === undefined) !== (value.workspaceRoot === undefined)
+    || (value.targetSnapshotId !== undefined && (typeof value.targetSnapshotId !== "string" || !boundedText(value.targetSnapshotId, 512)))
+    || (value.sessionId !== undefined && (value.targetSnapshotId === undefined || typeof value.sessionId !== "string" || !boundedText(value.sessionId, 512)))
+    || (value.workspaceRoot !== undefined && (typeof value.workspaceRoot !== "string" || value.workspaceRoot.length > 4_096 || /[\r\n\0]/.test(value.workspaceRoot)
+      || !binding.workspaceRoots.some((root) => normalizeBridgePath(root) === normalizeBridgePath(value.workspaceRoot as string))))
     || value.windowSessionId !== binding.windowSessionId || value.adapterVersion !== binding.adapterVersion
     || !Array.isArray(value.capabilities) || value.capabilities.length !== 1 || value.capabilities[0] !== "show_voice_center"
     || !exactTimestampOrder(value.claimedAt, value.expiresAt, value.actionExpiresAt)) return false;
   return true;
 }
+
+function normalizeBridgePath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
 
 function exactTimestampOrder(claimedAt: unknown, expiresAt: unknown, actionExpiresAt: unknown): boolean {
   if (typeof claimedAt !== "string" || typeof expiresAt !== "string" || typeof actionExpiresAt !== "string") return false;
@@ -1027,8 +1227,11 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
   const workspaceRoot = result.data?.hostActionWorkspaceRoot;
   const debugConfiguration = result.data?.hostActionDebugConfiguration;
   const debugSessionId = result.data?.hostActionDebugSessionId;
+  const debugEffectSessionId = result.data?.hostActionDebugEffectSessionId;
+  const debugBindingId = result.data?.hostActionDebugBindingId;
   const debugOriginOperationId = result.data?.hostActionDebugOriginOperationId;
   const pythonInterpreter = result.data?.hostActionPythonInterpreter;
+  const pythonInterpreterIdentity = result.data?.hostActionPythonInterpreterIdentity;
   const githubCandidates = result.data?.githubCandidates;
   const managedTerminalProfile = result.data?.managedTerminalProfile;
   if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
@@ -1038,18 +1241,35 @@ export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHo
     || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
     || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
     || (debugSessionId !== undefined && (typeof debugSessionId !== "string" || !debugSessionId.trim() || debugSessionId.length > 256 || /[\r\n\0]/.test(debugSessionId)))
+    || (debugEffectSessionId !== undefined && (typeof debugEffectSessionId !== "string" || !debugEffectSessionId.trim() || debugEffectSessionId.length > 256 || /[\r\n\0]/.test(debugEffectSessionId)))
+    || (debugBindingId !== undefined && (typeof debugBindingId !== "string" || !debugBindingId.trim() || debugBindingId.length > 256 || /[\r\n\0]/.test(debugBindingId)))
     || (debugOriginOperationId !== undefined && (typeof debugOriginOperationId !== "string" || !debugOriginOperationId.trim() || debugOriginOperationId.length > 256 || /[\r\n\0]/.test(debugOriginOperationId)))
     || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))
     || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)
     || (kind === "create_claude_terminal" || kind === "create_codex_terminal"
       ? !isManagedTerminalProfile(managedTerminalProfile, kind === "create_claude_terminal" ? "claude_code" : "codex")
       : managedTerminalProfile !== undefined)
+    || (kind === "configure_python_venv"
+      ? typeof workspaceRoot !== "string" || typeof pythonInterpreter !== "string" || !isRepositoryExecutableIdentity(pythonInterpreterIdentity, pythonInterpreter)
+      : pythonInterpreter !== undefined || pythonInterpreterIdentity !== undefined)
     || (kind === "start_vscode_debug"
-      ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || debugSessionId !== undefined || debugOriginOperationId !== undefined
+      ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || debugSessionId !== undefined || debugEffectSessionId !== undefined || debugBindingId !== undefined || debugOriginOperationId !== undefined
       : kind === "stop_vscode_debug"
-        ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || typeof debugSessionId !== "string" || typeof debugOriginOperationId !== "string"
-        : debugSessionId !== undefined || debugOriginOperationId !== undefined)) return undefined;
-  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof debugSessionId === "string" ? { debugSessionId } : {}), ...(typeof debugOriginOperationId === "string" ? { debugOriginOperationId } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
+        ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || typeof debugSessionId !== "string"
+          || typeof debugEffectSessionId !== "string" || typeof debugBindingId !== "string" || typeof debugOriginOperationId !== "string"
+        : debugSessionId !== undefined || debugEffectSessionId !== undefined || debugBindingId !== undefined || debugOriginOperationId !== undefined)) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof debugSessionId === "string" ? { debugSessionId } : {}), ...(typeof debugEffectSessionId === "string" ? { debugEffectSessionId } : {}), ...(typeof debugBindingId === "string" ? { debugBindingId } : {}), ...(typeof debugOriginOperationId === "string" ? { debugOriginOperationId } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isRepositoryExecutableIdentity(pythonInterpreterIdentity, pythonInterpreter) ? { pythonInterpreterIdentity } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
+}
+
+function isRepositoryExecutableIdentity(value: unknown, expectedPath?: unknown): value is RepositoryExecutableIdentitySummary {
+  return isRecord(value) && exactKeys(value, ["canonicalPath", "sha256", "device", "inode", "size", "modifiedMs"])
+    && typeof value.canonicalPath === "string" && value.canonicalPath.length <= 4_096 && /^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value.canonicalPath) && !/[\r\n\0]/.test(value.canonicalPath)
+    && (expectedPath === undefined || typeof expectedPath === "string" && normalizeBridgePath(value.canonicalPath) === normalizeBridgePath(expectedPath))
+    && typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+    && typeof value.device === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value.device)
+    && typeof value.inode === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value.inode)
+    && Number.isSafeInteger(value.size) && Number(value.size) > 0 && Number(value.size) <= 2 * 1024 * 1024 * 1024
+    && typeof value.modifiedMs === "number" && Number.isFinite(value.modifiedMs) && value.modifiedMs >= 0;
 }
 
 function isLocalHostAction(value: string): value is LocalHostAction {
@@ -1446,6 +1666,77 @@ function credentialIdentifier(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
 }
 
+function isExtensionReanchorAuthority(value: unknown): value is ExtensionReanchorAuthority {
+  return isRecord(value) && exactKeys(value, ["id", "issuedBy", "expiresAt"])
+    && reference(value.id) && contentText(value.issuedBy, 256) && timeText(value.expiresAt);
+}
+
+function isExtensionReanchorStatus(value: unknown): value is ExtensionReanchorStatus {
+  const required = ["schema", "version", "requestId", "operationId", "sessionId", "authorityId", "oldTargetSnapshotId", "newTargetSnapshotId", "state"];
+  const optional = ["summary", "discrepancies", "risks", "questions", "confirmationScopeDigest", "confirmationExpiresAt", "receipt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, optional)
+    || value.schema !== "sxsy-b122.installed-reanchor-status" || value.version !== 1
+    || typeof value.requestId !== "string" || !/^reanchor:[a-f0-9]{64}$/.test(value.requestId)
+    || !reference(value.operationId) || !reference(value.sessionId) || !reference(value.authorityId)
+    || !sha256Text(value.oldTargetSnapshotId) || !sha256Text(value.newTargetSnapshotId)
+    || !["pending_preview", "pending_confirmation", "confirmed", "executing", "external_committed", "session_rebound", "ambiguous", "rejected", "recorded"].includes(value.state as string)
+    || (value.summary !== undefined && !contentText(value.summary, 1_024))
+    || ![value.discrepancies, value.risks, value.questions].every((items) => items === undefined || reanchorTextList(items))
+    || (value.confirmationScopeDigest !== undefined && !sha256Text(value.confirmationScopeDigest))
+    || (value.confirmationExpiresAt !== undefined && !timeText(value.confirmationExpiresAt))) return false;
+  const hasPreview = value.discrepancies !== undefined || value.risks !== undefined || value.questions !== undefined
+    || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined;
+  if (hasPreview && (value.discrepancies === undefined || value.risks === undefined || value.questions === undefined
+    || value.confirmationScopeDigest === undefined || value.confirmationExpiresAt === undefined)) return false;
+  if (value.state === "pending_confirmation" && !hasPreview) return false;
+  if (value.state === "recorded") {
+    return isExtensionReanchorReceipt(value.receipt, value);
+  }
+  return value.receipt === undefined;
+}
+
+function isExtensionReanchorReceipt(value: unknown, status: Record<string, unknown>): value is ExtensionReanchorReceipt {
+  const keys = [
+    "version", "id", "requestId", "operationId", "oldTargetSnapshotId", "newTargetSnapshotId", "sessionId", "authorityId",
+    "previewDigest", "confirmationDigest", "confirmationScopeDigest", "externalEffectId", "acknowledgementDigest", "artifactDigest",
+    "rereadEvidence", "report", "sessionRebindOutcome", "resultingBindingDigest", "resumed", "evidenceDigest", "result", "createdAt"
+  ];
+  return isRecord(value) && exactKeys(value, keys) && value.version === 1
+    && typeof value.id === "string" && /^reanchor-receipt:[a-f0-9]{64}$/.test(value.id)
+    && value.requestId === status.requestId && value.operationId === status.operationId
+    && value.oldTargetSnapshotId === status.oldTargetSnapshotId && value.newTargetSnapshotId === status.newTargetSnapshotId
+    && value.sessionId === status.sessionId && value.authorityId === status.authorityId
+    && sha256Text(value.previewDigest) && sha256Text(value.confirmationDigest) && sha256Text(value.confirmationScopeDigest)
+    && reference(value.externalEffectId) && sha256Text(value.acknowledgementDigest) && sha256Text(value.artifactDigest)
+    && isExtensionReanchorRereadEvidence(value.rereadEvidence, value.newTargetSnapshotId)
+    && isExtensionReanchorReport(value.report)
+    && (value.sessionRebindOutcome === "rebound" || value.sessionRebindOutcome === "already_rebound")
+    && sha256Text(value.resultingBindingDigest) && value.resumed === false
+    && sha256Text(value.evidenceDigest) && value.result === "reanchored_without_resume" && timeText(value.createdAt)
+    && (status.confirmationScopeDigest === undefined || value.confirmationScopeDigest === status.confirmationScopeDigest);
+}
+
+function isExtensionReanchorRereadEvidence(value: unknown, newTargetSnapshotId: unknown): value is ExtensionReanchorRereadEvidence {
+  return isRecord(value) && exactKeys(value, ["contextDigest", "authorityDigest", "instructionDigests", "planDigest", "documentationDigests", "currentWorkDigest", "inspectedTargetSnapshotId"])
+    && sha256Text(value.contextDigest) && sha256Text(value.authorityDigest) && reanchorDigestList(value.instructionDigests)
+    && sha256Text(value.planDigest) && reanchorDigestList(value.documentationDigests) && sha256Text(value.currentWorkDigest)
+    && value.inspectedTargetSnapshotId === newTargetSnapshotId;
+}
+
+function isExtensionReanchorReport(value: unknown): value is ExtensionReanchorReport {
+  return isRecord(value) && exactKeys(value, ["summary", "discrepancies", "risks", "questions", "result"])
+    && contentText(value.summary, 1_024) && reanchorTextList(value.discrepancies) && reanchorTextList(value.risks)
+    && reanchorTextList(value.questions) && value.result === "reanchored_without_resume";
+}
+
+function reanchorTextList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length <= 128 && value.every((item) => contentText(item, 1_024));
+}
+
+function reanchorDigestList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length > 0 && value.length <= 128 && value.every(sha256Text);
+}
+
 function isExtensionManagedSession(value: unknown): value is ExtensionManagedSession {
   const required = ["id", "provider", "surface", "capabilities", "status", "plannedFiles", "lastHeartbeat", "adapterVersion", "metadata"];
   if (!isRecord(value) || !allowedExactKeys(value, required, ["workspaceRoot", "targetSnapshotId", "taskId", "planRevision"])
@@ -1586,7 +1877,7 @@ function isHardwareSignalClaim(value: unknown): value is HardwareSignalClaim {
 
 function isPreparedCommand(value: unknown): value is PreparedCommand {
   if (!isRecord(value)) return false;
-  if (!allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationScopeDigest", "confirmationExpiresAt", "workflowReview"])
+  if (!allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationScopeDigest", "confirmationExpiresAt", "workflowReview", "automationReview", "debugStopReview"])
     || !["prepared", "blocked", "unavailable", "incomplete"].includes(value.status as string)
     || typeof value.summary !== "string" || !boundedText(value.summary, 512)
     || (value.session !== undefined && !isRecord(value.session))
@@ -1594,11 +1885,119 @@ function isPreparedCommand(value: unknown): value is PreparedCommand {
     || (value.confirmationScopeDigest !== undefined && !sha256Text(value.confirmationScopeDigest))
     || (value.confirmationExpiresAt !== undefined && (typeof value.confirmationExpiresAt !== "string" || !Number.isFinite(Date.parse(value.confirmationExpiresAt))))) return false;
   if (value.confirmationScopeDigest !== undefined && value.confirmationToken === undefined) return false;
+  const reviewCount = [value.workflowReview, value.automationReview, value.debugStopReview].filter((item) => item !== undefined).length;
+  if (reviewCount > 1) return false;
   if (value.workflowReview !== undefined) {
     if (value.status !== "incomplete" || value.session === undefined || value.authorityId !== undefined || value.confirmationToken !== undefined
       || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined || !isPlanApprovalWorkflowReview(value.workflowReview)) return false;
   }
+  if (value.automationReview !== undefined) {
+    if (value.status !== "incomplete" || !isExtensionManagedSession(value.session) || typeof value.authorityId !== "string"
+      || value.confirmationToken !== undefined || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined
+      || !isAutomationManifestReview(value.automationReview)
+      || value.automationReview.manifest.sessionId !== value.session.id
+      || value.automationReview.manifest.authorityId !== value.authorityId) return false;
+  }
+  if (value.debugStopReview !== undefined) {
+    if (value.status !== "incomplete" || !isExtensionManagedSession(value.session) || typeof value.authorityId !== "string"
+      || value.confirmationToken !== undefined || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined
+      || !isDebugStopReview(value.debugStopReview)
+      || value.debugStopReview.sourceSessionId !== value.session.id
+      || value.debugStopReview.authorityId !== value.authorityId) return false;
+  }
+  if (value.status === "prepared" && reviewCount !== 0) return false;
   return true;
+}
+
+function isAutomationManifestReview(value: unknown): value is AutomationManifestReview {
+  if (!isRecord(value) || !exactKeys(value, ["action", "manifest", "reviewScopeDigest"])
+    || !isAutomationManifestAction(value.action) || !isExtensionAutomationManifest(value.manifest)
+    || value.manifest.action !== value.action || !sha256Text(value.reviewScopeDigest)) return false;
+  try {
+    return automationManifestReviewScopeDigest(value.manifest as unknown as AutomationOperationManifest) === value.reviewScopeDigest;
+  } catch { return false; }
+}
+
+function isExtensionAutomationManifest(value: unknown): value is ExtensionAutomationOperationManifest {
+  try { parseAutomationOperationManifest(value); return true; }
+  catch { return false; }
+}
+
+function isAutomationManifestAction(value: unknown): value is AutomationManifestAction {
+  return value === "compound_capture" || value === "compound_refresh" || value === "lfg" || value === "repair_mission";
+}
+
+function isAutomationProposal(value: unknown, action: AutomationManifestAction): value is Readonly<Record<string, unknown>> {
+  if (!isRecord(value) || value.kind !== action) return false;
+  if (action === "compound_capture") {
+    return exactKeys(value, ["kind", "solvedProblemEvidenceDigest", "verifiedOutcomeEvidenceDigest", "nonTrivialRationale", "documents", "instructionFileMutation"])
+      && sha256Text(value.solvedProblemEvidenceDigest) && sha256Text(value.verifiedOutcomeEvidenceDigest)
+      && contentText(value.nonTrivialRationale, 4_096) && isAutomationMutations(value.documents, true)
+      && isRecord(value.instructionFileMutation)
+      && (exactKeys(value.instructionFileMutation, ["kind"]) && value.instructionFileMutation.kind === "none"
+        || exactKeys(value.instructionFileMutation, ["kind", "path", "beforeDigest", "afterDigest"])
+          && value.instructionFileMutation.kind === "edit_existing" && pathText(value.instructionFileMutation.path)
+          && sha256Text(value.instructionFileMutation.beforeDigest) && sha256Text(value.instructionFileMutation.afterDigest));
+  }
+  if (action === "compound_refresh") {
+    return exactKeys(value, ["kind", "audit", "mutations", "commit"])
+      && exactStringArray(value.audit, ["drift", "overlap", "supersession", "contradiction"])
+      && isAutomationMutations(value.mutations, true) && isRecord(value.commit)
+      && (exactKeys(value.commit, ["planned"]) && value.commit.planned === false
+        || exactKeys(value.commit, ["planned", "messageDigest"]) && value.commit.planned === true && sha256Text(value.commit.messageDigest));
+  }
+  if (action === "lfg") {
+    return exactKeys(value, ["kind", "requirementsSources", "approvedScopePaths", "authorizedActions", "deployAuthorized"])
+      && Array.isArray(value.requirementsSources) && value.requirementsSources.length >= 1 && value.requirementsSources.length <= 64
+      && value.requirementsSources.every((source) => isRecord(source) && exactKeys(source, ["path", "digest"]) && pathText(source.path) && sha256Text(source.digest))
+      && isBoundedUniqueStringArray(value.approvedScopePaths, 1, 512, pathText)
+      && exactStringArray(value.authorizedActions, ["filesystem_mutation", "git_commit", "git_push", "pull_request", "ci_watch"])
+      && value.deployAuthorized === false;
+  }
+  return exactKeys(value, [
+    "kind", "failingGateId", "reproductionCommandDigest", "approvedScopePaths", "affectedChecks", "fullChecks", "testEnvironment",
+    "pushAuthorized", "mergeAuthorized", "deployAuthorized", "hostedRerunAuthorized", "productionDataAuthorized"
+  ]) && reference(value.failingGateId) && sha256Text(value.reproductionCommandDigest)
+    && isBoundedUniqueStringArray(value.approvedScopePaths, 1, 512, pathText)
+    && isBoundedUniqueStringArray(value.affectedChecks, 1, 256, reference)
+    && isBoundedUniqueStringArray(value.fullChecks, 1, 256, reference)
+    && isRecord(value.testEnvironment) && exactKeys(value.testEnvironment, ["id", "digest", "egress", "databaseName"])
+    && reference(value.testEnvironment.id) && sha256Text(value.testEnvironment.digest) && value.testEnvironment.egress === "deny" && reference(value.testEnvironment.databaseName)
+    && value.pushAuthorized === false && value.mergeAuthorized === false && value.deployAuthorized === false
+    && value.hostedRerunAuthorized === false && value.productionDataAuthorized === false;
+}
+
+function isAutomationMutations(value: unknown, nonEmpty: boolean): boolean {
+  return Array.isArray(value) && (!nonEmpty || value.length > 0) && value.length <= 512 && value.every((mutation) =>
+    isRecord(mutation) && allowedExactKeys(mutation, ["path", "mutation"], ["beforeDigest", "afterDigest"])
+      && pathText(mutation.path) && ["create", "update", "replace", "delete"].includes(mutation.mutation as string)
+      && (mutation.beforeDigest === undefined || sha256Text(mutation.beforeDigest))
+      && (mutation.afterDigest === undefined || sha256Text(mutation.afterDigest)));
+}
+
+function exactStringArray(value: unknown, expected: readonly string[]): boolean {
+  return Array.isArray(value) && value.length === expected.length && value.every((item, index) => item === expected[index]);
+}
+
+function isBoundedUniqueStringArray(value: unknown, minimum: number, maximum: number, predicate: (value: unknown) => value is string): boolean {
+  return Array.isArray(value) && value.length >= minimum && value.length <= maximum && value.every(predicate) && new Set(value).size === value.length;
+}
+
+function isDebugStopReview(value: unknown): value is DebugStopReview {
+  return isRecord(value) && exactKeys(value, [
+    "schema", "version", "action", "bindingId", "bindingDigest", "reviewScopeDigest", "sourceSessionId", "authorityId",
+    "targetSnapshotId", "repositoryRoot", "originOperationId", "effectKind", "debugSessionId", "debugBindingId", "debugConfiguration", "managedProcessId", "createdAt", "expiresAt"
+  ]) && value.schema === "sxsy-b122.debug-stop-review" && value.version === 1 && value.action === "stop_managed_run"
+    && typeof value.bindingId === "string" && /^debug-stop:[a-f0-9]{64}$/.test(value.bindingId)
+    && sha256Text(value.bindingDigest) && sha256Text(value.reviewScopeDigest)
+    && reference(value.sourceSessionId) && reference(value.authorityId) && sha256Text(value.targetSnapshotId)
+    && pathText(value.repositoryRoot) && reference(value.originOperationId)
+    && (value.effectKind === "debug_session"
+      ? reference(value.debugSessionId) && reference(value.debugBindingId) && reference(value.debugConfiguration) && value.managedProcessId === null
+      : value.effectKind === "managed_run" && value.debugSessionId === null && value.debugBindingId === null && value.debugConfiguration === null
+        && typeof value.managedProcessId === "string" && /^managed:[a-f0-9]{64}$/.test(value.managedProcessId))
+    && timeText(value.createdAt) && timeText(value.expiresAt)
+    && Date.parse(value.createdAt as string) < Date.parse(value.expiresAt as string);
 }
 
 function isPlanApprovalWorkflowReview(value: unknown): value is PlanApprovalWorkflowReview {
@@ -1606,16 +2005,20 @@ function isPlanApprovalWorkflowReview(value: unknown): value is PlanApprovalWork
     || value.action !== "plan_approval" || !reference(value.sessionId) || !reference(value.targetSnapshotId) || !pathText(value.repositoryRoot)
     || (value.provider !== "claude" && value.provider !== "codex") || !reference(value.contextId) || !timeText(value.observedAt)
     || !isRecord(value.adapter) || !exactKeys(value.adapter, ["id", "version", "moduleSha256"]) || !reference(value.adapter.id) || !reference(value.adapter.version) || !sha256Text(value.adapter.moduleSha256)
-    || !isPlanApprovalBinding(value.plan) || !sha256Text(value.scopeDigest) || !contentText(value.summary, 4_096)
+    || !isPlanApprovalBinding(value.plan, value.targetSnapshotId) || !sha256Text(value.scopeDigest) || !contentText(value.summary, 4_096)
     || !sha256Text(value.providerContextDigest) || !Number.isSafeInteger(value.sourceRevision) || (value.sourceRevision as number) < 1) return false;
   return true;
 }
 
-function isPlanApprovalBinding(value: unknown): value is PlanApprovalWorkflowReview["plan"] {
-  if (!isRecord(value) || !exactKeys(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions"])
+function isPlanApprovalBinding(value: unknown, targetSnapshotId: unknown): value is PlanApprovalWorkflowReview["plan"] {
+  if (!isRecord(value) || !exactKeys(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions", "expectedTargetTransition"])
     || !sha256Text(value.digest) || !reference(value.revision) || !reference(value.originSessionId) || !reference(value.taskId) || !contentText(value.objective, 16_384)
     || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 512 || !value.steps.every(isPlanApprovalStep)
-    || !Array.isArray(value.decisions) || value.decisions.length > 512 || !value.decisions.every((item) => contentText(item, 16_384))) return false;
+    || !Array.isArray(value.decisions) || value.decisions.length > 512 || !value.decisions.every((item) => contentText(item, 16_384))
+    || !isRecord(value.expectedTargetTransition) || !exactKeys(value.expectedTargetTransition, ["beforeTargetSnapshotId", "expectedAfterTargetSnapshotId", "expectation"])
+    || value.expectedTargetTransition.beforeTargetSnapshotId !== targetSnapshotId || !sha256Text(value.expectedTargetTransition.expectedAfterTargetSnapshotId)
+    || (value.expectedTargetTransition.expectation !== "unchanged" && value.expectedTargetTransition.expectation !== "changed")
+    || ((value.expectedTargetTransition.expectation === "unchanged") !== (value.expectedTargetTransition.expectedAfterTargetSnapshotId === targetSnapshotId))) return false;
   return true;
 }
 

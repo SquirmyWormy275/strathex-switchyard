@@ -31,6 +31,12 @@ export type CompanionMethod =
   | "operation.cancel"
   | "command.prepare"
   | "confirmation.request"
+  | "provider-mediated.final-current"
+  | "reanchor.authority.list"
+  | "reanchor.begin"
+  | "reanchor.hardware.begin"
+  | "reanchor.confirm-apply"
+  | "reanchor.get"
   | "git.review.submit"
   | "git.review.inspect"
   | "runtime.pin.install"
@@ -197,6 +203,22 @@ export interface ConfirmationRequestPayload {
   readonly reason: string;
 }
 
+export interface ReanchorAuthorityListPayload { readonly sessionId: string; }
+export interface ReanchorBeginPayload { readonly sessionId: string; readonly authorityId: string; readonly reason: string; }
+export interface ReanchorHardwareBeginPayload extends ReanchorBeginPayload {
+  readonly signalId: string;
+  readonly claimToken: string;
+  readonly windowSessionId: string;
+  readonly workspaceRoots: readonly string[];
+}
+export interface ReanchorConfirmationPayload { readonly requestId: string; }
+export interface ReanchorGetPayload { readonly requestId: string; }
+export interface ReanchorEligibleAuthority {
+  readonly id: string;
+  readonly issuedBy: string;
+  readonly expiresAt: string;
+}
+
 export interface CouncilPortProxyPayload {
   readonly epochId: string;
   readonly sessionId: string;
@@ -236,9 +258,15 @@ export interface CommandPreparationPayload {
   readonly control: Control;
   readonly modifier: Modifier;
   readonly sessionId?: string;
+  /** Preparation-only debug effect selected by the trusted extension host. */
+  readonly effectSessionId?: string;
   readonly reason: string;
   /** Exact host-issued Plan Approval review scope after trusted UI presentation. */
   readonly reviewScopeDigest?: string;
+  /** Protected workflow artifact selected only by the trusted review UI. */
+  readonly reviewArtifactId?: string;
+  /** Immutable digest of the exact protected workflow artifact presented. */
+  readonly reviewArtifactDigest?: string;
 }
 
 /** A typed result from the installed VS Code host, never an execution request. */
@@ -258,6 +286,7 @@ export interface HostActionCompletionPayload {
 
 export interface HostActionClaimPayload {
   readonly windowSessionId: string;
+  readonly workspaceRoots: readonly string[];
   readonly adapterVersion: string;
   readonly capabilities: readonly string[];
   readonly focused: true;
@@ -332,7 +361,7 @@ export interface ContainmentReleasePayload {
 export type RawHidInstallPayload = RawHidDeviceIdentity;
 export interface HardwareSignalBindingPayload { readonly signalId: string; readonly claimToken: string; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
 export interface HardwareSignalClaimPayload { readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; readonly focused: true; }
-export interface HardwareSignalPreparationPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly reason: string; readonly reviewScopeDigest?: string; }
+export interface HardwareSignalPreparationPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly effectSessionId?: string; readonly reason: string; readonly reviewScopeDigest?: string; readonly reviewArtifactId?: string; readonly reviewArtifactDigest?: string; }
 export interface HardwareSignalDispatchPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly authorityId?: string; readonly confirmationToken?: string; readonly confirmationScopeDigest?: string; readonly input?: Readonly<Record<string, string>>; }
 export interface HardwareSignalCompletionPayload extends HardwareSignalBindingPayload { readonly outcome: HardwareSignalCompletionOutcome; readonly summary: string; readonly dispatchReceiptId?: string; readonly dispatchSessionId?: string; readonly repositoryRoot?: string; }
 export interface HandoffCreatePayload extends Omit<HandoffPackageInput, "repositoryRoot" | "targetSnapshotId" | "taskId" | "planRevision" | "authorityId" | "id"> { readonly sessionId: string; readonly authorityId?: string; }
@@ -398,7 +427,8 @@ export function isCompanionRequest(value: unknown): value is CompanionRequest {
 export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
-    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request",
+    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request", "provider-mediated.final-current",
+    "reanchor.authority.list", "reanchor.begin", "reanchor.hardware.begin", "reanchor.confirm-apply", "reanchor.get",
     "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
     "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke",
     "council.port-proxy.activate", "council.credential-network.execute", "council.recommendation.approve",
@@ -417,3 +447,8 @@ export function isCompanionMethod(value: unknown): value is CompanionMethod {
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+export type {
+  ProviderMediatedFinalCurrentRequest,
+  ProviderMediatedFinalCurrentDecision
+} from "./provider-mediated-final-current.ts";

@@ -152,7 +152,8 @@ test("Plan Approval hardware review keeps the exact signal live for reviewed sec
             plan: {
               digest: "4".repeat(64), revision: "1", originSessionId: "window-1", taskId: "task-1", objective: "Complete the reviewed plan.",
               steps: [{ id: "step-1", summary: "Run the exact step.", ownedFiles: ["apps/example.ts"], dependencies: [], status: "approved" }],
-              decisions: ["Use the reviewed provider context."]
+              decisions: ["Use the reviewed provider context."],
+              expectedTargetTransition: { beforeTargetSnapshotId: "2".repeat(64), expectedAfterTargetSnapshotId: "2".repeat(64), expectation: "unchanged" }
             },
             scopeDigest,
             summary: "Complete the reviewed plan. Step step-1: Run the exact step.",

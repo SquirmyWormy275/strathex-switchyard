@@ -57,8 +57,20 @@ hash-chain-only persistence.
 The package commands `sxsy-b122-companion` and
 `sxsy-b122-hid-simulator --self-test` respectively start the authenticated
 named-pipe entry point and exercise all 176 logical chord combinations without
-opening hardware or the network. The simulator is product protocol evidence,
-not physical keyboard acceptance. A bridge request still
+opening hardware or the network. The separate
+`sxsy-b122-containment-remote-evaluator --challenge <absolute-json>
+--private-key <absolute-pem> --output <absolute-json> --git-executable
+<absolute-pinned-git>` command is intended for an authorized network-enabled
+evaluator host. It accepts only an exact, fresh, host-issued challenge and
+matching purpose-scoped P-256 key, rehashes the pinned Git executable, inventories
+every advertised ref before mirroring, after mirroring, and after all scans,
+fails on namespace churn or incomplete object history, and writes signed
+path-digest-only findings without Git diagnostics or secret values. The packaged
+production command disables interactive prompts and ambient Git configuration
+and supports credential-free, DNS-pinned public HTTPS only. Private/authenticated
+remote evaluation requires a separately authorized adapter and is not claimed by
+this package. The simulator is product protocol
+evidence, not physical keyboard acceptance. A bridge request still
 cannot invent a commit message or path set: the extension collects exact
 operator-reviewed input, and the companion binds it to the current target,
 authority, confirmation, and final effect guard.

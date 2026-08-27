@@ -104,6 +104,7 @@ function request(action: "focus_vscode" | "focus_external_terminal", signal = ne
     processOwner: "current-user",
     processSession: "current-session",
     windowSurface: "visible-top-level",
+    windowCycleOrdinal: 0,
     shell: false,
     signal,
     async beforeEffect() {}
@@ -155,6 +156,7 @@ test("focus crosses the host barrier once after READY and authorizes only the ex
         order.push("prepare");
         assert.equal(value.action, "effect");
         assert.equal(value.effect, "focus_vscode");
+        assert.equal(value.windowCycleOrdinal, 0);
         assert.deepEqual(value.fixedArguments, ["--reuse-window"]);
         assert.deepEqual(value.identity, identity("vscode"));
         assert.equal("repositoryRoot" in value, false);
@@ -194,6 +196,23 @@ test("no matching window uses only the compiled CreateProcess fallback and never
   const prepare = JSON.parse(transport.sessions[0]!.writes[0]!) as Record<string, unknown>;
   assert.deepEqual(prepare.fixedArguments, []);
   assert.equal(prepare.effect, "focus_external_terminal");
+  assert.equal(prepare.windowCycleOrdinal, 0);
+});
+
+test("the pinned helper receives only a bounded compiled VS Code cycle ordinal", async () => {
+  const transport = new FakeTransport();
+  transport.configure = (session) => {
+    session.onWrite = (value) => {
+      if (value.kind === "authorize") session.responses.push(envelope(value, "result", { action: "effect", effect: "focused", processId: 4013, windowId: "hwnd:10b0" }));
+      else {
+        assert.equal(value.windowCycleOrdinal, 7);
+        session.responses.push(envelope(value, "ready", { action: "effect", authorizationNonce: "8".repeat(64), mode: "focus", processId: 4013, windowId: "hwnd:10b0" }));
+      }
+    };
+  };
+  await port(transport).execute({ ...request("focus_vscode"), windowCycleOrdinal: 7 });
+  await assert.rejects(port(new FakeTransport()).execute({ ...request("focus_vscode"), windowCycleOrdinal: -1 }), /cycle|request|ordinal/i);
+  await assert.rejects(port(new FakeTransport()).execute({ ...request("focus_external_terminal"), windowCycleOrdinal: 1 }), /cycle|request|ordinal/i);
 });
 
 test("changed identity, caller arguments, or a malformed helper plan fail before the host barrier", async () => {
@@ -294,6 +313,7 @@ test("the production transport and helper contract expose the required Windows-n
     "ProcessIdToSessionId", "QueryFullProcessImageNameW", "EnumWindows", "IsWindowVisible", "GetWindowThreadProcessId",
     "DwmGetWindowAttribute", "SetForegroundWindow", "GetForegroundWindow", "CreateProcessW", "CREATE_SUSPENDED", "Get-AuthenticodeSignature",
     "FileShare.Read", "FileAttributes.ReparsePoint"
+    , "windowCycleOrdinal"
   ]) assert.match(windowsHostActionHelperContractSource, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(windowsHostActionHelperContractSource, /Get-AppxPackage -Name Microsoft\.WindowsTerminal/);
   assert.match(windowsHostActionHelperContractSource, /Candidate \$app/);

@@ -4,10 +4,10 @@
   "license": "UNLICENSED",
   "type": "module",
   "version": "0.1.0",
-  "description": "Safe SXSY-B122 firmware transport and host routing baseline",
+  "description": "Hardware-independent SXSY-B122 firmware, mediated Windows companion, VS Code control surface, and release tooling",
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "build:vscode": "tsc -p apps/vscode-extension/tsconfig.build.json",
+    "build:vscode": "node scripts/clean-vscode-build.mjs && tsc -p apps/vscode-extension/tsconfig.build.json",
     "build:protocol": "tsc -p packages/protocol/tsconfig.build.json",
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
     "build:provider-host": "tsc -p apps/provider-adapter-host/tsconfig.build.json",

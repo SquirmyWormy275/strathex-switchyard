@@ -8,6 +8,8 @@ import type { AuthorityGrant, ManagedSession } from "../src/contracts.ts";
 import { HandoffPackageStore } from "../src/context-packages.ts";
 import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
 import {
+  authorityBroadcastReviewScopeDigest,
+  canonicalWorkflowArtifact,
   DurableWorkflowPreparationCoordinator,
   planApprovalReviewScopeDigest,
   WorkflowArtifactStore,
@@ -31,7 +33,8 @@ function existingPlan(): ExistingPlanBinding {
   const material = {
     revision: "plan-7", originSessionId: "planner-session", taskId: "task-1", objective: "Finish the reviewed integration",
     steps: [{ id: "step-1", summary: "Implement exact route", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }],
-    decisions: ["Use typed authenticated IPC."]
+    decisions: ["Use typed authenticated IPC."],
+    expectedTargetTransition: { beforeTargetSnapshotId: "a".repeat(64), expectedAfterTargetSnapshotId: "a".repeat(64), expectation: "unchanged" as const }
   };
   return { digest: sha256(stableJson(material)), ...material };
 }
@@ -178,7 +181,13 @@ test("Plan Approval binds the immutable originating plan, current session, autho
   await assert.rejects(() => artifacts.create({ ...base("plan_approval", { ...payload, plan: proposedPlan }), id: "unapproved-plan" }), /approved plan steps/i);
   const submitted = await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-plan" });
   assert.ok(submitted);
-  const result = { kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision, originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId, acknowledgementId: "ack-plan-1", executionStarted: true };
+  const result = {
+    kind: "plan", mode: "execution_ack", planDigest: payload.plan.digest, planRevision: payload.plan.revision,
+    originSessionId: payload.plan.originSessionId, executorSessionId: payload.executorSessionId, authorityId: payload.authorityId,
+    acknowledgementId: "ack-plan-1", executionStarted: true,
+    targetTransition: { beforeTargetSnapshotId: created.targetSnapshotId, expectedAfterTargetSnapshotId: created.targetSnapshotId, expectation: "unchanged" },
+    childEffects: [{ id: "plan-child-1", action: "plan_execution", status: "running", effectDisposition: "committed", summary: "Execution started.", externalId: "provider-child-1" }]
+  } as const;
   const response = parseWorkflowProviderResponse(submittedResponse(submitted, result), submitted);
   assert.equal(response.result.kind === "plan" && response.result.mode === "execution_ack" ? response.result.originSessionId : undefined, "planner-session");
   const acknowledged = await artifacts.acknowledge(response);
@@ -186,13 +195,40 @@ test("Plan Approval binds the immutable originating plan, current session, autho
   assert.deepEqual(acknowledged.providerResult, result);
   assert.deepEqual((await artifacts.acknowledge(response)).providerResult, result);
   assert.equal((await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-plan-2" })), undefined);
+  assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submitted, {
+    ...result,
+    targetTransition: { ...result.targetTransition, expectedAfterTargetSnapshotId: "f".repeat(64), expectation: "changed" }
+  }), submitted), /reviewed before execution|transition/i);
+  assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submitted, {
+    ...result,
+    childEffects: [{ ...result.childEffects[0], effectDisposition: "not_started" }]
+  }), submitted), /committed/i);
 });
 
-test("Re-anchor and Proof carry coordinator-owned plan, docs, diff, files and classified tests and never auto-resume", async (context) => {
+test("generic Re-anchor artifacts are creation-blocked while legacy journals remain decodable but non-dispatchable", async (context) => {
+  const journal = await store(context);
+  const artifacts = new WorkflowArtifactStore(journal);
+  const input = base("reanchor", { kind: "anchor", evidence: evidence(), cooperativeStopRequested: true, resumeAuthorized: false, unresolved: [] });
+  await assert.rejects(() => artifacts.create(input), /dedicated Re-anchor lifecycle/i);
+
+  const canonical = canonicalWorkflowArtifact({ ...input, id: input.id! });
+  const legacy: WorkflowArtifact = {
+    ...canonical.immutable,
+    digest: canonical.digest,
+    status: "prepared",
+    executionAuthorized: false,
+    createdAt: "2026-08-25T12:00:00.000Z",
+    updatedAt: "2026-08-25T12:00:00.000Z"
+  };
+  await journal.append("workflow-artifact.saved", { artifact: legacy });
+  assert.equal((await artifacts.get(legacy.id))?.action, "reanchor", "legacy evidence remains visible for audit");
+  await assert.rejects(() => artifacts.claimForDispatch({
+    action: "reanchor", targetSnapshotId: legacy.targetSnapshotId, sessionId: legacy.sessionId, operationId: "legacy-reanchor-operation"
+  }), /dedicated Re-anchor lifecycle/i);
+});
+
+test("Proof carries coordinator-owned plan, docs, diff, files and classified tests", async (context) => {
   const artifacts = new WorkflowArtifactStore(await store(context));
-  const anchor = await artifacts.create(base("reanchor", { kind: "anchor", evidence: evidence(), cooperativeStopRequested: true, resumeAuthorized: false, unresolved: [] }));
-  assert.equal((anchor.payload as { resumeAuthorized: boolean }).resumeAuthorized, false);
-  await assert.rejects(() => artifacts.create({ ...base("reanchor", { kind: "anchor", evidence: evidence(), cooperativeStopRequested: true, resumeAuthorized: true as false, unresolved: [] }), id: "bad-anchor" }), /resume/i);
   const adversarial = await artifacts.create(base("proof_adversarial", { kind: "proof", evidence: evidence(), claims: ["Exact plan is satisfied."], requiredBackends: ["codex", "claude"], independentBackendRequired: true }));
   await assert.rejects(() => artifacts.create({ ...base("proof_adversarial", { kind: "proof", evidence: evidence(), claims: ["claim"], requiredBackends: ["codex"], independentBackendRequired: false }), id: "bad-proof" }), /independent/i);
   const submitted = await artifacts.claimForDispatch({ action: adversarial.action, targetSnapshotId: adversarial.targetSnapshotId, sessionId: adversarial.sessionId, operationId: "operation-adversarial" });
@@ -278,7 +314,7 @@ test("Authority broadcast uses each recipient's protected pending request and re
   const journal = await store(context);
   const contexts = new WorkflowCoordinatorContextStore(journal, { clock: () => "2026-08-24T12:00:00.000Z" });
   const source = managedSession("session-1", "running");
-  const recipients = [managedSession("recipient-1", "running"), managedSession("recipient-2", "verified_blocked")];
+  const recipients = [managedSession("recipient-1", "verified_blocked"), managedSession("recipient-2", "verified_blocked")];
   const sourceAuthority = authorityGrant("authority-broadcast", source.id, ["authority_broadcast"]);
   const recipientAuthorities = recipients.map((recipient, index) => authorityGrant(`authority-recipient-${index + 1}`, recipient.id, ["proof", "authority_broadcast"]));
   await contexts.record({ sessionId: source.id, repositoryRoot: source.workspaceRoot!, targetSnapshotId: source.targetSnapshotId!, authorityId: sourceAuthority.id, sourceRevision: 1, provenance: providerProvenance("codex", "source", source.adapterVersion), evidence: evidence(), pendingDecisions: [] });
@@ -300,10 +336,27 @@ test("Authority broadcast uses each recipient's protected pending request and re
   ]);
   assert.equal(payload.packets.every((packet) => packet.providerEffect?.session.id === packet.recipientSessionId && packet.providerEffect.authority.id === packet.grantId), true);
   assert.equal(new Set(payload.packets.map((packet) => packet.providerEffect?.bindingDigest)).size, 2);
+  await assert.rejects(() => coordinator.prepare({
+    action: "authority_broadcast", session: source, authorityId: sourceAuthority.id,
+    intent: { kind: "authority_broadcast", recipientSessionIds: [recipients[0]!.id, recipients[0]!.id] }
+  }), /unique|duplicate/i);
+  sessionMap.set(recipients[0]!.id, { ...recipients[0]!, status: "running" });
+  await assert.rejects(() => coordinator.prepare({
+    action: "authority_broadcast", session: source, authorityId: sourceAuthority.id,
+    intent: { kind: "authority_broadcast", recipientSessionIds: recipients.map((recipient) => recipient.id) }
+  }), /verified.blocked|blocked recipient/i);
+  sessionMap.set(recipients[0]!.id, recipients[0]!);
 
   const artifacts = new WorkflowArtifactStore(journal);
-  const created = await artifacts.create(base("authority_broadcast", payload));
-  const submitted = await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-authority" });
+  const created = await artifacts.create({ ...base("authority_broadcast", payload), authorityId: sourceAuthority.id });
+  const reviewScopeDigest = authorityBroadcastReviewScopeDigest(created);
+  assert.equal(reviewScopeDigest, sha256(stableJson({
+    action: "authority_broadcast", artifactId: created.id, artifactDigest: created.digest,
+    sessionId: created.sessionId, authorityId: sourceAuthority.id, repositoryRoot: created.repositoryRoot,
+    targetSnapshotId: created.targetSnapshotId,
+    packets: payload.packets.map(({ recipientSessionId, matchDigest }) => ({ recipientSessionId, matchDigest }))
+  })));
+  const submitted = await artifacts.claimForDispatch({ action: created.action, targetSnapshotId: created.targetSnapshotId, sessionId: created.sessionId, operationId: "operation-authority", authorityId: sourceAuthority.id });
   assert.ok(submitted);
   const acknowledgements = payload.packets.map((packet) => ({ recipientSessionId: packet.recipientSessionId, grantId: packet.grantId, matchDigest: packet.matchDigest, acknowledged: true }));
   parseWorkflowProviderResponse(submittedResponse(submitted, { kind: "authority", acknowledgements }), submitted);
@@ -321,9 +374,29 @@ test("Handoff packages are coordinator-assembled and preserve exact source, reci
   const sessions = new Map([source, recipient].map((session) => [session.id, session]));
   const coordinator = new DurableWorkflowPreparationCoordinator(contexts, { list: async () => [...sessions.values()], get: async (id) => sessions.get(id) }, { get: async (id) => id === authority.id ? authority : undefined }, handoffs);
 
-  const normalQueued = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const normalQueuedPreparation = await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } });
+  const normalQueued = normalQueuedPreparation.payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const artifacts = new WorkflowArtifactStore(journal);
+  const storedNormalQueued = await artifacts.create({
+    ...base("handoff", normalQueued), id: "artifact-normal-queued", authorityId: normalQueuedPreparation.authorityId,
+    coordinatorContextDigest: normalQueuedPreparation.coordinatorContextDigest, coordinatorContextRevision: normalQueuedPreparation.coordinatorContextRevision
+  });
   await handoffs.setRoutingDefault("immediate");
-  const normalImmediate = (await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  assert.equal((storedNormalQueued.payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>).route, "queue");
+  assert.equal(((await artifacts.get(storedNormalQueued.id))?.payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>).route, "queue", "changing the default cannot mutate an existing package route");
+  const submittedQueued = await artifacts.claimForDispatch({ action: "handoff", targetSnapshotId: storedNormalQueued.targetSnapshotId, sessionId: storedNormalQueued.sessionId, operationId: "operation-normal-queued", authorityId: authority.id });
+  assert.ok(submittedQueued);
+  assert.equal(parseWorkflowProviderResponse(submittedResponse(submittedQueued, { kind: "handoff", packageId: normalQueued.packageId, recipientSessionId: recipient.id, acknowledged: false }), submittedQueued).result.kind, "handoff");
+  assert.throws(() => parseWorkflowProviderResponse(submittedResponse(submittedQueued, { kind: "handoff", packageId: normalQueued.packageId, recipientSessionId: recipient.id, acknowledged: true }), submittedQueued), /queued.*acknowledge|acknowledge.*queued/i);
+  const normalImmediatePreparation = await coordinator.prepare({ action: "handoff", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "default" } });
+  const normalImmediate = normalImmediatePreparation.payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
+  const storedNormalImmediate = await artifacts.create({
+    ...base("handoff", normalImmediate), id: "artifact-normal-immediate", authorityId: normalImmediatePreparation.authorityId,
+    coordinatorContextDigest: normalImmediatePreparation.coordinatorContextDigest, coordinatorContextRevision: normalImmediatePreparation.coordinatorContextRevision
+  });
+  const submittedImmediate = await artifacts.claimForDispatch({ action: "handoff", targetSnapshotId: storedNormalImmediate.targetSnapshotId, sessionId: storedNormalImmediate.sessionId, operationId: "operation-normal-immediate", authorityId: authority.id });
+  assert.ok(submittedImmediate);
+  assert.equal(parseWorkflowProviderResponse(submittedResponse(submittedImmediate, { kind: "handoff", packageId: normalImmediate.packageId, recipientSessionId: recipient.id, acknowledged: true }), submittedImmediate).result.kind, "handoff");
   const immediate = (await coordinator.prepare({ action: "handoff_immediate", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "immediate" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
   const queued = (await coordinator.prepare({ action: "handoff_queue", session: source, authorityId: authority.id, intent: { kind: "handoff", recipientSessionId: recipient.id, route: "queue" } })).payload as Extract<WorkflowArtifactPayload, { kind: "handoff" }>;
 

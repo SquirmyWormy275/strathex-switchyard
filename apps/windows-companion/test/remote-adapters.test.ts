@@ -3,13 +3,15 @@ import test from "node:test";
 
 import type { WorkflowArtifact, WorkflowArtifactAction, WorkflowChildProviderResponse, WorkflowProviderEffectBinding, WorkflowProviderResponse } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
+import type { EffectGuard } from "../../../packages/control-plane/src/brokers.ts";
+import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import type { ChildOperationLease, ChildOperationOutcome, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 import { sha256, stableJson } from "../../../packages/control-plane/src/store.ts";
-import { automationRequestSchema, automationResultSchema } from "../../../packages/control-plane/src/automation-protocol.ts";
-import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker } from "../src/remote-adapters.ts";
+import { AttestedProviderHandshakeCoordinator, ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, createConfiguredAutomationBroker, remoteAutomationActions } from "../src/remote-adapters.ts";
 
 const providerTargetId = "a".repeat(64);
 function proofEvidence() {
-  const planMaterial = { revision: "plan-1", originSessionId: "session-1", taskId: "task-1", objective: "Verify the provider route.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[] };
+  const planMaterial = { revision: "plan-1", originSessionId: "session-1", taskId: "task-1", objective: "Verify the provider route.", steps: [{ id: "step-1", summary: "Verify", ownedFiles: ["src/safe.ts"], dependencies: [], status: "approved" as const }], decisions: [] as string[], expectedTargetTransition: { beforeTargetSnapshotId: providerTargetId, expectedAfterTargetSnapshotId: providerTargetId, expectation: "unchanged" as const } };
   const plan = { digest: sha256(stableJson(planMaterial)), ...planMaterial };
   const material = { instructions: [{ id: "instructions", digest: "1".repeat(64), source: "protected_context" as const, summary: "Instructions" }], plan, documentation: [{ id: "documentation", digest: "5".repeat(64), source: "repository" as const, summary: "Documentation" }], diff: { id: "diff", digest: "2".repeat(64), source: "target_snapshot" as const, summary: "Diff" }, files: [{ id: "file", digest: "3".repeat(64), source: "repository" as const, summary: "File" }], tests: [{ id: "receipt", digest: "4".repeat(64), source: "receipt" as const, summary: "Test", status: "passed" as const }] };
   return { contextDigest: sha256(stableJson(material)), ...material };
@@ -86,7 +88,7 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   });
   const childSaga = {
     async begin(input: unknown) { childEvents.push(["begin", input]); return { id: "child-provider-1", mayExecute: true }; },
-    async markExecuting(input: unknown) { childEvents.push(["executing", input]); },
+    async markExecuting(_input: unknown, details: unknown) { childEvents.push(["executing", details]); },
     async markExternalCommitted(_input: unknown, details: unknown) { childEvents.push(["external", details]); },
     async markCompensating(input: unknown) { childEvents.push(["compensating", input]); },
     async settle(_input: unknown, state: unknown, details: unknown) { childEvents.push([String(state), details]); }
@@ -110,7 +112,19 @@ test("configured provider adapter dispatches and acknowledges only an exact type
   assert.deepEqual(document.artifact, { id: artifact.id, digest: artifact.digest, taskId: "task-1", planRevision: "plan-1", payload: artifact.payload, executionAuthorized: false });
   const started = childEvents.find(([kind]) => kind === "begin")?.[1] as { action: string; details: Record<string, string> };
   assert.equal(started.action, "provider.proof");
-  assert.deepEqual(started.details, { repositoryRoot: "C:\\repo", routeId: "provider.proof", targetSnapshotId: providerTargetId, artifactId: artifact.id, artifactDigest: artifact.digest });
+  assert.deepEqual(started.details, {
+    repositoryRoot: "C:\\repo",
+    routeId: "provider.proof",
+    targetSnapshotId: providerTargetId,
+    artifactId: artifact.id,
+    artifactDigest: artifact.digest,
+    providerOperationId: "operation-1",
+    providerAction: "proof",
+    sessionId: "session-1",
+    provider: "codex",
+    authorityId: "authority-proof"
+  });
+  assert.deepEqual(childEvents.find(([kind]) => kind === "executing")?.[1], started.details);
   assert.deepEqual(childEvents.find(([kind]) => kind === "external")?.[1], { artifactId: artifact.id, routeId: "provider.proof", externalId: "provider-proof-1" });
   assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
 });
@@ -118,6 +132,8 @@ test("configured provider adapter dispatches and acknowledges only an exact type
 test("Shift Proof dispatches two independent durable provider children and retries aggregation without replay", async () => {
   let artifact = adversarialArtifact();
   const requests: Array<{ body: string; trustedDispatch: { session: { provider: string } } }> = [];
+  const parentGuardInputs: Array<Readonly<{ operationId: string; sessionId?: string; authorityId?: string }>> = [];
+  const executingBindings: Array<Record<string, string>> = [];
   const childStates = new Map<string, "recorded">();
   let failFirstAggregate = true;
   let acknowledged: WorkflowProviderResponse | undefined;
@@ -134,18 +150,26 @@ test("Shift Proof dispatches two independent durable provider children and retri
     }
   };
   const saga = {
-    async begin(input: { idempotencyScope: string }) {
+    async begin(input: { action: string; idempotencyScope: string }) {
       const prior = childStates.has(input.idempotencyScope);
-      return { operationId: `child:${input.idempotencyScope.slice(-16)}`, parentOperationId: artifact.operationId!, action: "provider.proof_adversarial", targetSnapshotId: providerTargetId, existing: prior, state: prior ? "recorded" as const : "prepared" as const, mayExecute: !prior };
+      return { operationId: `child:${input.idempotencyScope.slice(-16)}`, parentOperationId: artifact.operationId!, action: input.action, targetSnapshotId: providerTargetId, existing: prior, state: prior ? "recorded" as const : "prepared" as const, mayExecute: !prior };
     },
-    async markExecuting() {}, async markExternalCommitted() {}, async markCancelling() {}, async markCompensating() {},
+    async markExecuting(_lease: unknown, details?: Readonly<Record<string, string>>) { if (details) executingBindings.push({ ...details }); }, async markExternalCommitted() {}, async markCancelling() {}, async markCompensating() {},
     async settle(_lease: unknown, state: string, details: { bindingDigest?: string }) { if (state === "completed" && details.bindingDigest) childStates.set(details.bindingDigest, "recorded"); }
   };
   // Key the test double by the exact idempotency scope used by the adapter.
   saga.settle = async (_lease: unknown, state: string, details: { idempotencyScope?: string; bindingDigest?: string }) => { if (state === "completed" && details.idempotencyScope) childStates.set(details.idempotencyScope, "recorded"); };
   const network = {
-    async request(input: { body: string; trustedDispatch: { session: { provider: "claude" | "codex" } } }) {
+    async request(input: { body: string; trustedDispatch: { guardAction: "proof_adversarial"; guardOperationId: string; target: TargetSnapshot; session: ManagedSession; authority: AuthorityGrant; effectGuard: EffectGuard } }) {
       requests.push(input);
+      const final = await input.trustedDispatch.effectGuard.assertCurrent({
+        action: input.trustedDispatch.guardAction,
+        operationId: input.trustedDispatch.guardOperationId,
+        target: input.trustedDispatch.target,
+        session: input.trustedDispatch.session,
+        authority: input.trustedDispatch.authority
+      });
+      assert.equal(final.allowed, true, final.reason);
       const document = JSON.parse(input.body) as { operationId: string; child: { role: "proof_backend"; bindingDigest: string }; artifact: { operationId: string } };
       const effect = (artifact.payload.kind === "proof" ? artifact.payload.providerEffects : [])!.find((candidate) => candidate.bindingDigest === document.child.bindingDigest)!;
       return { outcome: "passed" as const, routeId: "provider.proof_adversarial", detail: "ok", effectDisposition: "ambiguous" as const, body: Buffer.from(JSON.stringify({
@@ -157,17 +181,76 @@ test("Shift Proof dispatches two independent durable provider children and retri
       })) };
     }
   };
-  const request = { ...(providerRequest(undefined, saga) as unknown as Record<string, unknown>), definition: { action: "proof_adversarial" }, operationId: artifact.operationId, confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "proof_adversarial", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-proof" } } as unknown as AdapterRequest;
+  const request = {
+    ...(providerRequest(undefined, saga) as unknown as Record<string, unknown>),
+    definition: { action: "proof_adversarial" },
+    operationId: artifact.operationId,
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "proof_adversarial", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-proof" },
+    effectGuard: {
+      async assertCurrent(input: Readonly<{ operationId: string; session?: ManagedSession; authority?: AuthorityGrant }>) {
+        parentGuardInputs.push({ operationId: input.operationId, sessionId: input.session?.id, authorityId: input.authority?.id });
+        const exact = input.operationId === artifact.operationId && input.session?.id === "session-1" && input.authority?.id === "authority-proof";
+        return exact ? { allowed: true, reason: "parent binding current" } : { allowed: false, reason: "the parent-bound guard rejects child identity substitution" };
+      }
+    }
+  } as unknown as AdapterRequest;
   const first = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(request);
   assert.equal(first.status, "failed", "the interrupted aggregate acknowledgement must not erase two committed child truths");
   assert.equal(requests.length, 2);
   assert.deepEqual(requests.map((entry) => entry.trustedDispatch.session.provider).sort(), ["claude", "codex"]);
   assert.equal(new Set(requests.map((entry) => JSON.parse(entry.body).operationId)).size, 2);
+  assert.deepEqual(executingBindings.map(({ providerOperationId, providerAction, sessionId, provider, authorityId }) => ({ providerOperationId, providerAction, sessionId, provider, authorityId })).sort((left, right) => left.provider.localeCompare(right.provider)), [
+    { providerOperationId: executingBindings.find((entry) => entry.provider === "claude")?.providerOperationId, providerAction: "proof_adversarial", sessionId: "session-claude", provider: "claude", authorityId: "authority-claude" },
+    { providerOperationId: executingBindings.find((entry) => entry.provider === "codex")?.providerOperationId, providerAction: "proof_adversarial", sessionId: "session-1", provider: "codex", authorityId: "authority-proof" }
+  ]);
   const beforeRetry = requests.length;
   const second = await new ConfiguredProviderCommandAdapter(network as never, artifacts).execute(request);
   assert.equal(second.status, "completed");
   assert.equal(requests.length, beforeRetry, "durably recorded provider children must never be replayed to repair aggregation");
   assert.deepEqual(acknowledged?.result.kind === "proof" ? acknowledged.result.backendResults : [], [{ backend: "codex", status: "passed" }, { backend: "claude", status: "passed" }]);
+  assert.equal(parentGuardInputs.every((input) => input.operationId === artifact.operationId && input.sessionId === "session-1" && input.authorityId === "authority-proof"), true);
+});
+
+test("composite provider dispatch rejects a child lease that substitutes its parent binding", async () => {
+  const artifact = adversarialArtifact();
+  let networkCalls = 0;
+  const settled: string[] = [];
+  const saga = {
+    async begin(input: { action: string }) {
+      return {
+        operationId: "child-forged-parent",
+        parentOperationId: "unrelated-parent",
+        action: input.action,
+        targetSnapshotId: providerTargetId,
+        existing: false,
+        state: "prepared" as const,
+        mayExecute: true
+      };
+    },
+    async markExecuting() {},
+    async markExternalCommitted() {},
+    async markCancelling() {},
+    async markCompensating() {},
+    async settle(_lease: unknown, state: string) { settled.push(state); }
+  };
+  const adapter = new ConfiguredProviderCommandAdapter({
+    async request() { networkCalls += 1; throw new Error("a forged child must not reach the provider"); }
+  } as never, {
+    async claimForDispatch() { return artifact; },
+    async assertDispatchBinding() { return artifact; },
+    async recordChildResult() { throw new Error("a forged child has no result"); },
+    async acknowledge() { throw new Error("a forged child cannot acknowledge"); }
+  });
+  const outcome = await adapter.execute({
+    ...(providerRequest(undefined, saga) as unknown as Record<string, unknown>),
+    definition: { action: "proof_adversarial" },
+    operationId: artifact.operationId,
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "proof_adversarial", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-proof" }
+  } as unknown as AdapterRequest);
+  assert.equal(outcome.status, "failed");
+  assert.equal(outcome.effectDisposition, "not_started");
+  assert.equal(networkCalls, 0);
+  assert.deepEqual(settled, ["failed"]);
 });
 
 test("Authority Broadcast creates one durable child per exact recipient and rejects a cross-recipient acknowledgement", async () => {
@@ -176,7 +259,7 @@ test("Authority Broadcast creates one durable child per exact recipient and reje
   let acknowledgements = 0;
   const begun = new Map<string, number>();
   const saga = {
-    async begin(input: { idempotencyScope: string }) { begun.set(input.idempotencyScope, (begun.get(input.idempotencyScope) ?? 0) + 1); return { operationId: `child-broadcast-${begun.size}`, parentOperationId: artifact.operationId!, action: "provider.authority_broadcast.codex", targetSnapshotId: providerTargetId, existing: false, state: "prepared" as const, mayExecute: true }; },
+    async begin(input: { action: string; idempotencyScope: string }) { begun.set(input.idempotencyScope, (begun.get(input.idempotencyScope) ?? 0) + 1); return { operationId: `child-broadcast-${begun.size}`, parentOperationId: artifact.operationId!, action: input.action, targetSnapshotId: providerTargetId, existing: false, state: "prepared" as const, mayExecute: true }; },
     async markExecuting() {}, async markExternalCommitted() {}, async markCancelling() {}, async markCompensating() {}, async settle() {}
   };
   let corruptRecipient = false;
@@ -291,33 +374,59 @@ test("Plan Approval sends execution authorization only from dispatcher-proven cu
       return { outcome: "passed", routeId: "provider.plan_approval", detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({
         schema: "sxsy-b122.workflow-result", version: 1, artifactId: artifact.id, artifactDigest: artifact.digest, operationId: artifact.operationId,
         action: "plan_approval", status: "completed", effectDisposition: "committed", summary: "The exact plan execution was acknowledged.", externalId: "provider-plan-1",
-        result: { kind: "plan", mode: "execution_ack", planDigest: artifact.payload.kind === "plan" ? artifact.payload.plan.digest : "", planRevision: "plan-1", originSessionId: "session-1", executorSessionId: "session-1", authorityId: "authority-plan", acknowledgementId: "ack-plan-1", executionStarted: true }
+        result: {
+          kind: "plan", mode: "execution_ack", planDigest: artifact.payload.kind === "plan" ? artifact.payload.plan.digest : "",
+          planRevision: "plan-1", originSessionId: "session-1", executorSessionId: "session-1", authorityId: "authority-plan",
+          acknowledgementId: "ack-plan-1", executionStarted: true,
+          targetTransition: { beforeTargetSnapshotId: providerTargetId, expectedAfterTargetSnapshotId: providerTargetId, expectation: "unchanged" },
+          childEffects: [{ id: "provider-plan-child-1", action: "plan_execution", status: "running", effectDisposition: "committed", summary: "Execution started.", externalId: "provider-plan-child-external-1" }]
+        }
       })) };
     }
   } as unknown as DynamicConfiguredNetworkClient;
   const artifacts = { async claimForDispatch() { return artifact; }, async assertDispatchBinding() { return artifact; }, async acknowledge() { return { ...artifact, status: "acknowledged" as const }; } };
-  const adapter = new ConfiguredProviderCommandAdapter(network, artifacts);
+  const childEvents: string[] = [];
+  const adapter = new ConfiguredProviderCommandAdapter(network, artifacts, {
+    async captureAndAccept(input) {
+      assert.equal(input.expectedTargetSnapshotId, providerTargetId);
+      assert.equal(input.allowUnchanged, true);
+      return { status: "unchanged", target: input.previousTarget, session: input.session };
+    }
+  });
   const base = {
     definition: { action: "plan_approval" }, operationId: "operation-plan-1",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1", digest: "d" },
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", taskId: "task-1", planRevision: "plan-1", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
     authority: { id: "authority-plan" },
     confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "7".repeat(64), action: "plan_approval", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan" },
-    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
+    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+    childSaga: {
+      async begin(input: ChildOperationStart) { childEvents.push(`begin:${input.action}`); return { operationId: `child-${input.action}`, parentOperationId: "operation-plan-1", action: input.action, targetSnapshotId: providerTargetId, existing: false, state: "prepared", mayExecute: true }; },
+      async markExecuting(lease: ChildOperationLease) { childEvents.push(`executing:${lease.action}`); },
+      async markExternalCommitted(lease: ChildOperationLease) { childEvents.push(`external:${lease.action}`); },
+      async markCancelling(lease: ChildOperationLease) { childEvents.push(`cancelling:${lease.action}`); },
+      async markCompensating(lease: ChildOperationLease) { childEvents.push(`compensating:${lease.action}`); },
+      async settle(lease: ChildOperationLease, outcome: ChildOperationOutcome) { childEvents.push(`settled:${lease.action}:${outcome}`); }
+    }
   } as unknown as AdapterRequest;
 
   assert.equal((await adapter.execute(base)).status, "completed");
+  assert.deepEqual(childEvents, [
+    "begin:provider.plan_approval", "executing:provider.plan_approval",
+    "begin:plan_execution", "executing:plan_execution", "external:plan_execution",
+    "external:provider.plan_approval", "settled:provider.plan_approval:completed"
+  ], "a running plan child remains durably external_committed for observation while the outer acknowledged request settles");
   const document = JSON.parse(requests[0]!.body) as { executionAuthorization: unknown };
   assert.deepEqual(document.executionAuthorization, {
     executionAuthorized: true, executeOnce: true, currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "7".repeat(64), operationId: "operation-plan-1", artifactId: artifact.id, artifactDigest: artifact.digest,
     targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-plan", planDigest: proofEvidence().plan.digest, planRevision: "plan-1", originSessionId: "session-1"
   });
 
-  const refused = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: undefined } as never);
+  const refused = await new ConfiguredProviderCommandAdapter(network, artifacts, { async captureAndAccept(input) { return { status: "unchanged", target: input.previousTarget, session: input.session }; } }).execute({ ...base, confirmation: undefined } as never);
   assert.equal(refused.status, "blocked");
-  const mismatchedConfirmation = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: { ...base.confirmation!, confirmationDigest: "7".repeat(64) } } as never);
+  const mismatchedConfirmation = await new ConfiguredProviderCommandAdapter(network, artifacts, { async captureAndAccept(input) { return { status: "unchanged", target: input.previousTarget, session: input.session }; } }).execute({ ...base, confirmation: { ...base.confirmation!, confirmationDigest: "7".repeat(64) } } as never);
   assert.equal(mismatchedConfirmation.status, "blocked");
-  const mismatchedScope = await new ConfiguredProviderCommandAdapter(network, artifacts).execute({ ...base, confirmation: { ...base.confirmation!, confirmationScopeDigest: "6".repeat(64) } } as never);
+  const mismatchedScope = await new ConfiguredProviderCommandAdapter(network, artifacts, { async captureAndAccept(input) { return { status: "unchanged", target: input.previousTarget, session: input.session }; } }).execute({ ...base, confirmation: { ...base.confirmation!, confirmationScopeDigest: "6".repeat(64) } } as never);
   assert.equal(mismatchedScope.status, "blocked");
   assert.equal(requests.length, 1);
 });
@@ -407,121 +516,81 @@ test("provider handshake cannot self-assert Mediated beyond its host-derived rou
   await assert.rejects(() => coordinator.handshake({ repositoryRoot: "C:\\repo", session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "vscode", metadata: {} } }), /host-derived transport boundary/i);
 });
 
-test("configured automation creates one observable child saga and records the gateway recovery identity", async () => {
-  const childEvents: Array<readonly [string, unknown]> = [];
-  const transport = {
-    recoveryExternalId(input: { operationId: string; provider: string }) {
-      assert.equal(input.provider, "codex");
-      return input.operationId;
-    },
-    async request(input: { routeId: string; body?: string }) {
-      assert.equal(input.routeId, "automation.repair_mission");
-      const document = JSON.parse(input.body!) as Record<string, unknown>;
-      assert.equal(document.schema, automationRequestSchema("repair_mission"));
-      assert.equal(document.action, "repair_mission");
-      assert.deepEqual(document.intent, {
-        kind: "repair_mission",
-        reproduceBeforeModify: true,
-        approvedScope: "exact_target_snapshot",
-        testEnvironment: { id: "repair-test-environment", egress: "deny", databaseName: "b122_repair_test" },
-        pushAuthorized: false,
-        mergeAuthorized: false,
-        deployAuthorized: false,
-        hostedRerunAuthorized: false,
-        productionDataAuthorized: false,
-        confirmation: { digest: "9".repeat(64), scopeDigest: "8".repeat(64) }
-      });
-      return {
-        outcome: "passed" as const,
-        routeId: input.routeId,
-        detail: "local gateway",
-        effectDisposition: "ambiguous" as const,
-        body: Buffer.from(JSON.stringify({
-          schema: automationResultSchema("repair_mission"),
-          version: 1,
-          action: "repair_mission",
-          status: "completed",
-          summary: "Repair completed in the deterministic provider.",
-          effectDisposition: "committed",
-          externalId: "automation-operation-1",
-          result: {
-            kind: "repair_mission",
-            reproduction: { commandDigest: "1".repeat(64), status: "reproduced", logsDigest: "2".repeat(64) },
-            approvedScopeDigest: "3".repeat(64),
-            diffDigest: "4".repeat(64),
-            affectedChecks: ["test:affected"],
-            fullChecks: ["test:full"],
-            risks: [],
-            nextAction: "Review the bounded repair diff.",
-            pushAttempted: false,
-            mergeAttempted: false,
-            deployAttempted: false,
-            hostedRerunAttempted: false,
-            productionDataUsed: false
-          }
-        }))
-      };
-    }
-  };
-  const childSaga = {
-    async begin(input: unknown) { childEvents.push(["begin", input]); return { operationId: "child-automation-1", mayExecute: true }; },
-    async markExecuting(input: unknown) { childEvents.push(["executing", input]); },
-    async markExternalCommitted(_input: unknown, details: unknown) { childEvents.push(["external", details]); },
-    async markCancelling(input: unknown) { childEvents.push(["cancelling", input]); },
-    async markCompensating(input: unknown) { childEvents.push(["compensating", input]); },
-    async settle(_input: unknown, outcome: unknown, details: unknown) { childEvents.push([String(outcome), details]); }
-  };
+test("configured remote automation refuses all four actions before policy, containment, guard, saga, recovery, or network", async () => {
+  const calls = { policy: 0, containment: 0, guard: 0, saga: 0, recovery: 0, network: 0, cancellation: 0 };
   const broker = createConfiguredAutomationBroker(
-    { verifyPermit() { return true; } },
-    { check() { return { allowed: true, reason: "clear" }; } },
-    transport as never
+    { verifyPermit() { calls.policy += 1; return true; } },
+    { check() { calls.containment += 1; return { allowed: true, reason: "clear" }; } },
+    {
+      recoveryExternalId() { calls.recovery += 1; return "forbidden-recovery-id"; },
+      async request() { calls.network += 1; throw new Error("remote automation must not reach the configured network transport"); }
+    }
+  );
+
+  for (const [index, action] of remoteAutomationActions.entries()) {
+    const outcome = await broker.execute({
+      action,
+      operationId: `remote-automation-disabled-${index}`,
+      target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
+      permit: {} as never,
+      executionControl: {
+        operationId: `remote-automation-disabled-${index}`,
+        deadline: "2000-01-01T00:00:00.000Z",
+        async isCancellationRequested() { calls.cancellation += 1; return true; }
+      },
+      effectGuard: { async assertCurrent() { calls.guard += 1; return { allowed: true, reason: "current" }; } },
+      childSaga: {
+        async begin() { calls.saga += 1; throw new Error("remote automation must not begin a child saga"); },
+        async markExecuting() { calls.saga += 1; },
+        async markExternalCommitted() { calls.saga += 1; },
+        async markCancelling() { calls.saga += 1; },
+        async markCompensating() { calls.saga += 1; },
+        async settle() { calls.saga += 1; }
+      } as never
+    });
+    assert.equal(outcome.status, "unavailable");
+    assert.equal(outcome.effectDisposition, "not_started");
+    assert.match(outcome.summary, /installed host-local automation executor/i);
+  }
+
+  assert.deepEqual(calls, { policy: 0, containment: 0, guard: 0, saga: 0, recovery: 0, network: 0, cancellation: 0 });
+});
+
+test("configured remote automation cannot be re-enabled by a provider-shaped privileged request", async () => {
+  const sideEffects: string[] = [];
+  const broker = createConfiguredAutomationBroker(
+    { verifyPermit() { sideEffects.push("policy"); return true; } },
+    { check() { sideEffects.push("containment"); return { allowed: true, reason: "clear" }; } },
+    {
+      recoveryExternalId() { sideEffects.push("recovery"); return "forged-recovery"; },
+      async request() { sideEffects.push("network"); throw new Error("remote automation must remain disabled"); }
+    }
   );
   const outcome = await broker.execute({
     action: "repair_mission",
-    operationId: "automation-operation-1",
+    operationId: "forged-provider-automation",
     target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
     session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
-    authority: { id: "authority-repair", sessionId: "session-1" } as never,
+    authority: { id: "authority-forged", sessionId: "session-1" } as never,
     permit: {} as never,
-    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "repair_mission", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-repair" },
-    testEnvironment: { id: "repair-test-environment", tempRoot: "C:\\b122-tests\\repair-test-environment", egress: "deny", databaseName: "b122_repair_test", environment: {} },
-    effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
-    childSaga: childSaga as never
-  });
-  assert.equal(outcome.status, "completed");
-  const begun = childEvents.find(([kind]) => kind === "begin")?.[1] as { action: string; details: Record<string, string> };
-  assert.equal(begun.action, "automation.repair_mission");
-  assert.equal(begun.details.externalId, "automation-operation-1");
-  assert.equal(childEvents.some(([kind]) => kind === "external"), true);
-  assert.equal(childEvents.some(([kind]) => kind === "completed"), true);
-});
-
-test("configured automation records a committed child but refuses success after post-effect target churn", async () => {
-  const childEvents: string[] = [];
-  let guardChecks = 0;
-  const broker = createConfiguredAutomationBroker(
-    { verifyPermit() { return true; } },
-    { check() { return { allowed: true, reason: "clear" }; } },
-    { async request(input) { return { outcome: "passed", routeId: input.routeId, detail: "ok", effectDisposition: "ambiguous", body: Buffer.from(JSON.stringify({ schema: automationResultSchema("compound_capture"), version: 1, action: "compound_capture", status: "completed", summary: "Remote automation committed.", effectDisposition: "committed", externalId: "automation-post-effect", result: { kind: "compound_capture", captureId: "capture:automation-post-effect", learningDigest: "5".repeat(64), verifiedProblemDigest: "6".repeat(64), documents: ["docs/solutions/repair.md"] } })) }; } }
-  );
-  const outcome = await broker.execute({
-    action: "compound_capture", operationId: "automation-post-effect", target: { id: providerTargetId, repositoryRoot: "C:\\repo", policyVersion: "v1" } as never,
-    session: { id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", plannedFiles: [], lastHeartbeat: "2026-08-24T00:00:00.000Z", adapterVersion: "v1", metadata: {} },
-    authority: { id: "authority-capture", sessionId: "session-1" } as never,
-    permit: {} as never,
-    effectGuard: { async assertCurrent() { guardChecks += 1; return guardChecks < 4 ? { allowed: true, reason: "current" } : { allowed: false, reason: "target changed after automation effect" }; } },
+    confirmation: { currentUserConfirmed: true, confirmationDigest: "9".repeat(64), confirmationScopeDigest: "8".repeat(64), action: "repair_mission", targetSnapshotId: providerTargetId, sessionId: "session-1", authorityId: "authority-forged" },
+    effectGuard: { async assertCurrent() { sideEffects.push("guard"); return { allowed: true, reason: "current" }; } },
     childSaga: {
-      async begin() { return { operationId: "child-automation-post-effect", mayExecute: true }; },
-      async markExecuting() { childEvents.push("executing"); },
-      async markExternalCommitted() { childEvents.push("external"); },
-      async markCancelling() { childEvents.push("cancelling"); },
-      async markCompensating() { childEvents.push("compensating"); },
-      async settle(_child: unknown, state: string) { childEvents.push(state); }
+      async begin() { sideEffects.push("saga"); throw new Error("remote automation must not begin a saga"); },
+      async markExecuting() { sideEffects.push("saga"); },
+      async markExternalCommitted() { sideEffects.push("saga"); },
+      async markCancelling() { sideEffects.push("saga"); },
+      async markCompensating() { sideEffects.push("saga"); },
+      async settle() { sideEffects.push("saga"); }
     } as never
   });
-  assert.equal(outcome.status, "failed");
-  assert.equal(outcome.effectDisposition, "committed");
-  assert.deepEqual(childEvents, ["executing", "external", "ambiguous"]);
+
+  assert.deepEqual(outcome, {
+    status: "unavailable",
+    summary: "Remote provider automation is disabled; use the installed host-local automation executor. No remote effect was started.",
+    effectDisposition: "not_started"
+  });
+  assert.deepEqual(sideEffects, []);
 });
 
 test("configured provider routing aborts when durable cancellation polling fails", async () => {

@@ -267,9 +267,12 @@ Invoke-B122PinnedNpm -Arguments @('run','build:vscode') -FailureMessage 'VS Code
 Invoke-B122PinnedNpm -Arguments @('run','build:provider-host') -FailureMessage 'Provider-adapter-host build failed.'
 $rawHidSimulatorBuild = Join-Path $buildRoot 'apps\windows-companion\dist\apps\windows-companion\src\raw-hid-simulator.js'
 $councilParticipantBuild = Join-Path $buildRoot 'apps\windows-companion\dist\apps\windows-companion\src\council-participant-main.js'
-foreach ($compiledProduct in @($rawHidSimulatorBuild, $councilParticipantBuild)) {
+$containmentRemoteEvaluatorBuild = Join-Path $buildRoot 'apps\windows-companion\dist\apps\windows-companion\src\containment-remote-evaluator-main.js'
+foreach ($compiledProduct in @($rawHidSimulatorBuild, $councilParticipantBuild, $containmentRemoteEvaluatorBuild)) {
   if (-not (Test-Path -LiteralPath $compiledProduct -PathType Leaf)) { throw "The companion build omitted a required packaged product entry point: $compiledProduct" }
 }
+$containmentRemoteEvaluatorHelp = Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($containmentRemoteEvaluatorBuild,'--help') -FailureMessage 'The signed containment remote evaluator packaged entry point failed.'
+if ($containmentRemoteEvaluatorHelp -cnotmatch '^Usage: sxsy-b122-containment-remote-evaluator --challenge <absolute-json> --private-key <absolute-pem> --output <absolute-json> --git-executable <absolute-pinned-git>\s*$') { throw 'The signed containment remote evaluator returned an invalid packaged help contract.' }
 $rawHidSimulationRaw = Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($rawHidSimulatorBuild,'--self-test') -FailureMessage 'The complete no-hardware Raw-HID product simulation failed.'
 if ([string]::IsNullOrWhiteSpace($rawHidSimulationRaw)) { throw 'The complete no-hardware Raw-HID product simulation returned no receipt.' }
 $rawHidSimulation = $rawHidSimulationRaw | ConvertFrom-Json
@@ -460,7 +463,7 @@ Copy-Item -LiteralPath (Join-Path $buildRoot 'apps\vscode-extension\README.md') 
 $vsixPackagePath=Join-Path $vsixExtension 'package.json'; $vsixPackage=Get-Content -LiteralPath $vsixPackagePath -Raw | ConvertFrom-Json; $vsixPackage.name='strathex-switchyard-b122'; Write-Utf8NoBom $vsixPackagePath ($vsixPackage | ConvertTo-Json -Depth 20)
 $vsixManifestPath=Join-Path $vsixRoot 'extension.vsixmanifest';Copy-Item -LiteralPath (Join-Path $buildRoot 'deployment\windows\extension.vsixmanifest') -Destination $vsixManifestPath
 [xml]$vsixManifest=Get-Content -LiteralPath $vsixManifestPath -Raw;$vsixNamespace=New-Object Xml.XmlNamespaceManager($vsixManifest.NameTable);$vsixNamespace.AddNamespace('v','http://schemas.microsoft.com/developer/vsx-schema/2011');$vsixIdentity=$vsixManifest.SelectSingleNode('/v:PackageManifest/v:Metadata/v:Identity',$vsixNamespace)
-if($null-eq$vsixIdentity-or[string]$vscodePackageIdentity.name-cne'@strathex/switchyard-vscode'-or[string]$vscodePackageIdentity.publisher-cne'SquirmyWormy275'-or[string]$vscodePackageIdentity.main-cne'./dist/extension.js'-or[string]$vscodePackageIdentity.version-cnotmatch'^\d+\.\d+\.\d+$'){throw 'The reviewed VS Code package identity cannot be represented by the fixed VSIX contract.'}
+if($null-eq$vsixIdentity-or[string]$vscodePackageIdentity.name-cne'@strathex/switchyard-vscode'-or[string]$vscodePackageIdentity.publisher-cne'SquirmyWormy275'-or[string]$vscodePackageIdentity.main-cne'./dist/apps/vscode-extension/src/extension.js'-or[string]$vscodePackageIdentity.version-cnotmatch'^\d+\.\d+\.\d+$'){throw 'The reviewed VS Code package identity cannot be represented by the fixed VSIX contract.'}
 $vsixIdentity.SetAttribute('Id','strathex-switchyard-b122');$vsixIdentity.SetAttribute('Publisher',[string]$vscodePackageIdentity.publisher);$vsixIdentity.SetAttribute('Version',[string]$vscodePackageIdentity.version);Write-Utf8NoBom $vsixManifestPath $vsixManifest.OuterXml
 Copy-Item -LiteralPath (Join-Path $buildRoot 'deployment\windows\Content_Types.xml') -Destination (Join-Path $vsixRoot '[Content_Types].xml')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -497,6 +500,12 @@ foreach ($document in (Get-ChildItem -LiteralPath $documentationSource -File -Re
   New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($documentDestination)) | Out-Null
   Copy-Item -LiteralPath $document.FullName -Destination $documentDestination
 }
+$manualPdfSource = Join-Path $buildRoot 'output\pdf\SXSY-B122-operator-technical-manual.pdf'
+if (
+  -not (Test-Path -LiteralPath $manualPdfSource -PathType Leaf) -or
+  (((Get-Item -LiteralPath $manualPdfSource -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)
+) { throw 'The pinned source commit omits the validated B122 operator manual PDF.' }
+Copy-Item -LiteralPath $manualPdfSource -Destination (Join-Path $documentation 'SXSY-B122-operator-technical-manual.pdf')
 Copy-Item -LiteralPath (Join-Path $buildRoot 'README.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $buildRoot 'SECURITY.md') -Destination $output
 Copy-Item -LiteralPath (Join-Path $buildRoot 'LICENSING.md') -Destination $output

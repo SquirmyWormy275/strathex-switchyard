@@ -130,6 +130,7 @@ test("process-identity failure releases the acquired companion lease before star
   try {
     await assert.rejects(() => runStandaloneCompanion({
       stateDirectory: root,
+      installedHelperIdentityReader: async () => `sha256:${"a".repeat(64)}`,
       processIdentityWriter: async () => { throw new Error("injected identity write failure"); }
     }), /injected identity write failure/);
     await assert.rejects(readFile(join(root, "companion-instance.json"), "utf8"), (error: unknown) => typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "ENOENT");
@@ -200,12 +201,12 @@ test("health probe distinguishes retryable absence from fail-closed configuratio
   const root = await mkdtemp(join(tmpdir(), "sxsy-b122-health-probe-"));
   try {
     const scriptDirectory = join(root, "scripts");
-    const extensionDirectory = join(root, "extension", "dist");
+    const extensionDirectory = join(root, "extension", "dist", "apps", "vscode-extension", "src");
     await mkdir(scriptDirectory, { recursive: true });
     await mkdir(extensionDirectory, { recursive: true });
     const healthScript = join(scriptDirectory, "Test-B122Health.mjs");
     await copyFile(join(process.cwd(), "deployment", "windows", "Test-B122Health.mjs"), healthScript);
-    await copyFile(join(process.cwd(), "apps", "vscode-extension", "dist", "named-pipe-transport.js"), join(extensionDirectory, "named-pipe-transport.js"));
+    await copyFile(join(process.cwd(), "apps", "vscode-extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js"), join(extensionDirectory, "named-pipe-transport.js"));
     const configuration = join(root, "authenticated-pipe.json");
     const absent = await runHealthProbe(healthScript, configuration);
     assert.equal(absent.code, 2);

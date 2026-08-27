@@ -7,6 +7,7 @@ import type { HostActionAuthorizationPayload, HostActionClaimPayload, HostAction
 import type { HostActionCompletionRecord, HostActionCoordinator } from "./service.ts";
 import type { GitHubNavigationCandidate, GitHubNavigationPage, GitHubNavigationResolver } from "./github-navigation.ts";
 import type { ManagedTerminalProfile } from "./provider-desktop.ts";
+import type { RepositoryExecutableIdentity } from "./repository-runtime.ts";
 
 export const localHostActionKinds = [
   "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
@@ -34,8 +35,14 @@ export interface HostActionIntent {
   readonly url?: string;
   readonly debugConfiguration?: string;
   readonly debugSessionId?: string;
+  /** Protected companion-recovered effect session; distinct from authority-source sessionId. */
+  readonly debugEffectSessionId?: string;
+  readonly debugEffectSessionBindingDigest?: string;
+  readonly debugSourceSessionBindingDigest?: string;
+  readonly debugBindingId?: string;
   readonly debugOriginOperationId?: string;
   readonly pythonInterpreter?: string;
+  readonly pythonInterpreterIdentity?: RepositoryExecutableIdentity;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly managedTerminalProfile?: ManagedTerminalProfile;
   readonly createdAt: string;
@@ -64,6 +71,9 @@ export interface HostActionClaim {
   readonly operationId: string;
   readonly commandAction: CommandAction;
   readonly hostActionKind: ExtensionClaimableHostActionKind;
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly workspaceRoot?: string;
   readonly windowSessionId: string;
   readonly adapterVersion: string;
   readonly capabilities: readonly ExtensionClaimableHostActionKind[];
@@ -77,8 +87,13 @@ export interface HostActionPlan {
   readonly url?: string;
   readonly debugConfiguration?: string;
   readonly debugSessionId?: string;
+  readonly debugEffectSessionId?: string;
+  readonly debugEffectSessionBindingDigest?: string;
+  readonly debugSourceSessionBindingDigest?: string;
+  readonly debugBindingId?: string;
   readonly debugOriginOperationId?: string;
   readonly pythonInterpreter?: string;
+  readonly pythonInterpreterIdentity?: RepositoryExecutableIdentity;
   readonly githubCandidates?: readonly GitHubNavigationCandidate[];
   readonly managedTerminalProfile?: ManagedTerminalProfile;
 }
@@ -139,11 +154,20 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   async enqueue(request: AdapterRequest, plan: Readonly<HostActionPlan>): Promise<HostActionIntent> {
     if (!request.operationId) throw new Error("A durable operation ID is required before a host action can be queued.");
     if (plan.hostAction === "start_vscode_debug") {
-      if (!plan.debugConfiguration || plan.debugSessionId !== undefined || plan.debugOriginOperationId !== undefined) throw new Error("VS Code debug start requires one exact configuration and no preselected session identity.");
+      if (!plan.debugConfiguration || plan.debugSessionId !== undefined || plan.debugEffectSessionId !== undefined || plan.debugEffectSessionBindingDigest !== undefined || plan.debugSourceSessionBindingDigest !== undefined || plan.debugBindingId !== undefined || plan.debugOriginOperationId !== undefined) throw new Error("VS Code debug start requires one exact configuration and no preselected session identity.");
     } else if (plan.hostAction === "stop_vscode_debug") {
-      if (!plan.debugConfiguration || !plan.debugSessionId || !plan.debugOriginOperationId) throw new Error("VS Code debug stop requires one exact configuration, session identity, and origin operation.");
-    } else if (plan.debugConfiguration !== undefined || plan.debugSessionId !== undefined || plan.debugOriginOperationId !== undefined) {
+      if (!plan.debugConfiguration || !plan.debugSessionId || !plan.debugEffectSessionId || !plan.debugEffectSessionBindingDigest || !plan.debugSourceSessionBindingDigest || !plan.debugBindingId || !plan.debugOriginOperationId) throw new Error("VS Code debug stop requires one exact configuration, debug identity, protected source/effect session bindings, debug binding, and origin operation.");
+      if (!/^[a-f0-9]{64}$/.test(plan.debugEffectSessionBindingDigest) || !/^[a-f0-9]{64}$/.test(plan.debugSourceSessionBindingDigest)) throw new Error("VS Code debug stop session-binding digests are invalid.");
+    } else if (plan.debugConfiguration !== undefined || plan.debugSessionId !== undefined || plan.debugEffectSessionId !== undefined || plan.debugEffectSessionBindingDigest !== undefined || plan.debugSourceSessionBindingDigest !== undefined || plan.debugBindingId !== undefined || plan.debugOriginOperationId !== undefined) {
       throw new Error("Only the exact VS Code debug host actions may carry debug identity fields.");
+    }
+    const pythonInterpreterIdentity = plan.pythonInterpreterIdentity ? validateRepositoryExecutableIdentity(plan.pythonInterpreterIdentity) : undefined;
+    if (plan.hostAction === "configure_python_venv") {
+      if (!plan.pythonInterpreter || !pythonInterpreterIdentity || normalizePath(plan.pythonInterpreter) !== normalizePath(pythonInterpreterIdentity.canonicalPath)) {
+        throw new Error("VS Code Python configuration requires one exact interpreter and protected executable identity.");
+      }
+    } else if (plan.pythonInterpreter !== undefined || pythonInterpreterIdentity !== undefined) {
+      throw new Error("Only the exact Python-environment host action may carry interpreter identity fields.");
     }
     const now = this.now();
     const intent: HostActionIntent = {
@@ -158,8 +182,13 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       ...(plan.url ? { url: plan.url } : {}),
       ...(plan.debugConfiguration ? { debugConfiguration: boundedDebugReference(plan.debugConfiguration, "VS Code debug configuration") } : {}),
       ...(plan.debugSessionId ? { debugSessionId: boundedDebugReference(plan.debugSessionId, "VS Code debug session ID") } : {}),
+      ...(plan.debugEffectSessionId ? { debugEffectSessionId: boundedDebugReference(plan.debugEffectSessionId, "VS Code debug effect managed-session ID") } : {}),
+      ...(plan.debugEffectSessionBindingDigest ? { debugEffectSessionBindingDigest: plan.debugEffectSessionBindingDigest } : {}),
+      ...(plan.debugSourceSessionBindingDigest ? { debugSourceSessionBindingDigest: plan.debugSourceSessionBindingDigest } : {}),
+      ...(plan.debugBindingId ? { debugBindingId: boundedDebugReference(plan.debugBindingId, "VS Code debug binding ID") } : {}),
       ...(plan.debugOriginOperationId ? { debugOriginOperationId: boundedDebugReference(plan.debugOriginOperationId, "VS Code debug origin operation ID") } : {}),
       ...(plan.pythonInterpreter ? { pythonInterpreter: plan.pythonInterpreter } : {}),
+      ...(pythonInterpreterIdentity ? { pythonInterpreterIdentity } : {}),
       ...(plan.githubCandidates ? { githubCandidates: validateGitHubCandidates(plan.githubCandidates) } : {}),
       ...(plan.managedTerminalProfile ? { managedTerminalProfile: validateManagedTerminalProfile(plan.managedTerminalProfile, plan.hostAction) } : {}),
       createdAt: now.toISOString(),
@@ -173,7 +202,12 @@ export class DurableHostActionQueue implements HostActionCoordinator {
           || existing.targetSnapshotId !== intent.targetSnapshotId || existing.workspaceRoot !== intent.workspaceRoot
           || existing.sessionId !== intent.sessionId
           || existing.url !== intent.url || existing.debugConfiguration !== intent.debugConfiguration || existing.debugSessionId !== intent.debugSessionId
+          || existing.debugEffectSessionId !== intent.debugEffectSessionId
+          || existing.debugEffectSessionBindingDigest !== intent.debugEffectSessionBindingDigest
+          || existing.debugSourceSessionBindingDigest !== intent.debugSourceSessionBindingDigest
+          || existing.debugBindingId !== intent.debugBindingId
           || existing.debugOriginOperationId !== intent.debugOriginOperationId || existing.pythonInterpreter !== intent.pythonInterpreter
+          || JSON.stringify(existing.pythonInterpreterIdentity) !== JSON.stringify(intent.pythonInterpreterIdentity)
           || JSON.stringify(existing.githubCandidates) !== JSON.stringify(intent.githubCandidates)
           || JSON.stringify(existing.managedTerminalProfile) !== JSON.stringify(intent.managedTerminalProfile)) {
           throw new Error("The durable host-action ID is already bound to different intent data.");
@@ -203,6 +237,7 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         .filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued")
         .map((event) => event.intent)
         .filter((candidate) => isExtensionClaimable(candidate.hostAction) && binding.capabilities.includes(candidate.hostAction)
+          && (candidate.workspaceRoot === undefined || binding.workspaceRoots.some((root) => normalizePath(root) === normalizePath(candidate.workspaceRoot!)))
           && Date.parse(candidate.expiresAt) > now.getTime() && !settled.has(candidate.id) && !cancelled.has(candidate.id)
           && !claimed.has(candidate.id) && !authorized.has(candidate.id))
         .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))[0];
@@ -217,6 +252,9 @@ export class DurableHostActionQueue implements HostActionCoordinator {
         operationId: intent.operationId,
         commandAction: intent.commandAction,
         hostActionKind: intent.hostAction,
+        ...(intent.targetSnapshotId ? { targetSnapshotId: intent.targetSnapshotId } : {}),
+        ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),
+        ...(intent.workspaceRoot ? { workspaceRoot: intent.workspaceRoot } : {}),
         windowSessionId: binding.windowSessionId,
         adapterVersion: binding.adapterVersion,
         capabilities: [...binding.capabilities],
@@ -362,8 +400,9 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
       const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
       const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+      const authorized = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized").map((event) => event.authorization.hostActionId));
       const pending = events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
-        && event.intent.operationId === exactOperation && !settled.has(event.intent.id) && !cancelled.has(event.intent.id));
+        && event.intent.operationId === exactOperation && !settled.has(event.intent.id) && !cancelled.has(event.intent.id) && !authorized.has(event.intent.id));
       for (const event of pending) {
         await transaction.append<HostActionEvent>("host_action", {
           version: 1, event: "cancelled", hostActionId: event.intent.id, operationId: exactOperation, reason: exactReason, at: this.now().toISOString()
@@ -381,9 +420,10 @@ export class DurableHostActionQueue implements HostActionCoordinator {
       const events = (await transaction.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
       const settled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled").map((event) => event.record.hostActionId));
       const cancelled = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled").map((event) => event.hostActionId));
+      const authorized = new Set(events.filter((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized").map((event) => event.authorization.hostActionId));
       const pending = events.filter((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
         && event.intent.workspaceRoot !== undefined && normalizePath(event.intent.workspaceRoot) === exactRoot
-        && !settled.has(event.intent.id) && !cancelled.has(event.intent.id));
+        && !settled.has(event.intent.id) && !cancelled.has(event.intent.id) && !authorized.has(event.intent.id));
       for (const event of pending) await transaction.append<HostActionEvent>("host_action", {
         version: 1, event: "cancelled", hostActionId: event.intent.id, operationId: event.intent.operationId, reason: exactReason, at: this.now().toISOString()
       });
@@ -392,24 +432,49 @@ export class DurableHostActionQueue implements HostActionCoordinator {
   }
 
   /** Read-only observation used by startup reconciliation; it never executes an intent. */
-  async observeOperation(operationId: string, action?: string): Promise<Readonly<{ outcome: "committed" | "failed" | "cancelled" | "unresolved"; note: string }>> {
+  async observeOperation(
+    operationId: string,
+    action?: string,
+    targetSnapshotId?: string,
+    repositoryRoot?: string
+  ): Promise<Readonly<{
+    outcome: "committed" | "failed" | "cancelled" | "unresolved";
+    note: string;
+    binding?: Readonly<{ action: CommandAction; targetSnapshotId?: string; repositoryRoot?: string }>;
+  }>> {
     const exactOperation = boundedReference(operationId, "host-action operation ID");
     const exactAction = action === undefined ? undefined : boundedReference(action, "host-action command action");
+    const exactTarget = targetSnapshotId === undefined ? undefined : boundedReference(targetSnapshotId, "host-action target snapshot ID");
+    const exactRoot = repositoryRoot === undefined ? undefined : normalizePath(repositoryRoot);
+    if ((exactTarget === undefined) !== (exactRoot === undefined)) throw new Error("The host-action target binding is partial.");
     const events = (await this.store.readEntries<HostActionEvent>()).filter((entry) => entry.kind === "host_action").map((entry) => entry.payload);
     const queued = events.find((event): event is Extract<HostActionEvent, { event: "queued" }> => event.event === "queued"
-      && event.intent.operationId === exactOperation && (exactAction === undefined || event.intent.commandAction === exactAction))?.intent;
+      && event.intent.operationId === exactOperation && (exactAction === undefined || event.intent.commandAction === exactAction)
+      && (exactTarget === undefined || (event.intent.targetSnapshotId === exactTarget && event.intent.workspaceRoot !== undefined && normalizePath(event.intent.workspaceRoot) === exactRoot)))?.intent;
     if (!queued) return { outcome: "unresolved", note: "No exact durable host-action intent was observed; nothing was replayed." };
+    const binding = {
+      action: queued.commandAction,
+      ...(queued.targetSnapshotId ? { targetSnapshotId: queued.targetSnapshotId } : {}),
+      ...(queued.workspaceRoot ? { repositoryRoot: queued.workspaceRoot } : {})
+    };
     const completedEvent = events.find((event): event is Extract<HostActionEvent, { event: "settled" }> => event.event === "settled" && event.record.hostActionId === queued.id)?.record;
     const completed = completedEvent ? safeCompletion(completedEvent, queued) : undefined;
     if (completed) return completed.status === "completed"
-      ? { outcome: "committed", note: "The authenticated host completion is durable for the exact operation." }
+      ? { outcome: "committed", note: "The authenticated host completion is durable for the exact operation.", binding }
       : completed.status === "incomplete"
-        ? { outcome: "unresolved", note: "The authenticated host reported a possibly committed effect that requires reconciliation and must not be replayed." }
-        : { outcome: "failed", note: "The authenticated host reported failure for the exact operation." };
-    if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === queued.id)) {
-      return { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion." };
+        ? { outcome: "unresolved", note: "The authenticated host reported a possibly committed effect that requires reconciliation and must not be replayed.", binding }
+        : { outcome: "failed", note: "The authenticated host reported failure for the exact operation.", binding };
+    if (events.some((event): event is Extract<HostActionEvent, { event: "authorized" }> => event.event === "authorized" && event.authorization.hostActionId === queued.id)) {
+      return {
+        outcome: "unresolved",
+        note: "The exact durable host action was authorized and may have started; only authenticated settlement can establish terminal effect truth.",
+        binding
+      };
     }
-    return { outcome: "unresolved", note: "The exact durable host action remains queued; no host effect was inferred or replayed." };
+    if (events.some((event): event is Extract<HostActionEvent, { event: "cancelled" }> => event.event === "cancelled" && event.hostActionId === queued.id)) {
+      return { outcome: "cancelled", note: "The exact durable host action was cancelled before authenticated completion.", binding };
+    }
+    return { outcome: "unresolved", note: "The exact durable host action remains queued; no host effect was inferred or replayed.", binding };
   }
 
   private async events(): Promise<readonly HostActionEvent[]> {
@@ -450,8 +515,11 @@ export class DurableHostActionAdapter implements CommandAdapter {
         ...(intent.url ? { hostActionUrl: intent.url } : {}),
         ...(intent.debugConfiguration ? { hostActionDebugConfiguration: intent.debugConfiguration } : {}),
         ...(intent.debugSessionId ? { hostActionDebugSessionId: intent.debugSessionId } : {}),
+        ...(intent.debugEffectSessionId ? { hostActionDebugEffectSessionId: intent.debugEffectSessionId } : {}),
+        ...(intent.debugBindingId ? { hostActionDebugBindingId: intent.debugBindingId } : {}),
         ...(intent.debugOriginOperationId ? { hostActionDebugOriginOperationId: intent.debugOriginOperationId } : {}),
         ...(intent.pythonInterpreter ? { hostActionPythonInterpreter: intent.pythonInterpreter } : {}),
+        ...(intent.pythonInterpreterIdentity ? { hostActionPythonInterpreterIdentity: intent.pythonInterpreterIdentity } : {}),
         ...(intent.githubCandidates ? { githubCandidates: intent.githubCandidates } : {}),
         ...(intent.managedTerminalProfile ? { managedTerminalProfile: intent.managedTerminalProfile } : {})
       }
@@ -463,7 +531,7 @@ export const hostActionCommandActions: readonly CommandAction[] = [
   "handoff_immediate", "handoff_routing_default", "blocker_queue", "done_queue",
   "focus_vscode", "new_vscode", "focus_terminal", "focus_vscode_terminal",
   "github_home", "github_pr", "github_issues", "github_actions", "compound_palette", "open_voice",
-  "switch_voice_provider", "voice_session_picker", "pipeline_failure_trace"
+  "switch_voice_provider", "bind_voice_session", "voice_session_picker", "pipeline_failure_trace"
 ];
 
 function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHostActionKind; url?: string; debugConfiguration?: string; pythonInterpreter?: string }> | undefined {
@@ -481,9 +549,10 @@ function hostActionPlan(request: AdapterRequest): Readonly<{ hostAction: LocalHo
     case "github_issues": return undefined;
     case "github_actions": return undefined;
     case "compound_palette": return { hostAction: "open_compound_palette" };
-    case "open_voice": return { hostAction: "show_voice_center" };
-    case "switch_voice_provider": return { hostAction: "switch_voice_provider" };
-    case "voice_session_picker": return { hostAction: "show_voice_session_picker" };
+    case "open_voice":
+    case "switch_voice_provider":
+    case "bind_voice_session":
+    case "voice_session_picker": return { hostAction: "show_voice_center" };
     case "pipeline_failure_trace": return { hostAction: "show_pipeline_failure_trace" };
     default: return undefined;
   }
@@ -552,6 +621,17 @@ function decimalIdentity(value: unknown): value is string {
   try { return BigInt(value) <= 0xffff_ffff_ffff_ffffn; } catch { return false; }
 }
 
+function validateRepositoryExecutableIdentity(value: RepositoryExecutableIdentity): RepositoryExecutableIdentity {
+  if (!value || typeof value !== "object" || !/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value.canonicalPath)
+    || value.canonicalPath.length > 4_096 || /[\0\r\n]/.test(value.canonicalPath)
+    || !/^[a-f0-9]{64}$/.test(value.sha256) || !decimalIdentity(value.device) || !decimalIdentity(value.inode)
+    || !Number.isSafeInteger(value.size) || value.size <= 0 || value.size > 2 * 1024 * 1024 * 1024
+    || !Number.isFinite(value.modifiedMs) || value.modifiedMs < 0) {
+    throw new Error("The protected Python interpreter identity is malformed or unbounded.");
+  }
+  return { canonicalPath: value.canonicalPath, sha256: value.sha256, device: value.device, inode: value.inode, size: value.size, modifiedMs: value.modifiedMs };
+}
+
 function selectGitHubCandidate(intent: HostActionIntent, selectionId: string | undefined): GitHubNavigationCandidate | undefined {
   if (intent.hostAction !== "select_github_navigation") {
     if (selectionId !== undefined) throw new Error("A host-action selection was supplied for an action that has no picker.");
@@ -586,16 +666,22 @@ function exactHostActionId(value: string): string {
 
 function exactClaimBinding(payload: HostActionClaimPayload): Readonly<{
   windowSessionId: string;
+  workspaceRoots: readonly string[];
   adapterVersion: string;
   capabilities: readonly ExtensionClaimableHostActionKind[];
 }> {
   if (!payload || payload.focused !== true) throw new Error("A host-action claim requires one explicitly focused extension window.");
   const windowSessionId = boundedReference(payload.windowSessionId, "host-action extension window session ID");
   const adapterVersion = boundedVersion(payload.adapterVersion);
+  if (!Array.isArray(payload.workspaceRoots) || payload.workspaceRoots.length > 32
+    || !payload.workspaceRoots.every((root) => typeof root === "string" && /^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(root) && root.length <= 4_096 && !/[\r\n\0]/.test(root))
+    || new Set(payload.workspaceRoots.map(normalizePath)).size !== payload.workspaceRoots.length) {
+    throw new Error("The extension host-action workspace-root set is malformed or ambiguous.");
+  }
   if (!Array.isArray(payload.capabilities) || payload.capabilities.length !== 1 || payload.capabilities[0] !== "show_voice_center") {
     throw new Error("The extension host-action capability set is malformed or outside the closed Voice Center boundary.");
   }
-  return { windowSessionId, adapterVersion, capabilities: ["show_voice_center"] };
+  return { windowSessionId, workspaceRoots: [...payload.workspaceRoots], adapterVersion, capabilities: ["show_voice_center"] };
 }
 
 function isExtensionClaimable(value: LocalHostActionKind): value is ExtensionClaimableHostActionKind {

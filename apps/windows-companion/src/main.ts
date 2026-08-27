@@ -152,6 +152,7 @@ export function createLifecycleAwareHandler(delegate: CompanionRequestHandler, r
 export async function runStandaloneCompanion(options: Readonly<{
   stateDirectory?: string;
   processIdentityWriter?: typeof writeAuthenticatedCompanionProcessIdentity;
+  installedHelperIdentityReader?: typeof installedHelperIdentity;
 }> = {}): Promise<{ stop(): Promise<void> }> {
   if (process.platform !== "win32") throw new Error("The packaged SXSY-B122 companion is supported on Windows only.");
   const protector = new WindowsDpapiCurrentUserProtector();
@@ -159,7 +160,12 @@ export async function runStandaloneCompanion(options: Readonly<{
   const mainPath = fileURLToPath(import.meta.url);
   const instance = await acquireCompanionInstance(stateDirectory, mainPath, { protector });
   const identityHelperPath = instance.record.supervisorHelperPath ?? packagedCompanionLifecycleHelperPath(mainPath);
-  const identityHelperSha256 = instance.record.supervisorHelperSha256 ?? (await installedHelperIdentity(identityHelperPath)).replace(/^sha256:/, "");
+  const installedIdentity = instance.record.supervisorHelperSha256 ? undefined : await (options.installedHelperIdentityReader ?? installedHelperIdentity)(identityHelperPath);
+  if (!instance.record.supervisorHelperSha256 && !installedIdentity?.startsWith("sha256:")) {
+    await instance.release();
+    throw new Error("The JavaScript-only companion package cannot start without the reviewed native supervisor helper from a verified Windows release bundle.");
+  }
+  const identityHelperSha256 = instance.record.supervisorHelperSha256 ?? installedIdentity!.slice("sha256:".length);
   let processIdentityPath: string;
   try {
     processIdentityPath = await (options.processIdentityWriter ?? writeAuthenticatedCompanionProcessIdentity)({
@@ -254,7 +260,8 @@ export async function runStandaloneCompanion(options: Readonly<{
     ? new WindowsJobObjectProcessSupervisor({
         helperPath: repositoryRuntimeHelperPath,
         helperSha256: repositoryRuntimeHelperIdentity.slice("sha256:".length),
-        stateRoot: join(stateDirectory, "repository-supervisors")
+        stateRoot: join(stateDirectory, "repository-supervisors"),
+        protectedStore: store
       })
     : undefined;
   const companion = createDurableWindowsCompanion({

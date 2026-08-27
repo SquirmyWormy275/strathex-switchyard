@@ -46,7 +46,14 @@ test("broker child sagas prevent replay, preserve ambiguity, and reconcile only 
     assert.equal(child.targetSnapshotId, "snapshot-1");
     assert.equal(child.mayExecute, true);
 
-    await saga.markExecuting(child);
+    await saga.markExecuting(child, {
+      providerOperationId: child.operationId,
+      sessionId: "session-1",
+      authorityId: "authority-1"
+    });
+    assert.equal((await operations.get(child.operationId))?.details.providerOperationId, child.operationId);
+    assert.equal((await operations.get(child.operationId))?.details.sessionId, "session-1");
+    assert.equal((await operations.get(child.operationId))?.details.authorityId, "authority-1");
     await saga.settle(child, "ambiguous", { providerObservation: "response_lost" });
     assert.equal((await operations.get(child.operationId))?.state, "executing");
     assert.equal((await operations.get(child.operationId))?.details.providerObservation, "response_lost");
@@ -212,13 +219,15 @@ test("a pre-effect unavailable composite settles its boundary and remains intent
       sessions: { get: (id) => id === session.id ? session : undefined },
       authorities: { get: (id) => id === authority.id ? authority : undefined },
       operations: coordinator,
-      automation
+      automation,
+      automationManifestReviews: { consume: async () => ({ manifest: {} as never, approval: {} as never }) }
     });
     const assignment = commandForAction("compound_capture").assignment!;
     const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+    const dispatch = () => dispatcher.dispatch({ ...request, confirmationToken: policy.createConfirmation({ action: "compound_capture", targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "reviewed capture", reauthenticated: true }).token });
 
-    assert.equal((await dispatcher.dispatch(request)).status, "unavailable");
-    assert.equal((await dispatcher.dispatch(request)).status, "unavailable");
+    assert.equal((await dispatch()).status, "unavailable");
+    assert.equal((await dispatch()).status, "unavailable");
     assert.equal(calls, 2, "a later intentional press may retry after a known pre-effect refusal");
     const all = await operations.list();
     assert.equal(all.filter((operation) => !operation.parentId).length, 2);
@@ -257,13 +266,15 @@ test("an explicitly committed partial composite is recorded without replay on th
       sessions: { get: (id) => id === session.id ? session : undefined },
       authorities: { get: (id) => id === authority.id ? authority : undefined },
       operations: coordinator,
-      automation
+      automation,
+      automationManifestReviews: { consume: async () => ({ manifest: {} as never, approval: {} as never }) }
     });
     const assignment = commandForAction("compound_capture").assignment!;
     const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+    const dispatch = () => dispatcher.dispatch({ ...request, confirmationToken: policy.createConfirmation({ action: "compound_capture", targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "reviewed capture", reauthenticated: true }).token });
 
-    assert.equal((await dispatcher.dispatch(request)).status, "incomplete");
-    assert.equal((await dispatcher.dispatch(request)).status, "incomplete");
+    assert.equal((await dispatch()).status, "incomplete");
+    assert.equal((await dispatch()).status, "incomplete");
     assert.equal(calls, 1, "the same stale target cannot replay a known committed partial effect");
     const all = await operations.list();
     const parent = all.find((operation) => !operation.parentId);
@@ -308,13 +319,15 @@ test("an unavailable response without explicit no-effect proof remains ambiguous
       sessions: { get: (id) => id === session.id ? session : undefined },
       authorities: { get: (id) => id === authority.id ? authority : undefined },
       operations: coordinator,
-      automation
+      automation,
+      automationManifestReviews: { consume: async () => ({ manifest: {} as never, approval: {} as never }) }
     });
     const assignment = commandForAction("compound_capture").assignment!;
     const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+    const dispatch = () => dispatcher.dispatch({ ...request, confirmationToken: policy.createConfirmation({ action: "compound_capture", targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "reviewed capture", reauthenticated: true }).token });
 
-    assert.equal((await dispatcher.dispatch(request)).status, "failed", "durable recording refuses to terminalize an unresolved child");
-    assert.equal((await dispatcher.dispatch(request)).status, "running", "a repeated press focuses the unresolved operation");
+    assert.equal((await dispatch()).status, "failed", "durable recording refuses to terminalize an unresolved child");
+    assert.equal((await dispatch()).status, "running", "a repeated press focuses the unresolved operation");
     assert.equal(calls, 1, "an ambiguous provider outcome is never replayed");
     const boundary = (await operations.list()).find((operation) => operation.parentId && operation.action.endsWith(".composite"));
     assert.equal(boundary?.state, "executing");
@@ -353,13 +366,15 @@ test("a completed label without explicit commit proof remains ambiguous and cann
       sessions: { get: (id) => id === session.id ? session : undefined },
       authorities: { get: (id) => id === authority.id ? authority : undefined },
       operations: coordinator,
-      automation
+      automation,
+      automationManifestReviews: { consume: async () => ({ manifest: {} as never, approval: {} as never }) }
     });
     const assignment = commandForAction("compound_capture").assignment!;
     const request = { assignment, control: assignment.control, modifier: assignment.modifier, targetSnapshot: target, sessionId: session.id, authorityId: authority.id } as const;
+    const dispatch = () => dispatcher.dispatch({ ...request, confirmationToken: policy.createConfirmation({ action: "compound_capture", targetSnapshotId: target.id, sessionId: session.id, authorityId: authority.id, reason: "reviewed capture", reauthenticated: true }).token });
 
-    assert.equal((await dispatcher.dispatch(request)).status, "failed");
-    assert.equal((await dispatcher.dispatch(request)).status, "running");
+    assert.equal((await dispatch()).status, "failed");
+    assert.equal((await dispatch()).status, "running");
     assert.equal(calls, 1);
     const boundary = (await operations.list()).find((operation) => operation.parentId && operation.action.endsWith(".composite"));
     assert.equal(boundary?.state, "executing");
@@ -428,6 +443,7 @@ test("durable dispatch gives Git, automation, and Council handlers a scoped chil
       operations: coordinator,
       git,
       automation,
+      automationManifestReviews: { consume: async () => ({ manifest: {} as never, approval: {} as never }) },
       council,
       gitMutationFactory: { create: () => ({ kind: "local_commit", paths: ["src/safe.ts"], message: "safe commit" }) }
     });
@@ -435,8 +451,8 @@ test("durable dispatch gives Git, automation, and Council handlers a scoped chil
     for (const action of ["local_commit", "compound_capture", "council_report"] as const) {
       const definition = commandForAction(action);
       const assignment = definition.assignment!;
-      const confirmation = action === "local_commit"
-        ? policy.createConfirmation({ action, targetSnapshotId: target.id, sessionId: session.id, authorityId: `authority-${action}`, reason: "isolated reviewed local commit", reauthenticated: true })
+      const confirmation = action === "local_commit" || action === "compound_capture"
+        ? policy.createConfirmation({ action, targetSnapshotId: target.id, sessionId: session.id, authorityId: `authority-${action}`, reason: "isolated reviewed effect", reauthenticated: true })
         : undefined;
       const result = await dispatcher.dispatch({
         assignment, control: assignment.control, modifier: assignment.modifier,

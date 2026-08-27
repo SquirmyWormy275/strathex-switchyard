@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AdapterRegistry, AdapterOutcome } from "./adapters.ts";
 import type {
   AutomationRequest,
+  BrokerConfirmation,
   BrokerOutcome,
   AutomationBroker,
   ExecutionBroker,
@@ -49,6 +50,29 @@ export interface CouncilExecutor {
     session?: ManagedSession;
   }>): Promise<CouncilRecommendation>;
 }
+export interface DebugStopReviewConsumer {
+  /** Resolves the hidden debug effect only from protected reviewed state. */
+  consume(input: Readonly<{
+    action: "stop_managed_run";
+    target: TargetSnapshot;
+    session: ManagedSession;
+    authority: AuthorityGrant;
+    confirmation: BrokerConfirmation;
+  }>): Promise<Readonly<{ effectSession: ManagedSession }> | undefined>;
+}
+export interface AutomationManifestReviewConsumer {
+  /** Atomically consumes one exact approved manifest; absence is a refusal. */
+  consume(input: Readonly<{
+    action: Extract<CommandAction, "compound_capture" | "compound_refresh" | "lfg" | "repair_mission">;
+    target: TargetSnapshot;
+    session: ManagedSession;
+    authority: AuthorityGrant;
+    confirmation: BrokerConfirmation;
+  }>): Promise<Readonly<{
+    manifest: NonNullable<AutomationRequest["reviewedManifest"]>;
+    approval: NonNullable<AutomationRequest["manifestApproval"]>;
+  }> | undefined>;
+}
 type MaybePromise<T> = T | Promise<T>;
 /** Both the in-memory harness and ProtectedJsonStore implementation satisfy this boundary. */
 export interface ContainmentManager {
@@ -63,7 +87,7 @@ export interface CommandOperationLease {
   readonly existingStatus?: CommandStatus;
 }
 export interface CommandOperationCoordinator {
-  claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string }>): Promise<CommandOperationLease>;
+  claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string; authorityId?: string }>): Promise<CommandOperationLease>;
   settle(lease: CommandOperationLease, status: CommandStatus): Promise<void>;
 }
 
@@ -136,8 +160,8 @@ export interface DispatchGovernance {
 export class InMemoryCommandOperationCoordinator implements CommandOperationCoordinator {
   private readonly active = new Map<string, CommandOperationLease>();
 
-  async claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string }>): Promise<CommandOperationLease> {
-    const key = `${input.action}:${input.targetSnapshotId ?? "none"}:${input.sessionId ?? "none"}`;
+  async claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string; authorityId?: string }>): Promise<CommandOperationLease> {
+    const key = `${input.action}:${input.targetSnapshotId ?? "none"}:${input.sessionId ?? "none"}:${input.authorityId ?? "none"}`;
     const previous = this.active.get(key);
     if (previous) return { ...previous, existing: true, existingStatus: "running" };
     const lease: CommandOperationLease = { operationId: `op-${randomUUID()}`, existing: false };
@@ -160,6 +184,8 @@ export interface CommandDispatcherDependencies {
   readonly git?: GitBroker;
   readonly testEnvironment?: TestEnvironmentBroker;
   readonly automation?: AutomationBroker;
+  readonly automationManifestReviews?: AutomationManifestReviewConsumer;
+  readonly debugStopReviews?: DebugStopReviewConsumer;
   readonly isolation?: IsolationRuntime;
   readonly containment?: ContainmentManager;
   readonly council?: CouncilExecutor;
@@ -176,6 +202,8 @@ export interface ContainmentReleaseCommandRequest {
   readonly sessionId: string;
   readonly authorityId: string;
   readonly confirmationToken: string;
+  /** Host-owned factory invoked only after the durable operation ID exists. */
+  readonly effectGuardFactory: (operationId: string) => EffectGuard;
   /** Obtained only from the companion-UI incident-review and reauth flow. */
   readonly review: Readonly<{
     reauthenticated: boolean;
@@ -224,7 +252,7 @@ export class CommandDispatcher {
     });
     if (preliminary.status !== "allowed") return policyResult(preliminary);
 
-    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot?.id, sessionId: context.session?.id });
+    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot?.id, sessionId: context.session?.id, authorityId: context.authority?.id });
     if (lease.existing) {
       return { status: lease.existingStatus ?? "running", summary: "An identical operation is already active; focused its current status.", operationId: lease.operationId };
     }
@@ -318,7 +346,7 @@ export class CommandDispatcher {
     if (!authority) return { status: "blocked", summary: "Containment release requires a current authority grant." };
     const preliminary = this.dependencies.policy.authorize({ definition, target: request.targetSnapshot, session, authority, confirmationToken: request.confirmationToken });
     if (preliminary.status !== "allowed") return policyResult(preliminary);
-    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot.id, sessionId: session.id });
+    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot.id, sessionId: session.id, authorityId: authority.id });
     if (lease.existing) return { status: lease.existingStatus ?? "running", summary: "An identical containment-release operation is already active; focused its current status.", operationId: lease.operationId };
     const lifecycle = durableLifecycle(this.operations);
     const permission = this.dependencies.policy.issuePermit({ definition, operationId: lease.operationId, target: request.targetSnapshot, session, authority, confirmationToken: request.confirmationToken });
@@ -338,8 +366,20 @@ export class CommandDispatcher {
       if (!this.dependencies.containment) {
         result = { status: "unavailable", summary: "No durable containment manager is configured.", operationId: lease.operationId };
       } else {
-        const release = await this.dependencies.containment.release({ repositoryRoot: request.targetSnapshot.repositoryRoot, ...request.review });
-        result = { status: release.status === "released" ? "completed" : release.status, summary: release.reason, operationId: lease.operationId };
+        const effectGuard = request.effectGuardFactory(lease.operationId);
+        const current = await effectGuard.assertCurrent({
+          action: definition.action,
+          operationId: lease.operationId,
+          target: request.targetSnapshot,
+          session,
+          authority
+        });
+        if (!current.allowed) {
+          result = { status: "incomplete", summary: current.reason, operationId: lease.operationId };
+        } else {
+          const release = await this.dependencies.containment.release({ repositoryRoot: request.targetSnapshot.repositoryRoot, ...request.review });
+          result = { status: release.status === "released" ? "completed" : release.status, summary: release.reason, operationId: lease.operationId };
+        }
       }
     } catch (error) {
       result = { status: "failed", summary: `Containment release adapter failed safely: ${untrustedSummary(String(error))}`, operationId: lease.operationId };
@@ -417,6 +457,17 @@ export class CommandDispatcher {
       case "automation": {
         if (!base) return unavailable("Automation requires a verified target.", operationId);
         if (!this.dependencies.automation) return unavailable("No trusted automation broker is configured; no prompt or workflow was submitted.", operationId);
+        if (!session || !authority || !base.confirmation || !this.dependencies.automationManifestReviews) {
+          return { status: "blocked", summary: "Automation requires one exact protected reviewed manifest and current-user approval.", operationId };
+        }
+        const reviewed = await this.dependencies.automationManifestReviews.consume({
+          action: definition.action as "compound_capture" | "compound_refresh" | "lfg" | "repair_mission",
+          target: base.target,
+          session,
+          authority,
+          confirmation: base.confirmation
+        });
+        if (!reviewed) return { status: "blocked", summary: "The exact automation manifest approval is absent, stale, forged, or already consumed.", operationId };
         let testEnvironment: TestEnvironment | undefined;
         if (definition.action === "repair_mission") {
           const environment = await this.prepareTestEnvironment(base, operationId);
@@ -424,7 +475,13 @@ export class CommandDispatcher {
           testEnvironment = environment.environment;
         }
         return this.executeComposite(definition, lease, async (childSaga) => {
-          const requestForBroker: AutomationRequest = { ...base, testEnvironment, ...(childSaga ? { childSaga } : {}) };
+          const requestForBroker: AutomationRequest = {
+            ...base,
+            testEnvironment,
+            reviewedManifest: reviewed.manifest,
+            manifestApproval: reviewed.approval,
+            ...(childSaga ? { childSaga } : {})
+          };
           return brokerResult(await this.dependencies.automation!.execute(requestForBroker), operationId);
         });
       }
@@ -448,6 +505,14 @@ export class CommandDispatcher {
       case "containment": {
         if (!base) return unavailable("Containment requires a verified target.", operationId);
         if (!this.dependencies.containment) return unavailable("No durable containment manager is configured.", operationId);
+        if (!base.effectGuard) return unavailable("Containment requires a host-owned final target guard.", operationId);
+        let current: Awaited<ReturnType<EffectGuard["assertCurrent"]>>;
+        try {
+          current = await base.effectGuard.assertCurrent({ action: base.action, operationId, target: base.target, ...(session ? { session } : {}), ...(authority ? { authority } : {}) });
+        } catch {
+          return unavailable("Containment could not revalidate its exact target, session, and authority immediately before activation.", operationId);
+        }
+        if (!current.allowed) return { status: "incomplete", summary: current.reason, operationId };
         const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, targetSnapshotId: base.target.id, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
         return {
           status: "completed",
@@ -464,7 +529,23 @@ export class CommandDispatcher {
     const recipe = this.dependencies.executionRecipeFactory?.create(definition, base.target);
     if (!recipe) return unavailable("No approved declarative execution recipe is configured for this command.", operationId);
     const environment = testEnvironment ? { ...testEnvironment.environment, ...recipe.environment } : recipe.environment;
-    return brokerResult(await this.dependencies.execution.execute({ ...base, recipe: { ...recipe, environment } }), operationId);
+    let effectSession: ManagedSession | undefined;
+    if (definition.action === "stop_managed_run") {
+      const confirmation = (base as typeof base & { readonly confirmation?: BrokerConfirmation }).confirmation;
+      if (!base.session || !base.authority || !confirmation || !this.dependencies.debugStopReviews) {
+        return { status: "blocked", summary: "Debug stop requires one exact protected reviewed split binding.", operationId };
+      }
+      const claimed = await this.dependencies.debugStopReviews.consume({
+        action: "stop_managed_run",
+        target: base.target,
+        session: base.session,
+        authority: base.authority,
+        confirmation
+      });
+      if (!claimed) return { status: "blocked", summary: "The exact reviewed debug-stop binding is absent, stale, forged, or already consumed.", operationId };
+      effectSession = claimed.effectSession;
+    }
+    return brokerResult(await this.dependencies.execution.execute({ ...base, ...(effectSession ? { effectSession } : {}), recipe: { ...recipe, environment } }), operationId);
   }
 
   /**

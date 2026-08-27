@@ -5,8 +5,15 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sha256 } from "../../../packages/control-plane/src/store.ts";
-import { CodexProviderAdapterBackend, FixtureProviderRuntimePort } from "./backends.ts";
-import { loadProviderBackendRuntime, loadProviderHostConfiguration } from "./config.ts";
+import { loadInstalledProviderMediatedFinalCurrentClient } from "../../windows-companion/src/provider-mediated-final-current.ts";
+import { CodexProviderAdapterBackend, FixtureProviderRuntimePort, type ProviderMediatedEffectGuard } from "./backends.ts";
+import {
+  loadProviderBackendRuntime,
+  loadProviderHostConfiguration,
+  type LoadedProviderBackendRuntime,
+  type LoadedProviderHostConfiguration,
+  type LoadProviderBackendOptions
+} from "./config.ts";
 import { startProviderAdapterHttpsServer } from "./server.ts";
 import { ProviderAdapterHostService } from "./service.ts";
 import { createProviderHostStore } from "./state.ts";
@@ -18,7 +25,7 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
   let runtime: Awaited<ReturnType<typeof loadProviderBackendRuntime>> | undefined;
   let shutdownPromise: Promise<void> | undefined;
   try {
-    runtime = await loadProviderBackendRuntime(configuration);
+    runtime = await loadInstalledProviderBackendRuntime(configuration);
     let requestShutdown = (): void => {};
     const service = new ProviderAdapterHostService({
       authenticationToken: configuration.authenticationTokenText,
@@ -60,8 +67,33 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     configuration.dispatchLeaseAuthenticationKey.fill(0);
     configuration.tls.privateKey.fill(0);
     for (const provider of configuration.providers) if (provider.kind === "module") { provider.credential.fill(0); provider.moduleSource.fill(0); }
+    for (const driver of configuration.effectDrivers) driver.moduleSource.fill(0);
     throw error;
   }
+}
+
+export interface InstalledProviderBackendRuntimeDependencies {
+  readonly loadMediatedFinalCurrent?: (stateDirectory: string) => Promise<ProviderMediatedEffectGuard>;
+  readonly loadRuntime?: (configuration: LoadedProviderHostConfiguration, options: LoadProviderBackendOptions) => Promise<LoadedProviderBackendRuntime>;
+}
+
+/**
+ * Attaches the provider host only to the companion's install-owned, DPAPI-sealed
+ * final-current endpoint. If that endpoint is absent or invalid the host still
+ * starts, but configured modules remain capped at Controllable because no
+ * Mediated effect guard is supplied to the backend composition.
+ */
+export async function loadInstalledProviderBackendRuntime(
+  configuration: LoadedProviderHostConfiguration,
+  dependencies: InstalledProviderBackendRuntimeDependencies = {}
+): Promise<LoadedProviderBackendRuntime> {
+  const loadClient = dependencies.loadMediatedFinalCurrent ?? loadInstalledProviderMediatedFinalCurrentClient;
+  const loadRuntime = dependencies.loadRuntime ?? loadProviderBackendRuntime;
+  let mediatedFinalCurrent: ProviderMediatedEffectGuard | undefined;
+  try {
+    mediatedFinalCurrent = await loadClient(configuration.companionStateDirectory);
+  } catch { /* Missing or invalid protected endpoint deliberately caps the host below Mediated. */ }
+  return loadRuntime(configuration, mediatedFinalCurrent ? { mediatedFinalCurrent } : {});
 }
 
 async function selfTest(): Promise<number> {
@@ -89,8 +121,8 @@ async function selfTest(): Promise<number> {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   runProviderAdapterHost(process.argv.slice(2)).then((code) => { process.exitCode = code; }).catch((error) => {
-    // A digest-pinned provider module can still be hostile and has seen its
-    // credential. Never persist its exception text in the lifecycle stderr log.
+    // A digest-pinned provider module can still be hostile. Never persist its
+    // exception text in the lifecycle stderr log.
     void error;
     process.stderr.write("Provider adapter host startup failed closed. Run the configuration validator for a bounded diagnostic.\n");
     process.exitCode = 1;

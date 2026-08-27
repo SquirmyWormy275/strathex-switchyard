@@ -8,6 +8,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -20,6 +21,7 @@ internal static class Program
 {
     private const string RequestSchema = "sxsy-b122.repository-supervisor-request";
     private const string StateSchema = "sxsy-b122.repository-supervisor-state";
+    private const string TerminalSchema = "sxsy-b122.repository-supervisor-terminal";
     private const int MaximumDocumentBytes = 256 * 1024;
     private const int MaximumArguments = 128;
     private const int MaximumEnvironmentEntries = 64;
@@ -73,17 +75,21 @@ internal static class Program
             {
                 return await RunTypedRecipeAsync(args[1], args[2], args[3], args[4]).ConfigureAwait(false);
             }
-            if (args.Length == 3 && StringComparer.Ordinal.Equals(args[0], "--supervise"))
+            if (args.Length == 4 && StringComparer.Ordinal.Equals(args[0], "--supervise"))
             {
-                return await SuperviseAsync(args[1], args[2]).ConfigureAwait(false);
+                return await SuperviseAsync(args[1], args[2], args[3]).ConfigureAwait(false);
             }
-            if (args.Length == 3 && StringComparer.Ordinal.Equals(args[0], "--observe"))
+            if (args.Length == 4 && StringComparer.Ordinal.Equals(args[0], "--observe"))
             {
-                return Observe(args[1], args[2]);
+                return Observe(args[1], args[2], args[3]);
             }
-            if (args.Length == 5 && StringComparer.Ordinal.Equals(args[0], "--terminate"))
+            if (args.Length == 4 && StringComparer.Ordinal.Equals(args[0], "--verify-terminal"))
             {
-                return await TerminateAsync(args[1], args[2], ParseBound(args[3], 0, 60_000), ParseBound(args[4], 1, 60_000)).ConfigureAwait(false);
+                return VerifyTerminal(args[1], args[2], args[3]);
+            }
+            if (args.Length == 6 && StringComparer.Ordinal.Equals(args[0], "--terminate"))
+            {
+                return await TerminateAsync(args[1], args[2], args[3], ParseBound(args[4], 0, 60_000), ParseBound(args[5], 1, 60_000)).ConfigureAwait(false);
             }
             Diagnostic("Expected one exact repository-runner mode.");
             return 64;
@@ -292,6 +298,67 @@ internal static class Program
         return info.FullName;
     }
 
+    private static DirectoryLockSet OpenVerifiedDirectoryChain(string repositoryRoot, string workingDirectory)
+    {
+        var paths = new List<string>();
+        AddChain(repositoryRoot, workingDirectory, paths);
+        var handles = new List<SafeFileHandle>();
+        try
+        {
+            foreach (string path in paths.Distinct(StringComparer.OrdinalIgnoreCase)) handles.Add(OpenVerifiedDirectory(path));
+            return new DirectoryLockSet(handles);
+        }
+        catch
+        {
+            foreach (SafeFileHandle handle in handles) handle.Dispose();
+            throw;
+        }
+    }
+
+    private static void AddChain(string root, string candidate, List<string> paths)
+    {
+        string current = Path.GetFullPath(root);
+        paths.Add(current);
+        string relative = Path.GetRelativePath(current, candidate);
+        if (Path.IsPathFullyQualified(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)) throw new RunnerException(65, "Directory lock chain escaped its fixed root.");
+        foreach (string component in relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, component);
+            paths.Add(current);
+        }
+    }
+
+    private static SafeFileHandle OpenVerifiedDirectory(string path)
+    {
+        const uint fileShareRead = 0x00000001;
+        const uint fileShareWrite = 0x00000002;
+        const uint openExisting = 3;
+        const uint fileFlagBackupSemantics = 0x02000000;
+        SafeFileHandle handle = CreateFileW(path, 0, fileShareRead | fileShareWrite, IntPtr.Zero, openExisting, fileFlagBackupSemantics, IntPtr.Zero);
+        if (handle.IsInvalid) throw LastError(65, "Reviewed directory could not be locked against rename or replacement.");
+        try
+        {
+            var finalPath = new StringBuilder(32_768);
+            uint length = GetFinalPathNameByHandleW(handle, finalPath, (uint)finalPath.Capacity, 0);
+            if (length == 0 || length >= finalPath.Capacity) throw LastError(65, "Reviewed directory final identity is unavailable.");
+            string canonical = NormalizeFinalHandlePath(finalPath.ToString());
+            if (!SamePath(canonical, path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new RunnerException(65, "Reviewed directory changed identity or became linked before CreateProcess.");
+            return handle;
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    private static string NormalizeFinalHandlePath(string path)
+    {
+        if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) return @"\\" + path[8..];
+        if (path.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)) return path[4..];
+        return path;
+    }
+
     private static string ResolveOwnedRelativePath(string root, string value, string label)
     {
         if (Path.IsPathFullyQualified(value) || value.IndexOf('\0') >= 0) throw new RunnerException(65, $"{label} must be relative.");
@@ -314,29 +381,34 @@ internal static class Program
         File.WriteAllBytes(path, bytes);
     }
 
-    private static async Task<int> SuperviseAsync(string requestArgument, string stateArgument)
+    private static async Task<int> SuperviseAsync(string requestArgument, string stateArgument, string expectedRequestDigest)
     {
         string requestPath = RequireAbsolutePath(requestArgument, "request");
         string statePath = RequireAbsolutePath(stateArgument, "state");
-        Request request = ReadRequest(requestPath);
+        Request request = ReadRequest(requestPath, expectedRequestDigest);
         if (!SamePath(request.StatePath, statePath)) throw new RunnerException(65, "Request state path does not match the exact invocation.");
         VerifyHelperIdentity(request);
         if (File.Exists(statePath)) throw new RunnerException(73, "Supervisor state already exists for this identity.");
 
-        string requestDigest = Sha256File(requestPath, MaximumDocumentBytes);
+        string requestDigest = expectedRequestDigest.ToLowerInvariant();
         string jobName = JobName(request.SupervisorId);
+        using DirectoryLockSet directoryLocks = OpenVerifiedDirectoryChain(request.RepositoryRoot, request.WorkingDirectory);
         using SafeJobHandle job = CreateKillOnCloseJob(jobName);
         using FileStream executableLock = OpenVerifiedExecutable(request.Executable, request.ExecutableSha256);
+        using ECDsa terminalSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        string signingPublicKeySpki = Convert.ToBase64String(terminalSigner.ExportSubjectPublicKeyInfo());
+        string signingPublicKeySha256 = Sha256Bytes(Convert.FromBase64String(signingPublicKeySpki));
         using StartedProcess child = StartSuspendedProcess(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment, job);
-        if (ResumeThread(child.ThreadHandle) == uint.MaxValue) throw LastError(74, "Could not resume the Job-Object child.");
-        child.ThreadHandle.Dispose();
-
+        string startedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
         SupervisorState state = new(
-            StateSchema, 1, request.SupervisorId, request.OperationId, request.Action, request.RepositoryRoot, request.ManifestSha256,
-            ResolveSelf(), request.HelperSha256, requestDigest, Sha256Text(request.ControlToken), jobName,
-            Environment.ProcessId, child.ProcessId, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            StateSchema, 3, request.SupervisorId, request.OperationId, request.Action, request.TargetSnapshotId, request.SessionId, request.AuthorityId, request.RepositoryRoot, request.ManifestSha256,
+            ResolveSelf(), request.HelperSha256, requestDigest, signingPublicKeySpki, signingPublicKeySha256, jobName,
+            Environment.ProcessId, child.ProcessId, startedAt,
             "running", null, false);
         WriteStateNew(statePath, state);
+        await WaitForBindingAckAsync(request.BindingAckPath, requestDigest, 30_000).ConfigureAwait(false);
+        if (ResumeThread(child.ThreadHandle) == uint.MaxValue) throw LastError(74, "Could not resume the Job-Object child.");
+        child.ThreadHandle.Dispose();
 
         var budget = new SharedOutputBudget(request.MaxOutputBytes);
         Task<byte[]> stdout = DrainBoundedAsync(child.StandardOutput, budget);
@@ -352,54 +424,56 @@ internal static class Program
         byte[][] output = await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
         await Console.OpenStandardOutput().WriteAsync(output[0]).ConfigureAwait(false);
         await Console.OpenStandardError().WriteAsync(output[1]).ConfigureAwait(false);
-        SupervisorState current = TryReadState(statePath, request) ?? state;
-        string terminal = current.State == "cancelled" ? "cancelled" : timedOut ? "timed_out" : exitCode == 0 ? "completed" : "failed";
-        SupervisorState completed = current with { State = terminal, ExitCode = checked((int)exitCode), OutputTruncated = budget.Truncated };
+        string terminal = timedOut ? "timed_out" : exitCode == 0 ? "completed" : "failed";
+        SupervisorState completed = state with { State = terminal, ExitCode = checked((int)exitCode), OutputTruncated = budget.Truncated };
         WriteStateReplace(statePath, completed);
+        WriteTerminalNew(request.TerminalPath, CreateTerminalReceipt(request, requestDigest, signingPublicKeySha256, startedAt,
+            DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture), terminal, checked((int)exitCode), budget.Truncated, terminalSigner));
         return timedOut ? 75 : checked((int)Math.Min(exitCode, 255));
     }
 
-    private static int Observe(string requestArgument, string stateArgument)
+    private static int Observe(string requestArgument, string stateArgument, string expectedRequestDigest)
     {
         string requestPath = RequireAbsolutePath(requestArgument, "request");
         string statePath = RequireAbsolutePath(stateArgument, "state");
-        Request request = ReadRequest(requestPath);
-        SupervisorState state = ReadBoundState(statePath, requestPath, request);
+        Request request = ReadRequest(requestPath, expectedRequestDigest);
+        if (!SamePath(request.StatePath, statePath)) throw new RunnerException(65, "Request state path does not match the exact invocation.");
         VerifyHelperIdentity(request);
-        if (state.State != "running") return 1;
-        using SafeJobHandle job = OpenJobObject(JobObjectQuery, false, state.JobName);
-        if (job.IsInvalid) return 1;
-        return ActiveProcessCount(job) > 0 ? 0 : 1;
+        // The repository child runs as the same current user and can rewrite
+        // its on-disk state. Observation therefore derives the kernel identity
+        // from the immutable request identity and consults only the exact Job.
+        using SafeJobHandle job = OpenJobObject(JobObjectQuery, false, JobName(request.SupervisorId));
+        if (job.IsInvalid) return 3;
+        return ActiveProcessCount(job) > 0 ? 0 : 3;
     }
 
-    private static async Task<int> TerminateAsync(string requestArgument, string stateArgument, int gracefulMs, int forceMs)
+    private static async Task<int> TerminateAsync(string requestArgument, string stateArgument, string expectedRequestDigest, int gracefulMs, int forceMs)
     {
         string requestPath = RequireAbsolutePath(requestArgument, "request");
         string statePath = RequireAbsolutePath(stateArgument, "state");
-        Request request = ReadRequest(requestPath);
-        SupervisorState state = ReadBoundState(statePath, requestPath, request);
+        Request request = ReadRequest(requestPath, expectedRequestDigest);
+        if (!SamePath(request.StatePath, statePath)) throw new RunnerException(65, "Request state path does not match the exact invocation.");
         VerifyHelperIdentity(request);
-        if (state.State != "running") return 0;
-        using SafeJobHandle job = OpenJobObject(JobObjectTerminate | JobObjectQuery, false, state.JobName);
-        if (job.IsInvalid) throw LastError(74, "The exact durable Job Object is no longer observable.");
+        // Never let mutable disk state select a PID or Job for termination.
+        // The request-bound supervisor identity deterministically names the
+        // one kernel object this invocation may affect.
+        using SafeJobHandle job = OpenJobObject(JobObjectTerminate | JobObjectQuery, false, JobName(request.SupervisorId));
+        if (job.IsInvalid || ActiveProcessCount(job) == 0) return 3;
 
         if (gracefulMs > 0)
         {
-            try
-            {
-                using Process direct = Process.GetProcessById(state.ChildPid);
-                _ = direct.CloseMainWindow();
-            }
-            catch (ArgumentException)
-            {
-                // The direct child already exited; Job accounting below remains authoritative.
-            }
+            // The state file is readable by the same current-user child and its
+            // PID is not termination authority. Give the exact Job a bounded
+            // natural-exit window, then terminate only that kernel object.
             await WaitUntilAsync(() => ActiveProcessCount(job) == 0, gracefulMs).ConfigureAwait(false);
         }
         if (ActiveProcessCount(job) > 0 && !TerminateJobObject(job, 130)) throw LastError(74, "The exact Job Object rejected forced containment.");
         bool stopped = await WaitUntilAsync(() => ActiveProcessCount(job) == 0, forceMs).ConfigureAwait(false);
         if (!stopped) throw new RunnerException(75, "The exact Job Object did not stop within the bounded force window.");
-        WriteStateReplace(statePath, state with { State = "cancelled", ExitCode = 130 });
+        // Do not write a terminal claim here. The supervising helper owns its
+        // original state object and records the observed process exit; the host
+        // authenticates this terminate helper's exit separately. Termination
+        // proves only that the tree stopped, never that prior effects rolled back.
         return 0;
     }
 
@@ -488,30 +562,48 @@ internal static class Program
         return 1;
     }
 
-    private static Request ReadRequest(string path)
+    private static Request ReadRequest(string path, string expectedDigest)
     {
         byte[] bytes = ReadBoundedFile(path, MaximumDocumentBytes, "request");
+        if (!SafeDigest.IsMatch(expectedDigest)
+            || !FixedEquals(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), expectedDigest.ToLowerInvariant()))
+        {
+            throw new RunnerException(65, "Request bytes do not match the immutable host-issued digest.");
+        }
         using JsonDocument document = JsonDocument.Parse(bytes, new JsonDocumentOptions { AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 16 });
-        JsonElement root = ExactObject(document.RootElement, new[] { "schema", "version", "supervisorId", "operationId", "action", "repositoryRoot", "manifestSha256", "helperPath", "helperSha256", "executable", "executableSha256", "arguments", "workingDirectory", "environment", "lifecycle", "timeoutMs", "maxOutputBytes", "controlToken", "statePath" }, "request");
+        JsonElement root = ExactObject(document.RootElement, new[] { "schema", "version", "supervisorId", "operationId", "action", "targetSnapshotId", "sessionId", "authorityId", "repositoryRoot", "manifestSha256", "helperPath", "helperSha256", "executable", "executableSha256", "arguments", "workingDirectory", "environment", "lifecycle", "timeoutMs", "maxOutputBytes", "controlToken", "statePath", "bindingAckPath", "terminalPath" }, "request");
         string schema = RequiredString(root, "schema", 128);
-        int version = RequiredInt(root, "version", 1, 1);
+        int version = RequiredInt(root, "version", 3, 3);
         string supervisorId = RequiredString(root, "supervisorId", 80);
         string operationId = RequiredString(root, "operationId", 256);
         string action = RequiredString(root, "action", 64);
-        string repositoryRoot = RequireAbsolutePath(RequiredString(root, "repositoryRoot", 4096), "repository root");
+        string targetSnapshotId = RequiredDigest(root, "targetSnapshotId");
+        string? sessionId = OptionalIdentifier(root, "sessionId");
+        string? authorityId = OptionalIdentifier(root, "authorityId");
+        string repositoryRoot = RequireConcreteDirectory(RequiredString(root, "repositoryRoot", 4096), "repository root");
         string manifestSha256 = RequiredDigest(root, "manifestSha256");
         string helperPath = RequireAbsolutePath(RequiredString(root, "helperPath", 4096), "helper");
         string helperSha256 = RequiredDigest(root, "helperSha256");
         string executable = RequireAbsolutePath(RequiredString(root, "executable", 4096), "executable");
         string executableSha256 = RequiredDigest(root, "executableSha256");
-        string workingDirectory = RequireAbsolutePath(RequiredString(root, "workingDirectory", 4096), "working directory");
+        string workingDirectory = RequireConcreteDirectory(RequiredString(root, "workingDirectory", 4096), "working directory");
         string lifecycle = RequiredString(root, "lifecycle", 16);
         int timeoutMs = RequiredInt(root, "timeoutMs", 50, MaximumTimeoutMilliseconds);
         int maxOutputBytes = RequiredInt(root, "maxOutputBytes", 1, MaximumOutputBytes);
         string controlToken = RequiredDigest(root, "controlToken");
         string statePath = RequireAbsolutePath(RequiredString(root, "statePath", 4096), "state");
-        if (schema != RequestSchema || version != 1 || !SafeManagedId.IsMatch(supervisorId) || !SafeAction.IsMatch(action) || lifecycle is not ("foreground" or "managed")) throw new RunnerException(65, "Request identity or lifecycle is invalid.");
-        if (!Directory.Exists(repositoryRoot) || !Directory.Exists(workingDirectory) || !Inside(workingDirectory, repositoryRoot)) throw new RunnerException(65, "Request working directory escaped the canonical repository root.");
+        string bindingAckPath = RequireAbsolutePath(RequiredString(root, "bindingAckPath", 4096), "binding acknowledgement");
+        string terminalPath = RequireAbsolutePath(RequiredString(root, "terminalPath", 4096), "terminal receipt");
+        if (schema != RequestSchema || !SafeManagedId.IsMatch(supervisorId) || !SafeAction.IsMatch(action) || lifecycle is not ("foreground" or "managed")) throw new RunnerException(65, "Request identity or lifecycle is invalid.");
+        if (!Inside(workingDirectory, repositoryRoot)) throw new RunnerException(65, "Request working directory escaped the canonical repository root.");
+        string repositoryVolume = Path.GetPathRoot(repositoryRoot) ?? throw new RunnerException(65, "Repository volume root is unavailable.");
+        EnsureNoReparseComponents(repositoryVolume, repositoryRoot, "repository root");
+        EnsureNoReparseComponents(repositoryRoot, workingDirectory, "working directory");
+        string stateRoot = Path.GetDirectoryName(statePath) ?? throw new RunnerException(65, "Supervisor state root is absent.");
+        string stem = supervisorId["managed:".Length..];
+        if (!SamePath(statePath, Path.Combine(stateRoot, stem + ".state.json"))
+            || !SamePath(bindingAckPath, Path.Combine(stateRoot, stem + ".binding-ack"))
+            || !SamePath(terminalPath, Path.Combine(stateRoot, stem + ".terminal.json"))) throw new RunnerException(65, "Supervisor durable paths do not match the exact immutable identity.");
 
         JsonElement argumentsElement = root.GetProperty("arguments");
         if (argumentsElement.ValueKind != JsonValueKind.Array || argumentsElement.GetArrayLength() > MaximumArguments) throw new RunnerException(65, "Request arguments are not bounded.");
@@ -532,33 +624,7 @@ internal static class Program
             string value = entry.Value.GetString() ?? string.Empty;
             if (value.IndexOf('\0') >= 0 || value.Length > 8192 || !environment.TryAdd(entry.Name, value)) throw new RunnerException(65, "Request environment entry is invalid or duplicated.");
         }
-        return new Request(schema, version, supervisorId, operationId, action, repositoryRoot, manifestSha256, helperPath, helperSha256, executable, executableSha256, arguments, workingDirectory, environment, lifecycle, timeoutMs, maxOutputBytes, controlToken, statePath);
-    }
-
-    private static SupervisorState ReadBoundState(string statePath, string requestPath, Request request)
-    {
-        SupervisorState state = TryReadState(statePath, request) ?? throw new RunnerException(65, "Supervisor state is absent or malformed.");
-        if (!FixedEquals(state.RequestSha256, Sha256File(requestPath, MaximumDocumentBytes)) || !FixedEquals(state.ControlTokenSha256, Sha256Text(request.ControlToken)) || !StringComparer.Ordinal.Equals(state.JobName, JobName(request.SupervisorId))) throw new RunnerException(65, "Supervisor state binding is stale or tampered.");
-        return state;
-    }
-
-    private static SupervisorState? TryReadState(string statePath, Request request)
-    {
-        try
-        {
-            byte[] bytes = ReadBoundedFile(statePath, MaximumDocumentBytes, "state");
-            using JsonDocument document = JsonDocument.Parse(bytes, new JsonDocumentOptions { AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 8 });
-            JsonElement root = ExactObject(document.RootElement, new[] { "schema", "version", "supervisorId", "operationId", "action", "repositoryRoot", "manifestSha256", "helperPath", "helperSha256", "requestSha256", "controlTokenSha256", "jobName", "supervisorPid", "childPid", "startedAt", "state", "exitCode", "outputTruncated" }, "state");
-            var state = new SupervisorState(
-                RequiredString(root, "schema", 128), RequiredInt(root, "version", 1, 1), RequiredString(root, "supervisorId", 80), RequiredString(root, "operationId", 256), RequiredString(root, "action", 64),
-                RequireAbsolutePath(RequiredString(root, "repositoryRoot", 4096), "state repository"), RequiredDigest(root, "manifestSha256"), RequireAbsolutePath(RequiredString(root, "helperPath", 4096), "state helper"), RequiredDigest(root, "helperSha256"),
-                RequiredDigest(root, "requestSha256"), RequiredDigest(root, "controlTokenSha256"), RequiredString(root, "jobName", 128), RequiredInt(root, "supervisorPid", 1, int.MaxValue), RequiredInt(root, "childPid", 1, int.MaxValue),
-                RequiredString(root, "startedAt", 64), RequiredString(root, "state", 16), root.GetProperty("exitCode").ValueKind == JsonValueKind.Null ? null : RequiredInt(root, "exitCode", int.MinValue, int.MaxValue), root.GetProperty("outputTruncated").GetBoolean());
-            if (state.Schema != StateSchema || state.Version != 1 || state.SupervisorId != request.SupervisorId || state.OperationId != request.OperationId || state.Action != request.Action || !SamePath(state.RepositoryRoot, request.RepositoryRoot) || state.ManifestSha256 != request.ManifestSha256 || !SamePath(state.HelperPath, ResolveSelf()) || state.HelperSha256 != request.HelperSha256 || !DateTimeOffset.TryParseExact(state.StartedAt, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out _) || state.State is not ("running" or "completed" or "failed" or "timed_out" or "cancelled")) return null;
-            return state;
-        }
-        catch (IOException) { return null; }
-        catch (JsonException) { return null; }
+        return new Request(schema, version, supervisorId, operationId, action, targetSnapshotId, sessionId, authorityId, repositoryRoot, manifestSha256, helperPath, helperSha256, executable, executableSha256, arguments, workingDirectory, environment, lifecycle, timeoutMs, maxOutputBytes, controlToken, statePath, bindingAckPath, terminalPath);
     }
 
     private static StartedProcess StartSuspendedProcess(string executable, IReadOnlyList<string> arguments, string workingDirectory, IReadOnlyDictionary<string, string> environment, SafeJobHandle job)
@@ -765,6 +831,16 @@ internal static class Program
         return text;
     }
 
+    private static string? OptionalIdentifier(JsonElement root, string name)
+    {
+        JsonElement element = root.GetProperty(name);
+        if (element.ValueKind == JsonValueKind.Null) return null;
+        if (element.ValueKind != JsonValueKind.String) throw new RunnerException(65, $"{name} must be null or an exact identifier.");
+        string value = element.GetString() ?? string.Empty;
+        if (value.Length < 1 || value.Length > 256 || value.IndexOf('\0') >= 0 || value.IndexOfAny(new[] { '\r', '\n' }) >= 0) throw new RunnerException(65, $"{name} is invalid.");
+        return value;
+    }
+
     private static string RequiredDigest(JsonElement root, string name)
     {
         string value = RequiredString(root, name, 64).ToLowerInvariant();
@@ -793,6 +869,7 @@ internal static class Program
     private static bool SamePath(string left, string right) => StringComparer.OrdinalIgnoreCase.Equals(Path.GetFullPath(left).TrimEnd('\\'), Path.GetFullPath(right).TrimEnd('\\'));
     private static bool FixedEquals(string left, string right) => left.Length == right.Length && CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(left), Encoding.ASCII.GetBytes(right));
     private static string Sha256Text(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    private static string Sha256Bytes(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
     private static string Sha256File(string path, int maximumBytes) => Convert.ToHexString(SHA256.HashData(ReadBoundedFile(path, maximumBytes, "file"))).ToLowerInvariant();
     private static int ParseBound(string value, int minimum, int maximum) => int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed) && parsed >= minimum && parsed <= maximum ? parsed : throw new RunnerException(64, "Termination bound is invalid.");
 
@@ -811,15 +888,130 @@ internal static class Program
         catch { try { File.Delete(temporary); } catch (IOException) { } throw; }
     }
 
+    private static async Task WaitForBindingAckAsync(string path, string expectedRequestDigest, int timeoutMs)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (File.Exists(path))
+            {
+                string observed = Encoding.ASCII.GetString(ReadBoundedFile(path, 256, "binding acknowledgement")).Trim();
+                if (!FixedEquals(observed, expectedRequestDigest)) throw new RunnerException(65, "Host binding acknowledgement does not match the immutable request digest.");
+                return;
+            }
+            await Task.Delay(25).ConfigureAwait(false);
+        }
+        throw new RunnerException(75, "The host did not authenticate the immutable supervisor binding before the child-release deadline.");
+    }
+
+    private static TerminalReceipt CreateTerminalReceipt(
+        Request request,
+        string requestSha256,
+        string signingPublicKeySha256,
+        string startedAt,
+        string finishedAt,
+        string state,
+        int exitCode,
+        bool outputTruncated,
+        ECDsa signer)
+    {
+        var unsigned = new SortedDictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["action"] = request.Action,
+            ["authorityId"] = request.AuthorityId,
+            ["effectDisposition"] = "committed",
+            ["exitCode"] = exitCode,
+            ["finishedAt"] = finishedAt,
+            ["helperSha256"] = request.HelperSha256,
+            ["manifestSha256"] = request.ManifestSha256,
+            ["operationId"] = request.OperationId,
+            ["outputTruncated"] = outputTruncated,
+            ["repositoryRoot"] = request.RepositoryRoot,
+            ["requestSha256"] = requestSha256,
+            ["schema"] = TerminalSchema,
+            ["sessionId"] = request.SessionId,
+            ["signingPublicKeySha256"] = signingPublicKeySha256,
+            ["startedAt"] = startedAt,
+            ["state"] = state,
+            ["supervisorId"] = request.SupervisorId,
+            ["targetSnapshotId"] = request.TargetSnapshotId,
+            ["version"] = 1
+        };
+        byte[] canonical = JsonSerializer.SerializeToUtf8Bytes(unsigned, CanonicalJsonOptions);
+        string signature = Convert.ToBase64String(signer.SignData(canonical, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+        return new TerminalReceipt(TerminalSchema, 1, request.SupervisorId, request.OperationId, request.Action, request.TargetSnapshotId,
+            request.SessionId, request.AuthorityId, request.RepositoryRoot, request.ManifestSha256, request.HelperSha256, requestSha256,
+            signingPublicKeySha256, startedAt, finishedAt, state, exitCode, outputTruncated, "committed", signature);
+    }
+
+    private static int VerifyTerminal(string terminalArgument, string signingPublicKeySpki, string expectedSigningPublicKeySha256)
+    {
+        string terminalPath = RequireAbsolutePath(terminalArgument, "terminal receipt");
+        byte[] bytes = ReadBoundedFile(terminalPath, MaximumDocumentBytes, "terminal receipt");
+        using JsonDocument document = JsonDocument.Parse(bytes, new JsonDocumentOptions { AllowTrailingCommas = false, CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 16 });
+        ExactObject(document.RootElement, new[] { "schema", "version", "supervisorId", "operationId", "action", "targetSnapshotId", "sessionId", "authorityId", "repositoryRoot", "manifestSha256", "helperSha256", "requestSha256", "signingPublicKeySha256", "startedAt", "finishedAt", "state", "exitCode", "outputTruncated", "effectDisposition", "signature" }, "terminal receipt");
+        TerminalReceipt receipt = JsonSerializer.Deserialize<TerminalReceipt>(bytes, JsonOptions) ?? throw new RunnerException(65, "Terminal receipt is malformed.");
+        byte[] publicKeyBytes;
+        byte[] signature;
+        try { publicKeyBytes = Convert.FromBase64String(signingPublicKeySpki); signature = Convert.FromBase64String(receipt.Signature); }
+        catch (FormatException) { throw new RunnerException(65, "Terminal signature material is malformed."); }
+        if (!SafeDigest.IsMatch(expectedSigningPublicKeySha256)
+            || !FixedEquals(Sha256Bytes(publicKeyBytes), expectedSigningPublicKeySha256.ToLowerInvariant())
+            || !FixedEquals(receipt.SigningPublicKeySha256, expectedSigningPublicKeySha256.ToLowerInvariant())) throw new RunnerException(65, "Terminal signing key identity changed.");
+        var unsigned = new SortedDictionary<string, object?>(StringComparer.Ordinal)
+        {
+            ["action"] = receipt.Action,
+            ["authorityId"] = receipt.AuthorityId,
+            ["effectDisposition"] = receipt.EffectDisposition,
+            ["exitCode"] = receipt.ExitCode,
+            ["finishedAt"] = receipt.FinishedAt,
+            ["helperSha256"] = receipt.HelperSha256,
+            ["manifestSha256"] = receipt.ManifestSha256,
+            ["operationId"] = receipt.OperationId,
+            ["outputTruncated"] = receipt.OutputTruncated,
+            ["repositoryRoot"] = receipt.RepositoryRoot,
+            ["requestSha256"] = receipt.RequestSha256,
+            ["schema"] = receipt.Schema,
+            ["sessionId"] = receipt.SessionId,
+            ["signingPublicKeySha256"] = receipt.SigningPublicKeySha256,
+            ["startedAt"] = receipt.StartedAt,
+            ["state"] = receipt.State,
+            ["supervisorId"] = receipt.SupervisorId,
+            ["targetSnapshotId"] = receipt.TargetSnapshotId,
+            ["version"] = receipt.Version
+        };
+        using ECDsa verifier = ECDsa.Create();
+        verifier.ImportSubjectPublicKeyInfo(publicKeyBytes, out int consumed);
+        if (consumed != publicKeyBytes.Length || !verifier.VerifyData(JsonSerializer.SerializeToUtf8Bytes(unsigned, CanonicalJsonOptions), signature, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence)) throw new RunnerException(65, "Terminal receipt signature is invalid.");
+        return 0;
+    }
+
+    private static void WriteTerminalNew(string path, TerminalReceipt receipt)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? throw new RunnerException(65, "Terminal receipt directory is absent."));
+        string temporary = path + "." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".tmp";
+        File.WriteAllBytes(temporary, JsonSerializer.SerializeToUtf8Bytes(receipt, JsonOptions));
+        try { File.Move(temporary, path, false); }
+        catch { try { File.Delete(temporary); } catch (IOException) { } throw; }
+    }
+
     private static RunnerException LastError(int exitCode, string message) => new(exitCode, message + " Win32=" + Marshal.GetLastWin32Error().ToString(CultureInfo.InvariantCulture));
     private static void Diagnostic(string message) => Console.Error.WriteLine(message);
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false };
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions CanonicalJsonOptions = new() { WriteIndented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    private sealed record Request(string Schema, int Version, string SupervisorId, string OperationId, string Action, string RepositoryRoot, string ManifestSha256, string HelperPath, string HelperSha256, string Executable, string ExecutableSha256, IReadOnlyList<string> Arguments, string WorkingDirectory, IReadOnlyDictionary<string, string> Environment, string Lifecycle, int TimeoutMs, int MaxOutputBytes, string ControlToken, string StatePath);
-    private sealed record SupervisorState(string Schema, int Version, string SupervisorId, string OperationId, string Action, string RepositoryRoot, string ManifestSha256, string HelperPath, string HelperSha256, string RequestSha256, string ControlTokenSha256, string JobName, int SupervisorPid, int ChildPid, string StartedAt, string State, int? ExitCode, bool OutputTruncated);
+    private sealed record Request(string Schema, int Version, string SupervisorId, string OperationId, string Action, string TargetSnapshotId, string? SessionId, string? AuthorityId, string RepositoryRoot, string ManifestSha256, string HelperPath, string HelperSha256, string Executable, string ExecutableSha256, IReadOnlyList<string> Arguments, string WorkingDirectory, IReadOnlyDictionary<string, string> Environment, string Lifecycle, int TimeoutMs, int MaxOutputBytes, string ControlToken, string StatePath, string BindingAckPath, string TerminalPath);
+    private sealed record SupervisorState(string Schema, int Version, string SupervisorId, string OperationId, string Action, string TargetSnapshotId, string? SessionId, string? AuthorityId, string RepositoryRoot, string ManifestSha256, string HelperPath, string HelperSha256, string RequestSha256, string SigningPublicKeySpki, string SigningPublicKeySha256, string JobName, int SupervisorPid, int ChildPid, string StartedAt, string State, int? ExitCode, bool OutputTruncated);
+    private sealed record TerminalReceipt(string Schema, int Version, string SupervisorId, string OperationId, string Action, string TargetSnapshotId, string? SessionId, string? AuthorityId, string RepositoryRoot, string ManifestSha256, string HelperSha256, string RequestSha256, string SigningPublicKeySha256, string StartedAt, string FinishedAt, string State, int ExitCode, bool OutputTruncated, string EffectDisposition, string Signature);
     private sealed record TypedRecipe(string Executable, string ExecutableSha256, IReadOnlyList<string> Arguments, string WorkingDirectory, IReadOnlyDictionary<string, string> Environment, int TimeoutMs, int MaxOutputBytes, IReadOnlyList<CoverageItem> Coverage, IReadOnlyList<string> ScannerFixtureIds, IReadOnlyList<string> AdvisoryFixtureIds);
     private sealed record CoverageItem(string Dimension, string FixtureId);
     private sealed class RunnerException : Exception { public RunnerException(int exitCode, string message) : base(message) { ExitCode = exitCode; } public int ExitCode { get; } }
+    private sealed class DirectoryLockSet : IDisposable
+    {
+        private readonly IReadOnlyList<SafeFileHandle> handles;
+        public DirectoryLockSet(IReadOnlyList<SafeFileHandle> handles) { this.handles = handles; }
+        public void Dispose() { foreach (SafeFileHandle handle in handles.Reverse()) handle.Dispose(); }
+    }
     private sealed class SharedOutputBudget
     {
         private readonly int limit; private int accepted;
@@ -866,6 +1058,7 @@ internal static class Program
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseHandle(IntPtr handle);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern SafeFileHandle OpenProcess(uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeFileHandle CreateFileW(string path, uint desiredAccess, uint shareMode, IntPtr securityAttributes, uint creationDisposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder path, uint characters, uint flags);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreatePipe(out IntPtr readPipe, out IntPtr writePipe, ref SecurityAttributes attributes, uint size);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
 

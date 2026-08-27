@@ -65,14 +65,14 @@ function Assert-B122VsixIdentity {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $archive=[IO.Compression.ZipFile]::OpenRead($path)
   try{
-    foreach($entryName in @('extension.vsixmanifest','[Content_Types].xml','extension/package.json','extension/dist/extension.js')){if(@($archive.Entries|Where-Object{$_.FullName-ceq$entryName}).Count-ne1){throw "VSIX entry is missing or duplicated: $entryName"}}
+    foreach($entryName in @('extension.vsixmanifest','[Content_Types].xml','extension/package.json','extension/dist/apps/vscode-extension/src/extension.js')){if(@($archive.Entries|Where-Object{$_.FullName-ceq$entryName}).Count-ne1){throw "VSIX entry is missing or duplicated: $entryName"}}
     function Read-B122VsixText([string]$EntryName,[long]$MaximumBytes){$entry=@($archive.Entries|Where-Object{$_.FullName-ceq$EntryName})[0];if($entry.Length-lt2-or$entry.Length-gt$MaximumBytes){throw "VSIX text entry is outside its size bound: $EntryName"};$stream=$entry.Open();$reader=New-Object IO.StreamReader($stream,(New-Object Text.UTF8Encoding($false,$true)),$true);try{return $reader.ReadToEnd()}finally{$reader.Dispose();$stream.Dispose()}}
     $package=(Read-B122VsixText 'extension/package.json' 1MB)|ConvertFrom-Json
-    if($package.name-cne$ExpectedId-or$package.publisher-cne$ExpectedPublisher-or$package.version-cne$ExpectedVersion-or$package.main-cne'./dist/extension.js'){throw 'The archived VS Code package identity does not match the reviewed release identity.'}
+    if($package.name-cne$ExpectedId-or$package.publisher-cne$ExpectedPublisher-or$package.version-cne$ExpectedVersion-or$package.main-cne'./dist/apps/vscode-extension/src/extension.js'){throw 'The archived VS Code package identity does not match the reviewed release identity.'}
     $manifestText=Read-B122VsixText 'extension.vsixmanifest' 256KB;$settings=New-Object Xml.XmlReaderSettings;$settings.DtdProcessing=[Xml.DtdProcessing]::Prohibit;$settings.XmlResolver=$null;$reader=[Xml.XmlReader]::Create((New-Object IO.StringReader($manifestText)),$settings);$manifest=New-Object Xml.XmlDocument;$manifest.XmlResolver=$null;try{$manifest.Load($reader)}finally{$reader.Dispose()}
     $namespace=New-Object Xml.XmlNamespaceManager($manifest.NameTable);$namespace.AddNamespace('v','http://schemas.microsoft.com/developer/vsx-schema/2011');$identities=@($manifest.SelectNodes('/v:PackageManifest/v:Metadata/v:Identity',$namespace));if($identities.Count-ne1){throw 'The VSIX manifest does not contain exactly one package identity.'};$identity=$identities[0]
     if((@($identity.Attributes|ForEach-Object{[string]$_.Name}|Sort-Object)-join',')-cne'Id,Language,Publisher,Version'-or$identity.Id-cne$ExpectedId-or$identity.Publisher-cne$ExpectedPublisher-or$identity.Version-cne$ExpectedVersion-or$identity.Language-cne'en-US'){throw 'The VSIX manifest identity does not match the archived package and release metadata.'}
-    return [pscustomobject][ordered]@{id=$ExpectedId;publisher=$ExpectedPublisher;version=$ExpectedVersion;main='./dist/extension.js'}
+    return [pscustomobject][ordered]@{id=$ExpectedId;publisher=$ExpectedPublisher;version=$ExpectedVersion;main='./dist/apps/vscode-extension/src/extension.js'}
   }finally{$archive.Dispose()}
 }
 

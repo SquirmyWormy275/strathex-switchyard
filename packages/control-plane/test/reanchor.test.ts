@@ -5,8 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 
 import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../src/contracts.ts";
+import type { CoordinatorEvidenceBundle } from "../src/workflow-artifacts.ts";
 import { DurableConfirmationLedger } from "../src/confirmations.ts";
 import {
+  canonicalReanchorApplyRequest,
   DurableReanchorCoordinator,
   type ReanchorApplyOutcome,
   type ReanchorApplyRequest,
@@ -15,7 +17,7 @@ import {
 } from "../src/reanchor.ts";
 import { sessionBindingDigest, type SessionTargetRebindRequest, type SessionTargetRebindResult } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
-import { ProtectedJsonStore, sha256 } from "../src/store.ts";
+import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
 
 const baseNow = "2026-08-25T12:00:00.000Z";
 
@@ -78,6 +80,27 @@ const request = () => ({
   authority
 });
 
+function contextEvidence(): CoordinatorEvidenceBundle {
+  const planMaterial = {
+    revision: session.planRevision!,
+    originSessionId: session.id,
+    taskId: session.taskId!,
+    objective: "Reread the exact task brief and reconcile current work.",
+    steps: [{ id: "step-one", summary: "Inspect the current work.", ownedFiles: ["src/one.ts"], dependencies: [], status: "approved" as const }],
+    decisions: ["Automatic resume is forbidden."],
+    expectedTargetTransition: { beforeTargetSnapshotId: oldTarget.id, expectedAfterTargetSnapshotId: oldTarget.id, expectation: "unchanged" as const }
+  };
+  const material = {
+    instructions: [{ id: "instructions-one", digest: sha256("protected instructions"), source: "protected_context" as const, summary: "Original protected instructions." }],
+    plan: { digest: sha256(stableJson(planMaterial)), ...planMaterial },
+    documentation: [{ id: "documentation-one", digest: sha256("project documentation"), source: "repository" as const, summary: "Repository documentation." }],
+    diff: { id: "diff-one", digest: sha256("current diff"), source: "target_snapshot" as const, summary: "Current worktree diff." },
+    files: [{ id: "file-one", digest: sha256("src/one.ts"), source: "repository" as const, summary: "Current planned file." }],
+    tests: [{ id: "test-one", digest: sha256("test result"), source: "receipt" as const, summary: "Current test evidence.", status: "passed" as const }]
+  };
+  return { contextDigest: sha256(stableJson(material)), ...material };
+}
+
 function committed(input: ReanchorApplyRequest, externalEffectId: string, summary: string): Extract<ReanchorApplyOutcome, { readonly disposition: "committed" }> {
   return {
     disposition: "committed",
@@ -93,7 +116,15 @@ function committed(input: ReanchorApplyRequest, externalEffectId: string, summar
       newTargetSnapshotId: input.newTargetSnapshotId,
       cooperativeStopAcknowledged: true,
       resumed: false,
-      summary
+      artifactDigest: input.artifactDigest,
+      rereadEvidence: input.rereadEvidence,
+      report: {
+        summary,
+        discrepancies: ["The provider reread found one target transition."],
+        risks: ["The managed session remains stopped."],
+        questions: ["Should a separately authorized action resume this work?"],
+        result: "reanchored_without_resume"
+      }
     }
   };
 }
@@ -163,6 +194,17 @@ function dependencies(overrides: Partial<ReanchorCoordinatorDependencies> = {}):
         };
       }
     },
+    previewer: {
+      async preview() {
+        return {
+          summary: "Read-only context comparison complete.",
+          discrepancies: ["HEAD changed."],
+          risks: [],
+          questions: [],
+          contextEvidence: contextEvidence()
+        };
+      }
+    },
     ...overrides
   };
 }
@@ -185,7 +227,7 @@ test("re-anchor is preview-only until exact human confirmation and records one d
       previewer: {
         async preview() {
           previews += 1;
-          return { summary: "Read-only context comparison complete.", discrepancies: ["HEAD changed."], risks: [], questions: ["Is the new plan revision expected?"] };
+          return { summary: "Read-only context comparison complete.", discrepancies: ["HEAD changed."], risks: [], questions: ["Is the new plan revision expected?"], contextEvidence: contextEvidence() };
         }
       },
       applier: {
@@ -228,10 +270,37 @@ test("re-anchor is preview-only until exact human confirmation and records one d
     assert.equal(completed.receipt?.newTargetSnapshotId, newTarget.id);
     assert.equal(completed.receipt?.sessionRebindOutcome, "rebound");
     assert.equal(completed.receipt?.resumed, false);
+    assert.deepEqual(completed.receipt?.report, {
+      summary: "Provider accepted the exact re-anchor packet.",
+      discrepancies: ["The provider reread found one target transition."],
+      risks: ["The managed session remains stopped."],
+      questions: ["Should a separately authorized action resume this work?"],
+      result: "reanchored_without_resume"
+    });
+    assert.equal(completed.receipt?.result, "reanchored_without_resume");
     const repeated = await coordinator.apply(created.request.id);
     assert.equal(repeated.receipt?.id, completed.receipt?.id);
     assert.equal(effects, 1, "an idempotent repeat must never replay the provider effect");
     assert.equal((await coordinator.request(request())).request.id, created.request.id);
+  });
+});
+
+test("provider Re-anchor request decoding is closed, artifact-bound, and rejects target or report-material substitution", async () => {
+  await withStore(async (store) => {
+    let captured: ReanchorApplyRequest | undefined;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      applier: { async apply(input) { captured = input; return committed(input, "canonical-request-effect", "Canonical request accepted."); } }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    await coordinator.apply(created.request.id);
+    assert.ok(captured);
+    const wire = JSON.parse(JSON.stringify(captured)) as Record<string, unknown>;
+    assert.deepEqual(canonicalReanchorApplyRequest(wire), captured);
+    assert.throws(() => canonicalReanchorApplyRequest({ ...wire, callerSelectedRoute: "provider.health" }), /closed|malformed/i);
+    assert.throws(() => canonicalReanchorApplyRequest({ ...wire, newTargetSnapshotId: oldTarget.id }), /target|binding|artifact/i);
+    assert.throws(() => canonicalReanchorApplyRequest({ ...wire, confirmationScopeDigest: "0".repeat(64) }), /artifact|binding|scope/i);
+    assert.throws(() => canonicalReanchorApplyRequest({ ...wire, requiredRereads: ["current_work"] }), /reread|artifact|binding/i);
   });
 });
 
@@ -400,7 +469,23 @@ test("provider acknowledgement summaries are redacted before durable persistence
   await withStore(async (store) => {
     const secret = "ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD";
     const coordinator = new DurableReanchorCoordinator(store, dependencies({
-      applier: { async apply(input) { return committed(input, "redacted-provider-effect", `Provider echoed ${secret} for person@example.com`); } }
+      applier: {
+        async apply(input) {
+          const outcome = committed(input, "redacted-provider-effect", `Provider echoed ${secret} for person@example.com`);
+          return {
+            ...outcome,
+            acknowledgement: {
+              ...outcome.acknowledgement,
+              report: {
+                ...outcome.acknowledgement.report,
+                discrepancies: [`Credential ${secret} changed.`],
+                risks: ["Contact person@example.com"],
+                questions: [`Reuse ${secret}?`]
+              }
+            }
+          };
+        }
+      }
     }), { clock: () => baseNow });
     const created = await coordinator.request(request());
     await reviewAndConfirm(coordinator, created.request.id);
@@ -409,6 +494,8 @@ test("provider acknowledgement summaries are redacted before durable persistence
     assert.doesNotMatch(JSON.stringify(await store.readEntries()), new RegExp(secret));
     assert.doesNotMatch(completed.externalEffect?.summary ?? "", /person@example\.com/);
     assert.match(completed.externalEffect?.summary ?? "", /REDACTED/);
+    assert.doesNotMatch(JSON.stringify(completed.receipt?.report), /person@example\.com/);
+    assert.match(JSON.stringify(completed.receipt?.report), /REDACTED/);
   });
 });
 
@@ -582,6 +669,47 @@ test("a provider acknowledgement must echo both exact targets and cannot claim a
   });
 });
 
+test("a stop-only provider acknowledgement cannot impersonate the required context reread and work inspection", async () => {
+  await withStore(async (store) => {
+    let rebinds = 0;
+    const coordinator = new DurableReanchorCoordinator(store, dependencies({
+      sessions: {
+        async get() { return session; },
+        async compareAndSwapTarget() { rebinds += 1; return { outcome: "unknown", reason: "must not run" }; }
+      },
+      applier: {
+        async apply(input) {
+          return {
+            disposition: "committed",
+            acknowledgement: {
+              schema: "sxsy-b122.reanchor-acknowledgement",
+              version: 1,
+              requestId: input.requestId,
+              operationId: input.operationId,
+              externalEffectId: "stop-only-effect",
+              sessionId: input.sessionId,
+              authorityId: input.authorityId,
+              oldTargetSnapshotId: input.oldTargetSnapshotId,
+              newTargetSnapshotId: input.newTargetSnapshotId,
+              cooperativeStopAcknowledged: true,
+              resumed: false,
+              report: {
+                summary: "Stopped.", discrepancies: [], risks: [], questions: [], result: "reanchored_without_resume"
+              }
+            }
+          } as never;
+        }
+      }
+    }), { clock: () => baseNow });
+    const created = await coordinator.request(request());
+    await reviewAndConfirm(coordinator, created.request.id);
+    const result = await coordinator.apply(created.request.id);
+    assert.equal(result.state, "ambiguous");
+    assert.equal(rebinds, 0);
+    assert.equal(result.receipt, undefined);
+  });
+});
+
 test("an uncertain session compare-and-swap records ambiguity after provider commit and never reports re-anchored", async () => {
   await withStore(async (store) => {
     let effects = 0;
@@ -701,7 +829,8 @@ test("untrusted read-only preview text is redacted before it enters the protecte
             summary: `Preview echoed ${secret}`,
             discrepancies: ["Contact person@example.com"],
             risks: [`token=${secret}`],
-            questions: ["Proceed without exposing the value?"]
+            questions: ["Proceed without exposing the value?"],
+            contextEvidence: contextEvidence()
           };
         }
       }

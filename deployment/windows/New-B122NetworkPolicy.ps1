@@ -77,6 +77,8 @@ if ($GitHubHost.StartsWith('.') -or $GitHubHost.EndsWith('.') -or -not $GitHubHo
 if ($GitHubActionsLogRedirectHosts.Count -gt 8 -or @($GitHubActionsLogRedirectHosts | Where-Object { $_.StartsWith('.') -or $_.EndsWith('.') -or -not $_.Contains('.') -or @($_.Split('.') | Where-Object { $_ -notmatch '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$' }).Count }).Count -or @($GitHubActionsLogRedirectHosts | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique).Count -ne $GitHubActionsLogRedirectHosts.Count) { throw 'GitHubActionsLogRedirectHosts must contain no more than eight unique exact canonical DNS hosts.' }
 if (-not $GitHubBaseOwner) { $GitHubBaseOwner = $GitHubOwner }
 if (-not $GitHubBaseRepository) { $GitHubBaseRepository = $GitHubRepository }
+function Test-GitHubSlug([string]$Value) { return $Value -cmatch '^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9_-])?$' }
+if (@($GitHubOwner,$GitHubRepository,$GitHubBaseOwner,$GitHubBaseRepository | Where-Object { -not (Test-GitHubSlug $_) }).Count) { throw 'GitHubOwner, GitHubRepository, GitHubBaseOwner, and GitHubBaseRepository must each be one exact canonical GitHub owner/repository slug.' }
 function Route([string]$id,[string]$method,[string]$url,[hashtable]$headers,[hashtable]$credential,[int]$requestCap=262144,[int]$responseCap=524288) {
   $value=[ordered]@{ id=$id; method=$method; url=$url; redirects='deny'; timeoutMs=30000; maxRequestBytes=$requestCap; maxResponseBytes=$responseCap }
   if ($headers.Count) { $value.staticHeaders=$headers }
@@ -109,7 +111,9 @@ Trace-Stage 'base-routes-ready'
 if ($ProviderBaseUri) {
   $providerCredential=@{reference=$ProviderCredentialReference;purpose='provider-api';header='authorization';prefix='Bearer '}
   $base=$ProviderBaseUri.AbsoluteUri.TrimEnd('/')
-  $actions=@('reanchor','proof','proof_adversarial','option_provider','option_packet','plan_expander','plan_approval','handoff','handoff_queue','handoff_immediate','focus_blocked_agent','focus_finished_agent','authority_refresh','authority_broadcast','bind_voice_session')
+  # Re-anchor is deliberately excluded: its old/new-target packet and
+  # observation lifecycle use provider-specific dedicated routes below.
+  $actions=@('proof','proof_adversarial','option_provider','option_packet','plan_expander','plan_approval','handoff','handoff_queue','handoff_immediate','focus_blocked_agent','focus_finished_agent','authority_refresh','authority_broadcast','bind_voice_session')
   foreach ($action in $actions) { $routes += Provider-Route ("provider.$action") 'POST' ("$base/v1/b122/command/$action") @{'content-type'='application/json'} $providerCredential }
   Trace-Stage 'provider-actions-ready'
   foreach ($provider in @('claude','codex')) {
@@ -119,6 +123,8 @@ if ($ProviderBaseUri) {
   }
   Trace-Stage 'provider-council-ready'
   foreach ($provider in @('claude','codex')) {
+    $routes += Provider-Route ("provider.reanchor.$provider") 'POST' ("$base/v1/b122/reanchor/$provider") @{'content-type'='application/json'} $providerCredential
+    $routes += Provider-Route ("provider.observe-reanchor.$provider") 'POST' ("$base/v1/b122/observe/reanchor/$provider") @{'content-type'='application/json'} $providerCredential
     $routes += Provider-Route ("provider.observe-session.$provider") 'POST' ("$base/v1/b122/observe/session/$provider") @{'content-type'='application/json'} $providerCredential
     $routes += Provider-Route ("provider.observe-workflow-context.$provider") 'POST' ("$base/v1/b122/observe/workflow-context/$provider") @{'content-type'='application/json'} $providerCredential
     $routes += Provider-Route ("provider.observe-operation.$provider") 'POST' ("$base/v1/b122/observe/operation/$provider") @{'content-type'='application/json'} $providerCredential
@@ -128,7 +134,9 @@ if ($ProviderBaseUri) {
   $routes += Provider-Route 'provider.health' 'GET' ("$base/v1/b122/health") @{} $providerCredential 1 65536
   $routes += Provider-Route 'provider.reconcile' 'POST' ("$base/v1/b122/reconcile") @{'content-type'='application/json'} $providerCredential 1024 65536
   Trace-Stage 'provider-health-ready'
-  foreach ($action in @('compound_capture','compound_refresh','lfg','repair_mission')) { $routes += Provider-Route ("automation.$action") 'POST' ("$base/v1/b122/automation/$action") @{'content-type'='application/json'} $providerCredential }
+  foreach ($action in @('compound_capture','compound_refresh','lfg','repair_mission')) {
+    $routes += Provider-Route ("automation.proposal.$action") 'POST' ("$base/v1/b122/automation-proposal/$action") @{'content-type'='application/json'} $providerCredential
+  }
   Trace-Stage 'provider-automation-ready'
 }
 $policy=[ordered]@{version=1;proxy='direct';routes=$routes}

@@ -119,6 +119,24 @@ test("Windows release packages both exact provider workflow-context observation 
   }
 });
 
+test("Windows release packages only exact provider Re-anchor and automation proposal policy routes", async () => {
+  const artifact = await readFile(join(deployment, "Test-B122ReleaseArtifact.ps1"), "utf8");
+  const networkPolicy = await readFile(join(deployment, "New-B122NetworkPolicy.ps1"), "utf8");
+  const bootstrap = await readFile(join(root, "apps", "windows-companion", "src", "bootstrap.ts"), "utf8");
+  for (const provider of ["claude", "codex"] as const) {
+    assert.equal(networkPolicy.includes(`("provider.reanchor.$provider") 'POST' ("$base/v1/b122/reanchor/$provider")`), true, `packaged policy is missing exact ${provider} Re-anchor apply route`);
+    assert.equal(networkPolicy.includes(`("provider.observe-reanchor.$provider") 'POST' ("$base/v1/b122/observe/reanchor/$provider")`), true, `packaged policy is missing exact ${provider} Re-anchor observation route`);
+  }
+  for (const action of ["compound_capture", "compound_refresh", "lfg", "repair_mission"] as const) {
+    assert.equal(networkPolicy.includes(`("automation.proposal.$action") 'POST' ("$base/v1/b122/automation-proposal/$action")`), true, `packaged policy is missing exact ${action} proposal route`);
+    assert.equal(networkPolicy.includes(`("automation.$action") 'POST' ("$base/v1/b122/automation/$action")`), false, `packaged policy must not expose provider-owned ${action} effects`);
+  }
+  assert.equal(networkPolicy.includes(`("provider.reanchor") 'POST' ("$base/v1/b122/command/reanchor")`), false);
+  assert.equal(bootstrap.includes("remoteAutomationActions"), false, "installed recovery must not route host-local automation through provider effect observation");
+  assert.match(artifact, /provider\.observe-reanchor\.\$provider/);
+  assert.match(artifact, /automation\.proposal\.\$action/);
+});
+
 test("Windows release packages, self-tests, and provenance-binds the native voice helper", async () => {
   const build = await readFile(join(deployment, "Build-B122Release.ps1"), "utf8");
   const artifact = await readFile(join(deployment, "Test-B122ReleaseArtifact.ps1"), "utf8");
@@ -463,4 +481,15 @@ test("deployment templates expose every typed recipe and never pretend the super
     assert.equal(recipes.recipes[recipeId]?.executableSha256, "0".repeat(64));
     assert.ok((recipes.recipes[recipeId]?.coverage.length ?? 0) > 0);
   }
+});
+
+test("Windows release carries the validated operator manual in both the bundle and pinned source archive", async () => {
+  const build = await readFile(join(deployment, "Build-B122Release.ps1"), "utf8");
+  const artifact = await readFile(join(deployment, "Test-B122ReleaseArtifact.ps1"), "utf8");
+  const manual = "SXSY-B122-operator-technical-manual.pdf";
+  assert.match(build, /output\\pdf\\SXSY-B122-operator-technical-manual\.pdf/);
+  assert.match(build, /Copy-Item -LiteralPath \$manualPdfSource -Destination/);
+  assert.match(artifact, /docs\\SXSY-B122-operator-technical-manual\.pdf/);
+  assert.match(artifact, /\(Get-Item -LiteralPath \$manualPdf\)\.Length -lt 10KB/);
+  assert.equal(artifact.includes(`output/pdf/${manual}`), true);
 });
