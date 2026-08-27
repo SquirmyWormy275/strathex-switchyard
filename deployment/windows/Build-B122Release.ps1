@@ -27,7 +27,9 @@ Import-Module -Name $integrityModule -Force
 if(-not('SxsyB122ReleaseBuildV1.FileSystemIdentity'-as[type])){
   Add-Type -TypeDefinition @'
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 namespace SxsyB122ReleaseBuildV1 {
   public static class FileSystemIdentity {
@@ -45,6 +47,35 @@ namespace SxsyB122ReleaseBuildV1 {
       IntPtr handle=CreateFileW(ExtendedPath(path),0,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero); if(handle==new IntPtr(-1)){int error=Marshal.GetLastWin32Error();throw new Win32Exception(error,"Cannot open exact filesystem identity for "+path);}
       try { ByHandleFileInformation information; if(!GetFileInformationByHandle(handle,out information)) throw new Win32Exception(Marshal.GetLastWin32Error()); return information.VolumeSerial.ToString("x8")+":"+information.FileIndexHigh.ToString("x8")+information.FileIndexLow.ToString("x8"); }
       finally { CloseHandle(handle); }
+    }
+  }
+  public static class VerifiedTreeDeletion {
+    sealed class Entry {
+      public readonly string Path;
+      public readonly string Parent;
+      public readonly string Identity;
+      public Entry(string path,string parent,string identity){Path=path;Parent=parent;Identity=identity;}
+    }
+    static FileAttributes Attributes(string path){return File.GetAttributes(path);}
+    static void RequireDirectory(string path){FileAttributes value=Attributes(path);if((value&FileAttributes.Directory)==0||(value&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup encountered an unsafe quarantined directory: "+path);}
+    static void RequireFile(string path){FileAttributes value=Attributes(path);if((value&FileAttributes.Directory)!=0||(value&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup encountered an unsafe quarantined file: "+path);}
+    public static void Delete(string path,string expectedRootIdentity){
+      string root=System.IO.Path.GetFullPath(path).TrimEnd('\\');RequireDirectory(root);if(!String.Equals(FileSystemIdentity.Get(root),expectedRootIdentity,StringComparison.Ordinal))throw new IOException("Build cleanup quarantine identity changed before inventory.");
+      var queue=new Queue<string>();var directories=new List<Entry>();var files=new List<Entry>();var directoryIdentities=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);queue.Enqueue(root);
+      while(queue.Count!=0){
+        string directory=queue.Dequeue();RequireDirectory(directory);string identity=FileSystemIdentity.Get(directory);directoryIdentities.Add(directory,identity);directories.Add(new Entry(directory,System.IO.Path.GetDirectoryName(directory),identity));
+        foreach(FileSystemInfo item in new DirectoryInfo(directory).GetFileSystemInfos()){
+          FileAttributes attributes=item.Attributes;if((attributes&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup inventory encountered a reparse point: "+item.FullName);
+          if((attributes&FileAttributes.Directory)!=0)queue.Enqueue(item.FullName);else files.Add(new Entry(item.FullName,directory,FileSystemIdentity.Get(item.FullName)));
+        }
+      }
+      foreach(Entry entry in files){
+        RequireDirectory(entry.Parent);string parentIdentity;if(!directoryIdentities.TryGetValue(entry.Parent,out parentIdentity)||!String.Equals(FileSystemIdentity.Get(entry.Parent),parentIdentity,StringComparison.Ordinal))throw new IOException("Build cleanup file parent changed inside quarantine: "+entry.Parent);
+        RequireFile(entry.Path);if(!String.Equals(FileSystemIdentity.Get(entry.Path),entry.Identity,StringComparison.Ordinal))throw new IOException("Build cleanup file changed inside quarantine: "+entry.Path);File.SetAttributes(entry.Path,FileAttributes.Normal);File.Delete(entry.Path);
+      }
+      directories.Sort(delegate(Entry left,Entry right){return right.Path.Length.CompareTo(left.Path.Length);});
+      foreach(Entry entry in directories){if(String.Equals(entry.Path,root,StringComparison.OrdinalIgnoreCase))continue;RequireDirectory(entry.Path);if(!String.Equals(FileSystemIdentity.Get(entry.Path),entry.Identity,StringComparison.Ordinal))throw new IOException("Build cleanup directory changed inside quarantine: "+entry.Path);Directory.Delete(entry.Path,false);}
+      RequireDirectory(root);if(!String.Equals(FileSystemIdentity.Get(root),expectedRootIdentity,StringComparison.Ordinal)||Directory.GetFileSystemEntries(root).Length!=0)throw new IOException("Build cleanup quarantine is not the empty inventoried directory.");Directory.Delete(root,false);
     }
   }
 }
@@ -114,11 +145,7 @@ function Remove-B122OwnedBuildTree([string]$Path){
   if([SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($output)-cne$outputIdentity-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($tree)-cne$treeIdentity){throw 'Build cleanup target identity changed before quarantine.'}
   Move-Item -LiteralPath $tree -Destination $quarantine
   if([SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($output)-cne$outputIdentity-or-not(Test-Path -LiteralPath $quarantine -PathType Container)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($quarantine)-cne$treeIdentity){throw 'Build cleanup quarantine did not retain the target directory identity.'}
-  $queue=New-Object Collections.Generic.Queue[string];$directories=New-Object Collections.Generic.List[object];$files=New-Object Collections.Generic.List[object];$directoryIdentities=@{};$queue.Enqueue($quarantine)
-  while($queue.Count){$directory=$queue.Dequeue();$directoryItem=Get-Item -LiteralPath $directory -Force;if(-not$directoryItem.PSIsContainer-or($directoryItem.Attributes-band[IO.FileAttributes]::ReparsePoint)){throw "Build cleanup inventory encountered an unsafe quarantined directory: $directory"};$relativeDirectory=if($directory.Length-eq$quarantine.Length){''}else{$directory.Substring($quarantine.Length+1)};$directoryIdentity=[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($directory);$directories.Add([pscustomobject]@{relative=$relativeDirectory;identity=$directoryIdentity});$directoryIdentities[$relativeDirectory]=$directoryIdentity;foreach($entry in @(Get-ChildItem -LiteralPath $directory -Force)){if(($entry.Attributes-band[IO.FileAttributes]::ReparsePoint)-ne0){throw "Build cleanup inventory encountered a reparse point: $($entry.FullName)"};if($entry.PSIsContainer){$queue.Enqueue($entry.FullName)}elseif($entry-is[IO.FileInfo]){$files.Add([pscustomobject]@{relative=$entry.FullName.Substring($quarantine.Length+1);parentRelative=$relativeDirectory;identity=[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($entry.FullName)})}else{throw "Build cleanup inventory encountered an unsupported filesystem entry: $($entry.FullName)"}}}
-  foreach($record in $files){$parent=if([string]::IsNullOrEmpty([string]$record.parentRelative)){$quarantine}else{Join-Path $quarantine $record.parentRelative};$parentItem=Get-Item -LiteralPath $parent -Force;if(-not$parentItem.PSIsContainer-or($parentItem.Attributes-band[IO.FileAttributes]::ReparsePoint)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($parent)-cne$directoryIdentities[[string]$record.parentRelative]){throw "Build cleanup file parent changed inside quarantine: $parent"};$leaf=Join-Path $quarantine $record.relative;$leafItem=Get-Item -LiteralPath $leaf -Force;if($leafItem.PSIsContainer-or($leafItem.Attributes-band[IO.FileAttributes]::ReparsePoint)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($leaf)-cne$record.identity){throw "Build cleanup file changed inside quarantine: $leaf"};Remove-Item -LiteralPath $leaf -Force}
-  foreach($record in @($directories|Sort-Object {$_.relative.Length} -Descending)){if([string]::IsNullOrEmpty([string]$record.relative)){continue};$directory=Join-Path $quarantine $record.relative;$directoryItem=Get-Item -LiteralPath $directory -Force;if(-not$directoryItem.PSIsContainer-or($directoryItem.Attributes-band[IO.FileAttributes]::ReparsePoint)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($directory)-cne$record.identity){throw "Build cleanup directory changed inside quarantine: $directory"};Remove-Item -LiteralPath $directory -Force}
-  $quarantineItem=Get-Item -LiteralPath $quarantine -Force;if(-not$quarantineItem.PSIsContainer-or($quarantineItem.Attributes-band[IO.FileAttributes]::ReparsePoint)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($quarantine)-cne$treeIdentity-or@(Get-ChildItem -LiteralPath $quarantine -Force).Count){throw 'Build cleanup quarantine is not the empty inventoried directory.'};Remove-Item -LiteralPath $quarantine -Force
+  [SxsyB122ReleaseBuildV1.VerifiedTreeDeletion]::Delete($quarantine,$treeIdentity)
 }
 Assert-Child ([IO.Path]::GetFullPath((Join-Path $repo 'artifacts'))) $output
 Assert-B122NoReparseAncestors -Path $output
