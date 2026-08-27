@@ -453,6 +453,8 @@ test("Windows release output is an authenticated exclusive leaf with no reparse 
   assert.match(build, /Set-B122ProtectedBuildOutputAcl -Path \$output/);
   assert.match(build, /function Remove-B122OwnedBuildTree/);
   assert.match(build, /Build cleanup target identity changed before quarantine/);
+  assert.match(build, /CreateFileW\(ExtendedPath\(path\)/);
+  assert.match(build, /Cannot open exact filesystem identity for/);
   const cleanupFunction = build.slice(
     build.indexOf("function Remove-B122OwnedBuildTree"),
     build.indexOf("Assert-Child ([IO.Path]::GetFullPath((Join-Path $repo 'artifacts'))) $output"),

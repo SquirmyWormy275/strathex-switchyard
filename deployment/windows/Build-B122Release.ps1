@@ -36,8 +36,13 @@ namespace SxsyB122ReleaseBuildV1 {
     [DllImport("kernel32.dll",SetLastError=true,CharSet=CharSet.Unicode)] static extern IntPtr CreateFileW(string path,uint access,uint share,IntPtr security,uint disposition,uint flags,IntPtr template);
     [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr handle,out ByHandleFileInformation information);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+    static string ExtendedPath(string path) {
+      if(path.StartsWith(@"\\?\",StringComparison.Ordinal)) return path;
+      if(path.StartsWith(@"\\",StringComparison.Ordinal)) return @"\\?\UNC\"+path.Substring(2);
+      return @"\\?\"+path;
+    }
     public static string Get(string path) {
-      IntPtr handle=CreateFileW(path,0,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero); if(handle==new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      IntPtr handle=CreateFileW(ExtendedPath(path),0,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero); if(handle==new IntPtr(-1)){int error=Marshal.GetLastWin32Error();throw new Win32Exception(error,"Cannot open exact filesystem identity for "+path);}
       try { ByHandleFileInformation information; if(!GetFileInformationByHandle(handle,out information)) throw new Win32Exception(Marshal.GetLastWin32Error()); return information.VolumeSerial.ToString("x8")+":"+information.FileIndexHigh.ToString("x8")+information.FileIndexLow.ToString("x8"); }
       finally { CloseHandle(handle); }
     }
