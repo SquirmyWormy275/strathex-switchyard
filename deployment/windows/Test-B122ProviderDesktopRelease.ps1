@@ -167,7 +167,7 @@ try {
 # Known Folder boundary; no provider credential or non-loopback network is used.
 $providerBundle = [IO.Path]::GetFullPath((Join-Path $temporaryBase ('sxsy-b122-provider-package-' + [guid]::NewGuid().ToString('N'))))
 $instanceName = 'release-e2e-' + [guid]::NewGuid().ToString('N').Substring(0,20)
-$localAppData = [Environment]::GetFolderPath('LocalApplicationData')
+$localAppData = if($env:SXSY_TEST_MODE-ceq'1'){[IO.Path]::GetFullPath([string]$env:LOCALAPPDATA)}else{[Environment]::GetFolderPath('LocalApplicationData')}
 $providerBase = [IO.Path]::GetFullPath((Join-Path $localAppData 'STRATHEX\switchyard\provider-host')).TrimEnd('\')
 $providerState = [IO.Path]::GetFullPath((Join-Path $providerBase $instanceName))
 if (-not $providerState.StartsWith($providerBase + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Refusing an unsafe packaged provider fixture root.' }
@@ -192,7 +192,7 @@ function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Argume
     throw "The packaged provider fixture command exceeded its $TimeoutSeconds-second bound: $Executable"
   }
   $child.WaitForExit();$output=$stdoutTask.GetAwaiter().GetResult();$detail=$stderrTask.GetAwaiter().GetResult();$exitCode=$child.ExitCode
-  if($exitCode-ne0){throw "The packaged provider fixture command failed ($exitCode): $Executable :: $detail"}
+  if($exitCode-ne0){$stages=@([regex]::Matches($detail,'SXSY_PROVIDER_E2E_TRACE=([^\r\n]+)')|ForEach-Object{$_.Groups[1].Value});$lastStage=if($stages.Count){[string]$stages[-1]}else{'unreported'};throw "The packaged provider fixture command failed ($exitCode): $Executable :: $detail :: last safe stage=$lastStage"}
   return $output
 }
 function Invoke-B122ProviderFixturePowerShell([string]$Script,[string[]]$Arguments,[int]$TimeoutSeconds=60){

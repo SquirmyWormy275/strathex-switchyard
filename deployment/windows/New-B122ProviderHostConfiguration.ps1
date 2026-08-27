@@ -22,6 +22,7 @@ function Absolute([string]$Value,[string]$Label) {
   return [IO.Path]::GetFullPath($Value)
 }
 function Inside([string]$Root,[string]$Candidate){$prefix=$Root.TrimEnd('\')+'\';return $Candidate.Equals($Root,[StringComparison]::OrdinalIgnoreCase)-or $Candidate.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)}
+function Local-AppData(){if($env:SXSY_TEST_MODE-ceq'1'){$test=Absolute ([string]$env:SXSY_TEST_ROOT) 'SXSY_TEST_ROOT';$candidate=Absolute ([string]$env:LOCALAPPDATA) 'LOCALAPPDATA';$prefix=$test.TrimEnd('\')+'\';if(-not$candidate.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw 'Test LocalAppData must be a strict child of SXSY_TEST_ROOT.'};return $candidate};$value=[Environment]::GetFolderPath('LocalApplicationData');if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)){throw 'Current-user LocalApplicationData is unavailable.'};return [IO.Path]::GetFullPath($value)}
 function Assert-NoReparseSegments([string]$Candidate) {
   $cursor=[IO.Path]::GetFullPath($Candidate);$segments=New-Object Collections.Generic.List[string]
   while(-not[string]::IsNullOrWhiteSpace($cursor)){$segments.Add($cursor);$parent=Split-Path -Parent $cursor;if([string]::IsNullOrWhiteSpace($parent)-or$parent-ceq$cursor){break};$cursor=$parent}
@@ -53,7 +54,7 @@ function Tls-Identity([string]$CertificatePath,[string]$PrivateKeyPath) {
 
 $output=Absolute $OutputPath 'OutputPath';$protectedRoot=Absolute $ProtectedStateRoot 'ProtectedStateRoot';$planPath=Absolute $BackendPlanPath 'BackendPlanPath'
 $certificate=Absolute $CertificateFile 'CertificateFile';$privateKey=Absolute $PrivateKeyFile 'PrivateKeyFile';$tokenEnvelope=Absolute $AuthenticationTokenEnvelopeFile 'AuthenticationTokenEnvelopeFile';$journalEnvelope=Absolute $JournalAuthenticationEnvelopeFile 'JournalAuthenticationEnvelopeFile';$dispatchLeaseEnvelope=Absolute $DispatchLeaseAuthenticationEnvelopeFile 'DispatchLeaseAuthenticationEnvelopeFile';$state=Absolute $StateFile 'StateFile'
-$local=[Environment]::GetFolderPath('LocalApplicationData');if([string]::IsNullOrWhiteSpace($local)){throw 'Current-user LocalApplicationData is unavailable.'};$base=[IO.Path]::GetFullPath((Join-Path $local 'STRATHEX\switchyard\provider-host'))
+$local=Local-AppData;$base=[IO.Path]::GetFullPath((Join-Path $local 'STRATHEX\switchyard\provider-host'))
 if(-not(Inside $base $protectedRoot)){throw 'ProtectedStateRoot must remain beneath the dedicated current-user provider-host directory.'}
 foreach($owned in @($output,$privateKey,$tokenEnvelope,$journalEnvelope,$dispatchLeaseEnvelope,$state)){if(-not(Inside $protectedRoot $owned)){throw 'Provider-host configuration, secret, key, and state paths must remain beneath ProtectedStateRoot.'}}
 if(-not(Test-Path -LiteralPath $protectedRoot -PathType Container)){throw 'ProtectedStateRoot must already exist with current-user-only ACLs.'}

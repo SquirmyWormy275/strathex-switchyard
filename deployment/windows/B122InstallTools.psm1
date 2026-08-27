@@ -257,7 +257,7 @@ function Set-B122ProtectedRootAcl {
   param([Parameter(Mandatory=$true)][string]$Path)
   $root=[IO.Path]::GetFullPath($Path).TrimEnd('\');Assert-B122NoReparseAncestors -Path $root;$info=New-Object IO.DirectoryInfo($root)
   $user=[Security.Principal.WindowsIdentity]::GetCurrent().User;$system=New-Object Security.Principal.SecurityIdentifier([Security.Principal.WellKnownSidType]::LocalSystemSid,$null)
-  $security=New-Object Security.AccessControl.DirectorySecurity;$security.SetOwner($user);$security.SetAccessRuleProtection($true,$false)
+  $security=Get-Acl -LiteralPath $root;$owner=([Security.Principal.NTAccount]$security.Owner).Translate([Security.Principal.SecurityIdentifier]);if(-not$owner.Equals($user)){throw 'The new B122 owned root is not owned by the current Windows user.'};$security.SetAccessRuleProtection($true,$false);foreach($rule in @($security.Access)){[void]$security.RemoveAccessRuleAll($rule)}
   $inherit=[Security.AccessControl.InheritanceFlags]::ContainerInherit-bor[Security.AccessControl.InheritanceFlags]::ObjectInherit
   foreach($sid in @($user,$system)){$rule=New-Object Security.AccessControl.FileSystemAccessRule($sid,[Security.AccessControl.FileSystemRights]::FullControl,$inherit,[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow);[void]$security.AddAccessRule($rule)}
   if('System.IO.FileSystemAclExtensions'-as[type]){[IO.FileSystemAclExtensions]::SetAccessControl($info,$security)}else{$info.SetAccessControl($security)};Assert-B122ProtectedRootAcl -Path $root|Out-Null

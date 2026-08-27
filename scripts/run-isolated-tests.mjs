@@ -92,7 +92,8 @@ export const requiredGroups = [
     file: "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ProviderDesktopRelease.ps1"],
-    timeoutMs: 240_000
+    timeoutMs: 240_000,
+    safeTrace: true
   }] : []),
   { file: "packages/protocol/test/b122.test.ts" },
   { file: "packages/protocol/test/raw-hid.test.ts" },

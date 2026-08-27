@@ -155,7 +155,8 @@ try {
     # one isolated current-user protected root. The driver plan can select only
     # its exact provider/path/digest; action and capability mapping stays fixed
     # in the host code and cannot be broadened through provisioning JSON.
-    $providerBase = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'STRATHEX\switchyard\provider-host'))
+    $providerLocal = if($env:SXSY_TEST_MODE-ceq'1'){[IO.Path]::GetFullPath([string]$env:LOCALAPPDATA)}else{[Environment]::GetFolderPath('LocalApplicationData')}
+    $providerBase = [IO.Path]::GetFullPath((Join-Path $providerLocal 'STRATHEX\switchyard\provider-host'))
     $providerProtectedTestRoot = Join-Path $providerBase "manifest-test-$([Guid]::NewGuid().ToString('N'))"
     $secretTool = Join-Path $PSScriptRoot 'Protect-B122ProviderHostSecret.ps1'
     $configurationTool = Join-Path $PSScriptRoot 'New-B122ProviderHostConfiguration.ps1'
@@ -241,7 +242,8 @@ try {
     "B122 manifest generator tests: PASS`nRuntime SHA-256: $($runtimeResult.Sha256)`nSandbox SHA-256: $($sandboxResult.Sha256)"
 } finally {
     if ($null -ne $providerProtectedTestRoot) {
-        $providerBase = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'STRATHEX\switchyard\provider-host')).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        $providerLocal = if($env:SXSY_TEST_MODE-ceq'1'){[IO.Path]::GetFullPath([string]$env:LOCALAPPDATA)}else{[Environment]::GetFolderPath('LocalApplicationData')}
+        $providerBase = [IO.Path]::GetFullPath((Join-Path $providerLocal 'STRATHEX\switchyard\provider-host')).TrimEnd([IO.Path]::DirectorySeparatorChar)
         $resolvedProviderTest = [IO.Path]::GetFullPath($providerProtectedTestRoot)
         if ($resolvedProviderTest.StartsWith("$providerBase$([IO.Path]::DirectorySeparatorChar)manifest-test-", [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedProviderTest)) { Remove-Item -LiteralPath $resolvedProviderTest -Recurse -Force }
     }

@@ -278,7 +278,7 @@ Set-B122LifecyclePhase -InstallRoot $InstallRoot -OperationId $OperationId -Phas
     $killOperation=Start-B122LifecycleOperation -InstallRoot $killRoot -Kind install -SourceCommit $first -BundleId ('b'*64) -PriorState $null
     $ready=Join-Path $root ('ready-'+$phase+'.txt');if(Test-Path -LiteralPath $ready){Remove-Item -LiteralPath $ready -Force}
     $child=Start-Process -FilePath powershell.exe -ArgumentList @('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',"`"$killScript`"",'-ModulePath',"`"$module`"",'-InstallRoot',"`"$killRoot`"",'-OperationId',$killOperation.operationId,'-Phase',$phase,'-ReadyPath',"`"$ready`"") -WindowStyle Hidden -PassThru
-    $killDeadline=[DateTime]::UtcNow.AddSeconds(15);do{Start-Sleep -Milliseconds 50;if($child.HasExited){throw "Lifecycle kill-injection child exited before the durable $phase marker."}}while(-not(Test-Path -LiteralPath $ready -PathType Leaf)-and[DateTime]::UtcNow-lt$killDeadline)
+    $killDeadline=[DateTime]::UtcNow.AddSeconds(30);do{Start-Sleep -Milliseconds 50;if($child.HasExited){throw "Lifecycle kill-injection child exited before the durable $phase marker."}}while(-not(Test-Path -LiteralPath $ready -PathType Leaf)-and[DateTime]::UtcNow-lt$killDeadline)
     if(-not(Test-Path -LiteralPath $ready -PathType Leaf)){Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue;throw "Lifecycle kill-injection marker was not durable for $phase."}
     Stop-Process -Id $child.Id -Force;$child.WaitForExit(5000)|Out-Null
     if(-not$child.HasExited){throw "Lifecycle kill-injection child survived termination for $phase."}

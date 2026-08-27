@@ -70,12 +70,12 @@ test("provider secret generation validates and Initialize emits its exact ready-
     ...instanceArguments
   ], 20_000));
   const canonicalInitializedRoot = await realpath(initializedRoot);
-  assertInitializeReceipt(windowsInitialized, canonicalInitializedRoot);
+  await assertInitializeReceipt(windowsInitialized, canonicalInitializedRoot);
   const expectedPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
   assertScopedProviderCredential(expectedPolicy);
 
   const initialized = parseReceipt(await runPowerShell(initializeScript, [...instanceArguments, "-Replace"]));
-  assertInitializeReceipt(initialized, canonicalInitializedRoot);
+  await assertInitializeReceipt(initialized, canonicalInitializedRoot);
   assertEquivalentProviderPolicy(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "pwsh and Windows PowerShell 5.1 must emit the same parsed source policy");
 
   await createInitializationBundle(initializationBundle);
@@ -83,13 +83,13 @@ test("provider secret generation validates and Initialize emits its exact ready-
   const packagedInitialized = parseReceipt(await runPowerShellExecutable(windowsPowerShell, packagedInitialize, [
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
   ], 20_000));
-  assertInitializeReceipt(packagedInitialized, canonicalInitializedRoot);
+  await assertInitializeReceipt(packagedInitialized, canonicalInitializedRoot);
   assertEquivalentProviderPolicy(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged Windows PowerShell 5.1 policy must preserve the exact parsed source policy");
 
   const packagedPwsh = parseReceipt(await runPowerShellExecutable(powershell, packagedInitialize, [
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
   ], 20_000));
-  assertInitializeReceipt(packagedPwsh, canonicalInitializedRoot);
+  await assertInitializeReceipt(packagedPwsh, canonicalInitializedRoot);
   const finalPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
   assertEquivalentProviderPolicy(finalPolicy, expectedPolicy, "the packaged pwsh policy must preserve the exact parsed source policy");
   await assertDispatchProvisioningArtifact(initializedRoot, repository, finalPolicy);
@@ -300,10 +300,10 @@ async function boundedBrokerRequest(
 }
 function route(policy: ConfiguredNetworkPolicy, routeId: string): ConfiguredNetworkRoute { const value = policy.routes.find((candidate) => candidate.id === routeId); if (!value) throw new Error(`missing ${routeId}`); return value; }
 function parseReceipt(value: string): Record<string, unknown> { const line = value.trim().split(/\r?\n/).filter(Boolean).at(-1); if (!line) throw new Error("missing lifecycle receipt"); return JSON.parse(line); }
-function assertInitializeReceipt(receipt: Record<string, unknown>, expectedRoot: string): void {
+async function assertInitializeReceipt(receipt: Record<string, unknown>, expectedRoot: string): Promise<void> {
   assert.equal(receipt.schema, "sxsy-b122.provider-host-bootstrap");
   assert.equal(receipt.status, "ready-to-provision");
-  assert.equal(resolve(String(receipt.protectedStateRoot)).toLowerCase(), resolve(expectedRoot).toLowerCase());
+  assert.equal((await realpath(resolve(String(receipt.protectedStateRoot)))).toLowerCase(), (await realpath(resolve(expectedRoot))).toLowerCase());
   assert.equal(receipt.fixtureDiagnosticOnly, true);
   assert.equal(receipt.providerEffectsEnabled, false);
   assert.equal(receipt.journalAuthenticationStable, true);

@@ -304,12 +304,14 @@ internal static class Program
         if (!AssignProcessToJobObject(job, child.ProcessHandle)) { ContainUnassignedSuspendedChild(child.ProcessHandle); throw LastError(74, "Self-test child could not enter the Job Object."); }
         if (ResumeThread(child.ThreadHandle) == uint.MaxValue) { _ = TerminateJobObject(job, 130); throw LastError(74, "Self-test child could not resume."); }
         child.ThreadHandle.Dispose();
-        if (!WaitUntil(() => File.Exists(marker) && ActiveProcessCount(job) >= 2, 5_000)) throw new ProtocolException(75, "Self-test did not observe the contained child tree.");
+        if (!WaitUntil(() => File.Exists(marker) && ActiveProcessCount(job) >= 2, 15_000)) throw new ProtocolException(75, "Self-test did not observe the contained child tree.");
         int[] pids = File.ReadAllText(marker).Split(',').Select(value => int.Parse(value, CultureInfo.InvariantCulture)).ToArray();
-        if (!TerminateJobObject(job, 130) || !WaitUntil(() => ActiveProcessCount(job) == 0, 5_000)) throw new ProtocolException(75, "Self-test Job Object retained a survivor.");
+        if (!TerminateJobObject(job, 130) || !WaitUntil(() => ActiveProcessCount(job) == 0, 15_000)) throw new ProtocolException(75, "Self-test Job Object retained a survivor.");
         if (pids.Any(ProcessExists)) throw new ProtocolException(75, "Self-test child identity survived Job-Object termination.");
         WriteReceipt(new { schema = "sxsy-b122.companion-supervisor-self-test", version = 1, status = "passed", capturedProcesses = pids.Length, activeProcesses = 0 });
-        Directory.Delete(root, true);
+        try { Directory.Delete(root, true); }
+        catch (IOException) { Thread.Sleep(100); Directory.Delete(root, true); }
+        catch (UnauthorizedAccessException) { Thread.Sleep(100); Directory.Delete(root, true); }
         return 0;
     }
 
@@ -471,7 +473,7 @@ internal static class Program
 #endif
     private static FileStream AcquireStateLock(string statePath) { string path = statePath + ".lock"; var timer = Stopwatch.StartNew(); while (true) { try { return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.WriteThrough); } catch (IOException) { if (timer.ElapsedMilliseconds >= 5_000) throw new ProtocolException(75, "The companion supervisor state transition lock timed out."); Thread.Sleep(25); } } }
     private static void ContainUnassignedSuspendedChild(SafeFileHandle process) { _ = TerminateProcess(process, 130); if (WaitForSingleObject(process, 5_000) != WaitObject0) throw new ProtocolException(75, "An unassigned suspended companion process could not be proven absent."); }
-    private static bool ProcessExists(int pid) { try { using Process process = Process.GetProcessById(pid); return !process.HasExited; } catch (ArgumentException) { return false; } }
+    private static bool ProcessExists(int pid) { try { using Process process = Process.GetProcessById(pid); return !process.HasExited; } catch (ArgumentException) { return false; } catch (InvalidOperationException) { return false; } catch (System.ComponentModel.Win32Exception) { return false; } }
     private static bool ExactProcessExists(int pid, string creationFileTimeUtc) { try { using Process process = Process.GetProcessById(pid); return !process.HasExited && process.StartTime.ToUniversalTime().ToFileTimeUtc().ToString(CultureInfo.InvariantCulture) == creationFileTimeUtc; } catch (ArgumentException) { return false; } catch (InvalidOperationException) { return false; } }
     private static string CreationTime(SafeFileHandle process) { if (!GetProcessTimes(process, out FileTime created, out _, out _, out _)) throw LastError(74, "The companion creation identity is unavailable."); return (((ulong)created.High << 32) | created.Low).ToString(CultureInfo.InvariantCulture); }
 

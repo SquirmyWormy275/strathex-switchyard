@@ -154,7 +154,7 @@ function Get-B122BootstrapItem([string]$Path,[bool]$Directory){
 
 function Get-B122BootstrapDirectoryIdentity([string]$Path){
   $full=[IO.Path]::GetFullPath($Path).TrimEnd('\')
-  $snapshot=$script:B122BootstrapIdentityType::Capture($full)
+  try{$snapshot=$script:B122BootstrapIdentityType::Capture($full)}catch{throw "The trusted bootstrap could not capture the exact directory identity: $full ($($_.Exception.Message))"}
   if(([uint32]$snapshot.Attributes-band[uint32][IO.FileAttributes]::ReparsePoint)-ne0-or([uint32]$snapshot.Attributes-band[uint32][IO.FileAttributes]::Directory)-eq0){throw "The trusted bootstrap directory identity is a reparse point or wrong filesystem type: $full"}
   return [pscustomobject]@{path=$full;finalPath=[IO.Path]::GetFullPath([string]$snapshot.FinalPath).TrimEnd('\');identity=[string]$snapshot.Identity}
 }
@@ -302,6 +302,12 @@ function Get-B122BootstrapStagingBase([string]$Override,[bool]$AllowOverride){
 }
 
 function Get-B122BootstrapKnownFolder([Environment+SpecialFolder]$Folder,[string]$Label){
+  if($env:SXSY_TEST_MODE-ceq'1'-and$Folder-in@([Environment+SpecialFolder]::UserProfile,[Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolder]::ApplicationData)){
+    $test=[IO.Path]::GetFullPath([string]$env:SXSY_TEST_ROOT)
+    $value=if($Folder-eq[Environment+SpecialFolder]::UserProfile){[string]$env:USERPROFILE}elseif($Folder-eq[Environment+SpecialFolder]::LocalApplicationData){[string]$env:LOCALAPPDATA}else{[string]$env:APPDATA}
+    if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)){throw "The isolated $Label path is unavailable."}
+    $value=[IO.Path]::GetFullPath($value);$prefix=$test.TrimEnd('\')+'\';if(-not$value.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "The isolated $Label path must be a strict child of SXSY_TEST_ROOT."};return $value
+  }
   $value=[Environment]::GetFolderPath($Folder)
   if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)-or$value.IndexOfAny([char[]]@([char]0,[char]10,[char]13))-ge0){throw "The current-user $Label Known Folder is unavailable."}
   return [IO.Path]::GetFullPath($value)
@@ -396,7 +402,7 @@ function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath
   $environmentBlock=New-B122BootstrapEnvironmentBlock $Environment $working
   $process=$script:B122BootstrapIdentityType::StartSupervisor($HelperPath,$command,$working,$environmentBlock,$StdoutPath,$StderrPath,$JobName)
   try{
-    $deadline=[DateTime]::UtcNow.AddSeconds(15);$runningState=$null
+    $deadline=[DateTime]::UtcNow.AddSeconds(30);$runningState=$null
     do{
       if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
       if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}

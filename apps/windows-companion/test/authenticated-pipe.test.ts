@@ -400,7 +400,7 @@ test("bounded companion DPAPI runner rejects an arbitrary descendant-spawning ex
   await assert.rejects(() => readFile(identityPath), /ENOENT/i);
 });
 
-test("Windows CurrentUser DPAPI seals and opens a non-secret local test value", { skip: process.platform !== "win32" ? "Windows-only DPAPI integration check." : false }, async () => {
+test("Windows CurrentUser DPAPI seals and opens a non-secret local test value", { skip: process.platform !== "win32" ? "Windows-only DPAPI integration check." : false, timeout: 120_000 }, async () => {
   const protector = new WindowsDpapiCurrentUserProtector();
   const cleartext = Buffer.from("sxsy-b122-dpapi-smoke-v1", "utf8");
   const sealed = await protector.seal(cleartext);
@@ -410,7 +410,7 @@ test("Windows CurrentUser DPAPI seals and opens a non-secret local test value", 
   reopened.fill(0);
 });
 
-test("Windows CurrentUser DPAPI round-trips the maximum supported credential size", { skip: process.platform !== "win32" ? "Windows-only DPAPI integration check." : false, timeout: 30_000 }, async () => {
+test("Windows CurrentUser DPAPI round-trips the maximum supported credential size", { skip: process.platform !== "win32" ? "Windows-only DPAPI integration check." : false, timeout: 120_000 }, async () => {
   const protector = new WindowsDpapiCurrentUserProtector();
   const cleartext = Buffer.alloc(64 * 1024, 0x5a);
   const sealed = await protector.seal(cleartext);

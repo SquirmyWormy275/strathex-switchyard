@@ -12,9 +12,9 @@ if($InstallRoot){
   $install=[IO.Path]::GetFullPath($InstallRoot);Import-Module (Join-Path $install 'B122InstallTools.psm1') -Force
   $bundle=Get-B122CurrentBundle -InstallRoot $install
 }elseif($BundleRoot){$bundle=[IO.Path]::GetFullPath($BundleRoot)}else{$bundle=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))}
-$local=[Environment]::GetFolderPath('LocalApplicationData')
+$local=if($env:SXSY_TEST_MODE-ceq'1'){$test=[IO.Path]::GetFullPath([string]$env:SXSY_TEST_ROOT);$candidate=[IO.Path]::GetFullPath([string]$env:LOCALAPPDATA);$prefix=$test.TrimEnd('\')+'\';if(-not$candidate.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw 'Test LocalAppData must be a strict child of SXSY_TEST_ROOT.'};$candidate}else{[Environment]::GetFolderPath('LocalApplicationData')}
 if([string]::IsNullOrWhiteSpace($local)){throw 'A current-user LocalApplicationData directory is required for provider-host lifecycle state.'}
-$config=if($ConfigurationPath){[IO.Path]::GetFullPath($ConfigurationPath)}else{Join-Path $local 'STRATHEX\switchyard\provider-host\provider-host.json'}
+$local=[IO.Path]::GetFullPath($local);$config=if($ConfigurationPath){[IO.Path]::GetFullPath($ConfigurationPath)}else{Join-Path $local 'STRATHEX\switchyard\provider-host\provider-host.json'}
 $stateDirectory=Split-Path -Parent $config;$recordPath=Join-Path $stateDirectory 'provider-host-process.json'
 $node=[IO.Path]::GetFullPath((Join-Path $bundle 'runtime\node.exe'));$main=[IO.Path]::GetFullPath((Join-Path $bundle 'provider-adapter-host\dist\apps\provider-adapter-host\src\main.js'))
 $health=[IO.Path]::GetFullPath((Join-Path $bundle 'scripts\Test-B122ProviderHostHealth.mjs'));$validator=[IO.Path]::GetFullPath((Join-Path $bundle 'scripts\provisioning\Test-B122ProviderHostConfiguration.ps1'))
