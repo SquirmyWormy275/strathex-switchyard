@@ -482,6 +482,11 @@ test("Windows release output is an authenticated exclusive leaf with no reparse 
   assert.match(build, /FileSystemIdentity\.Get\(entry\.Parent\)/);
   assert.match(build, /FileSystemIdentity\.Get\(entry\.Path\)/);
   assert.match(build, /FileAttributes\.ReparsePoint/);
+  assert.match(build, /Build cleanup reparse parent changed inside quarantine/);
+  assert.match(build, /Build cleanup reparse point changed inside quarantine/);
+  assert.match(build, /Directory\.Delete\(entry\.Path,false\)/);
+  assert.match(build, /File\.Delete\(entry\.Path\)/);
+  assert.match(build, /0x02200000/);
   assert.match(build, /directories\.Sort/);
   assert.doesNotMatch(build, /Remove-Item[^\r\n]*-Recurse/);
   assert.equal(artifact.includes("$_.FullName.Substring($root.Length+1).Replace('\\','/') -notin @('SHA256SUMS.json','sbom.spdx.json','release.json')"), true);

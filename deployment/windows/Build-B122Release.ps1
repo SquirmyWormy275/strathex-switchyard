@@ -44,7 +44,7 @@ namespace SxsyB122ReleaseBuildV1 {
       return @"\\?\"+path;
     }
     public static string Get(string path) {
-      IntPtr handle=CreateFileW(ExtendedPath(path),0,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero); if(handle==new IntPtr(-1)){int error=Marshal.GetLastWin32Error();throw new Win32Exception(error,"Cannot open exact filesystem identity for "+path);}
+      IntPtr handle=CreateFileW(ExtendedPath(path),0,7,IntPtr.Zero,3,0x02200000,IntPtr.Zero); if(handle==new IntPtr(-1)){int error=Marshal.GetLastWin32Error();throw new Win32Exception(error,"Cannot open exact filesystem identity for "+path);}
       try { ByHandleFileInformation information; if(!GetFileInformationByHandle(handle,out information)) throw new Win32Exception(Marshal.GetLastWin32Error()); return information.VolumeSerial.ToString("x8")+":"+information.FileIndexHigh.ToString("x8")+information.FileIndexLow.ToString("x8"); }
       finally { CloseHandle(handle); }
     }
@@ -54,24 +54,30 @@ namespace SxsyB122ReleaseBuildV1 {
       public readonly string Path;
       public readonly string Parent;
       public readonly string Identity;
-      public Entry(string path,string parent,string identity){Path=path;Parent=parent;Identity=identity;}
+      public readonly bool Directory;
+      public Entry(string path,string parent,string identity,bool directory=false){Path=path;Parent=parent;Identity=identity;Directory=directory;}
     }
     static FileAttributes Attributes(string path){return File.GetAttributes(path);}
     static void RequireDirectory(string path){FileAttributes value=Attributes(path);if((value&FileAttributes.Directory)==0||(value&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup encountered an unsafe quarantined directory: "+path);}
     static void RequireFile(string path){FileAttributes value=Attributes(path);if((value&FileAttributes.Directory)!=0||(value&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup encountered an unsafe quarantined file: "+path);}
     public static void Delete(string path,string expectedRootIdentity){
       string root=System.IO.Path.GetFullPath(path).TrimEnd('\\');RequireDirectory(root);if(!String.Equals(FileSystemIdentity.Get(root),expectedRootIdentity,StringComparison.Ordinal))throw new IOException("Build cleanup quarantine identity changed before inventory.");
-      var queue=new Queue<string>();var directories=new List<Entry>();var files=new List<Entry>();var directoryIdentities=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);queue.Enqueue(root);
+      var queue=new Queue<string>();var directories=new List<Entry>();var files=new List<Entry>();var reparses=new List<Entry>();var directoryIdentities=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);queue.Enqueue(root);
       while(queue.Count!=0){
         string directory=queue.Dequeue();RequireDirectory(directory);string identity=FileSystemIdentity.Get(directory);directoryIdentities.Add(directory,identity);directories.Add(new Entry(directory,System.IO.Path.GetDirectoryName(directory),identity));
         foreach(FileSystemInfo item in new DirectoryInfo(directory).GetFileSystemInfos()){
-          FileAttributes attributes=item.Attributes;if((attributes&FileAttributes.ReparsePoint)!=0)throw new IOException("Build cleanup inventory encountered a reparse point: "+item.FullName);
+          FileAttributes attributes=item.Attributes;if((attributes&FileAttributes.ReparsePoint)!=0){reparses.Add(new Entry(item.FullName,directory,FileSystemIdentity.Get(item.FullName),(attributes&FileAttributes.Directory)!=0));continue;}
           if((attributes&FileAttributes.Directory)!=0)queue.Enqueue(item.FullName);else files.Add(new Entry(item.FullName,directory,FileSystemIdentity.Get(item.FullName)));
         }
       }
       foreach(Entry entry in files){
         RequireDirectory(entry.Parent);string parentIdentity;if(!directoryIdentities.TryGetValue(entry.Parent,out parentIdentity)||!String.Equals(FileSystemIdentity.Get(entry.Parent),parentIdentity,StringComparison.Ordinal))throw new IOException("Build cleanup file parent changed inside quarantine: "+entry.Parent);
         RequireFile(entry.Path);if(!String.Equals(FileSystemIdentity.Get(entry.Path),entry.Identity,StringComparison.Ordinal))throw new IOException("Build cleanup file changed inside quarantine: "+entry.Path);File.SetAttributes(entry.Path,FileAttributes.Normal);File.Delete(entry.Path);
+      }
+      foreach(Entry entry in reparses){
+        RequireDirectory(entry.Parent);string parentIdentity;if(!directoryIdentities.TryGetValue(entry.Parent,out parentIdentity)||!String.Equals(FileSystemIdentity.Get(entry.Parent),parentIdentity,StringComparison.Ordinal))throw new IOException("Build cleanup reparse parent changed inside quarantine: "+entry.Parent);
+        FileAttributes attributes=Attributes(entry.Path);if((attributes&FileAttributes.ReparsePoint)==0||((attributes&FileAttributes.Directory)!=0)!=entry.Directory||!String.Equals(FileSystemIdentity.Get(entry.Path),entry.Identity,StringComparison.Ordinal))throw new IOException("Build cleanup reparse point changed inside quarantine: "+entry.Path);
+        if(entry.Directory)Directory.Delete(entry.Path,false);else File.Delete(entry.Path);
       }
       directories.Sort(delegate(Entry left,Entry right){return right.Path.Length.CompareTo(left.Path.Length);});
       foreach(Entry entry in directories){if(String.Equals(entry.Path,root,StringComparison.OrdinalIgnoreCase))continue;RequireDirectory(entry.Path);if(!String.Equals(FileSystemIdentity.Get(entry.Path),entry.Identity,StringComparison.Ordinal))throw new IOException("Build cleanup directory changed inside quarantine: "+entry.Path);Directory.Delete(entry.Path,false);}
