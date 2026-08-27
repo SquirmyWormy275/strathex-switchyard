@@ -341,7 +341,7 @@ function Get-B122BootstrapChildEnvironment($HostIdentity,[string]$StagingRoot){
   $local=Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::LocalApplicationData) 'LocalApplicationData'
   $roaming=Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::ApplicationData) 'ApplicationData'
   $common=Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::CommonApplicationData) 'CommonApplicationData'
-  $programFiles=Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::ProgramFiles) 'ProgramFiles'
+  $programFiles=if($env:SXSY_TEST_MODE-ceq'1'){[IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetPathRoot([string]$HostIdentity.windowsRoot)) 'Program Files'))}else{Get-B122BootstrapKnownFolder ([Environment+SpecialFolder]::ProgramFiles) 'ProgramFiles'}
   $pathEntries=[Collections.Generic.List[string]]::new()
   foreach($path in @([string]$HostIdentity.systemDirectory,[IO.Path]::GetDirectoryName([string]$HostIdentity.path),(Join-Path $local 'Programs\Microsoft VS Code\bin'),(Join-Path $programFiles 'Microsoft VS Code\bin'))){
     if([string]::IsNullOrWhiteSpace($path)-or$pathEntries.Contains($path)){continue}

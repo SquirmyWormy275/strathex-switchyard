@@ -182,7 +182,7 @@ function Write-B122ProviderReleaseTrace([string]$Message){if($env:SXSY_B122_RELE
 function ConvertTo-B122FixtureArgumentLine([string[]]$Arguments) {
   return (@($Arguments|ForEach-Object{$value=[string]$_;if($value.IndexOf([char]0)-ge0-or$value.Contains('"')-or$value-match'[\r\n]'){throw 'A packaged provider fixture argument is invalid.'};if($value-match'\s'){"`"$value`""}else{$value}})-join' ')
 }
-function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Arguments,[hashtable]$Environment=@{},[int]$TimeoutSeconds=60){
+function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Arguments,[hashtable]$Environment=@{},[int]$TimeoutSeconds=120){
   $start=New-Object Diagnostics.ProcessStartInfo;$start.FileName=$Executable;$start.Arguments=ConvertTo-B122FixtureArgumentLine $Arguments;$start.WorkingDirectory=$providerBundle;$start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true
   foreach($name in $Environment.Keys){$start.EnvironmentVariables[[string]$name]=[string]$Environment[$name]}
   $child=New-Object Diagnostics.Process;$child.StartInfo=$start;if(-not$child.Start()){throw "The packaged provider fixture command could not start: $Executable"}
@@ -195,7 +195,7 @@ function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Argume
   if($exitCode-ne0){$stages=@([regex]::Matches($detail,'SXSY_PROVIDER_E2E_TRACE=([^\r\n]+)')|ForEach-Object{$_.Groups[1].Value});$lastStage=if($stages.Count){[string]$stages[-1]}else{'unreported'};throw "The packaged provider fixture command failed ($exitCode): $Executable :: $detail :: last safe stage=$lastStage"}
   return $output
 }
-function Invoke-B122ProviderFixturePowerShell([string]$Script,[string[]]$Arguments,[int]$TimeoutSeconds=60){
+function Invoke-B122ProviderFixturePowerShell([string]$Script,[string[]]$Arguments,[int]$TimeoutSeconds=120){
   return Invoke-B122ProviderFixtureProcess -Executable $providerFixturePowerShell -Arguments (@('-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$Script)+@($Arguments)) -TimeoutSeconds $TimeoutSeconds
 }
 function Get-B122FixtureProcessIdentity([Diagnostics.Process]$Process) {

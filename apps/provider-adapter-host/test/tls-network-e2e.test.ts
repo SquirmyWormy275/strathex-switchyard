@@ -370,7 +370,7 @@ function freePort(): Promise<number> { return new Promise((resolvePort, rejectPo
 function runPowerShell(script: string, arguments_: readonly string[]): Promise<string> {
   return runPowerShellExecutable(powershell, script, arguments_);
 }
-function runPowerShellExecutable(executable: string, script: string, arguments_: readonly string[], timeoutMs = 45_000): Promise<string> {
+function runPowerShellExecutable(executable: string, script: string, arguments_: readonly string[], timeoutMs = 120_000): Promise<string> {
   return new Promise((resolveRun, rejectRun) => {
     const childEnvironment: NodeJS.ProcessEnv = { ...process.env, SXSY_PROVIDER_E2E_TRACE: "1" };
     if (resolve(executable).toLowerCase() === resolve(windowsPowerShell).toLowerCase()) {

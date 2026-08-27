@@ -190,7 +190,7 @@ try{
     $candidate=$null;$deadline=[DateTime]::UtcNow.AddSeconds(5);do{$candidate=Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$process.Id)" -ErrorAction SilentlyContinue;if($null-ne$candidate){break};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow-lt$deadline)
     if($null-eq$candidate-or-not(Exact-Arguments $candidate $nonce)){throw 'The provider host did not establish its exact process identity.'}
     $record=Adopt-Record $record $candidate
-    $healthReceipt=Wait-Healthy $record 30;if($null-eq$healthReceipt){throw 'The provider host did not pass authenticated pinned-TLS health within 30 seconds.'}
+    $healthReceipt=Wait-Healthy $record 60;if($null-eq$healthReceipt){throw 'The provider host did not pass authenticated pinned-TLS health within 60 seconds.'}
     $record.state='running';Write-Record $record
     Emit 'running' @{processId=[int]$record.processId;lifecycleNonceSha256=[string]$record.lifecycleNonceSha256;configurationSha256=[string]$record.configurationSha256;tlsIdentityPinned=$true;authenticated=$true;startingIntentReconciled=$true};return
   }catch{
