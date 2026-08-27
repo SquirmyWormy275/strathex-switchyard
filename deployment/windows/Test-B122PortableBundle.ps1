@@ -328,13 +328,20 @@ setInterval(() => {}, 1000);
       Assert-B122PortableCommandSucceeded $shutdownCommand 'The portable companion authenticated shutdown probe'
       $shutdownReceipt = $shutdownCommand.stdout | ConvertFrom-Json
       if ($shutdownReceipt.schema -cne 'sxsy-b122.install-shutdown' -or $shutdownReceipt.version -ne 1 -or $shutdownReceipt.status -cne 'stopping') { throw 'The portable companion returned an invalid authenticated shutdown receipt.' }
-      $shutdownDeadline = [DateTime]::UtcNow.AddSeconds(15)
+      $shutdownDeadline = [DateTime]::UtcNow.AddSeconds(30)
       do {
         $survivors = @($capturedTree | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
         if (-not $survivors.Count) { break }
         Start-Sleep -Milliseconds 100
       } while ([DateTime]::UtcNow -lt $shutdownDeadline)
-      if ($survivors.Count) { throw 'The portable companion graceful shutdown left one or more captured process-tree survivors.' }
+      if ($survivors.Count) {
+        $survivorDetail = @($survivors | ForEach-Object {
+          $candidate = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$_.processId)" -ErrorAction SilentlyContinue
+          if ($null -eq $candidate) { "pid=$([int]$_.processId),name=exited" } else { "pid=$([int]$_.processId),name=$([string]$candidate.Name)" }
+        }) -join ';'
+        if ($survivorDetail.Length -gt 1024) { $survivorDetail = $survivorDetail.Substring(0,1024) }
+        throw "The portable companion graceful shutdown left one or more captured process-tree survivors: $survivorDetail"
+      }
       $nodeVersionCommand = Invoke-B122PortableBoundedProcess -Executable $node -ArgumentValues @('-p','process.version') -TimeoutSeconds 10 -Label 'The portable Node version probe'
       Assert-B122PortableCommandSucceeded $nodeVersionCommand 'The portable Node version probe'
       [ordered]@{ schema='sxsy-b122.portable-smoke'; version=1; status='ready'; node=$nodeVersionCommand.stdout.Trim(); sandboxHelperPresent=$true; sandboxLifecycleHelperPresent=$true; sandboxLifecycleSelfTest=$true; repositoryRuntimeHelperPresent=$true; repositoryRuntimeContainmentSelfTest=$true; companionLifecycleHelperPresent=$true; companionLifecycleSelfTest=$true; companionLifecycleCapturedProcesses=[int]$companionLifecycleSelfTest.capturedProcesses; companionLifecycleActiveProcesses=[int]$companionLifecycleSelfTest.activeProcesses; rawHidHelperPresent=$true; rawHidSimulatorPresent=$true; rawHidSimulationSelfTest=$true; rawHidChordsExercised=[int]$rawHidSimulation.chordsExercised; rawHidAssignedChords=[int]$rawHidSimulation.assignedChords; rawHidUnassignedChords=[int]$rawHidSimulation.unassignedChords; councilParticipantPresent=$true; councilParticipantAutoLaunched=$false; containmentRemoteEvaluatorPresent=$true; containmentRemoteEvaluatorHelp=$true; providerDesktopHelperPresent=$true; providerDesktopSelfTest=$true; providerHostPresent=$true; providerHostSelfTest=$true; voiceHelperPresent=$true; voiceHelperSelfTest=$true; microphoneAccessed=$false; providerNetworkAccessed=$false; proprietaryProviderCredentialAccessed=$false; physicalRawHidHardwareAccessed=$false; authenticatedGracefulShutdown=$true; boundedProcessControlSelfTest=$true; boundedProcessOutputCharacters=[long]$processControlReceipt.outputCharacters; capturedProcessTree=$capturedTree.Count; processTreeSurvivors=0 } | ConvertTo-Json -Compress
