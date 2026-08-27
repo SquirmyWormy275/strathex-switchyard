@@ -61,6 +61,8 @@ test("Windows release packages and runtime-pins the companion lifecycle supervis
   assert.match(portable, /function Invoke-B122PortableExactTreeKill/);
   assert.match(portable, /foreach \(\$identity in \$survivors\) \{ Invoke-B122PortableExactTreeKill \$identity \}/);
   assert.match(portable, /created=\$\(\[string\]\$_\.createdAt\)/);
+  assert.match(portable, /\$startupTimeoutSeconds = 120/);
+  assert.match(portable, /AddSeconds\(\$startupTimeoutSeconds\)/);
   const unhealthyCleanup = portable.indexOf("The unhealthy portable companion did not exit after exact process-tree cleanup.");
   const diagnosticRead = portable.indexOf("$companionDetail = Read-B122PortableBoundedFile $stderr");
   assert.ok(unhealthyCleanup >= 0 && diagnosticRead > unhealthyCleanup);

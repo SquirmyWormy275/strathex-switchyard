@@ -297,7 +297,12 @@ setInterval(() => {}, 1000);
   }
   $arguments = @("`"$main`"", '--isolated-test-state-directory', "`"$state`"")
   $process = Start-Process -FilePath $node -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-  $deadline = [DateTime]::UtcNow.AddSeconds(30)
+  # Cold startup loads the complete secured runtime and can be materially
+  # slower under Windows Defender on hosted runners. Keep the probe bounded,
+  # but allow enough time for a valid release bundle to reach authenticated
+  # readiness before exact process-tree cleanup.
+  $startupTimeoutSeconds = 120
+  $deadline = [DateTime]::UtcNow.AddSeconds($startupTimeoutSeconds)
   do {
     Start-Sleep -Milliseconds 250
     Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
@@ -355,7 +360,7 @@ setInterval(() => {}, 1000);
   $process.WaitForExit()
   $companionDetail = Read-B122PortableBoundedFile $stderr
   $healthDetail = [string]$healthCommand.stderr
-  throw "The portable companion did not become healthy within 30 seconds. Companion: $companionDetail Health: $healthDetail"
+  throw "The portable companion did not become healthy within $startupTimeoutSeconds seconds. Companion: $companionDetail Health: $healthDetail"
 } finally {
   if ($null -ne $process) {
     Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
