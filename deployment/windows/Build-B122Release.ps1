@@ -555,6 +555,7 @@ Copy-Item -LiteralPath (Join-Path $sourceScripts 'licenses\DOTNET-RUNTIME-THIRD-
 Set-Location -LiteralPath $output
 foreach($workspaceJunction in @(
   @{link=(Join-Path $buildRoot 'node_modules\@strathex\switchyard-companion');target=(Join-Path $buildRoot 'apps\windows-companion')},
+  @{link=(Join-Path $buildRoot 'node_modules\@strathex\switchyard-provider-adapter-host');target=(Join-Path $buildRoot 'apps\provider-adapter-host')},
   @{link=(Join-Path $buildRoot 'node_modules\@strathex\switchyard-vscode');target=(Join-Path $buildRoot 'apps\vscode-extension')}
 )){Remove-B122VerifiedWorkspaceJunction -Link $workspaceJunction.link -ExpectedTarget $workspaceJunction.target}
 foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$testTempRoot,$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
