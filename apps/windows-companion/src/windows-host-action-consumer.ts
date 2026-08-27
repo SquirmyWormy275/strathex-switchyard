@@ -89,10 +89,7 @@ export interface WindowsHostActionQueuePort {
 }
 
 export interface CompanionWindowsHostActionConsumerOptions {
-  readonly applications: Readonly<{
-    vscode: FixedWindowsHostApplicationIdentity;
-    terminal: FixedWindowsHostApplicationIdentity;
-  }>;
+  readonly applications: Readonly<Partial<Record<WindowsHostApplication, FixedWindowsHostApplicationIdentity>>>;
   readonly pollIntervalMs?: number;
   readonly effectTimeoutMs?: number;
   readonly repeatWindowMs?: number;
@@ -163,7 +160,7 @@ export class CompanionWindowsHostActionConsumer {
   private readonly queue: WindowsHostActionQueuePort;
   private readonly executor: ExternalCompletionCapableMediatedCommandExecutor;
   private readonly effects: WindowsHostActionEffectPort;
-  private readonly applications: Readonly<Record<WindowsHostApplication, FixedWindowsHostApplicationIdentity>>;
+  private readonly applications: Readonly<Partial<Record<WindowsHostApplication, FixedWindowsHostApplicationIdentity>>>;
   private readonly pollIntervalMs: number;
   private readonly effectTimeoutMs: number;
   private readonly repeatWindowMs: number;
@@ -190,8 +187,8 @@ export class CompanionWindowsHostActionConsumer {
     this.executor = executor;
     this.effects = effects;
     this.applications = Object.freeze({
-      vscode: validateApplicationIdentity(options.applications.vscode, "vscode"),
-      terminal: validateApplicationIdentity(options.applications.terminal, "terminal")
+      ...(options.applications.vscode ? { vscode: validateApplicationIdentity(options.applications.vscode, "vscode") } : {}),
+      ...(options.applications.terminal ? { terminal: validateApplicationIdentity(options.applications.terminal, "terminal") } : {})
     });
     this.pollIntervalMs = options.pollIntervalMs ?? 100;
     this.effectTimeoutMs = options.effectTimeoutMs ?? 10_000;
@@ -331,7 +328,8 @@ export class CompanionWindowsHostActionConsumer {
 
   private async dispatch(intent: HostActionIntent, plan: EffectPlan, abort: AbortController): Promise<void> {
     const identity = this.applications[plan.application];
-    const claim = await this.claim(intent, plan, identity);
+    const executableIdentityDigest = identity ? identityDigest(identity) : digest(`unavailable:${plan.application}`);
+    const claim = await this.claim(intent, plan, executableIdentityDigest);
     if (!claim) return;
 
     let authorization: Awaited<ReturnType<WindowsHostActionQueuePort["authorize"]>>;
@@ -352,32 +350,34 @@ export class CompanionWindowsHostActionConsumer {
 
     let barrierCrossed = false;
     let barrierCalls = 0;
-    const request: WindowsHostActionEffectRequest = Object.freeze({
-      action: plan.action,
-      application: plan.application,
-      hostActionId: intent.id,
-      operationId: intent.operationId,
-      executable: identity,
-      fixedArguments: plan.fixedArguments,
-      processOwner: "current-user",
-      processSession: "current-session",
-      windowSurface: "visible-top-level",
-      windowCycleOrdinal: claim.windowCycleOrdinal,
-      shell: false,
-      signal: abort.signal,
-      beforeEffect: async () => {
-        barrierCalls += 1;
-        if (barrierCalls !== 1) throw new Error("The Windows effect barrier is single-use.");
-        if (!this.running || abort.signal.aborted) throw new Error("The Windows effect was cancelled before its durable boundary.");
-        await this.appendEffectStarted(claim);
-        if (!this.running || abort.signal.aborted) throw new Error("The Windows effect was cancelled at its durable boundary.");
-        barrierCrossed = true;
-      }
-    });
-
     let disposition: WindowsHostActionDisposition;
     let summary: string;
-    try {
+    if (!identity) {
+      disposition = "not_started";
+      summary = `The reviewed Windows ${plan.application} application is unavailable; no host effect was admitted.`;
+    } else try {
+      const request: WindowsHostActionEffectRequest = Object.freeze({
+        action: plan.action,
+        application: plan.application,
+        hostActionId: intent.id,
+        operationId: intent.operationId,
+        executable: identity,
+        fixedArguments: plan.fixedArguments,
+        processOwner: "current-user",
+        processSession: "current-session",
+        windowSurface: "visible-top-level",
+        windowCycleOrdinal: claim.windowCycleOrdinal,
+        shell: false,
+        signal: abort.signal,
+        beforeEffect: async () => {
+          barrierCalls += 1;
+          if (barrierCalls !== 1) throw new Error("The Windows effect barrier is single-use.");
+          if (!this.running || abort.signal.aborted) throw new Error("The Windows effect was cancelled before its durable boundary.");
+          await this.appendEffectStarted(claim);
+          if (!this.running || abort.signal.aborted) throw new Error("The Windows effect was cancelled at its durable boundary.");
+          barrierCrossed = true;
+        }
+      });
       const outcome = await boundedEffect(this.effects.execute(request), abort, this.effectTimeoutMs);
       if (outcome.kind === "timeout") {
         disposition = barrierCrossed ? "ambiguous" : "not_started";
@@ -435,7 +435,7 @@ export class CompanionWindowsHostActionConsumer {
     ).catch(() => undefined);
   }
 
-  private async claim(intent: HostActionIntent, plan: EffectPlan, identity: FixedWindowsHostApplicationIdentity): Promise<ConsumerClaim | undefined> {
+  private async claim(intent: HostActionIntent, plan: EffectPlan, executableIdentityDigest: string): Promise<ConsumerClaim | undefined> {
     const claimToken = boundedClaimToken(this.claimTokenFactory());
     const claimedAt = exactTimestamp(this.now(), "Windows host-action claim time");
     return this.store.transaction(async (transaction) => {
@@ -450,14 +450,14 @@ export class CompanionWindowsHostActionConsumer {
       const windowCycleOrdinal = repeated ? (prior.windowCycleOrdinal + 1) % 65_536 : 0;
       const claim: ConsumerClaim = {
         version: 1,
-        claimId: `windows-host-action-claim:${digest(`${intent.id}:${identityDigest(identity)}`)}`,
+        claimId: `windows-host-action-claim:${digest(`${intent.id}:${executableIdentityDigest}`)}`,
         claimToken,
         hostActionId: intent.id,
         operationId: intent.operationId,
         commandAction: intent.commandAction,
         hostAction: plan.action,
         application: plan.application,
-        executableIdentityDigest: identityDigest(identity),
+        executableIdentityDigest,
         windowCycleOrdinal,
         claimedAt
       };

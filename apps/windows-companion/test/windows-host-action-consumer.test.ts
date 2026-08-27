@@ -95,13 +95,13 @@ async function fixture(context: TestContext) {
   });
   const executor = new RecordingExecutor();
   const effects = new RecordingEffects();
-  const create = (queuePort: WindowsHostActionQueuePort = queue, completionExecutor: RecordingExecutor = executor) => new CompanionWindowsHostActionConsumer(
+  const create = (queuePort: WindowsHostActionQueuePort = queue, completionExecutor: RecordingExecutor = executor, applications: Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>> = { vscode: identity("vscode"), terminal: identity("terminal") }) => new CompanionWindowsHostActionConsumer(
     store,
     queuePort,
     completionExecutor,
     effects,
     {
-      applications: { vscode: identity("vscode"), terminal: identity("terminal") },
+      applications,
       pollIntervalMs: 10,
       effectTimeoutMs: 75,
       now: () => clock,
@@ -165,6 +165,18 @@ test("the companion consumes only exact targetless VS Code and terminal focus in
   assert.deepEqual(terminal.fixedArguments, []);
   assert.ok(setup.executor.records.every((record) => record.status === "completed"));
   assert.equal((await setup.queue.listPending()).length, 0);
+});
+
+test("an unavailable reviewed host application settles not-started without invoking the effect port", async (context) => {
+  const setup = await fixture(context);
+  await queueAction(setup.queue, "focus_vscode", "operation-unavailable-vscode");
+  const consumer = setup.create(setup.queue, setup.executor, { terminal: identity("terminal") });
+  await consumer.start();
+  await waitFor(() => setup.executor.records.length === 1, "unavailable VS Code settlement");
+  await consumer.stop();
+  assert.equal(setup.effects.requests.length, 0);
+  assert.equal(setup.executor.records[0]!.status, "failed");
+  assert.match(setup.executor.records[0]!.summary, /vscode.*unavailable/i);
 });
 
 test("repeated VS Code focus durably advances the exact native window ordinal across consumer restart and resets after the repeat window", async (context) => {

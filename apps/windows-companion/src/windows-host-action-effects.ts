@@ -50,10 +50,7 @@ interface WindowsHostActionRuntimeOptions {
 }
 
 export interface PinnedWindowsHostActionEffectPortOptions extends WindowsHostActionRuntimeOptions {
-  readonly applications: Readonly<{
-    vscode: FixedWindowsHostApplicationIdentity;
-    terminal: FixedWindowsHostApplicationIdentity;
-  }>;
+  readonly applications: Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>>;
 }
 
 /** Production transport for the fixed inbox PowerShell/native helper. */
@@ -173,13 +170,13 @@ export class NodeWindowsHostActionHelperTransport implements WindowsHostActionHe
  * one-time authorization that permits SetForegroundWindow/CreateProcess.
  */
 export class PinnedWindowsHostActionEffectPort implements WindowsHostActionEffectPort {
-  private readonly applications: Readonly<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>;
+  private readonly applications: Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>>;
   private readonly runtime: RuntimeBoundary;
 
   constructor(options: PinnedWindowsHostActionEffectPortOptions) {
     this.applications = Object.freeze({
-      vscode: validateIdentity(options.applications.vscode, "vscode"),
-      terminal: validateIdentity(options.applications.terminal, "terminal")
+      ...(options.applications.vscode ? { vscode: validateIdentity(options.applications.vscode, "vscode") } : {}),
+      ...(options.applications.terminal ? { terminal: validateIdentity(options.applications.terminal, "terminal") } : {})
     });
     this.runtime = runtimeBoundary(options);
   }
@@ -187,8 +184,9 @@ export class PinnedWindowsHostActionEffectPort implements WindowsHostActionEffec
   async execute(request: WindowsHostActionEffectRequest): Promise<WindowsHostActionEffectResult> {
     this.runtime.requireWindows();
     const application = request.action === "focus_vscode" ? "vscode" : request.action === "focus_external_terminal" ? "terminal" : undefined;
-    if (!application || request.application !== application || request.processOwner !== "current-user" || request.processSession !== "current-session"
-      || request.windowSurface !== "visible-top-level" || request.shell !== false || !sameIdentity(request.executable, this.applications[application])
+    const configured = application ? this.applications[application] : undefined;
+    if (!application || !configured || request.application !== application || request.processOwner !== "current-user" || request.processSession !== "current-session"
+      || request.windowSurface !== "visible-top-level" || request.shell !== false || !sameIdentity(request.executable, configured)
       || !exactArguments(request.action, request.fixedArguments) || !exactWindowCycleOrdinal(request.action, request.windowCycleOrdinal) || request.signal.aborted) {
       throw new Error("The Windows host-action request changed its fixed executable, action, arguments, or current-user window boundary.");
     }
@@ -250,10 +248,7 @@ export class PinnedWindowsHostActionEffectPort implements WindowsHostActionEffec
   }
 }
 
-export async function provisionWindowsHostActionApplications(options: WindowsHostActionRuntimeOptions = {}): Promise<Readonly<{
-  vscode: FixedWindowsHostApplicationIdentity;
-  terminal: FixedWindowsHostApplicationIdentity;
-}>> {
+export async function provisionWindowsHostActionApplications(options: WindowsHostActionRuntimeOptions = {}): Promise<Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>>> {
   const runtime = runtimeBoundary(options);
   runtime.requireWindows();
   const provision = async (application: "vscode" | "terminal"): Promise<FixedWindowsHostApplicationIdentity> => {
@@ -278,7 +273,12 @@ export async function provisionWindowsHostActionApplications(options: WindowsHos
     if (!identity) throw new Error(`The fixed Windows ${application} provisioning helper returned no identity.`);
     return identity;
   };
-  return Object.freeze({ vscode: await provision("vscode"), terminal: await provision("terminal") });
+  const applications: Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>> = {};
+  for (const application of ["vscode", "terminal"] as const) {
+    try { applications[application] = await provision(application); }
+    catch { /* An absent or unverifiable host application remains unavailable. */ }
+  }
+  return Object.freeze(applications);
 }
 
 interface RuntimeBoundary {

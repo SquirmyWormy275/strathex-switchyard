@@ -144,6 +144,22 @@ test("provisioning asks the fixed helper for host-derived Code and Terminal iden
   }
 });
 
+test("provisioning keeps independently verified applications and leaves an unavailable application fail closed", async () => {
+  const transport = new FakeTransport();
+  transport.configure = (session) => {
+    session.onWrite = (value) => {
+      const application = value.application as "vscode" | "terminal";
+      session.responses.push(application === "vscode"
+        ? envelope(value, "error", { code: "native_discovery_failure" })
+        : envelope(value, "result", { action: "provision", identity: identity("terminal") }));
+    };
+  };
+  const provisioned = await provisionWindowsHostActionApplications({ transport, timeoutMs: 100, testPlatform: "win32", testSystemDirectory: "C:\\Windows\\System32" });
+  assert.deepEqual(provisioned, { terminal: identity("terminal") });
+  assert.equal(transport.sessions.length, 2);
+  assert.equal(transport.sessions.every((session) => session.terminated), true);
+});
+
 test("focus crosses the host barrier once after READY and authorizes only the exact fixed helper plan", async () => {
   const transport = new FakeTransport();
   const order: string[] = [];
