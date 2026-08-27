@@ -257,7 +257,7 @@ function Set-B122ProtectedRootAcl {
   param([Parameter(Mandatory=$true)][string]$Path)
   $root=[IO.Path]::GetFullPath($Path).TrimEnd('\');Assert-B122NoReparseAncestors -Path $root;$info=New-Object IO.DirectoryInfo($root)
   $user=[Security.Principal.WindowsIdentity]::GetCurrent().User;$system=New-Object Security.Principal.SecurityIdentifier([Security.Principal.WellKnownSidType]::LocalSystemSid,$null)
-  $security=New-Object Security.AccessControl.DirectorySecurity;$security.SetAccessRuleProtection($true,$false)
+  $security=New-Object Security.AccessControl.DirectorySecurity;$security.SetOwner($user);$security.SetAccessRuleProtection($true,$false)
   $inherit=[Security.AccessControl.InheritanceFlags]::ContainerInherit-bor[Security.AccessControl.InheritanceFlags]::ObjectInherit
   foreach($sid in @($user,$system)){$rule=New-Object Security.AccessControl.FileSystemAccessRule($sid,[Security.AccessControl.FileSystemRights]::FullControl,$inherit,[Security.AccessControl.PropagationFlags]::None,[Security.AccessControl.AccessControlType]::Allow);[void]$security.AddAccessRule($rule)}
   if('System.IO.FileSystemAclExtensions'-as[type]){[IO.FileSystemAclExtensions]::SetAccessControl($info,$security)}else{$info.SetAccessControl($security)};Assert-B122ProtectedRootAcl -Path $root|Out-Null

@@ -191,19 +191,22 @@ $npmCache=Join-Path $buildProfileLocal 'npm-cache'
 $npmPrefix=Join-Path $buildProfileLocal 'npm-prefix'
 $dotnetCliHome=Join-Path $buildProfileLocal 'dotnet-home'
 $trustedNuGetPackages=Join-Path $buildProfileLocal 'nuget-packages'
-foreach($directory in @($buildProfile,$buildProfileLocal,$buildProfileRoaming,$buildTemp,$npmCache,$npmPrefix,$dotnetCliHome,$trustedNuGetPackages)){New-Item -ItemType Directory -Path $directory -Force|Out-Null;Assert-B122NoReparseAncestors -Path $directory}
+$testTempRoot=Join-Path $output '.test-temp'
+foreach($directory in @($buildProfile,$buildProfileLocal,$buildProfileRoaming,$buildTemp,$npmCache,$npmPrefix,$dotnetCliHome,$trustedNuGetPackages,$testTempRoot)){New-Item -ItemType Directory -Path $directory -Force|Out-Null;Assert-B122NoReparseAncestors -Path $directory}
 $npmUserConfig=Join-Path $buildProfile 'npm-userconfig'
 $npmGlobalConfig=Join-Path $buildProfile 'npm-globalconfig'
 Write-Utf8NoBom $npmUserConfig "`n"
 Write-Utf8NoBom $npmGlobalConfig "`n"
 $trustedPowerShellDirectory=if([IO.Path]::GetFileName((Get-Process -Id $PID).Path)-ieq'pwsh.exe'){Split-Path -Parent (Get-Process -Id $PID).Path}else{Join-Path $systemDirectory 'WindowsPowerShell\v1.0'}
-$isolatedPath=@($reviewedRuntimeBin,(Join-Path $buildRoot 'node_modules\.bin'),(Split-Path -Parent $dotnetExe),(Split-Path -Parent $trustedGitExe),$trustedPowerShellDirectory,$systemDirectory)-join';'
+$windowsPowerShellDirectory=Join-Path $systemDirectory 'WindowsPowerShell\v1.0'
+$isolatedPath=@($reviewedRuntimeBin,(Join-Path $buildRoot 'node_modules\.bin'),(Split-Path -Parent $dotnetExe),(Split-Path -Parent $trustedGitExe),$trustedPowerShellDirectory,$windowsPowerShellDirectory,$systemDirectory)|Select-Object -Unique
+$isolatedPath=$isolatedPath-join';'
 $buildEnvironment=[ordered]@{
   'PATH'=$isolatedPath;'PATHEXT'='.COM;.EXE;.BAT;.CMD';'SystemRoot'=$windowsDirectory;'WINDIR'=$windowsDirectory;'ComSpec'=(Join-Path $systemDirectory 'cmd.exe');'OS'='Windows_NT'
   'ProgramFiles'=$programFiles;'ProgramFiles(x86)'=$programFilesX86;'ProgramData'=[Environment]::GetFolderPath([Environment+SpecialFolder]::CommonApplicationData)
   'USERPROFILE'=$buildProfile;'HOME'=$buildProfile;'APPDATA'=$buildProfileRoaming;'LOCALAPPDATA'=$buildProfileLocal;'TEMP'=$buildTemp;'TMP'=$buildTemp
   'npm_config_cache'=$npmCache;'npm_config_userconfig'=$npmUserConfig;'npm_config_globalconfig'=$npmGlobalConfig;'npm_config_prefix'=$npmPrefix;'npm_config_update_notifier'='false';'npm_config_audit'='false';'npm_config_fund'='false';'npm_config_scripts_prepend_node_path'='true';'npm_node_execpath'=$node.FullName;'npm_execpath'=$npmCli.FullName
-  'DOTNET_ROOT'=(Split-Path -Parent $dotnetExe);'DOTNET_CLI_HOME'=$dotnetCliHome;'DOTNET_NOLOGO'='1';'DOTNET_SKIP_FIRST_TIME_EXPERIENCE'='1';'DOTNET_CLI_TELEMETRY_OPTOUT'='1';'DOTNET_MULTILEVEL_LOOKUP'='0';'NUGET_PACKAGES'=$trustedNuGetPackages;'MSBUILDDISABLENODEREUSE'='1'
+  'DOTNET_ROOT'=(Split-Path -Parent $dotnetExe);'DOTNET_CLI_HOME'=$dotnetCliHome;'DOTNET_NOLOGO'='1';'DOTNET_SKIP_FIRST_TIME_EXPERIENCE'='1';'DOTNET_CLI_TELEMETRY_OPTOUT'='1';'DOTNET_MULTILEVEL_LOOKUP'='0';'NUGET_PACKAGES'=$trustedNuGetPackages;'SXSY_B122_NUGET_CONFIG'=$trustedNuGetConfig;'SXSY_B122_NUGET_FEED'=$trustedNuGetFeed;'SXSY_B122_TEST_TEMP_ROOT'=$testTempRoot;'MSBUILDDISABLENODEREUSE'='1'
   'GIT_CONFIG_NOSYSTEM'='1';'GIT_CONFIG_GLOBAL'='NUL';'GIT_TERMINAL_PROMPT'='0';'GCM_INTERACTIVE'='Never';'CI'='1';'NO_COLOR'='1'
 }
 function Invoke-B122WithIsolatedBuildEnvironment([scriptblock]$Action){
@@ -246,6 +249,14 @@ function Invoke-B122PinnedDotNetPublish([string]$Project,[string]$Destination,[s
   }
   if([int]$exitCode-ne0){throw $FailureMessage}
 }
+function Invoke-B122PinnedDotNetRestore([string]$Project,[string]$FailureMessage){
+  $runtimeFrameworkVersion=[string]$dotnetToolchain.runtimeVersion
+  $exitCode=Invoke-B122WithIsolatedBuildEnvironment {
+    & $dotnetExe restore $Project -r win-x64 "-p:RuntimeFrameworkVersion=$runtimeFrameworkVersion" "-p:RestorePackagesPath=$trustedNuGetPackages" --disable-parallel --configfile $trustedNuGetConfig --source $trustedNuGetFeed|Out-Host
+    return $LASTEXITCODE
+  }
+  if([int]$exitCode-ne0){throw $FailureMessage}
+}
 function Invoke-B122IsolatedCapture([string]$Executable,[string[]]$Arguments,[string]$FailureMessage){
   $result=Invoke-B122WithIsolatedBuildEnvironment { $captured=@(& $Executable @Arguments);[pscustomobject]@{exitCode=$LASTEXITCODE;output=($captured-join[Environment]::NewLine)} }
   if([int]$result.exitCode-ne0){throw $FailureMessage}
@@ -256,6 +267,12 @@ function Invoke-B122IsolatedHost([string]$Executable,[string[]]$Arguments,[strin
   if([int]$exitCode-ne0){throw $FailureMessage}
 }
 Invoke-B122PinnedNpm -Arguments @('ci','--ignore-scripts','--no-audit','--no-fund','--prefer-offline') -FailureMessage 'Pinned dependency installation from package-lock.json failed.'
+$testHelperProjects=@(
+  'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj',
+  'apps\windows-companion\sandbox-lifecycle-helper\Sxsy.B122.SandboxLifecycleHelper.csproj',
+  'apps\windows-companion\companion-lifecycle-helper\Sxsy.B122.CompanionLifecycleHelper.csproj'
+)
+foreach($testHelperProject in $testHelperProjects){Invoke-B122PinnedDotNetRestore -Project (Join-Path $buildRoot $testHelperProject) -FailureMessage "Pinned restore failed for $testHelperProject"}
 $tscCli=Join-Path $buildRoot 'node_modules\typescript\lib\tsc.js'
 if(-not(Test-Path -LiteralPath $tscCli -PathType Leaf)-or(Get-Item -LiteralPath $tscCli -Force).Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'The lockfile-installed TypeScript compiler is missing or unsafe.'}
 $nodeExecutableSha256=(Get-FileHash -LiteralPath $node.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$npmCliSha256=(Get-FileHash -LiteralPath $npmCli.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$tscSha256=(Get-FileHash -LiteralPath $tscCli -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -524,7 +541,7 @@ Copy-Item -LiteralPath (Join-Path $sourceScripts 'licenses\DOTNET-RUNTIME-LICENS
 Copy-Item -LiteralPath (Join-Path $sourceScripts 'licenses\DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt') -Destination $licenses
 
 Set-Location -LiteralPath $output
-foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
+foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$testTempRoot,$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
 
 $portableSmokeResult=Invoke-B122WithIsolatedBuildEnvironment { $captured=@(& (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output);[pscustomobject]@{exitCode=$LASTEXITCODE;output=($captured-join[Environment]::NewLine)} }
 $portableSmoke=[string]$portableSmokeResult.output

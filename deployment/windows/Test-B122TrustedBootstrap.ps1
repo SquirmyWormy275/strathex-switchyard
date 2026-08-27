@@ -58,8 +58,9 @@ try{
   if($buildRepositoryRunner){
     $publish=Join-Path $testRoot 'repository-runner-publish';$project=Join-Path $repositoryRoot 'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj'
     $dotnet=Join-Path $repositoryRoot '.tools\dotnet\dotnet.exe';if(-not(Test-Path -LiteralPath $dotnet -PathType Leaf)){$dotnet='dotnet.exe'}
-    $env:DOTNET_CLI_HOME=Join-Path $testRoot 'dotnet-home';$env:DOTNET_NOLOGO='1';$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1';$env:APPDATA=Join-Path $testRoot 'appdata';$env:NUGET_PACKAGES=Join-Path $repositoryRoot '.tools\nuget-packages'
-    & $dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $publish --configfile (Join-Path $repositoryRoot '.tools\NuGet.Config')|Out-Null
+    $env:DOTNET_CLI_HOME=Join-Path $testRoot 'dotnet-home';$env:DOTNET_NOLOGO='1';$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1';$env:APPDATA=Join-Path $testRoot 'appdata';if([string]::IsNullOrWhiteSpace($env:NUGET_PACKAGES)){$env:NUGET_PACKAGES=Join-Path $repositoryRoot '.tools\nuget-packages'}
+    $nugetConfig=if([string]::IsNullOrWhiteSpace($env:SXSY_B122_NUGET_CONFIG)){Join-Path $repositoryRoot '.tools\NuGet.Config'}else{$env:SXSY_B122_NUGET_CONFIG}
+    & $dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o $publish --configfile $nugetConfig|Out-Null
     if($LASTEXITCODE-ne0){throw 'The trusted-bootstrap test could not build its exact repository-runner helper.'}
     $RepositoryRunnerPath=Join-Path $publish 'b122-repository-runner.exe'
   }

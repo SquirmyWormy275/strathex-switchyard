@@ -4,7 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { terminateOwnedProcessTree } from "./test-support/process-tree.mjs";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -68,6 +68,7 @@ export const requiredGroups = [
   { file: "firmware/verify-require-compiler.test.mjs" },
   { file: "build:companion", args: [npmCli, "run", "build:companion"] },
   { file: "build:provider-host", args: [npmCli, "run", "build:provider-host"] },
+  { file: "build:vscode", args: [npmCli, "run", "build:vscode"] },
   ...(process.platform === "win32" ? [{
     file: "deployment/windows/Test-B122ManifestGenerators.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -154,7 +155,8 @@ const inheritedNames = [
   "PATH", "SystemRoot", "WINDIR", "ComSpec", "PATHEXT", "OS", "SystemDrive",
   "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER",
   "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "CommonProgramFiles",
-  "CommonProgramFiles(x86)", "CommonProgramW6432", "LANG", "LC_ALL", "TZ", "TERM"
+  "CommonProgramFiles(x86)", "CommonProgramW6432", "LANG", "LC_ALL", "TZ", "TERM",
+  "DOTNET_ROOT", "NUGET_PACKAGES", "SXSY_B122_NUGET_CONFIG", "SXSY_B122_NUGET_FEED"
 ];
 
 function inheritedValue(source, name) {
@@ -207,7 +209,11 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const isTestRun = !group.args;
   const args = group.args ? [...group.args] : ["--experimental-transform-types", "--test", "--test-reporter=tap"]; const pattern = group.args ? undefined : patternArgument(group.pattern); if (pattern) args.push("--test-name-pattern", pattern); if (!group.args) args.push(group.file);
   const startedAt = new Date().toISOString(); const started = Date.now();
-  const testRoot = await mkdtemp(join(tmpdir(), "sxsy-isolated-child-"));
+  const configuredTestParent = inheritedValue(sourceEnvironment, "SXSY_B122_TEST_TEMP_ROOT");
+  if (configuredTestParent !== undefined && (!isAbsolute(configuredTestParent) || /[\0\r\n"]/u.test(configuredTestParent))) throw new Error("The isolated test parent is invalid.");
+  const testParent = configuredTestParent ?? tmpdir();
+  await mkdir(testParent, { recursive: true });
+  const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
   await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.SXSY_B122_STATE_DIR].map((directory) => mkdir(directory, { recursive: true })));
@@ -253,7 +259,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
         try {
-          await cleanupIsolatedRoot(cleanup, testRoot);
+          await cleanupIsolatedRoot(cleanup, testRoot, testParent);
           result.cleanupCompleted = true;
         } catch {
           result.cleanupError = "isolated-test-root-cleanup-failed";
@@ -265,10 +271,10 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   });
 }
 
-async function cleanupIsolatedRoot(cleanup, testRoot) {
+async function cleanupIsolatedRoot(cleanup, testRoot, testParent) {
   const canonicalRoot = resolve(testRoot);
-  const canonicalTemp = resolve(tmpdir());
-  if (canonicalRoot === canonicalTemp || dirname(canonicalRoot) !== canonicalTemp || !canonicalRoot.startsWith(join(canonicalTemp, "sxsy-isolated-child-"))) {
+  const canonicalParent = resolve(testParent);
+  if (canonicalRoot === canonicalParent || dirname(canonicalRoot) !== canonicalParent || !canonicalRoot.startsWith(join(canonicalParent, "i-"))) {
     throw new Error("Refusing to clean a non-isolated test root.");
   }
   let failure;

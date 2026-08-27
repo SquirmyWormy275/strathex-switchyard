@@ -27,9 +27,9 @@ test("packaged companion supervisor proves kill-on-close containment and refuses
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1",
     APPDATA: join(root, "appdata"),
     LOCALAPPDATA: join(root, "localappdata"),
-    NUGET_PACKAGES: join(repositoryRoot, ".tools", "nuget-packages")
+    NUGET_PACKAGES: process.env.NUGET_PACKAGES ?? join(repositoryRoot, ".tools", "nuget-packages")
   };
-  const built = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-p:DefineConstants=B122_TEST_HOOKS", "-o", publish, "--configfile", join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
+  const built = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-p:DefineConstants=B122_TEST_HOOKS", "-o", publish, "--configfile", process.env.SXSY_B122_NUGET_CONFIG ?? join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
   assert.equal(built.code, 0, built.stderr || built.stdout);
   const helper = join(publish, "b122-companion-supervisor.exe");
   const selfTest = await command(helper, ["--self-test"], {}, 30_000);

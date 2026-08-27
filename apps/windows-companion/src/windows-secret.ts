@@ -8,7 +8,7 @@ import type { JournalAuthenticator } from "../../../packages/control-plane/src/s
 
 const maximumSecretBytes = 64 * 1024;
 const maximumEnvelopeBytes = maximumSecretBytes * 4;
-const defaultDpapiTimeoutMs = 10_000;
+const defaultDpapiTimeoutMs = 30_000;
 const cleanupTimeoutMs = 5_000;
 const protectScript = "& { param([int]$length) Add-Type -AssemblyName System.Security;$raw=$null;$out=$null;try{if($length-lt1-or$length-gt262144){throw'input length'};$raw=New-Object byte[] $length;$stream=[Console]::OpenStandardInput();$offset=0;while($offset-lt$length){$read=$stream.Read($raw,$offset,$length-$offset);if($read-le0){throw'truncated input'};$offset+=$read};if($stream.ReadByte()-ne-1){throw'oversized input'};$out=[Security.Cryptography.ProtectedData]::Protect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::OpenStandardOutput().Write($out,0,$out.Length)}finally{if($null-ne$raw){[Array]::Clear($raw,0,$raw.Length)};if($null-ne$out){[Array]::Clear($out,0,$out.Length)}} }";
 const unprotectScript = "& { param([int]$length) Add-Type -AssemblyName System.Security;$raw=$null;$out=$null;try{if($length-lt1-or$length-gt262144){throw'input length'};$raw=New-Object byte[] $length;$stream=[Console]::OpenStandardInput();$offset=0;while($offset-lt$length){$read=$stream.Read($raw,$offset,$length-$offset);if($read-le0){throw'truncated input'};$offset+=$read};if($stream.ReadByte()-ne-1){throw'oversized input'};$out=[Security.Cryptography.ProtectedData]::Unprotect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::OpenStandardOutput().Write($out,0,$out.Length)}finally{if($null-ne$raw){[Array]::Clear($raw,0,$raw.Length)};if($null-ne$out){[Array]::Clear($out,0,$out.Length)}} }";

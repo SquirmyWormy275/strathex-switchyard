@@ -78,10 +78,22 @@ jobs:
       - name: Build and verify the complete Windows bundle
         shell: pwsh
         run: |
-          .\deployment\windows\Build-B122Release.ps1 `
-            -NodeRuntimeZip $env:NODE_RUNTIME_ARCHIVE `
-            -NodeRuntimeSha256 $env:NODE_RUNTIME_SHA256 `
-            -NodeRuntimeSourceUri $env:NODE_RUNTIME_URI
+          $ErrorActionPreference = 'Stop'
+          $buildDrive = 'B:'
+          if (Test-Path "$buildDrive\") { throw 'The fixed short release-build drive is already occupied.' }
+          subst $buildDrive $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { throw 'The short release-build drive could not be created.' }
+          try {
+            Set-Location "$buildDrive\"
+            .\deployment\windows\Build-B122Release.ps1 `
+              -NodeRuntimeZip $env:NODE_RUNTIME_ARCHIVE `
+              -NodeRuntimeSha256 $env:NODE_RUNTIME_SHA256 `
+              -NodeRuntimeSourceUri $env:NODE_RUNTIME_URI
+          } finally {
+            Set-Location $env:GITHUB_WORKSPACE
+            subst $buildDrive /d
+            if ($LASTEXITCODE -ne 0) { throw 'The short release-build drive could not be removed.' }
+          }
 
       - name: Prove generated source remains canonical
         shell: pwsh
