@@ -42,7 +42,7 @@ test("self-contained repository runner proves Job-Object child and grandchild co
     APPDATA: appData,
     NUGET_PACKAGES: process.env.NUGET_PACKAGES ?? join(repositoryRoot, ".tools", "nuget-packages")
   };
-  const built = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-o", publish, "--configfile", process.env.SXSY_B122_NUGET_CONFIG ?? join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
+  const built = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-p:UseSharedCompilation=false", "--disable-build-servers", "-o", publish, "--configfile", process.env.SXSY_B122_NUGET_CONFIG ?? join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
   assert.equal(built.code, 0, built.stderr || built.stdout);
   const helper = join(publish, "b122-repository-runner.exe");
   const helperDigest = createHash("sha256").update(await readFile(helper)).digest("hex");

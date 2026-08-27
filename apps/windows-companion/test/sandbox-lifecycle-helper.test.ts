@@ -153,7 +153,7 @@ test("published sandbox lifecycle executable returns the exact no-hardware self-
     APPDATA: join(temporaryRoot, "appdata"),
     NUGET_PACKAGES: process.env.NUGET_PACKAGES ?? join(repositoryRoot, ".tools", "nuget-packages")
   };
-  const published = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-o", output, "--configfile", process.env.SXSY_B122_NUGET_CONFIG ?? join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
+  const published = await command(dotnet, ["publish", project, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-p:UseSharedCompilation=false", "--disable-build-servers", "-o", output, "--configfile", process.env.SXSY_B122_NUGET_CONFIG ?? join(repositoryRoot, ".tools", "NuGet.Config")], environment, 120_000);
   assert.equal(published.timedOut, false);
   assert.equal(published.outputTruncated, false, "dotnet publish output exceeded the evidence bound");
   assert.equal(published.code, 0, published.stderr || published.stdout);
