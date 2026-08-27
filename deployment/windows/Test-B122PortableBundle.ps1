@@ -303,6 +303,7 @@ setInterval(() => {}, 1000);
     Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
     Assert-B122PortableCompanionLogsBounded
     if ($process.HasExited) {
+      $process.WaitForExit()
       $detail = Read-B122PortableBoundedFile $stderr
       throw "The portable companion exited before health verification: $detail"
     }
@@ -347,6 +348,11 @@ setInterval(() => {}, 1000);
       return
     }
   } while ([DateTime]::UtcNow -lt $deadline)
+  Add-B122PortableProcessTree -Inventory $companionInventory -RootProcessId $process.Id
+  $remaining = @($companionInventory.Values | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
+  if ($remaining.Count) { Stop-B122PortableProcessTree -RootProcessId $process.Id -Inventory $companionInventory }
+  if (-not $process.HasExited -and -not $process.WaitForExit(10000)) { throw 'The unhealthy portable companion did not exit after exact process-tree cleanup.' }
+  $process.WaitForExit()
   $companionDetail = Read-B122PortableBoundedFile $stderr
   $healthDetail = [string]$healthCommand.stderr
   throw "The portable companion did not become healthy within 30 seconds. Companion: $companionDetail Health: $healthDetail"
@@ -356,6 +362,8 @@ setInterval(() => {}, 1000);
     $remaining = @($companionInventory.Values | Where-Object { Test-B122PortableProcessIdentityAlive $_ })
     if ($remaining.Count) { Stop-B122PortableProcessTree -RootProcessId $process.Id -Inventory $companionInventory }
     if (-not $process.HasExited) { $process.WaitForExit(10000) | Out-Null }
+    if ($process.HasExited) { $process.WaitForExit() }
+    $process.Dispose()
   }
   if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
 }

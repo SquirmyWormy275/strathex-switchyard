@@ -61,6 +61,10 @@ test("Windows release packages and runtime-pins the companion lifecycle supervis
   assert.match(portable, /function Invoke-B122PortableExactTreeKill/);
   assert.match(portable, /foreach \(\$identity in \$survivors\) \{ Invoke-B122PortableExactTreeKill \$identity \}/);
   assert.match(portable, /created=\$\(\[string\]\$_\.createdAt\)/);
+  const unhealthyCleanup = portable.indexOf("The unhealthy portable companion did not exit after exact process-tree cleanup.");
+  const diagnosticRead = portable.indexOf("$companionDetail = Read-B122PortableBoundedFile $stderr");
+  assert.ok(unhealthyCleanup >= 0 && diagnosticRead > unhealthyCleanup);
+  assert.match(portable, /\$process\.Dispose\(\)/);
 });
 
 test("Windows release binds the reviewed local dotnet toolchain and isolates nested build authority", async () => {
