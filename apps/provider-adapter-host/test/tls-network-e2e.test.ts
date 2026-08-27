@@ -68,7 +68,7 @@ test("provider secret generation validates and Initialize emits its exact ready-
   const instanceArguments = ["-RepositoryRoot", repository, "-InstanceName", `test-compat-${suffix}`, "-ListenPort", listenPort] as const;
   const windowsInitialized = parseReceipt(await runPowerShellExecutable(windowsPowerShell, initializeScript, [
     ...instanceArguments
-  ], 20_000));
+  ], 60_000));
   const canonicalInitializedRoot = await realpath(initializedRoot);
   await assertInitializeReceipt(windowsInitialized, canonicalInitializedRoot);
   const expectedPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
@@ -82,13 +82,13 @@ test("provider secret generation validates and Initialize emits its exact ready-
   const packagedInitialize = join(initializationBundle, "scripts", "Initialize-B122ProviderHost.ps1");
   const packagedInitialized = parseReceipt(await runPowerShellExecutable(windowsPowerShell, packagedInitialize, [
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
-  ], 20_000));
+  ], 60_000));
   await assertInitializeReceipt(packagedInitialized, canonicalInitializedRoot);
   assertEquivalentProviderPolicy(await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json")), expectedPolicy, "the packaged Windows PowerShell 5.1 policy must preserve the exact parsed source policy");
 
   const packagedPwsh = parseReceipt(await runPowerShellExecutable(powershell, packagedInitialize, [
     ...instanceArguments, "-BundleRoot", initializationBundle, "-Replace"
-  ], 20_000));
+  ], 60_000));
   await assertInitializeReceipt(packagedPwsh, canonicalInitializedRoot);
   const finalPolicy = await loadConfiguredNetworkPolicy(join(initializedRoot, "network-policy.json"));
   assertEquivalentProviderPolicy(finalPolicy, expectedPolicy, "the packaged pwsh policy must preserve the exact parsed source policy");

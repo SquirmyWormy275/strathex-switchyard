@@ -383,7 +383,7 @@ test("the administration boundary requires current-user presence for every state
   await writeFile(policyPath, JSON.stringify(policy), "utf8");
   assert.throws(() => new DurableContainmentRemoteEvidenceRegistry(new ProtectedJsonStore({ filePath: join(root, "unprotected.jsonl") })), /authenticated.*storage/i);
   const registry = new DurableContainmentRemoteEvidenceRegistry(new ProtectedJsonStore({ filePath: join(root, "protected.jsonl"), authenticator }), { now: () => new Date(initialNow) });
-  const administration = createContainmentRemoteEvidenceAdministration({ registry, presence: { async verify() { return { verified: false }; } } });
+  const administration = createContainmentRemoteEvidenceAdministration({ registry, presence: { async verify() { return { verified: false }; } }, now: () => new Date(initialNow) });
   await assert.rejects(administration.installTrustPolicy(policyPath), /presence|approve/i);
   assert.deepEqual(await registry.listTrust(), []);
 });
