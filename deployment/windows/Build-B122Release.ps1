@@ -212,6 +212,9 @@ function Invoke-B122WithIsolatedBuildEnvironment([scriptblock]$Action){
   try{
     foreach($name in @($savedEnvironment.Keys)){if(-not$name.StartsWith('=')){[Environment]::SetEnvironmentVariable($name,$null,[EnvironmentVariableTarget]::Process)}}
     foreach($entry in $buildEnvironment.GetEnumerator()){[Environment]::SetEnvironmentVariable([string]$entry.Key,[string]$entry.Value,[EnvironmentVariableTarget]::Process)}
+    [Environment]::SetEnvironmentVariable('SXSY_B122_BUILD_SECRET_SENTINEL',$null,[EnvironmentVariableTarget]::Process)
+    Remove-Item -LiteralPath 'Env:\SXSY_B122_BUILD_SECRET_SENTINEL' -ErrorAction SilentlyContinue
+    if($null-ne[Environment]::GetEnvironmentVariable('SXSY_B122_BUILD_SECRET_SENTINEL',[EnvironmentVariableTarget]::Process)){throw 'The isolated build parent retained the secret sentinel.'}
     & $Action
   }finally{
     foreach($entry in [Environment]::GetEnvironmentVariables([EnvironmentVariableTarget]::Process).GetEnumerator()){if(-not([string]$entry.Key).StartsWith('=')){[Environment]::SetEnvironmentVariable([string]$entry.Key,$null,[EnvironmentVariableTarget]::Process)}}

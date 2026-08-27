@@ -65,6 +65,7 @@ foreach ($token in @(
     throw "Release build is missing immutable-source/evidence token: $token"
   }
 }
+foreach($token in @("SetEnvironmentVariable('SXSY_B122_BUILD_SECRET_SENTINEL',`$null", "Remove-Item -LiteralPath 'Env:\SXSY_B122_BUILD_SECRET_SENTINEL'", 'The isolated build parent retained the secret sentinel.')){if($build.IndexOf($token,[StringComparison]::Ordinal)-lt0){throw "Release environment isolation is missing explicit sentinel removal: $token"}}
 foreach ($token in @('--porcelain=v1', '--untracked-files=all', 'HEAD changed', 'worktree is not clean')) {
   if ($integritySource.IndexOf($token, [StringComparison]::Ordinal) -lt 0) {
     throw "Release source guard is missing state-rejection token: $token"
