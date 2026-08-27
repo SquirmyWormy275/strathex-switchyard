@@ -4,6 +4,8 @@ $portable = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Test-B122Portable
 $artifact = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Test-B122ReleaseArtifact.ps1') -Raw
 $integritySource = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'B122ReleaseIntegrity.psm1') -Raw
 $companionPackage = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\apps\windows-companion\package.json') -Raw | ConvertFrom-Json
+$workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\.github\workflows\b122-windows.yml') -Raw
+$provisioner = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Provision-B122DotnetToolchain.ps1') -Raw
 
 $requiredBuildTokens = @(
   'ProviderDesktopHelperPath',
@@ -23,6 +25,8 @@ foreach ($token in $requiredBuildTokens) {
 if ($build.IndexOf('-Filter LICENSE -File -Recurse', [StringComparison]::Ordinal) -ge 0) {
   throw 'Release build must validate the exact root Node LICENSE instead of counting dependency licenses recursively.'
 }
+foreach($token in @('Provision-B122DotnetToolchain.ps1','dotnet-sdk-8.0.424-win-x64.zip','microsoft.net.illink.tasks','Get-Sha512','nuget-feed')){if(($workflow+$provisioner+$build).IndexOf($token,[StringComparison]::Ordinal)-lt0){throw "Pinned .NET provisioning is missing token: $token"}}
+if($workflow.IndexOf('actions/setup-dotnet',[StringComparison]::Ordinal)-ge0){throw 'Hosted release verification must not substitute an ambient setup-dotnet installation for the reviewed repository-local toolchain.'}
 
 foreach ($content in @($portable, $artifact)) {
   foreach ($token in @('provider-desktop', 'sxsy-b122-provider-desktop-helper.exe')) {

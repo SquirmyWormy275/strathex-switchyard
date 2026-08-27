@@ -160,24 +160,27 @@ $dotnetToolchainHasher=[Security.Cryptography.SHA256]::Create();try{$dotnetToolc
 $dotnetToolchain=[Text.Encoding]::UTF8.GetString($dotnetToolchainManifestBytes)|ConvertFrom-Json
 if($dotnetToolchain.schema-cne'sxsy-b122.dotnet-toolchain'-or$dotnetToolchain.version-ne1-or$dotnetToolchain.sdkVersion-cne'8.0.424'-or$dotnetToolchain.runtimeVersion-cne'8.0.30'-or$dotnetToolchain.dotnetExeSha256-notmatch'^[0-9a-f]{64}$'-or$dotnetToolchain.nugetConfigSha256-notmatch'^[0-9a-f]{64}$'){throw 'The reviewed .NET toolchain manifest is invalid.'}
 $expectedRuntimePackageIds=@('microsoft.aspnetcore.app.runtime.win-x64','microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesktop.app.runtime.win-x64')
+$expectedBuildPackageIds=@('microsoft.net.illink.tasks')
 $runtimePackageRecords=@($dotnetToolchain.runtimePackages)
 if($runtimePackageRecords.Count-ne$expectedRuntimePackageIds.Count-or@($runtimePackageRecords|Where-Object{$_.id-notin$expectedRuntimePackageIds-or$_.version-cne$dotnetToolchain.runtimeVersion-or$_.sha256-notmatch'^[0-9a-f]{64}$'}).Count-ne0-or@($runtimePackageRecords.id|Sort-Object -Unique).Count-ne$expectedRuntimePackageIds.Count){throw 'The reviewed .NET runtime-package manifest is incomplete or ambiguous.'}
+$buildPackageRecords=@($dotnetToolchain.buildPackages)
+if($buildPackageRecords.Count-ne$expectedBuildPackageIds.Count-or@($buildPackageRecords|Where-Object{$_.id-notin$expectedBuildPackageIds-or$_.version-cne$dotnetToolchain.runtimeVersion-or$_.sha256-notmatch'^[0-9a-f]{64}$'}).Count-ne0){throw 'The reviewed .NET build-package manifest is incomplete or ambiguous.'}
 $dotnetExe=[IO.Path]::GetFullPath((Join-Path $repo '.tools\dotnet\dotnet.exe'))
 $trustedNuGetConfig=[IO.Path]::GetFullPath((Join-Path $repo '.tools\NuGet.Config'))
-$trustedNuGetPackages=[IO.Path]::GetFullPath((Join-Path $repo '.tools\nuget-packages'))
-foreach($toolchainPath in @($dotnetExe,$trustedNuGetConfig,$trustedNuGetPackages)){Assert-B122NoReparseAncestors -Path $toolchainPath;if(-not(Test-Path -LiteralPath $toolchainPath)){throw "A reviewed local .NET toolchain input is missing: $toolchainPath"}}
-if(-not(Test-Path -LiteralPath $dotnetExe -PathType Leaf)-or-not(Test-Path -LiteralPath $trustedNuGetConfig -PathType Leaf)-or-not(Test-Path -LiteralPath $trustedNuGetPackages -PathType Container)){throw 'The reviewed local .NET toolchain has the wrong filesystem type.'}
+$trustedNuGetFeed=[IO.Path]::GetFullPath((Join-Path $repo '.tools\nuget-feed'))
+foreach($toolchainPath in @($dotnetExe,$trustedNuGetConfig,$trustedNuGetFeed)){Assert-B122NoReparseAncestors -Path $toolchainPath;if(-not(Test-Path -LiteralPath $toolchainPath)){throw "A reviewed local .NET toolchain input is missing: $toolchainPath"}}
+if(-not(Test-Path -LiteralPath $dotnetExe -PathType Leaf)-or-not(Test-Path -LiteralPath $trustedNuGetConfig -PathType Leaf)-or-not(Test-Path -LiteralPath $trustedNuGetFeed -PathType Container)){throw 'The reviewed local .NET toolchain has the wrong filesystem type.'}
 $dotnetExeSha256=(Get-FileHash -LiteralPath $dotnetExe -Algorithm SHA256).Hash.ToLowerInvariant()
 $nugetConfigSha256=(Get-FileHash -LiteralPath $trustedNuGetConfig -Algorithm SHA256).Hash.ToLowerInvariant()
 if($dotnetExeSha256-cne[string]$dotnetToolchain.dotnetExeSha256-or$nugetConfigSha256-cne[string]$dotnetToolchain.nugetConfigSha256){throw 'The local .NET host or offline NuGet configuration does not match the reviewed toolchain manifest.'}
 $verifiedRuntimePackages=[Collections.Generic.List[object]]::new()
-foreach($runtimePackage in $runtimePackageRecords){
-  $packagePath=Join-Path $trustedNuGetPackages (Join-Path ([string]$runtimePackage.id) (Join-Path ([string]$runtimePackage.version) (([string]$runtimePackage.id)+'.'+([string]$runtimePackage.version)+'.nupkg')))
+foreach($runtimePackage in @($runtimePackageRecords)+@($buildPackageRecords)){
+  $packagePath=Join-Path $trustedNuGetFeed (([string]$runtimePackage.id)+'.'+([string]$runtimePackage.version)+'.nupkg')
   Assert-B122NoReparseAncestors -Path $packagePath
   if(-not(Test-Path -LiteralPath $packagePath -PathType Leaf)-or((Get-Item -LiteralPath $packagePath -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw "A reviewed .NET runtime package is missing or unsafe: $($runtimePackage.id)"}
   $packageDigest=(Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
   if($packageDigest-cne[string]$runtimePackage.sha256){throw "A reviewed .NET runtime package digest is wrong: $($runtimePackage.id)"}
-  $verifiedRuntimePackages.Add([ordered]@{id=[string]$runtimePackage.id;version=[string]$runtimePackage.version;sha256=$packageDigest})
+  if($runtimePackage.id-in$expectedRuntimePackageIds){$verifiedRuntimePackages.Add([ordered]@{id=[string]$runtimePackage.id;version=[string]$runtimePackage.version;sha256=$packageDigest})}
 }
 
 $buildProfile=Join-Path $output '.build-profile'
@@ -187,7 +190,8 @@ $buildTemp=Join-Path $buildProfileLocal 'Temp'
 $npmCache=Join-Path $buildProfileLocal 'npm-cache'
 $npmPrefix=Join-Path $buildProfileLocal 'npm-prefix'
 $dotnetCliHome=Join-Path $buildProfileLocal 'dotnet-home'
-foreach($directory in @($buildProfile,$buildProfileLocal,$buildProfileRoaming,$buildTemp,$npmCache,$npmPrefix,$dotnetCliHome)){New-Item -ItemType Directory -Path $directory -Force|Out-Null;Assert-B122NoReparseAncestors -Path $directory}
+$trustedNuGetPackages=Join-Path $buildProfileLocal 'nuget-packages'
+foreach($directory in @($buildProfile,$buildProfileLocal,$buildProfileRoaming,$buildTemp,$npmCache,$npmPrefix,$dotnetCliHome,$trustedNuGetPackages)){New-Item -ItemType Directory -Path $directory -Force|Out-Null;Assert-B122NoReparseAncestors -Path $directory}
 $npmUserConfig=Join-Path $buildProfile 'npm-userconfig'
 $npmGlobalConfig=Join-Path $buildProfile 'npm-globalconfig'
 Write-Utf8NoBom $npmUserConfig "`n"
@@ -234,7 +238,7 @@ function Invoke-B122PinnedDotNetPublish([string]$Project,[string]$Destination,[s
   Assert-Child $output $Destination
   $runtimeFrameworkVersion=[string]$dotnetToolchain.runtimeVersion
   $exitCode=Invoke-B122WithIsolatedBuildEnvironment {
-    & $dotnetExe publish $Project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true "-p:RuntimeFrameworkVersion=$runtimeFrameworkVersion" "-p:RestorePackagesPath=$trustedNuGetPackages" -p:UseSharedCompilation=false --disable-build-servers --configfile $trustedNuGetConfig -o $Destination|Out-Host
+    & $dotnetExe publish $Project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true "-p:RuntimeFrameworkVersion=$runtimeFrameworkVersion" "-p:RestorePackagesPath=$trustedNuGetPackages" -p:UseSharedCompilation=false --disable-build-servers --configfile $trustedNuGetConfig --source $trustedNuGetFeed -o $Destination|Out-Host
     return $LASTEXITCODE
   }
   if([int]$exitCode-ne0){throw $FailureMessage}

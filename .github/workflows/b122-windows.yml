@@ -38,11 +38,6 @@ jobs:
           node-version: 24.14.0
           cache: npm
 
-      - name: Install the pinned .NET SDK
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
-        with:
-          dotnet-version: 8.0.424
-
       - name: Install the pinned documentation Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -75,6 +70,10 @@ jobs:
           if ($actual -cne $env:NODE_RUNTIME_SHA256) { throw "The official Node runtime digest did not match the reviewed value: $actual" }
           "NODE_RUNTIME_ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "NODE_RUNTIME_URI=$uri" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Provision the reviewed repository-local .NET toolchain
+        shell: pwsh
+        run: .\deployment\windows\Provision-B122DotnetToolchain.ps1
 
       - name: Build and verify the complete Windows bundle
         shell: pwsh

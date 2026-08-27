@@ -165,8 +165,13 @@ Use the exact reviewed inputs required by
 [`windows-release-and-installation.md`](windows-release-and-installation.md).
 The builder rejects a dirty worktree and requires a reviewed official Node
 Windows x64 archive plus digest. Native helper inputs are also digest-bound.
+First run `Provision-B122DotnetToolchain.ps1` on a clean checkout. It verifies
+the exact SDK archive and offline NuGet packages pinned by
+`dotnet-toolchain.json`; the release builder does not accept ambient .NET.
 
 ```powershell
+.\deployment\windows\Provision-B122DotnetToolchain.ps1
+
 .\deployment\windows\Build-B122Release.ps1 `
   -NodeRuntimeZip C:\reviewed\node-v24-win-x64.zip `
   -NodeRuntimeSha256 <reviewed-sha256> `
