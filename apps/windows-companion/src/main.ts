@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { lstat, mkdir, open, readFile, realpath, rename, rm } from "node:fs/promises";
@@ -460,19 +460,45 @@ export function packagedVoiceHelperPath(mainModulePath: string): string {
   return resolve(dirname(mainModulePath), "..", "voice", "sxsy-b122-voice-helper.exe");
 }
 
-async function installedHelperIdentity(path: string): Promise<string> {
+export async function installedHelperIdentity(path: string): Promise<string> {
   try {
-    const metadata = await lstat(path);
-    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size <= 0 || metadata.size > 256 * 1024 * 1024) {
+    const absolute = resolve(path);
+    await assertNoReparsePath(absolute);
+    const before = await lstat(absolute);
+    if (!before.isFile() || before.isSymbolicLink() || before.size <= 0 || before.size > 256 * 1024 * 1024) {
       throw new Error("A packaged B122 helper is not a bounded regular file.");
     }
-    const canonical = await realpath(path);
-    if (resolve(canonical).toLowerCase() !== resolve(path).toLowerCase()) throw new Error("A packaged B122 helper path traverses an unexpected filesystem alias.");
-    return `sha256:${createHash("sha256").update(await readFile(canonical)).digest("hex")}`;
+    const handle = await open(absolute, "r");
+    try {
+      const opened = await handle.stat();
+      if (!sameFileIdentity(before, opened)) throw new Error("A packaged B122 helper changed before its identity handle opened.");
+      const bytes = await handle.readFile();
+      if (bytes.byteLength !== opened.size) throw new Error("A packaged B122 helper changed while its identity was read.");
+      const after = await lstat(absolute);
+      await assertNoReparsePath(absolute);
+      if (!sameFileIdentity(opened, after)) throw new Error("A packaged B122 helper changed before identity verification completed.");
+      return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+    } finally {
+      await handle.close();
+    }
   } catch (error) {
     if (isMissingFile(error)) return "unavailable:not-installed";
     throw error;
   }
+}
+
+async function assertNoReparsePath(path: string): Promise<void> {
+  const absolute = resolve(path);
+  const root = parse(absolute).root;
+  let cursor = root;
+  for (const component of relative(root, absolute).split(/[\\/]/).filter(Boolean)) {
+    cursor = join(cursor, component);
+    if ((await lstat(cursor)).isSymbolicLink()) throw new Error("A packaged B122 helper path traverses a reparse point.");
+  }
+}
+
+function sameFileIdentity(left: Readonly<{ dev: number | bigint; ino: number | bigint; size: number; mtimeMs: number }>, right: Readonly<{ dev: number | bigint; ino: number | bigint; size: number; mtimeMs: number }>): boolean {
+  return left.dev === right.dev && left.ino === right.ino && left.size === right.size && left.mtimeMs === right.mtimeMs;
 }
 
 async function loadNetworkPolicy(path: string): Promise<ConfiguredNetworkPolicy> {
