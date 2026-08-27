@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -176,8 +176,9 @@ test("repository execution delegates exact hash-bound launches to the configured
   assert.equal(result.output, "supervised");
   assert.equal(supervisor.starts.length, 1);
   const request = supervisor.starts[0]!;
-  assert.equal(request.executable, process.execPath);
-  assert.equal(request.executableSha256, createHash("sha256").update(await import("node:fs/promises").then(({ readFile }) => readFile(process.execPath))).digest("hex"));
+  const canonicalNode = await realpath(process.execPath);
+  assert.equal(request.executable, canonicalNode);
+  assert.equal(request.executableSha256, createHash("sha256").update(await import("node:fs/promises").then(({ readFile }) => readFile(canonicalNode))).digest("hex"));
   assert.deepEqual(request.environment, { SXSY_TEST_MODE: "1" });
   assert.equal(request.repositoryRoot, setup.verified.canonicalRepositoryRoot);
   assert.equal(request.manifestSha256, setup.verified.digest);

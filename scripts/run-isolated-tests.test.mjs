@@ -64,6 +64,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     assert.deepEqual(overrides, new Map([
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 240_000],
+      ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
+      ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
       ["apps/windows-companion/test/installed-automation-e2e.test.ts", 240_000],

@@ -45,7 +45,8 @@ test("credential provisioning attests and durably records only the exact submitt
   assert.deepEqual(summary.scopes, scopes.map((scope) => ({ ...scope, repositoryRoot: expectedRoot })));
   assert.match(prompts[0]!, /configured-network\/provider-api/);
   assert.match(prompts[0]!, /council-resource-host\/council-session/);
-  assert.equal(prompts[0]!.includes(expectedRoot), true);
+  assert.match(prompts[0]!, /Exact scope [a-f0-9]{64}/);
+  assert.equal(prompts[0]!.length <= 240, true);
   const durableReceipt = JSON.stringify(await store.readEntries());
   assert.equal(durableReceipt.includes("secret-value"), false);
   assert.equal(durableReceipt.includes("configured-network"), true);

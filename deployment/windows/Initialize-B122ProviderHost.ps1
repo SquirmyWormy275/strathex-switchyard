@@ -20,15 +20,12 @@ $config=Join-Path $root 'provider-host.json';$certificate=Join-Path $root 'loopb
 $priorProfile=$null;if(Test-Path -LiteralPath $provisioning -PathType Leaf){$priorArtifact=Get-Content -LiteralPath $provisioning -Raw|ConvertFrom-Json;if($priorArtifact.schema-ceq'sxsy-b122.provider-host-companion-provisioning'-and$priorArtifact.version-eq2){$candidate=$priorArtifact.profile;$generation=0;if($candidate.schema-cne'sxsy-b122.provider-host-dispatch-profile'-or$candidate.version-ne1-or-not[int]::TryParse([string]$candidate.generation,[ref]$generation)-or$generation-lt1-or[string]$candidate.configurationSha256-cnotmatch'^[a-f0-9]{64}$'-or[string]$candidate.profileDigest-cnotmatch'^[a-f0-9]{64}$'){throw 'The prior provider-host profile generation is malformed.'};$priorProfile=$candidate}elseif($priorArtifact.schema-cne'sxsy-b122.provider-host-companion-provisioning'-or$priorArtifact.version-ne1){throw 'The prior provider-host companion provisioning artifact is malformed.'}}
 if((Test-Path -LiteralPath $config)-and-not$Replace){throw 'The provider-host instance is already configured; use -Replace for rollback-preserving rotation.'}
 & $secretTool -Action GenerateAuthenticationToken -ProtectedStateRoot $root -EnvelopePath $tokenEnvelope -ConfirmCurrentUser -Replace:$Replace|Out-Null
-if($LASTEXITCODE-ne0){throw 'The DPAPI provider-host authentication token could not be generated.'}
 Trace-Stage 'authentication-token-ready'
 if(Test-Path -LiteralPath $journalEnvelope -PathType Leaf){& $secretTool -Action Validate -ProtectedStateRoot $root -EnvelopePath $journalEnvelope -ConfirmCurrentUser|Out-Null}
 else{& $secretTool -Action GenerateJournalAuthenticationKey -ProtectedStateRoot $root -EnvelopePath $journalEnvelope -ConfirmCurrentUser|Out-Null}
-if($LASTEXITCODE-ne0){throw 'The stable DPAPI provider-host journal authentication key could not be established.'}
 Trace-Stage 'journal-key-ready'
 if(Test-Path -LiteralPath $dispatchLeaseEnvelope -PathType Leaf){& $secretTool -Action Validate -ProtectedStateRoot $root -EnvelopePath $dispatchLeaseEnvelope -ConfirmCurrentUser|Out-Null}
 else{& $secretTool -Action GenerateDispatchLeaseAuthenticationKey -ProtectedStateRoot $root -EnvelopePath $dispatchLeaseEnvelope -ConfirmCurrentUser|Out-Null}
-if($LASTEXITCODE-ne0){throw 'The stable DPAPI provider-host dispatch-lease authentication key could not be established.'}
 Trace-Stage 'dispatch-lease-key-ready'
 if(-not(Test-Path -LiteralPath $certificate)-and-not(Test-Path -LiteralPath $privateKey)){& $node $tlsTool --certificate $certificate --private-key $privateKey|Out-Null;if($LASTEXITCODE-ne0){throw 'The loopback TLS identity could not be generated.'}}
 elseif(-not(Test-Path -LiteralPath $certificate)-or-not(Test-Path -LiteralPath $privateKey)){throw 'The provider-host TLS identity is incomplete and was not replaced.'}

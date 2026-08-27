@@ -374,6 +374,7 @@ if (rejected) {
   $shutdownMainSource=Join-Path $shutdownBundle 'app\dist\apps\windows-companion\src\main.js';$shutdownNodeSource=Join-Path $shutdownBundle 'runtime\node.exe'
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $shutdownMainSource),(Split-Path -Parent $shutdownNodeSource)|Out-Null
   Copy-Item -LiteralPath (Get-Command node.exe -ErrorAction Stop).Source -Destination $shutdownNodeSource
+  [IO.File]::WriteAllText((Join-Path $shutdownBundle 'app\package.json'),'{"type":"commonjs"}',(New-Object Text.UTF8Encoding($false)))
   [IO.File]::WriteAllText($shutdownMainSource,"const{spawn}=require('node:child_process');const{writeFileSync}=require('node:fs');const{join}=require('node:path');const c=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});writeFileSync(join(process.argv[3],'child.pid'),String(c.pid));setInterval(()=>{},1000);",(New-Object Text.UTF8Encoding($false)))
   [IO.File]::WriteAllText((Join-Path $shutdownBundle 'release.json'),([ordered]@{schema='sxsy-b122.windows-release';version=1;sourceCommit=$shutdownCommit}|ConvertTo-Json),(New-Object Text.UTF8Encoding($false)))
   Initialize-B122OwnedInstallRoot -InstallRoot $shutdownInstall -ProtectedPaths @($shutdownBundle,$PSScriptRoot)|Out-Null

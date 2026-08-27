@@ -48,7 +48,7 @@ const companionTests = [
 ].map((name) => ({
   file: `apps/windows-companion/test/${name}.test.ts`,
   currentUserProfile: name === "packaged-runtime",
-  ...(name === "companion-lifecycle-helper" ? { timeoutMs: 240_000 } : {}),
+  ...(["authenticated-pipe", "companion-lifecycle-helper"].includes(name) ? { timeoutMs: 240_000 } : {}),
   ...(["council-workspace-isolation", "installed-automation-e2e", "repository-runner-helper"].includes(name) ? { timeoutMs: 240_000 } : {})
 }));
 const mediatedGitTests = [
@@ -58,7 +58,7 @@ const mediatedGitTests = [
   "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
-  .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts` }));
+  .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts`, ...(name === "named-pipe-transport" ? { timeoutMs: 120_000 } : {}) }));
 const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "main", "reanchor", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
   .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 240_000 } : {}) }));
 export const requiredGroups = [

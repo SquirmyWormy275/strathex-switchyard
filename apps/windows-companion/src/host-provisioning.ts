@@ -208,11 +208,12 @@ function exactCredentialScopes(value: readonly CredentialScope[]): readonly Cred
 }
 
 function credentialPresencePrompt(reference: string, scopes: readonly CredentialScope[], replacing: boolean): string {
-  const grouped = new Map<string, string[]>();
-  for (const scope of scopes) grouped.set(scope.repositoryRoot, [...(grouped.get(scope.repositoryRoot) ?? []), `${scope.adapterId}/${scope.purpose}`]);
-  const exactScopes = [...grouped].map(([repositoryRoot, pairs]) => `${JSON.stringify(repositoryRoot)}=>${pairs.join(",")}`).join("; ");
-  const prompt = `${replacing ? "Rotate" : "Provision"} B122 credential ${reference} for ${exactScopes}`;
-  if (prompt.length > 240) throw new Error("The exact credential scope set is too large for the trusted presence prompt.");
+  const exactScopes = scopes.map((scope) => ({ repositoryRoot: scope.repositoryRoot, adapterId: scope.adapterId, purpose: scope.purpose }));
+  const scopeDigest = createHash("sha256").update(JSON.stringify(exactScopes), "utf8").digest("hex");
+  const pairs = scopes.map((scope) => `${scope.adapterId}/${scope.purpose}`).join(",");
+  const prefix = `${replacing ? "Rotate" : "Provision"} B122 credential ${reference}. Exact scope ${scopeDigest}. `;
+  const prompt = `${prefix}${pairs.slice(0, Math.max(0, 240 - prefix.length))}`;
+  if (prompt.length > 240 || prefix.length > 240) throw new Error("The exact credential scope set is too large for the trusted presence prompt.");
   return prompt;
 }
 

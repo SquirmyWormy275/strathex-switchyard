@@ -204,6 +204,7 @@ test("health probe distinguishes retryable absence from fail-closed configuratio
     const extensionDirectory = join(root, "extension", "dist", "apps", "vscode-extension", "src");
     await mkdir(scriptDirectory, { recursive: true });
     await mkdir(extensionDirectory, { recursive: true });
+    await writeFile(join(root, "extension", "package.json"), JSON.stringify({ type: "commonjs" }), "utf8");
     const healthScript = join(scriptDirectory, "Test-B122Health.mjs");
     await copyFile(join(process.cwd(), "deployment", "windows", "Test-B122Health.mjs"), healthScript);
     await copyFile(join(process.cwd(), "apps", "vscode-extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js"), join(extensionDirectory, "named-pipe-transport.js"));

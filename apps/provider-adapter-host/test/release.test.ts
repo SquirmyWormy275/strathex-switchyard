@@ -50,6 +50,7 @@ test("provider companion provisioning loads the self-contained packaged extensio
   const transport = join(bundle, "extension", "dist", "apps", "vscode-extension", "src", "named-pipe-transport.js");
   const artifactPath = join(fixture, "companion-provisioning.json");
   await mkdir(dirname(transport), { recursive: true });
+  await writeFile(join(bundle, "extension", "package.json"), JSON.stringify({ type: "commonjs" }), "utf8");
   await writeFile(transport, `exports.ProvisionedNamedPipeJsonLineTransport = class {
   async request(value) {
     const request = JSON.parse(value);

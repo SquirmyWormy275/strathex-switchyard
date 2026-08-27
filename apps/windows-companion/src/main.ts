@@ -348,9 +348,10 @@ export async function writeAuthenticatedCompanionProcessIdentity(input: Readonly
     realpath(resolve(input.processPath))
   ]);
   const identity = await (input.capture ?? (() => captureCurrentWindowsProcessIdentity(input.supervisorHelperPath, input.supervisorHelperSha256)))();
+  const identityExecutablePath = await realpath(resolve(identity.executablePath)).catch(() => "");
   if (identity.pid !== process.pid || !Number.isSafeInteger(identity.parentProcessId) || identity.parentProcessId < 0 || !Number.isSafeInteger(identity.sessionId) || identity.sessionId < 0
     || !/^[1-9][0-9]{10,19}$/.test(identity.creationFileTimeUtc) || /[\r\n\0]/.test(identity.executablePath) || identity.arguments.length < 1 || identity.arguments.some((argument) => /[\r\n\0]/.test(argument))
-    || resolve(identity.executablePath).toLowerCase() !== resolve(processPath).toLowerCase()) throw new Error("The exact companion process identity is invalid.");
+    || identityExecutablePath.toLowerCase() !== processPath.toLowerCase()) throw new Error("The exact companion process identity is invalid.");
   const payload = {
     schema: "sxsy-b122.companion-process-identity",
     version: 1,
@@ -384,7 +385,7 @@ async function captureCurrentWindowsProcessIdentity(helperPath: string | undefin
   try {
     const observed = JSON.parse(output) as Record<string, unknown>;
     if (Object.keys(observed).sort().join(",") !== "creationFileTimeUtc,pid,schema,sessionId,version" || observed.schema !== "sxsy-b122.windows-process-identity" || observed.version !== 1 || observed.pid !== process.pid || typeof observed.creationFileTimeUtc !== "string" || !/^[1-9][0-9]{10,19}$/.test(observed.creationFileTimeUtc) || !Number.isSafeInteger(observed.sessionId) || Number(observed.sessionId) < 0) throw new Error("invalid receipt");
-    return { pid: process.pid, creationFileTimeUtc: String(observed.creationFileTimeUtc), sessionId: Number(observed.sessionId), executablePath: process.execPath, arguments: process.argv.slice(1), parentProcessId: process.ppid };
+    return { pid: process.pid, creationFileTimeUtc: String(observed.creationFileTimeUtc), sessionId: Number(observed.sessionId), executablePath: await realpath(process.execPath), arguments: process.argv.slice(1), parentProcessId: process.ppid };
   } catch { throw new Error("The exact companion process identity probe returned invalid JSON."); }
 }
 
