@@ -391,10 +391,27 @@ async function boundedFile(path: string, maximum: number, label: string): Promis
 }
 async function defaultProtectedBaseRoot(): Promise<string> {
   const local = process.platform === "win32"
-    ? await windowsKnownLocalApplicationData()
+    ? await windowsKnownLocalApplicationDataForRuntime()
     : process.env.LOCALAPPDATA;
   if (!local || /[\0\r\n]/.test(local) || !isAbsolute(local)) throw new Error("The current-user LocalAppData boundary is unavailable.");
   return resolve(local, "STRATHEX", "switchyard", "provider-host");
+}
+
+async function windowsKnownLocalApplicationDataForRuntime(): Promise<string> {
+  if (process.env.SXSY_TEST_MODE !== "1") return windowsKnownLocalApplicationData();
+  const testRootValue = process.env.SXSY_TEST_ROOT;
+  const localValue = process.env.LOCALAPPDATA;
+  if (!testRootValue || !localValue || /[\0\r\n]/.test(testRootValue) || /[\0\r\n]/.test(localValue)
+    || !isAbsolute(testRootValue) || !isAbsolute(localValue)) {
+    throw new Error("The isolated provider-host LocalAppData boundary is unavailable.");
+  }
+  const testRoot = resolve(testRootValue);
+  const local = resolve(localValue);
+  const suffix = relative(testRoot, local);
+  if (!suffix || suffix.startsWith("..") || isAbsolute(suffix)) {
+    throw new Error("The isolated provider-host LocalAppData boundary must be a strict child of the test root.");
+  }
+  return local;
 }
 
 function windowsKnownLocalApplicationData(): Promise<string> {

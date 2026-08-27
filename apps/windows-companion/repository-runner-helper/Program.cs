@@ -338,11 +338,14 @@ internal static class Program
         if (handle.IsInvalid) throw LastError(65, "Reviewed directory could not be locked against rename or replacement.");
         try
         {
-            var finalPath = new StringBuilder(32_768);
-            uint length = GetFinalPathNameByHandleW(handle, finalPath, (uint)finalPath.Capacity, 0);
-            if (length == 0 || length >= finalPath.Capacity) throw LastError(65, "Reviewed directory final identity is unavailable.");
-            string canonical = NormalizeFinalHandlePath(finalPath.ToString());
-            if (!SamePath(canonical, path) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new RunnerException(65, "Reviewed directory changed identity or became linked before CreateProcess.");
+            // The opened handle is the authoritative directory identity. It is
+            // held without FILE_SHARE_DELETE through CreateProcess, so the
+            // reviewed object cannot be renamed or replaced. A textual final-
+            // path equality check is invalid for a legitimate SUBST alias:
+            // Windows may report the underlying physical path for this exact
+            // same handle. Parent/leaf reparse checks remain mandatory.
+            string canonical = FinalPath(handle, "Reviewed directory final identity is unavailable.");
+            if (!Path.IsPathFullyQualified(canonical) || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new RunnerException(65, "Reviewed directory changed identity or became linked before CreateProcess.");
             return handle;
         }
         catch
@@ -357,6 +360,14 @@ internal static class Program
         if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) return @"\\" + path[8..];
         if (path.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase)) return path[4..];
         return path;
+    }
+
+    private static string FinalPath(SafeFileHandle handle, string unavailableMessage)
+    {
+        var finalPath = new StringBuilder(32_768);
+        uint length = GetFinalPathNameByHandleW(handle, finalPath, (uint)finalPath.Capacity, 0);
+        if (length == 0 || length >= finalPath.Capacity) throw LastError(65, unavailableMessage);
+        return NormalizeFinalHandlePath(finalPath.ToString());
     }
 
     private static string ResolveOwnedRelativePath(string root, string value, string label)
@@ -759,7 +770,16 @@ internal static class Program
     private static void VerifyHelperIdentity(Request request)
     {
         string self = ResolveSelf();
-        if (!SamePath(self, request.HelperPath) || !FixedEquals(Sha256File(self, 512 * 1024 * 1024), request.HelperSha256)) throw new RunnerException(65, "Helper path or digest does not match the reviewed package identity.");
+        FileInfo reviewed = new(request.HelperPath);
+        FileInfo running = new(self);
+        if (!reviewed.Exists || !running.Exists || (reviewed.Attributes & FileAttributes.ReparsePoint) != 0 || (running.Attributes & FileAttributes.ReparsePoint) != 0)
+            throw new RunnerException(65, "Helper path or digest does not match the reviewed package identity.");
+        using var reviewedStream = new FileStream(request.HelperPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var runningStream = new FileStream(self, FileMode.Open, FileAccess.Read, FileShare.Read);
+        string reviewedIdentity = FinalPath(reviewedStream.SafeFileHandle, "Reviewed helper final identity is unavailable.");
+        string runningIdentity = FinalPath(runningStream.SafeFileHandle, "Running helper final identity is unavailable.");
+        if (!SamePath(reviewedIdentity, runningIdentity) || !FixedEquals(Sha256File(self, 512 * 1024 * 1024), request.HelperSha256))
+            throw new RunnerException(65, "Helper path or digest does not match the reviewed package identity.");
     }
 
     private static string ResolveSelf() => Path.GetFullPath(Environment.ProcessPath ?? throw new RunnerException(70, "Helper executable path is unavailable."));

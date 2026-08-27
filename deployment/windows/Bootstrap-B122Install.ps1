@@ -406,9 +406,17 @@ function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath
     do{
       if([IO.File]::Exists($StatePath)){try{$runningBytes=Read-B122BootstrapBytes $StatePath 262144;try{$runningState=([Text.Encoding]::UTF8.GetString($runningBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($runningBytes,0,$runningBytes.Length)}}catch{$runningState=$null}}
       if($null-ne$runningState-and[string]$runningState.state-ceq'running'-and[int]$runningState.supervisorPid-eq[int]$process.ProcessId-and[int]$runningState.childPid-gt0){break}
+      if($process.Wait(0)){break}
       [Threading.Thread]::Sleep(20)
     }while([DateTime]::UtcNow-lt$deadline)
-    if($null-eq$runningState-or[string]$runningState.state-cne'running'){throw 'The trusted repository supervisor did not reach an exact running child state.'}
+    if($null-eq$runningState-or[string]$runningState.state-cne'running'){
+      $exitDetail=if($process.Wait(0)){"exit $([int]$process.ExitCode)"}else{'still running'}
+      $diagnostic='no bounded diagnostic'
+      if([IO.File]::Exists($StderrPath)){
+        try{$candidate=(Read-B122BootstrapOutput $StderrPath 262144).Trim().Replace("`r",' ').Replace("`n",' ');if($candidate.Length-gt2048){$candidate=$candidate.Substring(0,2048)};if(-not[string]::IsNullOrWhiteSpace($candidate)){$diagnostic=$candidate}}catch{$diagnostic='unreadable bounded diagnostic'}
+      }
+      throw "The trusted repository supervisor did not reach an exact running child state ($exitDetail; $diagnostic)."
+    }
     $requestBytes=Read-B122BootstrapBytes $RequestPath 262144;try{$request=([Text.Encoding]::UTF8.GetString($requestBytes)|Microsoft.PowerShell.Utility\ConvertFrom-Json)}finally{[Array]::Clear($requestBytes,0,$requestBytes.Length)}
     $runningKeys=@($runningState.PSObject.Properties.Name);$expectedRunningKeys=@('schema','version','supervisorId','operationId','action','targetSnapshotId','sessionId','authorityId','repositoryRoot','manifestSha256','helperPath','helperSha256','requestSha256','signingPublicKeySpki','signingPublicKeySha256','jobName','supervisorPid','childPid','startedAt','state','exitCode','outputTruncated')
     $runningSpkiBytes=$null;try{$runningSpkiBytes=[Convert]::FromBase64String([string]$runningState.signingPublicKeySpki);$runningSpkiSha=Get-B122BootstrapSha256Bytes $runningSpkiBytes}finally{if($null-ne$runningSpkiBytes-and$runningSpkiBytes.Length){[Array]::Clear($runningSpkiBytes,0,$runningSpkiBytes.Length)}}
