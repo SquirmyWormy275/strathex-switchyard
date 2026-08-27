@@ -306,7 +306,7 @@ function Get-B122BootstrapKnownFolder([Environment+SpecialFolder]$Folder,[string
     $test=[IO.Path]::GetFullPath([string]$env:SXSY_TEST_ROOT)
     $value=if($Folder-eq[Environment+SpecialFolder]::UserProfile){[string]$env:USERPROFILE}elseif($Folder-eq[Environment+SpecialFolder]::LocalApplicationData){[string]$env:LOCALAPPDATA}else{[string]$env:APPDATA}
     if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)){throw "The isolated $Label path is unavailable."}
-    $value=[IO.Path]::GetFullPath($value);$prefix=$test.TrimEnd('\')+'\';if(-not$value.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "The isolated $Label path must be a strict child of SXSY_TEST_ROOT."};return $value
+    $value=[IO.Path]::GetFullPath($value);$prefix=$test.TrimEnd('\')+'\';$profileRoot=$Folder-eq[Environment+SpecialFolder]::UserProfile-and$value.Equals($test,[StringComparison]::OrdinalIgnoreCase);if(-not$profileRoot-and-not$value.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)){throw "The isolated $Label path must remain within SXSY_TEST_ROOT."};return $value
   }
   $value=[Environment]::GetFolderPath($Folder)
   if([string]::IsNullOrWhiteSpace($value)-or-not[IO.Path]::IsPathRooted($value)-or$value.IndexOfAny([char[]]@([char]0,[char]10,[char]13))-ge0){throw "The current-user $Label Known Folder is unavailable."}

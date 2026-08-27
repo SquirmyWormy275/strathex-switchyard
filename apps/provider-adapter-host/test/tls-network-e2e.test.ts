@@ -96,13 +96,10 @@ test("provider secret generation validates and Initialize emits its exact ready-
 });
 
 test("packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS", { skip: process.platform !== "win32" }, async (context) => {
-  // The production PowerShell tools use the Windows Known Folder API rather
-  // than mutable environment variables. The isolated runner deliberately
-  // redirects LOCALAPPDATA, so query the same authority and still create only
-  // one unique receipt-owned child beneath it.
-  const protectedBase = join(await windowsKnownLocalAppData(), "STRATHEX", "switchyard", "provider-host");
-  await mkdir(protectedBase, { recursive: true });
-  const root = await mkdtemp(join(protectedBase, "e2e-"));
+  const local = process.env.LOCALAPPDATA;
+  if (!local || !isAbsolute(local) || /[\0\r\n]/.test(local)) throw new Error("The isolated LocalApplicationData fixture is unavailable.");
+  const protectedBase = join(resolve(local), "STRATHEX", "switchyard", "provider-host");
+  const root = join(protectedBase, `e2e-${randomUUID().replaceAll("-", "")}`);
   const bundle = join(root, "bundle");
   const config = join(root, "provider-host.json");
   let lifecycleReady = false;
@@ -123,10 +120,10 @@ test("packaged provider host lifecycle and the production pinned network broker 
   const networkPolicyPath = join(root, "network-policy.json");
   const firstPort = await freePort();
   const replacementPort = await freePort();
-  await runExecutable(process.execPath, [join(repository, "deployment/windows/New-B122LoopbackTlsIdentity.mjs"), "--certificate", certificate, "--private-key", privateKey]);
   await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateAuthenticationToken", "-ProtectedStateRoot", root, "-EnvelopePath", tokenEnvelope, "-ConfirmCurrentUser"]);
   await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateJournalAuthenticationKey", "-ProtectedStateRoot", root, "-EnvelopePath", journalEnvelope, "-ConfirmCurrentUser"]);
   await runPowerShell(join(repository, "deployment/windows/Protect-B122ProviderHostSecret.ps1"), ["-Action", "GenerateDispatchLeaseAuthenticationKey", "-ProtectedStateRoot", root, "-EnvelopePath", dispatchLeaseEnvelope, "-ConfirmCurrentUser"]);
+  await runExecutable(process.execPath, [join(repository, "deployment/windows/New-B122LoopbackTlsIdentity.mjs"), "--certificate", certificate, "--private-key", privateKey]);
   await writeFile(backendPlan, JSON.stringify({ schema: "sxsy-b122.provider-host-backend-plan", version: 1, providers: [{ provider: "codex", kind: "fixture" }] }), { mode: 0o600 });
   const tls = JSON.parse(await runExecutable(process.execPath, [join(repository, "deployment/windows/Get-B122TlsIdentity.mjs"), "--certificate", certificate, "--private-key", privateKey]));
   const sealedToken = JSON.parse(await readFile(tokenEnvelope, "utf8"));
@@ -359,15 +356,6 @@ async function assertDispatchProvisioningArtifact(initializedRoot: string, expec
     (await realpath(join(initializedRoot, "dispatch-lease-authentication.envelope.json"))).toLowerCase(),
     "the dispatch-lease envelope must resolve to the exact initialized artifact even when Windows returns an 8.3 alias"
   );
-}
-async function windowsKnownLocalAppData(): Promise<string> {
-  const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
-  if (!systemRoot || !isAbsolute(systemRoot) || /[\0\r\n]/.test(systemRoot)) throw new Error("Windows SystemRoot is unavailable.");
-  const executable = join(resolve(systemRoot), "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  const command = `$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;$profile=[string](Get-ItemPropertyValue -LiteralPath ('Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\'+$sid) -Name ProfileImagePath);$local=[string](Get-ItemPropertyValue -LiteralPath 'Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders' -Name 'Local AppData');if([string]::IsNullOrWhiteSpace($profile)-or[string]::IsNullOrWhiteSpace($local)){exit 1};if($local.StartsWith('%USERPROFILE%',[StringComparison]::OrdinalIgnoreCase)){$local=Join-Path $profile $local.Substring(13).TrimStart([char]92,[char]47)}elseif($local.Contains('%')-or-not[IO.Path]::IsPathRooted($local)){exit 1};[Console]::Out.Write([IO.Path]::GetFullPath($local))`;
-  const value = (await runExecutable(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], { SystemRoot: resolve(systemRoot), WINDIR: resolve(systemRoot) })).trim();
-  if (!isAbsolute(value) || /[\0\r\n]/.test(value)) throw new Error("Windows LocalApplicationData Known Folder is unavailable.");
-  return resolve(value);
 }
 async function removeWithRetry(path: string): Promise<void> {
   let failure: unknown;

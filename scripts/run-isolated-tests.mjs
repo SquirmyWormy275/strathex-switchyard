@@ -72,7 +72,8 @@ export const requiredGroups = [
   ...(process.platform === "win32" ? [{
     file: "deployment/windows/Test-B122ManifestGenerators.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ManifestGenerators.ps1"]
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ManifestGenerators.ps1"],
+    timeoutMs: 180_000
   }, {
     file: "deployment/windows/Test-B122InstallLifecycle.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
