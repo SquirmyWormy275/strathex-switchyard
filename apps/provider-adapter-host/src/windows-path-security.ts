@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { lstat, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { lstat } from "node:fs/promises";
+import { dirname, isAbsolute, parse, relative, resolve } from "node:path";
 
 export interface ProviderHostPathSecurity {
   assertCurrentUserProtected(protectedRoot: string, existingPaths: readonly string[]): Promise<void>;
@@ -13,12 +13,24 @@ export class WindowsCurrentUserProviderHostPathSecurity implements ProviderHostP
     const root = resolve(protectedRoot);
     if (!isAbsolute(root) || !existingPaths.every((path) => isInside(root, resolve(path)))) throw new Error("Provider-host secrets and state must remain beneath the protected current-user root.");
     for (const path of [root, ...existingPaths]) {
-      const metadata = await lstat(path);
-      if ((!metadata.isDirectory() && !metadata.isFile()) || metadata.isSymbolicLink() || resolve(await realpath(path)).toLowerCase() !== resolve(path).toLowerCase()) {
-        throw new Error("A provider-host protected path is not one canonical non-reparse filesystem object.");
-      }
+      await assertNonReparseObject(path);
     }
     await verifyWindowsAcl([root, ...existingPaths]);
+  }
+}
+
+async function assertNonReparseObject(path: string): Promise<void> {
+  let current = resolve(path);
+  const volumeRoot = parse(current).root;
+  for (;;) {
+    const metadata = await lstat(current);
+    if ((!metadata.isDirectory() && !metadata.isFile()) || metadata.isSymbolicLink()) {
+      throw new Error("A provider-host protected path is not one canonical non-reparse filesystem object.");
+    }
+    if (current.toLowerCase() === volumeRoot.toLowerCase()) return;
+    const parent = dirname(current);
+    if (parent === current) throw new Error("A provider-host protected path has no exact filesystem root.");
+    current = parent;
   }
 }
 

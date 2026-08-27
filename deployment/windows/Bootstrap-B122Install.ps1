@@ -529,7 +529,10 @@ function Invoke-B122BootstrapInterruptedReconciliation([string]$StagingBase){
 }
 
 function Invoke-B122BootstrapCleanupReplacementProbe([string]$Root){
-  $retained="$Root.retained-$(New-B122BootstrapHex 16)";[IO.Directory]::Move($Root,$retained);[IO.Directory]::CreateDirectory($Root)|Out-Null;Set-B122BootstrapProtectedAcl $Root
+  $retained="$Root.retained-$(New-B122BootstrapHex 16)";$moved=$false;$lastFailure=$null
+  for($attempt=0;$attempt-lt250;$attempt++){try{[IO.Directory]::Move($Root,$retained);$moved=$true;break}catch{$lastFailure=$_.Exception.Message;[Threading.Thread]::Sleep(20)}}
+  if(-not$moved){throw "The test cleanup replacement probe could not establish its exact rename seam: $lastFailure"}
+  [IO.Directory]::CreateDirectory($Root)|Out-Null;Set-B122BootstrapProtectedAcl $Root
   [IO.File]::WriteAllText((Join-Path $Root 'replacement-sentinel.txt'),'must survive cleanup',(New-Object Text.UTF8Encoding($false)))
 }
 
