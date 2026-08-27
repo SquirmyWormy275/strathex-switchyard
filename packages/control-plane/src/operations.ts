@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CommandStatus, OperationRecord, OperationState, ReceiptResult } from "./contracts.ts";
+import type { CommandStatus, EffectDisposition, OperationRecord, OperationState, ReceiptResult } from "./contracts.ts";
 import { redactText } from "./redaction.ts";
 import { ReceiptLedger } from "./receipts.ts";
 import { jsonClone, sha256, stableJson, type JournalEntry, type JsonStoreTransaction, ProtectedJsonStore } from "./store.ts";
@@ -93,7 +93,7 @@ export type ChildOperationOutcome = "completed" | "failed" | "cancelled" | "ambi
  */
 export interface ChildOperationSaga {
   begin(input: ChildOperationStart): Promise<ChildOperationLease>;
-  markExecuting(lease: ChildOperationLease): Promise<void>;
+  markExecuting(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void>;
   markExternalCommitted(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void>;
   markCancelling(lease: ChildOperationLease): Promise<void>;
   markCompensating(lease: ChildOperationLease): Promise<void>;
@@ -116,6 +116,7 @@ export interface DurableOperationClaim {
   readonly action: string;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
+  readonly authorityId?: string;
 }
 
 export interface DurableOperationResult {
@@ -124,6 +125,7 @@ export interface DurableOperationResult {
   readonly authorityId?: string;
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly effectDisposition?: EffectDisposition;
   /** Gate-bearing receipts are issued only with explicit evidence metadata. */
   readonly policyVersion?: string;
   readonly evidenceDigest?: string;
@@ -295,6 +297,10 @@ export class OperationSagaStore {
         .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
       const active = matching.find((operation) => !isTerminal(operation.state));
       if (active) return { operation: cloneOperation(active), reused: true };
+      const latest = matching.at(-1);
+      if (latest?.state === "recorded" && latest.details.noReplay === "true") {
+        return { operation: cloneOperation(latest), reused: true };
+      }
       const generation = matching.length + 1;
       return this.beginWithin(transaction, {
         action: input.action,
@@ -415,6 +421,59 @@ export class OperationSagaStore {
         : "External state was reconciled without replaying the parent saga.";
       await this.recordReconciliation(candidate.id, outcome, note);
       results.push({ operationId: candidate.id, outcome, note });
+    }
+    return results;
+  }
+
+  /**
+   * Bootstrap recovery may prove every child terminal after the original
+   * process lost its broker result. Settle derived composite boundaries first,
+   * then their roots, but only as incomplete/failed/cancelled. This never
+   * manufactures a completed result or receipt; it merely releases the active
+   * dispatch scope so a fresh explicit generation can re-observe provider state.
+   */
+  async settleRecoveredParents(): Promise<readonly ReconciliationResult[]> {
+    const results: ReconciliationResult[] = [];
+    for (;;) {
+      const operations = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      let candidate: OperationRecord | undefined;
+      let evidence: readonly OperationRecord[] = [];
+
+      // Composite boundaries are siblings of their concrete effect children.
+      for (const parent of operations.values()) {
+        const children = parent.childIds.map((id) => operations.get(id)).filter((child): child is OperationRecord => !!child);
+        const boundary = children.find((child) => !isTerminal(child.state) && child.action.endsWith(".composite"));
+        const siblings = boundary ? children.filter((child) => child.id !== boundary.id) : [];
+        if (boundary && siblings.length && siblings.every((child) => isTerminal(child.state))) { candidate = boundary; evidence = siblings; break; }
+      }
+
+      // Once all child boundaries/effects are terminal, release the root scope.
+      if (!candidate) {
+        candidate = [...operations.values()].find((operation) => !operation.parentId && !isTerminal(operation.state) && operation.childIds.length > 0
+          && operation.childIds.every((id) => { const child = operations.get(id); return !!child && isTerminal(child.state); }));
+        if (candidate) evidence = candidate.childIds.map((id) => operations.get(id)!).filter(Boolean);
+      }
+      if (!candidate) break;
+
+      const recordedEffect = evidence.some((operation) => operation.state === "recorded");
+      const target: OperationState = recordedEffect ? "recorded" : evidence.some((operation) => operation.state === "failed") ? "failed" : "cancelled";
+      const note = recordedEffect
+        ? "All durable children are terminal and at least one external effect was recorded; the lost root result is incomplete and must be explicitly re-observed."
+        : target === "failed" ? "All durable children are terminal and a child failed; the lost root result was closed as failed without replay."
+          : "All durable children are terminal and cancelled; the lost root result was closed without replay.";
+      const details = recordedEffect
+        ? { commandStatus: "incomplete", recoveryDisposition: "child-effects-recorded", recoveredWithoutReceipt: "true" }
+        : { commandStatus: target, recoveryDisposition: `children-${target}`, recoveredWithoutReceipt: "true" };
+      try {
+        await this.advanceReconciled(candidate, target, details);
+        await this.recordReconciliation(candidate.id, target, note);
+        results.push({ operationId: candidate.id, outcome: target, note });
+      } catch {
+        const failedNote = "Terminal child state could not safely settle the recovered parent; it remains fail-closed.";
+        await this.recordReconciliation(candidate.id, "unresolved", failedNote);
+        results.push({ operationId: candidate.id, outcome: "unresolved", note: failedNote });
+        break;
+      }
     }
     return results;
   }
@@ -628,11 +687,14 @@ class DurableChildOperationSaga implements ChildOperationSaga {
     return childLeaseFor(begun.operation, begun.reused);
   }
 
-  async markExecuting(lease: ChildOperationLease): Promise<void> {
+  async markExecuting(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void> {
     const child = await this.requireNewChild(lease);
-    if (child.state === "executing") return;
+    if (child.state === "executing") {
+      if (details && Object.keys(details).length > 0) await this.operations.advance(child.id, "executing", details);
+      return;
+    }
     if (child.state !== "prepared") throw new OperationSagaError(`Child ${child.id} cannot begin provider execution from ${child.state}.`);
-    await this.operations.advance(child.id, "executing");
+    await this.operations.advance(child.id, "executing", details);
   }
 
   async markExternalCommitted(lease: ChildOperationLease, details?: Readonly<Record<string, string>>): Promise<void> {
@@ -770,7 +832,7 @@ export class NoReplayOperationRecovery {
   }
 
   async recoverPending(): Promise<readonly ReconciliationResult[]> {
-    return this.operations.reconcilePending({
+    const results = [...await this.operations.reconcilePending({
       reconcile: async (operation) => {
         const reconciler = this.reconcilers.get(operation.action);
         if (!reconciler) {
@@ -790,7 +852,12 @@ export class NoReplayOperationRecovery {
         }
         return decision;
       }
-    });
+    })];
+    for (const settled of await this.operations.settleRecoveredParents()) {
+      const prior = results.findIndex((result) => result.operationId === settled.operationId);
+      if (prior >= 0) results[prior] = settled; else results.push(settled);
+    }
+    return results;
   }
 }
 
@@ -801,10 +868,16 @@ function commandStatusFor(operation: OperationRecord): CommandStatus {
     case "external_committed":
     case "compensating": return "running";
     case "cancelling": return "running";
-    case "recorded": return "completed";
+    case "recorded": return recordedCommandStatus(operation.details.commandStatus);
     case "failed": return "failed";
     case "cancelled": return "cancelled";
   }
+}
+
+function recordedCommandStatus(value: string | undefined): CommandStatus {
+  return value === "completed" || value === "failed" || value === "timed_out" || value === "unavailable" || value === "incomplete" || value === "blocked" || value === "cancelled"
+    ? value
+    : "completed";
 }
 
 function receiptResultFor(status: CommandStatus): ReceiptResult {
@@ -840,12 +913,12 @@ export class DurableOperationCoordinator {
   async claim(input: DurableOperationClaim): Promise<DurableCommandOperationLease> {
     const action = nonEmpty(input.action, "dispatch action");
     const targetSnapshotId = input.targetSnapshotId ?? `<no-target:${input.sessionId ?? "host"}>`;
-    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none" });
+    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none" });
     const claimed = await this.operations.claimScope({
       scope,
       action,
       targetSnapshotId,
-      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
+      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
     });
     return {
       operationId: claimed.operation.id,
@@ -917,7 +990,7 @@ export class DurableOperationCoordinator {
       throw new OperationSagaError(`Unsupported command status for durable operation: ${result.status}`);
     }
     let receiptId: string | undefined;
-    if (result.status === "completed") {
+    if (result.status === "completed" || result.effectDisposition === "committed") {
       await this.markExternalCommitted(lease, { commandStatus: result.status });
       operation = await this.requireOperation(lease.operationId);
     } else if (result.status === "cancelled") {
@@ -971,8 +1044,13 @@ export class DurableOperationCoordinator {
     });
 
     operation = await this.requireOperation(lease.operationId);
-    if (result.status === "completed" && operation.state === "external_committed") {
-      await this.operations.advance(operation.id, "recorded", { commandStatus: result.status, ...(receiptId ? { receiptId } : {}) });
+    if ((result.status === "completed" || result.effectDisposition === "committed") && operation.state === "external_committed") {
+      await this.operations.advance(operation.id, "recorded", {
+        commandStatus: result.status,
+        ...(result.effectDisposition === "committed" ? { effectDisposition: "committed" } : {}),
+        ...(result.effectDisposition === "committed" && result.status !== "completed" ? { noReplay: "true" } : {}),
+        ...(receiptId ? { receiptId } : {})
+      });
     } else if (result.status === "cancelled" && operation.state === "cancelling") {
       await this.operations.advance(operation.id, "cancelled", { commandStatus: result.status });
     } else if (result.status !== "completed" && operation.state !== "external_committed") {

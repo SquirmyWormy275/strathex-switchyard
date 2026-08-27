@@ -10,6 +10,25 @@ import { companionBridgeVersion, type CompanionRequest } from "../src/bridge.ts"
 import { DurableCompanionEndpoint, DurableCompanionEndpointError } from "../src/durable-endpoint.ts";
 import { CompanionService } from "../src/service.ts";
 
+test("durable endpoint preserves the exact transport request context", async () => {
+  await withRegistry(async (registry) => {
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    const service = {
+      installTrustedSession() {},
+      listSessions() { return []; },
+      async handle(candidate: CompanionRequest, context?: { readonly signal?: AbortSignal }) {
+        received = context?.signal;
+        return { version: companionBridgeVersion, id: candidate.id, ok: true as const, result: [] };
+      }
+    } as unknown as CompanionService;
+    const endpoint = new DurableCompanionEndpoint(service, registry);
+    const response = await endpoint.handle(request("context", "session.list"), { signal: controller.signal });
+    assert.equal(response.ok, true);
+    assert.equal(received, controller.signal);
+  });
+});
+
 async function withRegistry(run: (registry: SessionRegistry) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-durable-endpoint-"));
   try {
@@ -46,7 +65,7 @@ function request(id: string, method: CompanionRequest["method"], payload?: unkno
 test("hydrates protected sessions through installTrustedSession before exposing the endpoint", async () => {
   await withRegistry(async (registry) => {
     await registry.register(trustedSession());
-    const endpoint = new DurableCompanionEndpoint(new CompanionService(), registry);
+    const endpoint = new DurableCompanionEndpoint(new CompanionService({ now: () => "2026-08-23T12:05:00.000Z" }), registry);
     await endpoint.ready();
 
     const sessions = await endpoint.listSessions();
@@ -99,10 +118,36 @@ test("a startup recovery failure leaves the durable endpoint fail-closed", async
   });
 });
 
+test("refreshes durable sessions before listing and fails closed when freshness cannot be established", async () => {
+  await withRegistry(async (registry) => {
+    await registry.register(trustedSession("refreshable"));
+    let refreshes = 0;
+    const endpoint = new DurableCompanionEndpoint(new CompanionService(), registry, {
+      refreshSessions: async () => {
+        refreshes += 1;
+        return [{ ...trustedSession("refreshable"), status: "stale" }];
+      }
+    });
+    await endpoint.ready();
+    const response = await endpoint.handle(request("list-refreshed", "session.list"));
+    assert.equal(response.ok, true);
+    assert.equal(((response.result as ManagedSession[])[0])?.status, "stale");
+    assert.ok(refreshes >= 2, "startup and pre-request freshness both ran");
+
+    const failed = new DurableCompanionEndpoint(new CompanionService(), registry, {
+      refreshSessions: async () => { throw new Error("protected session registry unavailable"); }
+    });
+    await assert.rejects(failed.ready(), DurableCompanionEndpointError);
+    const unavailable = await failed.handle(request("refresh-failed", "session.list"));
+    assert.equal(unavailable.ok, false);
+    assert.equal(unavailable.error?.code, "companion_unavailable");
+  });
+});
+
 test("persists normalized lifecycle updates and prevents a raw re-registration from retaining trusted capability after restart", async () => {
   await withRegistry(async (registry) => {
     await registry.register(trustedSession("terminal-2"));
-    const endpoint = new DurableCompanionEndpoint(new CompanionService(), registry);
+    const endpoint = new DurableCompanionEndpoint(new CompanionService({ now: () => "2026-08-23T12:05:00.000Z" }), registry);
     await endpoint.ready();
 
     const rawRegistration = await endpoint.handle(request("raw-register", "session.register", { session: trustedSession("terminal-2") }));
@@ -128,7 +173,7 @@ test("persists normalized lifecycle updates and prevents a raw re-registration f
     assert.equal(persisted?.status, "running");
     assert.equal(persisted?.lastHeartbeat, "2026-08-23T12:05:00.000Z");
 
-    const restarted = new DurableCompanionEndpoint(new CompanionService(), registry);
+    const restarted = new DurableCompanionEndpoint(new CompanionService({ now: () => "2026-08-23T12:05:00.000Z" }), registry);
     await restarted.ready();
     const recovered = (await restarted.listSessions())[0];
     assert.deepEqual(recovered?.capabilities, ["registered"]);

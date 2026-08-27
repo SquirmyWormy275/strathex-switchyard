@@ -1,18 +1,34 @@
 import { randomUUID } from "node:crypto";
-import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction } from "./command-catalog.ts";
 import type { ContainmentChannel } from "./containment.ts";
+import type { ContainmentRemediationAction, ContainmentRemediationBinding } from "./containment-incidents.ts";
 import type { ExecutionControl } from "./execution-control.ts";
+import { readDurableCancellation } from "./execution-cancellation.ts";
 import type { ChildOperationSaga } from "./operations.ts";
+import type { AutomationManifestApproval, AutomationOperationManifest } from "./automation-operation-manifest.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 import type { PermitBinding, PolicyPermit } from "./policy.ts";
 import { validateRecipe, type RepositoryRecipe } from "./recipes.ts";
 
-export type BrokerStatus = "completed" | "failed" | "unavailable" | "blocked" | "incomplete" | "cancelled" | "timed_out";
+export type BrokerStatus = "running" | "completed" | "failed" | "unavailable" | "blocked" | "incomplete" | "cancelled" | "timed_out";
 export interface BrokerOutcome {
   readonly status: BrokerStatus;
   readonly summary: string;
+  /** Omitted non-success dispositions are conservatively treated as ambiguous. */
+  readonly effectDisposition?: EffectDisposition;
   readonly data?: Readonly<Record<string, unknown>>;
+}
+
+/** Dispatcher-minted proof that one exact reviewed confirmation was consumed. */
+export interface BrokerConfirmation {
+  readonly currentUserConfirmed: true;
+  readonly confirmationDigest: string;
+  readonly confirmationScopeDigest?: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
 }
 
 export interface BrokerInvocation {
@@ -22,10 +38,17 @@ export interface BrokerInvocation {
   readonly session?: ManagedSession;
   readonly authority?: AuthorityGrant;
   readonly permit?: PolicyPermit;
+  readonly confirmation?: BrokerConfirmation;
   /** Cooperative deadline/cancellation; real adapters must observe it before each external effect. */
   readonly executionControl?: ExecutionControl;
   /** Present only for a scoped composite dispatch; broker handlers must settle or leave it ambiguous. */
   readonly childSaga?: ChildOperationSaga;
+  /**
+   * A host-owned final barrier.  Durable admission checks the target before a
+   * saga begins; a concrete broker checks this again immediately before its
+   * own effect so a stale snapshot cannot cross a delayed handler boundary.
+   */
+  readonly effectGuard?: EffectGuard;
 }
 
 export interface PermitVerifier {
@@ -33,18 +56,26 @@ export interface PermitVerifier {
 }
 
 export interface ContainmentGuard {
-  check(repositoryRoot: string, channel: ContainmentChannel): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
+  check(repositoryRoot: string, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
+}
+
+export interface EffectGuard {
+  assertCurrent(input: Readonly<{
+    action: CommandAction;
+    operationId: string;
+    target: TargetSnapshot;
+    session?: ManagedSession;
+    authority?: AuthorityGrant;
+  }>): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
 }
 
 type MaybePromise<T> = T | Promise<T>;
 
 async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): Promise<BrokerOutcome | undefined> {
-  if (invocation.executionControl && Date.parse(invocation.executionControl.deadline) <= Date.now()) {
-    return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline has already elapsed." };
-  }
-  if (invocation.executionControl && await invocation.executionControl.isCancellationRequested()) {
-    return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested." };
-  }
+  const cancellation = await readDurableCancellation(invocation.executionControl);
+  if (cancellation === "deadline") return { status: "timed_out", summary: "Broker refused an invocation whose durable deadline elapsed while checking cancellation.", effectDisposition: "not_started" };
+  if (cancellation === "cancelled") return { status: "cancelled", summary: "Broker refused an invocation after durable cancellation was requested.", effectDisposition: "not_started" };
+  if (cancellation === "unavailable") return { status: "unavailable", summary: "Broker refused an invocation because its durable cancellation state was unavailable.", effectDisposition: "not_started" };
   if (!policy.verifyPermit(invocation.permit, {
     action: invocation.action,
     operationId: invocation.operationId,
@@ -52,14 +83,24 @@ async function permitted(policy: PermitVerifier, invocation: BrokerInvocation): 
     ...(invocation.session ? { sessionId: invocation.session.id } : {}),
     ...(invocation.authority ? { authorityId: invocation.authority.id } : {})
   })) {
-    return { status: "blocked", summary: "Broker denied an absent, expired, forged, or mismatched policy permit." };
+    return { status: "blocked", summary: "Broker denied an absent, expired, forged, or mismatched policy permit.", effectDisposition: "not_started" };
+  }
+  if (invocation.effectGuard) {
+    const result = await invocation.effectGuard.assertCurrent({
+      action: invocation.action,
+      operationId: invocation.operationId,
+      target: invocation.target,
+      ...(invocation.session ? { session: invocation.session } : {}),
+      ...(invocation.authority ? { authority: invocation.authority } : {})
+    });
+    if (!result.allowed) return { status: "incomplete", summary: result.reason, effectDisposition: "not_started" };
   }
   return undefined;
 }
 
-async function fenced(containment: ContainmentGuard | undefined, invocation: BrokerInvocation, channel: ContainmentChannel): Promise<BrokerOutcome | undefined> {
-  const result = containment ? await containment.check(invocation.target.repositoryRoot, channel) : undefined;
-  return result && !result.allowed ? { status: "blocked", summary: result.reason } : undefined;
+async function fenced(containment: ContainmentGuard | undefined, invocation: BrokerInvocation, channel: ContainmentChannel, remediation?: ContainmentRemediationBinding): Promise<BrokerOutcome | undefined> {
+  const result = containment ? await containment.check(invocation.target.repositoryRoot, channel, remediation) : undefined;
+  return result && !result.allowed ? { status: "blocked", summary: result.reason, effectDisposition: "not_started" } : undefined;
 }
 
 function redacted(outcome: BrokerOutcome): BrokerOutcome {
@@ -80,6 +121,12 @@ export interface ExecutionRecipe {
 
 export interface ExecutionRequest extends BrokerInvocation {
   readonly recipe: ExecutionRecipe;
+  /**
+   * Host-recovered effect target for split-identity controls such as Alt-Run.
+   * It is never copied from CommandRequest input; the provider session in
+   * `session` remains the policy and authority source.
+   */
+  readonly effectSession?: ManagedSession;
 }
 
 /** Runtime boundary for an allowlisted structured executor. */
@@ -95,9 +142,11 @@ export type ExecutionHandler = (request: ExecutionRequest) => MaybePromise<Broke
 export class InMemoryExecutionBroker {
   private readonly handlers = new Map<string, ExecutionHandler>();
   private readonly policy: PermitVerifier;
+  private readonly containment?: ContainmentGuard;
 
-  constructor(policy: PermitVerifier) {
+  constructor(policy: PermitVerifier, containment?: ContainmentGuard) {
     this.policy = policy;
+    this.containment = containment;
   }
 
   register(recipeId: string, handler: ExecutionHandler): void {
@@ -107,10 +156,12 @@ export class InMemoryExecutionBroker {
   async execute(request: ExecutionRequest): Promise<BrokerOutcome> {
     const denial = await permitted(this.policy, request);
     if (denial) return denial;
+    const fence = await fenced(this.containment, request, "execution");
+    if (fence) return fence;
     const validation = validateExecutionRecipe(request);
     if (validation) return validation;
     const handler = this.handlers.get(request.recipe.id);
-    if (!handler) return { status: "unavailable", summary: `No trusted execution handler is registered for recipe ${request.recipe.id}.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted execution handler is registered for recipe ${request.recipe.id}.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }
@@ -118,17 +169,17 @@ export class InMemoryExecutionBroker {
 function validateExecutionRecipe(request: ExecutionRequest): BrokerOutcome | undefined {
   const unknownRequest = request as unknown as Readonly<Record<string, unknown>>;
   if ("shell" in unknownRequest || "command" in unknownRequest) {
-    return { status: "blocked", summary: "Execution broker accepts structured executable/args only; shell command strings are forbidden." };
+    return { status: "blocked", summary: "Execution broker accepts structured executable/args only; shell command strings are forbidden.", effectDisposition: "not_started" };
   }
   const recipe = request.recipe;
   if (!recipe.id || !recipe.executable || /[\r\n\0;]/.test(recipe.executable)) {
-    return { status: "blocked", summary: "Execution recipe has an invalid executable." };
+    return { status: "blocked", summary: "Execution recipe has an invalid executable.", effectDisposition: "not_started" };
   }
   if (recipe.args.some((arg) => /[\r\n\0]/.test(arg))) {
-    return { status: "blocked", summary: "Execution recipe contains an unsafe argument." };
+    return { status: "blocked", summary: "Execution recipe contains an unsafe argument.", effectDisposition: "not_started" };
   }
   if (normalisePath(recipe.workingDirectory) !== normalisePath(request.target.repositoryRoot)) {
-    return { status: "blocked", summary: "Execution recipe working directory does not match the verified target root." };
+    return { status: "blocked", summary: "Execution recipe working directory does not match the verified target root.", effectDisposition: "not_started" };
   }
   return undefined;
 }
@@ -138,8 +189,8 @@ function normalisePath(path: string): string {
 }
 
 export type GitMutation =
-  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string }
-  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string }
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string; readonly containmentRemediation?: Readonly<{ permitId: string; incidentId: string; fenceEpoch: number; action: ContainmentRemediationAction; remediatedFindingIds: readonly string[] }> }
+  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
   | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
   | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
 
@@ -177,29 +228,81 @@ export class InMemoryGitBroker {
     if (denial) return denial;
     const unknownMutation = request.mutation as unknown as Readonly<Record<string, unknown>>;
     if ("force" in unknownMutation || "forceWithLease" in unknownMutation) {
-      return { status: "blocked", summary: "Force-push semantics are never accepted by the B122 Git broker." };
+      return { status: "blocked", summary: "Force-push semantics are never accepted by the B122 Git broker.", effectDisposition: "not_started" };
     }
     if (actionForGitMutation[request.mutation.kind] !== request.action) {
-      return { status: "blocked", summary: "Git mutation kind does not match the policy-authorized command action." };
+      return { status: "blocked", summary: "Git mutation kind does not match the policy-authorized command action.", effectDisposition: "not_started" };
     }
-    if (!validGitMutation(request.mutation)) return { status: "blocked", summary: "Git request omits an exact branch, head, receipt, or owned path requirement." };
-    if (request.mutation.kind !== "local_commit") {
-      const fence = await fenced(this.containment, request, "git");
-      if (fence) return fence;
-    }
+    if (!validGitMutation(request.mutation)) return { status: "blocked", summary: "Git request omits an exact branch, head, receipt, or owned path requirement.", effectDisposition: "not_started" };
+    const ownership = validateLocalCommitOwnership(request);
+    if (ownership) return { status: "blocked", summary: ownership, effectDisposition: "not_started" };
+    const remediation: ContainmentRemediationBinding | undefined = request.mutation.kind === "local_commit" && request.mutation.containmentRemediation
+      ? { ...request.mutation.containmentRemediation, relativePaths: request.mutation.paths }
+      : undefined;
+    // Ordinary local commits stay fenced. Only an exact one-time incident
+    // permit can admit a path-bounded local remediation commit.
+    const fence = await fenced(this.containment, request, remediation ? "local_remediation" : "git", remediation);
+    if (fence) return fence;
     const handler = this.handlers.get(request.mutation.kind);
-    if (!handler) return { status: "unavailable", summary: `No trusted Git adapter is registered for ${request.mutation.kind}.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted Git adapter is registered for ${request.mutation.kind}.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }
 
 function validGitMutation(mutation: GitMutation): boolean {
   switch (mutation.kind) {
-    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim();
-    case "pr_upsert": return !!mutation.headBranch && !!mutation.baseBranch;
+    case "local_commit": return mutation.paths.length > 0 && !!mutation.message.trim() && (mutation.featureBranch === undefined || !!mutation.featureBranch.trim())
+      && (mutation.containmentRemediation === undefined || validContainmentRemediation(mutation.containmentRemediation));
+    case "pr_upsert": return !!mutation.headBranch && !!mutation.baseBranch && !!mutation.title.trim() && mutation.title.length <= 256 && mutation.body.length <= 16_384;
     case "merge_pr": return mutation.pullRequest > 0 && !!mutation.head && !!mutation.baseBranch;
     case "direct_main": return !!mutation.branch && !!mutation.validationReceiptId;
   }
+}
+
+function validContainmentRemediation(value: NonNullable<Extract<GitMutation, { kind: "local_commit" }>["containmentRemediation"]>): boolean {
+  return /^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    && /^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    && Number.isSafeInteger(value.fenceEpoch) && value.fenceEpoch > 0
+    && ["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(value.action)
+    && Array.isArray(value.remediatedFindingIds) && value.remediatedFindingIds.length > 0 && value.remediatedFindingIds.length <= 1_024
+    && value.remediatedFindingIds.every((id) => /^containment-finding:[a-f0-9]{64}$|^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id))
+    && new Set(value.remediatedFindingIds).size === value.remediatedFindingIds.length;
+}
+
+function validateLocalCommitOwnership(request: GitRequest): string | undefined {
+  if (request.mutation.kind !== "local_commit") return undefined;
+  const { session, authority, mutation } = request;
+  if (!session?.taskId?.trim()) return "Local commit requires a selected task-owned mediated session.";
+  if (!authority?.taskId || authority.taskId !== session.taskId || authority.planRevision !== session.planRevision) {
+    return "Local commit authority does not match the selected task and plan revision.";
+  }
+  const allowed = new Set<string>();
+  for (const path of session.plannedFiles) {
+    const normalized = canonicalRepositoryPath(path);
+    if (!normalized) return "The session has an invalid task-owned path grant.";
+    allowed.add(normalized);
+  }
+  if (allowed.size === 0) return "Local commit requires at least one task-owned path grant.";
+  const requested = new Set<string>();
+  for (const path of mutation.paths) {
+    const normalized = canonicalRepositoryPath(path);
+    if (!normalized) return "Local commit contains an unsafe repository-relative path.";
+    if (requested.has(normalized)) return "Local commit repeats a repository path after canonicalization.";
+    if (!allowed.has(normalized)) return "Local commit requested a path outside the selected task-owned grant.";
+    requested.add(normalized);
+  }
+  return undefined;
+}
+
+/** Reject absolute, traversal, Git-internal, and platform-aliasing paths. */
+export function canonicalRepositoryPath(value: string): string | undefined {
+  if (typeof value !== "string" || !value.trim() || /[\0\r\n]/.test(value)) return undefined;
+  const normalized = value.replaceAll("\\", "/").replace(/^\.\//, "");
+  if (/^(?:[A-Za-z]:)?\//.test(normalized)) return undefined;
+  const parts = normalized.split("/");
+  if (parts.some((part) => !part || part === "." || part === "..")) return undefined;
+  if (parts[0]?.toLowerCase() === ".git") return undefined;
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
 export interface CredentialRegistration {
@@ -227,10 +330,12 @@ export class InMemoryCredentialBroker {
   private readonly credentials = new Map<string, CredentialRegistration>();
   private readonly policy: PermitVerifier;
   private readonly containment?: ContainmentGuard;
+  private readonly now: () => Date;
 
-  constructor(policy: PermitVerifier, containment?: ContainmentGuard) {
+  constructor(policy: PermitVerifier, containment?: ContainmentGuard, now: () => Date = () => new Date()) {
     this.policy = policy;
     this.containment = containment;
+    this.now = now;
   }
 
   register(credential: CredentialRegistration): void {
@@ -246,8 +351,8 @@ export class InMemoryCredentialBroker {
       candidate.repositoryRoot === request.target.repositoryRoot
       && candidate.actions.includes(request.action)
       && candidate.scopes.includes(request.scope)
-      && new Date(candidate.expiresAt).getTime() > Date.now());
-    if (!credential) return { status: "unavailable", summary: "No current credential is scoped to this repository, action, and requested capability." };
+      && new Date(candidate.expiresAt).getTime() > this.now().getTime());
+    if (!credential) return { status: "unavailable", summary: "No current credential is scoped to this repository, action, and requested capability.", effectDisposition: "not_started" };
     const lease: CredentialLease = {
       id: randomUUID(),
       credentialId: credential.id,
@@ -289,14 +394,14 @@ export class InMemoryNetworkBroker {
     const fence = await fenced(this.containment, request, "network");
     if (fence) return fence;
     const parsed = safeUrl(request.url);
-    if (!parsed) return { status: "blocked", summary: "Network broker rejected an invalid URL." };
+    if (!parsed) return { status: "blocked", summary: "Network broker rejected an invalid URL.", effectDisposition: "not_started" };
     const host = parsed.hostname.toLowerCase();
     const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
     if ((parsed.protocol !== "https:" && !(loopback && parsed.protocol === "http:")) || !request.allowedHosts.map((item) => item.toLowerCase()).includes(host)) {
-      return { status: "blocked", summary: "Network broker rejected a non-allowlisted or unsafe URL." };
+      return { status: "blocked", summary: "Network broker rejected a non-allowlisted or unsafe URL.", effectDisposition: "not_started" };
     }
     const response = this.responses.get(`${request.method}:${request.url}`);
-    if (!response) return { status: "unavailable", summary: "No trusted local response is registered for this network request." };
+    if (!response) return { status: "unavailable", summary: "No trusted local response is registered for this network request.", effectDisposition: "not_started" };
     return { status: "completed", summary: "Completed an allowlisted in-memory network exchange.", response: { ...response, body: untrustedSummary(response.body) }, data: { statusCode: response.statusCode } };
   }
 }
@@ -333,13 +438,15 @@ export class InMemoryTestEnvironmentBroker {
   async prepare(request: TestEnvironmentRequest): Promise<TestEnvironmentOutcome> {
     const denial = await permitted(this.policy, request);
     if (denial) return denial;
+    const fence = await fenced(this.containment, request, "test_environment");
+    if (fence) return fence;
     const validation = validateRecipe(request.recipe);
-    if (!validation.valid) return { status: "unavailable", summary: `Test recipe is incomplete: ${validation.errors.join(" ")}` };
+    if (!validation.valid) return { status: "unavailable", summary: `Test recipe is incomplete: ${validation.errors.join(" ")}`, effectDisposition: "not_started" };
     if (normalisePath(request.recipe.repositoryRoot) !== normalisePath(request.target.repositoryRoot)) {
-      return { status: "blocked", summary: "Test recipe repository does not match the verified target." };
+      return { status: "blocked", summary: "Test recipe repository does not match the verified target.", effectDisposition: "not_started" };
     }
     const production = findProductionInput(request.sourceEnvironment, request.recipe.productionHostPatterns);
-    if (production) return { status: "blocked", summary: "Test environment rejected a production host, DSN, or production-mode input." };
+    if (production) return { status: "blocked", summary: "Test environment rejected a production host, DSN, or production-mode input.", effectDisposition: "not_started" };
     const id = `test-${this.nextId++}`;
     const environment: Record<string, string> = { NODE_ENV: "test", SXSY_TEST_DATABASE: `sxsy_test_${id}` };
     for (const key of request.recipe.environmentAllowlist) {
@@ -355,7 +462,6 @@ export class InMemoryTestEnvironmentBroker {
     };
     // No network or credential lease is allocated here. An explicit broker must
     // request one after this safe, deny-egress environment exists.
-    void this.containment;
     return { status: "completed", summary: "Prepared a disposable, deny-egress test environment descriptor.", environment: testEnvironment };
   }
 }
@@ -381,27 +487,36 @@ export interface IsolationRuntime { start(request: IsolationRequest): Promise<Br
 /** Safe default: a `.venv` is not represented as a full sandbox or quarantine. */
 export class UnavailableIsolationRuntime implements IsolationRuntime {
   private readonly policy: PermitVerifier;
-  constructor(policy: PermitVerifier) { this.policy = policy; }
+  private readonly containment?: ContainmentGuard;
+  constructor(policy: PermitVerifier, containment?: ContainmentGuard) { this.policy = policy; this.containment = containment; }
   async start(request: IsolationRequest): Promise<BrokerOutcome> {
     const denial = await permitted(this.policy, request);
     if (denial) return denial;
-    return { status: "unavailable", summary: `${request.profile} has no proven isolation backend; refusing to claim enforcement.` };
+    const fence = await fenced(this.containment, request, "isolation");
+    if (fence) return fence;
+    return { status: "unavailable", summary: `${request.profile} has no proven isolation backend; refusing to claim enforcement.`, effectDisposition: "not_started" };
   }
 }
 
 /** Explicit test harness only; its result says simulated and never claims host isolation. */
 export class InMemoryIsolationRuntime implements IsolationRuntime {
   private readonly policy: PermitVerifier;
-  constructor(policy: PermitVerifier) { this.policy = policy; }
+  private readonly containment?: ContainmentGuard;
+  constructor(policy: PermitVerifier, containment?: ContainmentGuard) { this.policy = policy; this.containment = containment; }
   async start(request: IsolationRequest): Promise<BrokerOutcome> {
     const denial = await permitted(this.policy, request);
     if (denial) return denial;
+    const fence = await fenced(this.containment, request, "isolation");
+    if (fence) return fence;
     return { status: "completed", summary: `Simulated ${request.profile} in the test harness; no host enforcement claim is made.`, data: { simulated: true, profile: request.profile } };
   }
 }
 
 export interface AutomationRequest extends BrokerInvocation {
   readonly testEnvironment?: TestEnvironment;
+  /** Exact protected proposal and one-use current-user approval. */
+  readonly reviewedManifest?: AutomationOperationManifest;
+  readonly manifestApproval?: AutomationManifestApproval;
 }
 export interface AutomationBroker { execute(request: AutomationRequest): Promise<BrokerOutcome>; }
 export type AutomationHandler = (request: AutomationRequest) => MaybePromise<BrokerOutcome>;
@@ -424,12 +539,12 @@ export class InMemoryAutomationBroker {
   async execute(request: AutomationRequest): Promise<BrokerOutcome> {
     const denial = await permitted(this.policy, request);
     if (denial) return denial;
-    if (request.action === "lfg") {
-      const fence = await fenced(this.containment, request, "git");
-      if (fence) return fence;
-    }
+    // All automated routes are fenced.  A non-LFG workflow must not become a
+    // containment bypass merely because it was classified as local learning.
+    const fence = await fenced(this.containment, request, "automation");
+    if (fence) return fence;
     const handler = this.handlers.get(request.action);
-    if (!handler) return { status: "unavailable", summary: `No trusted automation adapter is registered for ${request.action}; no prompt or workflow was submitted.` };
+    if (!handler) return { status: "unavailable", summary: `No trusted automation adapter is registered for ${request.action}; no prompt or workflow was submitted.`, effectDisposition: "not_started" };
     return redacted(await handler(request));
   }
 }

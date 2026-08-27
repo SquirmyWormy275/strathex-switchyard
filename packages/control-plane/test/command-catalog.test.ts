@@ -34,3 +34,37 @@ test("containment release exists as a separately gated administrative action, no
   assert.equal(release.requiresConfirmation, true);
   assert.ok(release.acceptanceGates.includes(20));
 });
+
+test("workflow navigation and Plan Approval declare the authority and confirmation needed by their durable coordinators", () => {
+  assert.equal(commandForAction("reanchor").requiresConfirmation, true, "Re-anchor must obtain host-owned current-user presence for the reviewed old/new target scope");
+  assert.equal(commandForAction("plan_approval").requiresConfirmation, true);
+  for (const action of ["handoff_immediate", "focus_blocked_agent", "focus_finished_agent"] as const) {
+    assert.equal(commandForAction(action).requiresAuthority, true, `${action} must receive exact scoped authority before workflow preparation`);
+  }
+  assert.equal(commandForAction("handoff_immediate").executor, "agent");
+});
+
+test("every provider-backed agent command receives a final complete-target effect guard", () => {
+  for (const action of [
+    "reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval",
+    "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent",
+    "authority_refresh", "authority_broadcast", "bind_voice_session"
+  ] as const) {
+    const definition = commandForAction(action);
+    assert.equal(definition.executor, "agent", `${action} must remain provider-backed`);
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${action} must receive a final effect guard`);
+  }
+});
+
+test("every installed GitHub and hosted Pipeline observation declares the complete target required by its final effect guard", () => {
+  for (const action of [
+    "github_home", "github_pr", "github_issues", "github_actions", "pipeline_status", "pipeline_failure_trace"
+  ] as const) {
+    const definition = commandForAction(action);
+    assert.equal(definition.requiresTarget, true, `${action} must remain bound to the selected repository`);
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${action} must receive the final exact TargetSnapshot guard required by its installed adapter`);
+  }
+  for (const definition of [...commandCatalog, ...administrativeCommands].filter((entry) => entry.requiresTarget)) {
+    assert.equal(definition.requiresCompleteTargetSnapshot, true, `${definition.action} cannot define a weaker unguarded repository target`);
+  }
+});

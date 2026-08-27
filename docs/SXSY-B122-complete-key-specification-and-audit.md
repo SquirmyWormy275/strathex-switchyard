@@ -116,7 +116,7 @@ In these tables, **Unassigned** means no behavior was approved. It does not mean
 | GitHub | Repository home | Current-branch PR or PR list | Issues | Current-branch Actions run/list | Unassigned | Unassigned | Unassigned | Unassigned | Unassigned |
 | Compound | Capture one durable learning | Refresh the learning store | Compound workflow palette | Guarded full `lfg` loop | Unassigned | Unassigned | Unassigned | Unassigned | Unassigned |
 | Run | Run active file or configured target | Debug | Stop the managed Run process | Start web app, detect URL, open browser | Unassigned | Unassigned | Unassigned | Unassigned | Unassigned |
-| Voice | Start/focus two-way voice center | Switch Claude/ChatGPT provider | Bind focused managed VS Code agent | Voice Session Picker | Unassigned | Unassigned | Unassigned | Unassigned | Repeat/long press handles mute/end; exact split unresolved |
+| Voice | Start/focus two-way voice center | Switch Claude/ChatGPT provider | Bind focused managed VS Code agent | Voice Session Picker | Unassigned | Unassigned | Unassigned | Unassigned | Repeated Normal toggles mute/resume in software; end is a reviewed Voice Center choice until physical long-press timing is accepted |
 | Pipeline | Status scan | Run local gate | Diagnose selected failure | Reproduce cleanly | Unassigned | Unassigned | Unassigned | Isolated Repair Mission | Repeated normal presses cycle failing gates |
 | Shield | Scan current changes | Deep codebase/history audit | Supply-chain audit | Exact-revision Release Shield | Unassigned | Unassigned | Unassigned | Emergency Containment | Status lighting if hardware supports it |
 | Sandbox | Create/enter repo `.venv` | Safely rebuild `.venv` | Create/enter full sandbox | Rebuild full sandbox | Unassigned | Unassigned | Unassigned | Quarantine | Unassigned |
@@ -393,11 +393,21 @@ Current installed-workflow details matter:
 - **Shift+Alt:** open a Voice Session Picker for all bindable managed agents.
 - **Repeat/long press:** mute and end; the exact gesture assignment is unresolved.
 
+**Software implementation resolution:** repeated Normal presses inside the
+bounded host repeat window toggle mute/resume. End is an explicit reviewed
+Voice Center choice. A firmware long-press gesture must not replace that choice
+until its timing and physical usability are accepted on the keyboard.
+
 The host coordinator owns the canonical context packet, session discovery, binding, transcript routing, spoken responses, and handoffs. Provider-specific adapters may differ internally, but missing Claude support may not silently route to Codex. “Switch providers without changing context” is desired coordinator behavior, not a native-provider guarantee.
 
 Current first-party documentation establishes Voice in ChatGPT desktop Work/Codex and full conversational Voice on Claude Desktop and the web. The remaining asymmetry is launch and binding: a documented Windows-global Claude Voice shortcut or deep link was not established, and neither provider documents the coordinator-owned binding to a specific managed Claude Code or Codex session in VS Code. Those behaviors remain explicit prototype gates.
 
-**Unresolved:** preferred provider, exact mute/end gestures, native-extension support, all Ctrl combinations, legend, and color. The Voice prototype must explicitly choose native-app automation, a custom voice gateway, or a hybrid; acceptance requires context injection, response routing, interruption, microphone consent, single-active-conversation handling, transcript retention/deletion, and target isolation.
+**Unresolved:** preferred provider, physical long-press timing, all Ctrl
+combinations, legend, and color. The software implementation uses a hybrid
+companion-owned gateway with a native VS Code Voice Center; acceptance still
+requires context injection, response routing, interruption, microphone consent,
+single-active-conversation handling, transcript retention/deletion, and target
+isolation on the target host.
 
 ### 6.10 Pipeline
 
@@ -797,7 +807,7 @@ These ideas should not be reintroduced without new workflow evidence:
 
 - One common picker/overlay design and where queues live.
 - Handoff packet schema and raw-conversation retention.
-- Voice architecture—native-app automation, custom gateway, or hybrid—plus default provider and mute/end gestures.
+- Voice default provider, physical long-press timing, and target-host acceptance of the implemented hybrid gateway/native Voice Center.
 - VS Code Shift behavior: blank, picker, or inherited workspace.
 - External terminal/profile/cwd policy.
 - Run target precedence and no-URL failure behavior.

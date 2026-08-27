@@ -26,11 +26,16 @@ export class WorkspaceSnapshotResolver implements TargetResolver {
   async resolve(input: Readonly<{ definition: CommandDefinition; session?: ManagedSession }>): Promise<TargetSnapshot | undefined> {
     const session = input.session;
     if (!session?.workspaceRoot) return undefined;
+    // Containment must also work for a valid local repository with no remote.
+    // Its dedicated remote child inventories the host Git configuration and
+    // records an explicit zero-remote proof; other consequential actions keep
+    // requiring a canonical remote.
+    const containmentTarget = input.definition.action === "emergency_containment" || input.definition.action === "containment_release";
     return this.factory.capture({
       targetHint: session.workspaceRoot,
       policyVersion: this.options.policyVersion,
       environment: this.options.environmentFor?.({ definition: input.definition, session }) ?? {},
-      requireCanonicalRemote: true,
+      requireCanonicalRemote: !containmentTarget,
       requireBranch: true
     });
   }

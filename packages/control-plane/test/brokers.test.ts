@@ -25,7 +25,7 @@ const target: TargetSnapshot = {
 const session: ManagedSession = {
   id: "session-1", provider: "codex", surface: "vscode_terminal", capabilities: ["registered", "observable", "controllable", "mediated"],
   status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: "task-1", planRevision: "plan-1",
-  plannedFiles: [], lastHeartbeat: now, adapterVersion: "test", metadata: {}
+  plannedFiles: ["src/a.ts", "src/safe.ts"], lastHeartbeat: now, adapterVersion: "test", metadata: {}
 };
 const grant = (action: CommandAction): AuthorityGrant => ({
   id: `authority-${action}`, repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId,
@@ -68,7 +68,40 @@ test("execution broker only invokes an explicitly registered typed recipe with a
   assert.equal(executions, 1);
 });
 
-test("Git broker refuses force semantics and containment fences every outbound Git action", async () => {
+test("containment and a refused final effect check stop execution before a registered handler", async () => {
+  const contained = permitted("run_target");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const containedBroker = new InMemoryExecutionBroker(contained.policy, containment);
+  let containedCalls = 0;
+  containedBroker.register("run_target", () => { containedCalls += 1; return { status: "completed", summary: "must not run" }; });
+  const recipe = { id: "run_target", executable: "node", args: ["app.js"], workingDirectory: target.repositoryRoot, environment: {} };
+
+  const containedResult = await containedBroker.execute({ ...contained.invocation, recipe });
+  assert.equal(containedResult.status, "blocked");
+  assert.equal(containedCalls, 0);
+
+  const guarded = permitted("run_target");
+  const guardedBroker = new InMemoryExecutionBroker(guarded.policy);
+  let guardedCalls = 0;
+  let guardCalls = 0;
+  guardedBroker.register("run_target", () => { guardedCalls += 1; return { status: "completed", summary: "must not run" }; });
+  const guardedResult = await guardedBroker.execute({
+    ...guarded.invocation,
+    recipe,
+    effectGuard: {
+      assertCurrent: () => {
+        guardCalls += 1;
+        return { allowed: false, reason: "Target changed before the execution effect." };
+      }
+    }
+  });
+  assert.equal(guardedResult.status, "incomplete");
+  assert.equal(guardCalls, 1);
+  assert.equal(guardedCalls, 0);
+});
+
+test("Git broker refuses force semantics and containment fences every Git mutation including local commit", async () => {
   const local = permitted("local_commit");
   const broker = new InMemoryGitBroker(local.policy);
   broker.register("local_commit", () => ({ status: "completed", summary: "simulated local commit" }));
@@ -81,15 +114,23 @@ test("Git broker refuses force semantics and containment fences every outbound G
   const outbound = new InMemoryGitBroker(pr.policy, containment);
   let writes = 0;
   outbound.register("pr_upsert", () => { writes += 1; return { status: "completed", summary: "simulated PR" }; });
-  const result = await outbound.execute({ ...pr.invocation, mutation: { kind: "pr_upsert", headBranch: target.branch!, baseBranch: "main" } });
+  const result = await outbound.execute({ ...pr.invocation, mutation: { kind: "pr_upsert", headBranch: target.branch!, baseBranch: "main", title: "Reviewed change", body: "Exact reviewed body." } });
   assert.equal(result.status, "blocked");
   assert.equal(writes, 0);
+
+  const containedLocal = permitted("local_commit");
+  const localFence = new InMemoryGitBroker(containedLocal.policy, containment);
+  let localWrites = 0;
+  localFence.register("local_commit", () => { localWrites += 1; return { status: "completed", summary: "must not commit" }; });
+  const localResult = await localFence.execute({ ...containedLocal.invocation, mutation: { kind: "local_commit", paths: ["src/a.ts"], message: "blocked by fence" } });
+  assert.equal(localResult.status, "blocked");
+  assert.equal(localWrites, 0);
 });
 
 test("credential, network, and test-environment brokers deny unsafe access without exposing secret material", async () => {
   const pipeline = permitted("pipeline_local_gate");
   const containment = new InMemoryContainmentManager();
-  const credentials = new InMemoryCredentialBroker(pipeline.policy, containment);
+  const credentials = new InMemoryCredentialBroker(pipeline.policy, containment, () => new Date(now));
   credentials.register({ id: "ci-token", repositoryRoot: target.repositoryRoot, actions: ["pipeline_local_gate"], scopes: ["read:checks"], expiresAt: "2026-08-24T12:00:00.000Z", material: "never-return-this" });
   const lease = await credentials.acquire({ ...pipeline.invocation, scope: "read:checks" });
   assert.equal(lease.status, "completed");
@@ -113,6 +154,31 @@ test("credential, network, and test-environment brokers deny unsafe access witho
   assert.match(safe.environment?.databaseName ?? "", /^sxsy_test_/);
 });
 
+test("active containment prevents a test-environment allocation before any disposable state is created", async () => {
+  const pipeline = permitted("pipeline_local_gate");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const testEnvironment = new InMemoryTestEnvironmentBroker(pipeline.policy, containment);
+  const request = { ...pipeline.invocation, recipe, sourceEnvironment: { SAFE_FLAG: "yes" } };
+
+  const blocked = await testEnvironment.prepare(request);
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.environment, undefined);
+
+  const released = containment.release({
+    repositoryRoot: target.repositoryRoot,
+    reason: "isolated test release",
+    reauthenticated: true,
+    expectedFenceEpoch: 1,
+    expectedActivationOperationId: "containment",
+    expectedIncidentId: containment.exportState().records[0]!.incidentId!,
+    expectedIncidentDigest: "0".repeat(64),
+    expectedAssessmentTargetSnapshotId: target.id
+  });
+  assert.equal(released.status, "blocked");
+  assert.equal((await testEnvironment.prepare(request)).status, "blocked");
+});
+
 test("unavailable high-risk adapters fail closed instead of pretending to isolate or automate", async () => {
   const highAction = commandForAction("full_sandbox");
   const policy = new PolicyEngine({
@@ -131,6 +197,19 @@ test("unavailable high-risk adapters fail closed instead of pretending to isolat
   assert.equal(lfg.status, "blocked");
 });
 
+test("active containment fences automation before a registered automation handler", async () => {
+  const capture = permitted("compound_capture");
+  const containment = new InMemoryContainmentManager();
+  containment.activate({ repositoryRoot: target.repositoryRoot, operationId: "containment", reason: "test" });
+  const automation = new InMemoryAutomationBroker(capture.policy, containment);
+  let calls = 0;
+  automation.register("compound_capture", () => { calls += 1; return { status: "completed", summary: "must not run" }; });
+
+  const result = await automation.execute(capture.invocation);
+  assert.equal(result.status, "blocked");
+  assert.equal(calls, 0);
+});
+
 test("a live broker permit cannot be replayed under another durable operation or authority", async () => {
   const { policy, invocation } = permitted("run_target");
   const broker = new InMemoryExecutionBroker(policy);
@@ -141,4 +220,61 @@ test("a live broker permit cannot be replayed under another durable operation or
   assert.equal((await broker.execute({ ...request, operationId: "op-replay" })).status, "blocked");
   assert.equal((await broker.execute({ ...request, authority: { ...grant("run_target"), id: "other-authority" } })).status, "blocked");
   assert.equal(executions, 1);
+});
+
+test("composed Git and automation brokers bound unavailable durable cancellation before handlers", async () => {
+  const local = permitted("local_commit");
+  const git = new InMemoryGitBroker(local.policy);
+  let gitHandlers = 0;
+  let gitReads = 0;
+  git.register("local_commit", () => { gitHandlers += 1; return { status: "completed", summary: "must not run" }; });
+  const gitStarted = Date.now();
+  const gitOutcome = await git.execute({
+    ...local.invocation,
+    executionControl: {
+      operationId: local.invocation.operationId,
+      deadline: new Date(Date.now() + 40).toISOString(),
+      async isCancellationRequested() { gitReads += 1; return new Promise<boolean>(() => undefined); }
+    },
+    mutation: { kind: "local_commit", paths: ["src/a.ts"], message: "must not commit" }
+  });
+  assert.equal(gitOutcome.status, "timed_out");
+  assert.equal(gitHandlers, 0);
+  assert.equal(gitReads, 1);
+  assert.ok(Date.now() - gitStarted < 1_000);
+
+  const capture = permitted("compound_capture");
+  const automation = new InMemoryAutomationBroker(capture.policy);
+  let automationHandlers = 0;
+  automation.register("compound_capture", () => { automationHandlers += 1; return { status: "completed", summary: "must not run" }; });
+  const automationOutcome = await automation.execute({
+    ...capture.invocation,
+    executionControl: {
+      operationId: capture.invocation.operationId,
+      deadline: new Date(Date.now() + 1_000).toISOString(),
+      async isCancellationRequested() { throw new Error("protected cancellation store unavailable"); }
+    }
+  });
+  assert.equal(automationOutcome.status, "unavailable");
+  assert.equal(automationHandlers, 0);
+});
+
+test("a delayed false cancellation read cannot admit an effect after its deadline", async () => {
+  const capture = permitted("compound_capture");
+  const automation = new InMemoryAutomationBroker(capture.policy);
+  let handlers = 0;
+  automation.register("compound_capture", () => { handlers += 1; return { status: "completed", summary: "must not run" }; });
+  const outcomePromise = automation.execute({
+    ...capture.invocation,
+    executionControl: {
+      operationId: capture.invocation.operationId,
+      deadline: new Date(Date.now() + 20).toISOString(),
+      async isCancellationRequested() { return false; }
+    }
+  });
+  const blockedUntil = Date.now() + 50;
+  while (Date.now() < blockedUntil) { /* deterministically delay the fulfilled-read microtask past the deadline */ }
+  const outcome = await outcomePromise;
+  assert.equal(outcome.status, "timed_out");
+  assert.equal(handlers, 0);
 });

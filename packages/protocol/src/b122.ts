@@ -106,13 +106,29 @@ export const specialGestures: Readonly<Record<Control, readonly string[]>> = {
   REANCHOR: [], PROOF: [], OPTION_PROVIDER: [], PLAN_EXPANDER: [], PLAN_APPROVAL: [], HANDOFF: [],
   FIND_BLOCKED_AGENT: ["Repeated normal presses cycle verified blocked agents."],
   FIND_FINISHED_AGENT: ["Repeated normal presses cycle verified finished agents."],
-  AUTHORITY_REFRESH: [], COUNCIL: [], CLAUDE: ["Window cycling remains unresolved."],
-  CHATGPT: ["Window cycling remains unresolved."], VSCODE: ["Repeated normal presses cycle VS Code windows."],
+  AUTHORITY_REFRESH: [], COUNCIL: [], CLAUDE: ["Repeated normal presses cycle exact current-user-approved Claude Desktop windows."],
+  CHATGPT: ["Repeated normal presses cycle exact current-user-approved ChatGPT Desktop windows."], VSCODE: ["Repeated normal presses cycle VS Code windows."],
   TERMINAL: [], COMMIT: [], GITHUB: [], COMPOUND: [], RUN: [],
-  VOICE: ["Repeat or long press handles mute/end; exact split is unresolved."],
+  VOICE: ["Repeated normal presses toggle mute/resume; end remains an explicit reviewed Voice Center choice until physical long-press timing is accepted."],
   PIPELINE: ["Repeated normal presses cycle failing gates."],
   SHIELD: ["Status lighting is hardware-dependent."], SANDBOX: []
 };
+
+/**
+ * The single canonical, machine-readable control map. Generated firmware
+ * artifacts are checked against the SHA-256 of `canonicalManifestJson`.
+ */
+export const manifest = {
+  schema: "sxsy-b122-control-map/v1",
+  protocolVersion,
+  controls,
+  assignments,
+  specialGestures,
+} as const;
+
+export const canonicalManifestJson = JSON.stringify(manifest);
+/** Updated only by `packages/protocol/scripts/generate-manifest.mjs`. */
+export const manifestSha256 = "7b8a6eb7e043665c04751a0fee15ee54d9793f9df288f9278bc8dc955f4174fc";
 
 export function assignmentFor(control: Control, modifier: Modifier): Assignment | undefined {
   return assignments.find((assignment) => assignment.control === control && assignment.modifier === modifier);
@@ -132,7 +148,7 @@ const modifiers: readonly Modifier[] = ["normal", "shift", "alt", "shift_alt", "
 export const modifierFromMask = (mask: number): Modifier | undefined => modifiers[mask];
 export const modifierMask = (modifier: Modifier): number => modifiers.indexOf(modifier);
 
-/** Raw HID packet: B1, version, control-id, modifier-mask, sequence-low, sequence-high, XOR checksum, 0. */
+/** @deprecated In-memory baseline codec only. Never send this 8-byte value over Raw HID; use raw-hid.ts. */
 export function encodeSignal(signal: B122Signal): Uint8Array {
   const packet = new Uint8Array(8);
   packet[0] = 0xb1; packet[1] = signal.version; packet[2] = controlId(signal.control); packet[3] = modifierMask(signal.modifier);

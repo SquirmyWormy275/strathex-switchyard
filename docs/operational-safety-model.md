@@ -14,7 +14,7 @@ The practical consequence is simple: an absent component is reported honestly. I
 
 ## Control flow and trust boundaries
 
-Signal, VS Code chord, or local bridge request flows to the canonical protocol assignment, then through CompanionService or ControlRouter to the one CommandDispatcher catalogue entry. The durable companion endpoint hydrates session lifecycle records; when constructed by the durable bootstrap, it runs no-replay startup recovery before becoming ready. DurableMediatedExecutor loads protected session, authority, and acceptance-evidence records, resolves a fresh target only from trusted host/session identity, and writes its content-addressed TargetSnapshot into the protected ledger before dispatch. When required, a host UI attestor issues an exact-scope confirmation through the durable confirmation ledger; the token is consumed once and a bridge payload cannot assert reauthentication. The dispatcher allocates a durable operation before policy issues an operation-bound short-lived permit. Runtime governance then requires a checkpoint capture, exact checkpoint scope, read-only artifact verification, and a second complete same-ID target snapshot immediately before budget/broker dispatch. A changed, incomplete, ignored-input-unknown, or unavailable target stops the broker. Only then can a broker-class command or Plan Approval receive a running budget claim, deadline/cancellation control, and an explicit typed adapter or broker that observes the containment fence. Protected operation, receipt, audit, checkpoint, confirmation, and budget stores record the result before the control plane considers the operation settled.
+Signal, VS Code chord, or local bridge request flows to the canonical protocol assignment, then through CompanionService or ControlRouter to the one CommandDispatcher catalogue entry. The durable companion endpoint hydrates session lifecycle records; when constructed by the durable bootstrap, it runs no-replay startup recovery before becoming ready. DurableMediatedExecutor loads protected session, authority, and acceptance-evidence records, resolves a fresh target only from trusted host/session identity, and writes its content-addressed TargetSnapshot into the protected ledger before dispatch. When required, a host UI attestor issues an exact-scope confirmation through the durable confirmation ledger; the token is consumed once and a bridge payload cannot assert reauthentication. The dispatcher allocates a durable operation before policy issues an operation-bound short-lived permit. Runtime governance then requires a checkpoint capture, exact checkpoint scope, read-only artifact verification, and a second complete same-ID target snapshot immediately before budget/broker dispatch. A changed, incomplete, ignored-input-unknown, or unavailable target stops the broker. Consequential broker and adapter routes receive a final host-owned effect guard; a refusal stops the handler. Only then can a broker-class command or Plan Approval receive a running budget claim, deadline/cancellation control, and an explicit typed adapter or broker that observes the containment fence. Protected operation, receipt, audit, checkpoint, confirmation, and budget stores record the result before the control plane considers the operation settled.
 
 The left half of this path routes and evaluates a request. The adapter/broker half is where a real side effect could occur, but only if a concrete, trusted adapter has been deliberately installed. The bundled in-memory brokers do not open a shell, fetch a URL, create a database, or contact a provider.
 
@@ -26,7 +26,7 @@ The left half of this path routes and evaluates a request. The adapter/broker ha
 | Authority ledger and companion UI | Current exact-action/task/plan grant, scoped target/session, durable exact-scope confirmation, and host-attested reauthentication. | Interpreting untrusted text as a grant or wildcard permission. |
 | Policy permit | A short-lived binding of action, durable operation, target, session, authority, and confirmation. | A reusable credential, a cross-operation replay token, or a bypass around a broker. |
 | Typed broker or adapter | A narrowly registered external action or safe unavailable result. | Arbitrary shell text, provider fallback, force-push semantics, or an implicit credential. |
-| Protected store | Append-only local records, hash-chain integrity checks, durable operation/containment state, and—when a reviewed host supplies one—authentication tags from a non-agent-accessible key boundary. | Proof that DPAPI/NCrypt/service authentication is actually implemented, operating-system hardening, or a substitute for external acceptance evidence. |
+| Protected store | Append-only local records, hash-chain integrity checks, durable operation/containment state, and authentication tags from a host key boundary. Standalone Windows startup uses a DPAPI CurrentUser protector. | Proof of a service account, named-pipe ACL policy, OS hardening, or a substitute for external acceptance evidence. |
 
 ## Capabilities are independent, not a maturity label
 
@@ -51,7 +51,7 @@ Consequential work must have all of the following immediately before it is sent 
 6. Host-attested reauthentication for high-consequence work when policy requires it; a keyboard, extension, or bridge payload cannot self-attest it.
 7. Current trusted passed evidence for every acceptance gate named by that high-consequence action.
 8. A short-lived permit accepted by the specific broker and bound to this action, durable operation, target, session, authority, and confirmation.
-9. An exact snapshot written to TargetSnapshotLedger before dispatch and, for a consequential action, re-resolved after checkpoint capture immediately before broker dispatch; it must remain complete and have the same content ID, including explicitly classified ignored inputs.
+9. An exact snapshot written to TargetSnapshotLedger before dispatch and, for a consequential action, re-resolved after checkpoint capture immediately before broker dispatch; it must remain complete and have the same content ID, including explicitly classified ignored inputs. The broker or adapter receives a final host-owned effect guard rather than trusting that earlier observation alone.
 10. Where the action is risky, a trusted checkpoint capture recorded and asserted against that exact target/operation scope, with every recovery artifact read-only verified against its recorded digest immediately before broker dispatch.
 11. For a broker-class command or Plan Approval, an active durable budget claim within a configured command-class limit plus operation-ID-scoped deadline/cancellation control.
 12. An explicit adapter, recipe, or mutation factory; missing registration is unavailable, never a guessed command.
@@ -75,7 +75,7 @@ The control plane is designed around protected append-only storage outside the a
 - versioned command-class budget configurations and admission/cancellation/retry claims; and
 - acceptance evidence and invalidation lineage.
 
-`ProtectedJsonStore` hash-chains these records. A host can authenticate each record hash with `JournalAuthenticator`; the durable companion bootstrap requires such an authenticator except in its explicit test-only mode. This repository supplies the interface and fail-closed wiring, not a DPAPI/NCrypt/service-key implementation. An operation has explicit states including prepared, executing, external_committed, recorded, failed, cancelling, compensating, and cancelled. If the companion loses a response after an external child could have run, it must reconcile that child; it must not restart the parent saga as a retry shortcut. Startup recovery observes pending work and never replays a broker action. Hash-chain or required authentication-tag failures fail closed. The concrete local mechanisms live in [store.ts](../packages/control-plane/src/store.ts), [confirmations.ts](../packages/control-plane/src/confirmations.ts), [operations.ts](../packages/control-plane/src/operations.ts), and [receipts.ts](../packages/control-plane/src/receipts.ts).
+`ProtectedJsonStore` hash-chains these records. A host can authenticate each record hash with `JournalAuthenticator`; the durable companion bootstrap requires such an authenticator except in its explicit test-only mode. The standalone Windows entry point supplies a DPAPI CurrentUser implementation, while a service account, NCrypt policy, and OS hardening remain separate deployment work. An operation has explicit states including prepared, executing, external_committed, recorded, failed, cancelling, compensating, and cancelled. If the companion loses a response after an external child could have run, it must reconcile that child; it must not restart the parent saga as a retry shortcut. Startup recovery observes pending work and never replays a broker action. Hash-chain or required authentication-tag failures fail closed. The concrete local mechanisms live in [store.ts](../packages/control-plane/src/store.ts), [windows-secret.ts](../apps/windows-companion/src/windows-secret.ts), [confirmations.ts](../packages/control-plane/src/confirmations.ts), [operations.ts](../packages/control-plane/src/operations.ts), and [receipts.ts](../packages/control-plane/src/receipts.ts).
 
 CheckpointLedger is intentionally not a recovery executor: it stores redacted immutable references and digests, validates them with a read-only verifier, and produces a manual-only guide that explicitly prohibits automatic restore, deletion, stashing, and overwrite. Durable runtime governance requires a trusted capture adapter, records the checkpoint, asserts its exact operation/snapshot scope, and calls its injected `RecoveryArtifactVerifier` immediately before it invokes a relevant risky broker. Missing, mismatched, or unverifiable artifacts stop that broker path. This is durable software state, not proof that every external provider has a reconciliation adapter. A provider-specific integration must supply its own read-before-retry and idempotency behavior.
 
@@ -87,31 +87,37 @@ The manager deliberately contains no process launcher, provider call, or backgro
 
 ## Safe adapter and broker model
 
-Each external capability has an interface and a fail-closed default.
+Each external capability has an interface, a test-only in-memory implementation,
+and a fail-closed installed path. Installed source does not make a route active:
+the exact host-attested configuration and external authorization must also be
+present.
 
-| Capability | Safe behavior without a real integration |
+| Capability | Installed source and safe unavailable behavior |
 | --- | --- |
-| Desktop, provider, or browser navigation | UnavailableCommandAdapter reports the missing surface and never substitutes another provider. |
-| Command or process execution | InMemoryExecutionBroker accepts only a fixed executable/argument recipe, exact operation-bound permit, and registered handler; it never invokes a shell itself. |
-| Git mutation | InMemoryGitBroker accepts typed mutations only, rejects force semantics, and verifies the exact action/operation/target/session/authority permit binding. Composite dispatch supplies a durable child-saga boundary to the handler; no implicit push occurs. |
-| Credentials | InMemoryCredentialBroker returns an opaque scoped lease, not secret material, and only after permit/fence checks. |
-| Network | InMemoryNetworkBroker uses an allowlisted test response only; it does not fetch. |
-| Pipeline or Repair environment | InMemoryTestEnvironmentBroker creates a descriptor with deny-egress and a test database name, without inheriting process environment or opening a database. |
-| Full Sandbox or Quarantine | UnavailableIsolationRuntime refuses to claim isolation. The in-memory variant says simulated explicitly. |
-| Automation or agent workflow | InMemoryAutomationBroker runs only a registered trusted handler; otherwise no prompt or workflow is submitted. |
+| Desktop, provider, or browser navigation | Fixed VS Code host actions and configured provider adapters act only on approved surfaces. Missing handshakes or routes report unavailable and never substitute another provider. |
+| Command or process execution | Host-attested repository manifests bind absolute executable identities, arguments, environment, output/time limits, managed process IDs, and final effect guards. No manifest means no execution. |
+| Git mutation | The reviewed local-commit handler uses task-owned paths, a private index, final target guard, hook-free fixed Git arguments, and shared-index reconciliation. Configured remote push/PR/merge uses exact refs, GitHub routes, scoped credentials, and durable child operations. Direct Main remains gate-disabled and no implicit push occurs. |
+| Credentials | The DPAPI credential-reference vault exposes only purpose/repository-scoped leases at the adapter boundary. No clear secret is returned to a command or persisted in repository state. |
+| Network | Exact-route HTTPS denies proxies, redirects, private/reserved DNS results, unpinned resolution, oversized bodies, missing credentials, and containment changes. No installed policy means no external request. |
+| Pipeline, Shield, or Repair environment | Host-attested recipes and configured GitHub/scanner adapters bind the exact target and protected receipts. Security and validation recipes requiring isolation are sent through the installed Windows Sandbox boundary. Missing recipes, feeds, or isolation report unavailable/incomplete. |
+| Full Sandbox or Quarantine | The attested Windows Sandbox installation pins the repository catalog, fixed guest-worker digest, and fixed host-lifecycle-helper digest. The host helper validates exact process identity and owns create/enter/focus/terminate/reconcile/cleanup; the guest worker enforces the declared in-sandbox boundary. Missing Windows Sandbox, either helper, catalog, or gate evidence blocks the action; no copy-only fallback is selected. |
+| Automation, provider, or agent workflow | Configured provider routes require a fresh exact-target handshake and scoped credentials. Durable Council additionally requires acknowledgements for every automatic phase. Missing capability or acknowledgement stops the workflow. |
 | Runtime governance | TargetSnapshotLedger records immutable target identity before dispatch; checkpoint capture and artifact verification, immediate complete same-ID target revalidation (including ignored inputs), durable budget admission, deadline/cancellation control, and no-replay recovery block or preserve the relevant risky/broker paths before an adapter is called. |
 
-These classes are intentional seams for a future real Windows service, Git adapter, credential vault, CI connector, and sandbox backend. They are useful for isolated local testing precisely because they cannot silently contact a real system.
+The in-memory classes remain useful for isolated tests precisely because they
+cannot contact a real system. The concrete installed adapters are likewise
+fail-closed: source availability is distinct from installed configuration,
+external authorization, and acceptance evidence.
 
 ## Test-data boundary
 
-Pipeline and Repair paths through this control plane do not inherit an ordinary terminal's environment. They need a repository-declared validation recipe and a test-environment broker that rejects configured production patterns and sensitive variables. With no verified recipe or no real isolation backend, the correct result is unavailable or blocked. This does not prevent an unmediated terminal from reaching its own environment; that bypass remains explicitly outside the claimed boundary.
+Pipeline and Repair paths through this control plane do not inherit an ordinary terminal's environment. They need a host-attested repository validation recipe and, where required, an active digest-pinned Windows Sandbox installation. With no verified recipe, helper, Windows feature, or configured external feed, the correct result is unavailable, incomplete, or blocked. This does not prevent an unmediated terminal from reaching its own environment; that bypass remains explicitly outside the claimed boundary.
 
 This design protects the test suite itself: unit tests use fakes, in-memory brokers, and temporary protected journals. They must never use a production database, production credentials, production data, or production endpoints.
 
 ## Containment is bounded but durable
 
-Emergency Containment is a durable policy fence for brokered Git, credential, network, and deployment paths. Activation records a new fence epoch before best-effort credential-revocation and queued-operation-cancellation hooks run. That order preserves the fact that an incident occurred even if a hook fails.
+Emergency Containment is a durable policy fence for wired Git, credential, network, execution, test-environment, automation, isolation, Council, and managed-adapter routes. Activation records a new fence epoch before best-effort credential-revocation and queued-operation-cancellation hooks run. That order preserves the fact that an incident occurred even if a hook fails.
 
 Containment does **not** claim to stop:
 
@@ -140,7 +146,7 @@ The companion should report one of the typed results rather than translate uncer
 
 The repository should not turn a high-consequence feature on until its integration supplies all of the following:
 
-1. A real, authenticated companion host with a DPAPI/NCrypt/service-backed `JournalAuthenticator` implementation and protected storage/identity model.
+1. A production-reviewed companion deployment model: service account or equivalent identity, protected storage access policy, named-pipe ACL review, and any required NCrypt/service-key policy. The local CurrentUser DPAPI implementation is not that acceptance evidence.
 2. A concrete capability handshake for the specific VS Code/provider/build.
 3. An OS-enforced mediated process, credential, network, test-data, and sandbox boundary, not merely a TypeScript interface or venv, with real external adapters propagating deadline/cancellation/reconciliation decisions.
 4. Typed, least-privilege Git/GitHub/CI/credential/provider adapters with provider-state reconciliation and no unsafe fallback.

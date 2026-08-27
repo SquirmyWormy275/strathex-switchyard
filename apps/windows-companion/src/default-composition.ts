@@ -1,51 +1,47 @@
 /** Concrete, conservative host composition for the installed companion. */
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AdapterRegistry, type AdapterOutcome, type AdapterRequest, type CommandAdapter } from "../../../packages/control-plane/src/adapters.ts";
-import type { AutomationBroker, AutomationRequest, BrokerOutcome, ExecutionBroker, ExecutionRequest, ExecutionRecipe, GitBroker, GitRequest, IsolationRuntime, IsolationRequest, TestEnvironmentBroker, TestEnvironmentRequest, TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
+import { InMemoryGitBroker, type AutomationBroker, type AutomationRequest, type BrokerOutcome, type GitRequest, type IsolationRuntime, type IsolationRequest, type TestEnvironmentBroker, type TestEnvironmentRequest, type TestEnvironmentOutcome } from "../../../packages/control-plane/src/brokers.ts";
 import { DurableContainmentManager } from "../../../packages/control-plane/src/containment.ts";
-import { CouncilCoordinator, type CouncilParticipant } from "../../../packages/control-plane/src/council.ts";
-import type { CouncilExecutor, CommandDispatcherDependencies } from "../../../packages/control-plane/src/dispatch.ts";
-import type { RuntimeDispatcherContext } from "../../../packages/control-plane/src/runtime.ts";
-import type { CommandDefinition } from "../../../packages/control-plane/src/command-catalog.ts";
+import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
+import type { CommandDispatcherDependencies, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
+import type { RuntimeDispatcherContext, TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
+import { commandForAction, type CommandDefinition } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
 import type { RepositoryRecipe } from "../../../packages/control-plane/src/recipes.ts";
 import type { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
-import { captureLiveTargetSnapshot, FilesystemBroker, LocalCredentialBroker, LocalNetworkBroker, LocalProcessBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
+import { ReceiptLedger } from "../../../packages/control-plane/src/receipts.ts";
+import { WorkflowArtifactStore } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import { TargetSnapshotLedger } from "../../../packages/control-plane/src/snapshot-ledger.ts";
+import { FilesystemBroker, LocalSandboxBroker, RawHidLoopbackTransport, ScannerFeedBroker, defaultRepositoryPolicy } from "./local-runtime.ts";
+import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "./mediated-git.ts";
+import { DurableHostActionAdapter, DurableHostActionQueue, hostActionCommandActions } from "./host-actions.ts";
+import { DurableCredentialReferenceVault } from "./durable-credentials.ts";
+import { createDirectConfiguredNetworkBroker, type ConfiguredHttpsNetworkBroker, type ConfiguredNetworkPolicy } from "./configured-network.ts";
+import type { UserSecretProtector } from "./windows-secret.ts";
+import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
+import { repositoryProcessActions, type RepositoryExecutionRootProvider, type RepositoryRuntimeAction } from "./repository-runtime.ts";
+import { RepositoryRuntimeExecutionBroker, SandboxedRepositoryExecutionBroker, repositoryRuntimeExecutionRecipe, type SandboxRepositoryRecipeRunner } from "./repository-runtime-broker.ts";
+import type { DurableNetworkPolicyRegistry } from "./host-provisioning.ts";
+import { ConfiguredProviderCommandAdapter, DynamicConfiguredNetworkClient, providerCommandActions, type ProviderCommandTransport } from "./remote-adapters.ts";
+import { ConfiguredGitHubGraphqlPort, ConfiguredGitSmartHttpPusher, ConfiguredRemoteGitHandler, configuredGitHostFromPolicy } from "./remote-git.ts";
+import { DurableConfiguredCouncilExecutor, type CouncilAssignmentResourceVerifier, type CouncilAutomaticAcceptanceGate } from "./council-runtime.ts";
+import type { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
+import { CompositePipelineStatusAdapter, ConfiguredGitHubPipelineAdapter, DurablePipelineFailureCursor, LocalPipelineFailureTraceAdapter, PipelineFailureFallbackAdapter, PipelineFailurePresentationAdapter, PipelineStatusFailureSelectionAdapter, readPipelineLocalReceipts, type PipelineFailureCursor, type PipelineReceiptReader } from "./pipeline-adapters.ts";
+import { ConfiguredGitHubNavigationResolver } from "./github-navigation.ts";
+import { installedProviderDesktopActions } from "./provider-desktop-adapter.ts";
+import { DurableEffectTargetTransitionCoordinator } from "./effect-target-transition.ts";
+import { createHostLocalAutomationBroker, type HostLocalAutomationBrokerOptions } from "./local-automation-broker.ts";
 
-// Every default process recipe is structured and shell-free. Keep the shared
-// allowlist narrow: reviewed commit summaries use hyphen/underscore words,
-// rather than widening the generic process broker for arbitrary Git flags.
-const processPolicy = /^[A-Za-z0-9_./:=@{}+-]+$/;
 const scannerFixture = createHash("sha256").update(JSON.stringify("")).digest("hex");
-function mapped(result: { readonly outcome: string; readonly detail: string }): BrokerOutcome {
-  return { status: result.outcome === "passed" ? "completed" : result.outcome === "blocked" ? "blocked" : result.outcome === "unavailable" ? "unavailable" : "failed", summary: result.detail };
-}
 function permit(request: Readonly<{ permit?: { readonly expiresAt: string }; executionControl?: { readonly deadline: string; isCancellationRequested(): Promise<boolean> } }>): BrokerOutcome | undefined {
-  if (!request.permit || Date.parse(request.permit.expiresAt) <= Date.now()) return { status: "blocked", summary: "The local broker rejected an absent or expired durable permit." };
-  if (request.executionControl && Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "The local broker rejected an expired execution deadline." };
+  if (!request.permit || Date.parse(request.permit.expiresAt) <= Date.now()) return { status: "blocked", summary: "The local broker rejected an absent or expired durable permit.", effectDisposition: "not_started" };
+  if (request.executionControl && Date.parse(request.executionControl.deadline) <= Date.now()) return { status: "timed_out", summary: "The local broker rejected an expired execution deadline.", effectDisposition: "not_started" };
   return undefined;
 }
 
-class LocalStructuredExecutionBroker implements ExecutionBroker {
-  private readonly processes: LocalProcessBroker; private readonly scanner: ScannerFeedBroker;
-  constructor(processes: LocalProcessBroker, scanner: ScannerFeedBroker) { this.processes = processes; this.scanner = scanner; }
-  async execute(request: ExecutionRequest): Promise<BrokerOutcome> {
-    const denied = permit(request); if (denied) return denied;
-    if (request.executionControl && await request.executionControl.isCancellationRequested()) return { status: "cancelled", summary: "The local execution broker observed a durable cancellation request." };
-    if (request.recipe.id !== "b122.local.git-diff-check" || request.recipe.executable !== "git" || request.recipe.args.join("\u0000") !== "diff\u0000--check") return { status: "unavailable", summary: "No reviewed local execution recipe is configured; the companion will not infer a command." };
-    let canonicalRoot: string;
-    try { canonicalRoot = await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); }
-    catch { return { status: "blocked", summary: "The execution target is outside the canonical local filesystem allowlist." }; }
-    const feed = this.scanner.ingest("", Date.now()); if (feed.outcome !== "passed") return mapped(feed);
-    return mapped(await this.processes.execute("git", request.recipe.args, canonicalRoot));
-  }
-}
-
 class LocalIsolatedTestEnvironmentBroker implements TestEnvironmentBroker {
-  private readonly stateDirectory: string;
-  constructor(stateDirectory: string) { this.stateDirectory = stateDirectory; }
   async prepare(request: TestEnvironmentRequest): Promise<TestEnvironmentOutcome> {
     const denied = permit(request); if (denied) return denied;
     const filesystem = new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot));
@@ -54,105 +50,161 @@ class LocalIsolatedTestEnvironmentBroker implements TestEnvironmentBroker {
     const normalized = (value: string) => value.replaceAll("\\", "/").replace(/^\/\/\?\//, "").replace(/\/+$/, "").toLowerCase();
     if (normalized(root) !== normalized(recipeRoot)) return { status: "blocked", summary: "The declared test recipe does not bind to the exact canonical target root." };
     if (Object.entries(request.sourceEnvironment).some(([key, value]) => /(secret|token|password|credential|api[_-]?key)/i.test(key) || (value !== undefined && /production|postgres(?:ql)?:\/\//i.test(value)))) return { status: "blocked", summary: "The isolated test broker rejected an ambient secret or production-looking input." };
-    const base = join(this.stateDirectory, "isolated-tests"); await mkdir(base, { recursive: true }); const tempRoot = await mkdtemp(join(base, "run-")); const id = tempRoot.split(/[\\/]/).at(-1) ?? "isolated";
-    return { status: "completed", summary: "Allocated a disposable deny-egress local test environment.", environment: { id, tempRoot, databaseName: `sxsy_test_${id}`, egress: "deny", environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } };
+    const id = `isolation-required:${request.operationId}`;
+    return { status: "completed", summary: "Prepared a sanitized isolation requirement; the pinned runtime must still attest an OS-enforced disposable root before execution.", environment: { id, tempRoot: id, databaseName: `sxsy_test_${request.operationId}`, egress: "deny", environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } };
   }
 }
 
-/**
- * Typed, review-gated local Git workflow.  It invokes only fixed Git
- * subcommands without a shell, revalidates the protected target before the
- * first mutation, and names every irreversible provider step in the durable
- * child saga supplied by the dispatcher.
- */
-class LocalReviewedGitBroker implements GitBroker {
-  private readonly processes: LocalProcessBroker;
-  constructor(processes: LocalProcessBroker) { this.processes = processes; }
-
-  async execute(request: GitRequest): Promise<BrokerOutcome> {
-    const denied = permit(request); if (denied) return denied;
-    let root: string;
-    try { root = await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); }
-    catch { return { status: "blocked", summary: "The Git mutation target is outside the canonical local filesystem allowlist." }; }
-    try {
-      const live = await captureLiveTargetSnapshot(root, request.target.policyVersion);
-      if (live.gitRoot.replaceAll("\\", "/").toLowerCase() !== root.replaceAll("\\", "/").toLowerCase() || live.head !== request.target.head || live.indexTree !== request.target.indexTree) {
-        return { status: "blocked", summary: "Live repository state no longer matches the protected TargetSnapshot; no Git mutation was started." };
-      }
-    } catch { return { status: "unavailable", summary: "The companion could not revalidate the exact local Git target." }; }
-    switch (request.mutation.kind) {
-      case "local_commit": {
-        if (!request.mutation.paths.every((path) => validRelativePath(path)) || !validCommitMessage(request.mutation.message)) return { status: "blocked", summary: "The reviewed commit package contains an unsafe path or commit message." };
-        const staged = await this.step(request, "stage", root, ["add", "--", ...request.mutation.paths]);
-        if (staged.status !== "completed") return staged;
-        return this.step(request, "commit", root, ["commit", "-m", request.mutation.message]);
-      }
-      case "pr_upsert": {
-        if (!validBranch(request.mutation.headBranch) || !validBranch(request.mutation.baseBranch) || request.mutation.headBranch === request.mutation.baseBranch) return { status: "blocked", summary: "The reviewed PR package contains an invalid or ambiguous branch." };
-        // This is deliberately only the safe local half of PR upsert. A
-        // provider-backed PR creation requires a separately configured,
-        // scoped GitHub credential adapter; it is never guessed from Git.
-        return this.step(request, "push-reviewed-head", root, ["push", "origin", `HEAD:refs/heads/${request.mutation.headBranch}`]);
-      }
-      case "merge_pr":
-        return { status: "unavailable", summary: "PR merge requires the configured GitHub credential/provider adapter; no local merge or direct-main fallback was attempted." };
-      case "direct_main":
-        return { status: "blocked", summary: "Direct-main mutation is prohibited by the default local policy." };
-    }
-  }
-
-  private async step(request: GitRequest, scope: string, root: string, args: readonly string[]): Promise<BrokerOutcome> {
-    const saga = request.childSaga;
-    const child = saga ? await saga.begin({ action: `git.${scope}`, idempotencyScope: `${request.mutation.kind}:${scope}`, details: { command: `git ${args[0]}` } }) : undefined;
-    if (child && !child.mayExecute) return { status: "blocked", summary: "A prior Git child operation exists and requires reconciliation; it was not replayed." };
-    if (child) await saga!.markExecuting(child);
-    const result = await this.processes.execute("git", args, root);
-    const outcome = mapped(result);
-    if (child) await saga!.settle(child, outcome.status === "completed" ? "completed" : outcome.status === "blocked" ? "cancelled" : "failed", { result: outcome.status });
-    return outcome;
-  }
-}
-function validRelativePath(path: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9_.@/ -]{0,240}$/.test(path) && !path.split(/[\\/]/).includes("..") && !path.split(/[\\/]/).includes(".git"); }
-function validCommitMessage(message: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9_.:@{}+-]{0,119}$/.test(message); }
-function validBranch(branch: string): boolean { return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(branch) && !branch.includes("..") && !branch.endsWith("/"); }
-class LocalFailClosedAutomationBroker implements AutomationBroker { async execute(request: AutomationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: "No local provider automation adapter is installed; no prompt, workflow, credential, or network request was submitted." }; } }
+class LocalFailClosedAutomationBroker implements AutomationBroker { async execute(request: AutomationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: "No local provider automation adapter is installed; no prompt, workflow, credential, or network request was submitted.", effectDisposition: "not_started" }; } }
 class LocalFailClosedIsolationRuntime implements IsolationRuntime {
-  private readonly sandboxes: LocalSandboxBroker;
-  constructor(sandboxes: LocalSandboxBroker) { this.sandboxes = sandboxes; }
-  async start(request: IsolationRequest): Promise<BrokerOutcome> { void this.sandboxes; return permit(request) ?? { status: "unavailable", summary: `${request.profile} requires a reviewed OS-enforced sandbox backend; no weaker copy-based sandbox was started.` }; }
+  async start(request: IsolationRequest): Promise<BrokerOutcome> { return permit(request) ?? { status: "unavailable", summary: `${request.profile} requires the installed OS-enforced sandbox backend; no weaker copy-based sandbox was started.`, effectDisposition: "not_started" }; }
 }
-class LocalCouncilExecutor implements CouncilExecutor {
-  private readonly council: CouncilCoordinator;
-  constructor(council: CouncilCoordinator) { this.council = council; }
-  async execute(request: Parameters<CouncilExecutor["execute"]>[0]): Promise<BrokerOutcome> {
-    const denied = permit(request); if (denied) return denied;
-    if (!request.session) return { status: "unavailable", summary: "Council requires a verified selected participant." };
-    if (request.action !== "council_report") return { status: "unavailable", summary: "Automatic Council needs multiple live mediated participants and explicit acknowledgement; it was not started." };
-    const participant: CouncilParticipant = { id: request.session.id, targetSnapshotId: request.target.id, status: request.session.status, capabilities: request.session.capabilities, lastHeartbeat: request.session.lastHeartbeat, plannedFiles: request.session.plannedFiles, resources: [], dependencies: [], diffDigest: `${request.target.trackedManifest}:${request.target.untrackedManifest}` };
-    try { const report = await this.council.report({ repositoryRoot: request.target.repositoryRoot, targetSnapshotId: request.target.id, participants: [participant] }); return { status: "completed", summary: "Collected a durable one-participant Council report; automatic coordination remains unavailable without peers.", data: { participants: report.participants.length, atomic: report.atomic } }; }
-    catch { return { status: "unavailable", summary: "Council participant state could not be durably validated." }; }
-  }
-}
-class LocalPipelineStatusAdapter implements CommandAdapter {
+export class LocalPipelineStatusAdapter implements CommandAdapter {
   readonly id = "local-pipeline-status"; readonly kind = "generic" as const;
-  private readonly processes: LocalProcessBroker;
-  constructor(processes: LocalProcessBroker) { this.processes = processes; }
+  private readonly git: LocalGitRunner;
+  private readonly receipts: PipelineReceiptReader;
+  private readonly now: () => string;
+  constructor(receipts: PipelineReceiptReader, git: LocalGitRunner = new SpawnLocalGitRunner(), now: () => string = () => new Date().toISOString()) { this.receipts = receipts; this.git = git; this.now = now; }
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target." };
-    try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist." }; }
-    const checked = await this.processes.execute("git", ["status", "--porcelain=v1", "--branch"], request.target.repositoryRoot);
-    return { status: checked.outcome === "passed" ? "completed" : checked.outcome === "blocked" ? "blocked" : checked.outcome === "unavailable" ? "unavailable" : "failed", summary: checked.detail, data: { broker: "filesystem+process+git" } };
+    if (!request.target) return { status: "unavailable", summary: "Pipeline status requires an exact target.", effectDisposition: "not_started" };
+    try { await new FilesystemBroker(defaultRepositoryPolicy(request.target.repositoryRoot)).canonical(request.target.repositoryRoot); } catch { return { status: "blocked", summary: "Pipeline status target is outside the local filesystem allowlist.", effectDisposition: "not_started" }; }
+    if (request.effectGuard) { const current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" }; }
+    let receiptObservation;
+    try { receiptObservation = await readPipelineLocalReceipts(this.receipts, request.target.id, this.now()); }
+    catch { return { status: "unavailable", summary: "The protected local Pipeline receipt ledger is unavailable; no local receipt state was inferred.", effectDisposition: "not_started" }; }
+    const receiptData = { localReceiptState: receiptObservation.state, localReceipts: receiptObservation.receipts };
+    let checked: Awaited<ReturnType<LocalGitRunner["run"]>>;
+    try {
+      checked = await this.git.run(["status", "--porcelain=v1", "--branch"], { cwd: request.target.repositoryRoot });
+    } catch {
+      return { status: "unavailable", summary: "The trusted absolute Git host is unavailable for live repository status; protected local Pipeline receipts remain visible as separate evidence.", effectDisposition: "not_started", data: receiptData };
+    }
+    if (request.effectGuard) {
+      let current;
+      try { current = await request.effectGuard.assertCurrent({ action: request.definition.action, operationId: request.operationId ?? "pipeline-status", target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); }
+      catch { return { status: "unavailable", summary: "The exact Pipeline target could not be revalidated after local observation; observed receipt data was discarded.", effectDisposition: "not_started" }; }
+      if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
+    }
+    const receiptSummary = receiptObservation.state === "absent" ? "no protected local receipts exist" : `protected local receipt state is ${receiptObservation.state}`;
+    return { status: checked.exitCode === 0 ? "completed" : "failed", summary: checked.exitCode === 0 ? `Inspected pipeline target status with the fixed absolute Git host; ${receiptSummary}.` : `The fixed Git status inspection failed; ${receiptSummary}.`, effectDisposition: "committed", data: { broker: "canonical-filesystem+fixed-git", clean: checked.exitCode === 0 && !checked.stdout.split(/\r?\n/).some((line) => line && !line.startsWith("##")), ...receiptData } };
   }
 }
 
 export interface DefaultLocalComposition {
-  readonly filesystem: "canonical-allowlist"; readonly credentials: LocalCredentialBroker; readonly network: LocalNetworkBroker; readonly processes: LocalProcessBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator;
+  readonly filesystem: "canonical-allowlist"; readonly credentials: DurableCredentialReferenceVault; readonly network: ConfiguredHttpsNetworkBroker; readonly scanner: ScannerFeedBroker; readonly rawHid: RawHidLoopbackTransport; readonly sandbox: LocalSandboxBroker; readonly containment: DurableContainmentManager; readonly council: CouncilCoordinator; readonly hostActions: DurableHostActionQueue; readonly repositoryRuntimes: DurableRepositoryRuntimeRegistry; readonly workflowArtifacts: WorkflowArtifactStore;
 }
-export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory = dirname(store.filePath)): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
-  void context;
-  const credentials = new LocalCredentialBroker(); const network = new LocalNetworkBroker(new Set(), { send: async () => { throw new Error("No approved network transport is configured."); } }, credentials);
-  const processes = new LocalProcessBroker([{ executable: "git", argumentPattern: processPolicy, timeoutMs: 30_000, outputLimit: 32_768 }]); const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const containment = new DurableContainmentManager(store); const council = new CouncilCoordinator(store);
-  const adapters = new AdapterRegistry(); adapters.register("pipeline_status", new LocalPipelineStatusAdapter(processes));
+export interface DefaultLocalCompositionOptions {
+  readonly localGitStateDirectory?: string;
+  readonly localGitMutationFactory?: GitMutationFactory;
+  readonly hostActions?: DurableHostActionQueue;
+  readonly credentialProtector: UserSecretProtector;
+  readonly networkPolicy?: ConfiguredNetworkPolicy;
+  readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
+  readonly repositoryRuntimes?: DurableRepositoryRuntimeRegistry;
+  readonly isolationRuntime?: IsolationRuntime;
+  readonly repositorySandbox?: SandboxRepositoryRecipeRunner;
+  readonly containmentManager?: DurableContainmentManager;
+  readonly credentialVault?: DurableCredentialReferenceVault;
+  readonly networkPolicyRegistry?: DurableNetworkPolicyRegistry;
+  readonly councilIsolation?: CouncilWorkspaceIsolationManager;
+  readonly councilResources?: CouncilAssignmentResourceVerifier;
+  readonly councilAutomaticGate?: CouncilAutomaticAcceptanceGate;
+  /** Authenticated local gateway with an explicitly configured-network fallback. */
+  readonly providerTransport?: ProviderCommandTransport;
+  /** Installed fixed-path desktop/managed-terminal adapter; omitted means those exact desktop commands remain unavailable. */
+  readonly providerDesktopAdapter?: CommandAdapter;
+  /** Trusted host-only TargetSnapshot resolver used for legitimate post-effect transitions. */
+  readonly targetResolver?: TargetResolver;
+  /** Request-bound installed host executor. Provider routes remain proposal-only. */
+  readonly automationExecutorFactory?: HostLocalAutomationBrokerOptions["createExecutor"];
+}
+export function createDefaultLocalComposition(context: RuntimeDispatcherContext, store: ProtectedJsonStore, stateDirectory: string = dirname(store.filePath), options: DefaultLocalCompositionOptions): { readonly dependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance">; readonly components: DefaultLocalComposition } {
+  let credentials: DurableCredentialReferenceVault | undefined = options.credentialVault;
+  const containment = options.containmentManager ?? new DurableContainmentManager(store, {
+    revokeCredentialLeases: async ({ repositoryRoot }) => {
+      if (!credentials) throw new Error("The durable credential vault is unavailable during containment.");
+      await credentials.revokeRepositoryLeases(repositoryRoot);
+    }
+  });
+  credentials ??= new DurableCredentialReferenceVault(store, options.credentialProtector, containment);
+  const network = createDirectConfiguredNetworkBroker(
+    options.networkPolicy ?? { version: 1, proxy: "direct", routes: [] },
+    containment,
+    credentials.createAdapter("configured-network")
+  );
+  const scanner = new ScannerFeedBroker(scannerFixture); const rawHid = new RawHidLoopbackTransport(); const sandbox = new LocalSandboxBroker(join(stateDirectory, "sandboxes")); const council = new CouncilCoordinator(store);
+  const workflowArtifacts = new WorkflowArtifactStore(store);
+  const targetTransitions = options.targetResolver
+    ? new DurableEffectTargetTransitionCoordinator({ sessions: context.sessions, targets: new TargetSnapshotLedger(store), targetResolver: options.targetResolver })
+    : undefined;
+  const repositoryRuntimes = options.repositoryRuntimes ?? new DurableRepositoryRuntimeRegistry(store, { ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}) });
+  const receiptLedger = new ReceiptLedger(store);
+  const pipelineCursor: PipelineFailureCursor = new DurablePipelineFailureCursor(store);
+  const localPipeline = new LocalPipelineStatusAdapter(receiptLedger);
+  const localPipelineTrace = new LocalPipelineFailureTraceAdapter(receiptLedger, pipelineCursor);
+  const dynamicNetwork = options.networkPolicyRegistry ? new DynamicConfiguredNetworkClient({ registry: options.networkPolicyRegistry, containment, credentials: credentials.createAdapter("configured-network") }) : undefined;
+  const hostActions = options.hostActions ?? new DurableHostActionQueue(store);
+  const adapters = new AdapterRegistry(containment);
+  adapters.register("pipeline_status", dynamicNetwork ? localPipeline : new PipelineStatusFailureSelectionAdapter(localPipeline, pipelineCursor));
+  adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(localPipelineTrace, hostActions));
+  const providerTransport = options.providerTransport ?? dynamicNetwork;
+  if (providerTransport) {
+    const provider = new ConfiguredProviderCommandAdapter(providerTransport, workflowArtifacts, targetTransitions);
+    for (const action of providerCommandActions) adapters.register(action, provider);
+  }
+  const configuredGitHost = options.networkPolicyRegistry ? { resolve: async (repositoryRoot: string) => configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve(repositoryRoot)) } : undefined;
+  const hostActionAdapter = new DurableHostActionAdapter(hostActions, dynamicNetwork && configuredGitHost ? new ConfiguredGitHubNavigationResolver(dynamicNetwork, configuredGitHost) : undefined);
+  for (const action of hostActionCommandActions) {
+    // Alt-Handoff is a provider workflow. Registering the legacy queue-view
+    // host action under the same action silently overwrote the exact provider
+    // adapter (and invented a local effect when no provider existed).
+    if (action !== "handoff_immediate" && action !== "pipeline_failure_trace") adapters.register(action, hostActionAdapter);
+  }
+  if (options.providerDesktopAdapter) for (const action of installedProviderDesktopActions) adapters.register(action, options.providerDesktopAdapter);
+  if (dynamicNetwork) {
+    const pipeline = new ConfiguredGitHubPipelineAdapter(dynamicNetwork, receiptLedger, configuredGitHost!, pipelineCursor);
+    adapters.register("pipeline_status", new CompositePipelineStatusAdapter(localPipeline, pipeline));
+    adapters.register("pipeline_failure_trace", new PipelineFailurePresentationAdapter(new PipelineFailureFallbackAdapter(pipeline, localPipelineTrace), hostActions));
+  }
+  const git = new InMemoryGitBroker(context.policy, containment);
+  if (options.localGitStateDirectory) {
+    const localGit = new LocalMediatedGitHandler({ stateDirectory: options.localGitStateDirectory, remediation: containment.incidents });
+    git.register("local_commit", (request) => localGit.execute(request));
+  }
+  if (dynamicNetwork) {
+    const directMainReceipts = { async verify(receiptId: string, targetSnapshotId: string) { const receipt = await receiptLedger.get(receiptId); return !!receipt && receipt.action === "release_shield" && await receiptLedger.isFresh(receipt, targetSnapshotId); } };
+    const pullRequestHost = { async open(request: GitRequest, url: string): Promise<BrokerOutcome> {
+        const fence = await containment.check(request.target.repositoryRoot, "adapter");
+        if (!fence.allowed) return { status: "blocked", summary: fence.reason };
+        const current = await request.effectGuard?.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) });
+        if (!current?.allowed) return { status: "incomplete", summary: current?.reason ?? "The PR status host action lacks a final target guard." };
+        const intent = await hostActions.enqueue({
+          definition: commandForAction(request.action), operationId: request.operationId, target: request.target,
+          ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}),
+          ...(request.executionControl ? { executionControl: request.executionControl } : {}), ...(request.effectGuard ? { effectGuard: request.effectGuard } : {})
+        }, { hostAction: "open_external_url", url });
+        return { status: "running", summary: "The exact PR is verified; opening its status awaits an authenticated VS Code acknowledgement.", data: { hostActionId: intent.id, hostActionKind: intent.hostAction, hostActionExpiresAt: intent.expiresAt, hostActionUrl: intent.url } };
+      } };
+    const executeRemoteGit = async (request: GitRequest) => {
+      try {
+        const host = configuredGitHostFromPolicy(await options.networkPolicyRegistry!.resolve(request.target.repositoryRoot));
+        return new ConfiguredRemoteGitHandler(
+          new ConfiguredGitSmartHttpPusher(dynamicNetwork, host),
+          new ConfiguredGitHubGraphqlPort(dynamicNetwork, host),
+          host,
+          directMainReceipts,
+          pullRequestHost
+        ).execute(request);
+      } catch {
+        return { status: "unavailable" as const, summary: "Remote Git requires one active exact-host GitHub or GitHub Enterprise route set.", effectDisposition: "not_started" as const };
+      }
+    };
+    git.register("pr_upsert", executeRemoteGit);
+    git.register("merge_pr", executeRemoteGit);
+    git.register("direct_main", executeRemoteGit);
+  }
   const recipeFor = (target: { readonly repositoryRoot: string }): RepositoryRecipe => ({ version: "b122-local-fixed-v1", repositoryRoot: target.repositoryRoot, gates: [{ name: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], timeoutMs: 30_000 }], productionHostPatterns: ["production", "postgres://", "postgresql://"], allowedDevelopmentHosts: ["localhost", "127.0.0.1", "::1"], environmentAllowlist: [] });
-  return { components: { filesystem: "canonical-allowlist", credentials, network, processes, scanner, rawHid, sandbox, containment, council }, dependencies: { adapters, execution: new LocalStructuredExecutionBroker(processes, scanner), git: new LocalReviewedGitBroker(processes), testEnvironment: new LocalIsolatedTestEnvironmentBroker(stateDirectory), automation: new LocalFailClosedAutomationBroker(), isolation: new LocalFailClosedIsolationRuntime(sandbox), containment, council: new LocalCouncilExecutor(council), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined => ["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(definition.action) ? { id: "b122.local.git-diff-check", executable: "git", args: ["diff", "--check"], workingDirectory: target.repositoryRoot, environment: {} } : undefined } } };
+  const runtimeActions = new Set<RepositoryRuntimeAction>([...repositoryProcessActions, "stop_managed_run"]);
+  const executionOptions = { containment, hostActions, ...(targetTransitions ? { targetTransitions } : {}) };
+  return { components: { filesystem: "canonical-allowlist", credentials, network, scanner, rawHid, sandbox, containment, council, hostActions, repositoryRuntimes, workflowArtifacts }, dependencies: { adapters, execution: options.repositorySandbox ? new SandboxedRepositoryExecutionBroker(repositoryRuntimes, options.repositorySandbox, executionOptions) : new RepositoryRuntimeExecutionBroker(repositoryRuntimes, executionOptions), git, testEnvironment: new LocalIsolatedTestEnvironmentBroker(), automation: options.automationExecutorFactory ? createHostLocalAutomationBroker(context.policy, containment, { createExecutor: options.automationExecutorFactory }) : new LocalFailClosedAutomationBroker(), isolation: options.isolationRuntime ?? new LocalFailClosedIsolationRuntime(), containment, council: new DurableConfiguredCouncilExecutor(council, context.sessions, providerTransport, Date.now, { ...(options.councilIsolation ? { isolation: options.councilIsolation } : {}), ...(options.councilAutomaticGate ? { automaticGate: options.councilAutomaticGate } : {}), ...(options.councilResources ? { resources: options.councilResources } : {}) }), recipes: { forTarget: (target) => recipeFor(target) }, executionRecipeFactory: { create: (definition: CommandDefinition, target: TargetSnapshot) => runtimeActions.has(definition.action as RepositoryRuntimeAction) ? repositoryRuntimeExecutionRecipe(definition.action as RepositoryRuntimeAction, target) : undefined }, ...(options.localGitMutationFactory ? { gitMutationFactory: options.localGitMutationFactory } : {}) } };
 }

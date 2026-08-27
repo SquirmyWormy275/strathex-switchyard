@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sxsy.invalid/schemas/b122-windows-sandbox-result-v2.json",
+  "title": "SXSY-B122 Windows Sandbox exact result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicyDigest", "outcome", "summary", "resourceEnforcement", "outputs"],
+  "properties": {
+    "schema": { "const": "sxsy-b122.windows-sandbox-result" },
+    "version": { "const": 2 },
+    "requestId": { "type": "string" },
+    "leaseId": { "type": "string" },
+    "recipeId": { "type": "string" },
+    "profile": { "enum": ["full_sandbox", "fresh_full_sandbox", "quarantine"] },
+    "recipeCatalogDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "resourcePolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "outcome": { "const": "completed" },
+    "summary": { "type": "string", "maxLength": 1024 },
+    "resourceEnforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobObject", "cpuHardCap", "memoryLimit", "processLimit", "noSurvivors", "activeProcessesAfterCleanup"],
+      "properties": {
+        "jobObject": { "const": true },
+        "cpuHardCap": { "const": true },
+        "memoryLimit": { "const": true },
+        "processLimit": { "const": true },
+        "noSurvivors": { "const": true },
+        "activeProcessesAfterCleanup": { "const": 0 }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "size": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  }
+}

@@ -31,6 +31,36 @@ test("target snapshots are protected, idempotent, and recoverable by their exact
   assert.equal((await ledger.list()).length, 1);
 });
 
+test("target snapshot ledger preserves default-branch and detached-HEAD identity fields", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-snapshot-ledger-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const ledger = new TargetSnapshotLedger(new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl") }));
+  const branchBoundMaterial = {
+    repositoryRoot: "C:/safe/repo", canonicalRemote: "https://github.com/example/safe.git", branch: "feature/safe",
+    defaultBranch: "main", upstream: "origin/feature/safe", head: "abc", indexTree: "tree", trackedManifest: "tracked",
+    untrackedManifest: "untracked", submodules: {}, policyVersion: "policy-1", environmentFingerprint: "environment",
+    completeness: "complete" as const, reasons: [] as readonly string[]
+  };
+  const branchBound: TargetSnapshot = {
+    id: targetSnapshotDigest(branchBoundMaterial), ...branchBoundMaterial, capturedAt: "2026-08-23T12:00:00.000Z"
+  };
+  const detachedMaterial = {
+    repositoryRoot: "C:/safe/repo", canonicalRemote: "https://github.com/example/safe.git", defaultBranch: "main",
+    detached: true as const, head: "def", indexTree: "tree", trackedManifest: "tracked", untrackedManifest: "untracked",
+    submodules: {}, policyVersion: "policy-1", environmentFingerprint: "environment", completeness: "complete" as const,
+    reasons: [] as readonly string[]
+  };
+  const detached: TargetSnapshot = {
+    id: targetSnapshotDigest(detachedMaterial), ...detachedMaterial, capturedAt: "2026-08-23T12:00:01.000Z"
+  };
+
+  await ledger.record(branchBound);
+  await ledger.record(detached);
+
+  assert.equal((await ledger.get(branchBound.id))?.defaultBranch, "main");
+  assert.equal((await ledger.get(detached.id))?.detached, true);
+});
+
 test("target snapshot ledger rejects a wrong digest and hash-chain tampering", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-snapshot-ledger-"));
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });

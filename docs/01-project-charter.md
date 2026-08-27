@@ -18,7 +18,9 @@ Agentic development fragments work across multiple sessions, projects, tools, wi
 - Maintain and revise the settled 22-key control vocabulary only from observed
   work and explicit safety evidence rather than intuition.
 - Make session and project routing faster without hiding context.
-- Provide a reliable, context-aware HALT/interrupt action.
+- Provide reliable, context-aware interruption through the settled Re-anchor
+  lifecycle and managed Run Stop behavior. There is no standalone `HALT` key in
+  the accepted 22-control map.
 - Reduce repeated mouse trips and awkward chords.
 - Preserve explicit confirmation for destructive or authority-expanding actions.
 - Publish reproducible Vial, host-automation, legend, test, and installation artifacts.
@@ -50,7 +52,9 @@ The first stable release must demonstrate:
 
 - all 22 physical controls are uniquely identifiable;
 - no destructive action can fire from an unrecognized context;
-- HALT behavior is tested in each supported agent/terminal context;
+- Re-anchor safe-stop/report behavior and managed Run Stop behavior are tested
+  in each claimed agent/terminal context, without implying rollback or a global
+  kill switch;
 - mappings and legends agree mechanically and semantically;
 - every distributed third-party artifact has a recorded source and permission basis;
 - install and rollback instructions work on a clean supported Windows environment;

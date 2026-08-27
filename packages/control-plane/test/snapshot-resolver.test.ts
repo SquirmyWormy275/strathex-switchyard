@@ -15,6 +15,15 @@ class Inspector implements GitInspector {
   }
 }
 
+class LocalOnlyInspector implements GitInspector {
+  async inspect(): Promise<GitInspection> {
+    return {
+      repositoryRoot: "C:/safe/local-only", branch: "feature/contained", head: "abc", indexTree: "tree",
+      trackedFiles: [{ path: "src/a.ts", digest: "a" }], untrackedFiles: [], submodules: {}
+    };
+  }
+}
+
 test("workspace target resolver uses only a selected session root and marks missing tool evidence incomplete", async () => {
   const resolver = new WorkspaceSnapshotResolver(new TargetSnapshotFactory(new Inspector()), { policyVersion: "policy-1" });
   const definition = commandForAction("proof");
@@ -30,4 +39,24 @@ test("workspace target resolver uses only a selected session root and marks miss
   assert.equal(snapshot?.repositoryRoot, "C:/safe/repo");
   assert.equal(snapshot?.completeness, "incomplete");
   assert.match(snapshot?.reasons.join(" ") ?? "", /fingerprints/i);
+});
+
+test("containment captures a complete explicit zero-remote target while ordinary consequential work still requires a canonical remote", async () => {
+  const session = {
+    id: "session-local", provider: "codex" as const, surface: "vscode_terminal" as const,
+    capabilities: ["registered", "observable", "controllable", "mediated"] as const, status: "running" as const,
+    workspaceRoot: "C:/safe/local-only", plannedFiles: [], lastHeartbeat: "2026-08-25T12:00:00.000Z", adapterVersion: "test", metadata: {}
+  };
+  const resolver = new WorkspaceSnapshotResolver(new TargetSnapshotFactory(new LocalOnlyInspector()), {
+    policyVersion: "policy-1",
+    environmentFor: () => ({ toolVersions: { git: "test" } })
+  });
+  const containment = await resolver.resolve({ definition: commandForAction("emergency_containment"), session });
+  assert.equal(containment?.completeness, "complete");
+  assert.equal(containment?.canonicalRemote, undefined);
+  const release = await resolver.resolve({ definition: commandForAction("containment_release"), session });
+  assert.equal(release?.completeness, "complete");
+  const ordinary = await resolver.resolve({ definition: commandForAction("local_commit"), session });
+  assert.equal(ordinary?.completeness, "incomplete");
+  assert.match(ordinary?.reasons.join(" ") ?? "", /canonical remote/i);
 });

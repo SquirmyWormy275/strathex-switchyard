@@ -1,0 +1,525 @@
+{
+  "schema": "sxsy-b122-control-map/v1",
+  "protocolVersion": 1,
+  "controls": [
+    "REANCHOR",
+    "PROOF",
+    "OPTION_PROVIDER",
+    "PLAN_EXPANDER",
+    "PLAN_APPROVAL",
+    "HANDOFF",
+    "FIND_BLOCKED_AGENT",
+    "FIND_FINISHED_AGENT",
+    "AUTHORITY_REFRESH",
+    "COUNCIL",
+    "CLAUDE",
+    "CHATGPT",
+    "VSCODE",
+    "TERMINAL",
+    "COMMIT",
+    "GITHUB",
+    "COMPOUND",
+    "RUN",
+    "VOICE",
+    "PIPELINE",
+    "SHIELD",
+    "SANDBOX"
+  ],
+  "assignments": [
+    {
+      "control": "REANCHOR",
+      "modifier": "normal",
+      "summary": "Safely re-anchor the active agent to scoped authority and evidence.",
+      "capability": "requires_mediation",
+      "handler": "b122.REANCHOR:normal"
+    },
+    {
+      "control": "PROOF",
+      "modifier": "normal",
+      "summary": "Request evidence-based self-verification.",
+      "capability": "requires_mediation",
+      "handler": "b122.PROOF:normal"
+    },
+    {
+      "control": "PROOF",
+      "modifier": "shift",
+      "summary": "Request a cross-backend adversarial review.",
+      "capability": "requires_mediation",
+      "handler": "b122.PROOF:shift"
+    },
+    {
+      "control": "OPTION_PROVIDER",
+      "modifier": "normal",
+      "summary": "Request five options and one recommendation.",
+      "capability": "requires_mediation",
+      "handler": "b122.OPTION_PROVIDER:normal"
+    },
+    {
+      "control": "OPTION_PROVIDER",
+      "modifier": "shift",
+      "summary": "Request one numbered packet for pending decisions.",
+      "capability": "requires_mediation",
+      "handler": "b122.OPTION_PROVIDER:shift"
+    },
+    {
+      "control": "PLAN_EXPANDER",
+      "modifier": "normal",
+      "summary": "Request fifteen ranked creative alternatives.",
+      "capability": "requires_mediation",
+      "handler": "b122.PLAN_EXPANDER:normal"
+    },
+    {
+      "control": "PLAN_APPROVAL",
+      "modifier": "normal",
+      "summary": "Route an already-approved plan to the selected session.",
+      "capability": "requires_mediation",
+      "handler": "b122.PLAN_APPROVAL:normal"
+    },
+    {
+      "control": "HANDOFF",
+      "modifier": "normal",
+      "summary": "Prepare a planner-to-coding-agent context transfer.",
+      "capability": "requires_mediation",
+      "handler": "b122.HANDOFF:normal"
+    },
+    {
+      "control": "HANDOFF",
+      "modifier": "shift",
+      "summary": "Queue a blocker or decision packet.",
+      "capability": "requires_mediation",
+      "handler": "b122.HANDOFF:shift"
+    },
+    {
+      "control": "HANDOFF",
+      "modifier": "alt",
+      "summary": "Focus the planner with the packet.",
+      "capability": "route_only",
+      "handler": "b122.HANDOFF:alt"
+    },
+    {
+      "control": "HANDOFF",
+      "modifier": "shift_alt",
+      "summary": "Toggle queued versus immediate-focus handoff.",
+      "capability": "route_only",
+      "handler": "b122.HANDOFF:shift_alt"
+    },
+    {
+      "control": "FIND_BLOCKED_AGENT",
+      "modifier": "normal",
+      "summary": "Focus the next verified blocked managed agent.",
+      "capability": "requires_mediation",
+      "handler": "b122.FIND_BLOCKED_AGENT:normal"
+    },
+    {
+      "control": "FIND_BLOCKED_AGENT",
+      "modifier": "shift",
+      "summary": "Open the blocker queue.",
+      "capability": "route_only",
+      "handler": "b122.FIND_BLOCKED_AGENT:shift"
+    },
+    {
+      "control": "FIND_FINISHED_AGENT",
+      "modifier": "normal",
+      "summary": "Focus the next verified finished managed agent.",
+      "capability": "requires_mediation",
+      "handler": "b122.FIND_FINISHED_AGENT:normal"
+    },
+    {
+      "control": "FIND_FINISHED_AGENT",
+      "modifier": "shift",
+      "summary": "Open the done queue.",
+      "capability": "route_only",
+      "handler": "b122.FIND_FINISHED_AGENT:shift"
+    },
+    {
+      "control": "AUTHORITY_REFRESH",
+      "modifier": "normal",
+      "summary": "Replay existing scoped authority to the active agent.",
+      "capability": "requires_mediation",
+      "handler": "b122.AUTHORITY_REFRESH:normal"
+    },
+    {
+      "control": "AUTHORITY_REFRESH",
+      "modifier": "shift",
+      "summary": "Prepare a reviewed individualized broadcast.",
+      "capability": "requires_mediation",
+      "handler": "b122.AUTHORITY_REFRESH:shift"
+    },
+    {
+      "control": "COUNCIL",
+      "modifier": "normal",
+      "summary": "Report verified cross-agent conflicts and dependencies.",
+      "capability": "requires_mediation",
+      "handler": "b122.COUNCIL:normal"
+    },
+    {
+      "control": "COUNCIL",
+      "modifier": "shift",
+      "summary": "Automatic partitioning and isolation (Council automatic mode).",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.COUNCIL:shift"
+    },
+    {
+      "control": "COUNCIL",
+      "modifier": "alt",
+      "summary": "Propose one coordinated plan for explicit approval.",
+      "capability": "requires_mediation",
+      "handler": "b122.COUNCIL:alt"
+    },
+    {
+      "control": "CLAUDE",
+      "modifier": "normal",
+      "summary": "Open or focus Claude Desktop.",
+      "capability": "route_only",
+      "handler": "b122.CLAUDE:normal"
+    },
+    {
+      "control": "CLAUDE",
+      "modifier": "shift",
+      "summary": "Open a fresh Claude surface.",
+      "capability": "route_only",
+      "handler": "b122.CLAUDE:shift"
+    },
+    {
+      "control": "CLAUDE",
+      "modifier": "alt",
+      "summary": "Open a managed Claude Code terminal in VS Code.",
+      "capability": "requires_mediation",
+      "handler": "b122.CLAUDE:alt"
+    },
+    {
+      "control": "CHATGPT",
+      "modifier": "normal",
+      "summary": "Open or focus ChatGPT Desktop.",
+      "capability": "route_only",
+      "handler": "b122.CHATGPT:normal"
+    },
+    {
+      "control": "CHATGPT",
+      "modifier": "shift",
+      "summary": "Open a fresh ChatGPT surface.",
+      "capability": "route_only",
+      "handler": "b122.CHATGPT:shift"
+    },
+    {
+      "control": "CHATGPT",
+      "modifier": "alt",
+      "summary": "Open a managed Codex terminal in VS Code.",
+      "capability": "requires_mediation",
+      "handler": "b122.CHATGPT:alt"
+    },
+    {
+      "control": "VSCODE",
+      "modifier": "normal",
+      "summary": "Focus the last-used VS Code window.",
+      "capability": "route_only",
+      "handler": "b122.VSCODE:normal"
+    },
+    {
+      "control": "VSCODE",
+      "modifier": "shift",
+      "summary": "Open a new VS Code window.",
+      "capability": "route_only",
+      "handler": "b122.VSCODE:shift"
+    },
+    {
+      "control": "TERMINAL",
+      "modifier": "normal",
+      "summary": "Open or focus an external terminal.",
+      "capability": "route_only",
+      "handler": "b122.TERMINAL:normal"
+    },
+    {
+      "control": "TERMINAL",
+      "modifier": "shift",
+      "summary": "Open or focus the VS Code integrated terminal.",
+      "capability": "route_only",
+      "handler": "b122.TERMINAL:shift"
+    },
+    {
+      "control": "COMMIT",
+      "modifier": "normal",
+      "summary": "Preview the Compound local-commit workflow.",
+      "capability": "requires_mediation",
+      "handler": "b122.COMMIT:normal"
+    },
+    {
+      "control": "COMMIT",
+      "modifier": "shift",
+      "summary": "Preview PR upsert after explicit review.",
+      "capability": "requires_mediation",
+      "handler": "b122.COMMIT:shift"
+    },
+    {
+      "control": "COMMIT",
+      "modifier": "alt",
+      "summary": "Broker-enforced exact-head PR merge.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.COMMIT:alt"
+    },
+    {
+      "control": "COMMIT",
+      "modifier": "shift_alt",
+      "summary": "Broker-enforced guarded Direct Main.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.COMMIT:shift_alt"
+    },
+    {
+      "control": "GITHUB",
+      "modifier": "normal",
+      "summary": "Open the repository home.",
+      "capability": "route_only",
+      "handler": "b122.GITHUB:normal"
+    },
+    {
+      "control": "GITHUB",
+      "modifier": "shift",
+      "summary": "Open the current-branch PR or PR list.",
+      "capability": "route_only",
+      "handler": "b122.GITHUB:shift"
+    },
+    {
+      "control": "GITHUB",
+      "modifier": "alt",
+      "summary": "Open repository issues.",
+      "capability": "route_only",
+      "handler": "b122.GITHUB:alt"
+    },
+    {
+      "control": "GITHUB",
+      "modifier": "shift_alt",
+      "summary": "Open the current-branch Actions run or list.",
+      "capability": "route_only",
+      "handler": "b122.GITHUB:shift_alt"
+    },
+    {
+      "control": "COMPOUND",
+      "modifier": "normal",
+      "summary": "Capture one durable learning.",
+      "capability": "requires_mediation",
+      "handler": "b122.COMPOUND:normal"
+    },
+    {
+      "control": "COMPOUND",
+      "modifier": "shift",
+      "summary": "Preview learning-store refresh scope.",
+      "capability": "requires_mediation",
+      "handler": "b122.COMPOUND:shift"
+    },
+    {
+      "control": "COMPOUND",
+      "modifier": "alt",
+      "summary": "Open the Compound workflow palette.",
+      "capability": "route_only",
+      "handler": "b122.COMPOUND:alt"
+    },
+    {
+      "control": "COMPOUND",
+      "modifier": "shift_alt",
+      "summary": "Guarded full lfg loop.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.COMPOUND:shift_alt"
+    },
+    {
+      "control": "RUN",
+      "modifier": "normal",
+      "summary": "Run the selected configured target.",
+      "capability": "requires_mediation",
+      "handler": "b122.RUN:normal"
+    },
+    {
+      "control": "RUN",
+      "modifier": "shift",
+      "summary": "Debug the selected configured target.",
+      "capability": "requires_mediation",
+      "handler": "b122.RUN:shift"
+    },
+    {
+      "control": "RUN",
+      "modifier": "alt",
+      "summary": "Stop a managed run process.",
+      "capability": "requires_mediation",
+      "handler": "b122.RUN:alt"
+    },
+    {
+      "control": "RUN",
+      "modifier": "shift_alt",
+      "summary": "Start a managed web app and offer its verified local URL.",
+      "capability": "requires_mediation",
+      "handler": "b122.RUN:shift_alt"
+    },
+    {
+      "control": "VOICE",
+      "modifier": "normal",
+      "summary": "Open the two-way voice center.",
+      "capability": "route_only",
+      "handler": "b122.VOICE:normal"
+    },
+    {
+      "control": "VOICE",
+      "modifier": "shift",
+      "summary": "Choose the Claude or ChatGPT provider.",
+      "capability": "route_only",
+      "handler": "b122.VOICE:shift"
+    },
+    {
+      "control": "VOICE",
+      "modifier": "alt",
+      "summary": "Bind voice only to a selected managed VS Code agent.",
+      "capability": "requires_mediation",
+      "handler": "b122.VOICE:alt"
+    },
+    {
+      "control": "VOICE",
+      "modifier": "shift_alt",
+      "summary": "Open the voice session picker.",
+      "capability": "route_only",
+      "handler": "b122.VOICE:shift_alt"
+    },
+    {
+      "control": "PIPELINE",
+      "modifier": "normal",
+      "summary": "Show non-mutating pipeline status.",
+      "capability": "route_only",
+      "handler": "b122.PIPELINE:normal"
+    },
+    {
+      "control": "PIPELINE",
+      "modifier": "shift",
+      "summary": "Run a local gate through the test-environment broker.",
+      "capability": "requires_mediation",
+      "handler": "b122.PIPELINE:shift"
+    },
+    {
+      "control": "PIPELINE",
+      "modifier": "alt",
+      "summary": "Diagnose the selected failure.",
+      "capability": "requires_mediation",
+      "handler": "b122.PIPELINE:alt"
+    },
+    {
+      "control": "PIPELINE",
+      "modifier": "shift_alt",
+      "summary": "Reproduce cleanly through the test-environment broker.",
+      "capability": "requires_mediation",
+      "handler": "b122.PIPELINE:shift_alt"
+    },
+    {
+      "control": "PIPELINE",
+      "modifier": "ctrl_shift_alt",
+      "summary": "Isolated Repair Mission.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.PIPELINE:ctrl_shift_alt"
+    },
+    {
+      "control": "SHIELD",
+      "modifier": "normal",
+      "summary": "Scan current changes using configured coverage.",
+      "capability": "requires_mediation",
+      "handler": "b122.SHIELD:normal"
+    },
+    {
+      "control": "SHIELD",
+      "modifier": "shift",
+      "summary": "Run a deeper codebase and history audit.",
+      "capability": "requires_mediation",
+      "handler": "b122.SHIELD:shift"
+    },
+    {
+      "control": "SHIELD",
+      "modifier": "alt",
+      "summary": "Run configured supply-chain audit coverage.",
+      "capability": "requires_mediation",
+      "handler": "b122.SHIELD:alt"
+    },
+    {
+      "control": "SHIELD",
+      "modifier": "shift_alt",
+      "summary": "Prepare an exact-revision Release Shield receipt.",
+      "capability": "requires_mediation",
+      "handler": "b122.SHIELD:shift_alt"
+    },
+    {
+      "control": "SHIELD",
+      "modifier": "ctrl_shift_alt",
+      "summary": "Containment release or emergency containment workflow.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.SHIELD:ctrl_shift_alt"
+    },
+    {
+      "control": "SANDBOX",
+      "modifier": "normal",
+      "summary": "Create or enter a repository-local virtual environment.",
+      "capability": "requires_mediation",
+      "handler": "b122.SANDBOX:normal"
+    },
+    {
+      "control": "SANDBOX",
+      "modifier": "shift",
+      "summary": "Preview safe virtual-environment rebuild scope.",
+      "capability": "requires_mediation",
+      "handler": "b122.SANDBOX:shift"
+    },
+    {
+      "control": "SANDBOX",
+      "modifier": "alt",
+      "summary": "Create or enter a Full Sandbox.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.SANDBOX:alt"
+    },
+    {
+      "control": "SANDBOX",
+      "modifier": "shift_alt",
+      "summary": "Rebuild a Full Sandbox.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.SANDBOX:shift_alt"
+    },
+    {
+      "control": "SANDBOX",
+      "modifier": "ctrl_shift_alt",
+      "summary": "Quarantine.",
+      "capability": "disabled_pending_gates",
+      "handler": "b122.SANDBOX:ctrl_shift_alt"
+    }
+  ],
+  "specialGestures": {
+    "REANCHOR": [],
+    "PROOF": [],
+    "OPTION_PROVIDER": [],
+    "PLAN_EXPANDER": [],
+    "PLAN_APPROVAL": [],
+    "HANDOFF": [],
+    "FIND_BLOCKED_AGENT": [
+      "Repeated normal presses cycle verified blocked agents."
+    ],
+    "FIND_FINISHED_AGENT": [
+      "Repeated normal presses cycle verified finished agents."
+    ],
+    "AUTHORITY_REFRESH": [],
+    "COUNCIL": [],
+    "CLAUDE": [
+      "Repeated normal presses cycle exact current-user-approved Claude Desktop windows."
+    ],
+    "CHATGPT": [
+      "Repeated normal presses cycle exact current-user-approved ChatGPT Desktop windows."
+    ],
+    "VSCODE": [
+      "Repeated normal presses cycle VS Code windows."
+    ],
+    "TERMINAL": [],
+    "COMMIT": [],
+    "GITHUB": [],
+    "COMPOUND": [],
+    "RUN": [],
+    "VOICE": [
+      "Repeated normal presses toggle mute/resume; end remains an explicit reviewed Voice Center choice until physical long-press timing is accepted."
+    ],
+    "PIPELINE": [
+      "Repeated normal presses cycle failing gates."
+    ],
+    "SHIELD": [
+      "Status lighting is hardware-dependent."
+    ],
+    "SANDBOX": []
+  }
+}

@@ -163,10 +163,18 @@ test("durable dispatch coordination focuses active work and records a result bef
       })()
     });
     const coordinator = new DurableOperationCoordinator(operations, receipts);
-    const first = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
-    const duplicate = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    const first = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "grant-1" });
+    const duplicate = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "grant-1" });
     assert.equal(duplicate.existing, true);
     assert.equal(duplicate.operationId, first.operationId);
+    const firstDetails = (await operations.get(first.operationId))?.details;
+    assert.equal(firstDetails?.sessionId, "session-1");
+    assert.equal(firstDetails?.authorityId, "grant-1");
+    assert.equal(firstDetails?.targetBound, "true");
+
+    const changedAuthority = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "grant-2" });
+    assert.equal(changedAuthority.existing, false, "a changed authority must not be confused with the protected active operation binding");
+    await coordinator.settle(changedAuthority, "blocked");
 
     await coordinator.markExecuting(first);
     const persisted = await coordinator.recordResult(first, {
@@ -183,7 +191,7 @@ test("durable dispatch coordination focuses active work and records a result bef
     assert.equal((await operations.get(first.operationId))?.state, "recorded");
     assert.equal((await receipts.get(persisted.receiptId!))?.operationId, first.operationId);
 
-    const later = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1" });
+    const later = await coordinator.claim({ action: "pr_upsert", targetSnapshotId: "snapshot-1", sessionId: "session-1", authorityId: "grant-1" });
     assert.equal(later.existing, false);
     assert.notEqual(later.operationId, first.operationId);
 

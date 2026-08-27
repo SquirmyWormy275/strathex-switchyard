@@ -1,6 +1,9 @@
-import type { B122Control, B122Modifier } from "./commands.ts";
-import { readFile } from "node:fs/promises";
-import { connect } from "node:net";
+import { chordFor, type B122Control, type B122Modifier } from "./commands.ts";
+import {
+  automationManifestReviewScopeDigest,
+  parseAutomationOperationManifest,
+  type AutomationOperationManifest
+} from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 
 export type ExtensionCapability = "registered" | "observable" | "controllable" | "mediated";
 export type ExtensionSessionStatus = "running" | "verified_blocked" | "verified_finished" | "unreachable" | "stale" | "unknown";
@@ -30,19 +33,399 @@ export interface ForwardedCommand {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
   readonly input?: Readonly<Record<string, string>>;
 }
 
 export interface ForwardedCommandResult {
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly operationId?: string;
+  readonly effectDisposition?: "not_started" | "committed" | "ambiguous";
   readonly data?: Readonly<Record<string, unknown>>;
 }
 
 export type LocalHostAction =
-  | "create_claude_terminal"
-  | "create_codex_terminal"
-  | "focus_integrated_terminal";
+  | "show_handoff_queue" | "toggle_handoff_routing" | "show_blocker_queue" | "show_done_queue"
+  | "open_external_url" | "create_claude_terminal" | "create_codex_terminal" | "focus_vscode"
+  | "new_vscode_window" | "focus_external_terminal" | "focus_integrated_terminal" | "open_compound_palette"
+  | "show_voice_center" | "switch_voice_provider" | "show_voice_session_picker" | "show_pipeline_failure_trace" | "start_vscode_debug" | "stop_vscode_debug" | "configure_python_venv" | "select_github_navigation";
+
+export interface GitHubNavigationCandidate { readonly id: string; readonly label: string; readonly description: string; readonly url: string; }
+
+export interface RepositoryExecutableIdentitySummary {
+  readonly canonicalPath: string;
+  readonly sha256: string;
+  readonly device: string;
+  readonly inode: string;
+  readonly size: number;
+  readonly modifiedMs: number;
+}
+
+export interface ForwardedHostAction {
+  readonly id: string;
+  readonly kind: LocalHostAction;
+  readonly expiresAt: string;
+  readonly url?: string;
+  readonly workspaceRoot?: string;
+  readonly debugConfiguration?: string;
+  readonly debugSessionId?: string;
+  readonly debugEffectSessionId?: string;
+  readonly debugBindingId?: string;
+  readonly debugOriginOperationId?: string;
+  readonly pythonInterpreter?: string;
+  readonly pythonInterpreterIdentity?: RepositoryExecutableIdentitySummary;
+  readonly githubCandidates?: readonly GitHubNavigationCandidate[];
+  readonly managedTerminalProfile?: ManagedTerminalProfileSummary;
+}
+
+export interface ForwardedHostActionAuthorization {
+  readonly hostActionId: string;
+  readonly authorizationToken: string;
+  readonly expiresAt: string;
+  readonly selectionId?: string;
+  readonly url?: string;
+}
+
+export interface HostActionClaimReference {
+  readonly claimId: string;
+  readonly claimToken: string;
+  readonly windowSessionId: string;
+}
+
+export interface ExtensionHostActionClaim extends HostActionClaimReference {
+  readonly version: 1;
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly commandAction: "open_voice" | "switch_voice_provider" | "bind_voice_session" | "voice_session_picker";
+  readonly hostActionKind: "show_voice_center";
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly workspaceRoot?: string;
+  readonly adapterVersion: string;
+  readonly capabilities: readonly ["show_voice_center"];
+  readonly claimedAt: string;
+  readonly expiresAt: string;
+  readonly actionExpiresAt: string;
+}
+
+export interface PreparedCommand {
+  readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
+  readonly summary: string;
+  readonly session?: ExtensionManagedSession;
+  readonly authorityId?: string;
+  readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
+  readonly confirmationExpiresAt?: string;
+  readonly workflowReview?: PlanApprovalWorkflowReview;
+  readonly automationReview?: AutomationManifestReview;
+  readonly debugStopReview?: DebugStopReview;
+}
+
+export type AutomationManifestAction = "compound_capture" | "compound_refresh" | "lfg" | "repair_mission";
+
+export interface ExtensionAutomationOperationManifest {
+  readonly schema: "sxsy-b122.automation-operation-manifest";
+  readonly version: 1;
+  readonly id: string;
+  readonly digest: string;
+  readonly action: AutomationManifestAction;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly taskId: string;
+  readonly planRevision: string;
+  readonly provider: string;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly proposal: Readonly<Record<string, unknown>>;
+}
+
+export interface AutomationManifestReview {
+  readonly action: AutomationManifestAction;
+  readonly manifest: ExtensionAutomationOperationManifest;
+  readonly reviewScopeDigest: string;
+}
+
+export interface DebugStopReview {
+  readonly schema: "sxsy-b122.debug-stop-review";
+  readonly version: 1;
+  readonly action: "stop_managed_run";
+  readonly bindingId: string;
+  readonly bindingDigest: string;
+  readonly reviewScopeDigest: string;
+  readonly sourceSessionId: string;
+  readonly authorityId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly originOperationId: string;
+  readonly effectKind: "debug_session" | "managed_run";
+  readonly debugSessionId: string | null;
+  readonly debugBindingId: string | null;
+  readonly debugConfiguration: string | null;
+  readonly managedProcessId: string | null;
+  readonly createdAt: string;
+  readonly expiresAt: string;
+}
+
+export interface PlanApprovalWorkflowReview {
+  readonly action: "plan_approval";
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly repositoryRoot: string;
+  readonly provider: "claude" | "codex";
+  readonly contextId: string;
+  readonly observedAt: string;
+  readonly adapter: Readonly<{ readonly id: string; readonly version: string; readonly moduleSha256: string }>;
+  readonly plan: Readonly<{
+    readonly digest: string;
+    readonly revision: string;
+    readonly originSessionId: string;
+    readonly taskId: string;
+    readonly objective: string;
+    readonly steps: readonly Readonly<{ readonly id: string; readonly summary: string; readonly ownedFiles: readonly string[]; readonly dependencies: readonly string[]; readonly status: "proposed" | "approved" | "completed" | "blocked" }>[];
+    readonly decisions: readonly string[];
+    readonly expectedTargetTransition: Readonly<{
+      readonly beforeTargetSnapshotId: string;
+      readonly expectedAfterTargetSnapshotId: string;
+      readonly expectation: "unchanged" | "changed";
+    }>;
+  }>;
+  readonly scopeDigest: string;
+  readonly summary: string;
+  readonly providerContextDigest: string;
+  readonly sourceRevision: number;
+}
+
+export type ReviewedGitMutation =
+  | { readonly kind: "local_commit"; readonly paths: readonly string[]; readonly message: string; readonly featureBranch?: string; readonly containmentRemediation?: Readonly<{ readonly permitId: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly remediatedFindingIds: readonly string[] }> }
+  | { readonly kind: "pr_upsert"; readonly headBranch: string; readonly baseBranch: string; readonly title: string; readonly body: string }
+  | { readonly kind: "merge_pr"; readonly pullRequest: number; readonly head: string; readonly baseBranch: string }
+  | { readonly kind: "direct_main"; readonly branch: string; readonly validationReceiptId: string };
+
+export interface GitReviewResult {
+  readonly status: "approved" | "blocked" | "unavailable";
+  readonly summary: string;
+  readonly reviewId?: string;
+  readonly targetSnapshotId?: string;
+  readonly expiresAt?: string;
+  readonly session?: ExtensionManagedSession;
+}
+
+export interface GitReviewWorkspace {
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly branch?: string;
+  readonly defaultBranch?: string;
+  readonly detached: boolean;
+  readonly changedPaths: readonly string[];
+}
+
+export interface RepositoryRuntimePin {
+  readonly canonicalRepositoryRoot: string;
+  readonly manifestPath: string;
+  readonly expectedSha256: string;
+  readonly installedAt: string;
+  readonly status: "active" | "revoked";
+}
+
+export interface SandboxInstallationPin {
+  readonly canonicalRepositoryRoot: string;
+  readonly catalogPath: string;
+  readonly catalogSha256: string;
+  readonly helperPath: string;
+  readonly helperSha256: string;
+  readonly installedAt: string;
+  readonly status: "active" | "revoked";
+}
+
+export interface CredentialProvisionScope { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string; }
+export interface CredentialReferenceSummary { readonly reference: string; readonly protectorProvider: string; readonly generation: number; readonly createdAt: string; readonly updatedAt: string; readonly scopes: readonly CredentialProvisionScope[]; readonly revokedAt?: string; readonly revocationReason?: string; }
+export interface InstalledNetworkPolicy { readonly repositoryRoot?: string; readonly filePath: string; readonly sha256: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface AcceptanceTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedGates: readonly number[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface AcceptanceEvidenceSummary { readonly id: string; readonly gate: number; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly targetSnapshotId?: string; readonly operationId?: string; readonly evidenceDigest: string; readonly policyVersion: string; readonly evaluatedBy: string; readonly evaluatedAt: string; readonly expiresAt?: string; readonly rationale: string; readonly invalidatedAt?: string; readonly invalidatedReason?: string; }
+export interface HighConsequenceActivationSummary { readonly id: string; readonly action: string; readonly targetSnapshotId: string; readonly policyVersion: string; readonly gateEvidenceIds: readonly string[]; readonly activatedAt: string; readonly expiresAt: string; readonly activatedBy: string; readonly status: "active" | "revoked"; }
+export interface ScannerTrustSummary { readonly authorityId: string; readonly keyId: string; readonly allowedKinds: readonly ("scanner" | "advisory")[]; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface ScannerFixtureSummary { readonly id: string; readonly kind: "scanner" | "advisory"; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export type ProviderDesktopId = "claude_desktop" | "chatgpt_desktop" | "claude_code" | "codex";
+export interface ProviderProductIdentitySummary { readonly productId: string; readonly displayName: string; readonly publisher: string; readonly role: "desktop" | "managed_terminal"; }
+export interface ProviderExecutableIdentitySummary { readonly canonicalExecutablePath: string; readonly executableSha256: string; readonly signerSubject: string; readonly signerThumbprint: string; readonly productIdentity: ProviderProductIdentitySummary; readonly size: number; readonly modifiedMs: number; readonly device: string; readonly inode: string; }
+export interface ProviderInstallationSummary { readonly provider: ProviderDesktopId; readonly installationId: string; readonly catalogDigest: string; readonly identity: ProviderExecutableIdentitySummary; readonly operator: string; readonly installedAt: string; readonly statusAt: string; readonly status: "active" | "stale" | "revoked"; }
+export interface ManagedTerminalProfileSummary { readonly provider: "claude_code" | "codex"; readonly profileName: string; readonly canonicalLauncherPath: string; readonly launcherSha256: string; readonly launcherProtocolVersion: 1; readonly canonicalExecutablePath: string; readonly executableSha256: string; readonly signerSubject: string; readonly signerThumbprint: string; readonly executableSize: number; readonly executableModifiedMs: number; readonly executableDevice: string; readonly executableInode: string; readonly productIdentity: ProviderProductIdentitySummary; readonly args: readonly string[]; readonly shell: false; readonly installationId: string; readonly catalogDigest: string; readonly issuedAt: string; readonly validUntil: string; readonly requiresFinalIdentityVerification: true; }
+export interface RawHidDeviceIdentity { readonly vendorId: number; readonly productId: number; readonly usagePage: number; readonly usage: number; readonly serialNumber?: string; }
+export interface RawHidInstallationPin { readonly identity: RawHidDeviceIdentity; readonly helperPath: string; readonly helperSha256: string; readonly protocolVersion: number; readonly mapFingerprint: string; readonly installedAt: string; readonly status: "active" | "revoked"; }
+export interface RawHidRuntimeStatus { readonly supervisor: { readonly state: "unprovisioned" | "starting" | "running" | "retrying" | "stopped" | "unavailable"; readonly generation: number; readonly detail: string }; readonly inbox: { readonly pending: number; readonly claimed: number; readonly completed: number; readonly needsReconciliation: number }; readonly installations: readonly RawHidInstallationPin[]; }
+export type ContainmentHookName = "credential_lease_revocation" | "queued_operation_cancellation";
+export type ContainmentHookStatus = "pending" | "running" | "completed" | "failed" | "unavailable";
+export interface ContainmentHookInspection { readonly name: ContainmentHookName; readonly status: ContainmentHookStatus; readonly attempts: number; readonly updatedAt: string; readonly failure?: string; }
+export type ContainmentIncidentStatus = "assessing" | "assessment_incomplete" | "remediation_required" | "ready_for_release" | "released";
+export type ContainmentRemediationAction = "remove_exposed_value" | "rewrite_local_history" | "add_ignore_rule";
+export interface ContainmentRemediationPermitSummary { readonly id: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly relativePaths: readonly string[]; readonly reviewedBy: string; readonly issuedAt: string; readonly expiresAt: string; readonly networkAllowed: false; readonly credentialAccessAllowed: false; readonly consumedAt?: string; }
+export interface ContainmentRemediationReceiptSummary { readonly id: string; readonly permitId: string; readonly incidentId: string; readonly fenceEpoch: number; readonly action: ContainmentRemediationAction; readonly relativePaths: readonly string[]; readonly remediatedFindingIds: readonly string[]; readonly evidenceDigest: string; readonly recordedAt: string; }
+export interface ContainmentIncidentFinding { readonly id: string; readonly relativePath: string; readonly credentialRelated: boolean; }
+export interface ContainmentIncidentAssessmentResult { readonly schema: "sxsy-b122.containment-assessment-result"; readonly version: 1; readonly incidentId: string; readonly repositoryRoot: string; readonly fenceEpoch: number; readonly step: "working_tree" | "history" | "remote"; readonly operationId: string; readonly externalId: string; readonly effectDisposition: "committed" | "not_started" | "ambiguous"; readonly status: "passed" | "failed" | "unavailable" | "incomplete"; readonly exposure: "none" | "found" | "unknown"; readonly summary: string; readonly findings: readonly ContainmentIncidentFinding[]; }
+export interface ContainmentIncidentStep { readonly name: "working_tree" | "history" | "remote"; readonly operationId: string; readonly externalId: string; readonly status: "pending" | "executing" | "ambiguous" | "completed"; readonly attempts: number; readonly updatedAt: string; readonly result?: ContainmentIncidentAssessmentResult; }
+export interface ContainmentAssessmentCycleInspection { readonly generation: number; readonly purpose: "initial" | "post_remediation"; readonly targetSnapshotId: string; readonly basedOnFindingIds: readonly string[]; readonly basedOnReceiptIds: readonly string[]; readonly credentialRotationRequired: boolean; readonly sourceIncidentDigest?: string; readonly startedAt: string; }
+export interface ContainmentIncidentInspection { readonly version: 1; readonly id: string; readonly repositoryRoot: string; readonly fenceEpoch: number; readonly activationOperationId: string; readonly reason: string; readonly createdAt: string; readonly updatedAt: string; readonly status: ContainmentIncidentStatus; readonly assessment: ContainmentAssessmentCycleInspection; readonly steps: readonly ContainmentIncidentStep[]; readonly permits: readonly ContainmentRemediationPermitSummary[]; readonly receipts: readonly ContainmentRemediationReceiptSummary[]; readonly rotation?: Readonly<{ readonly disposition: "complete" | "not_required"; readonly evidenceReference: string; readonly evidenceDigest: string; readonly reviewedAt: string }>; readonly releasedAt?: string; }
+export interface ContainmentInspectionSummary {
+  readonly sessionId: string;
+  readonly repositoryRoot: string;
+  readonly active: true;
+  readonly fenceEpoch: number;
+  readonly activatedByOperationId: string;
+  readonly hookStates: readonly ContainmentHookInspection[];
+  readonly hookFailures: readonly string[];
+  readonly uncontrolledPaths: readonly string[];
+  readonly incident: ContainmentIncidentInspection;
+  readonly incidentDigest: string;
+}
+export interface ContainmentHistoryRefUpdateSummary { readonly refName: string; readonly kind: "head" | "tag"; readonly oldObject: string; readonly newObject: string; readonly oldPeeledCommit: string | null; readonly newPeeledCommit: string | null; }
+export interface ContainmentHistoryRemediationSummary { readonly operationId: string; readonly incidentId: string; readonly permitId: string; readonly repositoryRoot: string; readonly branch: string; readonly oldHead: string; readonly newHead: string; readonly backupBundlePath: string; readonly backupBundleSha256: string; readonly incidentDigest: string; readonly updatedRefs: readonly ContainmentHistoryRefUpdateSummary[]; readonly strippedTagSignatures: number; readonly status: "completed"; }
+export interface ContainmentRemoteTrustSummary { readonly schema: "sxsy-b122.containment-remote-trust-policy"; readonly version: 1; readonly purpose: "containment-remote-assessment"; readonly authorityId: string; readonly keyId: string; readonly publicKeyPem: string; readonly expiresAt: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; readonly revokedAt?: string; }
+export interface ContainmentConfiguredRemoteSummary { readonly name: string; readonly canonicalIdentity: string; }
+export interface ContainmentRemoteChallengeSummary { readonly id: string; readonly incidentId: string; readonly generation: number; readonly targetSnapshotId: string; readonly configuredRemotes: readonly ContainmentConfiguredRemoteSummary[]; readonly issuedAt: string; readonly expiresAt: string; readonly status: "active" | "used"; readonly challengePath: string; }
+export interface ContainmentRemoteEvidenceSummary { readonly evidenceId: string; readonly challengeId: string; readonly documentSha256: string; readonly expiresAt: string; readonly status: "available" | "consumed"; }
+export interface ExtensionCouncilAssignment { readonly sessionId: string; readonly paths: readonly string[]; readonly resources: readonly string[]; }
+export interface ExtensionCouncilRecommendation {
+  readonly id: string;
+  readonly digest: string;
+  readonly reportId: string;
+  readonly reportDigest: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participantSessionIds: readonly string[];
+  readonly assignments: Readonly<Record<string, ExtensionCouncilAssignment>>;
+  readonly reviewScopeDigest: string;
+  readonly preparationOperationId: string;
+  readonly ready: boolean;
+  readonly status: "prepared" | "approved" | "rejected";
+  readonly approvalOperationId?: string;
+  readonly rejectionReason?: string;
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+export interface HardwareSignalClaim { readonly signalId: string; readonly claimToken: string; readonly deviceId: string; readonly connectionEpoch: number; readonly bootNonce: number; readonly counter: number; readonly control: B122Control; readonly modifier: B122Modifier; readonly acceptedAt: string; readonly claimedAt: string; readonly attempt: number; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
+export interface HardwareSignalDispatchResult { readonly command: ForwardedCommandResult; readonly dispatchReceiptId: string; }
+export interface HardwareSignalPreparationResult { readonly preparation: PreparedCommand; readonly dispositionReceiptId?: string; }
+export interface HardwareSignalCompletionResult { readonly signalId: string; readonly outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; }
+export interface ExtensionReanchorAuthority { readonly id: string; readonly issuedBy: string; readonly expiresAt: string; }
+export interface ExtensionReanchorReport {
+  readonly summary: string;
+  readonly discrepancies: readonly string[];
+  readonly risks: readonly string[];
+  readonly questions: readonly string[];
+  readonly result: "reanchored_without_resume";
+}
+export interface ExtensionReanchorRereadEvidence {
+  readonly contextDigest: string;
+  readonly authorityDigest: string;
+  readonly instructionDigests: readonly string[];
+  readonly planDigest: string;
+  readonly documentationDigests: readonly string[];
+  readonly currentWorkDigest: string;
+  readonly inspectedTargetSnapshotId: string;
+}
+export interface ExtensionReanchorReceipt {
+  readonly version: 1;
+  readonly id: string;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly previewDigest: string;
+  readonly confirmationDigest: string;
+  readonly confirmationScopeDigest: string;
+  readonly externalEffectId: string;
+  readonly acknowledgementDigest: string;
+  readonly artifactDigest: string;
+  readonly rereadEvidence: ExtensionReanchorRereadEvidence;
+  readonly report: ExtensionReanchorReport;
+  readonly sessionRebindOutcome: "rebound" | "already_rebound";
+  readonly resultingBindingDigest: string;
+  readonly resumed: false;
+  readonly evidenceDigest: string;
+  readonly result: "reanchored_without_resume";
+  readonly createdAt: string;
+}
+export interface ExtensionReanchorStatus {
+  readonly schema: "sxsy-b122.installed-reanchor-status";
+  readonly version: 1;
+  readonly requestId: string;
+  readonly operationId: string;
+  readonly sessionId: string;
+  readonly authorityId: string;
+  readonly oldTargetSnapshotId: string;
+  readonly newTargetSnapshotId: string;
+  readonly state: "pending_preview" | "pending_confirmation" | "confirmed" | "executing" | "external_committed" | "session_rebound" | "ambiguous" | "rejected" | "recorded";
+  readonly summary?: string;
+  readonly discrepancies?: readonly string[];
+  readonly risks?: readonly string[];
+  readonly questions?: readonly string[];
+  readonly confirmationScopeDigest?: string;
+  readonly confirmationExpiresAt?: string;
+  readonly receipt?: ExtensionReanchorReceipt;
+}
+export interface ExtensionReanchorHardwareBeginResult {
+  readonly reanchor: ExtensionReanchorStatus;
+  readonly dispatchReceiptId: string;
+}
+export interface ExtensionHandoffPackage { readonly id: string; readonly digest: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly taskId: string; readonly planRevision: string; readonly recipientSessionId?: string; readonly status: "queued" | "immediate_focus_requested" | "acknowledged" | "cancelled" | "archived"; readonly executionAuthorized: false; }
+export type ExtensionWorkflowAction = "reanchor" | "proof" | "proof_adversarial" | "option_provider" | "option_packet" | "plan_expander" | "plan_approval" | "handoff" | "handoff_queue" | "handoff_immediate" | "focus_blocked_agent" | "focus_finished_agent" | "authority_refresh" | "authority_broadcast" | "bind_voice_session";
+export type ExtensionWorkflowPreparationIntent =
+  | { readonly kind: "none" }
+  | { readonly kind: "decision"; readonly question: string; readonly context: string }
+  | { readonly kind: "handoff"; readonly recipientSessionId: string; readonly route: "default" | "queue" | "immediate" }
+  | { readonly kind: "authority_broadcast"; readonly recipientSessionIds: readonly string[] }
+  | { readonly kind: "plan_approval"; readonly confirmationToken: string; readonly confirmationScopeDigest: string };
+export interface ExtensionWorkflowArtifact {
+  readonly id: string;
+  readonly digest: string;
+  readonly action: ExtensionWorkflowAction;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId: string;
+  readonly taskId?: string;
+  readonly planRevision?: string;
+  readonly authorityId: string;
+  readonly coordinatorContextDigest?: string;
+  readonly coordinatorContextRevision?: number;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly status: "prepared" | "submitted" | "cancelling" | "acknowledged" | "rejected" | "cancelled";
+  readonly operationId?: string;
+  readonly providerExternalId?: string;
+  readonly providerResult?: ExtensionWorkflowProviderResult;
+  readonly providerSummary?: string;
+  readonly providerResponseStatus?: "completed" | "failed" | "blocked" | "unavailable" | "running" | "awaiting_input" | "awaiting_confirmation";
+  readonly providerEffectDisposition?: "not_started" | "committed" | "ambiguous";
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+export type ExtensionWorkflowProviderResult =
+  | { readonly kind: "anchor"; readonly anchorDigest: string; readonly discrepancies: readonly string[]; readonly questions: readonly string[]; readonly resumed: false }
+  | { readonly kind: "proof"; readonly verifiedClaims: readonly string[]; readonly evidenceReferences: readonly string[]; readonly backendResults: readonly { readonly backend: string; readonly status: "passed" | "failed" | "unavailable" }[] }
+  | { readonly kind: "decision"; readonly decisionPacketId: string; readonly decisions: readonly { readonly decisionId: string; readonly options: readonly { readonly id: string; readonly label: string; readonly tradeoffs: readonly string[]; readonly risks: readonly string[] }[]; readonly recommendationId: string }[]; readonly userSelectionRequired: true }
+  | { readonly kind: "plan"; readonly mode: "expanded"; readonly planDigest: string; readonly alternatives: readonly { readonly rank: number; readonly id: string; readonly summary: string; readonly rationale: string; readonly risks: readonly string[] }[] }
+  | { readonly kind: "plan"; readonly mode: "execution_ack"; readonly planDigest: string; readonly planRevision: string; readonly originSessionId: string; readonly executorSessionId: string; readonly authorityId: string; readonly acknowledgementId: string; readonly executionStarted: true }
+  | { readonly kind: "handoff"; readonly packageId: string; readonly recipientSessionId: string; readonly acknowledged: boolean }
+  | { readonly kind: "focus"; readonly selectedSessionId: string; readonly status: "verified_blocked" | "verified_finished"; readonly queueCycleId: string; readonly resultDelivered: true }
+  | { readonly kind: "authority"; readonly acknowledgements: readonly { readonly recipientSessionId: string; readonly grantId: string; readonly matchDigest: string; readonly acknowledged: true }[] }
+  | { readonly kind: "voice_binding"; readonly bindingId: string; readonly active: boolean };
+export interface ForwardedWorkflowOutcome {
+  readonly artifactId: string;
+  readonly artifactDigest: string;
+  readonly resultKind: ExtensionWorkflowProviderResult["kind"];
+  readonly workflowResult: ExtensionWorkflowProviderResult;
+  readonly providerSummary: string;
+  readonly externalId?: string;
+}
+export type ExtensionVoiceProvider = "claude" | "chatgpt" | "system";
+export interface ExtensionVoiceConsent { readonly id: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly expiresAt: string; }
+export interface ExtensionVoiceBinding { readonly id: string; readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly contextPackageId: string; readonly contextDigest: string; readonly provider: ExtensionVoiceProvider; readonly transcript: "off" | "redacted"; readonly retentionMinutes: number; readonly status: "active" | "muted" | "interrupted" | "ended"; readonly transcriptDeletedAt?: string; }
 
 export type BridgeResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -50,45 +433,102 @@ export type BridgeResult<T> =
 
 export interface ExtensionCompanionBridge {
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>>;
+  listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>>;
   registerSession(session: ExtensionManagedSession, kind?: "session" | "terminal" | "debug"): Promise<BridgeResult<ExtensionManagedSession>>;
   adoptTerminal(sessionId: string, adoptionKey: string, provider: Exclude<ExtensionProvider, "voice">): Promise<BridgeResult<ExtensionManagedSession>>;
   updateStatus(sessionId: string, status: ExtensionSessionStatus): Promise<BridgeResult<ExtensionManagedSession>>;
   heartbeat(sessionId: string, at?: string): Promise<BridgeResult<ExtensionManagedSession>>;
+  listReanchorAuthorities(sessionId: string): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>>;
+  beginReanchor(input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  beginHardwareReanchor(claim: HardwareSignalClaim, input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>>;
+  confirmReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  getReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>>;
+  prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }>): Promise<BridgeResult<PreparedCommand>>;
+  inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>>;
+  reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>>;
+  installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>>;
+  listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>>;
+  revokeRuntimePin(repositoryRoot: string): Promise<BridgeResult<RepositoryRuntimePin>>;
+  installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>>;
+  listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>>;
+  revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>>;
+  provisionCredential(input: Readonly<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>>;
+  listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>>;
+  revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>>;
+  installNetworkPolicy(repositoryRoot: string, sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  currentNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy | undefined>>;
+  revokeNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy>>;
+  installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>>;
+  revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>>;
+  importAcceptanceEvidence(sourcePath: string): Promise<BridgeResult<AcceptanceEvidenceSummary>>;
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>>;
+  invalidateAcceptanceEvidence(evidenceId: string, reason: string): Promise<BridgeResult<boolean>>;
+  activateHighConsequence(action: string, targetSnapshotId: string, expiresAt: string): Promise<BridgeResult<HighConsequenceActivationSummary>>;
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>>;
+  revokeHighConsequenceActivation(activationId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installScannerTrust(sourcePath: string): Promise<BridgeResult<ScannerTrustSummary>>;
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>>;
+  revokeScannerTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installScannerFixture(sourcePath: string): Promise<BridgeResult<ScannerFixtureSummary>>;
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>>;
+  revokeScannerFixture(fixtureId: string, reason: string): Promise<BridgeResult<boolean>>;
+  installProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
+  listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>>;
+  revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>>;
+  providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>>;
+  inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  reassessContainment(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  verifyContainmentRemediation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>>;
+  rewriteContainmentHistory(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }>): Promise<BridgeResult<ContainmentHistoryRemediationSummary>>;
+  installContainmentRemoteTrust(sourcePath: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>>;
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>>;
+  revokeContainmentRemoteTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>>;
+  issueContainmentRemoteChallenge(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }>): Promise<BridgeResult<ContainmentRemoteChallengeSummary>>;
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>>;
+  importContainmentRemoteEvidence(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }>): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>>;
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>>;
+  recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>>;
+  releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>>;
+  approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>>;
+  installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>>;
+  listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>>;
+  revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>>;
+  rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>>;
+  claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>>;
+  prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string, reviewArtifactId?: string, reviewArtifactDigest?: string, effectSessionId?: string): Promise<BridgeResult<HardwareSignalPreparationResult>>;
+  dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>>;
+  completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>>;
+  claimHostAction(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>>;
+  createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>>;
+  acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  cancelHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  archiveHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>>;
+  handoffRouting(): Promise<BridgeResult<"queue" | "immediate">>;
+  setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">>;
+  prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
+  cancelWorkflow(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<BridgeResult<ExtensionWorkflowArtifact>>;
+  listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>>;
+  grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>>;
+  startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>>;
+  switchVoice(input: Readonly<{ bindingId: string; consentId: string; voiceSessionId: string }>): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  interruptVoice(bindingId: string, reason: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
+  deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>>;
   dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>>;
+  authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string, claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedHostActionAuthorization>>;
+  completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous", claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedCommandResult>>;
 }
 
 /** A line round-trip owned by a deliberately started local companion process. */
 export interface JsonLineTransport {
   request(line: string): Promise<string>;
-}
-
-export interface LocalCompanionConfiguration { readonly ipcPath: string; readonly token: string; }
-
-/** Reads a deliberately configured per-user companion configuration; absence remains fail-closed. */
-export async function readLocalCompanionConfiguration(path: string): Promise<LocalCompanionConfiguration> {
-  const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
-  if (!isRecord(parsed) || typeof parsed.ipcPath !== "string" || !parsed.ipcPath || typeof parsed.token !== "string" || !/^[a-f0-9]{64}$/i.test(parsed.token)) {
-    throw new Error("The configured SXSY-B122 companion configuration is invalid.");
-  }
-  return { ipcPath: parsed.ipcPath, token: parsed.token };
-}
-
-/** Authenticated request/response transport for the companion's local named pipe. */
-export class AuthenticatedLocalPipeTransport implements JsonLineTransport {
-  private readonly configuration: LocalCompanionConfiguration;
-  private readonly timeoutMs: number;
-  constructor(configuration: LocalCompanionConfiguration, timeoutMs = 5_000) { this.configuration = configuration; this.timeoutMs = timeoutMs; }
-
-  request(line: string): Promise<string> {
-    return new Promise((resolveResponse, reject) => {
-      const socket = connect(this.configuration.ipcPath); let pending = ""; let settled = false;
-      const finish = (work: () => void) => { if (settled) return; settled = true; clearTimeout(timer); socket.destroy(); work(); };
-      const timer = setTimeout(() => finish(() => reject(new Error("The local SXSY-B122 companion did not respond before the health timeout."))), this.timeoutMs);
-      socket.once("error", () => finish(() => reject(new Error("The configured local SXSY-B122 companion pipe is unavailable."))));
-      socket.on("data", (chunk) => { pending += chunk.toString("utf8"); const newline = pending.indexOf("\n"); if (newline >= 0) finish(() => resolveResponse(pending.slice(0, newline))); });
-      socket.once("connect", () => socket.write(`${JSON.stringify({ token: this.configuration.token, request: JSON.parse(line) })}\n`));
-    });
-  }
 }
 
 /**
@@ -108,6 +548,13 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
 
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.call("ping", undefined); }
 
+  async listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>> {
+    const result = await this.call<unknown>("session.list", undefined);
+    if (!result.ok) return result;
+    if (!Array.isArray(result.value) || result.value.length > 4_096 || !result.value.every(isExtensionManagedSession)) return invalidResponse();
+    return { ok: true, value: result.value };
+  }
+
   registerSession(session: ExtensionManagedSession, kind: "session" | "terminal" | "debug" = "session"): Promise<BridgeResult<ExtensionManagedSession>> {
     const method = kind === "terminal" ? "terminal.register" : kind === "debug" ? "debug.register" : "session.register";
     return this.call(method, { session });
@@ -125,9 +572,457 @@ export class JsonLineCompanionBridge implements ExtensionCompanionBridge {
     return this.call("session.heartbeat", at ? { sessionId, at } : { sessionId });
   }
 
+  async listReanchorAuthorities(sessionId: string): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>> {
+    const result = await this.call<unknown>("reanchor.authority.list", { sessionId });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["authorities"]) || !Array.isArray(result.value.authorities)
+      || result.value.authorities.length > 32 || !result.value.authorities.every(isExtensionReanchorAuthority)) return invalidResponse();
+    const ids = result.value.authorities.map((authority) => authority.id);
+    if (new Set(ids).size !== ids.length) return invalidResponse();
+    return { ok: true, value: result.value.authorities };
+  }
+
+  async beginReanchor(input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.begin", input);
+  }
+
+  async beginHardwareReanchor(claim: HardwareSignalClaim, input: Readonly<{ sessionId: string; authorityId: string; reason: string }>): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>> {
+    const result = await this.call<unknown>("reanchor.hardware.begin", hardwareClaimPayload(claim, input));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["reanchor", "dispatchReceiptId"])
+      || !isExtensionReanchorStatus(result.value.reanchor) || result.value.reanchor.state !== "pending_confirmation"
+      || typeof result.value.dispatchReceiptId !== "string" || !/^hardware-dispatch:[a-f0-9]{64}$/.test(result.value.dispatchReceiptId)) return invalidResponse();
+    return { ok: true, value: { reanchor: result.value.reanchor, dispatchReceiptId: result.value.dispatchReceiptId } };
+  }
+
+  async confirmReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.confirm-apply", { requestId });
+  }
+
+  async getReanchor(requestId: string): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    return this.reanchorResult("reanchor.get", { requestId });
+  }
+
   async dispatch(command: ForwardedCommand): Promise<BridgeResult<ForwardedCommandResult>> {
-    const result = await this.call<{ command: ForwardedCommandResult }>("command.dispatch", command);
-    return result.ok ? { ok: true, value: result.value.command } : result;
+    const result = await this.call<unknown>("command.dispatch", command);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
+  }
+
+  async inspectContainment(sessionId: string): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.inspect", { sessionId });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, sessionId)) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async reassessContainment(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.assess", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, input.sessionId)) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async verifyContainmentRemediation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.verify", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, input.sessionId)
+      || result.value.containment.incident.id !== input.expectedIncidentId || result.value.containment.incident.assessment.purpose !== "post_remediation") return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async issueContainmentPermit(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> {
+    const result = await this.call<unknown>("containment.permit.issue", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["permit", "containment"])
+      || !isContainmentPermit(result.value.permit, input) || !isContainmentInspection(result.value.containment, input.sessionId)
+      || result.value.containment.incident.id !== input.expectedIncidentId) return invalidResponse();
+    return { ok: true, value: { permit: result.value.permit, containment: result.value.containment } };
+  }
+
+  async rewriteContainmentHistory(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; permitId: string; relativePaths: readonly string[]; remediatedFindingIds: readonly string[] }>): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> {
+    const result = await this.call<unknown>("containment.history.rewrite", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["remediation"]) || !isContainmentHistoryRemediation(result.value.remediation, input)) return invalidResponse();
+    return { ok: true, value: result.value.remediation };
+  }
+
+  installContainmentRemoteTrust(sourcePath: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    return this.adminItem("containment.remote.trust.install", { sourcePath }, "trust", isContainmentRemoteTrust);
+  }
+
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>> {
+    return this.adminList("containment.remote.trust.list", "trust", isContainmentRemoteTrust);
+  }
+
+  revokeContainmentRemoteTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<ContainmentRemoteTrustSummary>> {
+    return this.adminItem("containment.remote.trust.revoke", { authorityId, keyId, reason }, "trust", isContainmentRemoteTrust);
+  }
+
+  async issueContainmentRemoteChallenge(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; expiresAt: string }>): Promise<BridgeResult<ContainmentRemoteChallengeSummary>> {
+    const result = await this.adminItem("containment.remote.challenge.issue", input, "challenge", isContainmentRemoteChallenge);
+    if (!result.ok) return result;
+    return result.value.incidentId === input.expectedIncidentId ? result : invalidResponse();
+  }
+
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>> {
+    return this.adminList("containment.remote.challenge.list", "challenges", isContainmentRemoteChallenge);
+  }
+
+  async importContainmentRemoteEvidence(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; sourcePath: string }>): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>> {
+    return this.adminItem("containment.remote.evidence.import", input, "evidence", isContainmentRemoteEvidence);
+  }
+
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>> {
+    return this.adminList("containment.remote.evidence.list", "evidence", isContainmentRemoteEvidence);
+  }
+
+  async recordContainmentRotation(input: Readonly<{ sessionId: string; expectedIncidentId: string; expectedIncidentDigest: string; disposition: "complete" | "not_required"; evidenceReference: string; evidenceDigest: string }>): Promise<BridgeResult<ContainmentInspectionSummary>> {
+    const result = await this.call<unknown>("containment.rotation.record", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["containment"]) || !isContainmentInspection(result.value.containment, input.sessionId)
+      || result.value.containment.incident.id !== input.expectedIncidentId) return invalidResponse();
+    return { ok: true, value: result.value.containment };
+  }
+
+  async releaseContainment(input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<unknown>("containment.release", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
+  }
+
+  async approveCouncilRecommendation(input: Readonly<{ recommendationId: string; recommendationDigest: string; approvalOperationId: string; repositoryRoot: string; targetSnapshotId: string; sessionId?: string }>): Promise<BridgeResult<ExtensionCouncilRecommendation>> {
+    const result = await this.call<unknown>("council.recommendation.approve", input);
+    if (!result.ok) return result;
+    const recommendation = isRecord(result.value) && exactKeys(result.value, ["recommendation"]) ? result.value.recommendation : undefined;
+    if (!isExtensionCouncilRecommendation(recommendation)
+      || recommendation.id !== input.recommendationId || recommendation.digest !== input.recommendationDigest
+      || recommendation.repositoryRoot !== input.repositoryRoot || recommendation.targetSnapshotId !== input.targetSnapshotId
+      || recommendation.approvalOperationId !== input.approvalOperationId || recommendation.status !== "approved"
+      || recommendation.executionAuthorized !== false) return invalidResponse();
+    return { ok: true, value: recommendation };
+  }
+
+  async prepareCommand(command: Readonly<{ control: B122Control; modifier: B122Modifier; sessionId?: string; effectSessionId?: string; reason: string; reviewScopeDigest?: string; reviewArtifactId?: string; reviewArtifactDigest?: string }>): Promise<BridgeResult<PreparedCommand>> {
+    const result = await this.call<unknown>("command.prepare", command);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["preparation"]) || !isPreparedCommand(result.value.preparation)) return invalidResponse();
+    return { ok: true, value: result.value.preparation };
+  }
+
+  async reviewGitMutation(request: Readonly<{ action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main"; sessionId: string; mutation: ReviewedGitMutation }>): Promise<BridgeResult<GitReviewResult>> {
+    const result = await this.call<{ review: GitReviewResult }>("git.review.submit", request);
+    return result.ok ? { ok: true, value: result.value.review } : result;
+  }
+
+  async inspectGitReview(sessionId: string): Promise<BridgeResult<GitReviewWorkspace>> {
+    const result = await this.call<unknown>("git.review.inspect", { sessionId });
+    if (!result.ok) return result;
+    const workspace = isRecord(result.value) ? result.value.workspace : undefined;
+    if (!isRecord(workspace) || !allowedExactKeys(workspace, ["repositoryRoot", "targetSnapshotId", "detached", "changedPaths"], ["branch", "defaultBranch"])
+      || typeof workspace.repositoryRoot !== "string" || !workspace.repositoryRoot || workspace.repositoryRoot.length > 4_096 || /[\r\n\0]/.test(workspace.repositoryRoot)
+      || typeof workspace.targetSnapshotId !== "string" || !workspace.targetSnapshotId
+      || typeof workspace.detached !== "boolean"
+      || (workspace.branch !== undefined && (typeof workspace.branch !== "string" || !safeBranch(workspace.branch)))
+      || (workspace.defaultBranch !== undefined && (typeof workspace.defaultBranch !== "string" || !safeBranch(workspace.defaultBranch)))
+      || (workspace.detached === true && workspace.branch !== undefined)
+      || !Array.isArray(workspace.changedPaths) || workspace.changedPaths.length > 4_096 || !workspace.changedPaths.every((path) => typeof path === "string" && path.length > 0 && path.length <= 4_096 && !/[\r\n\0]/.test(path))) return invalidResponse();
+    return { ok: true, value: { repositoryRoot: workspace.repositoryRoot, targetSnapshotId: workspace.targetSnapshotId, detached: workspace.detached, changedPaths: workspace.changedPaths as string[], ...(typeof workspace.branch === "string" ? { branch: workspace.branch } : {}), ...(typeof workspace.defaultBranch === "string" ? { defaultBranch: workspace.defaultBranch } : {}) } };
+  }
+
+  async installRuntimePin(repositoryRoot: string, manifestPath: string): Promise<BridgeResult<RepositoryRuntimePin>> {
+    const result = await this.call<{ pin: RepositoryRuntimePin }>("runtime.pin.install", { repositoryRoot, manifestPath });
+    return result.ok ? { ok: true, value: result.value.pin } : result;
+  }
+
+  async listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> {
+    const result = await this.call<{ pins: readonly RepositoryRuntimePin[] }>("runtime.pin.list", undefined);
+    return result.ok ? { ok: true, value: result.value.pins } : result;
+  }
+
+  async revokeRuntimePin(repositoryRoot: string): Promise<BridgeResult<RepositoryRuntimePin>> {
+    const result = await this.call<{ pin: RepositoryRuntimePin }>("runtime.pin.revoke", { repositoryRoot });
+    return result.ok ? { ok: true, value: result.value.pin } : result;
+  }
+
+  async installSandbox(repositoryRoot: string, catalogPath: string): Promise<BridgeResult<SandboxInstallationPin>> {
+    const result = await this.call<{ installation: SandboxInstallationPin }>("sandbox.install", { repositoryRoot, catalogPath });
+    return result.ok ? { ok: true, value: result.value.installation } : result;
+  }
+
+  async listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>> {
+    const result = await this.call<{ installations: readonly SandboxInstallationPin[] }>("sandbox.list", undefined);
+    return result.ok ? { ok: true, value: result.value.installations } : result;
+  }
+
+  async revokeSandbox(repositoryRoot: string): Promise<BridgeResult<SandboxInstallationPin>> {
+    const result = await this.call<{ installation: SandboxInstallationPin }>("sandbox.revoke", { repositoryRoot });
+    return result.ok ? { ok: true, value: result.value.installation } : result;
+  }
+
+  async provisionCredential(input: Readonly<{ reference: string; scopes: readonly CredentialProvisionScope[]; sealedSecret: string; replaceExisting?: boolean }>): Promise<BridgeResult<CredentialReferenceSummary>> {
+    const result = await this.call<unknown>("credential.provision", input);
+    if (!result.ok) return result;
+    const credential = isRecord(result.value) && exactKeys(result.value, ["credential"]) ? result.value.credential : undefined;
+    if (!isCredentialReferenceSummary(credential) || credential.reference !== input.reference || !sameCredentialScopes(credential.scopes, input.scopes)) return invalidResponse();
+    return { ok: true, value: credential };
+  }
+  async listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> {
+    const result = await this.call<unknown>("credential.list", undefined);
+    if (!result.ok) return result;
+    const credentials = isRecord(result.value) && exactKeys(result.value, ["credentials"]) ? result.value.credentials : undefined;
+    return Array.isArray(credentials) && credentials.length <= 1_024 && credentials.every(isCredentialReferenceSummary) ? { ok: true, value: credentials } : invalidResponse();
+  }
+  async revokeCredential(reference: string, reason: string): Promise<BridgeResult<boolean>> { const result = await this.call<{ revoked: boolean }>("credential.revoke", { reference, reason }); return result.ok ? { ok: true, value: result.value.revoked } : result; }
+  async installNetworkPolicy(repositoryRoot: string, sourcePath: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.install", { repositoryRoot, sourcePath }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async currentNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { const result = await this.call<{ policy?: InstalledNetworkPolicy }>("network-policy.current", { repositoryRoot }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  async revokeNetworkPolicy(repositoryRoot: string): Promise<BridgeResult<InstalledNetworkPolicy>> { const result = await this.call<{ policy: InstalledNetworkPolicy }>("network-policy.revoke", { repositoryRoot }); return result.ok ? { ok: true, value: result.value.policy } : result; }
+  installAcceptanceTrust(sourcePath: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.install", { sourcePath }, "trust", isAcceptanceTrust); }
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return this.adminList("acceptance.trust.list", "trust", isAcceptanceTrust); }
+  revokeAcceptanceTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.adminItem("acceptance.trust.revoke", { authorityId, keyId, reason }, "trust", isAcceptanceTrust); }
+  importAcceptanceEvidence(sourcePath: string): Promise<BridgeResult<AcceptanceEvidenceSummary>> { return this.adminItem("acceptance.evidence.import", { sourcePath }, "evidence", isAcceptanceEvidence); }
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>> { return this.adminList("acceptance.evidence.list", "evidence", isAcceptanceEvidence); }
+  async invalidateAcceptanceEvidence(evidenceId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("acceptance.evidence.invalidate", { evidenceId, reason }, "invalidated"); }
+  activateHighConsequence(action: string, targetSnapshotId: string, expiresAt: string): Promise<BridgeResult<HighConsequenceActivationSummary>> { return this.adminItem("acceptance.activation.activate", { action, targetSnapshotId, expiresAt }, "activation", isHighConsequenceActivation); }
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>> { return this.adminList("acceptance.activation.list", "activations", isHighConsequenceActivation); }
+  async revokeHighConsequenceActivation(activationId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("acceptance.activation.revoke", { activationId, reason }, "revoked"); }
+  installScannerTrust(sourcePath: string): Promise<BridgeResult<ScannerTrustSummary>> { return this.adminItem("scanner.trust.install", { sourcePath }, "trust", isScannerTrust); }
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>> { return this.adminList("scanner.trust.list", "trust", isScannerTrust); }
+  async revokeScannerTrust(authorityId: string, keyId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("scanner.trust.revoke", { authorityId, keyId, reason }, "revoked"); }
+  installScannerFixture(sourcePath: string): Promise<BridgeResult<ScannerFixtureSummary>> { return this.adminItem("scanner.fixture.install", { sourcePath }, "fixture", isScannerFixture); }
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>> { return this.adminList("scanner.fixture.list", "fixtures", isScannerFixture); }
+  async revokeScannerFixture(fixtureId: string, reason: string): Promise<BridgeResult<boolean>> { return this.adminBoolean("scanner.fixture.revoke", { fixtureId, reason }, "revoked"); }
+  async installProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> {
+    const result = await this.adminItem("provider-desktop.install", { provider }, "installation", isProviderInstallation);
+    return result.ok && result.value.provider !== provider ? invalidResponse() : result;
+  }
+  async listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> {
+    const result = await this.adminList("provider-desktop.list", "installations", isProviderInstallation);
+    if (!result.ok) return result;
+    if (result.value.length > 4 || new Set(result.value.map((item) => item.provider)).size !== result.value.length) return invalidResponse();
+    return result;
+  }
+  async revokeProviderDesktop(provider: ProviderDesktopId): Promise<BridgeResult<ProviderInstallationSummary>> {
+    const result = await this.adminItem("provider-desktop.revoke", { provider }, "installation", isProviderInstallation);
+    return result.ok && result.value.provider !== provider ? invalidResponse() : result;
+  }
+  providerHandshake(sessionId: string, repositoryRoot: string): Promise<BridgeResult<ExtensionManagedSession>> { return this.call("provider.handshake", { sessionId, repositoryRoot }); }
+
+  async installRawHid(identity: RawHidDeviceIdentity): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> {
+    const result = await this.call<unknown>("raw-hid.install", identity);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installation", "supervisor"]) || !isRawHidPin(result.value.installation) || !isRawHidSupervisorStatus(result.value.supervisor)
+      || !sameRawHidIdentity(result.value.installation.identity, identity) || result.value.installation.status !== "active") return invalidResponse();
+    return { ok: true, value: { installation: result.value.installation, supervisor: result.value.supervisor } };
+  }
+
+  async listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> {
+    const result = await this.call<unknown>("raw-hid.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installations"]) || !Array.isArray(result.value.installations) || !result.value.installations.every(isRawHidPin)) return invalidResponse();
+    return { ok: true, value: result.value.installations };
+  }
+
+  async revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> {
+    const result = await this.call<unknown>("raw-hid.revoke", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["installation"]) || !isRawHidPin(result.value.installation) || result.value.installation.status !== "revoked") return invalidResponse();
+    return { ok: true, value: result.value.installation };
+  }
+
+  async rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> {
+    const result = await this.call<unknown>("raw-hid.status", undefined);
+    if (!result.ok) return result;
+    if (!isRawHidRuntimeStatus(result.value)) return invalidResponse();
+    return { ok: true, value: result.value };
+  }
+
+  async claimHardwareSignal(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; focused: true }>): Promise<BridgeResult<HardwareSignalClaim | undefined>> {
+    const result = await this.call<unknown>("hardware-signal.claim", binding);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["claim"])) return invalidResponse();
+    if (result.value.claim === undefined) return { ok: true, value: undefined };
+    if (!isHardwareSignalClaim(result.value.claim) || result.value.claim.windowSessionId !== binding.windowSessionId || !sameRoots(result.value.claim.workspaceRoots, binding.workspaceRoots)) return invalidResponse();
+    return { ok: true, value: result.value.claim };
+  }
+
+  async prepareHardwareSignal(claim: HardwareSignalClaim, sessionId: string | undefined, reason: string, reviewScopeDigest?: string, reviewArtifactId?: string, reviewArtifactDigest?: string, effectSessionId?: string): Promise<BridgeResult<HardwareSignalPreparationResult>> {
+    const result = await this.call<unknown>("hardware-signal.prepare", hardwareClaimPayload(claim, {
+      ...(sessionId ? { sessionId } : {}),
+      reason,
+      ...(reviewScopeDigest ? { reviewScopeDigest } : {}),
+      ...(reviewArtifactId ? { reviewArtifactId } : {}),
+      ...(reviewArtifactDigest ? { reviewArtifactDigest } : {}),
+      ...(effectSessionId ? { effectSessionId } : {})
+    }));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, ["preparation"], ["dispositionReceiptId"]) || !isPreparedCommand(result.value.preparation)
+      || (result.value.dispositionReceiptId !== undefined && !isHardwareDispatchReceipt(result.value.dispositionReceiptId))
+      || (result.value.preparation.status === "prepared" || result.value.preparation.workflowReview !== undefined
+        || result.value.preparation.automationReview !== undefined || result.value.preparation.debugStopReview !== undefined
+        ? result.value.dispositionReceiptId !== undefined
+        : result.value.dispositionReceiptId === undefined)) return invalidResponse();
+    return { ok: true, value: { preparation: result.value.preparation, ...(typeof result.value.dispositionReceiptId === "string" ? { dispositionReceiptId: result.value.dispositionReceiptId } : {}) } };
+  }
+
+  async dispatchHardwareSignal(claim: HardwareSignalClaim, command: Omit<ForwardedCommand, "control" | "modifier">): Promise<BridgeResult<HardwareSignalDispatchResult>> {
+    const result = await this.call<unknown>("hardware-signal.dispatch", hardwareClaimPayload(claim, command));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command", "dispatchReceiptId"]) || !isForwardedCommandResult(result.value.command) || !isHardwareDispatchReceipt(result.value.dispatchReceiptId)) return invalidResponse();
+    return { ok: true, value: { command: result.value.command, dispatchReceiptId: result.value.dispatchReceiptId } };
+  }
+
+  async completeHardwareSignal(claim: HardwareSignalClaim, completion: Readonly<{ outcome: "handled" | "failed_before_dispatch" | "needs_reconciliation"; summary: string; dispatchReceiptId?: string; dispatchSessionId?: string; repositoryRoot?: string }>): Promise<BridgeResult<HardwareSignalCompletionResult>> {
+    const result = await this.call<unknown>("hardware-signal.complete", hardwareClaimPayload(claim, completion));
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["completion"]) || !isHardwareSignalCompletion(result.value.completion)
+      || result.value.completion.signalId !== claim.signalId || result.value.completion.outcome !== completion.outcome) return invalidResponse();
+    return { ok: true, value: result.value.completion };
+  }
+
+  async claimHostAction(binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> {
+    const result = await this.call<unknown>("host-action.claim", binding);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["claim"])) return invalidResponse();
+    if (result.value.claim === undefined) return { ok: true, value: undefined };
+    if (!isExtensionHostActionClaim(result.value.claim, binding)) return invalidResponse();
+    return { ok: true, value: result.value.claim };
+  }
+
+  async createHandoff(input: Readonly<{ sessionId: string; recipientSessionId?: string; routing?: "queue" | "immediate"; authorityId?: string; plan: string; decisions: readonly string[]; documentation: readonly string[]; references: readonly string[]; constraints: readonly string[]; openQuestions: readonly string[]; nextActions: readonly string[] }>): Promise<BridgeResult<ExtensionHandoffPackage>> {
+    return this.handoffResult("handoff.create", input);
+  }
+
+  async listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> {
+    const result = await this.call<unknown>("handoff.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["handoffs"]) || !Array.isArray(result.value.handoffs) || !result.value.handoffs.every(isExtensionHandoffPackage)) return invalidResponse();
+    return { ok: true, value: result.value.handoffs };
+  }
+
+  acknowledgeHandoff(handoffId: string, recipientSessionId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.acknowledge", { handoffId, recipientSessionId }); }
+  cancelHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.cancel", { handoffId }); }
+  archiveHandoff(handoffId: string): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.handoffResult("handoff.archive", { handoffId }); }
+
+  async handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> {
+    return this.routingResult("handoff.routing.get", undefined);
+  }
+
+  async setHandoffRouting(routing: "queue" | "immediate"): Promise<BridgeResult<"queue" | "immediate">> {
+    return this.routingResult("handoff.routing.set", { routing });
+  }
+
+  async prepareWorkflow(input: Readonly<{ action: ExtensionWorkflowAction; sessionId: string; authorityId: string; intent: ExtensionWorkflowPreparationIntent }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
+    const result = await this.call<unknown>("workflow.prepare", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
+    return { ok: true, value: result.value.artifact };
+  }
+
+  async cancelWorkflow(input: Readonly<{ artifactId: string; sessionId: string; authorityId: string }>): Promise<BridgeResult<ExtensionWorkflowArtifact>> {
+    const result = await this.call<unknown>("workflow.cancel", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifact"]) || !isExtensionWorkflowArtifact(result.value.artifact)) return invalidResponse();
+    const artifact = result.value.artifact;
+    if (artifact.id !== input.artifactId || artifact.sessionId !== input.sessionId || artifact.authorityId !== input.authorityId || artifact.status !== "cancelled") return invalidResponse();
+    return { ok: true, value: artifact };
+  }
+
+  async listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> {
+    const result = await this.call<unknown>("workflow.list", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["artifacts"]) || !Array.isArray(result.value.artifacts) || !result.value.artifacts.every(isExtensionWorkflowArtifact)) return invalidResponse();
+    return { ok: true, value: result.value.artifacts };
+  }
+
+  async grantVoiceConsent(input: Readonly<{ handoffId: string; provider: ExtensionVoiceProvider; transcript: "off" | "redacted"; retentionMinutes: number; expiresInMinutes: number }>): Promise<BridgeResult<ExtensionVoiceConsent>> {
+    const result = await this.call<unknown>("voice.consent", input);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["consent"]) || !isExtensionVoiceConsent(result.value.consent)) return invalidResponse();
+    return { ok: true, value: result.value.consent };
+  }
+
+  startVoice(input: Readonly<{ consentId: string; voiceSessionId: string; managedSessionId?: string }>): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.start", input); }
+
+  async currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> {
+    const result = await this.call<unknown>("voice.current", undefined);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !allowedExactKeys(result.value, [], ["binding"]) || (result.value.binding !== undefined && !isExtensionVoiceBinding(result.value.binding))) return invalidResponse();
+    return { ok: true, value: result.value.binding };
+  }
+
+  switchVoice(input: Readonly<{ bindingId: string; consentId: string; voiceSessionId: string }>): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.switch", input); }
+  bindVoice(bindingId: string, managedSessionId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.bind", { bindingId, managedSessionId }); }
+  muteVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.mute", { bindingId }); }
+  resumeVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.resume", { bindingId }); }
+  interruptVoice(bindingId: string, reason: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.interrupt", { bindingId, reason }); }
+  endVoice(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.end", { bindingId }); }
+  deleteVoiceTranscript(bindingId: string): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.voiceBindingResult("voice.transcript.delete", { bindingId }); }
+
+  async authorizeHostAction(hostActionId: string, adapterVersion: string, selectionId?: string, expectedUrl?: string, claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedHostActionAuthorization>> {
+    const result = await this.call<unknown>("host-action.authorize", { hostActionId, adapterVersion, ...(selectionId ? { selectionId } : {}), ...(claim ? exactHostActionClaimReference(claim) : {}) });
+    if (!result.ok) return result;
+    const authorization = isRecord(result.value) ? result.value.authorization : undefined;
+    if (!isRecord(authorization) || !allowedExactKeys(authorization, ["hostActionId", "authorizationToken", "expiresAt"], ["selectionId", "url"])
+      || authorization.hostActionId !== hostActionId
+      || typeof authorization.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(authorization.authorizationToken)
+      || typeof authorization.expiresAt !== "string" || !Number.isFinite(Date.parse(authorization.expiresAt))
+      || (expectedUrl !== undefined && !trustedHostActionUrl(expectedUrl))
+      || (selectionId === undefined && authorization.selectionId !== undefined)
+      || (selectionId === undefined && expectedUrl === undefined && authorization.url !== undefined)
+      || (selectionId === undefined && expectedUrl !== undefined && authorization.url !== expectedUrl)
+      || (selectionId !== undefined && (authorization.selectionId !== selectionId || typeof authorization.url !== "string" || !trustedHttpsUrl(authorization.url)))) return invalidResponse();
+    return { ok: true, value: { hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(selectionId ? { selectionId, url: authorization.url as string } : {}), ...(selectionId === undefined && expectedUrl !== undefined ? { url: authorization.url as string } : {}) } };
+  }
+
+  async completeHostAction(hostActionId: string, succeeded: boolean, summary: string, adapterVersion: string, authorizationToken?: string, effectDisposition?: "not_started" | "committed" | "ambiguous", claim?: HostActionClaimReference): Promise<BridgeResult<ForwardedCommandResult>> {
+    const result = await this.call<unknown>("host-action.complete", { hostActionId, succeeded, summary, adapterVersion, ...(authorizationToken ? { authorizationToken } : {}), ...(effectDisposition ? { effectDisposition } : {}), ...(claim ? exactHostActionClaimReference(claim) : {}) });
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["command"]) || !isForwardedCommandResult(result.value.command)) return invalidResponse();
+    return { ok: true, value: result.value.command };
+  }
+
+  private async adminItem<T>(method: string, payload: unknown, key: string, validator: (value: unknown) => value is T): Promise<BridgeResult<T>> {
+    const result = await this.call<unknown>(method, payload); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return validator(value) ? { ok: true, value } : invalidResponse();
+  }
+  private async adminList<T>(method: string, key: string, validator: (value: unknown) => value is T): Promise<BridgeResult<readonly T[]>> {
+    const result = await this.call<unknown>(method, undefined); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return Array.isArray(value) && value.length <= 4_096 && value.every(validator) ? { ok: true, value } : invalidResponse();
+  }
+  private async adminBoolean(method: string, payload: unknown, key: string): Promise<BridgeResult<boolean>> {
+    const result = await this.call<unknown>(method, payload); if (!result.ok) return result;
+    const value = isRecord(result.value) && exactKeys(result.value, [key]) ? result.value[key] : undefined; return value === true ? { ok: true, value: true } : invalidResponse();
+  }
+
+  private async handoffResult(method: string, payload: unknown): Promise<BridgeResult<ExtensionHandoffPackage>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["handoff"]) || !isExtensionHandoffPackage(result.value.handoff)) return invalidResponse();
+    return { ok: true, value: result.value.handoff };
+  }
+
+  private async routingResult(method: string, payload: unknown): Promise<BridgeResult<"queue" | "immediate">> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["routing"]) || (result.value.routing !== "queue" && result.value.routing !== "immediate")) return invalidResponse();
+    return { ok: true, value: result.value.routing };
+  }
+
+  private async voiceBindingResult(method: string, payload: unknown): Promise<BridgeResult<ExtensionVoiceBinding>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["binding"]) || !isExtensionVoiceBinding(result.value.binding)) return invalidResponse();
+    return { ok: true, value: result.value.binding };
+  }
+
+  private async reanchorResult(method: "reanchor.begin" | "reanchor.confirm-apply" | "reanchor.get", payload: unknown): Promise<BridgeResult<ExtensionReanchorStatus>> {
+    const result = await this.call<unknown>(method, payload);
+    if (!result.ok) return result;
+    if (!isRecord(result.value) || !exactKeys(result.value, ["reanchor"]) || !isExtensionReanchorStatus(result.value.reanchor)) return invalidResponse();
+    return { ok: true, value: result.value.reanchor };
   }
 
   private async call<T>(method: string, payload: unknown): Promise<BridgeResult<T>> {
@@ -172,11 +1067,97 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
   }
 
   health(): Promise<BridgeResult<Readonly<{ status?: string }>>> { return this.unavailable(); }
+  listSessions(): Promise<BridgeResult<readonly ExtensionManagedSession[]>> { return this.unavailable(); }
   registerSession(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   adoptTerminal(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   updateStatus(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
   heartbeat(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  listReanchorAuthorities(): Promise<BridgeResult<readonly ExtensionReanchorAuthority[]>> { return this.unavailable(); }
+  beginReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
+  beginHardwareReanchor(): Promise<BridgeResult<ExtensionReanchorHardwareBeginResult>> { return this.unavailable(); }
+  confirmReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
+  getReanchor(): Promise<BridgeResult<ExtensionReanchorStatus>> { return this.unavailable(); }
+  prepareCommand(): Promise<BridgeResult<PreparedCommand>> { return this.unavailable(); }
+  inspectGitReview(): Promise<BridgeResult<GitReviewWorkspace>> { return this.unavailable(); }
+  reviewGitMutation(): Promise<BridgeResult<GitReviewResult>> { return this.unavailable(); }
+  installRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
+  listRuntimePins(): Promise<BridgeResult<readonly RepositoryRuntimePin[]>> { return this.unavailable(); }
+  revokeRuntimePin(): Promise<BridgeResult<RepositoryRuntimePin>> { return this.unavailable(); }
+  installSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
+  listSandboxes(): Promise<BridgeResult<readonly SandboxInstallationPin[]>> { return this.unavailable(); }
+  revokeSandbox(): Promise<BridgeResult<SandboxInstallationPin>> { return this.unavailable(); }
+  provisionCredential(): Promise<BridgeResult<CredentialReferenceSummary>> { return this.unavailable(); }
+  listCredentials(): Promise<BridgeResult<readonly CredentialReferenceSummary[]>> { return this.unavailable(); }
+  revokeCredential(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
+  currentNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy | undefined>> { return this.unavailable(); }
+  revokeNetworkPolicy(): Promise<BridgeResult<InstalledNetworkPolicy>> { return this.unavailable(); }
+  installAcceptanceTrust(): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.unavailable(); }
+  listAcceptanceTrust(): Promise<BridgeResult<readonly AcceptanceTrustSummary[]>> { return this.unavailable(); }
+  revokeAcceptanceTrust(): Promise<BridgeResult<AcceptanceTrustSummary>> { return this.unavailable(); }
+  importAcceptanceEvidence(): Promise<BridgeResult<AcceptanceEvidenceSummary>> { return this.unavailable(); }
+  listAcceptanceEvidence(): Promise<BridgeResult<readonly AcceptanceEvidenceSummary[]>> { return this.unavailable(); }
+  invalidateAcceptanceEvidence(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  activateHighConsequence(): Promise<BridgeResult<HighConsequenceActivationSummary>> { return this.unavailable(); }
+  listHighConsequenceActivations(): Promise<BridgeResult<readonly HighConsequenceActivationSummary[]>> { return this.unavailable(); }
+  revokeHighConsequenceActivation(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installScannerTrust(): Promise<BridgeResult<ScannerTrustSummary>> { return this.unavailable(); }
+  listScannerTrust(): Promise<BridgeResult<readonly ScannerTrustSummary[]>> { return this.unavailable(); }
+  revokeScannerTrust(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installScannerFixture(): Promise<BridgeResult<ScannerFixtureSummary>> { return this.unavailable(); }
+  listScannerFixtures(): Promise<BridgeResult<readonly ScannerFixtureSummary[]>> { return this.unavailable(); }
+  revokeScannerFixture(): Promise<BridgeResult<boolean>> { return this.unavailable(); }
+  installProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
+  listProviderDesktops(): Promise<BridgeResult<readonly ProviderInstallationSummary[]>> { return this.unavailable(); }
+  revokeProviderDesktop(): Promise<BridgeResult<ProviderInstallationSummary>> { return this.unavailable(); }
+  providerHandshake(): Promise<BridgeResult<ExtensionManagedSession>> { return this.unavailable(); }
+  inspectContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  reassessContainment(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  verifyContainmentRemediation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  issueContainmentPermit(): Promise<BridgeResult<Readonly<{ permit: ContainmentRemediationPermitSummary; containment: ContainmentInspectionSummary }>>> { return this.unavailable(); }
+  rewriteContainmentHistory(): Promise<BridgeResult<ContainmentHistoryRemediationSummary>> { return this.unavailable(); }
+  installContainmentRemoteTrust(): Promise<BridgeResult<ContainmentRemoteTrustSummary>> { return this.unavailable(); }
+  listContainmentRemoteTrust(): Promise<BridgeResult<readonly ContainmentRemoteTrustSummary[]>> { return this.unavailable(); }
+  revokeContainmentRemoteTrust(): Promise<BridgeResult<ContainmentRemoteTrustSummary>> { return this.unavailable(); }
+  issueContainmentRemoteChallenge(): Promise<BridgeResult<ContainmentRemoteChallengeSummary>> { return this.unavailable(); }
+  listContainmentRemoteChallenges(): Promise<BridgeResult<readonly ContainmentRemoteChallengeSummary[]>> { return this.unavailable(); }
+  importContainmentRemoteEvidence(): Promise<BridgeResult<ContainmentRemoteEvidenceSummary>> { return this.unavailable(); }
+  listContainmentRemoteEvidence(): Promise<BridgeResult<readonly ContainmentRemoteEvidenceSummary[]>> { return this.unavailable(); }
+  recordContainmentRotation(): Promise<BridgeResult<ContainmentInspectionSummary>> { return this.unavailable(); }
+  releaseContainment(_input: Readonly<{ sessionId: string; reason: string; expectedFenceEpoch: number; expectedActivationOperationId: string; expectedIncidentId: string; expectedIncidentDigest: string }>): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  approveCouncilRecommendation(): Promise<BridgeResult<ExtensionCouncilRecommendation>> { return this.unavailable(); }
+  installRawHid(): Promise<BridgeResult<Readonly<{ installation: RawHidInstallationPin; supervisor: RawHidRuntimeStatus["supervisor"] }>>> { return this.unavailable(); }
+  listRawHid(): Promise<BridgeResult<readonly RawHidInstallationPin[]>> { return this.unavailable(); }
+  revokeRawHid(): Promise<BridgeResult<RawHidInstallationPin>> { return this.unavailable(); }
+  rawHidStatus(): Promise<BridgeResult<RawHidRuntimeStatus>> { return this.unavailable(); }
+  claimHardwareSignal(): Promise<BridgeResult<HardwareSignalClaim | undefined>> { return this.unavailable(); }
+  prepareHardwareSignal(): Promise<BridgeResult<HardwareSignalPreparationResult>> { return this.unavailable(); }
+  dispatchHardwareSignal(): Promise<BridgeResult<HardwareSignalDispatchResult>> { return this.unavailable(); }
+  completeHardwareSignal(): Promise<BridgeResult<HardwareSignalCompletionResult>> { return this.unavailable(); }
+  claimHostAction(): Promise<BridgeResult<ExtensionHostActionClaim | undefined>> { return this.unavailable(); }
+  createHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  listHandoffs(): Promise<BridgeResult<readonly ExtensionHandoffPackage[]>> { return this.unavailable(); }
+  acknowledgeHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  cancelHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  archiveHandoff(): Promise<BridgeResult<ExtensionHandoffPackage>> { return this.unavailable(); }
+  handoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
+  setHandoffRouting(): Promise<BridgeResult<"queue" | "immediate">> { return this.unavailable(); }
+  prepareWorkflow(): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return this.unavailable(); }
+  cancelWorkflow(): Promise<BridgeResult<ExtensionWorkflowArtifact>> { return this.unavailable(); }
+  listWorkflows(): Promise<BridgeResult<readonly ExtensionWorkflowArtifact[]>> { return this.unavailable(); }
+  grantVoiceConsent(): Promise<BridgeResult<ExtensionVoiceConsent>> { return this.unavailable(); }
+  startVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  currentVoice(): Promise<BridgeResult<ExtensionVoiceBinding | undefined>> { return this.unavailable(); }
+  switchVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  bindVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  muteVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  resumeVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  interruptVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  endVoice(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
+  deleteVoiceTranscript(): Promise<BridgeResult<ExtensionVoiceBinding>> { return this.unavailable(); }
   dispatch(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
+  authorizeHostAction(): Promise<BridgeResult<ForwardedHostActionAuthorization>> { return this.unavailable(); }
+  completeHostAction(): Promise<BridgeResult<ForwardedCommandResult>> { return this.unavailable(); }
 
   private async unavailable<T>(): Promise<BridgeResult<T>> {
     return { ok: false, code: "companion_unavailable", message: this.reason };
@@ -184,12 +1165,1009 @@ export class UnavailableExtensionCompanionBridge implements ExtensionCompanionBr
 }
 
 export function localHostAction(result: ForwardedCommandResult): LocalHostAction | undefined {
-  const candidate = result.data?.localAction;
-  return candidate === "create_claude_terminal" || candidate === "create_codex_terminal" || candidate === "focus_integrated_terminal"
-    ? candidate
-    : undefined;
+  return forwardedHostAction(result)?.kind;
+}
+
+function exactHostActionClaimReference(value: HostActionClaimReference): HostActionClaimReference {
+  if (!value || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || typeof value.windowSessionId !== "string" || !boundedText(value.windowSessionId, 512)) {
+    throw new Error("The extension host-action claim reference is malformed.");
+  }
+  return { claimId: value.claimId, claimToken: value.claimToken, windowSessionId: value.windowSessionId };
+}
+
+function isExtensionHostActionClaim(
+  value: unknown,
+  binding: Readonly<{ windowSessionId: string; workspaceRoots: readonly string[]; adapterVersion: string; capabilities: readonly ["show_voice_center"]; focused: true }>
+): value is ExtensionHostActionClaim {
+  if (!isRecord(value) || !allowedExactKeys(value, [
+    "version", "claimId", "claimToken", "hostActionId", "operationId", "commandAction", "hostActionKind",
+    "windowSessionId", "adapterVersion", "capabilities", "claimedAt", "expiresAt", "actionExpiresAt"
+  ], ["targetSnapshotId", "sessionId", "workspaceRoot"]) || value.version !== 1 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || typeof value.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(value.hostActionId)
+    || typeof value.operationId !== "string" || !boundedText(value.operationId, 512)
+    || !["open_voice", "switch_voice_provider", "bind_voice_session", "voice_session_picker"].includes(String(value.commandAction)) || value.hostActionKind !== "show_voice_center"
+    || (value.targetSnapshotId === undefined) !== (value.workspaceRoot === undefined)
+    || (value.targetSnapshotId !== undefined && (typeof value.targetSnapshotId !== "string" || !boundedText(value.targetSnapshotId, 512)))
+    || (value.sessionId !== undefined && (value.targetSnapshotId === undefined || typeof value.sessionId !== "string" || !boundedText(value.sessionId, 512)))
+    || (value.workspaceRoot !== undefined && (typeof value.workspaceRoot !== "string" || value.workspaceRoot.length > 4_096 || /[\r\n\0]/.test(value.workspaceRoot)
+      || !binding.workspaceRoots.some((root) => normalizeBridgePath(root) === normalizeBridgePath(value.workspaceRoot as string))))
+    || value.windowSessionId !== binding.windowSessionId || value.adapterVersion !== binding.adapterVersion
+    || !Array.isArray(value.capabilities) || value.capabilities.length !== 1 || value.capabilities[0] !== "show_voice_center"
+    || !exactTimestampOrder(value.claimedAt, value.expiresAt, value.actionExpiresAt)) return false;
+  return true;
+}
+
+function normalizeBridgePath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
+
+function exactTimestampOrder(claimedAt: unknown, expiresAt: unknown, actionExpiresAt: unknown): boolean {
+  if (typeof claimedAt !== "string" || typeof expiresAt !== "string" || typeof actionExpiresAt !== "string") return false;
+  const claimed = Date.parse(claimedAt);
+  const expires = Date.parse(expiresAt);
+  const actionExpires = Date.parse(actionExpiresAt);
+  return Number.isFinite(claimed) && Number.isFinite(expires) && Number.isFinite(actionExpires)
+    && claimed < expires && expires <= actionExpires;
+}
+
+export function forwardedWorkflowOutcome(result: ForwardedCommandResult): ForwardedWorkflowOutcome | undefined {
+  return isWorkflowOutcomeData(result.data) ? result.data : undefined;
+}
+
+export function forwardedWorkflowResult(result: ForwardedCommandResult): ExtensionWorkflowProviderResult | undefined {
+  return forwardedWorkflowOutcome(result)?.workflowResult;
+}
+
+export function forwardedHostAction(result: ForwardedCommandResult): ForwardedHostAction | undefined {
+  const id = result.data?.hostActionId;
+  const kind = result.data?.hostActionKind;
+  const expiresAt = result.data?.hostActionExpiresAt;
+  const url = result.data?.hostActionUrl;
+  const workspaceRoot = result.data?.hostActionWorkspaceRoot;
+  const debugConfiguration = result.data?.hostActionDebugConfiguration;
+  const debugSessionId = result.data?.hostActionDebugSessionId;
+  const debugEffectSessionId = result.data?.hostActionDebugEffectSessionId;
+  const debugBindingId = result.data?.hostActionDebugBindingId;
+  const debugOriginOperationId = result.data?.hostActionDebugOriginOperationId;
+  const pythonInterpreter = result.data?.hostActionPythonInterpreter;
+  const pythonInterpreterIdentity = result.data?.hostActionPythonInterpreterIdentity;
+  const githubCandidates = result.data?.githubCandidates;
+  const managedTerminalProfile = result.data?.managedTerminalProfile;
+  if (typeof id !== "string" || !/^host-action:[a-f0-9]{64}$/.test(id)
+    || typeof kind !== "string" || !isLocalHostAction(kind)
+    || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))
+    || (url !== undefined && typeof url !== "string")
+    || (workspaceRoot !== undefined && (typeof workspaceRoot !== "string" || workspaceRoot.length > 4_096 || /[\r\n\0]/.test(workspaceRoot)))
+    || (debugConfiguration !== undefined && (typeof debugConfiguration !== "string" || !debugConfiguration.trim() || debugConfiguration.length > 256 || /[\r\n\0]/.test(debugConfiguration)))
+    || (debugSessionId !== undefined && (typeof debugSessionId !== "string" || !debugSessionId.trim() || debugSessionId.length > 256 || /[\r\n\0]/.test(debugSessionId)))
+    || (debugEffectSessionId !== undefined && (typeof debugEffectSessionId !== "string" || !debugEffectSessionId.trim() || debugEffectSessionId.length > 256 || /[\r\n\0]/.test(debugEffectSessionId)))
+    || (debugBindingId !== undefined && (typeof debugBindingId !== "string" || !debugBindingId.trim() || debugBindingId.length > 256 || /[\r\n\0]/.test(debugBindingId)))
+    || (debugOriginOperationId !== undefined && (typeof debugOriginOperationId !== "string" || !debugOriginOperationId.trim() || debugOriginOperationId.length > 256 || /[\r\n\0]/.test(debugOriginOperationId)))
+    || (pythonInterpreter !== undefined && (typeof pythonInterpreter !== "string" || pythonInterpreter.length > 4_096 || /[\r\n\0]/.test(pythonInterpreter)))
+    || (kind === "select_github_navigation" ? !isGitHubCandidates(githubCandidates) || url !== undefined : githubCandidates !== undefined)
+    || (kind === "create_claude_terminal" || kind === "create_codex_terminal"
+      ? !isManagedTerminalProfile(managedTerminalProfile, kind === "create_claude_terminal" ? "claude_code" : "codex")
+      : managedTerminalProfile !== undefined)
+    || (kind === "configure_python_venv"
+      ? typeof workspaceRoot !== "string" || typeof pythonInterpreter !== "string" || !isRepositoryExecutableIdentity(pythonInterpreterIdentity, pythonInterpreter)
+      : pythonInterpreter !== undefined || pythonInterpreterIdentity !== undefined)
+    || (kind === "start_vscode_debug"
+      ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || debugSessionId !== undefined || debugEffectSessionId !== undefined || debugBindingId !== undefined || debugOriginOperationId !== undefined
+      : kind === "stop_vscode_debug"
+        ? typeof workspaceRoot !== "string" || typeof debugConfiguration !== "string" || typeof debugSessionId !== "string"
+          || typeof debugEffectSessionId !== "string" || typeof debugBindingId !== "string" || typeof debugOriginOperationId !== "string"
+        : debugSessionId !== undefined || debugEffectSessionId !== undefined || debugBindingId !== undefined || debugOriginOperationId !== undefined)) return undefined;
+  return { id, kind, expiresAt, ...(typeof url === "string" ? { url } : {}), ...(typeof workspaceRoot === "string" ? { workspaceRoot } : {}), ...(typeof debugConfiguration === "string" ? { debugConfiguration } : {}), ...(typeof debugSessionId === "string" ? { debugSessionId } : {}), ...(typeof debugEffectSessionId === "string" ? { debugEffectSessionId } : {}), ...(typeof debugBindingId === "string" ? { debugBindingId } : {}), ...(typeof debugOriginOperationId === "string" ? { debugOriginOperationId } : {}), ...(typeof pythonInterpreter === "string" ? { pythonInterpreter } : {}), ...(isRepositoryExecutableIdentity(pythonInterpreterIdentity, pythonInterpreter) ? { pythonInterpreterIdentity } : {}), ...(isGitHubCandidates(githubCandidates) ? { githubCandidates } : {}), ...(isManagedTerminalProfile(managedTerminalProfile) ? { managedTerminalProfile } : {}) };
+}
+
+function isRepositoryExecutableIdentity(value: unknown, expectedPath?: unknown): value is RepositoryExecutableIdentitySummary {
+  return isRecord(value) && exactKeys(value, ["canonicalPath", "sha256", "device", "inode", "size", "modifiedMs"])
+    && typeof value.canonicalPath === "string" && value.canonicalPath.length <= 4_096 && /^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(value.canonicalPath) && !/[\r\n\0]/.test(value.canonicalPath)
+    && (expectedPath === undefined || typeof expectedPath === "string" && normalizeBridgePath(value.canonicalPath) === normalizeBridgePath(expectedPath))
+    && typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+    && typeof value.device === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value.device)
+    && typeof value.inode === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value.inode)
+    && Number.isSafeInteger(value.size) && Number(value.size) > 0 && Number(value.size) <= 2 * 1024 * 1024 * 1024
+    && typeof value.modifiedMs === "number" && Number.isFinite(value.modifiedMs) && value.modifiedMs >= 0;
+}
+
+function isLocalHostAction(value: string): value is LocalHostAction {
+  return [
+    "show_handoff_queue", "toggle_handoff_routing", "show_blocker_queue", "show_done_queue",
+    "open_external_url", "create_claude_terminal", "create_codex_terminal", "focus_vscode",
+    "new_vscode_window", "focus_external_terminal", "focus_integrated_terminal", "open_compound_palette",
+    "show_voice_center", "switch_voice_provider", "show_voice_session_picker", "show_pipeline_failure_trace", "start_vscode_debug", "stop_vscode_debug", "configure_python_venv", "select_github_navigation"
+  ].includes(value);
+}
+
+function isGitHubCandidates(value: unknown): value is readonly GitHubNavigationCandidate[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 50) return false;
+  const ids = new Set<string>();
+  return value.every((candidate) => isRecord(candidate) && exactKeys(candidate, ["id", "label", "description", "url"])
+    && typeof candidate.id === "string" && /^(?:pull|run):[A-Za-z0-9._:-]{1,128}$/.test(candidate.id) && !ids.has(candidate.id) && !!ids.add(candidate.id)
+    && typeof candidate.label === "string" && !!candidate.label.trim() && candidate.label.length <= 160 && !/[\r\n\0]/.test(candidate.label)
+    && typeof candidate.description === "string" && !!candidate.description.trim() && candidate.description.length <= 512 && !/[\r\n\0]/.test(candidate.description)
+    && typeof candidate.url === "string" && trustedHttpsUrl(candidate.url));
+}
+
+function isContainmentInspection(value: unknown, expectedSessionId: string): value is ContainmentInspectionSummary {
+  if (!isRecord(value) || !exactKeys(value, ["sessionId", "repositoryRoot", "active", "fenceEpoch", "activatedByOperationId", "hookStates", "hookFailures", "uncontrolledPaths", "incident", "incidentDigest"])
+    || value.sessionId !== expectedSessionId || !reference(value.sessionId) || !pathText(value.repositoryRoot) || value.active !== true
+    || !Number.isSafeInteger(value.fenceEpoch) || Number(value.fenceEpoch) < 1 || !reference(value.activatedByOperationId)
+    || !Array.isArray(value.hookStates) || value.hookStates.length !== 2
+    || !Array.isArray(value.hookFailures) || value.hookFailures.length > 16 || !value.hookFailures.every((failure) => contentText(failure, 2_048))
+    || !Array.isArray(value.uncontrolledPaths) || value.uncontrolledPaths.length > 256 || !value.uncontrolledPaths.every(pathText)
+    || !digestText(value.incidentDigest) || !isContainmentIncident(value.incident, value.repositoryRoot, Number(value.fenceEpoch), value.activatedByOperationId)
+    || new Set(value.uncontrolledPaths).size !== value.uncontrolledPaths.length) return false;
+  const hookNames = new Set<string>();
+  for (const hook of value.hookStates) {
+    if (!isRecord(hook) || !allowedExactKeys(hook, ["name", "status", "attempts", "updatedAt"], ["failure"])
+      || (hook.name !== "credential_lease_revocation" && hook.name !== "queued_operation_cancellation") || hookNames.has(hook.name)
+      || !["pending", "running", "completed", "failed", "unavailable"].includes(String(hook.status))
+      || !Number.isSafeInteger(hook.attempts) || Number(hook.attempts) < 0 || !timeText(hook.updatedAt)
+      || (hook.failure !== undefined && !contentText(hook.failure, 2_048))) return false;
+    hookNames.add(hook.name);
+  }
+  return hookNames.has("credential_lease_revocation") && hookNames.has("queued_operation_cancellation");
+}
+
+function isContainmentHistoryRemediation(value: unknown, expected: Readonly<{ expectedIncidentId: string; expectedIncidentDigest: string; permitId: string }>): value is ContainmentHistoryRemediationSummary {
+  if (!isRecord(value) || !exactKeys(value, ["operationId", "incidentId", "permitId", "repositoryRoot", "branch", "oldHead", "newHead", "backupBundlePath", "backupBundleSha256", "incidentDigest", "updatedRefs", "strippedTagSignatures", "status"])
+    || !Array.isArray(value.updatedRefs) || !value.updatedRefs.length || value.updatedRefs.length > 256 || !value.updatedRefs.every(isContainmentHistoryRefUpdate)
+    || new Set(value.updatedRefs.map((update) => update.refName)).size !== value.updatedRefs.length
+    || !Number.isSafeInteger(value.strippedTagSignatures) || Number(value.strippedTagSignatures) < 0
+    || Number(value.strippedTagSignatures) > value.updatedRefs.filter((update) => update.kind === "tag").length) return false;
+  const current = value.updatedRefs.find((update) => update.refName === `refs/heads/${String(value.branch)}`);
+  if (current ? current.oldObject !== value.oldHead || current.newObject !== value.newHead : value.oldHead !== value.newHead) return false;
+  return typeof value.operationId === "string" && /^containment-history:[a-f0-9]{64}$/.test(value.operationId)
+    && value.incidentId === expected.expectedIncidentId && value.permitId === expected.permitId
+    && pathText(value.repositoryRoot) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.repositoryRoot)
+    && typeof value.branch === "string" && safeBranch(value.branch)
+    && typeof value.oldHead === "string" && /^[a-f0-9]{40,64}$/.test(value.oldHead)
+    && typeof value.newHead === "string" && /^[a-f0-9]{40,64}$/.test(value.newHead)
+    && pathText(value.backupBundlePath) && /^(?:[A-Za-z]:[\\/]|\/)/.test(value.backupBundlePath)
+    && digestText(value.backupBundleSha256) && digestText(value.incidentDigest) && value.status === "completed"
+    && /^containment-remediation-permit:[a-f0-9]{64}$/.test(expected.permitId) && digestText(expected.expectedIncidentDigest);
+}
+
+function isContainmentHistoryRefUpdate(value: unknown): value is ContainmentHistoryRefUpdateSummary {
+  return isRecord(value) && exactKeys(value, ["refName", "kind", "oldObject", "newObject", "oldPeeledCommit", "newPeeledCommit"])
+    && typeof value.refName === "string" && value.refName.length <= 1_024 && !/[\r\n\0]/.test(value.refName)
+    && ((value.kind === "head" && value.refName.startsWith("refs/heads/")) || (value.kind === "tag" && value.refName.startsWith("refs/tags/")))
+    && safeBranch(value.refName.slice(value.kind === "head" ? "refs/heads/".length : "refs/tags/".length))
+    && typeof value.oldObject === "string" && /^[a-f0-9]{40,64}$/.test(value.oldObject)
+    && typeof value.newObject === "string" && /^[a-f0-9]{40,64}$/.test(value.newObject) && value.newObject !== value.oldObject
+    && (value.oldPeeledCommit === null || (typeof value.oldPeeledCommit === "string" && /^[a-f0-9]{40,64}$/.test(value.oldPeeledCommit)))
+    && (value.newPeeledCommit === null || (typeof value.newPeeledCommit === "string" && /^[a-f0-9]{40,64}$/.test(value.newPeeledCommit)))
+    && (value.oldPeeledCommit === null) === (value.newPeeledCommit === null);
+}
+
+function isContainmentIncident(value: unknown, repositoryRoot: string, fenceEpoch: number, activationOperationId: string): value is ContainmentIncidentInspection {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["version", "id", "repositoryRoot", "fenceEpoch", "activationOperationId", "reason", "createdAt", "updatedAt", "status", "assessment", "steps", "permits", "receipts"],
+    ["rotation", "releasedAt"])
+    || value.version !== 1 || typeof value.id !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(value.id)
+    || value.repositoryRoot !== repositoryRoot || value.fenceEpoch !== fenceEpoch || value.activationOperationId !== activationOperationId
+    || !contentText(value.reason, 2_048) || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || !["assessing", "assessment_incomplete", "remediation_required", "ready_for_release", "released"].includes(String(value.status))
+    || !Array.isArray(value.steps) || value.steps.length !== 3 || !Array.isArray(value.permits) || value.permits.length > 1_024
+    || !Array.isArray(value.receipts) || value.receipts.length > 1_024
+    || !value.permits.every((permit) => isContainmentPermitRecord(permit, value.id as string, fenceEpoch))
+    || !value.receipts.every((receipt) => isContainmentReceiptRecord(receipt, value.id as string, fenceEpoch))
+    || (value.releasedAt !== undefined && !timeText(value.releasedAt))) return false;
+  if (!isRecord(value.assessment) || !allowedExactKeys(value.assessment, ["generation", "purpose", "targetSnapshotId", "basedOnFindingIds", "basedOnReceiptIds", "credentialRotationRequired", "startedAt"], ["sourceIncidentDigest"])
+    || !Number.isSafeInteger(value.assessment.generation) || Number(value.assessment.generation) < 1
+    || (value.assessment.purpose !== "initial" && value.assessment.purpose !== "post_remediation")
+    || !reference(value.assessment.targetSnapshotId)
+    || !Array.isArray(value.assessment.basedOnFindingIds) || value.assessment.basedOnFindingIds.length > 1_024 || !value.assessment.basedOnFindingIds.every(reference)
+    || new Set(value.assessment.basedOnFindingIds).size !== value.assessment.basedOnFindingIds.length
+    || !Array.isArray(value.assessment.basedOnReceiptIds) || value.assessment.basedOnReceiptIds.length > 1_024
+    || !value.assessment.basedOnReceiptIds.every((id) => typeof id === "string" && /^containment-remediation-receipt:[a-f0-9]{64}$/.test(id))
+    || new Set(value.assessment.basedOnReceiptIds).size !== value.assessment.basedOnReceiptIds.length
+    || typeof value.assessment.credentialRotationRequired !== "boolean"
+    || (value.assessment.sourceIncidentDigest !== undefined && !digestText(value.assessment.sourceIncidentDigest))
+    || !timeText(value.assessment.startedAt)
+    || (value.assessment.purpose === "initial" && (value.assessment.generation !== 1 || value.assessment.basedOnFindingIds.length !== 0 || value.assessment.basedOnReceiptIds.length !== 0 || value.assessment.sourceIncidentDigest !== undefined))) return false;
+  const names = new Set<string>();
+  for (const step of value.steps) {
+    if (!isRecord(step) || !allowedExactKeys(step, ["name", "operationId", "externalId", "status", "attempts", "updatedAt"], ["result"])
+      || !["working_tree", "history", "remote"].includes(String(step.name)) || names.has(String(step.name))
+      || !reference(step.operationId) || !reference(step.externalId)
+      || !["pending", "executing", "ambiguous", "completed"].includes(String(step.status))
+      || !Number.isSafeInteger(step.attempts) || Number(step.attempts) < 0 || !timeText(step.updatedAt)
+      || (step.result !== undefined && !isContainmentAssessmentResult(step.result, value.id, repositoryRoot, fenceEpoch, String(step.name), step.operationId, step.externalId))) return false;
+    names.add(String(step.name));
+  }
+  if (!["working_tree", "history", "remote"].every((name) => names.has(name))) return false;
+  if (value.rotation !== undefined && (!isRecord(value.rotation) || !exactKeys(value.rotation, ["disposition", "evidenceReference", "evidenceDigest", "reviewedAt"])
+    || (value.rotation.disposition !== "complete" && value.rotation.disposition !== "not_required")
+    || !contentText(value.rotation.evidenceReference, 512) || !digestText(value.rotation.evidenceDigest) || !timeText(value.rotation.reviewedAt))) return false;
+  return (value.status === "released") === (value.releasedAt !== undefined);
+}
+
+function isContainmentAssessmentResult(value: unknown, incidentId: string, repositoryRoot: string, fenceEpoch: number, step: string, operationId: unknown, externalId: unknown): value is ContainmentIncidentAssessmentResult {
+  if (!isRecord(value) || !exactKeys(value, ["schema", "version", "incidentId", "repositoryRoot", "fenceEpoch", "step", "operationId", "externalId", "effectDisposition", "status", "exposure", "summary", "findings"])
+    || value.schema !== "sxsy-b122.containment-assessment-result" || value.version !== 1 || value.incidentId !== incidentId
+    || value.repositoryRoot !== repositoryRoot || value.fenceEpoch !== fenceEpoch || value.step !== step || value.operationId !== operationId || value.externalId !== externalId
+    || !["committed", "not_started", "ambiguous"].includes(String(value.effectDisposition))
+    || !["passed", "failed", "unavailable", "incomplete"].includes(String(value.status))
+    || !["none", "found", "unknown"].includes(String(value.exposure)) || !contentText(value.summary, 1_024)
+    || !Array.isArray(value.findings) || value.findings.length > 1_024) return false;
+  return value.findings.every((finding) => isRecord(finding) && exactKeys(finding, ["id", "relativePath", "credentialRelated"])
+    && reference(finding.id) && pathText(finding.relativePath) && typeof finding.credentialRelated === "boolean");
+}
+
+function isContainmentPermit(value: unknown, expected: Readonly<{ expectedIncidentId: string; action: ContainmentRemediationAction; relativePaths: readonly string[]; expiresAt: string }>): value is ContainmentRemediationPermitSummary {
+  if (!isContainmentPermitRecord(value, expected.expectedIncidentId)
+    || value.action !== expected.action
+    || value.relativePaths.length !== expected.relativePaths.length
+    || !expected.relativePaths.every((path) => value.relativePaths.some((candidate) => candidate.toLowerCase() === path.toLowerCase()))
+    || value.expiresAt !== expected.expiresAt) return false;
+  return true;
+}
+
+function isContainmentPermitRecord(value: unknown, incidentId: string, fenceEpoch?: number): value is ContainmentRemediationPermitSummary {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["id", "incidentId", "fenceEpoch", "action", "relativePaths", "reviewedBy", "issuedAt", "expiresAt", "networkAllowed", "credentialAccessAllowed"],
+    ["consumedAt"])
+    || typeof value.id !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(value.id)
+    || value.incidentId !== incidentId || (fenceEpoch !== undefined && value.fenceEpoch !== fenceEpoch)
+    || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    || !Number.isSafeInteger(value.fenceEpoch) || Number(value.fenceEpoch) < 1
+    || !Array.isArray(value.relativePaths) || value.relativePaths.length < 1 || value.relativePaths.length > 1_024
+    || !value.relativePaths.every(pathText) || new Set(value.relativePaths.map((path) => String(path).toLowerCase())).size !== value.relativePaths.length
+    || !contentText(value.reviewedBy, 256) || !timeText(value.issuedAt) || !timeText(value.expiresAt)
+    || value.networkAllowed !== false || value.credentialAccessAllowed !== false
+    || (value.consumedAt !== undefined && !timeText(value.consumedAt))) return false;
+  return true;
+}
+
+function isContainmentReceiptRecord(value: unknown, incidentId: string, fenceEpoch: number): value is ContainmentRemediationReceiptSummary {
+  if (!isRecord(value) || !exactKeys(value, ["id", "permitId", "incidentId", "fenceEpoch", "action", "relativePaths", "remediatedFindingIds", "evidenceDigest", "recordedAt"])
+    || typeof value.id !== "string" || !/^containment-remediation-receipt:[a-f0-9]{64}$/.test(value.id)
+    || typeof value.permitId !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    || value.incidentId !== incidentId || value.fenceEpoch !== fenceEpoch
+    || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    || !Array.isArray(value.relativePaths) || !value.relativePaths.length || value.relativePaths.length > 1_024 || !value.relativePaths.every(pathText)
+    || !Array.isArray(value.remediatedFindingIds) || !value.remediatedFindingIds.length || value.remediatedFindingIds.length > 1_024 || !value.remediatedFindingIds.every(reference)
+    || !digestText(value.evidenceDigest) || !timeText(value.recordedAt)) return false;
+  return true;
+}
+
+function isExtensionCouncilRecommendation(value: unknown): value is ExtensionCouncilRecommendation {
+  if (!isRecord(value) || !allowedExactKeys(value,
+    ["id", "digest", "reportId", "reportDigest", "repositoryRoot", "targetSnapshotId", "participantSessionIds", "assignments", "reviewScopeDigest", "preparationOperationId", "ready", "status", "executionAuthorized", "createdAt", "updatedAt"],
+    ["approvalOperationId", "rejectionReason"])
+    || !reference(value.id) || !digestText(value.digest) || value.reportId !== `council-report:${String(value.reportDigest)}` || !digestText(value.reportDigest)
+    || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId)
+    || !Array.isArray(value.participantSessionIds) || value.participantSessionIds.length < 1 || value.participantSessionIds.length > 64
+    || !value.participantSessionIds.every(reference) || new Set(value.participantSessionIds).size !== value.participantSessionIds.length
+    || !isRecord(value.assignments) || Object.keys(value.assignments).length > 64
+    || !Object.entries(value.assignments).every(([sessionId, assignment]) => Array.isArray(value.participantSessionIds) && value.participantSessionIds.includes(sessionId) && isCouncilAssignment(assignment, sessionId))
+    || !digestText(value.reviewScopeDigest) || !reference(value.preparationOperationId) || typeof value.ready !== "boolean"
+    || !["prepared", "approved", "rejected"].includes(value.status as string) || value.executionAuthorized !== false
+    || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || (value.approvalOperationId !== undefined && !reference(value.approvalOperationId))
+    || (value.rejectionReason !== undefined && !contentText(value.rejectionReason, 2_048))) return false;
+  if (value.ready !== (Object.keys(value.assignments).length === value.participantSessionIds.length)) return false;
+  if (value.status === "approved" && value.approvalOperationId === undefined) return false;
+  if (value.status !== "approved" && value.approvalOperationId !== undefined) return false;
+  return true;
+}
+
+function isCouncilAssignment(value: unknown, expectedSessionId: string): value is ExtensionCouncilAssignment {
+  return isRecord(value) && exactKeys(value, ["sessionId", "paths", "resources"])
+    && value.sessionId === expectedSessionId && reference(value.sessionId)
+    && Array.isArray(value.paths) && value.paths.length <= 128 && value.paths.every(councilDetail)
+    && Array.isArray(value.resources) && value.resources.length <= 128 && value.resources.every(councilDetail);
+}
+
+function councilDetail(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\r\n\0]/.test(value);
+}
+
+function isAcceptanceTrust(value: unknown): value is AcceptanceTrustSummary {
+  return isRecord(value) && exactKeys(value, ["schema", "version", "authorityId", "keyId", "publicKeyPem", "allowedGates", "expiresAt", "installedAt", "installedBy", "status"])
+    && value.schema === "sxsy-b122.acceptance-trust-policy" && value.version === 1 && reference(value.authorityId) && digestText(value.keyId)
+    && contentText(value.publicKeyPem, 16_384) && Array.isArray(value.allowedGates) && value.allowedGates.length > 0 && value.allowedGates.length <= 27
+    && new Set(value.allowedGates).size === value.allowedGates.length && value.allowedGates.every((gate) => Number.isInteger(gate) && gate >= 1 && gate <= 27)
+    && timeText(value.expiresAt) && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isContainmentRemoteTrust(value: unknown): value is ContainmentRemoteTrustSummary {
+  return isRecord(value) && allowedExactKeys(value,
+    ["schema", "version", "purpose", "authorityId", "keyId", "publicKeyPem", "expiresAt", "installedAt", "installedBy", "status"],
+    ["revokedAt"])
+    && value.schema === "sxsy-b122.containment-remote-trust-policy" && value.version === 1
+    && value.purpose === "containment-remote-assessment" && reference(value.authorityId) && digestText(value.keyId)
+    && contentText(value.publicKeyPem, 16_384) && timeText(value.expiresAt) && timeText(value.installedAt)
+    && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked")
+    && (value.revokedAt === undefined || timeText(value.revokedAt))
+    && (value.status === "revoked") === (value.revokedAt !== undefined);
+}
+
+function isContainmentRemoteChallenge(value: unknown): value is ContainmentRemoteChallengeSummary {
+  if (!isRecord(value) || !exactKeys(value, ["id", "incidentId", "generation", "targetSnapshotId", "configuredRemotes", "issuedAt", "expiresAt", "status", "challengePath"])
+    || typeof value.id !== "string" || !/^containment-remote-challenge:[a-f0-9]{64}$/.test(value.id)
+    || typeof value.incidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    || !Number.isSafeInteger(value.generation) || (value.generation as number) < 1 || !reference(value.targetSnapshotId)
+    || !Array.isArray(value.configuredRemotes) || value.configuredRemotes.length < 1 || value.configuredRemotes.length > 16
+    || !value.configuredRemotes.every(isContainmentConfiguredRemote) || !timeText(value.issuedAt) || !timeText(value.expiresAt)
+    || Date.parse(value.expiresAt as string) <= Date.parse(value.issuedAt as string)
+    || Date.parse(value.expiresAt as string) - Date.parse(value.issuedAt as string) > 15 * 60_000
+    || (value.status !== "active" && value.status !== "used") || !pathText(value.challengePath)
+    || !/^(?:[A-Za-z]:[\\/]|\/)/.test(value.challengePath as string)) return false;
+  const remotes = value.configuredRemotes as ContainmentConfiguredRemoteSummary[];
+  return new Set(remotes.map((remote) => remote.name.toLowerCase())).size === remotes.length
+    && new Set(remotes.map((remote) => remote.canonicalIdentity.toLowerCase())).size === remotes.length;
+}
+
+function isContainmentConfiguredRemote(value: unknown): value is ContainmentConfiguredRemoteSummary {
+  return isRecord(value) && exactKeys(value, ["name", "canonicalIdentity"])
+    && typeof value.name === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value.name)
+    && contentText(value.canonicalIdentity, 2_048) && !/\s/.test(value.canonicalIdentity as string);
+}
+
+function isContainmentRemoteEvidence(value: unknown): value is ContainmentRemoteEvidenceSummary {
+  return isRecord(value) && exactKeys(value, ["evidenceId", "challengeId", "documentSha256", "expiresAt", "status"])
+    && typeof value.evidenceId === "string" && /^containment-remote-evidence:[a-f0-9]{64}$/.test(value.evidenceId)
+    && typeof value.challengeId === "string" && /^containment-remote-challenge:[a-f0-9]{64}$/.test(value.challengeId)
+    && digestText(value.documentSha256) && timeText(value.expiresAt)
+    && (value.status === "available" || value.status === "consumed");
+}
+
+function isAcceptanceEvidence(value: unknown): value is AcceptanceEvidenceSummary {
+  return isRecord(value) && allowedExactKeys(value, ["id", "gate", "status", "evidenceDigest", "policyVersion", "evaluatedBy", "evaluatedAt", "rationale"], ["targetSnapshotId", "operationId", "evidenceReference", "expiresAt", "invalidatedAt", "invalidatedReason"])
+    && reference(value.id) && Number.isInteger(value.gate) && Number(value.gate) >= 1 && Number(value.gate) <= 27
+    && ["passed", "failed", "unavailable", "incomplete"].includes(value.status as string) && contentText(value.evidenceDigest, 512)
+    && reference(value.policyVersion) && contentText(value.evaluatedBy, 160) && timeText(value.evaluatedAt) && contentText(value.rationale, 4_096)
+    && [value.targetSnapshotId, value.operationId].every((item) => item === undefined || reference(item))
+    && (value.evidenceReference === undefined || pathText(value.evidenceReference))
+    && [value.expiresAt, value.invalidatedAt].every((item) => item === undefined || timeText(item))
+    && (value.invalidatedReason === undefined || contentText(value.invalidatedReason, 2_048));
+}
+
+function isHighConsequenceActivation(value: unknown): value is HighConsequenceActivationSummary {
+  return isRecord(value) && exactKeys(value, ["id", "action", "targetSnapshotId", "policyVersion", "gateEvidenceIds", "activatedAt", "expiresAt", "activatedBy", "status"])
+    && reference(value.id) && reference(value.action) && reference(value.targetSnapshotId) && reference(value.policyVersion)
+    && Array.isArray(value.gateEvidenceIds) && value.gateEvidenceIds.length > 0 && value.gateEvidenceIds.length <= 27 && new Set(value.gateEvidenceIds).size === value.gateEvidenceIds.length && value.gateEvidenceIds.every(reference)
+    && timeText(value.activatedAt) && timeText(value.expiresAt) && contentText(value.activatedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isScannerTrust(value: unknown): value is ScannerTrustSummary {
+  return isRecord(value) && exactKeys(value, ["schema", "version", "authorityId", "keyId", "publicKeyPem", "allowedKinds", "expiresAt", "installedAt", "installedBy", "status"])
+    && value.schema === "sxsy-b122.scanner-fixture-trust" && value.version === 1 && reference(value.authorityId) && digestText(value.keyId) && contentText(value.publicKeyPem, 16_384)
+    && Array.isArray(value.allowedKinds) && value.allowedKinds.length > 0 && value.allowedKinds.length <= 2 && new Set(value.allowedKinds).size === value.allowedKinds.length && value.allowedKinds.every((kind) => kind === "scanner" || kind === "advisory")
+    && timeText(value.expiresAt) && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isScannerFixture(value: unknown): value is ScannerFixtureSummary {
+  return isRecord(value) && exactKeys(value, ["id", "kind", "packageRoot", "manifestSha256", "installedAt", "installedBy", "status"])
+    && reference(value.id) && (value.kind === "scanner" || value.kind === "advisory") && pathText(value.packageRoot) && digestText(value.manifestSha256)
+    && timeText(value.installedAt) && contentText(value.installedBy, 160) && (value.status === "active" || value.status === "revoked");
+}
+
+function isProviderInstallation(value: unknown): value is ProviderInstallationSummary {
+  if (!isRecord(value) || !exactKeys(value, ["provider", "installationId", "catalogDigest", "identity", "operator", "installedAt", "statusAt", "status"])
+    || !providerDesktopId(value.provider) || !reference(value.installationId) || !digestText(value.catalogDigest)
+    || !contentText(value.operator, 160) || !timeText(value.installedAt) || !timeText(value.statusAt)
+    || (value.status !== "active" && value.status !== "stale" && value.status !== "revoked") || !isRecord(value.identity)
+    || !exactKeys(value.identity, ["canonicalExecutablePath", "executableSha256", "signerSubject", "signerThumbprint", "productIdentity", "size", "modifiedMs", "device", "inode"])
+    || !absoluteExecutable(value.identity.canonicalExecutablePath) || !digestText(value.identity.executableSha256)
+    || !contentText(value.identity.signerSubject, 512) || typeof value.identity.signerThumbprint !== "string" || !/^[a-f0-9]{40,128}$/.test(value.identity.signerThumbprint)
+    || !Number.isSafeInteger(value.identity.size) || (value.identity.size as number) <= 0
+    || !Number.isFinite(value.identity.modifiedMs) || !uint64Decimal(value.identity.device) || !uint64Decimal(value.identity.inode)
+    || !isProviderProductIdentity(value.identity.productIdentity, value.provider)) return false;
+  return true;
+}
+
+function isManagedTerminalProfile(value: unknown, expectedProvider?: "claude_code" | "codex"): value is ManagedTerminalProfileSummary {
+  return isRecord(value) && exactKeys(value, ["provider", "profileName", "canonicalLauncherPath", "launcherSha256", "launcherProtocolVersion", "canonicalExecutablePath", "executableSha256", "signerSubject", "signerThumbprint", "executableSize", "executableModifiedMs", "executableDevice", "executableInode", "productIdentity", "args", "shell", "installationId", "catalogDigest", "issuedAt", "validUntil", "requiresFinalIdentityVerification"])
+    && (value.provider === "claude_code" || value.provider === "codex") && (expectedProvider === undefined || value.provider === expectedProvider)
+    && value.profileName === (value.provider === "claude_code" ? "SXSY-B122 Claude Code" : "SXSY-B122 Codex")
+    && absoluteExecutable(value.canonicalLauncherPath) && digestText(value.launcherSha256) && value.launcherProtocolVersion === 1
+    && absoluteExecutable(value.canonicalExecutablePath) && digestText(value.executableSha256)
+    && contentText(value.signerSubject, 512) && typeof value.signerThumbprint === "string" && /^[a-f0-9]{40,128}$/.test(value.signerThumbprint)
+    && Number.isSafeInteger(value.executableSize) && (value.executableSize as number) > 0 && (value.executableSize as number) <= 2 * 1024 * 1024 * 1024
+    && Number.isFinite(value.executableModifiedMs) && (value.executableModifiedMs as number) >= 0
+    && uint64Decimal(value.executableDevice) && uint64Decimal(value.executableInode)
+    && isProviderProductIdentity(value.productIdentity, value.provider) && value.productIdentity.role === "managed_terminal"
+    && Array.isArray(value.args) && value.args.length === 0 && value.shell === false && reference(value.installationId) && digestText(value.catalogDigest)
+    && timeText(value.issuedAt) && timeText(value.validUntil) && Date.parse(value.validUntil) > Date.parse(value.issuedAt)
+    && Date.parse(value.validUntil) - Date.parse(value.issuedAt) <= 30_000 && value.requiresFinalIdentityVerification === true;
+}
+
+function isProviderProductIdentity(value: unknown, expectedProvider?: ProviderDesktopId): value is ProviderProductIdentitySummary {
+  if (!isRecord(value) || !exactKeys(value, ["productId", "displayName", "publisher", "role"])) return false;
+  if (expectedProvider === undefined) return reference(value.productId) && contentText(value.displayName, 160) && contentText(value.publisher, 160) && (value.role === "desktop" || value.role === "managed_terminal");
+  const expected = expectedProvider === "claude_desktop"
+    ? ["anthropic.claude-desktop", "Claude Desktop", "Anthropic, PBC", "desktop"]
+    : expectedProvider === "chatgpt_desktop"
+      ? ["openai.chatgpt-desktop", "ChatGPT Desktop", "OpenAI, L.L.C.", "desktop"]
+      : expectedProvider === "claude_code"
+        ? ["anthropic.claude-code", "Claude Code", "Anthropic, PBC", "managed_terminal"]
+        : ["openai.codex", "Codex", "OpenAI, L.L.C.", "managed_terminal"];
+  return value.productId === expected[0] && value.displayName === expected[1] && value.publisher === expected[2] && value.role === expected[3];
+}
+
+function providerDesktopId(value: unknown): value is ProviderDesktopId { return value === "claude_desktop" || value === "chatgpt_desktop" || value === "claude_code" || value === "codex"; }
+function absoluteExecutable(value: unknown): value is string { return typeof value === "string" && value.length <= 160 && /^(?:[A-Za-z]:[\\/]|\/)/.test(value) && !/^(?:\\\\|\/\/|\\\\\?\\|\\\\\.\\)/.test(value) && /\.exe$/i.test(value) && !/[\r\n\0]/.test(value); }
+
+function digestText(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
+function uint64Decimal(value: unknown): value is string {
+  return typeof value === "string" && /^(?:0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= 18_446_744_073_709_551_615n;
+}
+
+function trustedHttpsUrl(value: string): boolean {
+  try { const url = new URL(value); return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && url.hash === ""; }
+  catch { return false; }
+}
+
+function trustedHostActionUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || !url.hostname || url.hash) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  } catch { return false; }
+}
+
+function safeBranch(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._/-]{0,240}$/.test(value)
+    && !value.startsWith("-") && !value.endsWith("/") && !value.includes("..") && !value.includes("@{");
+}
+
+function hardwareClaimPayload(claim: HardwareSignalClaim, extra: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return {
+    signalId: claim.signalId,
+    claimToken: claim.claimToken,
+    windowSessionId: claim.windowSessionId,
+    workspaceRoots: claim.workspaceRoots,
+    ...extra
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+function invalidResponse<T>(): BridgeResult<T> {
+  return { ok: false, code: "invalid_response", message: "The local companion returned a value outside the strict SXSY-B122 schema." };
+}
+
+function isCredentialReferenceSummary(value: unknown): value is CredentialReferenceSummary {
+  if (!isRecord(value) || !allowedExactKeys(value, ["reference", "protectorProvider", "generation", "createdAt", "updatedAt", "scopes"], ["revokedAt", "revocationReason"])
+    || !credentialIdentifier(value.reference) || !reference(value.protectorProvider)
+    || !Number.isSafeInteger(value.generation) || (value.generation as number) < 1
+    || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || !Array.isArray(value.scopes) || value.scopes.length < 1 || value.scopes.length > 64 || !value.scopes.every(isCredentialScope)
+    || (value.revokedAt !== undefined && !timeText(value.revokedAt))
+    || (value.revocationReason !== undefined && !contentText(value.revocationReason, 256))
+    || (value.revokedAt === undefined) !== (value.revocationReason === undefined)) return false;
+  const identities = (value.scopes as CredentialProvisionScope[]).map(credentialScopeIdentity);
+  return new Set(identities).size === identities.length;
+}
+
+function isCredentialScope(value: unknown): value is CredentialProvisionScope {
+  return isRecord(value) && exactKeys(value, ["repositoryRoot", "adapterId", "purpose"])
+    && pathText(value.repositoryRoot) && credentialIdentifier(value.adapterId) && credentialIdentifier(value.purpose);
+}
+
+function sameCredentialScopes(left: readonly CredentialProvisionScope[], right: readonly CredentialProvisionScope[]): boolean {
+  return left.length === right.length && left.every((scope, index) => credentialScopeIdentity(scope) === credentialScopeIdentity(right[index]!));
+}
+
+function credentialScopeIdentity(scope: CredentialProvisionScope): string {
+  return `${scope.repositoryRoot.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase()}\0${scope.adapterId}\0${scope.purpose}`;
+}
+
+function credentialIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
+}
+
+function isExtensionReanchorAuthority(value: unknown): value is ExtensionReanchorAuthority {
+  return isRecord(value) && exactKeys(value, ["id", "issuedBy", "expiresAt"])
+    && reference(value.id) && contentText(value.issuedBy, 256) && timeText(value.expiresAt);
+}
+
+function isExtensionReanchorStatus(value: unknown): value is ExtensionReanchorStatus {
+  const required = ["schema", "version", "requestId", "operationId", "sessionId", "authorityId", "oldTargetSnapshotId", "newTargetSnapshotId", "state"];
+  const optional = ["summary", "discrepancies", "risks", "questions", "confirmationScopeDigest", "confirmationExpiresAt", "receipt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, optional)
+    || value.schema !== "sxsy-b122.installed-reanchor-status" || value.version !== 1
+    || typeof value.requestId !== "string" || !/^reanchor:[a-f0-9]{64}$/.test(value.requestId)
+    || !reference(value.operationId) || !reference(value.sessionId) || !reference(value.authorityId)
+    || !sha256Text(value.oldTargetSnapshotId) || !sha256Text(value.newTargetSnapshotId)
+    || !["pending_preview", "pending_confirmation", "confirmed", "executing", "external_committed", "session_rebound", "ambiguous", "rejected", "recorded"].includes(value.state as string)
+    || (value.summary !== undefined && !contentText(value.summary, 1_024))
+    || ![value.discrepancies, value.risks, value.questions].every((items) => items === undefined || reanchorTextList(items))
+    || (value.confirmationScopeDigest !== undefined && !sha256Text(value.confirmationScopeDigest))
+    || (value.confirmationExpiresAt !== undefined && !timeText(value.confirmationExpiresAt))) return false;
+  const hasPreview = value.discrepancies !== undefined || value.risks !== undefined || value.questions !== undefined
+    || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined;
+  if (hasPreview && (value.discrepancies === undefined || value.risks === undefined || value.questions === undefined
+    || value.confirmationScopeDigest === undefined || value.confirmationExpiresAt === undefined)) return false;
+  if (value.state === "pending_confirmation" && !hasPreview) return false;
+  if (value.state === "recorded") {
+    return isExtensionReanchorReceipt(value.receipt, value);
+  }
+  return value.receipt === undefined;
+}
+
+function isExtensionReanchorReceipt(value: unknown, status: Record<string, unknown>): value is ExtensionReanchorReceipt {
+  const keys = [
+    "version", "id", "requestId", "operationId", "oldTargetSnapshotId", "newTargetSnapshotId", "sessionId", "authorityId",
+    "previewDigest", "confirmationDigest", "confirmationScopeDigest", "externalEffectId", "acknowledgementDigest", "artifactDigest",
+    "rereadEvidence", "report", "sessionRebindOutcome", "resultingBindingDigest", "resumed", "evidenceDigest", "result", "createdAt"
+  ];
+  return isRecord(value) && exactKeys(value, keys) && value.version === 1
+    && typeof value.id === "string" && /^reanchor-receipt:[a-f0-9]{64}$/.test(value.id)
+    && value.requestId === status.requestId && value.operationId === status.operationId
+    && value.oldTargetSnapshotId === status.oldTargetSnapshotId && value.newTargetSnapshotId === status.newTargetSnapshotId
+    && value.sessionId === status.sessionId && value.authorityId === status.authorityId
+    && sha256Text(value.previewDigest) && sha256Text(value.confirmationDigest) && sha256Text(value.confirmationScopeDigest)
+    && reference(value.externalEffectId) && sha256Text(value.acknowledgementDigest) && sha256Text(value.artifactDigest)
+    && isExtensionReanchorRereadEvidence(value.rereadEvidence, value.newTargetSnapshotId)
+    && isExtensionReanchorReport(value.report)
+    && (value.sessionRebindOutcome === "rebound" || value.sessionRebindOutcome === "already_rebound")
+    && sha256Text(value.resultingBindingDigest) && value.resumed === false
+    && sha256Text(value.evidenceDigest) && value.result === "reanchored_without_resume" && timeText(value.createdAt)
+    && (status.confirmationScopeDigest === undefined || value.confirmationScopeDigest === status.confirmationScopeDigest);
+}
+
+function isExtensionReanchorRereadEvidence(value: unknown, newTargetSnapshotId: unknown): value is ExtensionReanchorRereadEvidence {
+  return isRecord(value) && exactKeys(value, ["contextDigest", "authorityDigest", "instructionDigests", "planDigest", "documentationDigests", "currentWorkDigest", "inspectedTargetSnapshotId"])
+    && sha256Text(value.contextDigest) && sha256Text(value.authorityDigest) && reanchorDigestList(value.instructionDigests)
+    && sha256Text(value.planDigest) && reanchorDigestList(value.documentationDigests) && sha256Text(value.currentWorkDigest)
+    && value.inspectedTargetSnapshotId === newTargetSnapshotId;
+}
+
+function isExtensionReanchorReport(value: unknown): value is ExtensionReanchorReport {
+  return isRecord(value) && exactKeys(value, ["summary", "discrepancies", "risks", "questions", "result"])
+    && contentText(value.summary, 1_024) && reanchorTextList(value.discrepancies) && reanchorTextList(value.risks)
+    && reanchorTextList(value.questions) && value.result === "reanchored_without_resume";
+}
+
+function reanchorTextList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length <= 128 && value.every((item) => contentText(item, 1_024));
+}
+
+function reanchorDigestList(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length > 0 && value.length <= 128 && value.every(sha256Text);
+}
+
+function isExtensionManagedSession(value: unknown): value is ExtensionManagedSession {
+  const required = ["id", "provider", "surface", "capabilities", "status", "plannedFiles", "lastHeartbeat", "adapterVersion", "metadata"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["workspaceRoot", "targetSnapshotId", "taskId", "planRevision"])
+    || !reference(value.id) || !["claude", "codex", "generic", "voice"].includes(value.provider as string)
+    || !["vscode_terminal", "vscode_window", "desktop", "browser", "bridge"].includes(value.surface as string)
+    || !Array.isArray(value.capabilities) || value.capabilities.length < 1 || value.capabilities.length > 4
+    || !value.capabilities.includes("registered") || new Set(value.capabilities).size !== value.capabilities.length
+    || !value.capabilities.every((capability) => ["registered", "observable", "controllable", "mediated"].includes(capability as string))
+    || !["running", "verified_blocked", "verified_finished", "unreachable", "stale", "unknown"].includes(value.status as string)
+    || !Array.isArray(value.plannedFiles) || value.plannedFiles.length > 4_096 || !value.plannedFiles.every(pathText)
+    || !timeText(value.lastHeartbeat) || !reference(value.adapterVersion)
+    || !isRecord(value.metadata) || Object.keys(value.metadata).length > 256
+    || !Object.entries(value.metadata).every(([key, item]) => reference(key) && typeof item === "string" && item.length <= 16_384 && !item.includes("\0"))
+    || (value.workspaceRoot !== undefined && !pathText(value.workspaceRoot))
+    || ![value.targetSnapshotId, value.taskId, value.planRevision].every((item) => item === undefined || reference(item))) return false;
+  return true;
+}
+
+function isExtensionHandoffPackage(value: unknown): value is ExtensionHandoffPackage {
+  const required = ["id", "digest", "repositoryRoot", "targetSnapshotId", "taskId", "planRevision", "plan", "decisions", "documentation", "references", "constraints", "openQuestions", "nextActions", "status", "executionAuthorized", "createdAt", "updatedAt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["authorityId", "recipientSessionId", "acknowledgedAt"])
+    || !reference(value.id) || typeof value.digest !== "string" || !/^[a-f0-9]{64}$/.test(value.digest)
+    || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.taskId) || !reference(value.planRevision)
+    || !contentText(value.plan, 16_384) || ![value.decisions, value.documentation, value.references, value.constraints, value.openQuestions, value.nextActions].every(contentList)
+    || !["queued", "immediate_focus_requested", "acknowledged", "cancelled", "archived"].includes(value.status as string)
+    || value.executionAuthorized !== false || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || ![value.authorityId, value.recipientSessionId].every((item) => item === undefined || reference(item))
+    || (value.acknowledgedAt !== undefined && !timeText(value.acknowledgedAt))) return false;
+  return true;
+}
+
+function isExtensionWorkflowArtifact(value: unknown): value is ExtensionWorkflowArtifact {
+  const required = ["action", "repositoryRoot", "targetSnapshotId", "sessionId", "authorityId", "payload", "id", "digest", "status", "executionAuthorized", "createdAt", "updatedAt"];
+  const providerKeys = ["providerResult", "providerSummary", "providerResponseStatus", "providerEffectDisposition"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["taskId", "planRevision", "coordinatorContextDigest", "coordinatorContextRevision", "operationId", "providerExternalId", ...providerKeys])
+    || !workflowAction(value.action) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.sessionId) || !reference(value.authorityId)
+    || !isRecord(value.payload) || !reference(value.id) || typeof value.digest !== "string" || !/^[a-f0-9]{64}$/.test(value.digest)
+    || !["prepared", "submitted", "cancelling", "acknowledged", "rejected", "cancelled"].includes(value.status as string)
+    || value.executionAuthorized !== false || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || ![value.taskId, value.planRevision, value.operationId, value.providerExternalId].every((item) => item === undefined || reference(item))) return false;
+  const hasCoordinatorDigest = value.coordinatorContextDigest !== undefined;
+  const hasCoordinatorRevision = value.coordinatorContextRevision !== undefined;
+  if (hasCoordinatorDigest !== hasCoordinatorRevision || (hasCoordinatorDigest && (!sha256Text(value.coordinatorContextDigest)
+    || !Number.isSafeInteger(value.coordinatorContextRevision) || (value.coordinatorContextRevision as number) < 1))) return false;
+  const presentProviderKeys = providerKeys.filter((key) => value[key] !== undefined);
+  if (presentProviderKeys.length !== 0 && presentProviderKeys.length !== providerKeys.length) return false;
+  if (presentProviderKeys.length && (!isWorkflowProviderResult(value.providerResult)
+    || !workflowBoundedText(value.providerSummary, 1_024)
+    || !["completed", "failed", "blocked", "unavailable", "running", "awaiting_input", "awaiting_confirmation"].includes(value.providerResponseStatus as string)
+    || !["not_started", "committed", "ambiguous"].includes(value.providerEffectDisposition as string))) return false;
+  return true;
+}
+
+function isExtensionVoiceConsent(value: unknown): value is ExtensionVoiceConsent {
+  if (!isRecord(value) || !exactKeys(value, ["id", "repositoryRoot", "targetSnapshotId", "contextPackageId", "contextDigest", "provider", "operatorPresenceId", "transcript", "retentionMinutes", "grantedAt", "expiresAt"])
+    || !reference(value.id) || !pathText(value.repositoryRoot) || !reference(value.targetSnapshotId) || !reference(value.contextPackageId)
+    || typeof value.contextDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.contextDigest) || !voiceProvider(value.provider)
+    || !reference(value.operatorPresenceId) || (value.transcript !== "off" && value.transcript !== "redacted")
+    || !Number.isSafeInteger(value.retentionMinutes) || (value.retentionMinutes as number) < 0 || (value.retentionMinutes as number) > 1_440
+    || !timeText(value.grantedAt) || !timeText(value.expiresAt)) return false;
+  return true;
+}
+
+function isExtensionVoiceBinding(value: unknown): value is ExtensionVoiceBinding {
+  const required = ["id", "consentId", "voiceSessionId", "repositoryRoot", "targetSnapshotId", "contextPackageId", "contextDigest", "provider", "transcript", "retentionMinutes", "status", "createdAt", "updatedAt"];
+  if (!isRecord(value) || !allowedExactKeys(value, required, ["managedSessionId", "endedAt", "interruptionReason", "transcriptDeletedAt"])
+    || !reference(value.id) || !reference(value.consentId) || !reference(value.voiceSessionId) || !pathText(value.repositoryRoot)
+    || !reference(value.targetSnapshotId) || !reference(value.contextPackageId) || typeof value.contextDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.contextDigest)
+    || !voiceProvider(value.provider) || (value.transcript !== "off" && value.transcript !== "redacted")
+    || !Number.isSafeInteger(value.retentionMinutes) || (value.retentionMinutes as number) < 0 || (value.retentionMinutes as number) > 1_440
+    || !["active", "muted", "interrupted", "ended"].includes(value.status as string) || !timeText(value.createdAt) || !timeText(value.updatedAt)
+    || (value.managedSessionId !== undefined && !reference(value.managedSessionId))
+    || ![value.endedAt, value.transcriptDeletedAt].every((item) => item === undefined || timeText(item))
+    || (value.interruptionReason !== undefined && !contentText(value.interruptionReason, 512))) return false;
+  return true;
+}
+
+function workflowAction(value: unknown): value is ExtensionWorkflowAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function voiceProvider(value: unknown): value is ExtensionVoiceProvider { return value === "claude" || value === "chatgpt" || value === "system"; }
+function reference(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value); }
+function pathText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value); }
+function contentText(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/\0/.test(value); }
+function contentList(value: unknown): value is readonly string[] { return Array.isArray(value) && value.length <= 512 && value.every((item) => contentText(item, 16_384)); }
+function timeText(value: unknown): value is string { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
+
+function isRawHidPin(value: unknown): value is RawHidInstallationPin {
+  if (!isRecord(value) || !exactKeys(value, ["identity", "helperPath", "helperSha256", "protocolVersion", "mapFingerprint", "installedAt", "status"])
+    || !isRawHidIdentity(value.identity) || typeof value.helperPath !== "string" || !boundedText(value.helperPath, 4_096)
+    || typeof value.helperSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.helperSha256)
+    || !Number.isInteger(value.protocolVersion) || (value.protocolVersion as number) < 1 || (value.protocolVersion as number) > 255
+    || typeof value.mapFingerprint !== "string" || !/^[a-f0-9]{16}$/.test(value.mapFingerprint)
+    || typeof value.installedAt !== "string" || !Number.isFinite(Date.parse(value.installedAt))
+    || (value.status !== "active" && value.status !== "revoked")) return false;
+  return true;
+}
+
+function isRawHidIdentity(value: unknown): value is RawHidDeviceIdentity {
+  return isRecord(value) && allowedExactKeys(value, ["vendorId", "productId", "usagePage", "usage"], ["serialNumber"])
+    && uint16(value.vendorId) && uint16(value.productId) && uint16(value.usagePage) && uint16(value.usage)
+    && (value.serialNumber === undefined || (typeof value.serialNumber === "string" && /^[A-Za-z0-9._-]{1,128}$/.test(value.serialNumber)));
+}
+
+function sameRawHidIdentity(left: RawHidDeviceIdentity, right: RawHidDeviceIdentity): boolean {
+  return left.vendorId === right.vendorId && left.productId === right.productId && left.usagePage === right.usagePage
+    && left.usage === right.usage && left.serialNumber === right.serialNumber;
+}
+
+function isRawHidSupervisorStatus(value: unknown): value is RawHidRuntimeStatus["supervisor"] {
+  return isRecord(value) && exactKeys(value, ["state", "generation", "detail"])
+    && ["unprovisioned", "starting", "running", "retrying", "stopped", "unavailable"].includes(value.state as string)
+    && Number.isSafeInteger(value.generation) && (value.generation as number) >= 0
+    && typeof value.detail === "string" && boundedText(value.detail, 512);
+}
+
+function isRawHidRuntimeStatus(value: unknown): value is RawHidRuntimeStatus {
+  if (!isRecord(value) || !exactKeys(value, ["supervisor", "inbox", "installations"]) || !isRawHidSupervisorStatus(value.supervisor)
+    || !isRecord(value.inbox) || !exactKeys(value.inbox, ["pending", "claimed", "completed", "needsReconciliation"])
+    || ![value.inbox.pending, value.inbox.claimed, value.inbox.completed, value.inbox.needsReconciliation].every((count) => Number.isSafeInteger(count) && (count as number) >= 0)
+    || !Array.isArray(value.installations) || !value.installations.every(isRawHidPin)) return false;
+  return true;
+}
+
+function isHardwareSignalClaim(value: unknown): value is HardwareSignalClaim {
+  if (!isRecord(value) || !exactKeys(value, ["signalId", "claimToken", "deviceId", "connectionEpoch", "bootNonce", "counter", "control", "modifier", "acceptedAt", "claimedAt", "attempt", "windowSessionId", "workspaceRoots"])
+    || typeof value.signalId !== "string" || !/^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{8,256}$/.test(value.claimToken)
+    || typeof value.deviceId !== "string" || !/^[a-f0-9]{64}$/.test(value.deviceId)
+    || !uint32(value.connectionEpoch) || !uint32(value.bootNonce) || !uint32(value.counter)
+    || typeof value.control !== "string" || typeof value.modifier !== "string" || !chordFor(value.control as B122Control, value.modifier as B122Modifier)
+    || typeof value.acceptedAt !== "string" || !Number.isFinite(Date.parse(value.acceptedAt))
+    || typeof value.claimedAt !== "string" || !Number.isFinite(Date.parse(value.claimedAt))
+    || !Number.isSafeInteger(value.attempt) || (value.attempt as number) < 1
+    || typeof value.windowSessionId !== "string" || !boundedText(value.windowSessionId, 512)
+    || !Array.isArray(value.workspaceRoots) || value.workspaceRoots.length < 1 || value.workspaceRoots.length > 32
+    || !value.workspaceRoots.every((root) => typeof root === "string" && boundedText(root, 4_096))) return false;
+  return true;
+}
+
+function isPreparedCommand(value: unknown): value is PreparedCommand {
+  if (!isRecord(value)) return false;
+  if (!allowedExactKeys(value, ["status", "summary"], ["session", "authorityId", "confirmationToken", "confirmationScopeDigest", "confirmationExpiresAt", "workflowReview", "automationReview", "debugStopReview"])
+    || !["prepared", "blocked", "unavailable", "incomplete"].includes(value.status as string)
+    || typeof value.summary !== "string" || !boundedText(value.summary, 512)
+    || (value.session !== undefined && !isRecord(value.session))
+    || ![value.authorityId, value.confirmationToken].every((item) => item === undefined || (typeof item === "string" && boundedText(item, 512)))
+    || (value.confirmationScopeDigest !== undefined && !sha256Text(value.confirmationScopeDigest))
+    || (value.confirmationExpiresAt !== undefined && (typeof value.confirmationExpiresAt !== "string" || !Number.isFinite(Date.parse(value.confirmationExpiresAt))))) return false;
+  if (value.confirmationScopeDigest !== undefined && value.confirmationToken === undefined) return false;
+  const reviewCount = [value.workflowReview, value.automationReview, value.debugStopReview].filter((item) => item !== undefined).length;
+  if (reviewCount > 1) return false;
+  if (value.workflowReview !== undefined) {
+    if (value.status !== "incomplete" || value.session === undefined || value.authorityId !== undefined || value.confirmationToken !== undefined
+      || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined || !isPlanApprovalWorkflowReview(value.workflowReview)) return false;
+  }
+  if (value.automationReview !== undefined) {
+    if (value.status !== "incomplete" || !isExtensionManagedSession(value.session) || typeof value.authorityId !== "string"
+      || value.confirmationToken !== undefined || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined
+      || !isAutomationManifestReview(value.automationReview)
+      || value.automationReview.manifest.sessionId !== value.session.id
+      || value.automationReview.manifest.authorityId !== value.authorityId) return false;
+  }
+  if (value.debugStopReview !== undefined) {
+    if (value.status !== "incomplete" || !isExtensionManagedSession(value.session) || typeof value.authorityId !== "string"
+      || value.confirmationToken !== undefined || value.confirmationScopeDigest !== undefined || value.confirmationExpiresAt !== undefined
+      || !isDebugStopReview(value.debugStopReview)
+      || value.debugStopReview.sourceSessionId !== value.session.id
+      || value.debugStopReview.authorityId !== value.authorityId) return false;
+  }
+  if (value.status === "prepared" && reviewCount !== 0) return false;
+  return true;
+}
+
+function isAutomationManifestReview(value: unknown): value is AutomationManifestReview {
+  if (!isRecord(value) || !exactKeys(value, ["action", "manifest", "reviewScopeDigest"])
+    || !isAutomationManifestAction(value.action) || !isExtensionAutomationManifest(value.manifest)
+    || value.manifest.action !== value.action || !sha256Text(value.reviewScopeDigest)) return false;
+  try {
+    return automationManifestReviewScopeDigest(value.manifest as unknown as AutomationOperationManifest) === value.reviewScopeDigest;
+  } catch { return false; }
+}
+
+function isExtensionAutomationManifest(value: unknown): value is ExtensionAutomationOperationManifest {
+  try { parseAutomationOperationManifest(value); return true; }
+  catch { return false; }
+}
+
+function isAutomationManifestAction(value: unknown): value is AutomationManifestAction {
+  return value === "compound_capture" || value === "compound_refresh" || value === "lfg" || value === "repair_mission";
+}
+
+function isAutomationProposal(value: unknown, action: AutomationManifestAction): value is Readonly<Record<string, unknown>> {
+  if (!isRecord(value) || value.kind !== action) return false;
+  if (action === "compound_capture") {
+    return exactKeys(value, ["kind", "solvedProblemEvidenceDigest", "verifiedOutcomeEvidenceDigest", "nonTrivialRationale", "documents", "instructionFileMutation"])
+      && sha256Text(value.solvedProblemEvidenceDigest) && sha256Text(value.verifiedOutcomeEvidenceDigest)
+      && contentText(value.nonTrivialRationale, 4_096) && isAutomationMutations(value.documents, true)
+      && isRecord(value.instructionFileMutation)
+      && (exactKeys(value.instructionFileMutation, ["kind"]) && value.instructionFileMutation.kind === "none"
+        || exactKeys(value.instructionFileMutation, ["kind", "path", "beforeDigest", "afterDigest"])
+          && value.instructionFileMutation.kind === "edit_existing" && pathText(value.instructionFileMutation.path)
+          && sha256Text(value.instructionFileMutation.beforeDigest) && sha256Text(value.instructionFileMutation.afterDigest));
+  }
+  if (action === "compound_refresh") {
+    return exactKeys(value, ["kind", "audit", "mutations", "commit"])
+      && exactStringArray(value.audit, ["drift", "overlap", "supersession", "contradiction"])
+      && isAutomationMutations(value.mutations, true) && isRecord(value.commit)
+      && (exactKeys(value.commit, ["planned"]) && value.commit.planned === false
+        || exactKeys(value.commit, ["planned", "messageDigest"]) && value.commit.planned === true && sha256Text(value.commit.messageDigest));
+  }
+  if (action === "lfg") {
+    return exactKeys(value, ["kind", "requirementsSources", "approvedScopePaths", "authorizedActions", "deployAuthorized"])
+      && Array.isArray(value.requirementsSources) && value.requirementsSources.length >= 1 && value.requirementsSources.length <= 64
+      && value.requirementsSources.every((source) => isRecord(source) && exactKeys(source, ["path", "digest"]) && pathText(source.path) && sha256Text(source.digest))
+      && isBoundedUniqueStringArray(value.approvedScopePaths, 1, 512, pathText)
+      && exactStringArray(value.authorizedActions, ["filesystem_mutation", "git_commit", "git_push", "pull_request", "ci_watch"])
+      && value.deployAuthorized === false;
+  }
+  return exactKeys(value, [
+    "kind", "failingGateId", "reproductionCommandDigest", "approvedScopePaths", "affectedChecks", "fullChecks", "testEnvironment",
+    "pushAuthorized", "mergeAuthorized", "deployAuthorized", "hostedRerunAuthorized", "productionDataAuthorized"
+  ]) && reference(value.failingGateId) && sha256Text(value.reproductionCommandDigest)
+    && isBoundedUniqueStringArray(value.approvedScopePaths, 1, 512, pathText)
+    && isBoundedUniqueStringArray(value.affectedChecks, 1, 256, reference)
+    && isBoundedUniqueStringArray(value.fullChecks, 1, 256, reference)
+    && isRecord(value.testEnvironment) && exactKeys(value.testEnvironment, ["id", "digest", "egress", "databaseName"])
+    && reference(value.testEnvironment.id) && sha256Text(value.testEnvironment.digest) && value.testEnvironment.egress === "deny" && reference(value.testEnvironment.databaseName)
+    && value.pushAuthorized === false && value.mergeAuthorized === false && value.deployAuthorized === false
+    && value.hostedRerunAuthorized === false && value.productionDataAuthorized === false;
+}
+
+function isAutomationMutations(value: unknown, nonEmpty: boolean): boolean {
+  return Array.isArray(value) && (!nonEmpty || value.length > 0) && value.length <= 512 && value.every((mutation) =>
+    isRecord(mutation) && allowedExactKeys(mutation, ["path", "mutation"], ["beforeDigest", "afterDigest"])
+      && pathText(mutation.path) && ["create", "update", "replace", "delete"].includes(mutation.mutation as string)
+      && (mutation.beforeDigest === undefined || sha256Text(mutation.beforeDigest))
+      && (mutation.afterDigest === undefined || sha256Text(mutation.afterDigest)));
+}
+
+function exactStringArray(value: unknown, expected: readonly string[]): boolean {
+  return Array.isArray(value) && value.length === expected.length && value.every((item, index) => item === expected[index]);
+}
+
+function isBoundedUniqueStringArray(value: unknown, minimum: number, maximum: number, predicate: (value: unknown) => value is string): boolean {
+  return Array.isArray(value) && value.length >= minimum && value.length <= maximum && value.every(predicate) && new Set(value).size === value.length;
+}
+
+function isDebugStopReview(value: unknown): value is DebugStopReview {
+  return isRecord(value) && exactKeys(value, [
+    "schema", "version", "action", "bindingId", "bindingDigest", "reviewScopeDigest", "sourceSessionId", "authorityId",
+    "targetSnapshotId", "repositoryRoot", "originOperationId", "effectKind", "debugSessionId", "debugBindingId", "debugConfiguration", "managedProcessId", "createdAt", "expiresAt"
+  ]) && value.schema === "sxsy-b122.debug-stop-review" && value.version === 1 && value.action === "stop_managed_run"
+    && typeof value.bindingId === "string" && /^debug-stop:[a-f0-9]{64}$/.test(value.bindingId)
+    && sha256Text(value.bindingDigest) && sha256Text(value.reviewScopeDigest)
+    && reference(value.sourceSessionId) && reference(value.authorityId) && sha256Text(value.targetSnapshotId)
+    && pathText(value.repositoryRoot) && reference(value.originOperationId)
+    && (value.effectKind === "debug_session"
+      ? reference(value.debugSessionId) && reference(value.debugBindingId) && reference(value.debugConfiguration) && value.managedProcessId === null
+      : value.effectKind === "managed_run" && value.debugSessionId === null && value.debugBindingId === null && value.debugConfiguration === null
+        && typeof value.managedProcessId === "string" && /^managed:[a-f0-9]{64}$/.test(value.managedProcessId))
+    && timeText(value.createdAt) && timeText(value.expiresAt)
+    && Date.parse(value.createdAt as string) < Date.parse(value.expiresAt as string);
+}
+
+function isPlanApprovalWorkflowReview(value: unknown): value is PlanApprovalWorkflowReview {
+  if (!isRecord(value) || !exactKeys(value, ["action", "sessionId", "targetSnapshotId", "repositoryRoot", "provider", "contextId", "observedAt", "adapter", "plan", "scopeDigest", "summary", "providerContextDigest", "sourceRevision"])
+    || value.action !== "plan_approval" || !reference(value.sessionId) || !reference(value.targetSnapshotId) || !pathText(value.repositoryRoot)
+    || (value.provider !== "claude" && value.provider !== "codex") || !reference(value.contextId) || !timeText(value.observedAt)
+    || !isRecord(value.adapter) || !exactKeys(value.adapter, ["id", "version", "moduleSha256"]) || !reference(value.adapter.id) || !reference(value.adapter.version) || !sha256Text(value.adapter.moduleSha256)
+    || !isPlanApprovalBinding(value.plan, value.targetSnapshotId) || !sha256Text(value.scopeDigest) || !contentText(value.summary, 4_096)
+    || !sha256Text(value.providerContextDigest) || !Number.isSafeInteger(value.sourceRevision) || (value.sourceRevision as number) < 1) return false;
+  return true;
+}
+
+function isPlanApprovalBinding(value: unknown, targetSnapshotId: unknown): value is PlanApprovalWorkflowReview["plan"] {
+  if (!isRecord(value) || !exactKeys(value, ["digest", "revision", "originSessionId", "taskId", "objective", "steps", "decisions", "expectedTargetTransition"])
+    || !sha256Text(value.digest) || !reference(value.revision) || !reference(value.originSessionId) || !reference(value.taskId) || !contentText(value.objective, 16_384)
+    || !Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 512 || !value.steps.every(isPlanApprovalStep)
+    || !Array.isArray(value.decisions) || value.decisions.length > 512 || !value.decisions.every((item) => contentText(item, 16_384))
+    || !isRecord(value.expectedTargetTransition) || !exactKeys(value.expectedTargetTransition, ["beforeTargetSnapshotId", "expectedAfterTargetSnapshotId", "expectation"])
+    || value.expectedTargetTransition.beforeTargetSnapshotId !== targetSnapshotId || !sha256Text(value.expectedTargetTransition.expectedAfterTargetSnapshotId)
+    || (value.expectedTargetTransition.expectation !== "unchanged" && value.expectedTargetTransition.expectation !== "changed")
+    || ((value.expectedTargetTransition.expectation === "unchanged") !== (value.expectedTargetTransition.expectedAfterTargetSnapshotId === targetSnapshotId))) return false;
+  return true;
+}
+
+function isPlanApprovalStep(value: unknown): value is PlanApprovalWorkflowReview["plan"]["steps"][number] {
+  return isRecord(value) && exactKeys(value, ["id", "summary", "ownedFiles", "dependencies", "status"])
+    && reference(value.id) && contentText(value.summary, 16_384)
+    && Array.isArray(value.ownedFiles) && value.ownedFiles.length <= 512 && value.ownedFiles.every(pathText)
+    && Array.isArray(value.dependencies) && value.dependencies.length <= 512 && value.dependencies.every(reference)
+    && ["proposed", "approved", "completed", "blocked"].includes(value.status as string);
+}
+
+function isForwardedCommandResult(value: unknown): value is ForwardedCommandResult {
+  return isRecord(value) && allowedExactKeys(value, ["status", "summary"], ["operationId", "effectDisposition", "data"])
+    && ["queued", "running", "awaiting_input", "awaiting_confirmation", "cancelling", "completed", "failed", "timed_out", "unavailable", "incomplete", "blocked", "cancelled"].includes(value.status as string)
+    && typeof value.summary === "string" && boundedText(value.summary, 512)
+    && (value.operationId === undefined || reference(value.operationId))
+    && (value.effectDisposition === undefined || value.effectDisposition === "not_started" || value.effectDisposition === "committed" || value.effectDisposition === "ambiguous")
+    && (value.data === undefined || (isRecord(value.data) && (!hasWorkflowOutcomeMarker(value.data) || isWorkflowOutcomeData(value.data))));
+}
+
+function hasWorkflowOutcomeMarker(value: Readonly<Record<string, unknown>>): boolean {
+  return value.workflowResult !== undefined || value.resultKind !== undefined;
+}
+
+function isWorkflowOutcomeData(value: unknown): value is ForwardedWorkflowOutcome {
+  if (!isRecord(value) || !allowedExactKeys(value, ["artifactId", "artifactDigest", "resultKind", "workflowResult", "providerSummary"], ["externalId"])
+    || !reference(value.artifactId) || !sha256Text(value.artifactDigest) || !isWorkflowProviderResult(value.workflowResult)
+    || value.resultKind !== value.workflowResult.kind || !workflowBoundedText(value.providerSummary, 1_024)
+    || (value.externalId !== undefined && !workflowBoundedText(value.externalId, 256))) return false;
+  return true;
+}
+
+function isWorkflowProviderResult(value: unknown): value is ExtensionWorkflowProviderResult {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  switch (value.kind) {
+    case "anchor":
+      return exactKeys(value, ["kind", "anchorDigest", "discrepancies", "questions", "resumed"])
+        && sha256Text(value.anchorDigest) && workflowTextList(value.discrepancies, true) && workflowTextList(value.questions, true) && value.resumed === false;
+    case "proof": {
+      if (!exactKeys(value, ["kind", "verifiedClaims", "evidenceReferences", "backendResults"])
+        || !workflowTextList(value.verifiedClaims, true) || !workflowTextList(value.evidenceReferences, true)
+        || !Array.isArray(value.backendResults) || value.backendResults.length < 1 || value.backendResults.length > 512) return false;
+      const backends: string[] = [];
+      for (const item of value.backendResults) {
+        if (!isRecord(item) || !exactKeys(item, ["backend", "status"]) || !workflowBoundedText(item.backend, 128)
+          || (item.status !== "passed" && item.status !== "failed" && item.status !== "unavailable")) return false;
+        backends.push(item.backend);
+      }
+      return new Set(backends).size === backends.length;
+    }
+    case "decision": {
+      if (!exactKeys(value, ["kind", "decisionPacketId", "decisions", "userSelectionRequired"])
+        || !workflowBoundedText(value.decisionPacketId, 256) || value.userSelectionRequired !== true
+        || !Array.isArray(value.decisions) || value.decisions.length < 1 || value.decisions.length > 64) return false;
+      const decisionIds: string[] = [];
+      for (const decision of value.decisions) {
+        if (!isRecord(decision) || !exactKeys(decision, ["decisionId", "options", "recommendationId"])
+          || !workflowIdentifier(decision.decisionId) || !workflowIdentifier(decision.recommendationId)
+          || !Array.isArray(decision.options) || decision.options.length < 2 || decision.options.length > 15) return false;
+        const optionIds: string[] = [];
+        for (const option of decision.options) {
+          if (!isRecord(option) || !exactKeys(option, ["id", "label", "tradeoffs", "risks"]) || !workflowIdentifier(option.id)
+            || !workflowBoundedText(option.label, 16_384)
+            || !workflowTextList(option.tradeoffs, false) || !workflowTextList(option.risks, false)) return false;
+          optionIds.push(option.id);
+        }
+        if (new Set(optionIds).size !== optionIds.length || !optionIds.includes(decision.recommendationId)) return false;
+        decisionIds.push(decision.decisionId);
+      }
+      return new Set(decisionIds).size === decisionIds.length;
+    }
+    case "plan": {
+      if (value.mode === "expanded") {
+        if (!exactKeys(value, ["kind", "mode", "planDigest", "alternatives"]) || !sha256Text(value.planDigest)
+          || !Array.isArray(value.alternatives) || value.alternatives.length !== 15) return false;
+        const ids: string[] = [];
+        for (const [index, alternative] of value.alternatives.entries()) {
+          if (!isRecord(alternative) || !exactKeys(alternative, ["rank", "id", "summary", "rationale", "risks"])
+            || alternative.rank !== index + 1 || !workflowIdentifier(alternative.id)
+            || !workflowBoundedText(alternative.summary, 16_384)
+            || !workflowBoundedText(alternative.rationale, 16_384)
+            || !workflowTextList(alternative.risks, true)) return false;
+          ids.push(alternative.id);
+        }
+        return new Set(ids).size === ids.length;
+      }
+      return value.mode === "execution_ack"
+        && exactKeys(value, ["kind", "mode", "planDigest", "planRevision", "originSessionId", "executorSessionId", "authorityId", "acknowledgementId", "executionStarted"])
+        && sha256Text(value.planDigest) && workflowIdentifier(value.planRevision) && workflowIdentifier(value.originSessionId)
+        && workflowIdentifier(value.executorSessionId) && workflowIdentifier(value.authorityId)
+        && workflowBoundedText(value.acknowledgementId, 256) && value.executionStarted === true;
+    }
+    case "handoff":
+      return exactKeys(value, ["kind", "packageId", "recipientSessionId", "acknowledged"])
+        && workflowIdentifier(value.packageId) && workflowIdentifier(value.recipientSessionId) && typeof value.acknowledged === "boolean";
+    case "focus":
+      return exactKeys(value, ["kind", "selectedSessionId", "status", "queueCycleId", "resultDelivered"])
+        && workflowIdentifier(value.selectedSessionId) && (value.status === "verified_blocked" || value.status === "verified_finished")
+        && workflowIdentifier(value.queueCycleId) && value.resultDelivered === true;
+    case "authority": {
+      if (!exactKeys(value, ["kind", "acknowledgements"]) || !Array.isArray(value.acknowledgements)
+        || value.acknowledgements.length < 1 || value.acknowledgements.length > 64) return false;
+      const recipients: string[] = [];
+      for (const acknowledgement of value.acknowledgements) {
+        if (!isRecord(acknowledgement) || !exactKeys(acknowledgement, ["recipientSessionId", "grantId", "matchDigest", "acknowledged"])
+          || !workflowIdentifier(acknowledgement.recipientSessionId) || !workflowIdentifier(acknowledgement.grantId)
+          || !sha256Text(acknowledgement.matchDigest) || acknowledgement.acknowledged !== true) return false;
+        recipients.push(acknowledgement.recipientSessionId);
+      }
+      return new Set(recipients).size === recipients.length;
+    }
+    case "voice_binding":
+      return exactKeys(value, ["kind", "bindingId", "active"]) && workflowBoundedText(value.bindingId, 256) && typeof value.active === "boolean";
+    default: return false;
+  }
+}
+
+function workflowTextList(value: unknown, emptyAllowed: boolean): value is readonly string[] {
+  if (!Array.isArray(value) || value.length > 512 || (!emptyAllowed && value.length === 0)
+    || !value.every((item) => workflowBoundedText(item, 16_384))) return false;
+  return new Set(value).size === value.length;
+}
+
+function workflowIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
+}
+
+function workflowBoundedText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && !!value.trim() && value.length <= maximum && !/[\r\n\0]/.test(value);
+}
+
+function sha256Text(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
+
+function isHardwareSignalCompletion(value: unknown): value is HardwareSignalCompletionResult {
+  return isRecord(value) && exactKeys(value, ["signalId", "outcome"])
+    && typeof value.signalId === "string" && /^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    && (value.outcome === "handled" || value.outcome === "failed_before_dispatch" || value.outcome === "needs_reconciliation");
+}
+
+function isHardwareDispatchReceipt(value: unknown): value is string {
+  return typeof value === "string" && /^hardware-dispatch:[a-f0-9]{64}$/.test(value);
+}
+
+function sameRoots(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((root, index) => root.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase() === right[index]!.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase());
+}
+
+function boundedText(value: string, maximum: number): boolean { return value.length > 0 && value.length <= maximum && !/[\r\n\0]/.test(value); }
+function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
+function uint32(value: unknown): value is number { return Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff_ffff; }
+function exactKeys(value: Record<string, unknown>, required: readonly string[]): boolean { const keys = Object.keys(value); return keys.length === required.length && required.every((key) => key in value); }
+function allowedExactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean { const keys = Object.keys(value); const allowed = new Set([...required, ...optional]); return required.every((key) => key in value) && keys.every((key) => allowed.has(key)); }

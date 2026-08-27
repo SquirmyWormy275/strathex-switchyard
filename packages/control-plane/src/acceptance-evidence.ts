@@ -13,6 +13,8 @@ export interface GateEvidence {
   readonly targetSnapshotId?: string;
   readonly operationId?: string;
   readonly evidenceDigest: string;
+  /** Host-owned durable evidence package; never accepted from a dispatch payload. */
+  readonly evidenceReference?: string;
   readonly policyVersion: string;
   readonly evaluatedBy: string;
   readonly evaluatedAt: string;
@@ -29,14 +31,34 @@ export interface GateEvidenceInput {
   readonly targetSnapshotId?: string;
   readonly operationId?: string;
   readonly evidenceDigest: string;
+  readonly evidenceReference?: string;
   readonly policyVersion: string;
   readonly evaluatedBy: string;
   readonly expiresAt?: string;
   readonly rationale: string;
+  /**
+   * Opaque, single-use host authorization. The ledger never persists it.
+   * Production authorizers bind it to the complete evidence operation;
+   * test-only allowlists may deliberately ignore it.
+   */
+  readonly authorizationProof?: string;
+}
+
+export interface EvidenceAuthorizationRequest {
+  readonly operation: "record" | "invalidate";
+  readonly evaluatedBy: string;
+  readonly gate: AcceptanceGate;
+  readonly evidenceId?: string;
+  readonly evidenceDigest?: string;
+  readonly authorizationProof?: string;
 }
 
 export interface EvidenceAuthorizer {
-  assertMayRecord(evaluatedBy: string, gate: AcceptanceGate): void | Promise<void>;
+  assertMayRecord(request: EvidenceAuthorizationRequest): void | Promise<void>;
+}
+
+export interface EvidenceArtifactVerifier {
+  verify(evidence: GateEvidence): boolean | Promise<boolean>;
 }
 
 /** Safe default: no code path can mark a gate as passed without an authenticated host attestor. */
@@ -54,8 +76,8 @@ export class AllowlistedEvidenceAuthorizer implements EvidenceAuthorizer {
     this.allowlist = new Set(identities.map((identity) => identity.trim()).filter(Boolean));
   }
 
-  assertMayRecord(evaluatedBy: string): void {
-    if (!this.allowlist.has(evaluatedBy)) throw new GateEvidenceError("Acceptance evidence attestor is not authenticated for this ledger.");
+  assertMayRecord(request: EvidenceAuthorizationRequest): void {
+    if (!this.allowlist.has(request.evaluatedBy)) throw new GateEvidenceError("Acceptance evidence attestor is not authenticated for this ledger.");
   }
 }
 
@@ -121,21 +143,30 @@ export class GateEvidenceLedger {
   private readonly authorizer: EvidenceAuthorizer;
   private readonly clock: () => string;
   private readonly idFactory: () => string;
+  private readonly artifactVerifier?: EvidenceArtifactVerifier;
 
   constructor(
     store: ProtectedJsonStore,
     authorizer: EvidenceAuthorizer = new DenyEvidenceAuthorizer(),
-    options: { readonly clock?: () => string; readonly idFactory?: () => string } = {}
+    options: { readonly clock?: () => string; readonly idFactory?: () => string; readonly artifactVerifier?: EvidenceArtifactVerifier } = {}
   ) {
     this.store = store;
     this.authorizer = authorizer;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? randomUUID;
+    this.artifactVerifier = options.artifactVerifier;
   }
 
   async record(input: GateEvidenceInput): Promise<GateEvidence> {
     const selectedGate = gate(input.gate);
-    await this.authorizer.assertMayRecord(input.evaluatedBy, selectedGate);
+    await this.authorizer.assertMayRecord({
+      operation: "record",
+      evaluatedBy: input.evaluatedBy,
+      gate: selectedGate,
+      ...(input.id ? { evidenceId: input.id } : {}),
+      evidenceDigest: input.evidenceDigest,
+      ...(input.authorizationProof ? { authorizationProof: input.authorizationProof } : {})
+    });
     const evaluatedAt = this.clock();
     const evidence: GateEvidence = {
       id: nonEmpty(input.id ?? this.idFactory(), "evidence id"),
@@ -144,6 +175,7 @@ export class GateEvidenceLedger {
       ...(input.targetSnapshotId ? { targetSnapshotId: nonEmpty(input.targetSnapshotId, "targetSnapshotId") } : {}),
       ...(input.operationId ? { operationId: nonEmpty(input.operationId, "operationId") } : {}),
       evidenceDigest: nonEmpty(input.evidenceDigest, "evidenceDigest"),
+      ...(input.evidenceReference ? { evidenceReference: nonEmpty(input.evidenceReference, "evidenceReference") } : {}),
       policyVersion: nonEmpty(input.policyVersion, "policyVersion"),
       evaluatedBy: nonEmpty(input.evaluatedBy, "evaluatedBy"),
       evaluatedAt: timestamp(evaluatedAt, "evaluation timestamp"),
@@ -160,10 +192,17 @@ export class GateEvidenceLedger {
     });
   }
 
-  async invalidate(id: string, reason: string, attestedBy: string): Promise<void> {
+  async invalidate(id: string, reason: string, attestedBy: string, authorizationProof?: string): Promise<void> {
     const existing = (await this.get(id));
     if (!existing) throw new GateEvidenceError(`Unknown acceptance evidence: ${id}`);
-    await this.authorizer.assertMayRecord(attestedBy, existing.gate);
+    await this.authorizer.assertMayRecord({
+      operation: "invalidate",
+      evaluatedBy: attestedBy,
+      gate: existing.gate,
+      evidenceId: existing.id,
+      evidenceDigest: existing.evidenceDigest,
+      ...(authorizationProof ? { authorizationProof } : {})
+    });
     await this.store.append<EvidenceInvalidatedEvent>("gate-evidence.invalidated", {
       evidenceId: nonEmpty(id, "evidence id"),
       at: timestamp(this.clock(), "invalidation timestamp"),
@@ -190,6 +229,7 @@ export class GateEvidenceLedger {
     if (!candidate) return { status: "not_evaluated" };
     if (candidate.invalidatedAt || (candidate.expiresAt && Date.parse(candidate.expiresAt) <= Date.parse(now))) return { status: "incomplete", evidence: candidate };
     if (targetSnapshotId !== undefined && candidate.targetSnapshotId !== targetSnapshotId) return { status: "incomplete", evidence: candidate };
+    if (candidate.status === "passed" && this.artifactVerifier && !await Promise.resolve(this.artifactVerifier.verify(candidate)).catch(() => false)) return { status: "incomplete", evidence: candidate };
     return { status: candidate.status, evidence: candidate };
   }
 

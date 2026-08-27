@@ -1,5 +1,11 @@
 # Post-merge adversarial audit — PR #3
 
+> **Historical point-in-time record:** this audit accurately records the PR #3
+> boundary, but its missing-component findings are not statements about current
+> source capability. It is superseded by
+> [`software-only-completion-audit.md`](software-only-completion-audit.md).
+> No historical result in this document marks an acceptance gate passed.
+
 **Audited revision:** `816e3d5` (PR #3 merge)  
 **Scope:** software evidence only; no physical B122, proprietary provider, or
 production credential was used.

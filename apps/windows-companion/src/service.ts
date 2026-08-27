@@ -1,5 +1,33 @@
+import { isAbsolute } from "node:path";
+import { realpath } from "node:fs/promises";
+
 import { assignmentFor, controls, type Control, type Modifier } from "../../../packages/protocol/src/b122.ts";
-import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import { commandActionIds, commandFor, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
+import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
+import type { HandoffPackage, HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
+import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact, type WorkflowArtifactAction, type WorkflowArtifactPayload, type WorkflowArtifactStore, type WorkflowPreparationCoordinator, type WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { VoiceBinding, VoiceConsent, VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
+import type { GitReviewResult, GitReviewWorkspace } from "./git-review.ts";
+import type { RuntimePinCoordinator } from "./runtime-provisioning.ts";
+import type { SandboxInstallationCoordinator } from "./sandbox-installation.ts";
+import type { CredentialProvisioningCoordinator, NetworkPolicyCoordinator } from "./host-provisioning.ts";
+import type { ProviderHandshakeCoordinator } from "./remote-adapters.ts";
+import type { CouncilResourceBrokerPort } from "./council-resource-broker.ts";
+import type { AttestedContainmentReleaseCoordinator } from "./containment-release.ts";
+import type { AttestedContainmentHistoryRemediator } from "./containment-history-remediation.ts";
+import type { ContainmentRemoteChallengeSummary, ContainmentRemoteEvidenceSummary, InstalledContainmentRemoteCoordinator } from "./containment-remote-host.ts";
+import type { InstalledContainmentRemoteTrust } from "./containment-remote-evidence.ts";
+import type { DurableHardwareSignalInbox, HardwareSignalClaim, HardwareSignalClaimBinding, HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
+import type { RawHidInstallationCoordinator, RawHidSupervisorStatus } from "./raw-hid-installation.ts";
+import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
+import type { HostActionClaim } from "./host-actions.ts";
+import type { GateEvidence } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import type { WorkflowContextReview } from "../../../packages/control-plane/src/runtime.ts";
+import type { CouncilRecommendation } from "../../../packages/control-plane/src/council.ts";
+import type { AcceptanceAdministration, HighConsequenceActivation, InstalledAcceptanceTrust } from "./acceptance-administration.ts";
+import type { InstalledScannerFixture, InstalledScannerFixtureTrust, ScannerFixtureAdministration } from "./scanner-fixtures.ts";
+import { providerIds, type AttestedProviderDesktopRegistry, type ProviderId, type ProviderInstallation } from "./provider-desktop.ts";
+import type { AttestedProviderDispatchProfileCoordinator, ProviderDispatchLeaseProfile } from "./provider-dispatch-lease.ts";
 import type {
   AuditEvent,
   Capability,
@@ -15,18 +43,78 @@ import {
   type CompanionRequest,
   type CompanionResponse,
   type DispatchPayload,
+  type CommandPreparationPayload,
   type ConfirmationRequestPayload,
+  type ReanchorAuthorityListPayload,
+  type ReanchorBeginPayload,
+  type ReanchorHardwareBeginPayload,
+  type ReanchorConfirmationPayload,
+  type ReanchorGetPayload,
+  type ReanchorEligibleAuthority,
+  type HostActionAuthorizationPayload,
+  type HostActionClaimPayload,
+  type HostActionCompletionPayload,
+  type GitReviewPayload,
+  type GitReviewInspectPayload,
+  type RuntimePinInstallPayload,
+  type RuntimePinRevokePayload,
+  type SandboxInstallPayload,
+  type SandboxRevokePayload,
+  type CredentialProvisionPayload,
+  type CredentialRevokePayload,
+  type NetworkPolicyInstallPayload,
+  type CouncilPortProxyPayload,
+  type CouncilCredentialNetworkPayload,
+  type CouncilRecommendationApprovalPayload,
+  type AdministrationSourcePayload,
+  type AcceptanceTrustRevokePayload,
+  type AcceptanceEvidenceInvalidatePayload,
+  type AcceptanceActivationPayload,
+  type AcceptanceActivationRevokePayload,
+  type ScannerTrustRevokePayload,
+  type ScannerFixtureRevokePayload,
+  type ProviderDesktopReferencePayload,
+  type ProviderHostProfileInstallPayload,
+  type ProviderHostProfileScopePayload,
+  type ProviderHandshakePayload,
+  type ContainmentInspectionPayload,
+  type ContainmentIncidentBindingPayload,
+  type ContainmentPermitIssuePayload,
+  type ContainmentHistoryRewritePayload,
+  type ContainmentRemoteTrustRevokePayload,
+  type ContainmentRemoteChallengeIssuePayload,
+  type ContainmentRemoteEvidenceImportPayload,
+  type ContainmentRotationRecordPayload,
+  type ContainmentReleasePayload,
+  type RawHidInstallPayload,
+  type HardwareSignalBindingPayload,
+  type HardwareSignalClaimPayload,
+  type HardwareSignalPreparationPayload,
+  type HardwareSignalDispatchPayload,
+  type HardwareSignalCompletionPayload,
   type OperationCancellationPayload,
+  type HandoffCreatePayload,
+  type HandoffReferencePayload,
+  type HandoffRoutingPayload,
+  type WorkflowPreparePayload,
+  type WorkflowCancelPayload,
+  type VoiceConsentPayload,
+  type VoiceStartPayload,
+  type VoiceSwitchPayload,
+  type VoiceBindingPayload,
+  type VoiceReferencePayload,
   type SessionAdoptionPayload,
   type SessionHeartbeatPayload,
   type SessionRegistrationPayload,
   type SessionStatusPayload
 } from "./bridge.ts";
-
-export type LocalHostAction =
-  | "create_claude_terminal"
-  | "create_codex_terminal"
-  | "focus_integrated_terminal";
+import type { CompanionRequestContext } from "./stdio.ts";
+import type { InstalledReanchorStatus } from "./reanchor-runtime.ts";
+import type { ProviderMediatedFinalCurrentDecision } from "./provider-mediated-final-current.ts";
+import type { AutomationOperationManifest } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
+import type { InstalledAutomationManifestCoordinator } from "./automation-manifest-coordinator.ts";
+import type { DurableAutomationManifestReviewQueue } from "./automation-manifest-review.ts";
+import { debugStopReview, type DebugStopReview, type DurableDebugStopBindingStore } from "./debug-stop.ts";
 
 /**
  * A mediator can be attached after it has a verified execution boundary.  The
@@ -43,13 +131,121 @@ export interface CancellableMediatedCommandExecutor extends MediatedCommandExecu
 }
 
 export interface ConfirmationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
-  requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string }>): Promise<Readonly<{ status: string; summary: string; token?: string; expiresAt?: string }>>;
+  requestConfirmation(request: Readonly<{ action: CommandAction; sessionId?: string; authorityId?: string; reason: string; confirmationScopeDigest?: string }>): Promise<Readonly<{ status: "issued" | "blocked" | "unavailable" | "incomplete"; summary: string; token?: string; expiresAt?: string }>>;
+}
+
+export interface CommandPreparationCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  prepareCommand(request: Readonly<{ action: CommandAction; sessionId?: string; reason: string; reviewScopeDigest?: string }>): Promise<Readonly<{ status: "prepared" | "blocked" | "unavailable" | "incomplete"; summary: string; session?: ManagedSession; authorityId?: string; confirmationToken?: string; confirmationScopeDigest?: string; confirmationExpiresAt?: string; workflowReview?: WorkflowContextReview }>>;
+}
+
+export interface AutomationManifestCommandReview {
+  readonly action: "compound_capture" | "compound_refresh" | "lfg" | "repair_mission";
+  readonly manifest: AutomationOperationManifest;
+  readonly reviewScopeDigest: string;
+}
+
+export interface PreparedCommandResult {
+  readonly status: "prepared" | "blocked" | "unavailable" | "incomplete";
+  readonly summary: string;
+  readonly session?: ManagedSession;
+  readonly authorityId?: string;
+  readonly confirmationToken?: string;
+  readonly confirmationScopeDigest?: string;
+  readonly confirmationExpiresAt?: string;
+  readonly workflowReview?: WorkflowContextReview;
+  readonly automationReview?: AutomationManifestCommandReview;
+  readonly debugStopReview?: DebugStopReview;
+}
+
+export interface CouncilReviewCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  approveCouncilRecommendation(input: CouncilRecommendationApprovalPayload): Promise<CouncilRecommendation>;
+}
+
+export interface HostActionCompletionRecord {
+  readonly hostActionId: string;
+  readonly operationId: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly status: "completed" | "failed" | "incomplete";
+  readonly summary: string;
+  /** Host-action idempotency evidence; deliberately not eligible for gate receipts. */
+  readonly completionDigest?: string;
+  readonly completedAt: string;
+}
+
+export interface VoiceRuntimeCoordinator {
+  open(bindingId: string, options?: DirectRequestOptions): Promise<unknown>;
+  switchProvider(bindingId: string, input: Readonly<{ consentId: string; voiceSessionId: string }>, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  bindManagedSession(bindingId: string, managedSessionId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  mute(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  resume(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  interrupt(bindingId: string, reason: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  end(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+  deleteTranscript(bindingId: string, options?: DirectRequestOptions): Promise<VoiceBinding>;
+}
+
+export interface DirectRequestOptions { readonly signal?: AbortSignal; }
+
+export interface HostActionCoordinator {
+  claim(payload: HostActionClaimPayload): Promise<HostActionClaim | undefined>;
+  authorize(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string; selectionId?: string; url?: string }>>;
+  settle(payload: HostActionCompletionPayload): Promise<HostActionCompletionRecord>;
+}
+
+export interface GitMutationReviewCoordinator {
+  inspect(sessionId: string): Promise<GitReviewWorkspace>;
+  review(payload: GitReviewPayload): Promise<GitReviewResult>;
+}
+
+export interface ExternalCompletionCapableMediatedCommandExecutor extends MediatedCommandExecutor {
+  completeExternalOperation(record: HostActionCompletionRecord): Promise<CommandResult>;
+}
+
+export interface InstalledReanchorServicePort {
+  eligibleAuthorities(sessionId: string, signal?: AbortSignal): Promise<readonly ReanchorEligibleAuthority[]>;
+  begin(input: ReanchorBeginPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus>;
+  confirmAndApply(input: ReanchorConfirmationPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus>;
+  get(requestId: string, signal?: AbortSignal): Promise<InstalledReanchorStatus | undefined>;
+}
+
+export interface ProviderMediatedFinalCurrentServicePort {
+  decide(value: unknown, signal?: AbortSignal): Promise<ProviderMediatedFinalCurrentDecision>;
 }
 
 export interface CompanionServiceOptions {
   readonly now?: () => string;
   readonly idFactory?: () => string;
   readonly executor?: MediatedCommandExecutor;
+  readonly reanchor?: InstalledReanchorServicePort;
+  readonly providerMediatedFinalCurrent?: ProviderMediatedFinalCurrentServicePort;
+  readonly automationManifestCoordinator?: InstalledAutomationManifestCoordinator;
+  readonly automationManifestReviews?: DurableAutomationManifestReviewQueue;
+  readonly debugStops?: DurableDebugStopBindingStore;
+  readonly hostActions?: HostActionCoordinator;
+  readonly gitReviews?: GitMutationReviewCoordinator;
+  readonly runtimePins?: RuntimePinCoordinator;
+  readonly sandboxInstallations?: SandboxInstallationCoordinator;
+  readonly credentialProvisioning?: CredentialProvisioningCoordinator;
+  readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  readonly councilResources?: CouncilResourceBrokerPort;
+  readonly acceptanceAdministration?: Pick<AcceptanceAdministration, "installTrustPolicy" | "listTrust" | "revokeTrust" | "importEvidence" | "listEvidence" | "invalidateEvidence" | "activate" | "listActivations" | "revokeActivation">;
+  readonly scannerAdministration?: ScannerFixtureAdministration;
+  readonly providerDesktopRegistry?: Pick<AttestedProviderDesktopRegistry, "install" | "list" | "revoke">;
+  readonly providerDispatchProfiles?: Pick<AttestedProviderDispatchProfileCoordinator, "install" | "current">;
+  readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
+  readonly containmentHistory?: Pick<AttestedContainmentHistoryRemediator, "execute">;
+  readonly containmentRemote?: Pick<InstalledContainmentRemoteCoordinator, "installTrustPolicy" | "listTrust" | "revokeTrust" | "issueChallenge" | "listChallenges" | "importEvidence" | "listEvidence">;
+  readonly rawHidInstallations?: RawHidInstallationCoordinator;
+  readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
+  readonly hardwareSignals?: DurableHardwareSignalInbox;
+  readonly handoffs?: HandoffPackageStore;
+  readonly workflowArtifacts?: WorkflowArtifactStore;
+  readonly workflowCoordinator?: WorkflowPreparationCoordinator;
+  readonly voice?: VoiceCoordinator;
+  readonly voiceRuntime?: VoiceRuntimeCoordinator;
+  readonly voicePresence?: WindowsUserPresenceRunner;
+  readonly canonicalizeHostPath?: (value: string) => Promise<string>;
   /**
    * Only a trusted adapter handshake may provide this callback.  A plain
    * JSON-lines registration is deliberately normalized to Registered.
@@ -70,16 +266,76 @@ export class CompanionService {
   private readonly now: () => string;
   private readonly idFactory: () => string;
   private readonly executor?: MediatedCommandExecutor;
+  private readonly reanchor?: InstalledReanchorServicePort;
+  private readonly providerMediatedFinalCurrent?: ProviderMediatedFinalCurrentServicePort;
+  private readonly automationManifestCoordinator?: InstalledAutomationManifestCoordinator;
+  private readonly automationManifestReviews?: DurableAutomationManifestReviewQueue;
+  private readonly debugStops?: DurableDebugStopBindingStore;
+  private readonly hostActions?: HostActionCoordinator;
+  private readonly gitReviews?: GitMutationReviewCoordinator;
+  private readonly runtimePins?: RuntimePinCoordinator;
+  private readonly sandboxInstallations?: SandboxInstallationCoordinator;
+  private readonly credentialProvisioning?: CredentialProvisioningCoordinator;
+  private readonly networkPolicyProvisioning?: NetworkPolicyCoordinator;
+  private readonly councilResources?: CouncilResourceBrokerPort;
+  private readonly acceptanceAdministration?: CompanionServiceOptions["acceptanceAdministration"];
+  private readonly scannerAdministration?: ScannerFixtureAdministration;
+  private readonly providerDesktopRegistry?: CompanionServiceOptions["providerDesktopRegistry"];
+  private readonly providerDispatchProfiles?: CompanionServiceOptions["providerDispatchProfiles"];
+  private readonly providerHandshakes?: ProviderHandshakeCoordinator;
+  private readonly containmentRelease?: AttestedContainmentReleaseCoordinator;
+  private readonly containmentHistory?: CompanionServiceOptions["containmentHistory"];
+  private readonly containmentRemote?: CompanionServiceOptions["containmentRemote"];
+  private readonly rawHidInstallations?: RawHidInstallationCoordinator;
+  private readonly rawHidSupervisor?: Readonly<{ startConfigured(): Promise<RawHidSupervisorStatus>; stop(): Promise<void>; status(): RawHidSupervisorStatus }>;
+  private readonly hardwareSignals?: DurableHardwareSignalInbox;
+  private readonly handoffs?: HandoffPackageStore;
+  private readonly workflowArtifacts?: WorkflowArtifactStore;
+  private readonly workflowCoordinator?: WorkflowPreparationCoordinator;
+  private readonly voice?: VoiceCoordinator;
+  private readonly voiceRuntime?: VoiceRuntimeCoordinator;
+  private readonly voicePresence?: WindowsUserPresenceRunner;
+  private readonly canonicalizeHostPath: (value: string) => Promise<string>;
   private readonly verifyCapabilities?: (session: ManagedSession) => readonly Capability[];
 
   constructor(options: CompanionServiceOptions = {}) {
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? (() => `audit-${crypto.randomUUID()}`);
     this.executor = options.executor;
+    this.reanchor = options.reanchor;
+    this.providerMediatedFinalCurrent = options.providerMediatedFinalCurrent;
+    this.automationManifestCoordinator = options.automationManifestCoordinator;
+    this.automationManifestReviews = options.automationManifestReviews;
+    this.debugStops = options.debugStops;
+    this.hostActions = options.hostActions;
+    this.gitReviews = options.gitReviews;
+    this.runtimePins = options.runtimePins;
+    this.sandboxInstallations = options.sandboxInstallations;
+    this.credentialProvisioning = options.credentialProvisioning;
+    this.networkPolicyProvisioning = options.networkPolicyProvisioning;
+    this.councilResources = options.councilResources;
+    this.acceptanceAdministration = options.acceptanceAdministration;
+    this.scannerAdministration = options.scannerAdministration;
+    this.providerDesktopRegistry = options.providerDesktopRegistry;
+    this.providerDispatchProfiles = options.providerDispatchProfiles;
+    this.providerHandshakes = options.providerHandshakes;
+    this.containmentRelease = options.containmentRelease;
+    this.containmentHistory = options.containmentHistory;
+    this.containmentRemote = options.containmentRemote;
+    this.rawHidInstallations = options.rawHidInstallations;
+    this.rawHidSupervisor = options.rawHidSupervisor;
+    this.hardwareSignals = options.hardwareSignals;
+    this.handoffs = options.handoffs;
+    this.workflowArtifacts = options.workflowArtifacts;
+    this.workflowCoordinator = options.workflowCoordinator;
+    this.voice = options.voice;
+    this.voiceRuntime = options.voiceRuntime;
+    this.voicePresence = options.voicePresence;
+    this.canonicalizeHostPath = options.canonicalizeHostPath ?? realpath;
     this.verifyCapabilities = options.verifyCapabilities;
   }
 
-  async handle(request: CompanionRequest): Promise<CompanionResponse> {
+  async handle(request: CompanionRequest, context?: CompanionRequestContext): Promise<CompanionResponse> {
     if (request.version !== companionBridgeVersion) {
       return this.failure(request.id, "unsupported_version", "Unsupported SXSY-B122 companion protocol version.");
     }
@@ -105,8 +361,149 @@ export class CompanionService {
           return this.success(request.id, { command: await this.dispatch(this.requireDispatch(request.payload)) });
         case "operation.cancel":
           return this.success(request.id, { command: await this.cancelOperation(this.requireCancellation(request.payload)) });
+        case "command.prepare":
+          return this.success(request.id, { preparation: await this.prepareCommand(this.requireCommandPreparation(request.payload)) });
         case "confirmation.request":
           return this.success(request.id, { confirmation: await this.requestConfirmation(this.requireConfirmation(request.payload)) });
+        case "provider-mediated.final-current":
+          if (!this.providerMediatedFinalCurrent) throw new CompanionServiceError("companion_unavailable", "The installed provider mediated final-current boundary is unavailable.");
+          return this.success(request.id, { decision: await this.direct(context, (signal) => this.providerMediatedFinalCurrent!.decide(request.payload, signal)) });
+        case "reanchor.authority.list":
+          return this.success(request.id, { authorities: await this.direct(context, (signal) => this.listEligibleReanchorAuthorities(this.requireReanchorAuthorityList(request.payload), signal)) });
+        case "reanchor.begin":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.beginReanchor(this.requireReanchorBegin(request.payload), signal)) });
+        case "reanchor.hardware.begin":
+          return this.success(request.id, await this.direct(context, (signal) => this.beginHardwareReanchor(this.requireReanchorHardwareBegin(request.payload), signal)));
+        case "reanchor.confirm-apply":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.confirmAndApplyReanchor(this.requireReanchorConfirmation(request.payload), signal)) });
+        case "reanchor.get":
+          return this.success(request.id, { reanchor: await this.direct(context, (signal) => this.getReanchor(this.requireReanchorGet(request.payload), signal)) });
+        case "git.review.submit":
+          return this.success(request.id, { review: await this.reviewGitMutation(this.requireGitReview(request.payload)) });
+        case "git.review.inspect":
+          return this.success(request.id, { workspace: await this.inspectGitReview(this.requireGitReviewInspect(request.payload)) });
+        case "runtime.pin.install":
+          return this.success(request.id, { pin: await this.direct(context, (signal) => this.installRuntimePin(this.requireRuntimePinInstall(request.payload), signal)) });
+        case "runtime.pin.list":
+          return this.success(request.id, { pins: await this.direct(context, (signal) => this.listRuntimePins(request.payload, signal)) });
+        case "runtime.pin.revoke":
+          return this.success(request.id, { pin: await this.direct(context, (signal) => this.revokeRuntimePin(this.requireRuntimePinRevoke(request.payload), signal)) });
+        case "sandbox.install":
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.installSandbox(this.requireSandboxInstall(request.payload), signal)) });
+        case "sandbox.list":
+          return this.success(request.id, { installations: await this.direct(context, (signal) => this.listSandboxes(request.payload, signal)) });
+        case "sandbox.revoke":
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeSandbox(this.requireSandboxRevoke(request.payload), signal)) });
+        case "credential.provision":
+          return this.success(request.id, { credential: await this.direct(context, (signal) => this.provisionCredential(this.requireCredentialProvision(request.payload), signal)) });
+        case "credential.list":
+          return this.success(request.id, { credentials: await this.direct(context, (signal) => this.listCredentials(request.payload, signal)) });
+        case "credential.revoke":
+          return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeCredential(this.requireCredentialRevoke(request.payload), signal)) });
+        case "network-policy.install":
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.installNetworkPolicy(this.requireNetworkPolicyInstall(request.payload), signal)) });
+        case "network-policy.current":
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.currentNetworkPolicy(request.payload, signal)) });
+        case "network-policy.revoke":
+          return this.success(request.id, { policy: await this.direct(context, (signal) => this.revokeNetworkPolicy(request.payload, signal)) });
+        case "council.port-proxy.activate":
+          return this.success(request.id, { receipt: await this.direct(context, (signal) => this.activateCouncilPortProxy(this.requireCouncilPortProxy(request.payload), signal)) });
+        case "council.credential-network.execute":
+          return this.success(request.id, { receipt: await this.direct(context, (signal) => this.executeCouncilCredentialNetwork(this.requireCouncilCredentialNetwork(request.payload), signal)) });
+        case "council.recommendation.approve":
+          return this.success(request.id, { recommendation: await this.approveCouncilRecommendation(this.requireCouncilRecommendationApproval(request.payload)) });
+        case "acceptance.trust.install": return this.success(request.id, { trust: await this.direct(context, (signal) => this.installAcceptanceTrust(this.requireAdministrationSource(request.payload, "Acceptance trust installation"), signal)) });
+        case "acceptance.trust.list": return this.success(request.id, { trust: await this.direct(context, (signal) => this.listAcceptanceTrust(request.payload, signal)) });
+        case "acceptance.trust.revoke": return this.success(request.id, { trust: await this.direct(context, (signal) => this.revokeAcceptanceTrust(this.requireAcceptanceTrustRevoke(request.payload), signal)) });
+        case "acceptance.evidence.import": return this.success(request.id, { evidence: await this.direct(context, (signal) => this.importAcceptanceEvidence(this.requireAdministrationSource(request.payload, "Acceptance evidence import"), signal)) });
+        case "acceptance.evidence.list": return this.success(request.id, { evidence: await this.direct(context, (signal) => this.listAcceptanceEvidence(request.payload, signal)) });
+        case "acceptance.evidence.invalidate": return this.success(request.id, { invalidated: await this.direct(context, (signal) => this.invalidateAcceptanceEvidence(this.requireAcceptanceEvidenceInvalidate(request.payload), signal)) });
+        case "acceptance.activation.activate": return this.success(request.id, { activation: await this.direct(context, (signal) => this.activateHighConsequence(this.requireAcceptanceActivation(request.payload), signal)) });
+        case "acceptance.activation.list": return this.success(request.id, { activations: await this.direct(context, (signal) => this.listHighConsequenceActivations(request.payload, signal)) });
+        case "acceptance.activation.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeHighConsequenceActivation(this.requireAcceptanceActivationRevoke(request.payload), signal)) });
+        case "scanner.trust.install": return this.success(request.id, { trust: await this.direct(context, (signal) => this.installScannerTrust(this.requireAdministrationSource(request.payload, "Scanner trust installation"), signal)) });
+        case "scanner.trust.list": return this.success(request.id, { trust: await this.direct(context, (signal) => this.listScannerTrust(request.payload, signal)) });
+        case "scanner.trust.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeScannerTrust(this.requireScannerTrustRevoke(request.payload), signal)) });
+        case "scanner.fixture.install": return this.success(request.id, { fixture: await this.direct(context, (signal) => this.installScannerFixture(this.requireAdministrationSource(request.payload, "Scanner fixture installation"), signal)) });
+        case "scanner.fixture.list": return this.success(request.id, { fixtures: await this.direct(context, (signal) => this.listScannerFixtures(request.payload, signal)) });
+        case "scanner.fixture.revoke": return this.success(request.id, { revoked: await this.direct(context, (signal) => this.revokeScannerFixture(this.requireScannerFixtureRevoke(request.payload), signal)) });
+        case "provider-desktop.install": return this.success(request.id, { installation: await this.direct(context, (signal) => this.installProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
+        case "provider-desktop.list": return this.success(request.id, { installations: await this.direct(context, (signal) => this.listProviderDesktops(request.payload, signal)) });
+        case "provider-desktop.revoke": return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeProviderDesktop(this.requireProviderDesktopReference(request.payload), signal)) });
+        case "provider-host.profile.install": return this.success(request.id, { profile: await this.direct(context, (signal) => this.installProviderHostProfile(this.requireProviderHostProfileInstall(request.payload), signal)) });
+        case "provider-host.profile.current": return this.success(request.id, { profile: await this.direct(context, (signal) => this.currentProviderHostProfile(this.requireProviderHostProfileScope(request.payload), signal)) });
+        case "provider.handshake":
+          return this.success(request.id, await this.direct(context, (signal) => this.providerHandshake(this.requireProviderHandshake(request.payload), signal)));
+        case "containment.inspect":
+          return this.success(request.id, { containment: await this.inspectContainment(this.requireContainmentInspection(request.payload)) });
+        case "containment.assess":
+          return this.success(request.id, { containment: await this.assessContainment(this.requireContainmentIncidentBinding(request.payload)) });
+        case "containment.verify":
+          return this.success(request.id, { containment: await this.verifyContainmentRemediation(this.requireContainmentIncidentBinding(request.payload)) });
+        case "containment.permit.issue":
+          return this.success(request.id, await this.issueContainmentPermit(this.requireContainmentPermitIssue(request.payload)));
+        case "containment.history.rewrite":
+          return this.success(request.id, { remediation: await this.rewriteContainmentHistory(this.requireContainmentHistoryRewrite(request.payload)) });
+        case "containment.remote.trust.install":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.installContainmentRemoteTrust(this.requireAdministrationSource(request.payload, "Containment remote trust installation"), signal)) });
+        case "containment.remote.trust.list":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.listContainmentRemoteTrust(request.payload, signal)) });
+        case "containment.remote.trust.revoke":
+          return this.success(request.id, { trust: await this.direct(context, (signal) => this.revokeContainmentRemoteTrust(this.requireContainmentRemoteTrustRevoke(request.payload), signal)) });
+        case "containment.remote.challenge.issue":
+          return this.success(request.id, { challenge: await this.direct(context, (signal) => this.issueContainmentRemoteChallenge(this.requireContainmentRemoteChallengeIssue(request.payload), signal)) });
+        case "containment.remote.challenge.list":
+          return this.success(request.id, { challenges: await this.direct(context, (signal) => this.listContainmentRemoteChallenges(request.payload, signal)) });
+        case "containment.remote.evidence.import":
+          return this.success(request.id, { evidence: await this.direct(context, (signal) => this.importContainmentRemoteEvidence(this.requireContainmentRemoteEvidenceImport(request.payload), signal)) });
+        case "containment.remote.evidence.list":
+          return this.success(request.id, { evidence: await this.direct(context, (signal) => this.listContainmentRemoteEvidence(request.payload, signal)) });
+        case "containment.rotation.record":
+          return this.success(request.id, { containment: await this.recordContainmentRotation(this.requireContainmentRotationRecord(request.payload)) });
+        case "containment.release":
+          return this.success(request.id, { command: await this.releaseContainment(this.requireContainmentRelease(request.payload)) });
+        case "raw-hid.install":
+          return this.success(request.id, await this.direct(context, (signal) => this.installRawHid(this.requireRawHidInstall(request.payload), signal)));
+        case "raw-hid.list":
+          return this.success(request.id, { installations: await this.direct(context, (signal) => this.listRawHid(request.payload, signal)) });
+        case "raw-hid.revoke":
+          return this.success(request.id, { installation: await this.direct(context, (signal) => this.revokeRawHid(request.payload, signal)) });
+        case "raw-hid.status":
+          return this.success(request.id, await this.direct(context, (signal) => this.rawHidStatus(request.payload, signal)));
+        case "hardware-signal.claim":
+          return this.success(request.id, { claim: await this.claimHardwareSignal(this.requireHardwareSignalClaim(request.payload)) });
+        case "hardware-signal.prepare":
+          return this.success(request.id, await this.prepareHardwareSignal(this.requireHardwareSignalPreparation(request.payload)));
+        case "hardware-signal.dispatch":
+          return this.success(request.id, await this.dispatchHardwareSignal(this.requireHardwareSignalDispatch(request.payload)));
+        case "hardware-signal.complete":
+          return this.success(request.id, { completion: await this.completeHardwareSignal(this.requireHardwareSignalCompletion(request.payload)) });
+        case "host-action.claim":
+          return this.success(request.id, { claim: await this.claimHostAction(this.requireHostActionClaim(request.payload)) });
+        case "host-action.authorize":
+          return this.success(request.id, { authorization: await this.authorizeHostAction(this.requireHostActionAuthorization(request.payload)) });
+        case "host-action.complete":
+          return this.success(request.id, { command: await this.completeHostAction(this.requireHostActionCompletion(request.payload)) });
+        case "handoff.create": return this.success(request.id, { handoff: await this.createHandoff(this.requireHandoffCreate(request.payload)) });
+        case "handoff.list": return this.success(request.id, { handoffs: await this.listHandoffs(request.payload) });
+        case "handoff.acknowledge": return this.success(request.id, { handoff: await this.acknowledgeHandoff(this.requireHandoffReference(request.payload, true)) });
+        case "handoff.cancel": return this.success(request.id, { handoff: await this.cancelHandoff(this.requireHandoffReference(request.payload, false)) });
+        case "handoff.archive": return this.success(request.id, { handoff: await this.archiveHandoff(this.requireHandoffReference(request.payload, false)) });
+        case "handoff.routing.get": return this.success(request.id, { routing: await this.handoffRouting(request.payload) });
+        case "handoff.routing.set": return this.success(request.id, { routing: await this.setHandoffRouting(this.requireHandoffRouting(request.payload)) });
+        case "workflow.prepare": return this.success(request.id, { artifact: await this.prepareWorkflowArtifact(this.requireWorkflowPrepare(request.payload)) });
+        case "workflow.cancel": return this.success(request.id, { artifact: await this.cancelWorkflowArtifact(this.requireWorkflowCancel(request.payload)) });
+        case "workflow.list": return this.success(request.id, { artifacts: await this.listWorkflowArtifacts(request.payload) });
+        case "voice.consent": return this.success(request.id, { consent: await this.direct(context, (signal) => this.grantVoiceConsent(this.requireVoiceConsent(request.payload), signal)) });
+        case "voice.start": return this.success(request.id, { binding: await this.direct(context, (signal) => this.startVoice(this.requireVoiceStart(request.payload), signal)) });
+        case "voice.current": return this.success(request.id, { binding: await this.direct(context, (signal) => this.currentVoice(request.payload, signal)) });
+        case "voice.switch": return this.success(request.id, { binding: await this.direct(context, (signal) => this.switchVoice(this.requireVoiceSwitch(request.payload), signal)) });
+        case "voice.bind": return this.success(request.id, { binding: await this.direct(context, (signal) => this.bindVoice(this.requireVoiceBinding(request.payload), signal)) });
+        case "voice.mute": return this.success(request.id, { binding: await this.direct(context, (signal) => this.muteVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.resume": return this.success(request.id, { binding: await this.direct(context, (signal) => this.resumeVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.interrupt": return this.success(request.id, { binding: await this.direct(context, (signal) => this.interruptVoice(this.requireVoiceReference(request.payload, true), signal)) });
+        case "voice.end": return this.success(request.id, { binding: await this.direct(context, (signal) => this.endVoice(this.requireVoiceReference(request.payload, false), signal)) });
+        case "voice.transcript.delete": return this.success(request.id, { binding: await this.direct(context, (signal) => this.deleteVoiceTranscript(this.requireVoiceReference(request.payload, false), signal)) });
         default:
           return this.failure(request.id, "unknown_method", "Unknown SXSY-B122 companion method.");
       }
@@ -174,7 +571,10 @@ export class CompanionService {
   private adopt(payload: SessionAdoptionPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
     const existingAdoption = this.adoptionKeys.get(payload.adoptionKey);
-    if (existingAdoption || session.metadata["sxsy-b122.adoptionKey"]) {
+    const reservedKey = session.metadata["sxsy-b122.adoptionKey"];
+    if ((existingAdoption && existingAdoption !== session.id)
+      || session.metadata["sxsy-b122.adoptedAt"]
+      || (reservedKey && reservedKey !== payload.adoptionKey)) {
       throw new CompanionServiceError("already_adopted", "This terminal has already been adopted; its capabilities were not changed.");
     }
     const next: ManagedSession = {
@@ -199,6 +599,7 @@ export class CompanionService {
 
   private setStatus(payload: SessionStatusPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
+    if (session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1") throw new CompanionServiceError("capability_denied", "Provider status is host-observed through its exact adapter boundary; an extension request cannot replace it.");
     if ((payload.status === "verified_blocked" || payload.status === "verified_finished") && !session.capabilities.includes("observable")) {
       throw new CompanionServiceError("capability_denied", "Verified blocked or finished status requires an Observable adapter signal.");
     }
@@ -210,7 +611,10 @@ export class CompanionService {
 
   private heartbeat(payload: SessionHeartbeatPayload): ManagedSession {
     const session = this.requireSession(payload.sessionId);
-    const next: ManagedSession = { ...session, lastHeartbeat: payload.at ?? this.now() };
+    if (session.metadata["sxsy-b122.providerHandshake"] === "exact-route-v1") throw new CompanionServiceError("capability_denied", "Provider liveness is host-observed through its exact adapter boundary; an extension heartbeat cannot extend it.");
+    const hostNow = Date.parse(this.now()); const at = payload.at ?? new Date(hostNow).toISOString(); const observed = Date.parse(at);
+    if (!Number.isFinite(hostNow) || !Number.isFinite(observed) || observed < Date.parse(session.lastHeartbeat) || observed > hostNow + 30_000) throw new CompanionServiceError("invalid_request", "The session heartbeat is invalid, out of order, or too far in the future.");
+    const next: ManagedSession = { ...session, lastHeartbeat: at };
     this.sessions.set(session.id, next);
     this.record("session.heartbeat", "completed", "Recorded a session heartbeat.", session.id);
     return cloneSession(next);
@@ -227,71 +631,24 @@ export class CompanionService {
       return result;
     }
 
-    if (assignment.capability === "disabled_pending_gates") {
-      const session = payload.sessionId ? this.requireSession(payload.sessionId) : undefined;
-      if (!session?.capabilities.includes("mediated") || !this.executor) {
-        const result: CommandResult = {
-          status: "blocked",
-          summary: "This high-consequence B122 control remains disabled until a Mediated executor evaluates its policy and acceptance gates."
-        };
-        this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-        return result;
-      }
-      // The executor is the policy/receipt authority. Forwarding a canonical,
-      // still-gated intent lets it emit durable evidence while preventing the
-      // transport layer from inventing a high-consequence happy path.
-      const result = await this.executor.execute({
-        assignment,
-        control: payload.control,
-        modifier: payload.modifier,
-        sessionId: payload.sessionId,
-        authorityId: payload.authorityId,
-        confirmationToken: payload.confirmationToken,
-        input: payload.input
-      });
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId, result.operationId);
-      return result;
+    if (assignment.control === "REANCHOR" && assignment.modifier === "normal") {
+      throw new CompanionServiceError("invalid_request", "Re-anchor is available only through the dedicated Re-anchor lifecycle with explicit review.");
     }
 
-    const localAction = directHostActionFor(payload.control, payload.modifier);
-    if (localAction) {
-      const result: CommandResult = {
-        status: "completed",
-        summary: "A direct VS Code host action was routed. Its resulting session/process remains Registered unless a verified mediator says otherwise.",
-        data: { localAction, mediated: false, assignment: assignment.summary }
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
-
-    if (assignment.capability === "route_only") {
-      const result: CommandResult = {
-        status: "completed",
-        summary: "Intent was routed for a visible host adapter. The companion did not execute a repository, Git, credential, network, or prompt action.",
-        data: { intentOnly: true, assignment: assignment.summary }
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
-
-    const session = payload.sessionId ? this.requireSession(payload.sessionId) : undefined;
-    if (!session?.capabilities.includes("mediated")) {
-      const result: CommandResult = {
-        status: "unavailable",
-        summary: "This request needs a Mediated session. Registered, Observable, or Controllable state cannot enforce filesystem, Git, credential, network, or test-data policy."
-      };
-      this.record("command.dispatch", result.status, result.summary, payload.sessionId);
-      return result;
-    }
     if (!this.executor) {
       const result: CommandResult = {
-        status: "unavailable",
-        summary: "A Mediated session was identified, but no verified execution broker is attached to this companion endpoint."
+        status: assignment.capability === "disabled_pending_gates" ? "blocked" : "unavailable",
+        summary: assignment.capability === "disabled_pending_gates"
+          ? "This high-consequence B122 control remains disabled until the durable policy executor evaluates its acceptance gates."
+          : "No durable policy executor is attached; this command was not reported as completed and no host action was requested."
       };
       this.record("command.dispatch", result.status, result.summary, payload.sessionId);
       return result;
     }
 
+    // Every settled assignment, including route-only UI/navigation work, must
+    // cross the durable executor. Missing adapters remain unavailable instead
+    // of becoming false-green transport acknowledgements.
     const request: CommandRequest = {
       assignment,
       control: payload.control,
@@ -299,6 +656,7 @@ export class CompanionService {
       sessionId: payload.sessionId,
       authorityId: payload.authorityId,
       confirmationToken: payload.confirmationToken,
+      confirmationScopeDigest: payload.confirmationScopeDigest,
       input: payload.input
     };
     const result = await this.executor.execute(request);
@@ -322,6 +680,1124 @@ export class CompanionService {
       return { status: "unavailable", summary: "No trusted companion-UI confirmation attestor is attached; no confirmation token was issued." };
     }
     return this.executor.requestConfirmation(payload);
+  }
+
+  private direct<T>(context: CompanionRequestContext | undefined, operation: (signal: AbortSignal | undefined) => Promise<T>): Promise<T> {
+    return waitForDirectOperation(operation, context?.signal);
+  }
+
+  private async listEligibleReanchorAuthorities(payload: ReanchorAuthorityListPayload, signal?: AbortSignal): Promise<readonly ReanchorEligibleAuthority[]> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return exactEligibleReanchorAuthorities(await this.reanchor.eligibleAuthorities(payload.sessionId, signal));
+  }
+
+  private async beginReanchor(payload: ReanchorBeginPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return this.reanchor.begin(payload, signal);
+  }
+
+  private async beginHardwareReanchor(payload: ReanchorHardwareBeginPayload, signal?: AbortSignal): Promise<Readonly<{ reanchor: InstalledReanchorStatus; dispatchReceiptId: string }>> {
+    if (!this.reanchor || !this.hardwareSignals) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor and hardware claim boundaries are unavailable.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    if (claim.control !== "REANCHOR" || claim.modifier !== "normal") {
+      throw new CompanionServiceError("capability_denied", "The live hardware claim is not the canonical Re-anchor assignment.");
+    }
+    await this.assertHardwareDispatchSession(claim, payload.sessionId);
+    const reanchor = await this.reanchor.begin({ sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason }, signal);
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The canonical Re-anchor assignment disappeared before dispatch receipt creation.");
+    const dispatch = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: `reanchor:${reanchor.state}`,
+      operationId: reanchor.operationId
+    });
+    return { reanchor, dispatchReceiptId: dispatch.dispatchReceiptId };
+  }
+
+  private async confirmAndApplyReanchor(payload: ReanchorConfirmationPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    return this.reanchor.confirmAndApply(payload, signal);
+  }
+
+  private async getReanchor(payload: ReanchorGetPayload, signal?: AbortSignal): Promise<InstalledReanchorStatus> {
+    if (!this.reanchor) throw new CompanionServiceError("companion_unavailable", "The dedicated durable Re-anchor lifecycle is unavailable.");
+    const found = await this.reanchor.get(payload.requestId, signal);
+    if (!found) throw new CompanionServiceError("not_found", "The exact durable Re-anchor request is unknown.");
+    return found;
+  }
+
+  private async prepareCommand(payload: CommandPreparationPayload): Promise<PreparedCommandResult> {
+    if (!isCommandPreparationExecutor(this.executor)) return { status: "unavailable", summary: "No durable command-preparation boundary is attached." };
+    const definition = commandFor(payload.control, payload.modifier);
+    if (!definition) return { status: "blocked", summary: "The chord is intentionally unassigned and cannot be prepared." };
+    const hasReviewArtifact = !!payload.reviewArtifactId || !!payload.reviewArtifactDigest;
+    if (isAutomationManifestAction(definition.action)) {
+      if (payload.effectSessionId) return { status: "blocked", summary: "Automation review never accepts a debug-effect session reference." };
+      if (hasReviewArtifact || payload.reviewScopeDigest) {
+        if (!payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.reviewScopeDigest || !payload.sessionId) {
+          return { status: "blocked", summary: "Automation confirmation requires one exact protected manifest id, digest, review scope, and managed session." };
+        }
+        if (!this.automationManifestReviews || !isConfirmationCapableExecutor(this.executor)) {
+          return { status: "unavailable", summary: "The protected automation manifest or confirmation boundary is unavailable." };
+        }
+        const inspected = await this.automationManifestReviews.inspect({
+          manifestId: payload.reviewArtifactId,
+          manifestDigest: payload.reviewArtifactDigest,
+          reviewScopeDigest: payload.reviewScopeDigest,
+          sessionId: payload.sessionId
+        });
+        if (!inspected || inspected.manifest.action !== definition.action) {
+          return { status: "blocked", summary: "The reviewed automation manifest is absent, stale, consumed, changed, or bound to a different action." };
+        }
+        let current: ManagedSession;
+        try { current = this.requireSession(payload.sessionId); }
+        catch { return { status: "blocked", summary: "The reviewed automation source session is no longer current in this companion connection." }; }
+        const confirmation = await this.executor.requestConfirmation({
+          action: definition.action,
+          sessionId: current.id,
+          authorityId: inspected.manifest.authorityId,
+          reason: payload.reason,
+          confirmationScopeDigest: inspected.reviewScopeDigest
+        });
+        if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+          const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+          this.record("command.prepare", status, confirmation.summary, current.id);
+          return { status, summary: confirmation.summary, session: current, authorityId: inspected.manifest.authorityId };
+        }
+        const approved = await this.automationManifestReviews.approve({
+          manifestId: inspected.manifest.id,
+          manifestDigest: inspected.manifest.digest,
+          reviewScopeDigest: inspected.reviewScopeDigest,
+          confirmationToken: confirmation.token,
+          confirmationExpiresAt: confirmation.expiresAt
+        });
+        if (approved.status !== "approved" || !approved.approval) {
+          const status = approved.status === "blocked" ? "blocked" : "unavailable";
+          this.record("command.prepare", status, approved.summary, current.id);
+          return { status, summary: approved.summary, session: current, authorityId: inspected.manifest.authorityId };
+        }
+        const result: PreparedCommandResult = {
+          status: "prepared",
+          summary: approved.summary,
+          session: current,
+          authorityId: inspected.manifest.authorityId,
+          confirmationToken: confirmation.token,
+          confirmationScopeDigest: inspected.reviewScopeDigest,
+          confirmationExpiresAt: confirmation.expiresAt
+        };
+        this.record("command.prepare", "completed", result.summary, current.id);
+        return result;
+      }
+      const initial = await this.executor.prepareCommand({
+        action: definition.action,
+        ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+        reason: payload.reason
+      });
+      if (initial.session) this.installTrustedSession(initial.session);
+      if (initial.status !== "incomplete" || !initial.session || !initial.authorityId) {
+        this.record("command.prepare", initial.status === "prepared" ? "completed" : initial.status, initial.summary, payload.sessionId);
+        return initial;
+      }
+      if (!this.automationManifestCoordinator) {
+        return { status: "unavailable", summary: "No installed automation manifest proposal coordinator is attached.", session: initial.session, authorityId: initial.authorityId };
+      }
+      const prepared = await this.automationManifestCoordinator.prepare({
+        action: definition.action,
+        sessionId: initial.session.id,
+        authorityId: initial.authorityId
+      });
+      if (prepared.status !== "prepared") {
+        this.record("command.prepare", prepared.status, prepared.summary, initial.session.id);
+        return { status: prepared.status, summary: prepared.summary, session: initial.session, authorityId: initial.authorityId };
+      }
+      if (!prepared.manifest || !prepared.reviewScopeDigest) {
+        const summary = "The automation proposal coordinator returned no exact protected review manifest.";
+        this.record("command.prepare", "unavailable", summary, initial.session.id);
+        return { status: "unavailable", summary, session: initial.session, authorityId: initial.authorityId };
+      }
+      const result: PreparedCommandResult = {
+        status: "incomplete",
+        summary: prepared.summary,
+        session: initial.session,
+        authorityId: initial.authorityId,
+        automationReview: { action: definition.action, manifest: prepared.manifest, reviewScopeDigest: prepared.reviewScopeDigest }
+      };
+      this.record("command.prepare", "incomplete", result.summary, initial.session.id);
+      return result;
+    }
+    if (definition.action === "stop_managed_run") {
+      if (hasReviewArtifact || payload.reviewScopeDigest) {
+        if (payload.effectSessionId || !payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.reviewScopeDigest || !payload.sessionId) {
+          return { status: "blocked", summary: "Debug-stop confirmation requires one exact protected binding id, digest, review scope, and source session; an effect session is forbidden in phase two." };
+        }
+        if (!this.debugStops || !isConfirmationCapableExecutor(this.executor)) {
+          return { status: "unavailable", summary: "The protected debug-stop binding or confirmation boundary is unavailable." };
+        }
+        const review = await this.debugStops.inspect({
+          bindingId: payload.reviewArtifactId,
+          bindingDigest: payload.reviewArtifactDigest,
+          reviewScopeDigest: payload.reviewScopeDigest,
+          sourceSessionId: payload.sessionId
+        });
+        if (!review) return { status: "blocked", summary: "The reviewed debug-stop binding is absent, stale, consumed, changed, or forged." };
+        let current: ManagedSession;
+        try { current = this.requireSession(payload.sessionId); }
+        catch { return { status: "blocked", summary: "The reviewed debug-stop authority source session is no longer current in this companion connection." }; }
+        const confirmation = await this.executor.requestConfirmation({
+          action: definition.action,
+          sessionId: current.id,
+          authorityId: review.authorityId,
+          reason: payload.reason,
+          confirmationScopeDigest: review.reviewScopeDigest
+        });
+        if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+          const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+          this.record("command.prepare", status, confirmation.summary, current.id);
+          return { status, summary: confirmation.summary, session: current, authorityId: review.authorityId };
+        }
+        const result: PreparedCommandResult = {
+          status: "prepared",
+          summary: "The exact reviewed debug-stop split binding was reauthenticated for one dispatch.",
+          session: current,
+          authorityId: review.authorityId,
+          confirmationToken: confirmation.token,
+          confirmationScopeDigest: review.reviewScopeDigest,
+          confirmationExpiresAt: confirmation.expiresAt
+        };
+        this.record("command.prepare", "completed", result.summary, current.id);
+        return result;
+      }
+      if (!payload.sessionId || !payload.effectSessionId) {
+        return { status: "blocked", summary: "Debug-stop preparation requires the exact provider authority session and a distinct trusted-host debug effect session." };
+      }
+      const initial = await this.executor.prepareCommand({ action: definition.action, sessionId: payload.sessionId, reason: payload.reason });
+      if (initial.session) this.installTrustedSession(initial.session);
+      if (initial.status !== "incomplete" || !initial.session || !initial.authorityId) {
+        this.record("command.prepare", initial.status === "prepared" ? "completed" : initial.status, initial.summary, payload.sessionId);
+        return initial;
+      }
+      if (!this.debugStops) {
+        return { status: "unavailable", summary: "No protected debug-stop split-binding store is attached.", session: initial.session, authorityId: initial.authorityId };
+      }
+      try {
+        const prepared = await this.debugStops.prepare({
+          sourceSessionId: initial.session.id,
+          effectSessionId: payload.effectSessionId,
+          authorityId: initial.authorityId
+        });
+        const result: PreparedCommandResult = {
+          status: "incomplete",
+          summary: "The exact protected debug-stop split binding is ready for trusted UI review; no debug effect has started.",
+          session: initial.session,
+          authorityId: initial.authorityId,
+          debugStopReview: debugStopReview(prepared.binding)
+        };
+        this.record("command.prepare", "incomplete", result.summary, initial.session.id);
+        return result;
+      } catch {
+        return { status: "blocked", summary: "The exact current provider/debug/origin binding could not be prepared for debug-stop review.", session: initial.session, authorityId: initial.authorityId };
+      }
+    }
+    if (payload.effectSessionId) {
+      return { status: "blocked", summary: "A debug-effect session is accepted only during the first phase of exact debug-stop preparation." };
+    }
+    if (definition.action === "authority_broadcast" && payload.reviewScopeDigest) {
+      if (!payload.reviewArtifactId || !payload.reviewArtifactDigest || !payload.sessionId) {
+        return { status: "blocked", summary: "Authority Broadcast confirmation requires one exact protected reviewed artifact and managed session." };
+      }
+      if (!this.workflowArtifacts || !isConfirmationCapableExecutor(this.executor)) {
+        return { status: "unavailable", summary: "The protected Authority Broadcast artifact or confirmation boundary is unavailable." };
+      }
+      let artifact: WorkflowArtifact | undefined;
+      try { artifact = await this.workflowArtifacts.get(payload.reviewArtifactId); }
+      catch { return { status: "unavailable", summary: "The protected Authority Broadcast artifact could not be verified." }; }
+      if (!artifact || artifact.status !== "prepared" || artifact.action !== "authority_broadcast"
+        || artifact.digest !== payload.reviewArtifactDigest || artifact.sessionId !== payload.sessionId || !artifact.authorityId
+        || artifact.payload.kind !== "authority" || artifact.payload.mode !== "broadcast") {
+        return { status: "blocked", summary: "The reviewed Authority Broadcast artifact is absent, stale, or changed its exact action/session/authority binding." };
+      }
+      let current: ManagedSession;
+      try { current = this.requireSession(payload.sessionId); }
+      catch { return { status: "blocked", summary: "The reviewed Authority Broadcast source session is no longer current." }; }
+      if (!current.workspaceRoot || !current.targetSnapshotId
+        || normalizeHostPath(current.workspaceRoot) !== normalizeHostPath(artifact.repositoryRoot)
+        || current.targetSnapshotId !== artifact.targetSnapshotId
+        || current.taskId !== artifact.taskId || current.planRevision !== artifact.planRevision) {
+        return { status: "blocked", summary: "The reviewed Authority Broadcast artifact no longer matches the exact current session target, task, and plan." };
+      }
+      let scopeDigest: string;
+      try { scopeDigest = authorityBroadcastReviewScopeDigest(artifact); }
+      catch { return { status: "blocked", summary: "The Authority Broadcast review artifact is malformed." }; }
+      if (scopeDigest !== payload.reviewScopeDigest) {
+        return { status: "blocked", summary: "The Authority Broadcast review acknowledgement does not match the exact protected recipient packet scope." };
+      }
+      const confirmation = await this.executor.requestConfirmation({
+        action: definition.action, sessionId: current.id, authorityId: artifact.authorityId,
+        reason: payload.reason, confirmationScopeDigest: scopeDigest
+      });
+      if (confirmation.status !== "issued" || !confirmation.token || !confirmation.expiresAt) {
+        const status = confirmation.status === "blocked" ? "blocked" : confirmation.status === "incomplete" ? "incomplete" : "unavailable";
+        this.record("command.prepare", status, confirmation.summary, current.id);
+        return { status, summary: confirmation.summary, session: current, authorityId: artifact.authorityId };
+      }
+      const result = {
+        status: "prepared" as const, summary: confirmation.summary, session: current, authorityId: artifact.authorityId,
+        confirmationToken: confirmation.token, confirmationScopeDigest: scopeDigest, confirmationExpiresAt: confirmation.expiresAt
+      };
+      this.record("command.prepare", "completed", result.summary, current.id);
+      return result;
+    }
+    if (payload.reviewArtifactId || payload.reviewArtifactDigest) {
+      return { status: "blocked", summary: "Protected review artifact references are accepted only by their exact two-phase review ceremony." };
+    }
+    const result = await this.executor.prepareCommand({ action: definition.action, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), reason: payload.reason, ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}) });
+    if (result.session) this.installTrustedSession(result.session);
+    this.record("command.prepare", result.status === "prepared" ? "completed" : result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
+  private async completeHostAction(payload: HostActionCompletionPayload): Promise<CommandResult> {
+    if (!this.hostActions || !isExternalCompletionExecutor(this.executor)) {
+      return { status: "unavailable", summary: "No durable host-action settlement boundary is attached; the acknowledgement was not accepted." };
+    }
+    const record = await this.hostActions.settle(payload);
+    const result = await this.executor.completeExternalOperation(record);
+    this.record("host-action.complete", result.status, result.summary, undefined, result.operationId);
+    return result;
+  }
+
+  private async claimHostAction(payload: HostActionClaimPayload): Promise<HostActionClaim | undefined> {
+    if (!this.hostActions) throw new CompanionServiceError("companion_unavailable", "No durable extension host-action claim boundary is attached.");
+    const claim = await this.hostActions.claim(payload);
+    if (claim) this.record("host-action.claim", "completed", "Assigned one exact extension-owned host action to one Registered VS Code window.", payload.windowSessionId, claim.hostActionId);
+    return claim;
+  }
+
+  private async authorizeHostAction(payload: HostActionAuthorizationPayload): Promise<Readonly<{ hostActionId: string; authorizationToken: string; expiresAt: string; selectionId?: string; url?: string }>> {
+    if (!this.hostActions) throw new CompanionServiceError("companion_unavailable", "No durable final host-action authorization boundary is attached.");
+    const authorization = await this.hostActions.authorize(payload);
+    this.record("host-action.authorize", "completed", "Authorized one exact queued host action after final host revalidation.", undefined, authorization.hostActionId);
+    return { hostActionId: authorization.hostActionId, authorizationToken: authorization.authorizationToken, expiresAt: authorization.expiresAt, ...(authorization.selectionId ? { selectionId: authorization.selectionId } : {}), ...(authorization.url ? { url: authorization.url } : {}) };
+  }
+
+  private async reviewGitMutation(payload: GitReviewPayload): Promise<GitReviewResult> {
+    if (!this.gitReviews) return { status: "unavailable", summary: "No trusted current-user Git review boundary is attached." };
+    const result = await this.gitReviews.review(payload);
+    if (result.session) this.installTrustedSession(result.session);
+    this.record("git.review.submit", result.status === "approved" ? "completed" : result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
+  private async inspectGitReview(payload: GitReviewInspectPayload): Promise<GitReviewWorkspace> {
+    if (!this.gitReviews) throw new CompanionServiceError("companion_unavailable", "No trusted Git review inspector is attached.");
+    const workspace = await this.gitReviews.inspect(payload.sessionId);
+    this.record("git.review.inspect", "completed", "Inspected the exact host-observed Git review target.", payload.sessionId, workspace.targetSnapshotId);
+    return workspace;
+  }
+
+  private async createHandoff(payload: HandoffCreatePayload): Promise<HandoffPackage> {
+    if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached.");
+    const session = this.requireSession(payload.sessionId);
+    if (!session.workspaceRoot || !session.targetSnapshotId || !session.taskId || !session.planRevision) throw new CompanionServiceError("capability_denied", "Handoff requires a managed session bound to an exact target, task, and plan revision.");
+    if (payload.recipientSessionId) {
+      const recipient = this.requireSession(payload.recipientSessionId);
+      if (recipient.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(recipient.workspaceRoot ?? "") !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Handoff recipient is not bound to the exact same target.");
+    }
+    const handoff = await this.handoffs.create({
+      repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, taskId: session.taskId, planRevision: session.planRevision,
+      ...(payload.authorityId ? { authorityId: payload.authorityId } : {}), plan: payload.plan, decisions: payload.decisions,
+      documentation: payload.documentation, references: payload.references, constraints: payload.constraints, openQuestions: payload.openQuestions,
+      nextActions: payload.nextActions, ...(payload.recipientSessionId ? { recipientSessionId: payload.recipientSessionId } : {}), ...(payload.routing ? { routing: payload.routing } : {})
+    });
+    this.record("handoff.create", "completed", "Created one immutable non-executing Handoff context package.", session.id);
+    return handoff;
+  }
+
+  private async listHandoffs(payload: unknown): Promise<readonly HandoffPackage[]> { requireEmptyPayload(payload, "Handoff listing"); if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.list(); }
+  private async acknowledgeHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs || !payload.recipientSessionId) throw new CompanionServiceError("capability_denied", "Handoff acknowledgement requires the durable store and exact recipient."); this.requireSession(payload.recipientSessionId); return this.handoffs.acknowledge(payload.handoffId, payload.recipientSessionId); }
+  private async cancelHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.cancel(payload.handoffId); }
+  private async archiveHandoff(payload: HandoffReferencePayload): Promise<HandoffPackage> { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.archive(payload.handoffId); }
+  private async handoffRouting(payload: unknown) { requireEmptyPayload(payload, "Handoff routing read"); if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.routingDefault(); }
+  private async setHandoffRouting(payload: HandoffRoutingPayload) { if (!this.handoffs) throw new CompanionServiceError("capability_denied", "No durable Handoff package store is attached."); return this.handoffs.setRoutingDefault(payload.routing); }
+
+  private async prepareWorkflowArtifact(payload: WorkflowPreparePayload): Promise<WorkflowArtifact> {
+    if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached.");
+    const session = this.requireSession(payload.sessionId);
+    if (!session.workspaceRoot || !session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "Workflow preparation requires an exact managed-session target.");
+    let workflowPayload: WorkflowArtifactPayload;
+    let coordinatorBinding: Readonly<{ authorityId: string; coordinatorContextDigest?: string; coordinatorContextRevision?: number }>;
+    if (payload.action === "bind_voice_session") {
+      if (payload.intent.kind !== "none") throw new CompanionServiceError("invalid_request", "Voice binding accepts no client-authored workflow fields.");
+      const active = this.voice ? await this.voice.active() : undefined;
+      const consent = active && this.voice ? await this.voice.getConsent(active.consentId) : undefined;
+      if (!consent || !active || active.managedSessionId !== session.id || active.targetSnapshotId !== session.targetSnapshotId || normalizeHostPath(active.repositoryRoot) !== normalizeHostPath(session.workspaceRoot)) throw new CompanionServiceError("capability_denied", "Voice workflow binding does not match the active protected consent, context, and managed session.");
+      workflowPayload = { kind: "voice_binding", voiceSessionId: active.voiceSessionId, provider: active.provider, contextPackageId: active.contextPackageId, consentId: active.consentId };
+      coordinatorBinding = { authorityId: payload.authorityId };
+    } else {
+      if (!this.workflowCoordinator) throw new CompanionServiceError("capability_denied", "No protected workflow preparation coordinator is attached; client-authored plans, evidence, options, and authority are rejected.");
+      const prepared = await this.workflowCoordinator.prepare({ action: payload.action, session, authorityId: payload.authorityId, intent: payload.intent });
+      workflowPayload = prepared.payload;
+      coordinatorBinding = {
+        authorityId: prepared.authorityId,
+        coordinatorContextDigest: prepared.coordinatorContextDigest,
+        coordinatorContextRevision: prepared.coordinatorContextRevision
+      };
+    }
+    if ((payload.action === "handoff" || payload.action === "handoff_queue" || payload.action === "handoff_immediate") && workflowPayload.kind === "handoff") {
+      const handoff = this.handoffs ? await this.handoffs.get(workflowPayload.packageId) : undefined;
+      if (!handoff || handoff.repositoryRoot !== session.workspaceRoot || handoff.targetSnapshotId !== session.targetSnapshotId) throw new CompanionServiceError("capability_denied", "The workflow Handoff package is missing or bound to another target.");
+      if (handoff.recipientSessionId !== workflowPayload.recipientSessionId || handoff.authorityId !== workflowPayload.authorityId || handoff.planRevision !== session.planRevision || handoff.taskId !== session.taskId) throw new CompanionServiceError("capability_denied", "The coordinator Handoff package changed its exact recipient, authority, task, or plan binding.");
+    }
+    return this.workflowArtifacts.create({ action: payload.action, repositoryRoot: session.workspaceRoot, targetSnapshotId: session.targetSnapshotId, sessionId: session.id, ...(session.taskId ? { taskId: session.taskId } : {}), ...(session.planRevision ? { planRevision: session.planRevision } : {}), ...coordinatorBinding, payload: workflowPayload });
+  }
+
+  private async listWorkflowArtifacts(payload: unknown): Promise<readonly WorkflowArtifact[]> { requireEmptyPayload(payload, "Workflow artifact listing"); if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); return this.workflowArtifacts.list(); }
+  private async cancelWorkflowArtifact(payload: WorkflowCancelPayload): Promise<WorkflowArtifact> { if (!this.workflowArtifacts) throw new CompanionServiceError("capability_denied", "No durable typed workflow artifact store is attached."); this.requireSession(payload.sessionId); return this.workflowArtifacts.cancelPrepared(payload); }
+
+  private async grantVoiceConsent(payload: VoiceConsentPayload, signal?: AbortSignal): Promise<VoiceConsent> {
+    if (!this.voice || !this.voicePresence || !this.handoffs) throw new CompanionServiceError("capability_denied", "Voice requires durable context, privacy state, and current-user presence.");
+    const handoff = await callDirect<HandoffPackage | undefined>(this.handoffs, "get", [payload.handoffId], signal);
+    if (!handoff || handoff.status === "cancelled" || handoff.status === "archived") throw new CompanionServiceError("not_found", "Voice consent requires a current immutable Handoff context package.");
+    const presence = await callDirect<Awaited<ReturnType<WindowsUserPresenceRunner["verify"]>>>(this.voicePresence, "verify", [`Start or switch SXSY-B122 voice for ${payload.provider} using context ${handoff.id} with transcripts ${payload.transcript}.`], signal);
+    if (!presence.verified || !presence.operator) throw new CompanionServiceError("capability_denied", "Current-user presence did not approve voice access.");
+    const expiresAt = new Date(Date.parse(this.now()) + payload.expiresInMinutes * 60_000).toISOString();
+    return callDirect<VoiceConsent>(this.voice, "grantConsent", [{ repositoryRoot: handoff.repositoryRoot, targetSnapshotId: handoff.targetSnapshotId, contextPackageId: handoff.id, contextDigest: handoff.digest, provider: payload.provider, operatorPresenceId: presence.operator, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes, expiresAt }], signal);
+  }
+
+  private async startVoice(payload: VoiceStartPayload, signal?: AbortSignal): Promise<VoiceBinding> {
+    if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached.");
+    const consent = await callDirect<VoiceConsent | undefined>(this.voice, "getConsent", [payload.consentId], signal);
+    if (!consent) throw new CompanionServiceError("not_found", "Voice consent was not found.");
+    if (this.voiceRuntime && !payload.managedSessionId) throw new CompanionServiceError("capability_denied", "The installed two-way voice runtime requires one explicitly selected exact managed session.");
+    if (payload.managedSessionId) this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), consent.repositoryRoot, consent.targetSnapshotId);
+    const binding = await callDirect<VoiceBinding>(this.voice, "start", [payload], signal);
+    if (payload.managedSessionId && this.voiceRuntime) {
+      try { await callDirect(this.voiceRuntime, "open", [binding.id], signal); }
+      catch (error) { await this.voice.end(binding.id).catch(() => undefined); throw voiceServiceFailure(error); }
+    }
+    return (await callDirect<VoiceBinding | undefined>(this.voice, "getBinding", [binding.id], signal)) ?? binding;
+  }
+  private async currentVoice(payload: unknown, signal?: AbortSignal): Promise<VoiceBinding | undefined> { requireEmptyPayload(payload, "Voice current binding"); if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); return callDirect(this.voice, "active", [], signal); }
+  private async switchVoice(payload: VoiceSwitchPayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { const target = this.voiceRuntime ?? this.voice; return await callDirect(target, "switchProvider", [payload.bindingId, { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async bindVoice(payload: VoiceBindingPayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); const binding = await callDirect<VoiceBinding | undefined>(this.voice, "getBinding", [payload.bindingId], signal); if (!binding) throw new CompanionServiceError("not_found", "Voice binding was not found."); this.assertVoiceSessionScope(this.requireSession(payload.managedSessionId), binding.repositoryRoot, binding.targetSnapshotId); try { const target = this.voiceRuntime ?? this.voice; return await callDirect(target, "bindManagedSession", [payload.bindingId, payload.managedSessionId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async muteVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "mute", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async resumeVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "resume", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async interruptVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice || !payload.reason) throw new CompanionServiceError("invalid_request", "Voice interruption requires a bounded reason."); try { return await callDirect(this.voiceRuntime ?? this.voice, "interrupt", [payload.bindingId, payload.reason], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async endVoice(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "end", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+  private async deleteVoiceTranscript(payload: VoiceReferencePayload, signal?: AbortSignal): Promise<VoiceBinding> { if (!this.voice) throw new CompanionServiceError("capability_denied", "No durable voice coordinator is attached."); try { return await callDirect(this.voiceRuntime ?? this.voice, "deleteTranscript", [payload.bindingId], signal); } catch (error) { throw voiceServiceFailure(error); } }
+
+  private assertVoiceSessionScope(session: ManagedSession, repositoryRoot: string, targetSnapshotId: string): void {
+    if (session.targetSnapshotId !== targetSnapshotId || normalizeHostPath(session.workspaceRoot ?? "") !== normalizeHostPath(repositoryRoot)) throw new CompanionServiceError("capability_denied", "Voice can bind only to a managed session on the exact consent target.");
+  }
+
+  private async installRuntimePin(payload: RuntimePinInstallPayload, signal?: AbortSignal) {
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    const pin = await callDirect(this.runtimePins, "install", [payload], signal);
+    this.record("runtime.pin.install", "completed", "Installed one current-user-attested repository runtime digest.");
+    return pin;
+  }
+
+  private async listRuntimePins(payload: unknown, signal?: AbortSignal) {
+    if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Runtime pin listing accepts no client options.");
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    return callDirect(this.runtimePins, "list", [], signal);
+  }
+
+  private async revokeRuntimePin(payload: RuntimePinRevokePayload, signal?: AbortSignal) {
+    if (!this.runtimePins) throw new CompanionServiceError("capability_denied", "No trusted runtime provisioning boundary is attached.");
+    const pin = await callDirect(this.runtimePins, "revoke", [payload.repositoryRoot], signal);
+    this.record("runtime.pin.revoke", "completed", "Revoked one current-user-attested repository runtime digest.");
+    return pin;
+  }
+
+  private requireRuntimePinInstall(payload: unknown): RuntimePinInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "manifestPath"])
+      || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.manifestPath)) {
+      throw new CompanionServiceError("invalid_request", "Runtime pin installation requires only bounded absolute repository and manifest paths.");
+    }
+    return { repositoryRoot: payload.repositoryRoot, manifestPath: payload.manifestPath };
+  }
+
+  private requireRuntimePinRevoke(payload: unknown): RuntimePinRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) {
+      throw new CompanionServiceError("invalid_request", "Runtime pin revocation requires one bounded absolute repository path.");
+    }
+    return { repositoryRoot: payload.repositoryRoot };
+  }
+
+  private async installSandbox(payload: SandboxInstallPayload, signal?: AbortSignal) {
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    const installation = await callDirect(this.sandboxInstallations, "install", [payload], signal);
+    this.record("sandbox.install", "completed", "Installed one current-user-attested Windows Sandbox catalog and helper pin.");
+    return installation;
+  }
+
+  private async listSandboxes(payload: unknown, signal?: AbortSignal) {
+    if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", "Windows Sandbox listing accepts no client options.");
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    return callDirect(this.sandboxInstallations, "list", [], signal);
+  }
+
+  private async revokeSandbox(payload: SandboxRevokePayload, signal?: AbortSignal) {
+    if (!this.sandboxInstallations) throw new CompanionServiceError("capability_denied", "No trusted Windows Sandbox installation boundary is attached.");
+    const installation = await callDirect(this.sandboxInstallations, "revoke", [payload.repositoryRoot], signal);
+    this.record("sandbox.revoke", "completed", "Revoked one current-user-attested Windows Sandbox installation.");
+    return installation;
+  }
+
+  private requireSandboxInstall(payload: unknown): SandboxInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "catalogPath"]) || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.catalogPath)) {
+      throw new CompanionServiceError("invalid_request", "Windows Sandbox installation requires only bounded absolute repository and catalog paths.");
+    }
+    return { repositoryRoot: payload.repositoryRoot, catalogPath: payload.catalogPath };
+  }
+
+  private requireSandboxRevoke(payload: unknown): SandboxRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Windows Sandbox revocation requires one bounded absolute repository path.");
+    return { repositoryRoot: payload.repositoryRoot };
+  }
+
+  private async provisionCredential(payload: CredentialProvisionPayload, signal?: AbortSignal) {
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    const credential = await callDirect<Awaited<ReturnType<CredentialProvisioningCoordinator["provision"]>>>(this.credentialProvisioning, "provision", [payload], signal);
+    const exactScopes = credential.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ");
+    this.record("credential.provision", "completed", `Provisioned one DPAPI-sealed credential reference for exact scopes: ${exactScopes}.`);
+    return credential;
+  }
+
+  private async listCredentials(payload: unknown, signal?: AbortSignal) {
+    requireEmptyPayload(payload, "Credential listing");
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    return callDirect(this.credentialProvisioning, "list", [], signal);
+  }
+
+  private async revokeCredential(payload: CredentialRevokePayload, signal?: AbortSignal): Promise<boolean> {
+    if (!this.credentialProvisioning) throw new CompanionServiceError("capability_denied", "No trusted credential provisioning boundary is attached.");
+    const revoked = await callDirect<boolean>(this.credentialProvisioning, "revoke", [payload.reference, payload.reason], signal);
+    this.record("credential.revoke", revoked ? "completed" : "unavailable", revoked ? "Revoked the selected credential reference." : "The selected live credential reference was not found.");
+    return revoked;
+  }
+
+  private async installNetworkPolicy(payload: NetworkPolicyInstallPayload, signal?: AbortSignal) {
+    if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached.");
+    const policy = await callDirect(this.networkPolicyProvisioning, "install", [payload.repositoryRoot, payload.sourcePath], signal);
+    this.record("network-policy.install", "completed", "Installed one current-user-attested exact-route HTTPS policy.");
+    return policy;
+  }
+
+  private async currentNetworkPolicy(payload: unknown, signal?: AbortSignal) { const scope = this.requireNetworkPolicyScope(payload); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); return callDirect(this.networkPolicyProvisioning, "current", [scope.repositoryRoot], signal); }
+  private async revokeNetworkPolicy(payload: unknown, signal?: AbortSignal) { const scope = this.requireNetworkPolicyScope(payload); if (!this.networkPolicyProvisioning) throw new CompanionServiceError("capability_denied", "No trusted network-policy provisioning boundary is attached."); const policy = await callDirect(this.networkPolicyProvisioning, "revoke", [scope.repositoryRoot], signal); this.record("network-policy.revoke", "completed", "Revoked the selected repository's exact-route HTTPS policy."); return policy; }
+
+  private acceptanceAdmin() { if (!this.acceptanceAdministration) throw new CompanionServiceError("capability_denied", "No current-user acceptance-evidence administration boundary is installed."); return this.acceptanceAdministration; }
+  private scannerAdmin() { if (!this.scannerAdministration) throw new CompanionServiceError("capability_denied", "No current-user signed scanner-fixture administration boundary is installed."); return this.scannerAdministration; }
+  private async installAcceptanceTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledAcceptanceTrust> { const value = await callDirect<InstalledAcceptanceTrust>(this.acceptanceAdmin(), "installTrustPolicy", [payload.sourcePath], signal); this.record("acceptance.trust.install", "completed", "Installed one current-user-approved acceptance authority."); return value; }
+  private async listAcceptanceTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledAcceptanceTrust[]> { requireEmptyPayload(payload, "Acceptance trust listing"); return callDirect(this.acceptanceAdmin(), "listTrust", [], signal); }
+  private async revokeAcceptanceTrust(payload: AcceptanceTrustRevokePayload, signal?: AbortSignal): Promise<InstalledAcceptanceTrust> { const value = await callDirect<InstalledAcceptanceTrust>(this.acceptanceAdmin(), "revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal); this.record("acceptance.trust.revoke", "completed", "Revoked one current-user-approved acceptance authority."); return value; }
+  private async importAcceptanceEvidence(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<GateEvidence> { const value = await callDirect<GateEvidence>(this.acceptanceAdmin(), "importEvidence", [payload.sourcePath], signal); this.record("acceptance.evidence.import", "completed", "Imported one independently signed acceptance-evidence package."); return value; }
+  private async listAcceptanceEvidence(payload: unknown, signal?: AbortSignal): Promise<readonly GateEvidence[]> { requireEmptyPayload(payload, "Acceptance evidence listing"); return callDirect(this.acceptanceAdmin(), "listEvidence", [], signal); }
+  private async invalidateAcceptanceEvidence(payload: AcceptanceEvidenceInvalidatePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.acceptanceAdmin(), "invalidateEvidence", [payload.evidenceId, payload.reason], signal); this.record("acceptance.evidence.invalidate", "completed", "Invalidated one selected acceptance-evidence record."); return true; }
+  private async activateHighConsequence(payload: AcceptanceActivationPayload, signal?: AbortSignal): Promise<HighConsequenceActivation> { const value = await callDirect<HighConsequenceActivation>(this.acceptanceAdmin(), "activate", [payload.action, payload.targetSnapshotId, payload.expiresAt], signal); this.record("acceptance.activation.activate", "completed", "Activated one high-consequence action for one exact target and expiry."); return value; }
+  private async listHighConsequenceActivations(payload: unknown, signal?: AbortSignal): Promise<readonly HighConsequenceActivation[]> { requireEmptyPayload(payload, "High-consequence activation listing"); return callDirect(this.acceptanceAdmin(), "listActivations", [], signal); }
+  private async revokeHighConsequenceActivation(payload: AcceptanceActivationRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.acceptanceAdmin(), "revokeActivation", [payload.activationId, payload.reason], signal); this.record("acceptance.activation.revoke", "completed", "Revoked one selected high-consequence activation."); return true; }
+  private async installScannerTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledScannerFixtureTrust> { const value = await callDirect<InstalledScannerFixtureTrust>(this.scannerAdmin(), "installTrust", [payload.sourcePath], signal); this.record("scanner.trust.install", "completed", "Installed one current-user-approved scanner-fixture authority."); return value; }
+  private async listScannerTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledScannerFixtureTrust[]> { requireEmptyPayload(payload, "Scanner trust listing"); return callDirect(this.scannerAdmin(), "listTrust", [], signal); }
+  private async revokeScannerTrust(payload: ScannerTrustRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.scannerAdmin(), "revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal); this.record("scanner.trust.revoke", "completed", "Revoked one selected scanner-fixture authority."); return true; }
+  private async installScannerFixture(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledScannerFixture> { const value = await callDirect<InstalledScannerFixture>(this.scannerAdmin(), "installFixture", [payload.sourcePath], signal); this.record("scanner.fixture.install", "completed", "Installed one current-user-approved signed scanner/advisory fixture."); return value; }
+  private async listScannerFixtures(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledScannerFixture[]> { requireEmptyPayload(payload, "Scanner fixture listing"); return callDirect(this.scannerAdmin(), "listFixtures", [], signal); }
+  private async revokeScannerFixture(payload: ScannerFixtureRevokePayload, signal?: AbortSignal): Promise<true> { await callDirect(this.scannerAdmin(), "revokeFixture", [payload.fixtureId, payload.reason], signal); this.record("scanner.fixture.revoke", "completed", "Revoked one selected scanner/advisory fixture."); return true; }
+
+  private providerDesktopAdmin() { if (!this.providerDesktopRegistry) throw new CompanionServiceError("capability_denied", "No fixed-path current-user provider installation registry is attached."); return this.providerDesktopRegistry; }
+  private async installProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "install", [payload.provider], signal); this.record("provider-desktop.install", "completed", "Installed one current-user-approved fixed provider executable identity."); return value; }
+  private async listProviderDesktops(payload: unknown, signal?: AbortSignal): Promise<readonly ProviderInstallation[]> { requireEmptyPayload(payload, "Provider desktop listing"); return callDirect(this.providerDesktopAdmin(), "list", [], signal); }
+  private async revokeProviderDesktop(payload: ProviderDesktopReferencePayload, signal?: AbortSignal): Promise<ProviderInstallation> { const value = await callDirect<ProviderInstallation>(this.providerDesktopAdmin(), "revoke", [payload.provider], signal); this.record("provider-desktop.revoke", "completed", "Revoked one fixed provider executable identity."); return value; }
+  private async installProviderHostProfile(payload: ProviderHostProfileInstallPayload, signal?: AbortSignal): Promise<ProviderDispatchLeaseProfile> {
+    if (!this.providerDispatchProfiles) throw new CompanionServiceError("capability_denied", "No trusted provider-host profile provisioning boundary is attached.");
+    const profile = await callDirect<ProviderDispatchLeaseProfile>(this.providerDispatchProfiles, "install", [payload.profile as unknown as ProviderDispatchLeaseProfile, payload.networkPolicyPath], signal);
+    this.record("provider-host.profile.install", "completed", "Installed one exact repository-scoped provider-host dispatch profile.");
+    return profile;
+  }
+  private async currentProviderHostProfile(payload: ProviderHostProfileScopePayload, signal?: AbortSignal): Promise<ProviderDispatchLeaseProfile | undefined> {
+    if (!this.providerDispatchProfiles) throw new CompanionServiceError("capability_denied", "No trusted provider-host profile provisioning boundary is attached.");
+    return callDirect(this.providerDispatchProfiles, "current", [payload.repositoryRoot], signal);
+  }
+
+  private async providerHandshake(payload: ProviderHandshakePayload, signal?: AbortSignal): Promise<ManagedSession> {
+    if (!this.providerHandshakes) throw new CompanionServiceError("capability_denied", "No configured provider handshake boundary is attached.");
+    const session = this.requireSession(payload.sessionId);
+    if (session.workspaceRoot && normalizeHostPath(session.workspaceRoot) !== normalizeHostPath(payload.repositoryRoot)) throw new CompanionServiceError("capability_denied", "The selected provider session is bound to a different repository root.");
+    const trusted = await callDirect<ManagedSession>(this.providerHandshakes, "handshake", [{ session, repositoryRoot: payload.repositoryRoot }], signal);
+    this.installTrustedSession(trusted);
+    this.record("provider.handshake", "completed", "Installed exact-target adapter-proven session capabilities.", trusted.id);
+    return cloneSession(trusted);
+  }
+
+  private async releaseContainment(payload: ContainmentReleasePayload): Promise<CommandResult> {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No host-attested containment-release boundary is attached.");
+    const result = await this.containmentRelease.release(payload);
+    this.record("containment.release", result.status, result.summary, payload.sessionId);
+    return result;
+  }
+
+  private async inspectContainment(payload: ContainmentInspectionPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No durable containment inspection boundary is attached.");
+    const result = await this.containmentRelease.inspect(payload.sessionId);
+    if (!result) throw new CompanionServiceError("not_found", "No exact active containment fence exists for this protected session target.");
+    return result;
+  }
+
+  private async assessContainment(payload: ContainmentIncidentBindingPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment assessment boundary is attached.");
+    try {
+      const result = await this.containmentRelease.reassess(payload);
+      this.record("containment.assess", "completed", "Reconciled the exact durable containment assessment without egress.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment assessment is unavailable, stale, or incomplete.");
+    }
+  }
+
+  private async verifyContainmentRemediation(payload: ContainmentIncidentBindingPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed post-remediation verification boundary is attached.");
+    try {
+      const result = await this.containmentRelease.verifyRemediation(payload);
+      this.record("containment.verify", "completed", "Completed one fresh durable post-remediation assessment generation without egress.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact post-remediation verification was refused because its incident, receipts, or assessment generation changed.");
+    }
+  }
+
+  private async issueContainmentPermit(payload: ContainmentPermitIssuePayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment remediation-review boundary is attached.");
+    try {
+      const result = await this.containmentRelease.issueRemediationPermit(payload);
+      this.record("containment.permit.issue", "completed", "Issued one exact no-egress, no-credential remediation permit.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment remediation permit was refused because its incident, findings, paths, or review changed.");
+    }
+  }
+
+  private async rewriteContainmentHistory(payload: ContainmentHistoryRewritePayload) {
+    if (!this.containmentHistory) throw new CompanionServiceError("capability_denied", "No installed attested local-history remediation boundary is attached.");
+    try {
+      const result = await this.containmentHistory.execute(payload);
+      this.record("containment.history.rewrite", "completed", `Atomically rewrote ${result.updatedRefs.length} reviewed local branch/tag ref(s) after creating a verified external recovery bundle; no remote ref was changed.`, payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact local-history remediation was refused, changed, or requires manual reconciliation; containment remains active.");
+    }
+  }
+
+  private containmentRemoteAdmin(): NonNullable<CompanionServiceOptions["containmentRemote"]> {
+    if (!this.containmentRemote) throw new CompanionServiceError("capability_denied", "No installed signed containment remote-evidence administration boundary is attached.");
+    return this.containmentRemote;
+  }
+
+  private async callContainmentRemote<T>(methodName: keyof NonNullable<CompanionServiceOptions["containmentRemote"]>, args: readonly unknown[], signal?: AbortSignal): Promise<T> {
+    const administration = this.containmentRemoteAdmin();
+    try {
+      return await callDirect<T>(administration, methodName, args, signal);
+    } catch (error) {
+      if (error instanceof CompanionServiceError) throw error;
+      throw new CompanionServiceError("capability_denied", "The signed containment remote-evidence boundary refused this exact request; no result was inferred.");
+    }
+  }
+
+  private async installContainmentRemoteTrust(payload: AdministrationSourcePayload, signal?: AbortSignal): Promise<InstalledContainmentRemoteTrust> {
+    const trust = await this.callContainmentRemote<InstalledContainmentRemoteTrust>("installTrustPolicy", [payload.sourcePath], signal);
+    this.record("containment.remote.trust.install", "completed", "Installed one current-user-approved purpose-scoped containment remote-evidence authority.");
+    return trust;
+  }
+
+  private async listContainmentRemoteTrust(payload: unknown, signal?: AbortSignal): Promise<readonly InstalledContainmentRemoteTrust[]> {
+    requireEmptyPayload(payload, "Containment remote trust listing");
+    const trust = await this.callContainmentRemote<readonly InstalledContainmentRemoteTrust[]>("listTrust", [], signal);
+    this.record("containment.remote.trust.list", "completed", "Listed the bounded signed containment remote-evidence trust registry.");
+    return trust;
+  }
+
+  private async revokeContainmentRemoteTrust(payload: ContainmentRemoteTrustRevokePayload, signal?: AbortSignal): Promise<InstalledContainmentRemoteTrust> {
+    const trust = await this.callContainmentRemote<InstalledContainmentRemoteTrust>("revokeTrust", [payload.authorityId, payload.keyId, payload.reason], signal);
+    this.record("containment.remote.trust.revoke", "completed", "Revoked one current-user-approved containment remote-evidence authority.");
+    return trust;
+  }
+
+  private async issueContainmentRemoteChallenge(payload: ContainmentRemoteChallengeIssuePayload, signal?: AbortSignal): Promise<ContainmentRemoteChallengeSummary> {
+    const challenge = await this.callContainmentRemote<ContainmentRemoteChallengeSummary>("issueChallenge", [payload], signal);
+    this.record("containment.remote.challenge.issue", "completed", "Issued one host-derived exact-incident offline remote-evidence challenge.", payload.sessionId);
+    return challenge;
+  }
+
+  private async listContainmentRemoteChallenges(payload: unknown, signal?: AbortSignal): Promise<readonly ContainmentRemoteChallengeSummary[]> {
+    requireEmptyPayload(payload, "Containment remote challenge listing");
+    const challenges = await this.callContainmentRemote<readonly ContainmentRemoteChallengeSummary[]>("listChallenges", [], signal);
+    this.record("containment.remote.challenge.list", "completed", "Listed the bounded host-derived containment remote-evidence challenges.");
+    return challenges;
+  }
+
+  private async importContainmentRemoteEvidence(payload: ContainmentRemoteEvidenceImportPayload, signal?: AbortSignal): Promise<ContainmentRemoteEvidenceSummary> {
+    const evidence = await this.callContainmentRemote<ContainmentRemoteEvidenceSummary>("importEvidence", [payload], signal);
+    this.record("containment.remote.evidence.import", "completed", "Imported one signed complete-namespace remote assessment bound to the exact current incident image.", payload.sessionId);
+    return evidence;
+  }
+
+  private async listContainmentRemoteEvidence(payload: unknown, signal?: AbortSignal): Promise<readonly ContainmentRemoteEvidenceSummary[]> {
+    requireEmptyPayload(payload, "Containment remote evidence listing");
+    const evidence = await this.callContainmentRemote<readonly ContainmentRemoteEvidenceSummary[]>("listEvidence", [], signal);
+    this.record("containment.remote.evidence.list", "completed", "Listed the bounded signed containment remote-evidence registry.");
+    return evidence;
+  }
+
+  private async recordContainmentRotation(payload: ContainmentRotationRecordPayload) {
+    if (!this.containmentRelease) throw new CompanionServiceError("capability_denied", "No installed containment credential-rotation review boundary is attached.");
+    try {
+      const result = await this.containmentRelease.recordRotationReview(payload);
+      this.record("containment.rotation.record", "completed", "Recorded the exact credential-rotation evidence disposition for the durable incident.", payload.sessionId);
+      return result;
+    } catch {
+      throw new CompanionServiceError("capability_denied", "The exact containment credential-rotation review was refused because the incident or evidence binding changed.");
+    }
+  }
+
+  private requireCredentialProvision(payload: unknown): CredentialProvisionPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["reference", "scopes", "sealedSecret"], ["replaceExisting"])
+      || !credentialIdentifier(payload.reference) || !Array.isArray(payload.scopes) || payload.scopes.length < 1 || payload.scopes.length > 16
+      || typeof payload.sealedSecret !== "string" || !payload.sealedSecret || payload.sealedSecret.length > 256 * 1024
+      || (payload.replaceExisting !== undefined && typeof payload.replaceExisting !== "boolean")) {
+      throw new CompanionServiceError("invalid_request", "Credential provisioning requires only a bounded reference, 1-16 exact repository/adapter/purpose scope triples, and a DPAPI-sealed secret.");
+    }
+    const scopes = payload.scopes.map((scope) => {
+      if (!isRecord(scope) || !exactKeys(scope, ["repositoryRoot", "adapterId", "purpose"])
+        || !boundedHostPath(scope.repositoryRoot) || !credentialIdentifier(scope.adapterId) || !credentialIdentifier(scope.purpose)) {
+        throw new CompanionServiceError("invalid_request", "Each credential scope must be one exact repositoryRoot, adapterId, and purpose triple.");
+      }
+      return { repositoryRoot: scope.repositoryRoot, adapterId: scope.adapterId, purpose: scope.purpose };
+    });
+    const identities = scopes.map((scope) => `${normalizeHostPath(scope.repositoryRoot)}\0${scope.adapterId}\0${scope.purpose}`);
+    if (new Set(identities).size !== identities.length) throw new CompanionServiceError("invalid_request", "Credential scope triples must be unique.");
+    return { reference: payload.reference, scopes, sealedSecret: payload.sealedSecret, ...(payload.replaceExisting === true ? { replaceExisting: true } : {}) };
+  }
+
+  private requireCredentialRevoke(payload: unknown): CredentialRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["reference", "reason"]) || typeof payload.reference !== "string" || typeof payload.reason !== "string") throw new CompanionServiceError("invalid_request", "Credential revocation requires exact reference and reason fields."); return { reference: payload.reference, reason: payload.reason }; }
+  private requireNetworkPolicyInstall(payload: unknown): NetworkPolicyInstallPayload { if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot", "sourcePath"]) || !boundedHostPath(payload.repositoryRoot) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", "Network policy installation requires one bounded absolute repository root and source path."); return { repositoryRoot: payload.repositoryRoot, sourcePath: payload.sourcePath }; }
+  private requireNetworkPolicyScope(payload: unknown): Readonly<{ repositoryRoot: string }> { if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Network policy operations require one bounded absolute repository root."); return { repositoryRoot: payload.repositoryRoot }; }
+  private requireCouncilPortProxy(payload: unknown): CouncilPortProxyPayload {
+    const keys = ["epochId", "sessionId", "targetSnapshotId", "leaseId", "operationId", "fenceDigest", "resourceHostDigest", "expectedPort", "backendPipePath", "backendProof"];
+    if (!isRecord(payload) || !exactKeys(payload, keys) || !keys.every((key) => typeof payload[key] === "string" && (payload[key] as string).length > 0 && (payload[key] as string).length <= 512 && !/[\r\n\0]/.test(payload[key] as string))) {
+      throw new CompanionServiceError("invalid_request", "Council port-proxy activation requires only exact epoch, session, target, lease, operation, and local backend-pipe fields.");
+    }
+    return payload as unknown as CouncilPortProxyPayload;
+  }
+  private requireCouncilCredentialNetwork(payload: unknown): CouncilCredentialNetworkPayload {
+    const required = ["epochId", "sessionId", "targetSnapshotId", "leaseId", "operationId", "fenceDigest", "resourceHostDigest", "capabilityId", "routeId"];
+    if (!isRecord(payload) || !exactKeys(payload, required)
+      || !required.every((key) => typeof payload[key] === "string" && (payload[key] as string).length > 0 && (payload[key] as string).length <= 256 && !/[\r\n\0]/.test(payload[key] as string))) {
+      throw new CompanionServiceError("invalid_request", "Council credentialed network execution requires only exact bounded broker fields.");
+    }
+    return payload as unknown as CouncilCredentialNetworkPayload;
+  }
+
+  private requireCouncilRecommendationApproval(payload: unknown): CouncilRecommendationApprovalPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload,
+      ["recommendationId", "recommendationDigest", "approvalOperationId", "repositoryRoot", "targetSnapshotId"], ["sessionId"])
+      || !boundedReferenceValue(payload.recommendationId)
+      || typeof payload.recommendationDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.recommendationDigest)
+      || typeof payload.approvalOperationId !== "string" || !/^council-review:[A-Za-z0-9._:-]{1,192}$/.test(payload.approvalOperationId)
+      || !boundedHostPath(payload.repositoryRoot)
+      || !boundedReferenceValue(payload.targetSnapshotId)
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) {
+      throw new CompanionServiceError("invalid_request", "Council recommendation approval requires one exact bounded artifact, digest, distinct review operation, repository, target, and optional session binding.");
+    }
+    return {
+      recommendationId: payload.recommendationId,
+      recommendationDigest: payload.recommendationDigest,
+      approvalOperationId: payload.approvalOperationId,
+      repositoryRoot: payload.repositoryRoot,
+      targetSnapshotId: payload.targetSnapshotId,
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {})
+    };
+  }
+
+  private async approveCouncilRecommendation(payload: CouncilRecommendationApprovalPayload): Promise<CouncilRecommendation> {
+    const executor = this.executor as Partial<CouncilReviewCapableMediatedCommandExecutor> | undefined;
+    if (!executor?.approveCouncilRecommendation) throw new CompanionServiceError("capability_denied", "No durable Council recommendation review boundary is attached.");
+    const recommendation = await executor.approveCouncilRecommendation(payload);
+    if (recommendation.id !== payload.recommendationId || recommendation.digest !== payload.recommendationDigest
+      || recommendation.repositoryRoot !== payload.repositoryRoot || recommendation.targetSnapshotId !== payload.targetSnapshotId
+      || recommendation.status !== "approved" || recommendation.approvalOperationId !== payload.approvalOperationId
+      || recommendation.executionAuthorized !== false) throw new CompanionServiceError("capability_denied", "Council recommendation review returned a mismatched or authorizing artifact.");
+    return recommendation;
+  }
+  private async activateCouncilPortProxy(payload: CouncilPortProxyPayload, signal?: AbortSignal) {
+    if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
+    return callDirect(this.councilResources, "activatePortProxy", [payload], signal);
+  }
+  private async executeCouncilCredentialNetwork(payload: CouncilCredentialNetworkPayload, signal?: AbortSignal) {
+    if (!this.councilResources) throw new CompanionServiceError("capability_denied", "No installed Council resource broker is attached.");
+    return callDirect(this.councilResources, "credentialNetwork", [payload], signal);
+  }
+  private requireAdministrationSource(payload: unknown, label: string): AdministrationSourcePayload { if (!isRecord(payload) || !exactKeys(payload, ["sourcePath"]) || !boundedHostPath(payload.sourcePath)) throw new CompanionServiceError("invalid_request", `${label} requires one bounded absolute source path.`); return { sourcePath: payload.sourcePath }; }
+  private requireContainmentRemoteTrustRevoke(payload: unknown): ContainmentRemoteTrustRevokePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"])
+      || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId)
+      || !boundedReason(payload.reason)) {
+      throw new CompanionServiceError("invalid_request", "Containment remote trust revocation requires exact bounded authority, key, and reason fields.");
+    }
+    return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason };
+  }
+  private requireContainmentRemoteChallengeIssue(payload: unknown): ContainmentRemoteChallengeIssuePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "expiresAt"])
+      || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt))
+      || new Date(payload.expiresAt).toISOString() !== payload.expiresAt) {
+      throw new CompanionServiceError("invalid_request", "Containment remote challenge issuance requires one exact reviewed incident image and canonical ISO expiry.");
+    }
+    const binding = this.requireContainmentIncidentBinding({
+      sessionId: payload.sessionId,
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
+    });
+    return { ...binding, expiresAt: payload.expiresAt };
+  }
+  private requireContainmentRemoteEvidenceImport(payload: unknown): ContainmentRemoteEvidenceImportPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "sourcePath"])
+      || !boundedHostPath(payload.sourcePath)) {
+      throw new CompanionServiceError("invalid_request", "Containment remote evidence import requires one exact reviewed incident image and bounded absolute source path.");
+    }
+    const binding = this.requireContainmentIncidentBinding({
+      sessionId: payload.sessionId,
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
+    });
+    return { ...binding, sourcePath: payload.sourcePath };
+  }
+  private requireAcceptanceTrustRevoke(payload: unknown): AcceptanceTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
+  private requireAcceptanceEvidenceInvalidate(payload: unknown): AcceptanceEvidenceInvalidatePayload { if (!isRecord(payload) || !exactKeys(payload, ["evidenceId", "reason"]) || !boundedIdentifier(payload.evidenceId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Acceptance evidence invalidation requires one exact evidence ID and bounded reason."); return { evidenceId: payload.evidenceId, reason: payload.reason }; }
+  private requireAcceptanceActivation(payload: unknown): AcceptanceActivationPayload { if (!isRecord(payload) || !exactKeys(payload, ["action", "targetSnapshotId", "expiresAt"]) || typeof payload.action !== "string" || !commandActionIds.includes(payload.action as CommandAction) || !boundedIdentifier(payload.targetSnapshotId) || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt))) throw new CompanionServiceError("invalid_request", "High-consequence activation requires one catalog action, exact target snapshot, and ISO expiry."); return { action: payload.action as CommandAction, targetSnapshotId: payload.targetSnapshotId, expiresAt: payload.expiresAt }; }
+  private requireAcceptanceActivationRevoke(payload: unknown): AcceptanceActivationRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["activationId", "reason"]) || !boundedIdentifier(payload.activationId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "High-consequence activation revocation requires one exact activation ID and bounded reason."); return { activationId: payload.activationId, reason: payload.reason }; }
+  private requireScannerTrustRevoke(payload: unknown): ScannerTrustRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["authorityId", "keyId", "reason"]) || !boundedIdentifier(payload.authorityId) || typeof payload.keyId !== "string" || !/^[a-f0-9]{64}$/.test(payload.keyId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner trust revocation requires exact authority, key, and reason fields."); return { authorityId: payload.authorityId, keyId: payload.keyId, reason: payload.reason }; }
+  private requireScannerFixtureRevoke(payload: unknown): ScannerFixtureRevokePayload { if (!isRecord(payload) || !exactKeys(payload, ["fixtureId", "reason"]) || !boundedIdentifier(payload.fixtureId) || !boundedReason(payload.reason)) throw new CompanionServiceError("invalid_request", "Scanner fixture revocation requires one exact fixture ID and bounded reason."); return { fixtureId: payload.fixtureId, reason: payload.reason }; }
+  private requireProviderDesktopReference(payload: unknown): ProviderDesktopReferencePayload { if (!isRecord(payload) || !exactKeys(payload, ["provider"]) || typeof payload.provider !== "string" || !(providerIds as readonly string[]).includes(payload.provider)) throw new CompanionServiceError("invalid_request", "Provider installation administration accepts only one compiled provider identity."); return { provider: payload.provider as ProviderId }; }
+  private requireProviderHostProfileInstall(payload: unknown): ProviderHostProfileInstallPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["profile", "networkPolicyPath"]) || !isRecord(payload.profile) || !boundedHostPath(payload.networkPolicyPath)) throw new CompanionServiceError("invalid_request", "Provider-host profile installation requires one closed profile record and absolute network-policy source path.");
+    return { profile: payload.profile, networkPolicyPath: payload.networkPolicyPath };
+  }
+  private requireProviderHostProfileScope(payload: unknown): ProviderHostProfileScopePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["repositoryRoot"]) || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider-host profile lookup requires one absolute repository root.");
+    return { repositoryRoot: payload.repositoryRoot };
+  }
+  private requireProviderHandshake(payload: unknown): ProviderHandshakePayload { if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "repositoryRoot"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || !boundedHostPath(payload.repositoryRoot)) throw new CompanionServiceError("invalid_request", "Provider handshake requires one existing session ID and exact absolute repository root."); return { sessionId: payload.sessionId, repositoryRoot: payload.repositoryRoot }; }
+  private requireContainmentInspection(payload: unknown): ContainmentInspectionPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId"]) || typeof payload.sessionId !== "string" || !payload.sessionId.trim()
+      || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)) {
+      throw new CompanionServiceError("invalid_request", "Containment inspection requires one exact bounded protected session ID.");
+    }
+    return { sessionId: payload.sessionId.trim() };
+  }
+
+  private requireContainmentIncidentBinding(payload: unknown): ContainmentIncidentBindingPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment incident administration requires one exact session and reviewed durable incident image.");
+    }
+    return { sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest };
+  }
+
+  private requireContainmentPermitIssue(payload: unknown): ContainmentPermitIssuePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "action", "relativePaths", "expiresAt"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || !["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(payload.action))
+      || !Array.isArray(payload.relativePaths) || !payload.relativePaths.length || payload.relativePaths.length > 256
+      || !payload.relativePaths.every((path) => safeContainmentRelativePath(path))
+      || new Set(payload.relativePaths.map((path) => String(path).toLowerCase())).size !== payload.relativePaths.length
+      || typeof payload.expiresAt !== "string" || !Number.isFinite(Date.parse(payload.expiresAt)) || new Date(payload.expiresAt).toISOString() !== payload.expiresAt) {
+      throw new CompanionServiceError("invalid_request", "Containment remediation review requires one exact incident, closed action, bounded unique finding paths, and ISO expiry.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      action: payload.action as ContainmentPermitIssuePayload["action"], relativePaths: payload.relativePaths as string[], expiresAt: payload.expiresAt
+    };
+  }
+
+  private requireContainmentHistoryRewrite(payload: unknown): ContainmentHistoryRewritePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "permitId", "relativePaths", "remediatedFindingIds"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || typeof payload.permitId !== "string" || !/^containment-remediation-permit:[a-f0-9]{64}$/.test(payload.permitId)
+      || !Array.isArray(payload.relativePaths) || !payload.relativePaths.length || payload.relativePaths.length > 256
+      || !payload.relativePaths.every((path) => safeContainmentRelativePath(path))
+      || new Set(payload.relativePaths.map((path) => String(path).toLowerCase())).size !== payload.relativePaths.length
+      || !Array.isArray(payload.remediatedFindingIds) || !payload.remediatedFindingIds.length || payload.remediatedFindingIds.length > 256
+      || !payload.remediatedFindingIds.every((id) => typeof id === "string" && /^containment-finding:[a-f0-9]{64}$/.test(id))
+      || new Set(payload.remediatedFindingIds).size !== payload.remediatedFindingIds.length) {
+      throw new CompanionServiceError("invalid_request", "Local-history remediation requires one exact reviewed incident, permit, unique path set, and unique history-finding set.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      permitId: payload.permitId, relativePaths: payload.relativePaths as string[], remediatedFindingIds: payload.remediatedFindingIds as string[]
+    };
+  }
+
+  private requireContainmentRotationRecord(payload: unknown): ContainmentRotationRecordPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "expectedIncidentId", "expectedIncidentDigest", "disposition", "evidenceReference", "evidenceDigest"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)
+      || (payload.disposition !== "complete" && payload.disposition !== "not_required")
+      || typeof payload.evidenceReference !== "string" || !payload.evidenceReference.trim() || payload.evidenceReference.length > 512 || /[\r\n\0]/.test(payload.evidenceReference)
+      || typeof payload.evidenceDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.evidenceDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment credential-rotation review requires one exact incident, closed disposition, and bounded evidence reference and digest.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(), expectedIncidentId: payload.expectedIncidentId, expectedIncidentDigest: payload.expectedIncidentDigest,
+      disposition: payload.disposition, evidenceReference: payload.evidenceReference.trim(), evidenceDigest: payload.evidenceDigest
+    };
+  }
+
+  private requireContainmentRelease(payload: unknown): ContainmentReleasePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "reason", "expectedFenceEpoch", "expectedActivationOperationId", "expectedIncidentId", "expectedIncidentDigest"])
+      || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256 || /[\r\n\0]/.test(payload.sessionId)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 2_048 || /[\0]/.test(payload.reason)
+      || !Number.isSafeInteger(payload.expectedFenceEpoch) || Number(payload.expectedFenceEpoch) < 1
+      || typeof payload.expectedActivationOperationId !== "string" || !payload.expectedActivationOperationId.trim()
+      || payload.expectedActivationOperationId.length > 256 || /[\r\n\0]/.test(payload.expectedActivationOperationId)
+      || typeof payload.expectedIncidentId !== "string" || !/^containment-incident:[a-f0-9]{64}$/.test(payload.expectedIncidentId)
+      || typeof payload.expectedIncidentDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.expectedIncidentDigest)) {
+      throw new CompanionServiceError("invalid_request", "Containment release requires one exact session, reviewed fence and durable incident image, and bounded incident reason.");
+    }
+    return {
+      sessionId: payload.sessionId.trim(),
+      reason: payload.reason.trim(),
+      expectedFenceEpoch: Number(payload.expectedFenceEpoch),
+      expectedActivationOperationId: payload.expectedActivationOperationId.trim(),
+      expectedIncidentId: payload.expectedIncidentId,
+      expectedIncidentDigest: payload.expectedIncidentDigest
+    };
+  }
+
+  private async installRawHid(payload: RawHidInstallPayload, signal?: AbortSignal) {
+    if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    // A changed tuple or helper pin is never made durable while the prior
+    // generation can still emit signals under the old installation identity.
+    await callDirect(this.rawHidSupervisor, "stop", [], signal);
+    const installation = await callDirect(this.rawHidInstallations, "install", [payload], signal);
+    const supervisor = await callDirect(this.rawHidSupervisor, "startConfigured", [], signal);
+    this.record("raw-hid.install", "completed", "Installed one current-user-attested exact B122 Raw-HID tuple and fixed helper pin.");
+    return { installation, supervisor };
+  }
+
+  private async listRawHid(payload: unknown, signal?: AbortSignal) {
+    requireEmptyPayload(payload, "Raw-HID installation listing");
+    if (!this.rawHidInstallations) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    return callDirect(this.rawHidInstallations, "list", [], signal);
+  }
+
+  private async revokeRawHid(payload: unknown, signal?: AbortSignal) {
+    requireEmptyPayload(payload, "Raw-HID revocation");
+    if (!this.rawHidInstallations || !this.rawHidSupervisor) throw new CompanionServiceError("capability_denied", "No trusted Raw-HID provisioning boundary is attached.");
+    await callDirect(this.rawHidSupervisor, "stop", [], signal);
+    const installation = await callDirect(this.rawHidInstallations, "revoke", [], signal);
+    this.record("raw-hid.revoke", "completed", "Revoked the current-user-attested B122 Raw-HID tuple and stopped its helper generation.");
+    return installation;
+  }
+
+  private async rawHidStatus(payload: unknown, signal?: AbortSignal) {
+    requireEmptyPayload(payload, "Raw-HID status");
+    if (!this.rawHidInstallations || !this.rawHidSupervisor || !this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No complete trusted Raw-HID runtime boundary is attached.");
+    return {
+      supervisor: await callDirect(this.rawHidSupervisor, "status", [], signal),
+      inbox: await callDirect(this.hardwareSignals, "status", [], signal),
+      installations: await callDirect(this.rawHidInstallations, "list", [], signal)
+    };
+  }
+
+  private async claimHardwareSignal(payload: HardwareSignalClaimPayload): Promise<HardwareSignalClaim | undefined> {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const binding = await this.requireFocusedWindowBinding(payload);
+    return this.hardwareSignals.claim(binding);
+  }
+
+  private async prepareHardwareSignal(payload: HardwareSignalPreparationPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    const sessionId = payload.sessionId ?? claim.windowSessionId;
+    await this.assertHardwareDispatchSession(claim, sessionId);
+    const preparation = await this.prepareCommand({
+      control: claim.control, modifier: claim.modifier, sessionId, reason: payload.reason,
+      ...(payload.effectSessionId ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(payload.reviewScopeDigest ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(payload.reviewArtifactId ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(payload.reviewArtifactDigest ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    });
+    if (preparation.status === "prepared") return { preparation };
+    // Plan Approval is deliberately a two-phase host ceremony.  The first
+    // preparation returns the exact provider-observed review packet without
+    // issuing authority or confirmation.  Keep the durable hardware claim
+    // live so the same canonical signal can be prepared again only after the
+    // trusted UI echoes that exact review scope.  Recording a disposition here
+    // would consume the signal before the reviewed second phase could occur.
+    if (preparation.status === "incomplete" && (preparation.workflowReview || preparation.automationReview || preparation.debugStopReview
+      || (claim.control === "AUTHORITY_REFRESH" && claim.modifier === "shift" && preparation.authorityId))) return { preparation };
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
+    const disposition = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: `preparation:${preparation.status}`
+    });
+    return { preparation, dispositionReceiptId: disposition.dispatchReceiptId };
+  }
+
+  private async dispatchHardwareSignal(payload: HardwareSignalDispatchPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    const sessionId = payload.sessionId ?? claim.windowSessionId;
+    await this.assertHardwareDispatchSession(claim, sessionId);
+    const assignment = assignmentFor(claim.control, claim.modifier);
+    if (!assignment) throw new CompanionServiceError("capability_denied", "The claimed hardware chord no longer has a settled canonical assignment.");
+    // Persist the exact canonical handler before the executor may cause an
+    // effect. A concurrent client can no longer requeue this claim as if
+    // dispatch had not begun.
+    const dispatch = await this.hardwareSignals.recordDispatch({
+      signalId: claim.signalId,
+      claimToken: claim.claimToken,
+      windowSessionId: claim.windowSessionId,
+      workspaceRoots: claim.workspaceRoots,
+      handler: assignment.handler,
+      resultStatus: "dispatching"
+    });
+    const command = await this.dispatch({
+      control: claim.control,
+      modifier: claim.modifier,
+      sessionId,
+      authorityId: payload.authorityId,
+      confirmationToken: payload.confirmationToken,
+      confirmationScopeDigest: payload.confirmationScopeDigest,
+      input: payload.input
+    });
+    this.record("hardware-signal.dispatch", command.status, `Dispatched the server-resolved ${assignment.handler} hardware assignment.`, sessionId, command.operationId);
+    return { command, dispatchReceiptId: dispatch.dispatchReceiptId };
+  }
+
+  private async completeHardwareSignal(payload: HardwareSignalCompletionPayload) {
+    if (!this.hardwareSignals) throw new CompanionServiceError("capability_denied", "No durable hardware signal inbox is attached.");
+    const claim = await this.hardwareSignals.resolveLiveClaim(payload);
+    if (payload.dispatchSessionId) await this.assertHardwareDispatchSession(claim, payload.dispatchSessionId);
+    const completionRoot = payload.repositoryRoot ? await this.canonicalizeHostPath(payload.repositoryRoot) : undefined;
+    if (completionRoot && !claim.workspaceRoots.some((root) => normalizeHostPath(root) === normalizeHostPath(completionRoot))) {
+      throw new CompanionServiceError("capability_denied", "The hardware completion repository is outside its exact focused-window workspace binding.");
+    }
+    const completion = await this.hardwareSignals.complete({ ...payload, ...(completionRoot ? { repositoryRoot: completionRoot } : {}) });
+    this.record("hardware-signal.complete", payload.outcome === "handled" ? "completed" : payload.outcome === "failed_before_dispatch" ? "failed" : "incomplete", payload.summary, payload.dispatchSessionId);
+    return completion;
+  }
+
+  private requireRawHidInstall(payload: unknown): RawHidInstallPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["vendorId", "productId", "usagePage", "usage"], ["serialNumber"])
+      || !uint16(payload.vendorId) || !uint16(payload.productId) || !uint16(payload.usagePage) || !uint16(payload.usage)
+      || (payload.serialNumber !== undefined && (typeof payload.serialNumber !== "string" || !/^[A-Za-z0-9._-]{1,128}$/.test(payload.serialNumber)))) {
+      throw new CompanionServiceError("invalid_request", "Raw-HID installation accepts only one exact uint16 VID/PID/usage tuple and optional bounded serial number; helper path, digest, map, and protocol are host-owned.");
+    }
+    return { vendorId: payload.vendorId, productId: payload.productId, usagePage: payload.usagePage, usage: payload.usage, ...(typeof payload.serialNumber === "string" ? { serialNumber: payload.serialNumber } : {}) };
+  }
+
+  private requireHardwareSignalClaim(payload: unknown): HardwareSignalClaimPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "workspaceRoots", "focused"]) || payload.focused !== true) throw new CompanionServiceError("invalid_request", "Hardware signal claim requires one explicitly focused VS Code window and its exact workspace roots.");
+    const binding = parseHardwareBinding(payload);
+    return { ...binding, focused: true };
+  }
+
+  private requireHardwareSignalPreparation(payload: unknown): HardwareSignalPreparationPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "reason"], ["sessionId", "effectSessionId", "reviewScopeDigest", "reviewArtifactId", "reviewArtifactDigest"])
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))
+      || (payload.effectSessionId !== undefined && !boundedReferenceValue(payload.effectSessionId))
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))
+      || (payload.reviewArtifactId !== undefined && !boundedReferenceValue(payload.reviewArtifactId))
+      || (payload.reviewArtifactDigest !== undefined && (typeof payload.reviewArtifactDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewArtifactDigest)))) throw new CompanionServiceError("invalid_request", "Hardware signal preparation requires an exact live claim, optional bound session, bounded reason, and only exact host-issued review references.");
+    if ((payload.reviewArtifactId === undefined) !== (payload.reviewArtifactDigest === undefined)) throw new CompanionServiceError("invalid_request", "A protected review artifact ID and digest must be supplied together.");
+    return {
+      ...parseHardwareClaimReference(payload), reason: payload.reason,
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}),
+      ...(typeof payload.effectSessionId === "string" ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(typeof payload.reviewArtifactId === "string" ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(typeof payload.reviewArtifactDigest === "string" ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    };
+  }
+
+  private requireHardwareSignalDispatch(payload: unknown): HardwareSignalDispatchPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots"], ["sessionId", "authorityId", "confirmationToken", "confirmationScopeDigest", "input"])
+      || (payload.sessionId !== undefined && !boundedReferenceValue(payload.sessionId))) throw new CompanionServiceError("invalid_request", "Hardware signal dispatch accepts only an exact live claim and host-issued mediation references; the chord is server-resolved.");
+    return {
+      ...parseHardwareClaimReference(payload),
+      ...(typeof payload.sessionId === "string" ? { sessionId: payload.sessionId } : {}),
+      authorityId: optionalReference(payload.authorityId, "authority ID"),
+      confirmationToken: optionalReference(payload.confirmationToken, "confirmation token"),
+      confirmationScopeDigest: optionalDigest(payload.confirmationScopeDigest, "confirmation scope digest"),
+      input: parseInput(payload.input)
+    };
+  }
+
+  private requireHardwareSignalCompletion(payload: unknown): HardwareSignalCompletionPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "outcome", "summary"], ["dispatchReceiptId", "dispatchSessionId", "repositoryRoot"])
+      || !hardwareCompletionOutcome(payload.outcome) || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
+      || (payload.dispatchReceiptId !== undefined && (typeof payload.dispatchReceiptId !== "string" || !/^hardware-dispatch:[a-f0-9]{64}$/.test(payload.dispatchReceiptId)))
+      || (payload.dispatchSessionId !== undefined && !boundedReferenceValue(payload.dispatchSessionId))
+      || (payload.repositoryRoot !== undefined && !boundedHostPath(payload.repositoryRoot))) throw new CompanionServiceError("invalid_request", "Hardware signal completion requires an exact live claim, bounded outcome, and server-issued dispatch receipt when handled.");
+    return { ...parseHardwareClaimReference(payload), outcome: payload.outcome, summary: payload.summary, ...(typeof payload.dispatchReceiptId === "string" ? { dispatchReceiptId: payload.dispatchReceiptId } : {}), ...(typeof payload.dispatchSessionId === "string" ? { dispatchSessionId: payload.dispatchSessionId } : {}), ...(typeof payload.repositoryRoot === "string" ? { repositoryRoot: payload.repositoryRoot } : {}) };
+  }
+
+  private async requireFocusedWindowBinding(payload: HardwareSignalClaimPayload): Promise<HardwareSignalClaimBinding> {
+    const session = this.requireSession(payload.windowSessionId);
+    if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !session.capabilities.includes("registered") || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "Hardware signals may be claimed only by a current Registered VS Code window session.");
+    }
+    let registeredRoots: unknown;
+    try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+    if (!Array.isArray(registeredRoots) || registeredRoots.length < 1 || !registeredRoots.every((root) => typeof root === "string" && boundedHostPath(root))) throw new CompanionServiceError("capability_denied", "The focused VS Code window has no valid Registered workspace-root record.");
+    const [canonicalRegistered, canonicalClaimed] = await Promise.all([
+      Promise.all(registeredRoots.map((root) => this.canonicalizeHostPath(root))),
+      Promise.all(payload.workspaceRoots.map((root) => this.canonicalizeHostPath(root)))
+    ]);
+    if (new Set(canonicalClaimed.map(normalizeHostPath)).size !== canonicalClaimed.length || !sameHostRoots(canonicalRegistered, canonicalClaimed)) throw new CompanionServiceError("capability_denied", "The focused VS Code window workspace binding does not match its canonical Registered host record.");
+    return { windowSessionId: payload.windowSessionId, workspaceRoots: canonicalClaimed };
+  }
+
+  private async assertHardwareDispatchSession(claim: HardwareSignalClaim, sessionId: string): Promise<void> {
+    const session = this.requireSession(sessionId);
+    if (!session.capabilities.includes("registered") || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "The selected hardware dispatch session is no longer a current Registered session.");
+    }
+    if (sessionId === claim.windowSessionId) {
+      let registeredRoots: unknown;
+      try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+      if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !Array.isArray(registeredRoots)
+        || registeredRoots.length < 1 || !registeredRoots.every((root) => typeof root === "string" && boundedHostPath(root))) {
+        throw new CompanionServiceError("capability_denied", "The focused hardware window session no longer has its exact Registered workspace binding.");
+      }
+      const canonicalRoots = await Promise.all(registeredRoots.map((root) => this.canonicalizeHostPath(root as string)));
+      if (!sameHostRoots(canonicalRoots, claim.workspaceRoots)) {
+        throw new CompanionServiceError("capability_denied", "The focused hardware window workspace binding changed after claim.");
+      }
+      return;
+    }
+    const sessionRoot = session.workspaceRoot ? await this.canonicalizeHostPath(session.workspaceRoot) : undefined;
+    if (!sessionRoot || !claim.workspaceRoots.some((root) => normalizeHostPath(root) === normalizeHostPath(sessionRoot))) {
+      throw new CompanionServiceError("capability_denied", "The selected hardware dispatch session is outside the exact focused-window workspace binding.");
+    }
   }
 
   private requireRegistration(payload: unknown): SessionRegistrationPayload {
@@ -351,7 +1827,8 @@ export class CompanionService {
   }
 
   private requireDispatch(payload: unknown): DispatchPayload {
-    if (!isRecord(payload) || !isControl(payload.control) || !isModifier(payload.modifier)) {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier"], ["sessionId", "authorityId", "confirmationToken", "confirmationScopeDigest", "input"])
+      || !isControl(payload.control) || !isModifier(payload.modifier)) {
       throw new CompanionServiceError("invalid_request", "A command dispatch requires a canonical B122 control and modifier.");
     }
     if (payload.sessionId !== undefined && typeof payload.sessionId !== "string") {
@@ -363,19 +1840,20 @@ export class CompanionService {
       sessionId: payload.sessionId,
       authorityId: optionalReference(payload.authorityId, "authority ID"),
       confirmationToken: optionalReference(payload.confirmationToken, "confirmation token"),
+      confirmationScopeDigest: optionalDigest(payload.confirmationScopeDigest, "confirmation scope digest"),
       input: parseInput(payload.input)
     };
   }
 
   private requireCancellation(payload: unknown): OperationCancellationPayload {
-    if (!isRecord(payload) || typeof payload.operationId !== "string" || typeof payload.reason !== "string" || !payload.operationId.trim() || !payload.reason.trim() || payload.operationId.length > 256 || payload.reason.length > 512) {
+    if (!isRecord(payload) || !exactKeys(payload, ["operationId", "reason"]) || typeof payload.operationId !== "string" || typeof payload.reason !== "string" || !payload.operationId.trim() || !payload.reason.trim() || payload.operationId.length > 256 || payload.reason.length > 512) {
       throw new CompanionServiceError("invalid_request", "An operation cancellation requires bounded operation ID and reason values.");
     }
     return { operationId: payload.operationId, reason: payload.reason };
   }
 
   private requireConfirmation(payload: unknown): ConfirmationRequestPayload {
-    if (!isRecord(payload) || typeof payload.action !== "string" || !(commandActionIds as readonly string[]).includes(payload.action)
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["action", "reason"], ["sessionId", "authorityId"]) || typeof payload.action !== "string" || !(commandActionIds as readonly string[]).includes(payload.action)
       || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
       || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")
       || (payload.authorityId !== undefined && typeof payload.authorityId !== "string")) {
@@ -383,6 +1861,191 @@ export class CompanionService {
     }
     return { action: payload.action as CommandAction, reason: payload.reason, ...(payload.sessionId ? { sessionId: payload.sessionId } : {}), ...(payload.authorityId ? { authorityId: payload.authorityId } : {}) };
   }
+
+  private requireReanchorAuthorityList(payload: unknown): ReanchorAuthorityListPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId"]) || !boundedReferenceValue(payload.sessionId)) {
+      throw new CompanionServiceError("invalid_request", "Eligible Re-anchor authority lookup requires one exact managed-session ID.");
+    }
+    return { sessionId: payload.sessionId };
+  }
+
+  private requireReanchorBegin(payload: unknown): ReanchorBeginPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["sessionId", "authorityId", "reason"])
+      || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512 || /[\r\n\0]/.test(payload.reason)) {
+      throw new CompanionServiceError("invalid_request", "Re-anchor begin requires one exact managed session, existing authority, and bounded reason.");
+    }
+    return { sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason.trim() };
+  }
+
+  private requireReanchorHardwareBegin(payload: unknown): ReanchorHardwareBeginPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["signalId", "claimToken", "windowSessionId", "workspaceRoots", "sessionId", "authorityId", "reason"])) {
+      throw new CompanionServiceError("invalid_request", "Hardware Re-anchor begin requires one exact live claim, managed session, existing authority, and bounded reason.");
+    }
+    const claim = parseHardwareClaimReference(payload);
+    const begin = this.requireReanchorBegin({ sessionId: payload.sessionId, authorityId: payload.authorityId, reason: payload.reason });
+    return { ...claim, ...begin };
+  }
+
+  private requireReanchorConfirmation(payload: unknown): ReanchorConfirmationPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["requestId"]) || typeof payload.requestId !== "string" || !/^reanchor:[a-f0-9]{64}$/.test(payload.requestId)) {
+      throw new CompanionServiceError("invalid_request", "Re-anchor confirmation accepts only one exact protected request ID.");
+    }
+    return { requestId: payload.requestId };
+  }
+
+  private requireReanchorGet(payload: unknown): ReanchorGetPayload {
+    return this.requireReanchorConfirmation(payload);
+  }
+
+  private requireCommandPreparation(payload: unknown): CommandPreparationPayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["control", "modifier", "reason"], ["sessionId", "effectSessionId", "reviewScopeDigest", "reviewArtifactId", "reviewArtifactDigest"]) || !isControl(payload.control) || !isModifier(payload.modifier)
+      || typeof payload.reason !== "string" || !payload.reason.trim() || payload.reason.length > 512
+      || (payload.sessionId !== undefined && typeof payload.sessionId !== "string")
+      || (payload.effectSessionId !== undefined && !boundedReferenceValue(payload.effectSessionId))
+      || (payload.reviewScopeDigest !== undefined && (typeof payload.reviewScopeDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewScopeDigest)))
+      || (payload.reviewArtifactId !== undefined && !boundedReferenceValue(payload.reviewArtifactId))
+      || (payload.reviewArtifactDigest !== undefined && (typeof payload.reviewArtifactDigest !== "string" || !/^[a-f0-9]{64}$/.test(payload.reviewArtifactDigest)))) {
+      throw new CompanionServiceError("invalid_request", "Command preparation requires a canonical chord, bounded host reason, and optional exact session ID.");
+    }
+    if ((payload.reviewArtifactId === undefined) !== (payload.reviewArtifactDigest === undefined)) throw new CompanionServiceError("invalid_request", "A protected review artifact ID and digest must be supplied together.");
+    return {
+      control: payload.control, modifier: payload.modifier, reason: payload.reason,
+      ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+      ...(typeof payload.effectSessionId === "string" ? { effectSessionId: payload.effectSessionId } : {}),
+      ...(typeof payload.reviewScopeDigest === "string" ? { reviewScopeDigest: payload.reviewScopeDigest } : {}),
+      ...(typeof payload.reviewArtifactId === "string" ? { reviewArtifactId: payload.reviewArtifactId } : {}),
+      ...(typeof payload.reviewArtifactDigest === "string" ? { reviewArtifactDigest: payload.reviewArtifactDigest } : {})
+    };
+  }
+
+  private requireHostActionCompletion(payload: unknown): HostActionCompletionPayload {
+    if (!isRecord(payload)
+      || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
+      || typeof payload.succeeded !== "boolean"
+      || (payload.effectDisposition !== undefined && !["not_started", "committed", "ambiguous"].includes(payload.effectDisposition as string))
+      || (payload.succeeded === true && payload.effectDisposition !== undefined && payload.effectDisposition !== "committed")
+      || (payload.succeeded === false && payload.effectDisposition === "committed")
+      || typeof payload.summary !== "string" || !payload.summary.trim() || payload.summary.length > 512
+      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || Object.keys(payload).some((key) => !["hostActionId", "succeeded", "effectDisposition", "summary", "adapterVersion", "authorizationToken", "claimId", "claimToken", "windowSessionId"].includes(key))) {
+      throw new CompanionServiceError("invalid_request", "A host-action acknowledgement requires an exact durable ID, outcome, bounded summary, and adapter version.");
+    }
+    if (payload.authorizationToken !== undefined && (typeof payload.authorizationToken !== "string" || !/^host-action-auth:[a-f0-9]{64}$/.test(payload.authorizationToken))) {
+      throw new CompanionServiceError("invalid_request", "The host-action completion authorization token is malformed.");
+    }
+    const claim = parseHostActionClaimReference(payload);
+    if (claim.windowSessionId) this.requireCurrentHostActionWindowBinding(claim.windowSessionId, payload.adapterVersion);
+    const effectDisposition = (payload.effectDisposition ?? (payload.succeeded ? "committed" : "not_started")) as "not_started" | "committed" | "ambiguous";
+    return { hostActionId: payload.hostActionId, succeeded: payload.succeeded, effectDisposition, summary: payload.summary, adapterVersion: payload.adapterVersion, ...(payload.authorizationToken ? { authorizationToken: payload.authorizationToken } : {}), ...claim };
+  }
+
+  private requireHostActionClaim(payload: unknown): HostActionClaimPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["windowSessionId", "workspaceRoots", "adapterVersion", "capabilities", "focused"])
+      || !boundedReferenceValue(payload.windowSessionId) || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || !Array.isArray(payload.workspaceRoots) || payload.workspaceRoots.length > 32
+      || !payload.workspaceRoots.every((root) => boundedHostPath(root))
+      || new Set(payload.workspaceRoots.map((root) => normalizeHostPath(root as string))).size !== payload.workspaceRoots.length
+      || payload.focused !== true || !Array.isArray(payload.capabilities) || payload.capabilities.length !== 1 || payload.capabilities[0] !== "show_voice_center") {
+      throw new CompanionServiceError("invalid_request", "A host-action claim requires one focused extension window, exact adapter version, and the closed Voice Center capability.");
+    }
+    const workspaceRoots = payload.workspaceRoots as string[];
+    this.requireCurrentHostActionWindowBinding(payload.windowSessionId, payload.adapterVersion, workspaceRoots);
+    return { windowSessionId: payload.windowSessionId, workspaceRoots, adapterVersion: payload.adapterVersion, capabilities: ["show_voice_center"], focused: true };
+  }
+
+  private requireHostActionAuthorization(payload: unknown): HostActionAuthorizationPayload {
+    if (!isRecord(payload)
+      || typeof payload.hostActionId !== "string" || !/^host-action:[a-f0-9]{64}$/.test(payload.hostActionId)
+      || typeof payload.adapterVersion !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(payload.adapterVersion)
+      || (payload.selectionId !== undefined && (typeof payload.selectionId !== "string" || !/^(?:pull|run):[A-Za-z0-9._:-]{1,128}$/.test(payload.selectionId)))
+      || Object.keys(payload).some((key) => !["hostActionId", "adapterVersion", "selectionId", "claimId", "claimToken", "windowSessionId"].includes(key))) {
+      throw new CompanionServiceError("invalid_request", "Host-action authorization requires an exact durable ID and adapter version.");
+    }
+    const claim = parseHostActionClaimReference(payload);
+    if (claim.windowSessionId) this.requireCurrentHostActionWindowBinding(claim.windowSessionId, payload.adapterVersion);
+    return { hostActionId: payload.hostActionId, adapterVersion: payload.adapterVersion, ...(typeof payload.selectionId === "string" ? { selectionId: payload.selectionId } : {}), ...claim };
+  }
+
+  private requireCurrentHostActionWindowBinding(windowSessionId: string, adapterVersion: string, workspaceRoots?: readonly string[]): void {
+    const session = this.requireSession(windowSessionId);
+    if (session.surface !== "vscode_window" || session.metadata["sxsy-b122.kind"] !== "window" || !session.capabilities.includes("registered")
+      || session.status === "stale" || session.status === "unreachable") {
+      throw new CompanionServiceError("capability_denied", "Host actions require a current Registered VS Code window session at every claim and settlement boundary.");
+    }
+    if (session.metadata["sxsy-b122.extensionVersion"] !== adapterVersion) {
+      throw new CompanionServiceError("capability_denied", "The host-action adapter version does not match the Registered extension window.");
+    }
+    let registeredCapabilities: unknown;
+    try { registeredCapabilities = JSON.parse(session.metadata["sxsy-b122.hostActionCapabilities"] ?? "null"); } catch { registeredCapabilities = undefined; }
+    if (!Array.isArray(registeredCapabilities) || registeredCapabilities.length !== 1 || registeredCapabilities[0] !== "show_voice_center") {
+      throw new CompanionServiceError("capability_denied", "The Registered extension window has no exact Voice Center delivery capability.");
+    }
+    if (workspaceRoots) {
+      let registeredRoots: unknown;
+      try { registeredRoots = JSON.parse(session.metadata["sxsy-b122.workspaceRoots"] ?? "null"); } catch { registeredRoots = undefined; }
+      if (!Array.isArray(registeredRoots) || registeredRoots.length > 32 || !registeredRoots.every((root) => boundedHostPath(root))
+        || !sameHostRoots(registeredRoots as string[], workspaceRoots)) {
+        throw new CompanionServiceError("capability_denied", "The host-action claim workspace roots do not match the exact Registered VS Code window binding.");
+      }
+    }
+  }
+
+  private requireGitReview(payload: unknown): GitReviewPayload {
+    if (!isRecord(payload) || !isGitReviewAction(payload.action) || typeof payload.sessionId !== "string" || !payload.sessionId.trim() || payload.sessionId.length > 256) {
+      throw new CompanionServiceError("invalid_request", "Git review requires an exact action and managed session ID.");
+    }
+    return { action: payload.action, sessionId: payload.sessionId, mutation: parseGitMutation(payload.mutation) };
+  }
+
+  private requireGitReviewInspect(payload: unknown): GitReviewInspectPayload {
+    if (!isRecord(payload) || !boundedReferenceValue(payload.sessionId) || Object.keys(payload).length !== 1) {
+      throw new CompanionServiceError("invalid_request", "Git review inspection requires one exact managed session ID.");
+    }
+    return { sessionId: payload.sessionId };
+  }
+
+  private requireHandoffCreate(payload: unknown): HandoffCreatePayload {
+    const required = ["sessionId", "plan", "decisions", "documentation", "references", "constraints", "openQuestions", "nextActions"];
+    if (!isRecord(payload) || !allowedExactKeys(payload, required, ["recipientSessionId", "routing", "authorityId"]) || !boundedReferenceValue(payload.sessionId)
+      || typeof payload.plan !== "string" || !payload.plan.trim() || payload.plan.length > 16_384 || /\0/.test(payload.plan)
+      || (payload.recipientSessionId !== undefined && !boundedReferenceValue(payload.recipientSessionId))
+      || (payload.authorityId !== undefined && !boundedReferenceValue(payload.authorityId))
+      || (payload.routing !== undefined && payload.routing !== "queue" && payload.routing !== "immediate")) throw new CompanionServiceError("invalid_request", "Handoff creation requires exact bounded context fields and one managed source session.");
+    return { sessionId: payload.sessionId, plan: payload.plan, decisions: boundedStringList(payload.decisions, "handoff decision"), documentation: boundedStringList(payload.documentation, "handoff documentation"), references: boundedStringList(payload.references, "handoff reference"), constraints: boundedStringList(payload.constraints, "handoff constraint"), openQuestions: boundedStringList(payload.openQuestions, "handoff open question"), nextActions: boundedStringList(payload.nextActions, "handoff next action"), ...(typeof payload.recipientSessionId === "string" ? { recipientSessionId: payload.recipientSessionId } : {}), ...(payload.routing === "queue" || payload.routing === "immediate" ? { routing: payload.routing } : {}), ...(typeof payload.authorityId === "string" ? { authorityId: payload.authorityId } : {}) };
+  }
+
+  private requireHandoffReference(payload: unknown, recipientRequired: boolean): HandoffReferencePayload {
+    if (!isRecord(payload) || !allowedExactKeys(payload, ["handoffId", ...(recipientRequired ? ["recipientSessionId"] : [])], recipientRequired ? [] : ["recipientSessionId"]) || !boundedReferenceValue(payload.handoffId) || (payload.recipientSessionId !== undefined && !boundedReferenceValue(payload.recipientSessionId))) throw new CompanionServiceError("invalid_request", "Handoff request requires an exact package ID and, for acknowledgement, exact recipient session.");
+    return { handoffId: payload.handoffId, ...(typeof payload.recipientSessionId === "string" ? { recipientSessionId: payload.recipientSessionId } : {}) };
+  }
+  private requireHandoffRouting(payload: unknown): HandoffRoutingPayload { if (!isRecord(payload) || !exactKeys(payload, ["routing"]) || (payload.routing !== "queue" && payload.routing !== "immediate")) throw new CompanionServiceError("invalid_request", "Handoff routing must be exactly queue or immediate."); return { routing: payload.routing }; }
+
+  private requireWorkflowPrepare(payload: unknown): WorkflowPreparePayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["action", "sessionId", "authorityId", "intent"]) || !workflowArtifactAction(payload.action) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) throw new CompanionServiceError("invalid_request", "Workflow preparation requires an exact supported action, managed session, host-issued authority, and bounded intent.");
+    if (payload.action === "reanchor") throw new CompanionServiceError("invalid_request", "Re-anchor requires the dedicated Re-anchor lifecycle; generic workflow preparation is forbidden.");
+    return { action: payload.action, sessionId: payload.sessionId, authorityId: payload.authorityId, intent: workflowPreparationIntent(payload.intent) };
+  }
+
+  private requireWorkflowCancel(payload: unknown): WorkflowCancelPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["artifactId", "sessionId", "authorityId"])
+      || !boundedReferenceValue(payload.artifactId) || !boundedReferenceValue(payload.sessionId) || !boundedReferenceValue(payload.authorityId)) {
+      throw new CompanionServiceError("invalid_request", "Workflow cancellation requires one exact prepared artifact, managed session, and host-issued authority.");
+    }
+    return { artifactId: payload.artifactId, sessionId: payload.sessionId, authorityId: payload.authorityId };
+  }
+
+  private requireVoiceConsent(payload: unknown): VoiceConsentPayload {
+    if (!isRecord(payload) || !exactKeys(payload, ["handoffId", "provider", "transcript", "retentionMinutes", "expiresInMinutes"]) || !boundedReferenceValue(payload.handoffId)
+      || (payload.provider !== "claude" && payload.provider !== "chatgpt" && payload.provider !== "system") || (payload.transcript !== "off" && payload.transcript !== "redacted")
+      || !Number.isInteger(payload.retentionMinutes) || (payload.retentionMinutes as number) < 0 || (payload.retentionMinutes as number) > 1_440
+      || !Number.isInteger(payload.expiresInMinutes) || (payload.expiresInMinutes as number) < 1 || (payload.expiresInMinutes as number) > 60) throw new CompanionServiceError("invalid_request", "Voice consent requires one Handoff, provider, privacy policy, bounded retention, and a short expiry.");
+    return { handoffId: payload.handoffId, provider: payload.provider, transcript: payload.transcript, retentionMinutes: payload.retentionMinutes as number, expiresInMinutes: payload.expiresInMinutes as number };
+  }
+  private requireVoiceStart(payload: unknown): VoiceStartPayload { if (!isRecord(payload) || !allowedExactKeys(payload, ["consentId", "voiceSessionId"], ["managedSessionId"]) || !boundedReferenceValue(payload.consentId) || !boundedReferenceValue(payload.voiceSessionId) || (payload.managedSessionId !== undefined && !boundedReferenceValue(payload.managedSessionId))) throw new CompanionServiceError("invalid_request", "Voice start requires exact consent and voice-session IDs."); return { consentId: payload.consentId, voiceSessionId: payload.voiceSessionId, ...(typeof payload.managedSessionId === "string" ? { managedSessionId: payload.managedSessionId } : {}) }; }
+  private requireVoiceSwitch(payload: unknown): VoiceSwitchPayload { if (!isRecord(payload) || !exactKeys(payload, ["bindingId", "consentId", "voiceSessionId"]) || !boundedReferenceValue(payload.bindingId) || !boundedReferenceValue(payload.consentId) || !boundedReferenceValue(payload.voiceSessionId)) throw new CompanionServiceError("invalid_request", "Voice switch requires exact binding, consent, and voice-session IDs."); return { bindingId: payload.bindingId, consentId: payload.consentId, voiceSessionId: payload.voiceSessionId }; }
+  private requireVoiceBinding(payload: unknown): VoiceBindingPayload { if (!isRecord(payload) || !exactKeys(payload, ["bindingId", "managedSessionId"]) || !boundedReferenceValue(payload.bindingId) || !boundedReferenceValue(payload.managedSessionId)) throw new CompanionServiceError("invalid_request", "Voice binding requires exact voice and managed-session IDs."); return { bindingId: payload.bindingId, managedSessionId: payload.managedSessionId }; }
+  private requireVoiceReference(payload: unknown, reasonRequired: boolean): VoiceReferencePayload { if (!isRecord(payload) || !allowedExactKeys(payload, ["bindingId", ...(reasonRequired ? ["reason"] : [])], reasonRequired ? [] : ["reason"]) || !boundedReferenceValue(payload.bindingId) || (payload.reason !== undefined && !boundedReferenceValue(payload.reason))) throw new CompanionServiceError("invalid_request", "Voice request requires an exact binding ID and bounded reason where applicable."); return { bindingId: payload.bindingId, ...(typeof payload.reason === "string" ? { reason: payload.reason } : {}) }; }
 
   private requireSession(id: string): ManagedSession {
     const session = this.sessions.get(id);
@@ -417,6 +2080,45 @@ class CompanionServiceError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+function waitForDirectOperation<T>(operation: (signal: AbortSignal | undefined) => Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal?.aborted) return Promise.reject(directRequestCancelled());
+  const pending = Promise.resolve().then(() => operation(signal));
+  return waitForDirectPromise(pending, signal);
+}
+
+function waitForDirectPromise<T>(pending: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return pending;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (work: () => void): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", aborted);
+      work();
+    };
+    const aborted = (): void => finish(() => reject(directRequestCancelled()));
+    signal.addEventListener("abort", aborted, { once: true });
+    pending.then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error))
+    );
+    if (signal.aborted) aborted();
+  });
+}
+
+function callDirect<T>(target: object, methodName: string, args: readonly unknown[], signal: AbortSignal | undefined): Promise<T> {
+  if (signal?.aborted) return Promise.reject(directRequestCancelled());
+  const method = (target as Record<string, unknown>)[methodName];
+  if (typeof method !== "function") return Promise.reject(new Error(`The direct ${methodName} boundary is unavailable.`));
+  const invocationArgs = signal ? [...args, { signal } satisfies DirectRequestOptions] : [...args];
+  const pending = Promise.resolve(Reflect.apply(method, target, invocationArgs) as T | PromiseLike<T>);
+  return waitForDirectPromise(pending, signal);
+}
+
+function directRequestCancelled(): CompanionServiceError {
+  return new CompanionServiceError("companion_unavailable", "The authenticated companion request ended before the direct operation completed; completion was not inferred.");
 }
 
 const statusValues = ["running", "verified_blocked", "verified_finished", "unreachable", "stale", "unknown"] as const;
@@ -490,6 +2192,14 @@ function optionalReference(value: unknown, label: string): string | undefined {
   return value;
 }
 
+function optionalDigest(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new CompanionServiceError("invalid_request", `A command dispatch ${label} must be one exact lowercase SHA-256 digest.`);
+  }
+  return value;
+}
+
 function normalizeCapabilities(values: readonly Capability[]): readonly Capability[] {
   return [...new Set(values.filter(isCapability))];
 }
@@ -503,25 +2213,181 @@ function cloneSession(session: ManagedSession): ManagedSession {
   };
 }
 
-function directHostActionFor(control: Control, modifier: Modifier): LocalHostAction | undefined {
-  const key = `${control}:${modifier}`;
-  const actions: Readonly<Record<string, LocalHostAction>> = {
-    "CLAUDE:alt": "create_claude_terminal",
-    "CHATGPT:alt": "create_codex_terminal",
-    "TERMINAL:shift": "focus_integrated_terminal"
-  };
-  // Run, Debug, and Stop Managed Run are explicitly requires_mediation in the
-  // canonical protocol. They must never become an extension-local process or
-  // debug API call just because this transport is available.
-  return actions[key];
-}
-
 function isCancellableExecutor(value: MediatedCommandExecutor | undefined): value is CancellableMediatedCommandExecutor {
   return !!value && typeof (value as Partial<CancellableMediatedCommandExecutor>).cancelOperation === "function";
 }
 
 function isConfirmationCapableExecutor(value: MediatedCommandExecutor | undefined): value is ConfirmationCapableMediatedCommandExecutor {
   return !!value && typeof (value as Partial<ConfirmationCapableMediatedCommandExecutor>).requestConfirmation === "function";
+}
+
+function voiceServiceFailure(error: unknown): CompanionServiceError {
+  if (error instanceof CompanionServiceError) return error;
+  const code = typeof error === "object" && error !== null && "code" in error ? (error as { code?: unknown }).code : undefined;
+  if (code === "deletion_incomplete") return new CompanionServiceError("companion_unavailable", "Local voice transcript keys were destroyed, but external provider deletion could not be confirmed.");
+  if (code === "provider_unavailable" || code === "deadline" || code === "cancelled") return new CompanionServiceError("companion_unavailable", "The exact configured voice runtime is unavailable or did not complete within its bounded lifecycle.");
+  return new CompanionServiceError("capability_denied", "The voice request no longer matches its exact consent, provider, target, and managed-session binding.");
+}
+
+function parseGitMutation(value: unknown): GitMutation {
+  if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Git review requires a typed mutation record.");
+  switch (value.kind) {
+    case "local_commit":
+      exactMutationKeys(value, ["kind", "paths", "message", ...(value.featureBranch === undefined ? [] : ["featureBranch"]), ...(value.containmentRemediation === undefined ? [] : ["containmentRemediation"])]);
+      if (!Array.isArray(value.paths) || !value.paths.length || value.paths.length > 256 || !value.paths.every((path) => typeof path === "string" && path.length <= 512)
+        || typeof value.message !== "string" || !value.message.trim() || value.message.length > 120
+        || (value.featureBranch !== undefined && typeof value.featureBranch !== "string")
+        || (value.containmentRemediation !== undefined && !isContainmentGitRemediation(value.containmentRemediation))) throw new CompanionServiceError("invalid_request", "Local commit review requires bounded paths, message, optional feature branch, and an exact closed containment permit binding.");
+      return {
+        kind: "local_commit", paths: value.paths, message: value.message,
+        ...(typeof value.featureBranch === "string" ? { featureBranch: value.featureBranch } : {}),
+        ...(isContainmentGitRemediation(value.containmentRemediation) ? { containmentRemediation: value.containmentRemediation } : {})
+      };
+    case "pr_upsert":
+      exactMutationKeys(value, ["kind", "headBranch", "baseBranch", "title", "body"]);
+      if (typeof value.headBranch !== "string" || typeof value.baseBranch !== "string"
+        || typeof value.title !== "string" || !value.title.trim() || value.title.length > 256 || /[\r\n\0]/.test(value.title)
+        || typeof value.body !== "string" || value.body.length > 16_384 || /\0/.test(value.body)) {
+        throw new CompanionServiceError("invalid_request", "PR review requires exact bounded head, base, title, and body fields.");
+      }
+      return { kind: "pr_upsert", headBranch: value.headBranch, baseBranch: value.baseBranch, title: value.title, body: value.body };
+    case "merge_pr":
+      exactMutationKeys(value, ["kind", "pullRequest", "head", "baseBranch"]);
+      if (!Number.isSafeInteger(value.pullRequest) || typeof value.head !== "string" || typeof value.baseBranch !== "string") throw new CompanionServiceError("invalid_request", "PR merge review requires exact pull request, head, and base values.");
+      return { kind: "merge_pr", pullRequest: value.pullRequest as number, head: value.head, baseBranch: value.baseBranch };
+    case "direct_main":
+      exactMutationKeys(value, ["kind", "branch", "validationReceiptId"]);
+      if (typeof value.branch !== "string" || typeof value.validationReceiptId !== "string") throw new CompanionServiceError("invalid_request", "Direct Main review requires an exact branch and validation receipt.");
+      return { kind: "direct_main", branch: value.branch, validationReceiptId: value.validationReceiptId };
+    default:
+      throw new CompanionServiceError("invalid_request", "Git review mutation kind is unknown.");
+  }
+}
+
+function safeContainmentRelativePath(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 2_048 || /[\r\n\0]/.test(value)) return false;
+  const normalized = value.replaceAll("\\", "/");
+  return !normalized.startsWith("/") && !/^[A-Za-z]:/.test(normalized)
+    && normalized.split("/").every((part) => !!part && part !== "." && part !== ".." && part.toLowerCase() !== ".git");
+}
+
+function isContainmentGitRemediation(value: unknown): value is NonNullable<Extract<GitMutation, { kind: "local_commit" }>["containmentRemediation"]> {
+  return isRecord(value) && exactKeys(value, ["permitId", "incidentId", "fenceEpoch", "action", "remediatedFindingIds"])
+    && typeof value.permitId === "string" && /^containment-remediation-permit:[a-f0-9]{64}$/.test(value.permitId)
+    && typeof value.incidentId === "string" && /^containment-incident:[a-f0-9]{64}$/.test(value.incidentId)
+    && Number.isSafeInteger(value.fenceEpoch) && Number(value.fenceEpoch) > 0
+    && ["remove_exposed_value", "rewrite_local_history", "add_ignore_rule"].includes(String(value.action))
+    && Array.isArray(value.remediatedFindingIds) && value.remediatedFindingIds.length > 0 && value.remediatedFindingIds.length <= 1_024
+    && value.remediatedFindingIds.every((id) => typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(id))
+    && new Set(value.remediatedFindingIds).size === value.remediatedFindingIds.length;
+}
+
+function exactMutationKeys(value: Record<string, unknown>, expected: readonly string[]): void {
+  const keys = Object.keys(value);
+  if (keys.length !== expected.length || expected.some((key) => !(key in value))) throw new CompanionServiceError("invalid_request", "Git review mutation contains an unknown or missing field.");
+}
+
+function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === expected.length && expected.every((key) => Object.hasOwn(value, key));
+}
+
+function allowedExactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.has(key));
+}
+
+function requireEmptyPayload(payload: unknown, label: string): void {
+  if (payload !== undefined && (!isRecord(payload) || Object.keys(payload).length !== 0)) throw new CompanionServiceError("invalid_request", `${label} accepts no client options.`);
+}
+
+function boundedHostPath(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 4_096 && !/[\r\n\0]/.test(value)
+    && (isAbsolute(value) || /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value));
+}
+
+function credentialIdentifier(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
+}
+
+function parseHardwareBinding(value: Record<string, unknown>): HardwareSignalClaimBinding {
+  if (!boundedReferenceValue(value.windowSessionId) || !Array.isArray(value.workspaceRoots) || value.workspaceRoots.length < 1 || value.workspaceRoots.length > 32
+    || !value.workspaceRoots.every((root) => boundedHostPath(root)) || new Set(value.workspaceRoots.map((root) => normalizeHostPath(root as string))).size !== value.workspaceRoots.length) {
+    throw new CompanionServiceError("invalid_request", "Hardware signal binding requires one exact window session and at least one unique absolute workspace root.");
+  }
+  return { windowSessionId: value.windowSessionId, workspaceRoots: value.workspaceRoots as string[] };
+}
+
+function parseHardwareClaimReference(value: Record<string, unknown>): HardwareSignalBindingPayload {
+  const binding = parseHardwareBinding(value);
+  if (typeof value.signalId !== "string" || !/^hardware-signal:[a-f0-9]{64}$/.test(value.signalId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{8,256}$/.test(value.claimToken)) {
+    throw new CompanionServiceError("invalid_request", "Hardware signal request requires an exact durable signal ID and opaque live claim token.");
+  }
+  return { signalId: value.signalId, claimToken: value.claimToken, ...binding };
+}
+
+function sameHostRoots(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((root, index) => normalizeHostPath(root) === normalizeHostPath(right[index]!));
+}
+
+function boundedReferenceValue(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 512 && !/[\r\n\0]/.test(value); }
+
+function exactEligibleReanchorAuthorities(value: unknown): readonly ReanchorEligibleAuthority[] {
+  if (!Array.isArray(value) || value.length > 32) throw new CompanionServiceError("invalid_request", "The host returned an invalid eligible Re-anchor authority set.");
+  const seen = new Set<string>();
+  const result: ReanchorEligibleAuthority[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !exactKeys(item, ["id", "issuedBy", "expiresAt"])
+      || !boundedReferenceValue(item.id) || !boundedReferenceValue(item.issuedBy)
+      || typeof item.expiresAt !== "string" || !Number.isFinite(Date.parse(item.expiresAt)) || seen.has(item.id)) {
+      throw new CompanionServiceError("invalid_request", "The host returned an invalid eligible Re-anchor authority set.");
+    }
+    seen.add(item.id);
+    result.push({ id: item.id, issuedBy: item.issuedBy, expiresAt: new Date(Date.parse(item.expiresAt)).toISOString() });
+  }
+  return result.sort((left, right) => left.expiresAt.localeCompare(right.expiresAt) || left.id.localeCompare(right.id));
+}
+function boundedIdentifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
+function boundedReason(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 2_048 && !/\0/.test(value); }
+function boundedStringList(value: unknown, label: string): readonly string[] { if (!Array.isArray(value) || value.length > 512 || !value.every((item) => typeof item === "string" && item.trim() && item.length <= 16_384 && !/\0/.test(item))) throw new CompanionServiceError("invalid_request", `${label} must be a bounded string list.`); return [...new Set(value.map((item) => (item as string).trim()))]; }
+function workflowArtifactAction(value: unknown): value is WorkflowArtifactAction { return typeof value === "string" && ["reanchor", "proof", "proof_adversarial", "option_provider", "option_packet", "plan_expander", "plan_approval", "handoff", "handoff_queue", "handoff_immediate", "focus_blocked_agent", "focus_finished_agent", "authority_refresh", "authority_broadcast", "bind_voice_session"].includes(value); }
+function workflowPreparationIntent(value: unknown): WorkflowPreparationIntent {
+  if (!isRecord(value) || typeof value.kind !== "string") throw new CompanionServiceError("invalid_request", "Workflow intent must be one exact bounded record.");
+  if (value.kind === "none" && exactKeys(value, ["kind"])) return { kind: "none" };
+  if (value.kind === "decision" && exactKeys(value, ["kind", "question", "context"]) && boundedWorkflowText(value.question) && boundedWorkflowText(value.context)) return { kind: "decision", question: value.question, context: value.context };
+  if (value.kind === "handoff" && exactKeys(value, ["kind", "recipientSessionId", "route"]) && boundedReferenceValue(value.recipientSessionId) && (value.route === "default" || value.route === "queue" || value.route === "immediate")) return { kind: "handoff", recipientSessionId: value.recipientSessionId, route: value.route };
+  if (value.kind === "authority_broadcast" && exactKeys(value, ["kind", "recipientSessionIds"]) && Array.isArray(value.recipientSessionIds) && value.recipientSessionIds.length >= 1 && value.recipientSessionIds.length <= 64 && value.recipientSessionIds.every(boundedReferenceValue)) return { kind: "authority_broadcast", recipientSessionIds: [...new Set(value.recipientSessionIds as string[])] };
+  if (value.kind === "plan_approval" && exactKeys(value, ["kind", "confirmationToken", "confirmationScopeDigest"])
+    && boundedReferenceValue(value.confirmationToken) && typeof value.confirmationScopeDigest === "string" && /^[a-f0-9]{64}$/.test(value.confirmationScopeDigest)) {
+    return { kind: "plan_approval", confirmationToken: value.confirmationToken, confirmationScopeDigest: value.confirmationScopeDigest };
+  }
+  throw new CompanionServiceError("invalid_request", "Workflow intent contains unsupported or unbounded client-authored fields.");
+}
+function boundedWorkflowText(value: unknown): value is string { return typeof value === "string" && !!value.trim() && value.length <= 16_384 && !/\0/.test(value); }
+function uint16(value: unknown): value is number { return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff; }
+function hardwareCompletionOutcome(value: unknown): value is HardwareSignalCompletionOutcome { return value === "handled" || value === "failed_before_dispatch" || value === "needs_reconciliation"; }
+
+function parseHostActionClaimReference(value: Record<string, unknown>): Readonly<{ claimId?: string; claimToken?: string; windowSessionId?: string }> {
+  const present = [value.claimId, value.claimToken, value.windowSessionId].filter((item) => item !== undefined).length;
+  if (present === 0) return {};
+  if (present !== 3 || typeof value.claimId !== "string" || !/^host-action-claim:[a-f0-9]{64}$/.test(value.claimId)
+    || typeof value.claimToken !== "string" || !/^[A-Za-z0-9_-]{16,128}$/.test(value.claimToken)
+    || !boundedReferenceValue(value.windowSessionId)) {
+    throw new CompanionServiceError("invalid_request", "The extension host-action claim reference is incomplete or malformed.");
+  }
+  return { claimId: value.claimId, claimToken: value.claimToken, windowSessionId: value.windowSessionId };
+}
+
+function normalizeHostPath(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
+
+function isCommandPreparationExecutor(value: MediatedCommandExecutor | undefined): value is CommandPreparationCapableMediatedCommandExecutor {
+  return !!value && typeof (value as Partial<CommandPreparationCapableMediatedCommandExecutor>).prepareCommand === "function";
+}
+
+function isExternalCompletionExecutor(value: MediatedCommandExecutor | undefined): value is ExternalCompletionCapableMediatedCommandExecutor {
+  return !!value && typeof (value as Partial<ExternalCompletionCapableMediatedCommandExecutor>).completeExternalOperation === "function";
 }
 
 function isControl(value: unknown): value is Control {
@@ -546,6 +2412,14 @@ function isProvider(value: unknown): value is ManagedSession["provider"] {
 
 function isTerminalProvider(value: unknown): value is SessionAdoptionPayload["provider"] {
   return value === "claude" || value === "codex" || value === "generic";
+}
+
+function isGitReviewAction(value: unknown): value is GitReviewPayload["action"] {
+  return value === "local_commit" || value === "pr_upsert" || value === "pr_merge" || value === "direct_main";
+}
+
+function isAutomationManifestAction(value: CommandAction): value is AutomationManifestCommandReview["action"] {
+  return value === "compound_capture" || value === "compound_refresh" || value === "lfg" || value === "repair_mission";
 }
 
 function isSurface(value: unknown): value is ManagedSession["surface"] {

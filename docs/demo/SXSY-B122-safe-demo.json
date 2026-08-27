@@ -1,0 +1,41 @@
+{
+  "acceptanceEvidence": [],
+  "externalEffects": [],
+  "fixtureTarget": "C:\\SXSY-B122-SIMULATED\\fixture-repository",
+  "frames": [
+    {
+      "action": "proof",
+      "chord": "PROOF:normal",
+      "message": "Read-only proof packet is bound to one simulated exact target.",
+      "result": "preview",
+      "sequence": 1
+    },
+    {
+      "action": "proof",
+      "chord": "PROOF:normal",
+      "message": "No attested provider is installed; no provider request is sent.",
+      "result": "unavailable",
+      "sequence": 2
+    },
+    {
+      "action": "pr_merge",
+      "chord": "COMMIT:alt",
+      "message": "Exact-head merge is blocked because required gates are NOT ACCEPTED.",
+      "result": "blocked",
+      "sequence": 3
+    },
+    {
+      "action": "pipeline_status",
+      "chord": "PIPELINE:normal",
+      "message": "Typed outcomes remain visible; no external effect or retry occurred.",
+      "result": "preserved",
+      "sequence": 4
+    }
+  ],
+  "hardwareObserved": false,
+  "providerContacted": false,
+  "schema": "sxsy-b122.safe-demo/v1",
+  "simulation": true,
+  "title": "SXSY-B122 deterministic fail-closed demonstration",
+  "version": "1.0.0"
+}

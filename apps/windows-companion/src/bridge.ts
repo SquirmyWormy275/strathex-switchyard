@@ -1,7 +1,14 @@
 import type { Control, Modifier } from "../../../packages/protocol/src/b122.ts";
 import type { CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import type { CommandResult, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
+import type { GitMutation } from "../../../packages/control-plane/src/brokers.ts";
+import type { HandoffPackageInput, HandoffRoutingDefault } from "../../../packages/control-plane/src/context-packages.ts";
+import type { WorkflowArtifactAction, WorkflowPreparationIntent } from "../../../packages/control-plane/src/workflow-artifacts.ts";
+import type { VoiceProvider, VoiceTranscriptPolicy } from "../../../packages/control-plane/src/voice.ts";
 import type { CompanionService } from "./service.ts";
+import type { HardwareSignalCompletionOutcome } from "./hardware-signal-queue.ts";
+import type { RawHidDeviceIdentity } from "./raw-hid-installation.ts";
+import type { ContainmentRemediationAction } from "../../../packages/control-plane/src/containment-incidents.ts";
 
 /**
  * Versioned, local-only JSON-lines contract used between the VS Code extension
@@ -22,7 +29,97 @@ export type CompanionMethod =
   | "debug.register"
   | "command.dispatch"
   | "operation.cancel"
-  | "confirmation.request";
+  | "command.prepare"
+  | "confirmation.request"
+  | "provider-mediated.final-current"
+  | "reanchor.authority.list"
+  | "reanchor.begin"
+  | "reanchor.hardware.begin"
+  | "reanchor.confirm-apply"
+  | "reanchor.get"
+  | "git.review.submit"
+  | "git.review.inspect"
+  | "runtime.pin.install"
+  | "runtime.pin.list"
+  | "runtime.pin.revoke"
+  | "sandbox.install"
+  | "sandbox.list"
+  | "sandbox.revoke"
+  | "credential.provision"
+  | "credential.list"
+  | "credential.revoke"
+  | "network-policy.install"
+  | "network-policy.current"
+  | "network-policy.revoke"
+  | "council.port-proxy.activate"
+  | "council.credential-network.execute"
+  | "council.recommendation.approve"
+  | "acceptance.trust.install"
+  | "acceptance.trust.list"
+  | "acceptance.trust.revoke"
+  | "acceptance.evidence.import"
+  | "acceptance.evidence.list"
+  | "acceptance.evidence.invalidate"
+  | "acceptance.activation.activate"
+  | "acceptance.activation.list"
+  | "acceptance.activation.revoke"
+  | "scanner.trust.install"
+  | "scanner.trust.list"
+  | "scanner.trust.revoke"
+  | "scanner.fixture.install"
+  | "scanner.fixture.list"
+  | "scanner.fixture.revoke"
+  | "provider-desktop.install"
+  | "provider-desktop.list"
+  | "provider-desktop.revoke"
+  | "provider-host.profile.install"
+  | "provider-host.profile.current"
+  | "provider.handshake"
+  | "containment.inspect"
+  | "containment.assess"
+  | "containment.verify"
+  | "containment.permit.issue"
+  | "containment.history.rewrite"
+  | "containment.remote.trust.install"
+  | "containment.remote.trust.list"
+  | "containment.remote.trust.revoke"
+  | "containment.remote.challenge.issue"
+  | "containment.remote.challenge.list"
+  | "containment.remote.evidence.import"
+  | "containment.remote.evidence.list"
+  | "containment.rotation.record"
+  | "containment.release"
+  | "raw-hid.install"
+  | "raw-hid.list"
+  | "raw-hid.revoke"
+  | "raw-hid.status"
+  | "hardware-signal.claim"
+  | "hardware-signal.prepare"
+  | "hardware-signal.dispatch"
+  | "hardware-signal.complete"
+  | "host-action.claim"
+  | "host-action.authorize"
+  | "host-action.complete"
+  | "handoff.create"
+  | "handoff.list"
+  | "handoff.acknowledge"
+  | "handoff.cancel"
+  | "handoff.archive"
+  | "handoff.routing.get"
+  | "handoff.routing.set"
+  | "workflow.prepare"
+  | "workflow.cancel"
+  | "workflow.list"
+  | "voice.consent"
+  | "voice.start"
+  | "voice.current"
+  | "voice.switch"
+  | "voice.bind"
+  | "voice.mute"
+  | "voice.resume"
+  | "voice.interrupt"
+  | "voice.end"
+  | "voice.transcript.delete";
 
 export interface CompanionRequest {
   readonly version: typeof companionBridgeVersion;
@@ -80,6 +177,8 @@ export interface DispatchPayload {
   readonly authorityId?: string;
   /** A short-lived, companion-UI-created confirmation reference. */
   readonly confirmationToken?: string;
+  /** Host-issued digest of the exact protected review consumed with the token. */
+  readonly confirmationScopeDigest?: string;
   /**
    * Named, bounded values selected by the host UI (for example a debug
    * configuration name).  Repository or terminal output is not authority.
@@ -103,6 +202,178 @@ export interface ConfirmationRequestPayload {
   readonly authorityId?: string;
   readonly reason: string;
 }
+
+export interface ReanchorAuthorityListPayload { readonly sessionId: string; }
+export interface ReanchorBeginPayload { readonly sessionId: string; readonly authorityId: string; readonly reason: string; }
+export interface ReanchorHardwareBeginPayload extends ReanchorBeginPayload {
+  readonly signalId: string;
+  readonly claimToken: string;
+  readonly windowSessionId: string;
+  readonly workspaceRoots: readonly string[];
+}
+export interface ReanchorConfirmationPayload { readonly requestId: string; }
+export interface ReanchorGetPayload { readonly requestId: string; }
+export interface ReanchorEligibleAuthority {
+  readonly id: string;
+  readonly issuedBy: string;
+  readonly expiresAt: string;
+}
+
+export interface CouncilPortProxyPayload {
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly leaseId: string;
+  readonly operationId: string;
+  readonly fenceDigest: string;
+  readonly resourceHostDigest: string;
+  readonly expectedPort: string;
+  readonly backendPipePath: string;
+  /** One activation-scoped proof sent only over the mutually authenticated companion pipe. */
+  readonly backendProof: string;
+}
+
+export interface CouncilCredentialNetworkPayload {
+  readonly epochId: string;
+  readonly sessionId: string;
+  readonly targetSnapshotId: string;
+  readonly leaseId: string;
+  readonly operationId: string;
+  readonly fenceDigest: string;
+  readonly resourceHostDigest: string;
+  readonly capabilityId: string;
+  readonly routeId: string;
+}
+
+export interface CouncilRecommendationApprovalPayload {
+  readonly recommendationId: string;
+  readonly recommendationDigest: string;
+  readonly approvalOperationId: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly sessionId?: string;
+}
+
+export interface CommandPreparationPayload {
+  readonly control: Control;
+  readonly modifier: Modifier;
+  readonly sessionId?: string;
+  /** Preparation-only debug effect selected by the trusted extension host. */
+  readonly effectSessionId?: string;
+  readonly reason: string;
+  /** Exact host-issued Plan Approval review scope after trusted UI presentation. */
+  readonly reviewScopeDigest?: string;
+  /** Protected workflow artifact selected only by the trusted review UI. */
+  readonly reviewArtifactId?: string;
+  /** Immutable digest of the exact protected workflow artifact presented. */
+  readonly reviewArtifactDigest?: string;
+}
+
+/** A typed result from the installed VS Code host, never an execution request. */
+export interface HostActionCompletionPayload {
+  readonly hostActionId: string;
+  readonly succeeded: boolean;
+  /** Distinguishes a proven pre-effect refusal from an effect that may already exist. */
+  readonly effectDisposition?: "not_started" | "committed" | "ambiguous";
+  readonly summary: string;
+  readonly adapterVersion: string;
+  readonly authorizationToken?: string;
+  /** Present only for a durable extension-owned claim. */
+  readonly claimId?: string;
+  readonly claimToken?: string;
+  readonly windowSessionId?: string;
+}
+
+export interface HostActionClaimPayload {
+  readonly windowSessionId: string;
+  readonly workspaceRoots: readonly string[];
+  readonly adapterVersion: string;
+  readonly capabilities: readonly string[];
+  readonly focused: true;
+}
+
+export interface HostActionAuthorizationPayload {
+  readonly hostActionId: string;
+  readonly adapterVersion: string;
+  readonly selectionId?: string;
+  /** Present only for a durable extension-owned claim. */
+  readonly claimId?: string;
+  readonly claimToken?: string;
+  readonly windowSessionId?: string;
+}
+
+export interface GitReviewPayload {
+  readonly action: "local_commit" | "pr_upsert" | "pr_merge" | "direct_main";
+  readonly sessionId: string;
+  readonly mutation: GitMutation;
+}
+export interface GitReviewInspectPayload { readonly sessionId: string; }
+
+/** Paths are selection input only; digest and user-presence evidence are host-owned. */
+export interface RuntimePinInstallPayload {
+  readonly repositoryRoot: string;
+  readonly manifestPath: string;
+}
+
+export interface RuntimePinRevokePayload {
+  readonly repositoryRoot: string;
+}
+
+export interface SandboxInstallPayload {
+  readonly repositoryRoot: string;
+  readonly catalogPath: string;
+}
+
+export interface SandboxRevokePayload { readonly repositoryRoot: string; }
+
+export interface CredentialProvisionScopePayload { readonly repositoryRoot: string; readonly adapterId: string; readonly purpose: string; }
+export interface CredentialProvisionPayload { readonly reference: string; readonly scopes: readonly CredentialProvisionScopePayload[]; readonly sealedSecret: string; readonly replaceExisting?: boolean; }
+export interface CredentialRevokePayload { readonly reference: string; readonly reason: string; }
+export interface NetworkPolicyInstallPayload { readonly repositoryRoot: string; readonly sourcePath: string; }
+export interface NetworkPolicyScopePayload { readonly repositoryRoot: string; }
+export interface AdministrationSourcePayload { readonly sourcePath: string; }
+export interface AcceptanceTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
+export interface AcceptanceEvidenceInvalidatePayload { readonly evidenceId: string; readonly reason: string; }
+export interface AcceptanceActivationPayload { readonly action: CommandAction; readonly targetSnapshotId: string; readonly expiresAt: string; }
+export interface AcceptanceActivationRevokePayload { readonly activationId: string; readonly reason: string; }
+export interface ScannerTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
+export interface ScannerFixtureRevokePayload { readonly fixtureId: string; readonly reason: string; }
+export interface ProviderDesktopReferencePayload { readonly provider: "claude_desktop" | "chatgpt_desktop" | "claude_code" | "codex"; }
+export interface ProviderHostProfileInstallPayload { readonly profile: Readonly<Record<string, unknown>>; readonly networkPolicyPath: string; }
+export interface ProviderHostProfileScopePayload { readonly repositoryRoot: string; }
+export interface ProviderHandshakePayload { readonly sessionId: string; readonly repositoryRoot: string; }
+export interface ContainmentInspectionPayload { readonly sessionId: string; }
+export interface ContainmentIncidentBindingPayload { readonly sessionId: string; readonly expectedIncidentId: string; readonly expectedIncidentDigest: string; }
+export interface ContainmentPermitIssuePayload extends ContainmentIncidentBindingPayload { readonly action: ContainmentRemediationAction; readonly relativePaths: readonly string[]; readonly expiresAt: string; }
+export interface ContainmentHistoryRewritePayload extends ContainmentIncidentBindingPayload { readonly permitId: string; readonly relativePaths: readonly string[]; readonly remediatedFindingIds: readonly string[]; }
+export interface ContainmentRemoteTrustRevokePayload { readonly authorityId: string; readonly keyId: string; readonly reason: string; }
+export interface ContainmentRemoteChallengeIssuePayload extends ContainmentIncidentBindingPayload { readonly expiresAt: string; }
+export interface ContainmentRemoteEvidenceImportPayload extends ContainmentIncidentBindingPayload { readonly sourcePath: string; }
+export interface ContainmentRotationRecordPayload extends ContainmentIncidentBindingPayload { readonly disposition: "complete" | "not_required"; readonly evidenceReference: string; readonly evidenceDigest: string; }
+export interface ContainmentReleasePayload {
+  readonly sessionId: string;
+  readonly reason: string;
+  readonly expectedFenceEpoch: number;
+  readonly expectedActivationOperationId: string;
+  readonly expectedIncidentId: string;
+  readonly expectedIncidentDigest: string;
+}
+export type RawHidInstallPayload = RawHidDeviceIdentity;
+export interface HardwareSignalBindingPayload { readonly signalId: string; readonly claimToken: string; readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; }
+export interface HardwareSignalClaimPayload { readonly windowSessionId: string; readonly workspaceRoots: readonly string[]; readonly focused: true; }
+export interface HardwareSignalPreparationPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly effectSessionId?: string; readonly reason: string; readonly reviewScopeDigest?: string; readonly reviewArtifactId?: string; readonly reviewArtifactDigest?: string; }
+export interface HardwareSignalDispatchPayload extends HardwareSignalBindingPayload { readonly sessionId?: string; readonly authorityId?: string; readonly confirmationToken?: string; readonly confirmationScopeDigest?: string; readonly input?: Readonly<Record<string, string>>; }
+export interface HardwareSignalCompletionPayload extends HardwareSignalBindingPayload { readonly outcome: HardwareSignalCompletionOutcome; readonly summary: string; readonly dispatchReceiptId?: string; readonly dispatchSessionId?: string; readonly repositoryRoot?: string; }
+export interface HandoffCreatePayload extends Omit<HandoffPackageInput, "repositoryRoot" | "targetSnapshotId" | "taskId" | "planRevision" | "authorityId" | "id"> { readonly sessionId: string; readonly authorityId?: string; }
+export interface HandoffReferencePayload { readonly handoffId: string; readonly recipientSessionId?: string; }
+export interface HandoffRoutingPayload { readonly routing: HandoffRoutingDefault; }
+export interface WorkflowPreparePayload { readonly action: WorkflowArtifactAction; readonly sessionId: string; readonly authorityId: string; readonly intent: WorkflowPreparationIntent; }
+export interface WorkflowCancelPayload { readonly artifactId: string; readonly sessionId: string; readonly authorityId: string; }
+export interface VoiceConsentPayload { readonly handoffId: string; readonly provider: VoiceProvider; readonly transcript: VoiceTranscriptPolicy; readonly retentionMinutes: number; readonly expiresInMinutes: number; }
+export interface VoiceStartPayload { readonly consentId: string; readonly voiceSessionId: string; readonly managedSessionId?: string; }
+export interface VoiceSwitchPayload { readonly bindingId: string; readonly consentId: string; readonly voiceSessionId: string; }
+export interface VoiceBindingPayload { readonly bindingId: string; readonly managedSessionId: string; }
+export interface VoiceReferencePayload { readonly bindingId: string; readonly reason?: string; }
 
 /** A minimal transport so extension and companion hosts can use the same wire format. */
 export interface CompanionBridge {
@@ -156,10 +427,28 @@ export function isCompanionRequest(value: unknown): value is CompanionRequest {
 export function isCompanionMethod(value: unknown): value is CompanionMethod {
   return typeof value === "string" && [
     "ping", "session.register", "session.adopt", "session.status", "session.heartbeat", "session.list",
-    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "confirmation.request"
+    "terminal.register", "terminal.adopt", "debug.register", "command.dispatch", "operation.cancel", "command.prepare", "confirmation.request", "provider-mediated.final-current",
+    "reanchor.authority.list", "reanchor.begin", "reanchor.hardware.begin", "reanchor.confirm-apply", "reanchor.get",
+    "git.review.submit", "git.review.inspect", "runtime.pin.install", "runtime.pin.list", "runtime.pin.revoke", "sandbox.install", "sandbox.list", "sandbox.revoke",
+    "credential.provision", "credential.list", "credential.revoke", "network-policy.install", "network-policy.current", "network-policy.revoke",
+    "council.port-proxy.activate", "council.credential-network.execute", "council.recommendation.approve",
+    "acceptance.trust.install", "acceptance.trust.list", "acceptance.trust.revoke", "acceptance.evidence.import", "acceptance.evidence.list", "acceptance.evidence.invalidate",
+    "acceptance.activation.activate", "acceptance.activation.list", "acceptance.activation.revoke",
+    "scanner.trust.install", "scanner.trust.list", "scanner.trust.revoke", "scanner.fixture.install", "scanner.fixture.list", "scanner.fixture.revoke",
+    "provider-desktop.install", "provider-desktop.list", "provider-desktop.revoke", "provider-host.profile.install", "provider-host.profile.current", "provider.handshake", "containment.inspect", "containment.assess", "containment.verify", "containment.permit.issue", "containment.history.rewrite",
+    "containment.remote.trust.install", "containment.remote.trust.list", "containment.remote.trust.revoke", "containment.remote.challenge.issue", "containment.remote.challenge.list", "containment.remote.evidence.import", "containment.remote.evidence.list",
+    "containment.rotation.record", "containment.release",
+    "raw-hid.install", "raw-hid.list", "raw-hid.revoke", "raw-hid.status", "hardware-signal.claim", "hardware-signal.prepare", "hardware-signal.dispatch", "hardware-signal.complete", "host-action.claim", "host-action.authorize", "host-action.complete",
+    "handoff.create", "handoff.list", "handoff.acknowledge", "handoff.cancel", "handoff.archive", "handoff.routing.get", "handoff.routing.set",
+    "workflow.prepare", "workflow.cancel", "workflow.list", "voice.consent", "voice.start", "voice.current", "voice.switch", "voice.bind", "voice.mute", "voice.resume", "voice.interrupt", "voice.end", "voice.transcript.delete"
   ].includes(value);
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+export type {
+  ProviderMediatedFinalCurrentRequest,
+  ProviderMediatedFinalCurrentDecision
+} from "./provider-mediated-final-current.ts";

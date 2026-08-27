@@ -43,11 +43,17 @@ function snapshotFromUnknown(value: unknown): TargetSnapshot {
   for (const [path, revision] of Object.entries(value.submodules)) submodules[nonEmpty(path, "submodule path")] = nonEmpty(revision, "submodule revision");
   const completeness = value.completeness;
   if (completeness !== "complete" && completeness !== "incomplete") throw new TargetSnapshotLedgerError("Protected TargetSnapshot completeness is malformed.");
+  if (value.detached !== undefined && value.detached !== true) {
+    throw new TargetSnapshotLedgerError("Protected TargetSnapshot detached-HEAD observation is malformed.");
+  }
+  const defaultBranch = optionalText(value.defaultBranch, "default branch");
   const snapshot: TargetSnapshot = {
     id: nonEmpty(value.id, "snapshot id"),
     repositoryRoot: nonEmpty(value.repositoryRoot, "repository root"),
     ...(optionalText(value.canonicalRemote, "canonical remote") ? { canonicalRemote: optionalText(value.canonicalRemote, "canonical remote") } : {}),
     ...(optionalText(value.branch, "branch") ? { branch: optionalText(value.branch, "branch") } : {}),
+    ...(defaultBranch ? { defaultBranch } : {}),
+    ...(value.detached === true ? { detached: true } : {}),
     ...(optionalText(value.upstream, "upstream") ? { upstream: optionalText(value.upstream, "upstream") } : {}),
     ...(optionalText(value.head, "HEAD") ? { head: optionalText(value.head, "HEAD") } : {}),
     ...(optionalText(value.indexTree, "index tree") ? { indexTree: optionalText(value.indexTree, "index tree") } : {}),

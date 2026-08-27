@@ -1,0 +1,544 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { CouncilCoordinator } from "../../../packages/control-plane/src/council.ts";
+import { AllowlistedEvidenceAuthorizer, GateEvidenceLedger } from "../../../packages/control-plane/src/acceptance-evidence.ts";
+import { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
+import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
+import { DurableConfiguredCouncilExecutor, LedgerCouncilAutomaticAcceptanceGate, type CouncilAutomaticAcceptanceGate, type CouncilWorkspaceIsolator } from "../src/council-runtime.ts";
+import type { CouncilIsolationPlan, CouncilIsolationPrepareRequest, CouncilWorkspaceBinding } from "../src/council-workspace-isolation.ts";
+import type { DynamicConfiguredNetworkClient, TrustedProviderDispatchBinding } from "../src/remote-adapters.ts";
+
+const at = "2026-08-24T12:00:00.000Z";
+const target: TargetSnapshot = { id: "a".repeat(64), repositoryRoot: "C:\\repo", branch: "feat/test", defaultBranch: "main", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), submodules: {}, policyVersion: "v1", environmentFingerprint: "f".repeat(64), capturedAt: at, completeness: "complete", reasons: [] };
+const councilAuthority: AuthorityGrant = { id: "authority-council-repository", repositoryRoot: target.repositoryRoot, allowedActions: ["council_automatic"], prohibitedActions: [], issuedAt: "2026-08-24T11:59:00.000Z", expiresAt: "2026-08-24T12:05:00.000Z", issuedBy: "isolated-test" };
+const session = (id: string, provider: ManagedSession["provider"], plannedFiles: readonly string[]): ManagedSession => ({ id, provider, surface: "bridge", capabilities: ["registered", "observable", "controllable", "mediated"], status: "running", workspaceRoot: target.repositoryRoot, targetSnapshotId: target.id, taskId: `task-${id}`, planRevision: "plan-1", plannedFiles, lastHeartbeat: at, adapterVersion: "provider-v1", metadata: { "sxsy-b122.providerHandshake": "exact-route-v1", "sxsy-b122.defaultBranch": "main", "sxsy-b122.resources": JSON.stringify([`port:${id === "one" ? "45101" : "45102"}`]), "sxsy-b122.dependencies": "[]", "sxsy-b122.diffDigest": (id === "one" ? "1" : "2").repeat(64) } });
+
+const acceptedGate: CouncilAutomaticAcceptanceGate = { async accepted() { return true; } };
+
+function fakeIsolation(): CouncilWorkspaceIsolator & { readonly prepared: CouncilIsolationPrepareRequest[]; readonly asserted: string[]; readonly cleaned: string[] } {
+  const plans = new Map<string, CouncilIsolationPlan>();
+  const prepared: CouncilIsolationPrepareRequest[] = []; const asserted: string[] = []; const cleaned: string[] = [];
+  const create = (input: CouncilIsolationPrepareRequest): CouncilIsolationPlan => {
+    const bindings: CouncilWorkspaceBinding[] = input.assignments.map((assignment, index) => ({
+      sessionId: assignment.sessionId, paths: assignment.paths, declarations: assignment.resources,
+      worktreeRoot: `C:\\host-state\\${input.epochId}\\${assignment.sessionId}`,
+      branch: `sxsy-b122/council/${input.epochId}/${assignment.sessionId}`,
+      head: input.targetHead,
+      leases: [],
+      resourceHost: {
+        schema: "sxsy-b122.council-resource-host", version: 1, epochId: input.epochId, sessionId: assignment.sessionId,
+        fenceDigest: (index === 0 ? "6" : "7").repeat(64), capabilities: ["held-loopback-port"], resources: [],
+        environment: { SXSY_COUNCIL_SESSION_ID: assignment.sessionId }, digest: (index === 0 ? "8" : "9").repeat(64)
+      },
+      assignmentDigest: (index === 0 ? "3" : "4").repeat(64)
+    }));
+    return { epochId: input.epochId, targetSnapshotId: input.targetSnapshotId, repositoryRoot: input.repositoryRoot, targetHead: input.targetHead, defaultBranch: input.defaultBranch, stateRoot: "C:\\host-state", bindings, status: "prepared", executionAuthorized: false, createdAt: at, updatedAt: at, digest: "5".repeat(64) };
+  };
+  return {
+    prepared, asserted, cleaned,
+    async prepare(input) { prepared.push(input); const plan = create(input); plans.set(input.epochId, plan); return plan; },
+    async assertCurrent(epochId) { asserted.push(epochId); const plan = plans.get(epochId); if (!plan) throw new Error("missing plan"); return plan; },
+    async cleanup(epochId) { cleaned.push(epochId); const plan = plans.get(epochId); if (!plan) throw new Error("missing plan"); return { ...plan, status: "cleaned" }; },
+    async cleanupOwned(epochId) { cleaned.push(epochId); const plan = plans.get(epochId); return plan ? { ...plan, status: "cleaned" } : undefined; }
+  };
+}
+
+test("durable Council reports every fresh exact-target observable session", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-runtime-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    const sharedDeclarations = { "sxsy-b122.resources": JSON.stringify(["port:45100"]), "sxsy-b122.dependencies": JSON.stringify(["task:shared-prerequisite"]) };
+    await sessions.upsert({ ...session("one", "codex", ["src/shared.ts"]), metadata: { ...session("one", "codex", []).metadata, ...sharedDeclarations } });
+    await sessions.upsert({ ...session("two", "claude", ["src/shared.ts"]), metadata: { ...session("two", "claude", []).metadata, ...sharedDeclarations } });
+    const executor = new DurableConfiguredCouncilExecutor(new CouncilCoordinator(store, { clock: () => at }), sessions, undefined, () => Date.parse(at));
+    const result = await executor.execute({ action: "council_report", operationId: "operation-report", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "completed");
+    assert.equal(result.data?.participants, 2);
+    assert.equal(result.data?.atomic, true);
+    assert.match(String(result.data?.reportId), /^council-report:[a-f0-9]{64}$/);
+    assert.match(String(result.data?.reportDigest), /^[a-f0-9]{64}$/);
+    assert.deepEqual(result.data?.pathConflicts, [{ resource: "src/shared.ts", participants: ["one", "two"] }]);
+    assert.deepEqual(result.data?.resourceConflicts, [{ resource: "port:45100", participants: ["one", "two"] }]);
+    assert.deepEqual(result.data?.dependencyConflicts, [{ resource: "task:shared-prerequisite", participants: ["one", "two"] }]);
+    assert.deepEqual((result.data?.participantDetails as readonly { id: string; plannedFiles: readonly string[] }[]).map((participant) => ({ id: participant.id, plannedFiles: participant.plannedFiles })), [
+      { id: "one", plannedFiles: ["src/shared.ts"] }, { id: "two", plannedFiles: ["src/shared.ts"] }
+    ]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("durable Council excludes a same-target session registered to another repository", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-repository-scope-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    await sessions.upsert({ ...session("other", "codex", ["src/other.ts"]), workspaceRoot: "C:\\other-repository" });
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => at }),
+      sessions,
+      undefined,
+      () => Date.parse(at)
+    ).execute({ action: "council_report", operationId: "operation-repository-scope", target, permit: {} as never });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.data?.participants, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council durably pauses, assigns, and resumes every provider through exact acknowledgements", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-auto-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const phases: string[] = [];
+    const documents: Record<string, unknown>[] = [];
+    const dispatches: TrustedProviderDispatchBinding[] = [];
+    const network = { async request(input: { routeId: string; body?: string; trustedDispatch?: TrustedProviderDispatchBinding }) { const document = JSON.parse(input.body!) as Record<string, unknown>; documents.push(document); if (input.trustedDispatch) dispatches.push(input.trustedDispatch); phases.push(`${input.routeId}:${document.phase}:${document.sessionId}`); const resourceHost = document.resourceHost as Record<string, unknown> | undefined; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: resourceHost?.digest } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-1" });
+    const isolation = fakeIsolation();
+    let resourceProofs = 0;
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), {
+      isolation,
+      automaticGate: acceptedGate,
+      resources: { async assertPlanOperational() { resourceProofs += 1; } }
+    });
+    const result = await executor.execute({ action: "council_automatic", operationId: "operation-auto", target, authority: councilAuthority, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "completed");
+    assert.equal(result.data?.status, "active");
+    assert.deepEqual(phases, [
+      "provider.council.codex:pause:one", "provider.council.claude:pause:two",
+      "provider.council.codex:assignment:one", "provider.council.claude:assignment:two",
+      "provider.council.codex:resume:one", "provider.council.claude:resume:two"
+    ]);
+    assert.equal(dispatches.length, 6);
+    assert.deepEqual(dispatches.map((dispatch) => dispatch.action), ["council_pause", "council_pause", "council_assignment", "council_assignment", "council_resume", "council_resume"]);
+    assert.ok(dispatches.every((dispatch) => dispatch.guardAction === "council_automatic" && dispatch.guardOperationId === "operation-auto" && dispatch.authority.id === councilAuthority.id && dispatch.confirmation === null));
+    assert.deepEqual(dispatches.map((dispatch) => dispatch.session.id), ["one", "two", "one", "two", "one", "two"]);
+    assert.deepEqual(dispatches.map((dispatch) => dispatch.artifact?.id ?? null), [null, null, "epoch-1", "epoch-1", "epoch-1", "epoch-1"]);
+    assert.ok(documents.every((document) => !Object.hasOwn(document, "dispatchLease") && !Object.hasOwn(document, "authorityId")));
+    assert.deepEqual((await council.get("epoch-1"))?.resumeAcknowledgedSessionIds, ["one", "two"]);
+    assert.equal(isolation.prepared.length, 1);
+    assert.deepEqual(isolation.prepared[0]?.assignments.map((assignment) => assignment.sessionId), ["one", "two"]);
+    assert.ok(isolation.asserted.length >= 16);
+    assert.equal(resourceProofs, 2);
+    for (const document of documents.filter((candidate) => candidate.phase !== "pause")) {
+      const resourceHost = document.resourceHost as Record<string, unknown>;
+      assert.match(String(resourceHost.digest), /^[a-f0-9]{64}$/);
+      assert.deepEqual(Object.keys(resourceHost.environment as Record<string, unknown>), ["SXSY_COUNCIL_SESSION_ID"]);
+      assert.equal(JSON.stringify(document).includes("secret-value"), false);
+    }
+    assert.equal((await council.get("epoch-1"))?.assignments.one?.isolationDigest, "3".repeat(64));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council rechecks cancellation and the final effect guard after a provider may have committed", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-post-effect-guard-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    let providerCalls = 0;
+    let guardChecks = 0;
+    const sagaEvents: string[] = [];
+    const network = {
+      async request(input: { routeId: string; body?: string }) {
+        providerCalls += 1;
+        const document = JSON.parse(input.body!) as Record<string, unknown>;
+        return {
+          outcome: "passed",
+          routeId: input.routeId,
+          detail: "provider committed pause",
+          body: Buffer.from(JSON.stringify({
+            schema: "sxsy-b122.council-ack",
+            version: 1,
+            epochId: document.epochId,
+            phase: document.phase,
+            sessionId: document.sessionId,
+            targetSnapshotId: document.targetSnapshotId,
+            accepted: true
+          }))
+        };
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-post-effect-guard" });
+    const result = await new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), {
+      isolation: fakeIsolation(),
+      automaticGate: acceptedGate
+    }).execute({
+      action: "council_automatic",
+      operationId: "operation-post-effect-guard",
+      target,
+      authority: councilAuthority,
+      permit: {} as never,
+      childSaga: {
+        async begin(input) {
+          sagaEvents.push(`begin:${input.action}`);
+          return { operationId: "child-pause-one", parentOperationId: "operation-post-effect-guard", action: input.action, targetSnapshotId: target.id, existing: false, state: "prepared", mayExecute: true };
+        },
+        async markExecuting() { sagaEvents.push("executing"); },
+        async markExternalCommitted() { sagaEvents.push("external_committed"); },
+        async markCancelling() { sagaEvents.push("cancelling"); },
+        async markCompensating() { sagaEvents.push("compensating"); },
+        async settle(_lease, outcome) { sagaEvents.push(`settle:${outcome}`); }
+      },
+      effectGuard: {
+        async assertCurrent() {
+          guardChecks += 1;
+          return providerCalls === 0
+            ? { allowed: true, reason: "current before provider effect" }
+            : { allowed: false, reason: "containment activated after provider effect" };
+        }
+      }
+    });
+
+    assert.equal(providerCalls, 1);
+    assert.ok(guardChecks >= 2);
+    assert.equal(result.status, "incomplete");
+    assert.equal(result.effectDisposition, "ambiguous");
+    assert.match(result.summary, /containment/i);
+    assert.deepEqual(sagaEvents, ["begin:council.pause", "executing", "external_committed", "settle:ambiguous"]);
+    assert.equal((await council.get("epoch-post-effect-guard"))?.status, "aborted");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council exact-repository cancellation aborts and joins an in-flight provider transport", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-live-cancel-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    let releaseStarted!: () => void;
+    const started = new Promise<void>((resolve) => { releaseStarted = resolve; });
+    let transportAborted = false;
+    const network = {
+      async request(input: { routeId: string; signal?: AbortSignal }) {
+        releaseStarted();
+        return new Promise<{ outcome: "blocked"; routeId: string; detail: string }>((resolve) => {
+          const finish = (): void => {
+            transportAborted = true;
+            resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled" });
+          };
+          if (input.signal?.aborted) finish();
+          else input.signal?.addEventListener("abort", finish, { once: true });
+        });
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-live-cancel" });
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), {
+      isolation: fakeIsolation(),
+      automaticGate: acceptedGate
+    });
+    const executing = executor.execute({
+      action: "council_automatic",
+      operationId: "operation-live-cancel",
+      target,
+      authority: councilAuthority,
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } }
+    });
+    await started;
+
+    const cancelled = await executor.cancelRepository(target.repositoryRoot, "repository containment activated");
+    const result = await executing;
+
+    assert.equal(transportAborted, true);
+    assert.equal(result.status, "incomplete");
+    assert.equal(result.effectDisposition, "ambiguous");
+    assert.deepEqual(cancelled.map((epoch) => epoch.id), ["epoch-live-cancel"]);
+    assert.equal((await council.get("epoch-live-cancel"))?.status, "aborted");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council records a pre-provider final-guard denial as not started rather than ambiguous", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-pre-effect-guard-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    let guardChecks = 0;
+    let providerCalls = 0;
+    const sagaOutcomes: string[] = [];
+    const executor = new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-pre-effect-guard" }),
+      sessions,
+      { async request() { providerCalls += 1; throw new Error("must not execute"); } } as unknown as DynamicConfiguredNetworkClient,
+      () => Date.parse(at),
+      { isolation: fakeIsolation(), automaticGate: acceptedGate }
+    );
+    const result = await executor.execute({
+      action: "council_automatic",
+      operationId: "operation-pre-effect-guard",
+      target,
+      authority: councilAuthority,
+      permit: {} as never,
+      childSaga: {
+        async begin(input) { return { operationId: "child-pre-effect", parentOperationId: "operation-pre-effect-guard", action: input.action, targetSnapshotId: target.id, existing: false, state: "prepared", mayExecute: true }; },
+        async markExecuting() {},
+        async markExternalCommitted() { sagaOutcomes.push("external"); },
+        async markCancelling() {},
+        async markCompensating() {},
+        async settle(_lease, outcome) { sagaOutcomes.push(outcome); }
+      },
+      effectGuard: {
+        async assertCurrent() {
+          guardChecks += 1;
+          return guardChecks === 1
+            ? { allowed: true, reason: "initial current" }
+            : { allowed: false, reason: "target changed before provider effect" };
+        }
+      }
+    });
+
+    assert.equal(providerCalls, 0);
+    assert.deepEqual(sagaOutcomes, ["failed"]);
+    assert.equal(result.effectDisposition, "not_started");
+    assert.match(result.summary, /target changed/i);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council aborts durably when provider acknowledges a stale resource-host digest", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-abort-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"])); await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const network = { async request(input: { routeId: string; body?: string }) { const document = JSON.parse(input.body!) as Record<string, unknown>; return { outcome: "passed", routeId: input.routeId, detail: "ok", body: Buffer.from(JSON.stringify({ schema: "sxsy-b122.council-ack", version: 1, epochId: document.epochId, phase: document.phase, sessionId: document.sessionId, targetSnapshotId: document.targetSnapshotId, accepted: true, ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: "0".repeat(64) } : {}) })) }; } } as unknown as DynamicConfiguredNetworkClient;
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-2" });
+    const isolation = fakeIsolation();
+    const result = await new DurableConfiguredCouncilExecutor(council, sessions, network, () => Date.parse(at), { isolation, automaticGate: acceptedGate }).execute({ action: "council_automatic", operationId: "operation-auto", target, authority: councilAuthority, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "incomplete");
+    assert.equal((await council.get("epoch-2"))?.status, "abort_pending", "remote resource cleanup must remain durable across restart");
+    assert.deepEqual(isolation.cleaned, ["epoch-2"]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council proves every assigned resource is operational before any participant resumes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-resource-proof-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const isolation = fakeIsolation();
+    const phases: string[] = [];
+    const network = {
+      async request(input: { body?: string }) {
+        const document = JSON.parse(input.body!) as Record<string, unknown>;
+        phases.push(String(document.phase));
+        const resourceHost = document.resourceHost as Record<string, unknown> | undefined;
+        return {
+          outcome: "passed",
+          detail: "ok",
+          body: Buffer.from(JSON.stringify({
+            schema: "sxsy-b122.council-ack",
+            version: 1,
+            epochId: document.epochId,
+            phase: document.phase,
+            sessionId: document.sessionId,
+            targetSnapshotId: document.targetSnapshotId,
+            accepted: true,
+            ...(document.assignmentDigest ? { assignmentDigest: document.assignmentDigest, resourceHostDigest: resourceHost?.digest } : {})
+          }))
+        };
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    let resourceProofs = 0;
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => at, idFactory: () => "epoch-resource-proof" }),
+      sessions,
+      network,
+      () => Date.parse(at),
+      {
+        isolation,
+        automaticGate: acceptedGate,
+        resources: {
+          async assertPlanOperational() {
+            resourceProofs += 1;
+            assert.equal(phases.includes("resume"), false);
+            throw new Error("one assigned port proxy was never activated");
+          }
+        }
+      }
+    ).execute({ action: "council_automatic", operationId: "operation-resource-proof", target, authority: councilAuthority, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "incomplete");
+    assert.equal(resourceProofs, 1);
+    assert.equal(phases.includes("resume"), false);
+    assert.deepEqual(isolation.cleaned, ["epoch-resource-proof"]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council stays gate-disabled and does not allocate isolation without independent acceptance", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-gate-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"])); await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const isolation = fakeIsolation();
+    const result = await new DurableConfiguredCouncilExecutor(new CouncilCoordinator(store), sessions, { async request() { throw new Error("must not run"); } } as unknown as DynamicConfiguredNetworkClient, () => Date.parse(at), { isolation }).execute({ action: "council_automatic", operationId: "operation-gated", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "unavailable");
+    assert.match(result.summary, /acceptance|gate-disabled/i);
+    assert.equal(isolation.prepared.length, 0);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("automatic Council aborts when durable cancellation polling fails", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-cancellation-ledger-"));
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const now = Date.now();
+    const heartbeat = new Date(now).toISOString();
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => heartbeat });
+    await sessions.upsert({ ...session("one", "codex", ["src/one.ts"]), lastHeartbeat: heartbeat });
+    await sessions.upsert({ ...session("two", "claude", ["src/two.ts"]), lastHeartbeat: heartbeat });
+    let checks = 0;
+    let transportAborted = false;
+    const network = {
+      async request(input: { routeId: string; signal?: AbortSignal }) {
+        assert.ok(input.signal);
+        return new Promise<{ outcome: "blocked"; routeId: string; detail: string }>((resolve) => {
+          const finish = (): void => { transportAborted = true; resolve({ outcome: "blocked", routeId: input.routeId, detail: "cancelled" }); };
+          if (input.signal!.aborted) finish();
+          else input.signal!.addEventListener("abort", finish, { once: true });
+        });
+      }
+    } as unknown as DynamicConfiguredNetworkClient;
+    const startedAt = Date.now();
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => heartbeat, idFactory: () => "epoch-cancellation-ledger" }),
+      sessions,
+      network,
+      () => now,
+      { isolation: fakeIsolation(), automaticGate: acceptedGate }
+    ).execute({
+      action: "council_automatic",
+      operationId: "operation-cancellation-ledger",
+      target,
+      authority: councilAuthority,
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+      executionControl: {
+        operationId: "operation-cancellation-ledger",
+        deadline: new Date(now + 2_000).toISOString(),
+        async isCancellationRequested() {
+          checks += 1;
+          if (checks === 1) return false;
+          throw new Error("protected cancellation ledger unavailable");
+        }
+      }
+    });
+    assert.equal(result.status, "incomplete");
+    assert.equal(transportAborted, true);
+    assert.ok(Date.now() - startedAt < 700, "Council waited for its deadline after cancellation polling failed");
+    assert.equal((await new CouncilCoordinator(store).get("epoch-cancellation-ledger"))?.status, "aborted");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council bounds a never-settling initial cancellation read", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-cancellation-hang-"));
+  try {
+    const now = Date.now();
+    const heartbeat = new Date(now).toISOString();
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => heartbeat });
+    await sessions.upsert({ ...session("one", "codex", ["src/one.ts"]), lastHeartbeat: heartbeat });
+    await sessions.upsert({ ...session("two", "claude", ["src/two.ts"]), lastHeartbeat: heartbeat });
+    let checks = 0;
+    let requests = 0;
+    const result = await new DurableConfiguredCouncilExecutor(
+      new CouncilCoordinator(store, { clock: () => heartbeat, idFactory: () => "epoch-cancellation-hang" }),
+      sessions,
+      { async request() { requests += 1; throw new Error("provider must not start"); } } as unknown as DynamicConfiguredNetworkClient,
+      () => now,
+      { isolation: fakeIsolation(), automaticGate: acceptedGate }
+    ).execute({
+      action: "council_automatic",
+      operationId: "operation-cancellation-hang",
+      target,
+      authority: councilAuthority,
+      permit: {} as never,
+      effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
+      executionControl: {
+        operationId: "operation-cancellation-hang",
+        deadline: new Date(now + 180).toISOString(),
+        async isCancellationRequested() { checks += 1; return new Promise<boolean>(() => undefined); }
+      }
+    });
+    assert.equal(result.status, "incomplete");
+    assert.equal(checks, 1);
+    assert.equal(requests, 0);
+    assert.equal((await new CouncilCoordinator(store).get("epoch-cancellation-hang"))?.status, "aborted");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("automatic Council gate requires every exact-target acceptance record and rejects stale target evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-evidence-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const ledger = new GateEvidenceLedger(store, new AllowlistedEvidenceAuthorizer(["independent-qa"]), { clock: () => at });
+    const gate = new LedgerCouncilAutomaticAcceptanceGate(ledger);
+    const request = { action: "council_automatic" as const, operationId: "operation-evidence", target, permit: {} as never };
+    assert.equal(await gate.accepted(request), false);
+    for (const gateNumber of [4, 10, 15, 21, 24, 27] as const) {
+      await ledger.record({ gate: gateNumber, status: "passed", targetSnapshotId: target.id, evidenceDigest: `sha256:gate-${gateNumber}`, policyVersion: "v1", evaluatedBy: "independent-qa", rationale: "Independent exact-target mechanism evidence." });
+    }
+    assert.equal(await gate.accepted(request), true);
+    assert.equal(await gate.accepted({ ...request, target: { ...target, id: "changed-target" } }), false);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("Council recommendation dispatch only prepares; a distinct exact review call approves without execution authority", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "b122-council-recommend-"));
+  try {
+    const store = new ProtectedJsonStore({ filePath: join(directory, "journal.jsonl") });
+    const sessions = new SessionRegistry(store, { clock: () => at });
+    await sessions.upsert(session("one", "codex", ["src/one.ts"]));
+    await sessions.upsert(session("two", "claude", ["src/two.ts"]));
+    const council = new CouncilCoordinator(store, { clock: () => at, idFactory: () => "recommendation-1" });
+    const executor = new DurableConfiguredCouncilExecutor(council, sessions, undefined, () => Date.parse(at));
+    const result = await executor.execute({ action: "council_recommend", operationId: "operation-recommend", target, permit: {} as never, effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } });
+    assert.equal(result.status, "completed");
+    assert.equal(result.data?.recommendationId, "recommendation-1");
+    assert.match(String(result.data?.recommendationDigest), /^[a-f0-9]{64}$/);
+    const stored = await council.getRecommendation("recommendation-1");
+    assert.equal(stored?.status, "prepared");
+    assert.equal(stored?.executionAuthorized, false);
+    const approved = await executor.approveRecommendation({
+      recommendationId: stored!.id,
+      recommendationDigest: stored!.digest,
+      approvalOperationId: "operation-review-1",
+      target
+    });
+    assert.equal(approved.status, "approved");
+    assert.equal(approved.executionAuthorized, false);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

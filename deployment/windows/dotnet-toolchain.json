@@ -1,0 +1,36 @@
+{
+  "schema": "sxsy-b122.dotnet-toolchain",
+  "version": 1,
+  "sdkVersion": "8.0.424",
+  "runtimeVersion": "8.0.30",
+  "sdkArchive": {
+    "source": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.424/dotnet-sdk-8.0.424-win-x64.zip",
+    "sha512": "1787ab90635c2950672ed7c6507b000e1b212ea7d9a22fcef37061344d37c64d4c4eda12b8742601eff5b45c8736485b31c55613892f240c300190e4e88a58b0"
+  },
+  "dotnetExeSha256": "76e6472063f53379b86fe8370203ab6c46c75d27f405b722845f0e495d8f5fd0",
+  "nugetConfigSha256": "5256a7e3e07d2c5c94f7a1e6c45f39aab011c659c5e2d53e452dea525ce04575",
+  "runtimePackages": [
+    {
+      "id": "microsoft.aspnetcore.app.runtime.win-x64",
+      "version": "8.0.30",
+      "sha256": "42c7192e6b7588ab768332f908a2a20a0b45b7b2533a58def3e335478ecf2da5"
+    },
+    {
+      "id": "microsoft.netcore.app.runtime.win-x64",
+      "version": "8.0.30",
+      "sha256": "47235c8046fd788fe1fdab5ef83d54e56ce0114b6fcd1197a7b6fc0d1656eb40"
+    },
+    {
+      "id": "microsoft.windowsdesktop.app.runtime.win-x64",
+      "version": "8.0.30",
+      "sha256": "658a37a76de73790c9ad06dda9e3aac84841f2f88813bbe3fc549ceae786e8b2"
+    }
+  ],
+  "buildPackages": [
+    {
+      "id": "microsoft.net.illink.tasks",
+      "version": "8.0.30",
+      "sha256": "91edab8b85d0b0e4bfdae0c04946913f9c84d1ddfde180faba9d78b4d5a205e4"
+    }
+  ]
+}

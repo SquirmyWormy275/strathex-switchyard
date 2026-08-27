@@ -5,12 +5,22 @@ export type SessionStatus = "running" | "verified_blocked" | "verified_finished"
 export type CommandStatus = "queued" | "running" | "awaiting_input" | "awaiting_confirmation" | "cancelling" | "completed" | "failed" | "timed_out" | "unavailable" | "incomplete" | "blocked" | "cancelled";
 export type OperationState = "prepared" | "executing" | "external_committed" | "recorded" | "failed" | "cancelling" | "compensating" | "cancelled";
 export type ReceiptResult = "passed" | "failed" | "unavailable" | "incomplete" | "not_run";
+/**
+ * What is durably known about the external effect behind an outcome. Status
+ * describes the user-visible command state; it must never be used to infer
+ * whether a provider, network peer, or subprocess accepted an effect.
+ */
+export type EffectDisposition = "not_started" | "committed" | "ambiguous" | "compensated";
 
 export interface TargetSnapshot {
   readonly id: string;
   readonly repositoryRoot: string;
   readonly canonicalRemote?: string;
   readonly branch?: string;
+  /** Host-observed default branch, usually from refs/remotes/origin/HEAD. */
+  readonly defaultBranch?: string;
+  /** True only when Git positively observed HEAD detached from every branch. */
+  readonly detached?: true;
   readonly upstream?: string;
   readonly head?: string;
   readonly indexTree?: string;
@@ -103,12 +113,15 @@ export interface CommandRequest {
   readonly targetSnapshot?: TargetSnapshot;
   readonly authorityId?: string;
   readonly confirmationToken?: string;
+  /** Echo of a host-computed reviewed scope; it cannot mint or broaden a token. */
+  readonly confirmationScopeDigest?: string;
   readonly input?: Readonly<Record<string, string>>;
 }
 
 export interface CommandResult {
   readonly status: CommandStatus;
   readonly summary: string;
+  readonly effectDisposition?: EffectDisposition;
   readonly operationId?: string;
   readonly receiptId?: string;
   readonly data?: Readonly<Record<string, unknown>>;

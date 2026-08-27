@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import type { Capability, SessionStatus } from "./contracts.ts";
-import { jsonClone, type JournalEntry, ProtectedJsonStore } from "./store.ts";
+import { jsonClone, type JournalEntry, ProtectedJsonStore, sha256, stableJson } from "./store.ts";
 
 export interface CouncilParticipant {
   readonly id: string;
+  /** Durable route identity used for cleanup even after the live session is lost. */
+  readonly provider: "claude" | "codex" | "generic" | "voice";
   readonly targetSnapshotId: string;
   readonly status: SessionStatus;
   readonly capabilities: readonly Capability[];
@@ -32,12 +34,23 @@ export interface CouncilReport {
   readonly collectedAt: string;
 }
 
-export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "active" | "aborted" | "completed";
+/** Immutable, bounded report content persisted for exact operator review. */
+export interface CouncilReportArtifact extends CouncilReport {
+  readonly id: string;
+  readonly digest: string;
+  readonly executionAuthorized: false;
+}
+
+export type CouncilEpochStatus = "awaiting_pause_acknowledgements" | "awaiting_assignment_acknowledgements" | "awaiting_resume_acknowledgements" | "active" | "completion_pending" | "abort_pending" | "aborted" | "completed";
 
 export interface CouncilAssignment {
   readonly sessionId: string;
   readonly paths: readonly string[];
   readonly resources: readonly string[];
+  /** Exact host-isolation binding acknowledged by the assigned participant. */
+  readonly isolationDigest?: string;
+  /** Exact participant-host resource binding needed for remote cleanup. */
+  readonly resourceHostDigest?: string;
 }
 
 export interface CouncilEpoch {
@@ -48,13 +61,38 @@ export interface CouncilEpoch {
   readonly assignments: Readonly<Record<string, CouncilAssignment>>;
   readonly pauseAcknowledgedSessionIds: readonly string[];
   readonly assignmentAcknowledgedSessionIds: readonly string[];
+  readonly resumeAcknowledgedSessionIds: readonly string[];
   readonly status: CouncilEpochStatus;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly abortReason?: string;
 }
 
+export type CouncilRecommendationStatus = "prepared" | "approved" | "rejected";
+export interface CouncilRecommendation {
+  readonly id: string;
+  readonly repositoryRoot: string;
+  readonly targetSnapshotId: string;
+  readonly participantSessionIds: readonly string[];
+  readonly assignments: Readonly<Record<string, CouncilAssignment>>;
+  readonly reportId: string;
+  readonly reportDigest: string;
+  /** Stable report content excluding heartbeat/collection time, rechecked at approval. */
+  readonly reviewScopeDigest: string;
+  readonly preparationOperationId: string;
+  readonly digest: string;
+  readonly ready: boolean;
+  readonly status: CouncilRecommendationStatus;
+  readonly approvalOperationId?: string;
+  readonly rejectionReason?: string;
+  readonly executionAuthorized: false;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 interface CouncilEpochSavedEvent { readonly epoch: CouncilEpoch; }
+interface CouncilReportSavedEvent { readonly report: CouncilReportArtifact; }
+interface CouncilRecommendationSavedEvent { readonly recommendation: CouncilRecommendation; }
 
 export class CouncilError extends Error {
   constructor(message: string) {
@@ -73,6 +111,13 @@ function nonEmpty(value: string, field: string): string {
 
 function unique(values: readonly string[], field: string): readonly string[] {
   return [...new Set(values.map((value) => nonEmpty(value, field)))].sort();
+}
+
+function boundedUnique(values: readonly string[], field: string): readonly string[] {
+  if (!Array.isArray(values) || values.length > 128) throw new CouncilError(`Council ${field} declarations exceed the 128-item review bound.`);
+  const normalized = values.map((value) => nonEmpty(value, field));
+  if (normalized.some((value) => value.length > 256 || /[\r\n\0]/u.test(value))) throw new CouncilError(`Council ${field} declarations contain an unbounded or unsafe value.`);
+  return [...new Set(normalized)].sort();
 }
 
 function cloneParticipant(participant: CouncilParticipant): CouncilParticipant {
@@ -95,8 +140,33 @@ function cloneEpoch(epoch: CouncilEpoch): CouncilEpoch {
       resources: [...assignment.resources]
     }])),
     pauseAcknowledgedSessionIds: [...epoch.pauseAcknowledgedSessionIds],
-    assignmentAcknowledgedSessionIds: [...epoch.assignmentAcknowledgedSessionIds]
+    assignmentAcknowledgedSessionIds: [...epoch.assignmentAcknowledgedSessionIds],
+    resumeAcknowledgedSessionIds: [...(epoch.resumeAcknowledgedSessionIds ?? [])]
   };
+}
+
+function cloneRecommendation(value: CouncilRecommendation): CouncilRecommendation {
+  return {
+    ...value,
+    participantSessionIds: [...value.participantSessionIds],
+    assignments: Object.fromEntries(Object.entries(value.assignments).map(([id, assignment]) => [id, { ...assignment, paths: [...assignment.paths], resources: [...assignment.resources] }])),
+    executionAuthorized: false
+  };
+}
+
+function cloneReport(value: CouncilReportArtifact): CouncilReportArtifact {
+  return {
+    ...value,
+    participants: value.participants.map(cloneParticipant),
+    pathConflicts: value.pathConflicts.map(cloneConflict),
+    resourceConflicts: value.resourceConflicts.map(cloneConflict),
+    dependencyConflicts: value.dependencyConflicts.map(cloneConflict),
+    executionAuthorized: false
+  };
+}
+
+function cloneConflict(value: CouncilConflict): CouncilConflict {
+  return { resource: value.resource, participants: [...value.participants] };
 }
 
 function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilEpoch> {
@@ -105,7 +175,38 @@ function epochs(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilE
     if (entry.kind !== "council.epoch.saved") continue;
     const epoch = (entry.payload as CouncilEpochSavedEvent | undefined)?.epoch;
     if (!epoch || typeof epoch.id !== "string") throw new CouncilError("Protected Council epoch record is malformed.");
+    if (Object.values(epoch.assignments ?? {}).some((assignment) => (assignment.isolationDigest !== undefined && !/^[a-f0-9]{64}$/.test(assignment.isolationDigest))
+      || (assignment.resourceHostDigest !== undefined && !/^[a-f0-9]{64}$/.test(assignment.resourceHostDigest)))) throw new CouncilError("Protected Council assignment isolation/resource-host digest is malformed.");
     result.set(epoch.id, cloneEpoch(epoch));
+  }
+  return result;
+}
+
+function recommendations(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilRecommendation> {
+  const result = new Map<string, CouncilRecommendation>();
+  const durableReports = reports(entries);
+  for (const entry of entries) {
+    if (entry.kind !== "council.recommendation.saved") continue;
+    const value = (entry.payload as CouncilRecommendationSavedEvent | undefined)?.recommendation;
+    if (!value || value.executionAuthorized !== false || !["prepared", "approved", "rejected"].includes(value.status)
+      || typeof value.reportId !== "string" || typeof value.reviewScopeDigest !== "string" || typeof value.preparationOperationId !== "string") throw new CouncilError("Protected Council recommendation is malformed.");
+    if (recommendationDigest(value) !== value.digest) throw new CouncilError("Protected Council recommendation digest is invalid.");
+    if (durableReports.get(value.reportId)?.digest !== value.reportDigest) throw new CouncilError("Protected Council recommendation is not bound to its durable report artifact.");
+    result.set(value.id, cloneRecommendation(value));
+  }
+  return result;
+}
+
+function reports(entries: readonly JournalEntry<unknown>[]): Map<string, CouncilReportArtifact> {
+  const result = new Map<string, CouncilReportArtifact>();
+  for (const entry of entries) {
+    if (entry.kind !== "council.report.saved") continue;
+    const value = (entry.payload as CouncilReportSavedEvent | undefined)?.report;
+    if (!value || value.executionAuthorized !== false || value.id !== `council-report:${value.digest}` || councilReportDigest(value) !== value.digest) {
+      throw new CouncilError("Protected Council report is malformed or has an invalid digest.");
+    }
+    assertBoundedReport(value);
+    result.set(value.id, cloneReport(value));
   }
   return result;
 }
@@ -117,18 +218,22 @@ function normalizedParticipant(input: CouncilParticipant): CouncilParticipant {
   if (!Number.isFinite(Date.parse(input.lastHeartbeat))) throw new CouncilError(`Participant ${input.id} has an invalid heartbeat.`);
   return {
     id: nonEmpty(input.id, "participant id"),
+    provider: providerIdentity(input.provider),
     targetSnapshotId: nonEmpty(input.targetSnapshotId, "participant targetSnapshotId"),
     status: input.status,
     capabilities: [...new Set(input.capabilities)],
     lastHeartbeat: input.lastHeartbeat,
-    plannedFiles: unique(input.plannedFiles, "planned file"),
-    resources: unique(input.resources, "resource"),
-    dependencies: unique(input.dependencies, "dependency"),
+    plannedFiles: boundedUnique(input.plannedFiles, "planned file"),
+    resources: boundedUnique(input.resources, "resource"),
+    dependencies: boundedUnique(input.dependencies, "dependency"),
     diffDigest: nonEmpty(input.diffDigest, "diffDigest")
   };
 }
 
 function assertAutomaticParticipant(participant: CouncilParticipant): void {
+  if (participant.provider !== "claude" && participant.provider !== "codex") {
+    throw new CouncilError(`Participant ${participant.id} has no supported exact provider-host route for automatic Council.`);
+  }
   if (!necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))) {
     throw new CouncilError(`Participant ${participant.id} lacks a proven automatic-coordination capability.`);
   }
@@ -150,7 +255,7 @@ function conflicts(participants: readonly CouncilParticipant[], field: "plannedF
     .sort((a, b) => a.resource.localeCompare(b.resource));
 }
 
-function allAcknowledged(epoch: CouncilEpoch, field: "pauseAcknowledgedSessionIds" | "assignmentAcknowledgedSessionIds"): boolean {
+function allAcknowledged(epoch: CouncilEpoch, field: "pauseAcknowledgedSessionIds" | "assignmentAcknowledgedSessionIds" | "resumeAcknowledgedSessionIds"): boolean {
   const acknowledgements = new Set(epoch[field]);
   return epoch.participants.every((participant) => acknowledgements.has(participant.id));
 }
@@ -168,18 +273,22 @@ export class CouncilCoordinator {
   private readonly store: ProtectedJsonStore;
   private readonly clock: () => string;
   private readonly idFactory: () => string;
+  private readonly heartbeatMaxAgeMs: number;
 
-  constructor(store: ProtectedJsonStore, options: { readonly clock?: () => string; readonly idFactory?: () => string } = {}) {
+  constructor(store: ProtectedJsonStore, options: { readonly clock?: () => string; readonly idFactory?: () => string; readonly heartbeatMaxAgeMs?: number } = {}) {
     this.store = store;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? randomUUID;
+    this.heartbeatMaxAgeMs = options.heartbeatMaxAgeMs ?? 5 * 60_000;
+    if (!Number.isSafeInteger(this.heartbeatMaxAgeMs) || this.heartbeatMaxAgeMs < 1) throw new CouncilError("Council heartbeat maximum age must be a positive integer.");
   }
 
   async report(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReport> {
+    if (!Array.isArray(input.participants) || input.participants.length > 64) throw new CouncilError("Council reports are bounded to 64 exact participants.");
     const participants = input.participants.map(normalizedParticipant);
     if (participants.length === 0) throw new CouncilError("Council needs at least one verified participant.");
     if (new Set(participants.map((participant) => participant.id)).size !== participants.length) throw new CouncilError("Council participant IDs must be unique.");
-    return {
+    const report: CouncilReport = {
       repositoryRoot: nonEmpty(input.repositoryRoot, "repositoryRoot"),
       targetSnapshotId: nonEmpty(input.targetSnapshotId, "targetSnapshotId"),
       participants: participants.map(cloneParticipant),
@@ -191,6 +300,30 @@ export class CouncilCoordinator {
         && necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))),
       collectedAt: this.clock()
     };
+    assertBoundedReport(report);
+    return report;
+  }
+
+  async createReport(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilReportArtifact> {
+    const report = await this.report(input);
+    const digest = councilReportDigest(report);
+    const artifact: CouncilReportArtifact = {
+      id: `council-report:${digest}`,
+      digest,
+      ...report,
+      executionAuthorized: false
+    };
+    return this.store.transaction(async (transaction) => {
+      const existing = reports(await transaction.readEntries()).get(artifact.id);
+      if (existing) return cloneReport(existing);
+      await transaction.append<CouncilReportSavedEvent>("council.report.saved", { report: artifact });
+      return cloneReport(artifact);
+    });
+  }
+
+  async getReport(id: string): Promise<CouncilReportArtifact | undefined> {
+    const found = reports(await this.store.readEntries()).get(nonEmpty(id, "Council report id"));
+    return found ? cloneReport(found) : undefined;
   }
 
   async beginAutomatic(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }): Promise<CouncilEpoch> {
@@ -212,6 +345,7 @@ export class CouncilCoordinator {
       assignments: {},
       pauseAcknowledgedSessionIds: [],
       assignmentAcknowledgedSessionIds: [],
+      resumeAcknowledgedSessionIds: [],
       status: "awaiting_pause_acknowledgements",
       createdAt: now,
       updatedAt: now
@@ -239,7 +373,7 @@ export class CouncilCoordinator {
     });
   }
 
-  async assign(id: string, sessionId: string, paths: readonly string[], resources: readonly string[]): Promise<CouncilEpoch> {
+  async assign(id: string, sessionId: string, paths: readonly string[], resources: readonly string[], isolationDigest?: string, resourceHostDigest?: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_pause_acknowledgements" && epoch.status !== "awaiting_assignment_acknowledgements") {
         throw new CouncilError("Council assignments are not accepted for this epoch state.");
@@ -248,6 +382,8 @@ export class CouncilCoordinator {
       const participant = this.assertParticipant(epoch, sessionId);
       const normalizedPaths = unique(paths, "assigned path");
       const normalizedResources = unique(resources, "assigned resource");
+      const normalizedIsolationDigest = isolationDigest === undefined ? undefined : exactIsolationDigest(isolationDigest);
+      const normalizedResourceHostDigest = resourceHostDigest === undefined ? undefined : exactIsolationDigest(resourceHostDigest);
       if (!normalizedPaths.every((path) => participant.plannedFiles.includes(path))) throw new CouncilError("Council cannot assign a path outside the participant's verified plan.");
       if (!normalizedResources.every((resource) => participant.resources.includes(resource))) throw new CouncilError("Council cannot assign a resource outside the participant's verified declaration.");
       for (const [otherId, assignment] of Object.entries(epoch.assignments)) {
@@ -258,17 +394,19 @@ export class CouncilCoordinator {
       }
       return {
         ...epoch,
-        assignments: { ...epoch.assignments, [sessionId]: { sessionId, paths: normalizedPaths, resources: normalizedResources } },
+        assignments: { ...epoch.assignments, [sessionId]: { sessionId, paths: normalizedPaths, resources: normalizedResources, ...(normalizedIsolationDigest ? { isolationDigest: normalizedIsolationDigest } : {}), ...(normalizedResourceHostDigest ? { resourceHostDigest: normalizedResourceHostDigest } : {}) } },
         status: "awaiting_assignment_acknowledgements"
       };
     });
   }
 
-  async acknowledgeAssignment(id: string, sessionId: string): Promise<CouncilEpoch> {
+  async acknowledgeAssignment(id: string, sessionId: string, isolationDigest?: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council assignment acknowledgement is not accepted for this epoch.");
       this.assertParticipant(epoch, sessionId);
-      if (!epoch.assignments[sessionId]) throw new CouncilError("A participant cannot acknowledge an assignment it has not received.");
+      const assignment = epoch.assignments[sessionId];
+      if (!assignment) throw new CouncilError("A participant cannot acknowledge an assignment it has not received.");
+      assertIsolationAcknowledgement(assignment, isolationDigest);
       return {
         ...epoch,
         assignmentAcknowledgedSessionIds: unique([...epoch.assignmentAcknowledgedSessionIds, sessionId], "session id")
@@ -276,12 +414,111 @@ export class CouncilCoordinator {
     });
   }
 
-  async resume(id: string): Promise<CouncilEpoch> {
+  async beginResume(id: string): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status !== "awaiting_assignment_acknowledgements") throw new CouncilError("Council epoch cannot resume from its current state.");
       if (Object.keys(epoch.assignments).length !== epoch.participants.length) throw new CouncilError("Every Council participant needs an explicit assignment before resuming.");
       if (!allAcknowledged(epoch, "assignmentAcknowledgedSessionIds")) throw new CouncilError("Every Council participant must acknowledge its assignment before resuming.");
+      return { ...epoch, status: "awaiting_resume_acknowledgements", resumeAcknowledgedSessionIds: [] };
+    });
+  }
+
+  /** Returns durable nonterminal epochs that require the installed lifecycle verifier. */
+  async listOngoing(): Promise<readonly CouncilEpoch[]> {
+    return [...epochs(await this.store.readEntries()).values()]
+      .filter((epoch) => epoch.status !== "completed" && epoch.status !== "aborted")
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map(cloneEpoch);
+  }
+
+  async prepareRecommendation(input: { readonly repositoryRoot: string; readonly targetSnapshotId: string; readonly participants: readonly CouncilParticipant[] }, preparationOperationId: string): Promise<CouncilRecommendation> {
+    const report = await this.createReport(input);
+    const ready = report.atomic && report.pathConflicts.length === 0 && report.resourceConflicts.length === 0 && report.dependencyConflicts.length === 0;
+    const assignments = ready ? Object.fromEntries(report.participants.map((participant) => [participant.id, { sessionId: participant.id, paths: participant.plannedFiles, resources: participant.resources }])) : {};
+    const now = this.clock();
+    const base = {
+      id: nonEmpty(this.idFactory(), "Council recommendation id"), repositoryRoot: report.repositoryRoot, targetSnapshotId: report.targetSnapshotId,
+      participantSessionIds: report.participants.map((participant) => participant.id).sort(), assignments,
+      reportId: report.id, reportDigest: report.digest, reviewScopeDigest: councilReviewScopeDigest(report),
+      preparationOperationId: nonEmpty(preparationOperationId, "preparation operation id"), ready, createdAt: now
+    };
+    const recommendation: CouncilRecommendation = { ...base, digest: recommendationDigest(base), status: "prepared", executionAuthorized: false, updatedAt: now };
+    return this.store.transaction(async (transaction) => {
+      if (recommendations(await transaction.readEntries()).has(recommendation.id)) throw new CouncilError(`Council recommendation already exists: ${recommendation.id}`);
+      await transaction.append<CouncilRecommendationSavedEvent>("council.recommendation.saved", { recommendation });
+      return cloneRecommendation(recommendation);
+    });
+  }
+
+  async getRecommendation(id: string): Promise<CouncilRecommendation | undefined> {
+    const found = recommendations(await this.store.readEntries()).get(nonEmpty(id, "Council recommendation id"));
+    return found ? cloneRecommendation(found) : undefined;
+  }
+
+  async approveRecommendation(input: Readonly<{
+    recommendationId: string;
+    recommendationDigest: string;
+    approvalOperationId: string;
+    repositoryRoot: string;
+    targetSnapshotId: string;
+    participants: readonly CouncilParticipant[];
+  }>): Promise<CouncilRecommendation> {
+    const currentReport = await this.report({ repositoryRoot: input.repositoryRoot, targetSnapshotId: input.targetSnapshotId, participants: input.participants });
+    return this.mutateRecommendation(input.recommendationId, (value) => {
+      if (input.recommendationDigest !== value.digest) throw new CouncilError("Council recommendation approval digest does not match the exact prepared artifact.");
+      const approvalOperationId = nonEmpty(input.approvalOperationId, "approval operation id");
+      if (approvalOperationId === value.preparationOperationId) throw new CouncilError("Council recommendation approval must be a distinct second operation.");
+      if (!value.ready) throw new CouncilError("Council recommendation cannot be approved while participant, target, path, resource, or dependency conflicts remain.");
+      if (value.repositoryRoot !== currentReport.repositoryRoot || value.targetSnapshotId !== currentReport.targetSnapshotId
+        || value.reviewScopeDigest !== councilReviewScopeDigest(currentReport)) throw new CouncilError("Council recommendation participants, target, conflicts, or declared work changed after preparation.");
+      if (value.status === "approved" && value.approvalOperationId === approvalOperationId) return value;
+      if (value.status !== "prepared") throw new CouncilError(`Council recommendation is already ${value.status}.`);
+      return { ...value, status: "approved", approvalOperationId, executionAuthorized: false };
+    });
+  }
+
+  async rejectRecommendation(id: string, reason: string): Promise<CouncilRecommendation> {
+    return this.mutateRecommendation(id, (value) => {
+      if (value.status === "approved") throw new CouncilError("An approved Council recommendation cannot be silently rejected.");
+      return { ...value, status: "rejected", rejectionReason: nonEmpty(reason, "recommendation rejection reason"), executionAuthorized: false };
+    });
+  }
+
+  async acknowledgeResume(id: string, sessionId: string, isolationDigest?: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_resume_acknowledgements") throw new CouncilError("Council resume acknowledgement is not accepted for this epoch.");
+      this.assertParticipant(epoch, sessionId);
+      const assignment = epoch.assignments[sessionId];
+      if (!assignment) throw new CouncilError("A participant cannot acknowledge resume without an exact assignment.");
+      assertIsolationAcknowledgement(assignment, isolationDigest);
+      return { ...epoch, resumeAcknowledgedSessionIds: unique([...epoch.resumeAcknowledgedSessionIds, sessionId], "session id") };
+    });
+  }
+
+  async activate(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status !== "awaiting_resume_acknowledgements") throw new CouncilError("Council epoch cannot activate from its current state.");
+      if (!allAcknowledged(epoch, "resumeAcknowledgedSessionIds")) throw new CouncilError("Every Council participant must durably acknowledge resume before the epoch becomes active.");
       return { ...epoch, status: "active" };
+    });
+  }
+
+  async beginCompletion(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status === "completion_pending") return epoch;
+      if (epoch.status !== "active") throw new CouncilError("Only an active Council epoch can begin completion.");
+      if (!epoch.participants.length || !epoch.participants.every((participant) => participant.status === "verified_finished")) {
+        throw new CouncilError("Council completion requires every exact participant to be freshly verified finished.");
+      }
+      return { ...epoch, status: "completion_pending" };
+    });
+  }
+
+  async complete(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status === "completed") return epoch;
+      if (epoch.status !== "completion_pending") throw new CouncilError("Council completion requires a durable pending-completion transition and resource cleanup.");
+      return { ...epoch, status: "completed" };
     });
   }
 
@@ -294,17 +531,28 @@ export class CouncilCoordinator {
     try {
       const normalized = observations.map((observation) => {
         const participant = normalizedParticipant(observation);
-        assertAutomaticParticipant(participant);
+        if (!necessaryAutomaticCapabilities.every((capability) => participant.capabilities.includes(capability))) {
+          throw new CouncilError(`Participant ${participant.id} lost a proven automatic-coordination capability.`);
+        }
+        if (participant.status !== "running" && participant.status !== "verified_finished") {
+          throw new CouncilError(`Participant ${participant.id} is ${participant.status}; the active Council epoch stopped.`);
+        }
         return participant;
       });
-      if (normalized.length !== epoch.participants.length) reason = "Council participant set changed during the epoch.";
+      if (normalized.length !== epoch.participants.length || new Set(normalized.map((participant) => participant.id)).size !== normalized.length) reason = "Council participant set changed during the epoch.";
+      const statuses = new Set(normalized.map((participant) => participant.status));
+      if (!reason && statuses.has("verified_finished") && statuses.size !== 1) reason = "Council participant completion was not verified for the complete exact session set.";
       const currentById = new Map(normalized.map((participant) => [participant.id, participant]));
+      const now = Date.parse(this.clock());
       for (const expected of epoch.participants) {
         const current = currentById.get(expected.id);
         if (!current) { reason = `Council participant ${expected.id} is missing.`; break; }
         if (current.targetSnapshotId !== epoch.targetSnapshotId) { reason = `Council participant ${expected.id} changed TargetSnapshot.`; break; }
         if (current.diffDigest !== expected.diffDigest) { reason = `Council participant ${expected.id} changed its diff during coordination.`; break; }
-        if (current.lastHeartbeat !== expected.lastHeartbeat) { reason = `Council participant ${expected.id} heartbeat changed; the epoch is no longer atomic.`; break; }
+        const heartbeat = Date.parse(current.lastHeartbeat);
+        if (heartbeat < Date.parse(expected.lastHeartbeat)) { reason = `Council participant ${expected.id} heartbeat regressed during coordination.`; break; }
+        if (heartbeat > now + 30_000) { reason = `Council participant ${expected.id} heartbeat is in the future.`; break; }
+        if (now - heartbeat > this.heartbeatMaxAgeMs) { reason = `Council participant ${expected.id} heartbeat is stale.`; break; }
         if (!equalStrings(current.plannedFiles, expected.plannedFiles) || !equalStrings(current.resources, expected.resources) || !equalStrings(current.dependencies, expected.dependencies)) {
           reason = `Council participant ${expected.id} changed its declared plan or resource lease.`;
           break;
@@ -313,14 +561,30 @@ export class CouncilCoordinator {
     } catch (error) {
       reason = error instanceof Error ? error.message : "Council observation could not be verified.";
     }
-    return reason ? this.abort(id, reason) : epoch;
+    if (reason) return this.abort(id, reason);
+    return this.mutate(id, (current) => current.status !== "active" ? current : {
+      ...current,
+      participants: observations.map(normalizedParticipant).sort((left, right) => left.id.localeCompare(right.id))
+    });
   }
 
-  async abort(id: string, reason: string): Promise<CouncilEpoch> {
+  async abort(id: string, reason: string, options: { readonly cleanupRequired?: boolean } = {}): Promise<CouncilEpoch> {
     return this.mutate(id, (epoch) => {
       if (epoch.status === "aborted") return epoch;
+      if (epoch.status === "abort_pending") return epoch;
       if (epoch.status === "completed") throw new CouncilError("A completed Council epoch cannot be aborted.");
-      return { ...epoch, status: "aborted", abortReason: nonEmpty(reason, "abort reason") };
+      const cleanupRequired = options.cleanupRequired === true
+        || Object.values(epoch.assignments).some((assignment) => assignment.isolationDigest !== undefined || assignment.resourceHostDigest !== undefined);
+      return { ...epoch, status: cleanupRequired ? "abort_pending" : "aborted", abortReason: nonEmpty(reason, "abort reason") };
+    });
+  }
+
+  /** Settles an abort only after every remote and local resource is proven cleaned. */
+  async settleAbort(id: string): Promise<CouncilEpoch> {
+    return this.mutate(id, (epoch) => {
+      if (epoch.status === "aborted") return epoch;
+      if (epoch.status !== "abort_pending") throw new CouncilError("Council abort settlement requires durable pending cleanup.");
+      return { ...epoch, status: "aborted" };
     });
   }
 
@@ -334,9 +598,100 @@ export class CouncilCoordinator {
     });
   }
 
+  private async mutateRecommendation(id: string, mutate: (value: CouncilRecommendation) => CouncilRecommendation): Promise<CouncilRecommendation> {
+    return this.store.transaction(async (transaction) => {
+      const existing = recommendations(await transaction.readEntries()).get(nonEmpty(id, "Council recommendation id"));
+      if (!existing) throw new CouncilError(`Unknown Council recommendation: ${id}`);
+      const changed = { ...mutate(cloneRecommendation(existing)), updatedAt: this.clock(), executionAuthorized: false as const };
+      await transaction.append<CouncilRecommendationSavedEvent>("council.recommendation.saved", { recommendation: changed });
+      return cloneRecommendation(changed);
+    });
+  }
+
   private assertParticipant(epoch: CouncilEpoch, sessionId: string): CouncilParticipant {
     const found = epoch.participants.find((participant) => participant.id === sessionId);
     if (!found) throw new CouncilError("Session is not a participant in this Council epoch.");
     return found;
+  }
+}
+
+function recommendationDigest(value: Pick<CouncilRecommendation, "id" | "repositoryRoot" | "targetSnapshotId" | "participantSessionIds" | "assignments" | "reportId" | "reportDigest" | "reviewScopeDigest" | "preparationOperationId" | "ready" | "createdAt">): string {
+  return sha256(stableJson({
+    id: value.id,
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participantSessionIds: value.participantSessionIds,
+    assignments: value.assignments,
+    reportId: value.reportId,
+    reportDigest: value.reportDigest,
+    reviewScopeDigest: value.reviewScopeDigest,
+    preparationOperationId: value.preparationOperationId,
+    ready: value.ready,
+    createdAt: value.createdAt
+  }));
+}
+
+function councilReportDigest(value: CouncilReport): string {
+  return sha256(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants: value.participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic,
+    collectedAt: value.collectedAt
+  }));
+}
+
+function councilReviewScopeDigest(value: CouncilReport): string {
+  const participants = value.participants.map(({ lastHeartbeat: _lastHeartbeat, ...participant }) => participant);
+  return sha256(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic
+  }));
+}
+
+function assertBoundedReport(value: CouncilReport): void {
+  if (value.participants.length > 64) throw new CouncilError("Council reports are bounded to 64 exact participants.");
+  for (const conflicts of [value.pathConflicts, value.resourceConflicts, value.dependencyConflicts]) {
+    if (conflicts.length > 512) throw new CouncilError("Council report conflicts exceed the 512-item exact-review bound.");
+    if (conflicts.some((conflict) => conflict.resource.length > 256 || conflict.participants.length > 64)) throw new CouncilError("Council report conflict detail exceeds its exact-review bound.");
+  }
+  if (Buffer.byteLength(stableJson({
+    repositoryRoot: value.repositoryRoot,
+    targetSnapshotId: value.targetSnapshotId,
+    participants: value.participants,
+    pathConflicts: value.pathConflicts,
+    resourceConflicts: value.resourceConflicts,
+    dependencyConflicts: value.dependencyConflicts,
+    atomic: value.atomic,
+    collectedAt: value.collectedAt
+  }), "utf8") > 262_144) throw new CouncilError("Council report detail exceeds the 256 KiB exact-review bound.");
+}
+
+function providerIdentity(value: CouncilParticipant["provider"]): CouncilParticipant["provider"] {
+  if (value !== "claude" && value !== "codex" && value !== "generic" && value !== "voice") throw new CouncilError("Council participant provider identity is invalid.");
+  return value;
+}
+
+function exactIsolationDigest(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) throw new CouncilError("Council isolation digest must be an exact SHA-256 value.");
+  return normalized;
+}
+
+function assertIsolationAcknowledgement(assignment: CouncilAssignment, supplied: string | undefined): void {
+  if (!assignment.isolationDigest) {
+    if (supplied !== undefined) throw new CouncilError("Council assignment has no durable isolation digest to acknowledge.");
+    return;
+  }
+  if (supplied === undefined || exactIsolationDigest(supplied) !== assignment.isolationDigest) {
+    throw new CouncilError("Council acknowledgement does not match the exact durable isolation digest.");
   }
 }

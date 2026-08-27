@@ -4,10 +4,12 @@
 **Authority:** `SXSY-B122-complete-key-specification-and-audit.md`  
 **Scope:** software that can be implemented and deterministically tested without the physical B122, an installed proprietary provider, or production credentials.
 
-> **Correction:** this document predates the adversarial post-merge audit.
-> It describes the safe control-plane foundation, not completion of each named
-> B122 behavior. See [`post-merge-adversarial-audit.md`](post-merge-adversarial-audit.md)
-> for the current evidence boundary.
+> **Historical point-in-time record:** this document predates the completed
+> hardware-independent implementation. It describes the earlier safe
+> control-plane foundation and must not be read as current source capability.
+> See [`software-only-completion-audit.md`](software-only-completion-audit.md)
+> for the current mechanism/evidence boundary. The historical PR #3 findings
+> remain in [`post-merge-adversarial-audit.md`](post-merge-adversarial-audit.md).
 
 ## What is implemented
 

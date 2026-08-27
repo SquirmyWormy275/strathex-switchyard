@@ -4,6 +4,19 @@ import { PassThrough } from "node:stream";
 import { CompanionService } from "../src/service.ts";
 import { handleJsonLine, serveJsonLines } from "../src/stdio.ts";
 
+test("JSON-lines embedding forwards the exact caller request context", async () => {
+  const controller = new AbortController();
+  let received: AbortSignal | undefined;
+  const response = await handleJsonLine('{"version":1,"id":"context","method":"ping"}', {
+    async handle(request, context) {
+      received = context?.signal;
+      return { version: 1, id: request.id, ok: true };
+    }
+  }, { signal: controller.signal });
+  assert.equal(response?.ok, true);
+  assert.equal(received, controller.signal);
+});
+
 test("JSON-lines handler replies to valid requests and keeps malformed input non-fatal", async () => {
   const service = new CompanionService({ now: () => "2026-08-23T00:00:00.000Z", idFactory: () => "audit" });
   const pong = await handleJsonLine('{"version":1,"id":"ping-1","method":"ping"}', service);

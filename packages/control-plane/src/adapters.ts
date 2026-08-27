@@ -1,14 +1,34 @@
-import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { AuthorityGrant, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { CommandAction, CommandDefinition } from "./command-catalog.ts";
 import type { ExecutionControl } from "./execution-control.ts";
+import type { ChildOperationSaga } from "./operations.ts";
+import type { ContainmentGuard, EffectGuard } from "./brokers.ts";
 import { redactRecord, untrustedSummary } from "./redaction.ts";
 
 /** Adapter lifecycle mirrors only truthful command dispositions; long-running provider work stays reconcilable. */
-export type AdapterStatus = "completed" | "unavailable" | "blocked" | "failed" | "awaiting_input" | "awaiting_confirmation" | "running" | "cancelled" | "timed_out";
+export type AdapterStatus = "completed" | "unavailable" | "blocked" | "failed" | "incomplete" | "awaiting_input" | "awaiting_confirmation" | "running" | "cancelled" | "timed_out";
 export interface AdapterOutcome {
   readonly status: AdapterStatus;
   readonly summary: string;
+  /** Explicitly separates a refusal before effect from an uncertain remote result. */
+  readonly effectDisposition?: EffectDisposition;
   readonly data?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Created only by CommandDispatcher after the exact confirmation has passed
+ * policy validation. Provider artifacts and extension payloads cannot mint it.
+ */
+export interface AdapterConfirmation {
+  readonly currentUserConfirmed: true;
+  /** SHA-256 of the exact one-time policy confirmation; the token never leaves the dispatcher. */
+  readonly confirmationDigest: string;
+  /** Optional host-reviewed scope that was matched by the durable token. */
+  readonly confirmationScopeDigest?: string;
+  readonly action: CommandAction;
+  readonly targetSnapshotId?: string;
+  readonly sessionId?: string;
+  readonly authorityId?: string;
 }
 
 /** Typed context crosses the adapter boundary; untrusted text is data only. */
@@ -19,7 +39,12 @@ export interface AdapterRequest {
   readonly target?: TargetSnapshot;
   readonly session?: ManagedSession;
   readonly authority?: AuthorityGrant;
+  readonly confirmation?: AdapterConfirmation;
   readonly executionControl?: ExecutionControl;
+  /** Host-owned final target barrier, checked before an adapter side effect. */
+  readonly effectGuard?: EffectGuard;
+  /** Durable child effects for provider/host adapters; absent only in simple previews/tests. */
+  readonly childSaga?: ChildOperationSaga;
   readonly untrustedInput?: Readonly<Record<string, string>>;
 }
 
@@ -47,7 +72,7 @@ export class UnavailableCommandAdapter implements CommandAdapter {
   }
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
-    return { status: "unavailable", summary: `${request.definition.title} is unavailable: ${this.reason}` };
+    return { status: "unavailable", summary: `${request.definition.title} is unavailable: ${this.reason}`, effectDisposition: "not_started" };
   }
 }
 
@@ -75,7 +100,7 @@ export class InMemoryCommandAdapter implements CommandAdapter {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const handler = this.handlers.get(request.definition.action);
-    if (!handler) return { status: "unavailable", summary: `Adapter ${this.id} has no supported capability for ${request.definition.action}.` };
+    if (!handler) return { status: "unavailable", summary: `Adapter ${this.id} has no supported capability for ${request.definition.action}.`, effectDisposition: "not_started" };
     const outcome = await handler(request);
     return {
       ...outcome,
@@ -88,6 +113,11 @@ export class InMemoryCommandAdapter implements CommandAdapter {
 /** Routes a command to one explicitly registered adapter; it never guesses a compatible provider. */
 export class AdapterRegistry {
   private readonly adapters = new Map<CommandAction, CommandAdapter>();
+  private readonly containment?: ContainmentGuard;
+
+  constructor(containment?: ContainmentGuard) {
+    this.containment = containment;
+  }
 
   register(action: CommandAction, adapter: CommandAdapter): void {
     this.adapters.set(action, adapter);
@@ -99,7 +129,33 @@ export class AdapterRegistry {
 
   async execute(request: AdapterRequest): Promise<AdapterOutcome> {
     const adapter = this.adapters.get(request.definition.action);
-    if (!adapter) return { status: "unavailable", summary: `No verified adapter is registered for ${request.definition.title}.` };
+    if (!adapter) return { status: "unavailable", summary: `No verified adapter is registered for ${request.definition.title}.`, effectDisposition: "not_started" };
+    if (request.effectGuard && request.target) {
+      const current = await request.effectGuard.assertCurrent({
+        action: request.definition.action,
+        operationId: request.operationId ?? "adapter-without-operation",
+        target: request.target,
+        ...(request.session ? { session: request.session } : {}),
+        ...(request.authority ? { authority: request.authority } : {})
+      });
+      if (!current.allowed) return { status: "blocked", summary: current.reason, effectDisposition: "not_started" };
+    }
+    if (this.containment && request.target && adapterNeedsContainment(request.definition)) {
+      const fence = await this.containment.check(request.target.repositoryRoot, "adapter");
+      if (!fence.allowed) return { status: "blocked", summary: fence.reason, effectDisposition: "not_started" };
+    }
     return adapter.execute(request);
   }
+}
+
+/**
+ * Read-only UI navigation can remain visible during containment.  Any managed
+ * agent/provider route or consequential adapter route must pass the durable
+ * fence before the adapter receives it.
+ */
+function adapterNeedsContainment(definition: CommandDefinition): boolean {
+  return definition.executor === "agent"
+    || definition.requiresCompleteTargetSnapshot
+    || definition.highConsequence
+    || definition.outbound;
 }

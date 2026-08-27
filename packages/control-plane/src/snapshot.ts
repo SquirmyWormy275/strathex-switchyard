@@ -5,6 +5,8 @@ export interface ManifestFile {
   readonly path: string;
   /** Content or canonical stat/hash data supplied by a trusted Git adapter. */
   readonly digest?: string;
+  /** A tracked path may be positively observed as absent from the worktree. */
+  readonly state?: "tracked_missing";
   /** Every untracked file must be explicitly included or excluded by policy. */
   readonly classification?: "included" | "excluded" | "unknown";
   /** Ignored inputs are never silently absent from a consequential snapshot. */
@@ -19,6 +21,8 @@ export interface GitInspection {
   readonly repositoryRoot?: string;
   readonly canonicalRemote?: string;
   readonly branch?: string;
+  readonly defaultBranch?: string;
+  readonly detached?: true;
   readonly upstream?: string;
   readonly head?: string;
   readonly indexTree?: string;
@@ -73,6 +77,8 @@ export function targetSnapshotIdentity(snapshot: TargetSnapshotIdentityInput): R
     repositoryRoot: snapshot.repositoryRoot,
     canonicalRemote: snapshot.canonicalRemote ?? null,
     branch: snapshot.branch ?? null,
+    defaultBranch: snapshot.defaultBranch ?? null,
+    detached: snapshot.detached ?? false,
     upstream: snapshot.upstream ?? null,
     head: snapshot.head ?? null,
     indexTree: snapshot.indexTree ?? null,
@@ -105,12 +111,43 @@ function nonEmpty(value: string | undefined, field: string, reasons: string[]): 
   return value.trim();
 }
 
-function manifestDigest(files: readonly ManifestFile[] | undefined, kind: "tracked" | "untracked", reasons: string[]): string {
+export interface CanonicalManifestFile {
+  readonly path: string;
+  readonly digest: string;
+  readonly state?: "tracked_missing";
+  readonly classification?: string;
+  readonly source?: string;
+}
+
+export interface CanonicalWorktreeManifest {
+  readonly files: readonly CanonicalManifestFile[];
+  readonly digest: string;
+  readonly reasons: readonly string[];
+}
+
+/** Canonical evidence for a tracked path Git positively reports as deleted. */
+export function trackedMissingFileDigest(pathValue: string): string {
+  const path = pathValue.replaceAll("\\", "/").replace(/^\.\//, "");
+  if (!path) throw new Error("A tracked-missing path must be named.");
+  return `sha256:${sha256(stableJson({ schema: "sxsy-b122.tracked-worktree-missing", version: 1, path }))}`;
+}
+
+function optionalNonEmpty(value: string | undefined, field: string, reasons: string[]): string | undefined {
+  if (value === undefined) return undefined;
+  if (!value.trim()) {
+    reasons.push(`${field} was supplied but empty.`);
+    return undefined;
+  }
+  return value.trim();
+}
+
+export function canonicalWorktreeManifest(files: readonly ManifestFile[] | undefined, kind: "tracked" | "untracked"): CanonicalWorktreeManifest {
+  const reasons: string[] = [];
   if (!files) {
     reasons.push(`${kind} worktree manifest is unavailable.`);
-    return sha256(stableJson({ kind, unavailable: true }));
+    return { files: [], digest: sha256(stableJson({ kind, unavailable: true })), reasons };
   }
-  const normalized: Array<{ path: string; digest: string; classification?: string; source?: string }> = [];
+  const normalized: CanonicalManifestFile[] = [];
   const paths = new Set<string>();
   for (const file of files) {
     const path = file.path?.replaceAll("\\", "/").replace(/^\.\//, "");
@@ -121,17 +158,30 @@ function manifestDigest(files: readonly ManifestFile[] | undefined, kind: "track
     if (paths.has(path)) reasons.push(`${kind} manifest repeats ${path}.`);
     paths.add(path);
     if (!file.digest?.trim()) reasons.push(`${kind} manifest cannot hash ${path}.`);
+    if (file.state !== undefined && (kind !== "tracked" || file.state !== "tracked_missing")) {
+      reasons.push(`${kind} manifest has an invalid state for ${path}.`);
+    }
+    if (file.state === "tracked_missing" && file.digest !== trackedMissingFileDigest(path)) {
+      reasons.push(`Tracked deletion evidence for ${path} has an invalid canonical digest.`);
+    }
     if (kind === "untracked" && (!file.classification || file.classification === "unknown")) {
       reasons.push(`Untracked file ${path} has no policy classification.`);
     }
     normalized.push({
       path,
       digest: file.digest?.trim() ?? "<unhashed>",
+      ...(file.state ? { state: file.state } : {}),
       ...(kind === "untracked" ? { classification: file.classification ?? "unknown", source: file.source ?? "untracked" } : {})
     });
   }
   normalized.sort((left, right) => left.path.localeCompare(right.path));
-  return sha256(stableJson(normalized));
+  return { files: normalized, digest: sha256(stableJson(normalized)), reasons };
+}
+
+function manifestDigest(files: readonly ManifestFile[] | undefined, kind: "tracked" | "untracked", reasons: string[]): string {
+  const manifest = canonicalWorktreeManifest(files, kind);
+  reasons.push(...manifest.reasons);
+  return manifest.digest;
 }
 
 export function environmentFingerprint(environment: SnapshotEnvironment): string {
@@ -217,8 +267,13 @@ export class TargetSnapshotFactory {
   private fromInspection(inspection: GitInspection, options: SnapshotCaptureOptions): TargetSnapshot {
     const reasons = [...(inspection.issues ?? [])];
     const repositoryRoot = nonEmpty(inspection.repositoryRoot, "Canonical Git root", reasons) ?? options.targetHint ?? "<unresolved>";
-    const canonicalRemote = nonEmpty(inspection.canonicalRemote, "Canonical remote", reasons);
-    const branch = nonEmpty(inspection.branch, "Branch", reasons);
+    const canonicalRemote = (options.requireCanonicalRemote ?? true)
+      ? nonEmpty(inspection.canonicalRemote, "Canonical remote", reasons)
+      : optionalNonEmpty(inspection.canonicalRemote, "Canonical remote", reasons);
+    const branch = optionalNonEmpty(inspection.branch, "Branch", reasons);
+    const defaultBranch = optionalNonEmpty(inspection.defaultBranch, "Default branch", reasons);
+    const detached = inspection.detached === true;
+    if (branch && detached) reasons.push("Git target cannot be both branch-bound and detached.");
     const head = nonEmpty(inspection.head, "HEAD object id", reasons);
     const indexTree = nonEmpty(inspection.indexTree, "Index tree hash", reasons);
     const upstream = inspection.upstream?.trim() || undefined;
@@ -233,13 +288,15 @@ export class TargetSnapshotFactory {
       if (!canonicalRemote) reasons.push("Consequential work requires a canonical remote.");
     }
     if (options.requireBranch ?? true) {
-      if (!branch) reasons.push("Consequential work requires a verified branch.");
+      if (!branch && !detached) reasons.push("Consequential work requires a verified branch or detached-HEAD observation.");
     }
     const completeness = reasons.length === 0 ? "complete" : "incomplete";
     const identity: TargetSnapshotIdentityInput = {
       repositoryRoot,
       ...(canonicalRemote ? { canonicalRemote } : {}),
       ...(branch ? { branch } : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+      ...(detached ? { detached: true as const } : {}),
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),
@@ -256,6 +313,8 @@ export class TargetSnapshotFactory {
       repositoryRoot,
       ...(canonicalRemote ? { canonicalRemote } : {}),
       ...(branch ? { branch } : {}),
+      ...(defaultBranch ? { defaultBranch } : {}),
+      ...(detached ? { detached: true as const } : {}),
       ...(upstream ? { upstream } : {}),
       ...(head ? { head } : {}),
       ...(indexTree ? { indexTree } : {}),

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AdapterRegistry, AdapterOutcome } from "./adapters.ts";
 import type {
   AutomationRequest,
+  BrokerConfirmation,
   BrokerOutcome,
   AutomationBroker,
   ExecutionBroker,
@@ -11,19 +12,25 @@ import type {
   IsolationRuntime,
   TestEnvironment,
   TestEnvironmentOutcome,
-  TestEnvironmentBroker
+  TestEnvironmentBroker,
+  EffectGuard
 } from "./brokers.ts";
 import { commandFor, commandForAction, type CommandAction, type CommandDefinition } from "./command-catalog.ts";
-import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult, IncidentStatus } from "./containment.ts";
-import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, ManagedSession, TargetSnapshot } from "./contracts.ts";
+import type { ContainmentActivation, ContainmentRecord, ContainmentReleaseRequest, ContainmentReleaseResult } from "./containment.ts";
+import type { ContainmentRemediationBinding } from "./containment-incidents.ts";
+import type { AuthorityGrant, CommandRequest, CommandResult, CommandStatus, EffectDisposition, ManagedSession, TargetSnapshot } from "./contracts.ts";
 import type { ChildOperationLease, ChildOperationSaga } from "./operations.ts";
+import type { CouncilRecommendation } from "./council.ts";
 import { PolicyEngine, type PolicyDecision, type PolicyPermit } from "./policy.ts";
 import { untrustedSummary } from "./redaction.ts";
 import type { ExecutionControl } from "./execution-control.ts";
 import type { RepositoryRecipe } from "./recipes.ts";
+import { sha256 } from "./store.ts";
 
 export interface SessionLookup { get(id: string): ManagedSession | undefined; }
 export interface AuthorityLookup { get(id: string): AuthorityGrant | undefined; }
+/** Host-runtime context that cannot be supplied through the public command payload. */
+export interface TrustedDispatchContext { readonly confirmationDigest?: string; readonly confirmationScopeDigest?: string; }
 export interface ExecutionRecipeFactory {
   /** Must resolve a companion-approved declarative recipe, never raw request input. */
   create(definition: CommandDefinition, target: TargetSnapshot): ExecutionRecipe | undefined;
@@ -34,12 +41,43 @@ export interface GitMutationFactory {
 }
 export interface RepositoryRecipeLookup { forTarget(target: TargetSnapshot): RepositoryRecipe | undefined; }
 export interface CouncilExecutor {
-  execute(request: Readonly<{ action: "council_report" | "council_automatic" | "council_recommend"; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl; childSaga?: ChildOperationSaga }>): Promise<BrokerOutcome>;
+  execute(request: Readonly<{ action: "council_report" | "council_automatic" | "council_recommend"; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl; effectGuard?: EffectGuard; childSaga?: ChildOperationSaga }>): Promise<BrokerOutcome>;
+  approveRecommendation?(request: Readonly<{
+    recommendationId: string;
+    recommendationDigest: string;
+    approvalOperationId: string;
+    target: TargetSnapshot;
+    session?: ManagedSession;
+  }>): Promise<CouncilRecommendation>;
+}
+export interface DebugStopReviewConsumer {
+  /** Resolves the hidden debug effect only from protected reviewed state. */
+  consume(input: Readonly<{
+    action: "stop_managed_run";
+    target: TargetSnapshot;
+    session: ManagedSession;
+    authority: AuthorityGrant;
+    confirmation: BrokerConfirmation;
+  }>): Promise<Readonly<{ effectSession: ManagedSession }> | undefined>;
+}
+export interface AutomationManifestReviewConsumer {
+  /** Atomically consumes one exact approved manifest; absence is a refusal. */
+  consume(input: Readonly<{
+    action: Extract<CommandAction, "compound_capture" | "compound_refresh" | "lfg" | "repair_mission">;
+    target: TargetSnapshot;
+    session: ManagedSession;
+    authority: AuthorityGrant;
+    confirmation: BrokerConfirmation;
+  }>): Promise<Readonly<{
+    manifest: NonNullable<AutomationRequest["reviewedManifest"]>;
+    approval: NonNullable<AutomationRequest["manifestApproval"]>;
+  }> | undefined>;
 }
 type MaybePromise<T> = T | Promise<T>;
 /** Both the in-memory harness and ProtectedJsonStore implementation satisfy this boundary. */
 export interface ContainmentManager {
   activate(request: ContainmentActivation): MaybePromise<ContainmentRecord>;
+  check(repositoryRoot: string, channel: "git" | "credential" | "network" | "deployment" | "execution" | "test_environment" | "automation" | "isolation" | "council" | "adapter" | "local_remediation" | "local_cleanup", remediation?: ContainmentRemediationBinding): MaybePromise<{ readonly allowed: boolean; readonly reason: string }>;
   release(request: ContainmentReleaseRequest): MaybePromise<ContainmentReleaseResult>;
 }
 
@@ -49,7 +87,7 @@ export interface CommandOperationLease {
   readonly existingStatus?: CommandStatus;
 }
 export interface CommandOperationCoordinator {
-  claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string }>): Promise<CommandOperationLease>;
+  claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string; authorityId?: string }>): Promise<CommandOperationLease>;
   settle(lease: CommandOperationLease, status: CommandStatus): Promise<void>;
 }
 
@@ -62,6 +100,7 @@ export interface DurableDispatchLifecycle extends CommandOperationCoordinator {
     authorityId?: string;
     status: CommandStatus;
     summary: string;
+    effectDisposition?: EffectDisposition;
     policyVersion?: string;
     evidenceDigest?: string;
     toolVersions?: Readonly<Record<string, string>>;
@@ -103,6 +142,8 @@ export interface DispatchGovernanceAdmission {
   readonly token?: string;
   /** Bound deadline/cancel signal passed only to a registered adapter/broker. */
   readonly executionControl?: ExecutionControl;
+  /** Rechecked by every broker/adapter immediately before its own effect. */
+  readonly effectGuard?: EffectGuard;
 }
 
 export interface DispatchGovernance {
@@ -119,8 +160,8 @@ export interface DispatchGovernance {
 export class InMemoryCommandOperationCoordinator implements CommandOperationCoordinator {
   private readonly active = new Map<string, CommandOperationLease>();
 
-  async claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string }>): Promise<CommandOperationLease> {
-    const key = `${input.action}:${input.targetSnapshotId ?? "none"}:${input.sessionId ?? "none"}`;
+  async claim(input: Readonly<{ action: CommandAction; targetSnapshotId?: string; sessionId?: string; authorityId?: string }>): Promise<CommandOperationLease> {
+    const key = `${input.action}:${input.targetSnapshotId ?? "none"}:${input.sessionId ?? "none"}:${input.authorityId ?? "none"}`;
     const previous = this.active.get(key);
     if (previous) return { ...previous, existing: true, existingStatus: "running" };
     const lease: CommandOperationLease = { operationId: `op-${randomUUID()}`, existing: false };
@@ -143,6 +184,8 @@ export interface CommandDispatcherDependencies {
   readonly git?: GitBroker;
   readonly testEnvironment?: TestEnvironmentBroker;
   readonly automation?: AutomationBroker;
+  readonly automationManifestReviews?: AutomationManifestReviewConsumer;
+  readonly debugStopReviews?: DebugStopReviewConsumer;
   readonly isolation?: IsolationRuntime;
   readonly containment?: ContainmentManager;
   readonly council?: CouncilExecutor;
@@ -159,8 +202,18 @@ export interface ContainmentReleaseCommandRequest {
   readonly sessionId: string;
   readonly authorityId: string;
   readonly confirmationToken: string;
+  /** Host-owned factory invoked only after the durable operation ID exists. */
+  readonly effectGuardFactory: (operationId: string) => EffectGuard;
   /** Obtained only from the companion-UI incident-review and reauth flow. */
-  readonly review: Readonly<{ reauthenticated: boolean; reason: string; incidentStatus: IncidentStatus }>;
+  readonly review: Readonly<{
+    reauthenticated: boolean;
+    reason: string;
+    expectedFenceEpoch: number;
+    expectedActivationOperationId: string;
+    expectedIncidentId: string;
+    expectedIncidentDigest: string;
+    expectedAssessmentTargetSnapshotId: string;
+  }>;
 }
 
 /**
@@ -179,7 +232,7 @@ export class CommandDispatcher {
     this.operations = dependencies.operations ?? new InMemoryCommandOperationCoordinator();
   }
 
-  async dispatch(request: CommandRequest): Promise<CommandResult> {
+  async dispatch(request: CommandRequest, trusted: TrustedDispatchContext = {}): Promise<CommandResult> {
     const definition = commandFor(request.control, request.modifier);
     if (!definition || definition.assignment !== request.assignment) {
       return { status: "blocked", summary: "Command assignment mismatch or intentionally unassigned chord; no action was routed." };
@@ -199,7 +252,7 @@ export class CommandDispatcher {
     });
     if (preliminary.status !== "allowed") return policyResult(preliminary);
 
-    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot?.id, sessionId: context.session?.id });
+    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot?.id, sessionId: context.session?.id, authorityId: context.authority?.id });
     if (lease.existing) {
       return { status: lease.existingStatus ?? "running", summary: "An identical operation is already active; focused its current status.", operationId: lease.operationId };
     }
@@ -245,7 +298,7 @@ export class CommandDispatcher {
         };
       } else {
         await lifecycle?.markExecuting(lease);
-        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl);
+        result = await this.execute(definition, request, context.session, context.authority, permission.permit, lease, governanceAdmission.executionControl, governanceAdmission.effectGuard, trusted.confirmationDigest, trusted.confirmationScopeDigest);
       }
     } catch (error) {
       const label = governanceAdmission ? "Command adapter" : "Dispatch governance";
@@ -293,7 +346,7 @@ export class CommandDispatcher {
     if (!authority) return { status: "blocked", summary: "Containment release requires a current authority grant." };
     const preliminary = this.dependencies.policy.authorize({ definition, target: request.targetSnapshot, session, authority, confirmationToken: request.confirmationToken });
     if (preliminary.status !== "allowed") return policyResult(preliminary);
-    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot.id, sessionId: session.id });
+    const lease = await this.operations.claim({ action: definition.action, targetSnapshotId: request.targetSnapshot.id, sessionId: session.id, authorityId: authority.id });
     if (lease.existing) return { status: lease.existingStatus ?? "running", summary: "An identical containment-release operation is already active; focused its current status.", operationId: lease.operationId };
     const lifecycle = durableLifecycle(this.operations);
     const permission = this.dependencies.policy.issuePermit({ definition, operationId: lease.operationId, target: request.targetSnapshot, session, authority, confirmationToken: request.confirmationToken });
@@ -313,8 +366,20 @@ export class CommandDispatcher {
       if (!this.dependencies.containment) {
         result = { status: "unavailable", summary: "No durable containment manager is configured.", operationId: lease.operationId };
       } else {
-        const release = await this.dependencies.containment.release({ repositoryRoot: request.targetSnapshot.repositoryRoot, ...request.review });
-        result = { status: release.status === "released" ? "completed" : release.status, summary: release.reason, operationId: lease.operationId };
+        const effectGuard = request.effectGuardFactory(lease.operationId);
+        const current = await effectGuard.assertCurrent({
+          action: definition.action,
+          operationId: lease.operationId,
+          target: request.targetSnapshot,
+          session,
+          authority
+        });
+        if (!current.allowed) {
+          result = { status: "incomplete", summary: current.reason, operationId: lease.operationId };
+        } else {
+          const release = await this.dependencies.containment.release({ repositoryRoot: request.targetSnapshot.repositoryRoot, ...request.review });
+          result = { status: release.status === "released" ? "completed" : release.status, summary: release.reason, operationId: lease.operationId };
+        }
       }
     } catch (error) {
       result = { status: "failed", summary: `Containment release adapter failed safely: ${untrustedSummary(String(error))}`, operationId: lease.operationId };
@@ -341,19 +406,34 @@ export class CommandDispatcher {
     return { session, authority };
   }
 
-  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl): Promise<CommandResult> {
+  private async execute(definition: CommandDefinition, request: CommandRequest, session: ManagedSession | undefined, authority: AuthorityGrant | undefined, permit: PolicyPermit, lease: CommandOperationLease, executionControl?: ExecutionControl, effectGuard?: EffectGuard, trustedConfirmationDigest?: string, trustedConfirmationScopeDigest?: string): Promise<CommandResult> {
     const operationId = lease.operationId;
     const target = request.targetSnapshot;
-    const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(executionControl ? { executionControl } : {}) } : undefined;
+    const confirmation = definition.requiresConfirmation && request.confirmationToken ? {
+      currentUserConfirmed: true as const,
+      confirmationDigest: trustedConfirmationDigest ?? sha256(request.confirmationToken),
+      ...(trustedConfirmationScopeDigest ? { confirmationScopeDigest: trustedConfirmationScopeDigest } : {}),
+      action: definition.action,
+      ...(target ? { targetSnapshotId: target.id } : {}),
+      ...(session ? { sessionId: session.id } : {}),
+      ...(authority ? { authorityId: authority.id } : {})
+    } : undefined;
+    const base = target ? { action: definition.action, operationId, target, session, authority, permit, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}) } : undefined;
     switch (definition.executor) {
       case "adapter":
-      case "agent":
         return adapterResult(
           this.dependencies.adapters
-            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(executionControl ? { executionControl } : {}), untrustedInput: request.input })
-            : { status: "unavailable", summary: "No verified adapter is registered for this command." },
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), untrustedInput: request.input })
+            : { status: "unavailable", summary: "No verified adapter is registered for this command.", effectDisposition: "not_started" },
           operationId
         );
+      case "agent":
+        return this.executeComposite(definition, lease, async (childSaga) => adapterResult(
+          this.dependencies.adapters
+            ? await this.dependencies.adapters.execute({ definition, operationId, target, session, authority, ...(confirmation ? { confirmation } : {}), ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), ...(childSaga ? { childSaga } : {}), untrustedInput: request.input })
+            : { status: "unavailable", summary: "No verified agent adapter is registered for this command.", effectDisposition: "not_started" },
+          operationId
+        ));
       case "git": {
         if (!base) return unavailable("Git mediation requires a verified target.", operationId);
         if (!this.dependencies.git) return unavailable("No Git broker is configured.", operationId);
@@ -377,6 +457,17 @@ export class CommandDispatcher {
       case "automation": {
         if (!base) return unavailable("Automation requires a verified target.", operationId);
         if (!this.dependencies.automation) return unavailable("No trusted automation broker is configured; no prompt or workflow was submitted.", operationId);
+        if (!session || !authority || !base.confirmation || !this.dependencies.automationManifestReviews) {
+          return { status: "blocked", summary: "Automation requires one exact protected reviewed manifest and current-user approval.", operationId };
+        }
+        const reviewed = await this.dependencies.automationManifestReviews.consume({
+          action: definition.action as "compound_capture" | "compound_refresh" | "lfg" | "repair_mission",
+          target: base.target,
+          session,
+          authority,
+          confirmation: base.confirmation
+        });
+        if (!reviewed) return { status: "blocked", summary: "The exact automation manifest approval is absent, stale, forged, or already consumed.", operationId };
         let testEnvironment: TestEnvironment | undefined;
         if (definition.action === "repair_mission") {
           const environment = await this.prepareTestEnvironment(base, operationId);
@@ -384,7 +475,13 @@ export class CommandDispatcher {
           testEnvironment = environment.environment;
         }
         return this.executeComposite(definition, lease, async (childSaga) => {
-          const requestForBroker: AutomationRequest = { ...base, testEnvironment, ...(childSaga ? { childSaga } : {}) };
+          const requestForBroker: AutomationRequest = {
+            ...base,
+            testEnvironment,
+            reviewedManifest: reviewed.manifest,
+            manifestApproval: reviewed.approval,
+            ...(childSaga ? { childSaga } : {})
+          };
           return brokerResult(await this.dependencies.automation!.execute(requestForBroker), operationId);
         });
       }
@@ -397,27 +494,58 @@ export class CommandDispatcher {
       case "council": {
         if (!base) return unavailable("Council requires a verified target.", operationId);
         if (!this.dependencies.council) return unavailable("No verified Council coordinator is configured; automatic coordination remains unavailable.", operationId);
+        const fence = this.dependencies.containment ? await this.dependencies.containment.check(base.target.repositoryRoot, "council") : undefined;
+        if (fence && !fence.allowed) return { status: "blocked", summary: fence.reason, operationId };
         const action = definition.action;
         if (action !== "council_report" && action !== "council_automatic" && action !== "council_recommend") return unavailable("Unknown Council command.", operationId);
         return this.executeComposite(definition, lease, async (childSaga) =>
-          brokerResult(await this.dependencies.council!.execute({ action, operationId, target: base.target, session, authority, permit, ...(executionControl ? { executionControl } : {}), ...(childSaga ? { childSaga } : {}) }), operationId)
+          brokerResult(await this.dependencies.council!.execute({ action, operationId, target: base.target, session, authority, permit, ...(executionControl ? { executionControl } : {}), ...(effectGuard ? { effectGuard } : {}), ...(childSaga ? { childSaga } : {}) }), operationId)
         );
       }
       case "containment": {
         if (!base) return unavailable("Containment requires a verified target.", operationId);
         if (!this.dependencies.containment) return unavailable("No durable containment manager is configured.", operationId);
-        const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
-        return { status: "completed", summary: `Containment fence ${record.fenceEpoch} is active for brokered egress; unmediated paths remain disclosed as uncontrolled.`, operationId, data: { fenceEpoch: record.fenceEpoch } };
+        if (!base.effectGuard) return unavailable("Containment requires a host-owned final target guard.", operationId);
+        let current: Awaited<ReturnType<EffectGuard["assertCurrent"]>>;
+        try {
+          current = await base.effectGuard.assertCurrent({ action: base.action, operationId, target: base.target, ...(session ? { session } : {}), ...(authority ? { authority } : {}) });
+        } catch {
+          return unavailable("Containment could not revalidate its exact target, session, and authority immediately before activation.", operationId);
+        }
+        if (!current.allowed) return { status: "incomplete", summary: current.reason, operationId };
+        const record = await this.dependencies.containment.activate({ repositoryRoot: base.target.repositoryRoot, targetSnapshotId: base.target.id, operationId, reason: "Emergency Containment requested through authenticated B122 policy." });
+        return {
+          status: "completed",
+          summary: `Containment fence ${record.fenceEpoch} is active and incident assessment is open for brokered egress; unmediated paths remain disclosed as uncontrolled.`,
+          operationId,
+          data: { fenceEpoch: record.fenceEpoch, ...(record.incidentId ? { incidentId: record.incidentId } : {}) }
+        };
       }
     }
   }
 
-  private async executeRecipe(definition: CommandDefinition, base: Readonly<{ action: CommandAction; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl }>, operationId: string, testEnvironment?: TestEnvironment): Promise<CommandResult> {
+  private async executeRecipe(definition: CommandDefinition, base: Readonly<{ action: CommandAction; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl; effectGuard?: EffectGuard }>, operationId: string, testEnvironment?: TestEnvironment): Promise<CommandResult> {
     if (!this.dependencies.execution) return unavailable("No execution broker is configured.", operationId);
     const recipe = this.dependencies.executionRecipeFactory?.create(definition, base.target);
     if (!recipe) return unavailable("No approved declarative execution recipe is configured for this command.", operationId);
     const environment = testEnvironment ? { ...testEnvironment.environment, ...recipe.environment } : recipe.environment;
-    return brokerResult(await this.dependencies.execution.execute({ ...base, recipe: { ...recipe, environment } }), operationId);
+    let effectSession: ManagedSession | undefined;
+    if (definition.action === "stop_managed_run") {
+      const confirmation = (base as typeof base & { readonly confirmation?: BrokerConfirmation }).confirmation;
+      if (!base.session || !base.authority || !confirmation || !this.dependencies.debugStopReviews) {
+        return { status: "blocked", summary: "Debug stop requires one exact protected reviewed split binding.", operationId };
+      }
+      const claimed = await this.dependencies.debugStopReviews.consume({
+        action: "stop_managed_run",
+        target: base.target,
+        session: base.session,
+        authority: base.authority,
+        confirmation
+      });
+      if (!claimed) return { status: "blocked", summary: "The exact reviewed debug-stop binding is absent, stale, forged, or already consumed.", operationId };
+      effectSession = claimed.effectSession;
+    }
+    return brokerResult(await this.dependencies.execution.execute({ ...base, ...(effectSession ? { effectSession } : {}), recipe: { ...recipe, environment } }), operationId);
   }
 
   /**
@@ -436,11 +564,27 @@ export class CommandDispatcher {
       }
       const result = await invoke(childSaga);
       if (childSaga && boundary) {
-        if (result.status === "completed") {
-          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status });
+        // A status is not evidence of effect. A remote peer can commit and then
+        // return blocked/unavailable when its response is lost. Only an
+        // explicit disposition from the trusted boundary can make a retry safe.
+        const disposition = result.effectDisposition ?? "ambiguous";
+        if (disposition === "committed") {
+          // The trusted boundary has positively identified the external
+          // effect.  It is therefore terminal even when the command result is
+          // intentionally incomplete (for example, creating a reviewed
+          // feature branch and requiring a fresh TargetSnapshot before the
+          // commit).  The parent may still record a non-green command result;
+          // the child receipt prevents both replay and false ambiguity.
+          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: disposition });
           await childSaga.settle(boundary, "completed");
+        } else if (disposition === "not_started") {
+          await childSaga.settle(boundary, "failed", { brokerStatus: result.status, externalEffect: disposition });
+        } else if (disposition === "compensated") {
+          await childSaga.markExternalCommitted(boundary, { brokerStatus: result.status, externalEffect: "committed_before_compensation" });
+          await childSaga.markCompensating(boundary);
+          await childSaga.settle(boundary, "cancelled", { brokerStatus: result.status, externalEffect: disposition });
         } else {
-          await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status });
+          await childSaga.settle(boundary, "ambiguous", { brokerStatus: result.status, externalEffect: disposition });
         }
       }
       return result;
@@ -454,7 +598,7 @@ export class CommandDispatcher {
     }
   }
 
-  private async prepareTestEnvironment(base: Readonly<{ action: CommandAction; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl }>, operationId: string): Promise<{ environment?: TestEnvironment; result?: CommandResult }> {
+  private async prepareTestEnvironment(base: Readonly<{ action: CommandAction; operationId: string; target: TargetSnapshot; session?: ManagedSession; authority?: AuthorityGrant; permit: PolicyPermit; executionControl?: ExecutionControl; effectGuard?: EffectGuard }>, operationId: string): Promise<{ environment?: TestEnvironment; result?: CommandResult }> {
     if (!this.dependencies.testEnvironment) return { result: unavailable("No test-environment broker is configured; validation will not inherit a normal shell environment.", operationId) };
     const recipe = this.dependencies.recipes?.forTarget(base.target);
     if (!recipe) return { result: unavailable("No approved repository test recipe is configured; validation cannot safely infer commands or production deny rules.", operationId) };
@@ -472,6 +616,7 @@ export class CommandDispatcher {
       ...(authority ? { authorityId: authority.id } : {}),
       status: result.status,
       summary: result.summary,
+      ...(result.effectDisposition ? { effectDisposition: result.effectDisposition } : {}),
       ...(evidence ?? {})
     });
   }
@@ -499,13 +644,13 @@ function policyResult(decision: PolicyDecision): CommandResult {
 }
 
 function brokerResult(outcome: BrokerOutcome, operationId: string): CommandResult {
-  return { status: outcome.status, summary: outcome.summary, operationId, data: outcome.data };
+  return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, operationId, data: outcome.data };
 }
 
 function adapterResult(outcome: AdapterOutcome, operationId: string): CommandResult {
-  return { status: outcome.status, summary: outcome.summary, operationId, data: outcome.data };
+  return { status: outcome.status, summary: outcome.summary, effectDisposition: outcome.effectDisposition, operationId, data: outcome.data };
 }
 
 function unavailable(summary: string, operationId?: string): CommandResult {
-  return { status: "unavailable", summary, operationId };
+  return { status: "unavailable", summary, effectDisposition: "not_started", operationId };
 }

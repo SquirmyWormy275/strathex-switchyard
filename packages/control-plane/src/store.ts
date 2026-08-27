@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, mkdir, open, readFile, stat, unlink } from "node:fs/promises";
+import { chmod, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -194,15 +194,18 @@ export class ProtectedJsonStore {
       const lock = await this.acquireFileLock();
       try {
         let entries = await this.readEntriesUnlocked();
+        const originalLength = entries.length;
         const transaction: JsonStoreTransaction = {
           readEntries: async <R = JsonValue>() => jsonClone(entries) as readonly JournalEntry<R>[],
           append: async <R = JsonValue>(kind: string, payload: R) => {
-            const entry = await this.appendUnlocked(kind, payload, entries);
+            const entry = await this.prepareEntry(kind, payload, entries);
             entries = [...entries, entry as JournalEntry<unknown>];
             return jsonClone(entry) as JournalEntry<R>;
           }
         };
-        return await work(transaction);
+        const result = await work(transaction);
+        if (entries.length > originalLength) await this.replaceJournal(entries);
+        return result;
       } finally {
         await this.releaseFileLock(lock);
       }
@@ -344,7 +347,7 @@ export class ProtectedJsonStore {
     return { ...unverified, hash, ...(authenticationTag ? { authenticationTag } : {}) };
   }
 
-  private async appendUnlocked<T>(kind: string, payload: T, entries: readonly JournalEntry<unknown>[]): Promise<JournalEntry<T>> {
+  private async prepareEntry<T>(kind: string, payload: T, entries: readonly JournalEntry<unknown>[]): Promise<JournalEntry<T>> {
     if (!kind.trim()) throw new StoreIntegrityError("Protected journal entries need a non-empty kind.");
     const clonedPayload = jsonClone(payload);
     const previousHash = entries.at(-1)?.hash;
@@ -369,19 +372,33 @@ export class ProtectedJsonStore {
     } else if (this.requireAuthenticatedProtection) {
       throw new StoreIntegrityError("The B122 protected store requires a host-backed journal authenticator.");
     }
-    const entry: JournalEntry<T> = { ...unverified, hash, ...(authenticationTag ? { authenticationTag } : {}) };
-    const handle = await open(this.filePath, "a", 0o600);
+    return { ...unverified, hash, ...(authenticationTag ? { authenticationTag } : {}) };
+  }
+
+  /**
+   * A transaction is published by replacing one complete, fsynced journal
+   * image while the inter-process lock is held.  No prepared entry becomes
+   * visible if transaction work or a later authenticator seal fails.
+   */
+  private async replaceJournal(entries: readonly JournalEntry<unknown>[]): Promise<void> {
+    const temporaryPath = `${this.filePath}.transaction-${process.pid}-${randomUUID()}`;
+    const handle = await open(temporaryPath, "wx", 0o600);
     try {
-      await handle.writeFile(`${stableJson(entry)}\n`, "utf8");
+      await handle.writeFile(`${entries.map((entry) => stableJson(entry)).join("\n")}\n`, "utf8");
       await handle.sync();
     } finally {
       await handle.close();
     }
     try {
-      await chmod(this.filePath, 0o600);
-    } catch {
-      // Best effort on platforms where POSIX file modes are not meaningful.
+      await rename(temporaryPath, this.filePath);
+      try {
+        await chmod(this.filePath, 0o600);
+      } catch {
+        // Best effort on platforms where POSIX file modes are not meaningful.
+      }
+    } catch (error) {
+      try { await unlink(temporaryPath); } catch (cleanupError) { if (!isNodeError(cleanupError, "ENOENT")) throw cleanupError; }
+      throw error;
     }
-    return entry;
   }
 }

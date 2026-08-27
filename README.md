@@ -7,10 +7,16 @@ operator keyboard for agentic software development. Its target platform is a
 Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
 physical keyboard and its integration are not validated by this repository.
 
-**Current status:** the repository implements and locally tests the
-software-owned control-plane machinery. It is **not** a production control
-system, a hardware integration, or evidence that any of the 27 acceptance
-gates has passed. Every gate remains **NOT ACCEPTED**.
+**Current status:** the repository contains the hardware-independent B122
+implementation: the canonical protocol and firmware/Raw-HID host source; the
+mutually authenticated, single-instance Windows companion; the VS Code
+operator and provisioning surfaces; durable mediation, receipts, recovery,
+containment, and Council; host-attested repository recipes; DPAPI credential
+references; exact-route HTTPS; configured provider, GitHub/Git/CI and scanner
+adapters; the Windows Sandbox guest-worker/host-lifecycle boundary; an exhaustive
+hardware-independent 176-chord Raw-HID product simulator; and content-verified,
+transactional per-user release tooling. Source availability is **not** production, hardware, provider,
+or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
 
 The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
 keys, 65 settled chord behaviors, and 111 intentionally unassigned chord slots.
@@ -43,13 +49,28 @@ safe and available in the current context.
   one-time confirmations, operation/child-operation sagas, receipts,
   no-replay recovery, containment, budget claims, deadline/cancellation
   control, and typed broker interfaces.
-- `apps/windows-companion/` — a local JSON-lines companion endpoint and
-  bootstrap seam. It hydrates durable state, runs no-replay startup recovery,
-  and requires a host-owned journal authenticator for a non-test durable
-  companion.
-- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It may
-  identify/focus approved local surfaces and route a canonical request; it does
-  not use direct Run/Debug APIs as a bypass around mediation.
+- `apps/windows-companion/` — a local named-pipe companion and bootstrap seam.
+  On Windows it uses a DPAPI CurrentUser-protected journal and endpoint token,
+  mutual challenge/response authentication, and strict single-instance state.
+  It hydrates durable state and runs no-replay startup recovery without opening
+  TCP. Host-attested registries connect reviewed repository recipes, Windows
+  Sandbox, credential references, exact-route HTTPS, provider handshakes,
+  GitHub/Git, CI, scanner, and Council adapters when their required local
+  configuration and authorization are present. Its separate Raw-HID simulator
+  exercises all 65 assigned and 111 deliberately unassigned chord combinations,
+  replay/epoch recovery, and corrupt framing without opening hardware or the
+  network.
+- `apps/provider-adapter-host/` — an authenticated, TLS-pinned loopback host for
+  the closed Claude/Codex command, observation, cancellation, Council, and
+  reconciliation ports. It packages deterministic fixture backends for isolated
+  verification; it does not bundle, infer, or claim live vendor authorization.
+- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It reads
+  only the companion-created sealed endpoint record, may identify/focus
+  approved local surfaces and route a canonical request, and does not use
+  direct Run/Debug APIs as a bypass around mediation.
+- `deployment/windows/` — content-verified per-user build, install, update,
+  rollback, start, health, and uninstall tooling with exact-root ownership,
+  crash-recovery receipts, and authenticated companion/provider shutdown.
 - `docs/` — the accepted specification, reconstructed interview history,
   adversarial review, project charter, attribution records, operational safety
   model, and source-linked software-only completion audit.
@@ -71,9 +92,13 @@ B122 signal / extension request
   -> explicitly registered typed broker or safe unavailable result
 ```
 
-The supplied in-memory brokers and adapters are test harnesses. They do not
-open shells, use credentials, fetch URLs, create databases, mutate GitHub, or
-contact an AI provider.
+The in-memory brokers and adapters are test harnesses and never contact a real
+system. The installed composition also contains concrete, fail-closed adapters.
+Those adapters can act only after the operator installs the exact repository
+manifest, Windows feature/helper, DPAPI credential reference, network policy,
+provider handshake, external account, or scanner feed required by that route.
+Absent configuration or authorization is reported as unavailable; it is never
+replaced by an unreviewed fallback.
 
 The following capabilities remain disabled by default, even though their
 software policy/saga paths are represented: Council automatic mode, Repair
@@ -83,8 +108,8 @@ pushes, merges, force-pushes, approves a permission, or submits a prompt.
 
 ## Local development
 
-Use a current Node.js runtime that supports TypeScript stripping (the test
-scripts use `node --experimental-strip-types`). Tests use temporary files,
+Use a current Node.js runtime that supports TypeScript transformation (the test
+scripts use `node --experimental-transform-types`). Tests use temporary files,
 fakes, and in-memory brokers; they must never use a production database,
 credentials, data, or endpoint.
 
@@ -93,17 +118,25 @@ npm ci
 npm test
 npm run typecheck
 npm run build:vscode
+npm run build:companion
+npm run build:provider-host
 ```
 
-`npm run start:companion` is intentionally **not** a ready-to-use Windows
-service. The standalone entry point fails closed because no DPAPI/NCrypt/
-service-backed `JournalAuthenticator` is bundled. A reviewed host must embed
-`createDurableWindowsCompanion`, provide that authenticator, and supply any
-real adapters before a durable companion can start.
+`npm run start:companion` starts the reviewed per-user companion, not a Windows
+service or service-account boundary. The standalone entry point supplies the
+reviewed Git-mutation queue and the configured adapter registries described
+above. It still does not establish independent named-pipe ACL acceptance,
+same-user adversary resistance, or production authorization. Uninstalled or
+unauthorized integrations fail closed. See
+[the local companion guide](docs/local-companion.md).
 
 QMK compilation is not part of the default suite because it needs the selected
 physical B122-compatible target and toolchain. See
 [firmware/qmk/README.md](firmware/qmk/README.md) before adapting the matrix.
+After `npm run build:companion`, run
+`node apps/windows-companion/dist/apps/windows-companion/src/raw-hid-simulator.js --self-test`
+for the hardware-independent exhaustive protocol receipt. That receipt is not
+physical-device, hot-plug, Vial, LED, or ergonomic acceptance evidence.
 
 ## Contributing
 
@@ -128,6 +161,8 @@ particular:
 
 - [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
 - [Software-only completion audit](docs/software-only-completion-audit.md)
+- [Local companion and VS Code guide](docs/local-companion.md)
+- [Windows release, installation, recovery, and uninstall guide](docs/windows-release-and-installation.md)
 - [Operational safety model](docs/operational-safety-model.md)
 - [Acceptance-gate ledger](docs/acceptance-gates.md)
 - [Project charter](docs/01-project-charter.md)
@@ -145,5 +180,8 @@ with, sponsored by, or endorsed by Model F Labs, IBM, Vial, QMK, Microsoft,
 OpenAI, Anthropic, or any other referenced project or company.
 
 The audit is the current evidence boundary: it documents source-controlled
-mechanisms and isolated tests, not hardware, Windows service, provider, GitHub,
-credential-vault, isolation-runtime, or production readiness.
+mechanisms and isolated tests, including the configured provider/GitHub,
+credential-reference, Raw-HID helper/simulator, and Windows Sandbox guest-worker
+plus host-lifecycle implementations. It
+does not claim physical hardware, live external authorization, pipe-ACL or
+same-user adversarial acceptance, a signed release, or production readiness.

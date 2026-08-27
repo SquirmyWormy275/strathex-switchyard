@@ -46,6 +46,14 @@ See the Leyden Jar repository's “How the project started,” “Comparison wit
 - **License:** GPL-2.0 with file/component-specific notices.
 - **Use here:** Indirect firmware lineage; no files copied at this stage.
 
+### Microsoft .NET runtime
+
+- **Contribution:** Runtime components statically bundled into the two self-contained Windows helper executables.
+- **Canonical source:** [dotnet/runtime](https://github.com/dotnet/runtime)
+- **License:** MIT with component-level third-party notices.
+- **Use here:** Windows Sandbox guest-helper and Raw-HID helper runtime.
+- **Distributed notices:** `deployment/windows/licenses/DOTNET-RUNTIME-LICENSE.txt` and `deployment/windows/licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt`, pinned to runtime 8.0.30.
+
 ### cyber_engineer / @Mates_ENGINEER
 
 - **Contribution:** A4 relegendable-keycap geometry, example sheet, blank sheet, print calibration target, and package instructions for Model F122-style relegendable keycaps.

@@ -3,9 +3,8 @@
  * use structured child-process calls rather than a shell: callers cannot turn a
  * repository field, path, or repository document into executable syntax.
  */
-import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { cp, mkdir, mkdtemp, readFile, realpath, readdir, rm, unlink, writeFile } from "node:fs/promises";
-import { createServer, connect, type Server, type Socket } from "node:net";
+import { createHash, randomUUID } from "node:crypto";
+import { cp, mkdir, mkdtemp, readFile, realpath, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
@@ -86,7 +85,13 @@ export class FilesystemBroker {
 }
 
 export interface GitStatus { branch: string; head: string; porcelain: readonly string[]; diff: string; }
-/** Real local Git mediation.  It never invokes a shell and revalidates state just before a mutation. */
+/**
+ * Legacy read-only repository helper retained for compatibility tests.  Its
+ * mutation entry points are intentionally retired: the candidate companion
+ * uses LocalMediatedGitHandler behind the durable policy/containment broker
+ * so no direct caller can commit, push, or merge around a private index,
+ * target guard, confirmation, or fence.
+ */
 export class LocalRepositoryBroker {
   private readonly root: string; private readonly policy: RepositoryPolicy;
   constructor(root: string, policy: RepositoryPolicy = defaultRepositoryPolicy(root)) { this.root = root; this.policy = policy; }
@@ -103,25 +108,16 @@ export class LocalRepositoryBroker {
     return stale ?? validateReviewApproval(approval, action, target);
   }
   async commit(target: TargetSnapshot, message: string, approval?: ReviewApproval): Promise<AdapterResult> {
-    const denial = await this.mutationGuard("COMMIT:normal", target, approval); if (denial) return { outcome: "blocked", detail: denial };
-    if (!message.trim()) return { outcome: "blocked", detail: "A non-empty reviewed commit message is required." };
-    if (!target.branch || target.branch === "main" || target.branch === "master") return { outcome: "blocked", detail: "Local commits require an isolated feature branch; the broker will not commit on a default or detached branch." };
-    const root = await this.rootFor(target); const result = await run("git", ["commit", "-m", message], root);
-    return result.code === 0 ? { outcome: "passed", detail: "Local commit completed after exact-target revalidation.", externalReference: await git(root, ["rev-parse", "HEAD"]) } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
+    void target; void message; void approval;
+    return { outcome: "blocked", detail: "Legacy direct Git commit is retired. Use the durable mediated Git handler with a reviewed confirmation, task-owned paths, private index, and containment fence." };
   }
   async push(target: TargetSnapshot, approval?: ReviewApproval): Promise<AdapterResult> {
-    if (this.policy.push !== "reviewed") return { outcome: "blocked", detail: "Policy forbids network push." };
-    if (!target.branch || target.branch === "main" || target.branch === "master") return { outcome: "blocked", detail: "PR upsert requires an isolated feature branch; the broker will not push a default or detached branch." };
-    const denial = await this.mutationGuard("COMMIT:shift", target, approval); if (denial) return { outcome: "blocked", detail: denial };
-    const root = await this.rootFor(target); const result = await run("git", ["push"], root);
-    return result.code === 0 ? { outcome: "passed", detail: "Push completed after explicit review.", externalReference: "git-push" } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
+    void target; void approval;
+    return { outcome: "blocked", detail: "Legacy direct Git push is retired. Network Git routes require the candidate broker and their separate acceptance gates." };
   }
   async merge(target: TargetSnapshot, source: string, approval?: ReviewApproval): Promise<AdapterResult> {
-    if (this.policy.directMain !== "reviewed" || target.branch === "main") return { outcome: "blocked", detail: "Direct-main merge is prohibited by the local policy." };
-    if (!/^[A-Za-z0-9._/-]+$/.test(source)) return { outcome: "blocked", detail: "The requested merge source is not a valid ref name." };
-    const denial = await this.mutationGuard("COMMIT:alt", target, approval); if (denial) return { outcome: "blocked", detail: denial };
-    const result = await run("git", ["merge", "--no-ff", "--no-edit", source], await this.rootFor(target));
-    return result.code === 0 ? { outcome: "passed", detail: "Reviewed merge completed." } : { outcome: "failed", detail: redact(result.stderr || result.stdout) };
+    void target; void source; void approval;
+    return { outcome: "blocked", detail: "Legacy direct Git merge is retired. Merge and Direct Main remain high-consequence candidate broker actions." };
   }
 }
 
@@ -165,20 +161,13 @@ export class LocalSandboxBroker {
   async reconcile(): Promise<readonly string[]> { await mkdir(this.baseDirectory, { recursive: true }); return (await readdir(this.baseDirectory)).filter((entry) => entry.startsWith("sandbox-") || entry.startsWith("quarantine-")); }
 }
 
-interface IpcEnvelope { token: string; id: string; method: string; params?: unknown; }
-export interface IpcResponse { id: string; ok: boolean; result?: unknown; error?: string; }
-export interface CompanionConfiguration { stateDirectory: string; ipcPath: string; token: string; startup: "manual" | "login"; }
-export async function createCompanionConfiguration(stateDirectory: string): Promise<CompanionConfiguration> { await mkdir(stateDirectory, { recursive: true }); const path = join(stateDirectory, "config.json"); try { return JSON.parse(await readFile(path, "utf8")) as CompanionConfiguration; } catch { const config = { stateDirectory, ipcPath: process.platform === "win32" ? `\\\\.\\pipe\\sxsy-b122-${hash(stateDirectory).slice(0, 16)}` : join(stateDirectory, "companion.sock"), token: randomBytes(32).toString("hex"), startup: "manual" as const }; await writeFile(path, JSON.stringify(config), { mode: 0o600 }); return config; } }
-/** Authenticated local IPC with newline-framed JSON.  No TCP listener is ever opened. */
-export class CompanionIpcServer {
-  private server?: Server;
-  private readonly configuration: CompanionConfiguration; private readonly handle: (method: string, params: unknown) => Promise<unknown>;
-  constructor(configuration: CompanionConfiguration, handle: (method: string, params: unknown) => Promise<unknown>) { this.configuration = configuration; this.handle = handle; }
-  async start(): Promise<void> { if (process.platform !== "win32") await unlink(this.configuration.ipcPath).catch(() => undefined); this.server = createServer((socket) => this.accept(socket)); await new Promise<void>((done, fail) => { this.server!.once("error", fail); this.server!.listen(this.configuration.ipcPath, done); }); }
-  private accept(socket: Socket): void { let pending = ""; socket.on("data", async (chunk) => { pending += chunk.toString(); let line: string | undefined; while ((line = pending.indexOf("\n") >= 0 ? pending.slice(0, pending.indexOf("\n")) : undefined) !== undefined) { pending = pending.slice(line.length + 1); let response: IpcResponse; try { const request = JSON.parse(line) as IpcEnvelope; if (request.token !== this.configuration.token) throw new Error("IPC authentication failed."); response = { id: request.id, ok: true, result: await this.handle(request.method, request.params) }; } catch (error) { response = { id: "unknown", ok: false, error: redact((error as Error).message) }; } socket.write(`${JSON.stringify(response)}\n`); } }); }
-  async stop(): Promise<void> { if (this.server) await new Promise<void>((done, fail) => this.server!.close((error) => error ? fail(error) : done())); if (process.platform !== "win32") await unlink(this.configuration.ipcPath).catch(() => undefined); }
-}
-export async function callCompanion(configuration: CompanionConfiguration, method: string, params?: unknown): Promise<IpcResponse> { return new Promise((done, fail) => { const socket = connect(configuration.ipcPath); let data = ""; socket.once("error", fail); socket.on("data", (chunk) => { data += chunk.toString(); if (data.includes("\n")) { socket.end(); done(JSON.parse(data) as IpcResponse); } }); socket.once("connect", () => socket.write(`${JSON.stringify({ token: configuration.token, id: randomUUID(), method, params })}\n`)); }); }
+/**
+ * The raw-token legacy IPC API was removed.  Use `authenticated-pipe.ts`,
+ * which carries the candidate CompanionRequest contract over a bounded,
+ * sealed-token local pipe.  Keeping the tombstone makes accidental imports
+ * fail visibly instead of reintroducing a plaintext bearer-token server.
+ */
+export const legacyRawIpcRetired = true as const;
 
 export interface ConcreteHandler {
   readonly name: HandlerName;

@@ -1,0 +1,402 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import {
+  containmentIncidentReviewDigest,
+  DurableContainmentIncidentCoordinator,
+  releaseContainmentIncidentInTransaction,
+  type ContainmentAssessmentEffectPort,
+  type ContainmentAssessmentRequest,
+  type ContainmentAssessmentResult
+} from "../src/containment-incidents.ts";
+import { DurableContainmentManager } from "../src/containment.ts";
+import { ProtectedJsonStore, sha256 } from "../src/store.ts";
+
+async function fixture(context: test.TestContext, options: ConstructorParameters<typeof DurableContainmentIncidentCoordinator>[1] = {}) {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-incident-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const store = new ProtectedJsonStore({ filePath: join(directory, "audit.jsonl") });
+  const coordinator = new DurableContainmentIncidentCoordinator(store, options);
+  const incident = await coordinator.activate({
+    repositoryRoot: "C:/work/example",
+    fenceEpoch: 7,
+    activationOperationId: "operation-containment-7",
+    targetSnapshotId: "snapshot-containment-7",
+    reason: "suspected token exposure"
+  });
+  return { store, coordinator, incident };
+}
+
+class AssessmentPort implements ContainmentAssessmentEffectPort {
+  readonly calls: ContainmentAssessmentRequest[] = [];
+  readonly observations: ContainmentAssessmentRequest[] = [];
+  readonly committed = new Map<string, ContainmentAssessmentResult>();
+  failAfterCommit = false;
+
+  async execute(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult> {
+    this.calls.push(request);
+    const result: ContainmentAssessmentResult = request.step === "working_tree"
+      ? {
+          ...binding(request),
+          effectDisposition: "committed",
+          status: "failed",
+          exposure: "found",
+          summary: "token=ghp_1234567890abcdef was found and must not be logged",
+          findings: [{ id: `containment-finding:${sha256(`${request.operationId}:config/local.env`)}`, relativePath: "config/local.env", credentialRelated: true }]
+        }
+      : {
+          ...binding(request),
+          effectDisposition: "committed",
+          status: "passed",
+          exposure: "none",
+          summary: `${request.step} has no exposure`,
+          findings: []
+        };
+    this.committed.set(request.externalId, result);
+    if (this.failAfterCommit) throw new Error("response lost after external commit");
+    return result;
+  }
+
+  async observe(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult | undefined> {
+    this.observations.push(request);
+    return this.committed.get(request.externalId);
+  }
+}
+
+class CleanAssessmentPort implements ContainmentAssessmentEffectPort {
+  readonly calls: ContainmentAssessmentRequest[] = [];
+  async execute(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult> {
+    this.calls.push(request);
+    return {
+      ...binding(request),
+      effectDisposition: "committed",
+      status: "passed",
+      exposure: "none",
+      summary: `${request.step} is clean after remediation`,
+      findings: []
+    };
+  }
+  observe(request: ContainmentAssessmentRequest): Promise<ContainmentAssessmentResult | undefined> {
+    return this.execute(request);
+  }
+}
+
+test("incident assessment is durable, redacts values, and never replays a committed child", async (context) => {
+  const { store, coordinator, incident } = await fixture(context);
+  const port = new AssessmentPort();
+  port.failAfterCommit = true;
+
+  const interrupted = await coordinator.assess(incident.id, port);
+  assert.equal(interrupted.steps.find((step) => step.name === "working_tree")?.status, "ambiguous");
+  assert.equal(port.calls.length, 1);
+
+  const restarted = new DurableContainmentIncidentCoordinator(store);
+  port.failAfterCommit = false;
+  const completed = await restarted.assess(incident.id, port);
+  assert.equal(port.calls.filter((call) => call.step === "working_tree").length, 1);
+  assert.equal(port.observations.filter((call) => call.step === "working_tree").length, 1);
+  assert.equal(completed.steps.every((step) => step.status === "completed"), true);
+  const serialized = JSON.stringify(completed);
+  assert.doesNotMatch(serialized, /ghp_1234567890abcdef/);
+  assert.match(serialized, /\[REDACTED\]/);
+  assert.equal(completed.status, "remediation_required");
+});
+
+test("remote unknown and missing credential remediation keep release unavailable", async (context) => {
+  const { coordinator, incident } = await fixture(context);
+  const port = new AssessmentPort();
+  const original = port.execute.bind(port);
+  port.execute = async (request) => request.step === "remote"
+    ? { ...binding(request), effectDisposition: "committed", status: "incomplete", exposure: "unknown", summary: "remote could not be determined", findings: [] }
+    : original(request);
+  const assessed = await coordinator.assess(incident.id, port);
+  assert.equal(assessed.status, "assessment_incomplete");
+  await assert.rejects(coordinator.assertReadyForRelease(incident.id), /assessment.*incomplete/i);
+});
+
+test("remediation permits are exact, one-time, no-egress, and invalid across fence generations", async (context) => {
+  let now = Date.parse("2026-08-25T12:00:00.000Z");
+  const { coordinator, incident } = await fixture(context, { now: () => new Date(now).toISOString() });
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0]!;
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: ["config/local.env"],
+    expiresAt: "2026-08-25T12:05:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  assert.equal(permit.networkAllowed, false);
+  assert.equal(permit.credentialAccessAllowed, false);
+  await assert.rejects(coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: ["other.env"],
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("receipt")
+  }), /path/i);
+  const remediated = await coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("receipt")
+  });
+  await assert.rejects(coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("receipt")
+  }), /consumed/i);
+
+  await assert.rejects(coordinator.assertReadyForRelease(incident.id), /verification/i);
+  const verification = await coordinator.beginRemediationVerification({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(remediated),
+    targetSnapshotId: "snapshot-remediated-7"
+  });
+  assert.equal(verification.assessment.purpose, "post_remediation");
+  assert.equal(verification.assessment.generation, 2);
+  assert.deepEqual(verification.assessment.basedOnReceiptIds, remediated.receipts.map((receipt) => receipt.id));
+  const verified = await coordinator.assess(incident.id, new CleanAssessmentPort(), containmentIncidentReviewDigest(verification));
+  assert.equal(verified.steps.every((step) => step.result?.status === "passed"), true);
+
+  await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(verified),
+    disposition: "complete",
+    evidenceReference: "credential-rotation-ticket-17",
+    evidenceDigest: sha256("rotation evidence")
+  });
+  assert.equal((await coordinator.assertReadyForRelease(incident.id)).status, "ready_for_release");
+
+  const replacement = await coordinator.activate({
+    repositoryRoot: incident.repositoryRoot,
+    fenceEpoch: 8,
+    activationOperationId: "operation-containment-8",
+    targetSnapshotId: "snapshot-containment-8",
+    reason: "new exposure generation"
+  });
+  assert.notEqual(replacement.id, incident.id);
+  await assert.rejects(coordinator.assertReadyForRelease(incident.id), /newer.*fence/i);
+  now += 10 * 60_000;
+  await assert.rejects(coordinator.issueRemediationPermit({
+    incidentId: replacement.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(replacement),
+    action: "remove_exposed_value",
+    relativePaths: ["config/local.env"],
+    expiresAt: "2026-08-25T12:05:00.000Z",
+    reviewedBy: "windows-current-user"
+  }), /expired|assessment/i);
+});
+
+test("release readiness requires exact finding receipts and credential-rotation evidence", async (context) => {
+  const { coordinator, incident } = await fixture(context);
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    disposition: "complete",
+    evidenceReference: "credential-rotation-ticket-18",
+    evidenceDigest: sha256("rotation evidence")
+  });
+  await assert.rejects(coordinator.assertReadyForRelease(incident.id), /finding.*remediation/i);
+});
+
+test("an expired permit reconciles only an effect durably started inside its validity window", async (context) => {
+  let now = Date.parse("2026-08-25T12:00:00.000Z");
+  const { coordinator, incident } = await fixture(context, { now: () => new Date(now).toISOString() });
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0]!;
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2026-08-25T12:05:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  const receipt = (effectStartedAt: string) => coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("crash-reconciled remediation"),
+    effectStartedAt
+  });
+  now = Date.parse("2026-08-25T12:10:00.000Z");
+  await assert.rejects(receipt("2026-08-25T12:11:00.000Z"), /future-dated/i);
+  await assert.rejects(receipt("2026-08-25T11:59:00.000Z"), /expired before.*started/i);
+  const reconciled = await receipt("2026-08-25T12:02:00.000Z");
+  assert.equal(reconciled.receipts.at(-1)?.permitId, permit.id);
+});
+
+test("release is bound to one exact ready incident image and published in the caller transaction", async (context) => {
+  const { store, coordinator, incident } = await fixture(context);
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0];
+  assert.ok(finding);
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  const remediated = await coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("remediation evidence")
+  });
+  const verification = await coordinator.beginRemediationVerification({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(remediated),
+    targetSnapshotId: "snapshot-remediated-release"
+  });
+  const verified = await coordinator.assess(incident.id, new CleanAssessmentPort(), containmentIncidentReviewDigest(verification));
+  let ready = await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(verified),
+    disposition: "complete",
+    evidenceReference: "rotation-ticket-atomic",
+    evidenceDigest: sha256("rotation evidence one")
+  });
+  const staleDigest = containmentIncidentReviewDigest(ready);
+  ready = await coordinator.recordRotationReview({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(ready),
+    disposition: "complete",
+    evidenceReference: "rotation-ticket-atomic-updated",
+    evidenceDigest: sha256("rotation evidence two")
+  });
+
+  await assert.rejects(store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+    incidentId: ready.id,
+    incidentDigest: containmentIncidentReviewDigest(ready),
+    repositoryRoot: ready.repositoryRoot,
+    fenceEpoch: ready.fenceEpoch,
+    activationOperationId: ready.activationOperationId,
+    targetSnapshotId: "snapshot-changed-after-clean-scan"
+  }, "2026-08-25T13:00:00.000Z")), /exact active fence|target/i);
+
+  await assert.rejects(store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+    incidentId: ready.id,
+    incidentDigest: staleDigest,
+    repositoryRoot: ready.repositoryRoot,
+    fenceEpoch: ready.fenceEpoch,
+    activationOperationId: ready.activationOperationId,
+    targetSnapshotId: ready.assessment.targetSnapshotId
+  }, "2026-08-25T13:00:00.000Z")), /changed after review/i);
+  assert.equal((await coordinator.get(ready.id))?.status, "ready_for_release");
+
+  const released = await store.transaction((transaction) => releaseContainmentIncidentInTransaction(transaction, {
+    incidentId: ready.id,
+    incidentDigest: containmentIncidentReviewDigest(ready),
+    repositoryRoot: ready.repositoryRoot,
+    fenceEpoch: ready.fenceEpoch,
+    activationOperationId: ready.activationOperationId,
+    targetSnapshotId: ready.assessment.targetSnapshotId
+  }, "2026-08-25T13:00:00.000Z"));
+  assert.equal(released.status, "released");
+  assert.equal((await coordinator.get(ready.id))?.releasedAt, "2026-08-25T13:00:00.000Z");
+});
+
+test("post-remediation verification uses a fresh generation and cannot reuse an earlier finding receipt", async (context) => {
+  const { coordinator, incident } = await fixture(context);
+  const assessed = await coordinator.assess(incident.id, new AssessmentPort());
+  const finding = assessed.steps.flatMap((step) => step.result?.findings ?? [])[0]!;
+  const permit = await coordinator.issueRemediationPermit({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(assessed),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  const remediated = await coordinator.recordRemediation({
+    permitId: permit.id,
+    incidentId: incident.id,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id],
+    evidenceDigest: sha256("first remediation")
+  });
+  const verification = await coordinator.beginRemediationVerification({
+    incidentId: incident.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(remediated),
+    targetSnapshotId: "snapshot-remediated-repeat"
+  });
+  assert.notEqual(verification.steps[0]?.operationId, assessed.steps[0]?.operationId);
+  const failedAgain = await coordinator.assess(incident.id, new AssessmentPort(), containmentIncidentReviewDigest(verification));
+  const nextFinding = failedAgain.steps.flatMap((step) => step.result?.findings ?? [])[0]!;
+  assert.notEqual(nextFinding.id, finding.id);
+  assert.equal(failedAgain.status, "remediation_required");
+  await assert.rejects(coordinator.assertReadyForRelease(incident.id), /finding.*remediation/i);
+});
+
+test("durable containment atomically opens and automatically resumes the incident assessment", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-incident-manager-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const store = new ProtectedJsonStore({ filePath: join(directory, "audit.jsonl") });
+  const port = new AssessmentPort();
+  const manager = new DurableContainmentManager(store, {
+    revokeCredentialLeases: async () => undefined,
+    cancelQueuedOperations: async () => undefined
+  }, { incidentAssessmentPort: port });
+  const fence = await manager.activate({ repositoryRoot: "C:/work/atomic", operationId: "operation-containment-atomic", reason: "atomic incident" });
+  assert.match(fence.incidentId ?? "", /^containment-incident:/);
+  const incident = await manager.incidents.get(fence.incidentId!);
+  assert.equal(incident?.steps.every((step) => step.status === "completed"), true);
+  assert.equal(port.calls.length, 3);
+  assert.equal((await manager.check(fence.repositoryRoot, "local_remediation")).allowed, false);
+  assert.equal((await manager.check(fence.repositoryRoot, "local_cleanup")).allowed, true);
+  const finding = incident?.steps.flatMap((step) => step.result?.findings ?? [])[0];
+  assert.ok(finding);
+  const permit = await manager.incidents.issueRemediationPermit({
+    incidentId: incident!.id,
+    expectedIncidentDigest: containmentIncidentReviewDigest(incident!),
+    action: "remove_exposed_value",
+    relativePaths: [finding.relativePath],
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    reviewedBy: "windows-current-user"
+  });
+  assert.equal((await manager.check(fence.repositoryRoot, "local_remediation", {
+    permitId: permit.id,
+    incidentId: incident!.id,
+    fenceEpoch: incident!.fenceEpoch,
+    action: permit.action,
+    relativePaths: permit.relativePaths,
+    remediatedFindingIds: [finding.id]
+  })).allowed, true);
+  const entries = await store.readEntries();
+  const fenceSequence = entries.find((entry) => entry.kind === "containment.saved")?.sequence;
+  const incidentSequence = entries.find((entry) => entry.kind === "containment.incident.saved.v1")?.sequence;
+  assert.equal(typeof fenceSequence, "number");
+  assert.equal(incidentSequence, (fenceSequence ?? 0) + 1);
+});
+
+function binding(request: ContainmentAssessmentRequest) {
+  return {
+    schema: "sxsy-b122.containment-assessment-result" as const,
+    version: 1 as const,
+    incidentId: request.incidentId,
+    repositoryRoot: request.repositoryRoot,
+    fenceEpoch: request.fenceEpoch,
+    step: request.step,
+    operationId: request.operationId,
+    externalId: request.externalId
+  };
+}

@@ -12,9 +12,31 @@
 - `adversarial-review.md` is a source-backed, implementation-oriented index of
   the review in section 9 of the complete design. It is not a substitute for
   that complete source.
-- `software-completion-audit.md` distinguishes the implemented, tested
-  software control-plane machinery from device, provider, and operational
-  acceptance evidence that remains unavailable in this checkout.
+- `software-only-completion-audit.md` distinguishes the completed
+  hardware-independent source boundary from the separate device,
+  provider, and operational acceptance evidence unavailable in this checkout.
+- `software-residual-ledger.md` maps all 22 controls and 65 settled chord
+  assignments to their concrete local mechanisms and honest external edges.
+- `software-completion-audit.md`, `post-merge-adversarial-audit.md`, and
+  `candidate-transport-git-containment-evidence.md` are explicitly historical
+  point-in-time records. They do not override the current audit or gate register.
+- `acceptance-gates.md` is the authoritative 27-gate status register; every
+  gate remains **NOT ACCEPTED** until its required real-world evidence exists.
+- `provider-adapter-protocol.md` specifies exact capability, command,
+  automatic-Council, Git smart-HTTP, and GitHub adapter contracts.
+- `windows-release-and-installation.md` defines the content-verified Windows
+  bundle, per-user state boundary, checksums, SBOM, transactional lifecycle,
+  and the limits of local installation evidence.
+- `SXSY-B122-operator-technical-manual.md` is the versioned first-install,
+  daily-operation, recovery, and troubleshooting manual. Its embedded printable
+  reference is mechanically generated from the canonical protocol and command
+  catalog.
+- `generated/SXSY-B122-65-chord-reference.md` and
+  `generated/SXSY-B122-documentation-manifest.json` record the exact 22-control,
+  65-assignment, 111-unassigned surface and source/output digests.
+- `demo/` contains an offline deterministic fail-closed storyboard and playback.
+  It is explicitly simulated and supplies no hardware, provider, or acceptance
+  evidence.
 
 The implementation follows the documented safety boundary: a keyboard signal
 may route an intent, but only mediated execution can enforce policy.
