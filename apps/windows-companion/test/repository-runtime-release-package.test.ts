@@ -470,6 +470,9 @@ test("Windows release output is an authenticated exclusive leaf with no reparse 
   const quarantineInventory = cleanupFunction.indexOf("$queue.Enqueue($quarantine)");
   assert.ok(quarantineMove >= 0 && quarantineInventory > quarantineMove);
   assert.equal(cleanupFunction.includes("$queue.Enqueue($tree)"), false);
+  assert.match(cleanupFunction, /parentRelative=\$relativeDirectory/);
+  assert.match(cleanupFunction, /\$directoryIdentities\[\$relativeDirectory\]=\$directoryIdentity/);
+  assert.equal(cleanupFunction.includes("Assert-B122NoReparseAncestors -Path $leaf"), false);
   assert.doesNotMatch(build, /Remove-Item[^\r\n]*-Recurse/);
   assert.equal(artifact.includes("$_.FullName.Substring($root.Length+1).Replace('\\','/') -notin @('SHA256SUMS.json','sbom.spdx.json','release.json')"), true);
 });
