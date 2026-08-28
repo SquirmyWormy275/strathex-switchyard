@@ -338,7 +338,10 @@ await writeFile(readyPath, JSON.stringify({ schema: "sxsy-b122.release-companion
   if($companionFixture.ExitCode-ne0-or(Test-B122FixtureProcessIdentityAlive $companionFixtureIdentity)){throw 'The packaged companion did not prove zero survivors after graceful shutdown.'}
   $companionFixture=$null
   Write-B122ProviderReleaseTrace 'companion-shutdown-complete'
-  $startedRaw=Invoke-B122ProviderFixturePowerShell -Script $providerLifecycle -Arguments @('-Action','Start','-BundleRoot',$providerBundle,'-ConfigurationPath',$providerConfiguration,'-WaitForHealth')
+  # The lifecycle manager permits a 120-second authenticated-health window
+  # under scanner contention. Leave bounded caller cleanup headroom instead
+  # of racing that exact internal deadline.
+  $startedRaw=Invoke-B122ProviderFixturePowerShell -Script $providerLifecycle -Arguments @('-Action','Start','-BundleRoot',$providerBundle,'-ConfigurationPath',$providerConfiguration,'-WaitForHealth') -TimeoutSeconds 240
   Write-B122ProviderReleaseTrace 'managed-start-complete'
   $started=$startedRaw|Select-Object -Last 1|ConvertFrom-Json
   if($started.schema-cne'sxsy-b122.provider-host-lifecycle'-or$started.status-cne'running'-or$started.authenticated-ne$true-or$started.tlsIdentityPinned-ne$true-or[int]$started.processId-lt1){throw 'The packaged provider host did not establish authenticated pinned-TLS health.'}

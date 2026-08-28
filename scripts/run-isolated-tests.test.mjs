@@ -74,10 +74,10 @@ test("only explicitly slow integration or release groups extend the bounded defa
   const directory = await mkdtemp(join(tmpdir(), "sxsy-group-timeout-"));
   try {
     const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
-    assert.equal(tlsGroup?.timeoutMs, 240_000);
+    assert.equal(tlsGroup?.timeoutMs, 1_200_000);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
-      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 240_000],
+      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 1_200_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
@@ -86,7 +86,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["apps/windows-companion/test/repository-runner-helper.test.ts", 240_000],
       ["deployment/windows/Test-B122ManifestGenerators.ps1", 180_000],
       ["deployment/windows/Test-B122InstallLifecycle.ps1", 240_000],
-      ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 240_000],
+      ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 600_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 300_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];

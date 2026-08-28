@@ -69,7 +69,7 @@ const providerHostTests = ["backends", "config", "council-resources", "dispatch-
     file: `apps/provider-adapter-host/test/${name}.test.ts`,
     currentUserProfile: name === "tls-network-e2e",
     safeTrace: name === "tls-network-e2e",
-    ...(name === "tls-network-e2e" ? { timeoutMs: 240_000, expectedSkipped: process.platform === "win32" ? 0 : 2 } : {}),
+    ...(name === "tls-network-e2e" ? { timeoutMs: 1_200_000, expectedSkipped: process.platform === "win32" ? 0 : 2 } : {}),
     ...(name === "linux-path-security" && process.platform !== "linux" ? { expectedSkipped: 1 } : {})
   }));
 const linuxSkippedOnNonLinux = new Map([
@@ -117,7 +117,7 @@ export const requiredGroups = [
     file: "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
     executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "deployment/windows/Test-B122ProviderDesktopRelease.ps1"],
-    timeoutMs: 240_000,
+    timeoutMs: 600_000,
     safeTrace: true
   }] : []),
   { file: "packages/protocol/test/b122.test.ts" },

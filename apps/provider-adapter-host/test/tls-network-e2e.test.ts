@@ -163,7 +163,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
 
   await createFixtureBundle(bundle);
   lifecycleReady = true;
-  const started = parseReceipt(await runPowerShellExecutable(windowsPowerShell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"]));
+  const started = parseReceipt(await runPowerShellExecutable(windowsPowerShell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"], 240_000));
   trace("provider-started");
   assert.equal(started.status, "running");
   assert.equal(started.tlsIdentityPinned, true);
@@ -231,7 +231,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
     ["packaged pwsh", powershell, packagedManage]
   ] as const) {
     lifecycleReady = true;
-    const restarted = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Start", ...lifecycleArguments, "-WaitForHealth"]));
+    const restarted = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Start", ...lifecycleArguments, "-WaitForHealth"], 240_000));
     assert.equal(restarted.status, "running", `${label} must complete the bounded authenticated readiness retry`);
     const restartedProcessId = Number(restarted.processId);
     assert.ok(Number.isSafeInteger(restartedProcessId) && restartedProcessId > 0);
