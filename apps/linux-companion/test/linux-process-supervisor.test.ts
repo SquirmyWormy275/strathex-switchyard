@@ -9,7 +9,7 @@ import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts
 import { FakeUserSecretProtector, SecretProtectorJournalAuthenticator } from "../../windows-companion/src/windows-secret.ts";
 import { LinuxProcessGroupSupervisor } from "../src/linux-process-supervisor.ts";
 
-test("Linux process supervisor binds, observes, and terminates an exact process group", { skip: process.platform !== "linux" }, async (context) => {
+test("Linux process supervisor binds, observes, and terminates an exact process group", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-")); context.after(async () => rm(root, { recursive: true, force: true }));
   const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
@@ -26,12 +26,14 @@ test("Linux process supervisor binds, observes, and terminates an exact process 
   assert.equal(await processHandle.isAlive(), false);
 });
 
-test("Linux process supervisor reserves one operation before concurrent launch", { skip: process.platform !== "linux" }, async (context) => {
+test("Linux process supervisor reserves one operation before concurrent launch", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-race-")); context.after(async () => rm(root, { recursive: true, force: true }));
   const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
   const supervisor = new LinuxProcessGroupSupervisor(store);
-  const request = { action: "run_target" as const, operationId: "linux-process-race", targetSnapshotId: "c".repeat(64), repositoryRoot: root, manifestSha256: "d".repeat(64), executable, executableSha256, args: ["-e", "setInterval(()=>{},1000)"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 60_000, maxOutputBytes: 4096 };
+  // This case proves reservation atomicity, not forced termination. Keep the
+  // fixture intrinsically bounded so a failed cleanup can never strand CI.
+  const request = { action: "run_target" as const, operationId: "linux-process-race", targetSnapshotId: "c".repeat(64), repositoryRoot: root, manifestSha256: "d".repeat(64), executable, executableSha256, args: ["-e", "setTimeout(()=>process.exit(0),1000)"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 5_000, maxOutputBytes: 4096 };
   const attempts = await Promise.allSettled([supervisor.start(request), supervisor.start(request)]);
   const started = attempts.filter((attempt): attempt is PromiseFulfilledResult<Awaited<ReturnType<typeof supervisor.start>>> => attempt.status === "fulfilled");
   context.after(async () => { for (const attempt of started) { if (await attempt.value.isAlive()) await attempt.value.terminateTree(1_000, 1_000); await attempt.value.wait().catch(() => undefined); } });
@@ -41,7 +43,7 @@ test("Linux process supervisor reserves one operation before concurrent launch",
   await started[0]!.value.wait();
 });
 
-test("Linux process supervisor persists and enforces the operation deadline", { skip: process.platform !== "linux" }, async (context) => {
+test("Linux process supervisor persists and enforces the operation deadline", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-deadline-")); context.after(async () => rm(root, { recursive: true, force: true }));
   const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
