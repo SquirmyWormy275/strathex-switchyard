@@ -214,6 +214,46 @@ test("credential-free fixture mode is loopback diagnostic-only and all owned pat
   await assert.rejects(() => loadProviderHostConfiguration(configPath, options(root)), /protected provider-host root/i);
 });
 
+test("startup opens the three independent host secrets concurrently", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "b122-provider-host-parallel-secrets-"));
+  context.after(async () => rm(root, { recursive: true, force: true }));
+  const paths = {
+    config: join(root, "config.json"), token: join(root, "token.json"), journal: join(root, "journal.json"),
+    dispatchLease: join(root, "dispatch-lease.json"), cert: join(root, "cert.pem"), key: join(root, "key.pem")
+  };
+  await Promise.all([
+    envelope(paths.token, "a".repeat(64)), envelope(paths.journal, "b".repeat(64)), envelope(paths.dispatchLease, "c".repeat(64)),
+    writeFile(paths.cert, tlsFixture.certificatePem), writeFile(paths.key, tlsFixture.privateKeyPem)
+  ]);
+  await writeFile(paths.config, JSON.stringify({
+    schema: "sxsy-b122.provider-host-config", version: 1, protectedStateRoot: root,
+    listen: { host: "127.0.0.1", port: 4747 }, tls: pinnedTls(paths.cert, paths.key),
+    authenticationTokenEnvelopeFile: paths.token, journalAuthenticationEnvelopeFile: paths.journal,
+    dispatchLeaseAuthenticationEnvelopeFile: paths.dispatchLease, stateFile: join(root, "state.jsonl"),
+    providers: [{ provider: "codex", kind: "fixture" }], allowFixtureBackends: true
+  }));
+  let active = 0;
+  let maximumActive = 0;
+  const concurrentProtector: UserSecretProtector = {
+    provider: protector.provider,
+    async seal() { throw new Error("not used"); },
+    async open(sealed) {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 25));
+      active -= 1;
+      return Buffer.from(sealed, "base64");
+    }
+  };
+  const loaded = await loadProviderHostConfiguration(paths.config, {
+    secretProtector: concurrentProtector, pathSecurity: new RecordingPathSecurity(), allowedProtectedBaseRoot: root
+  });
+  assert.equal(maximumActive, 3);
+  loaded.authenticationToken.fill(0);
+  loaded.journalAuthenticationKey.fill(0);
+  loaded.dispatchLeaseAuthenticationKey.fill(0);
+});
+
 test("digest-pinned modules never receive the raw protected credential or an ambient effect capability", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "b122-provider-module-config-"));
   context.after(async () => rm(root, { recursive: true, force: true }));

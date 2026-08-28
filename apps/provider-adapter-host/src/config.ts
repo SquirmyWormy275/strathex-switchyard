@@ -188,21 +188,24 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   await traceConfigurationStage(absoluteConfigurationPath, "config-path-security");
   await pathSecurity.assertCurrentUserProtected(protectedStateRoot, protectedExistingPaths);
   await traceConfigurationStage(absoluteConfigurationPath, "config-bearer-secret");
-  const tokenBytes = await openProviderHostSecretEnvelope(tokenEnvelopeFile, protector);
+  await traceConfigurationStage(absoluteConfigurationPath, "config-journal-secret");
+  await traceConfigurationStage(absoluteConfigurationPath, "config-dispatch-secret");
+  // These envelopes are cryptographically independent. Open them together so
+  // Windows startup pays one bounded helper-startup interval instead of three
+  // serial intervals on constrained/Defender-scanned hosts.
+  const [tokenBytes, journalBytes, dispatchLeaseBytes] = await openIndependentHostSecrets([
+    tokenEnvelopeFile, journalEnvelopeFile, dispatchLeaseEnvelopeFile
+  ], protector);
   let token: string;
   try {
     token = Buffer.from(tokenBytes).toString("ascii");
     if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("The protected provider-host authentication token must contain exactly 256 canonical bits.");
   } finally { tokenBytes.fill(0); }
-  await traceConfigurationStage(absoluteConfigurationPath, "config-journal-secret");
-  const journalBytes = await openProviderHostSecretEnvelope(journalEnvelopeFile, protector);
   let journalAuthenticationKey: string;
   try {
     journalAuthenticationKey = Buffer.from(journalBytes).toString("ascii");
     if (!/^[a-f0-9]{64}$/.test(journalAuthenticationKey)) throw new Error("The protected provider-host journal authentication key must contain exactly 256 canonical bits.");
   } finally { journalBytes.fill(0); }
-  await traceConfigurationStage(absoluteConfigurationPath, "config-dispatch-secret");
-  const dispatchLeaseBytes = await openProviderHostSecretEnvelope(dispatchLeaseEnvelopeFile, protector);
   let dispatchLeaseAuthenticationKey: string;
   try {
     dispatchLeaseAuthenticationKey = Buffer.from(dispatchLeaseBytes).toString("ascii");
@@ -263,6 +266,19 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     dispatchLeaseAuthenticationKey: Buffer.from(dispatchLeaseAuthenticationKey, "ascii"), dispatchLeaseAuthenticationKeyText: dispatchLeaseAuthenticationKey,
     stateFile, providers, effectDrivers
   };
+}
+
+async function openIndependentHostSecrets(
+  paths: readonly [string, string, string],
+  protector: UserSecretProtector
+): Promise<[Uint8Array, Uint8Array, Uint8Array]> {
+  const results = await Promise.allSettled(paths.map((path) => openProviderHostSecretEnvelope(path, protector)));
+  if (results.every((result): result is PromiseFulfilledResult<Uint8Array> => result.status === "fulfilled")) {
+    return [results[0].value, results[1].value, results[2].value];
+  }
+  for (const result of results) if (result.status === "fulfilled") result.value.fill(0);
+  const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  throw failure?.reason ?? new Error("The independent provider-host secrets could not be opened.");
 }
 
 async function traceConfigurationStage(configurationPath: string, stage: string): Promise<void> {
