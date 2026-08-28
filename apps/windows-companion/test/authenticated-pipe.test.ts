@@ -351,7 +351,7 @@ test("journal authenticator test harness detects a sealed tag from the wrong dig
   assert.equal(await authenticator.verify("b".repeat(64), tag), false);
 });
 
-test("DPAPI protector zeroes task-owned input and output buffers on both paths", async () => {
+test("DPAPI protector zeroes task-owned input and output buffers on both paths", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   const inputs: Buffer[] = [];
   const outputs: Buffer[] = [];
   const runner: BoundedWindowsProcessRunner = async (request) => {
@@ -373,7 +373,7 @@ test("DPAPI protector zeroes task-owned input and output buffers on both paths",
   assert.equal(outputs.every((buffer) => buffer.every((byte) => byte === 0)), true);
 });
 
-test("DPAPI helper identity is anchored to the loaded Windows kernel instead of inherited SystemRoot", async () => {
+test("DPAPI helper identity is anchored to the loaded Windows kernel instead of inherited SystemRoot", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   let executable = "";
   const runner: BoundedWindowsProcessRunner = async (request) => {
     executable = request.executable;

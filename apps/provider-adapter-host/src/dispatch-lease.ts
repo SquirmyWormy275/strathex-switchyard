@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { exactHostAbsoluteRoot, hostRootKey } from "../../../packages/control-plane/src/host-path.ts";
+import { exactPortableAbsoluteRoot, portableRootKey } from "../../../packages/control-plane/src/host-path.ts";
 
 import { sha256, stableJson, type ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 
@@ -361,11 +361,11 @@ function nullableIdentifier(value: unknown): value is string | null { return val
 function safeRoute(value: unknown): value is string { return typeof value === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(value); }
 function adapterId(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value); }
 function adapterVersion(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9_.+-]{1,80}$/.test(value); }
-function absoluteRoot(value: unknown): value is string { return exactHostAbsoluteRoot(value); }
+function absoluteRoot(value: unknown): value is string { return exactPortableAbsoluteRoot(value); }
 function bounded(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
 function nullableBounded(value: unknown, maximum: number): value is string | null { return value === null || bounded(value, maximum); }
 function boundedList(value: unknown, maximumItems: number, maximumLength: number): value is readonly string[] { return Array.isArray(value) && value.length <= maximumItems && value.every((entry) => bounded(entry, maximumLength)); }
 function submodules(value: unknown): value is Readonly<Record<string, string>> { return record(value) && Object.keys(value).length <= 128 && Object.entries(value).every(([path, revision]) => bounded(path, 512) && bounded(revision, 256)); }
 function timestamp(value: unknown): value is string { return typeof value === "string" && value.length <= 64 && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value; }
 function nullablePositiveInteger(value: unknown): value is number | null { return value === null || (Number.isSafeInteger(value) && (value as number) >= 1); }
-function sameRoot(left: string, right: string): boolean { const leftKey = hostRootKey(left); return leftKey !== "" && leftKey === hostRootKey(right); }
+function sameRoot(left: string, right: string): boolean { const leftKey = portableRootKey(left); return leftKey !== "" && leftKey === portableRootKey(right); }

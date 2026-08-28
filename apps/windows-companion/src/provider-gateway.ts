@@ -6,7 +6,7 @@ import type {
   ManagedSession,
   SessionStatus
 } from "../../../packages/control-plane/src/contracts.ts";
-import { exactHostAbsoluteRoot, hostRootKey } from "../../../packages/control-plane/src/host-path.ts";
+import { exactPortableAbsoluteRoot, portableRootKey } from "../../../packages/control-plane/src/host-path.ts";
 import type { SessionRegistry } from "../../../packages/control-plane/src/session-registry.ts";
 import {
   canonicalReanchorApplyRequest,
@@ -1500,9 +1500,9 @@ function safeIdentifier(value: unknown, field: string): string { if (typeof valu
 function safeOperationId(value: unknown): value is string { try { safeIdentifier(value, "operation ID"); return true; } catch { return false; } }
 function safeRoute(value: unknown): string { if (typeof value !== "string" || !/^[a-z][a-z0-9_.-]{0,127}$/.test(value)) throw new Error("The provider gateway route is invalid."); return value; }
 function legacyAutomationEffectRoute(routeId: string): boolean { return routeId.startsWith("automation.") && !routeId.startsWith("automation.proposal."); }
-function safeRoot(value: unknown): string { if (!exactHostAbsoluteRoot(value)) throw new Error("The provider repository root is invalid."); return value; }
+function safeRoot(value: unknown): string { if (!exactPortableAbsoluteRoot(value)) throw new Error("The provider repository root is invalid."); return value; }
 function exactRoot(value: unknown, expected: string): string { const root = safeRoot(value); if (rootKey(root) !== rootKey(safeRoot(expected))) throw new Error("The provider repository root changed."); return expected; }
-function rootKey(value: string): string { return hostRootKey(value); }
+function rootKey(value: string): string { return portableRootKey(value); }
 function digest(value: unknown, field: string): string { if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value)) throw new Error(`${field} is invalid.`); return value.toLowerCase(); }
 function digest40(value: unknown, field: string): string { if (typeof value !== "string" || !/^[a-f0-9]{40}$/i.test(value)) throw new Error(`${field} is invalid.`); return value.toLowerCase(); }
 function safeText(value: unknown, field: string, maximum = maximumText): string { if (typeof value !== "string" || !value.trim() || value.length > maximum || /[\0\r\n]/.test(value)) throw new Error(`${field} is invalid.`); return value.trim(); }

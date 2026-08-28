@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
-import { exactHostAbsoluteRoot, hostRootKey } from "../../../packages/control-plane/src/host-path.ts";
+import { exactPortableAbsoluteRoot, portableRootKey } from "../../../packages/control-plane/src/host-path.ts";
 import type { EffectGuard } from "../../../packages/control-plane/src/brokers.ts";
 import type { Capability, EffectDisposition, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
@@ -810,12 +810,12 @@ function requireProvider(value: ManagedSession["provider"]): ConfiguredProviderI
 function supportedProvider(value: ManagedSession["provider"]): value is ConfiguredProviderIdentity { return value === "claude" || value === "codex"; }
 function requireRoot(value: string | undefined): string { if (!absoluteRoot(value)) throw new Error("The exact provider repository root is invalid."); return value; }
 function requireDigest(value: string | undefined): string { if (!digest(value)) throw new Error("The exact provider TargetSnapshot is invalid."); return value; }
-function absoluteRoot(value: unknown): value is string { return exactHostAbsoluteRoot(value); }
+function absoluteRoot(value: unknown): value is string { return exactPortableAbsoluteRoot(value); }
 function safeId(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value); }
 function safeRoute(value: unknown): value is string { return typeof value === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(value); }
 function digest(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 function sha40(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{40}$/.test(value); }
-function rootKey(value: unknown): string { return typeof value === "string" ? hostRootKey(value) : ""; }
+function rootKey(value: unknown): string { return typeof value === "string" ? portableRootKey(value) : ""; }
 function pathKey(value: unknown): string { return typeof value === "string" ? value.replaceAll("\\", "/").toLowerCase() : ""; }
 function summary(value: unknown, maximum = 512): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
 function boundedIdentity(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= 256 && !/[\0\r\n]/.test(value); }

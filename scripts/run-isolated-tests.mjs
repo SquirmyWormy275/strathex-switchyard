@@ -48,7 +48,7 @@ const companionTests = [
 ].map((name) => ({
   file: `apps/windows-companion/test/${name}.test.ts`,
   currentUserProfile: name === "packaged-runtime",
-  ...(name === "authenticated-pipe" ? { expectedSkipped: process.platform === "win32" ? 2 : 3 } : {}),
+    ...(name === "authenticated-pipe" ? { expectedSkipped: process.platform === "win32" ? 2 : 5 } : {}),
   ...(name === "packaged-runtime" && process.platform !== "win32" ? { expectedSkipped: 1 } : {}),
   ...(["authenticated-pipe", "companion-lifecycle-helper"].includes(name) ? { timeoutMs: 240_000 } : {}),
   ...(["council-workspace-isolation", "installed-automation-e2e", "repository-runner-helper"].includes(name) ? { timeoutMs: 240_000 } : {})

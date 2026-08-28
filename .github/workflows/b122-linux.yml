@@ -47,10 +47,17 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
 
-      - name: Verify the complete portable control plane
+      - name: Verify shared and native Linux control planes
         run: |
           npm run typecheck
-          npm test
+          node --experimental-transform-types --test-concurrency=1 --test \
+            packages/protocol/test/*.test.ts \
+            packages/control-plane/test/*.test.ts \
+            apps/provider-adapter-host/test/*.test.ts \
+            apps/vscode-extension/test/*.test.ts \
+            apps/linux-companion/test/*.test.ts \
+            scripts/*.test.mjs \
+            firmware/*.test.mjs
           npm run build:vscode
           npm run build:companion
           npm run build:linux-companion

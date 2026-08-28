@@ -14,3 +14,14 @@ export function hostRootKey(value: string, platform: NodeJS.Platform = process.p
   if (platform === "win32") return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase();
   return value === "/" ? value : value.replace(/\/+$/, "");
 }
+
+/** Canonical absolute identity carried in durable cross-host protocol records. */
+export function exactPortableAbsoluteRoot(value: unknown): value is string {
+  return exactHostAbsoluteRoot(value, "win32") || exactHostAbsoluteRoot(value, "linux");
+}
+
+export function portableRootKey(value: string): string {
+  if (exactHostAbsoluteRoot(value, "win32")) return `win32:${hostRootKey(value, "win32")}`;
+  if (exactHostAbsoluteRoot(value, "linux")) return `linux:${hostRootKey(value, "linux")}`;
+  return "";
+}

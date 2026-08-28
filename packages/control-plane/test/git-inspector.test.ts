@@ -31,10 +31,10 @@ class FakeDigests implements FileDigestReader {
 
 const result = (stdout: string): GitCommandResult => ({ exitCode: 0, stdout, stderr: "" });
 
-test("default Git command runner accepts only fixed absolute git.exe identities", () => {
+test("default Git command runner accepts only fixed absolute Git identities", () => {
   assert.throws(() => new NodeGitCommandRunner(["git"]), /fixed absolute/i);
   assert.throws(() => new NodeGitCommandRunner(["C:\\tools\\not-git.cmd"]), /fixed absolute/i);
-  assert.doesNotThrow(() => new NodeGitCommandRunner(["C:\\Program Files\\Git\\cmd\\git.exe"]));
+  assert.doesNotThrow(() => new NodeGitCommandRunner([process.platform === "win32" ? "C:\\Program Files\\Git\\cmd\\git.exe" : "/usr/bin/git"]));
 });
 
 test("read-only Git inspector uses fixed argument vectors and classifies every untracked input", async () => {

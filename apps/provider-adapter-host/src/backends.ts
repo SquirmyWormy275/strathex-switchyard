@@ -1,5 +1,5 @@
 import type { AuthorityGrant, Capability, EffectDisposition, ManagedSession, SessionStatus, TargetSnapshot } from "../../../packages/control-plane/src/contracts.ts";
-import { exactHostAbsoluteRoot, hostRootKey } from "../../../packages/control-plane/src/host-path.ts";
+import { exactPortableAbsoluteRoot, portableRootKey } from "../../../packages/control-plane/src/host-path.ts";
 import { commandActionIds, commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type {
@@ -1791,7 +1791,7 @@ function consistentOperationEffect(outcome: ProviderGatewayOperationObservation[
 }
 function requireCouncilAcknowledgement(value: ProviderCouncilAcknowledgement, request: ProviderCouncilRequest): void { if (value.schema !== "sxsy-b122.council-ack" || value.version !== 1 || value.epochId !== request.epochId || value.phase !== request.phase || value.sessionId !== request.sessionId || value.targetSnapshotId !== request.targetSnapshotId || value.accepted !== true || value.assignmentDigest !== request.assignmentDigest || value.resourceHostDigest !== request.resourceHost?.digest) throw new Error("The provider Council acknowledgement changed its exact binding."); }
 function councilRuntimeKey(value: ProviderCouncilRequest): string { return `${value.epochId}:${value.sessionId}:${value.phase}`; }
-function rootKey(value: string): string { return hostRootKey(value); }
+function rootKey(value: string): string { return portableRootKey(value); }
 function remoteStatus(value: unknown): boolean { return value === "completed" || value === "unavailable" || value === "blocked" || value === "failed" || value === "awaiting_input" || value === "awaiting_confirmation" || value === "running" || value === "cancelled" || value === "timed_out"; }
 function effectDisposition(value: unknown): boolean { return value === "not_started" || value === "committed" || value === "ambiguous" || value === "compensated"; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
@@ -1810,7 +1810,7 @@ function safeAdapterId(value: unknown): value is string { return typeof value ==
 function safeAdapterVersion(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9_.+-]{1,80}$/.test(value); }
 function digest(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 function sha40(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{40}$/.test(value); }
-function absoluteRoot(value: unknown): value is string { return exactHostAbsoluteRoot(value); }
+function absoluteRoot(value: unknown): value is string { return exactPortableAbsoluteRoot(value); }
 function safeBranch(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 240 && !/[\0\r\n~^:?*\\\[]/.test(value); }
 function boundedStringList(value: unknown, maximumItems: number, maximumLength: number): value is readonly string[] {
   return Array.isArray(value) && value.length <= maximumItems && new Set(value).size === value.length

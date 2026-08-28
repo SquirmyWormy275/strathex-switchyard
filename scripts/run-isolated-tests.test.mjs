@@ -76,7 +76,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
     assert.equal(tlsGroup?.timeoutMs, 240_000);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
-    assert.deepEqual(overrides, new Map([
+    const expected = [
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 240_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
@@ -89,7 +89,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 240_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 300_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
-    ]));
+    ];
+    assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });
     assert.equal(overridden.receipt.success, true);
