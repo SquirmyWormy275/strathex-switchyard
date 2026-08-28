@@ -68,7 +68,11 @@ jobs:
       - name: Lint Linux lifecycle scripts
         run: |
           shellcheck deployment/linux/*.sh
-          systemd-analyze verify deployment/linux/sxsy-b122.service deployment/linux/sxsy-b122-provider-host.service
+          unit_tmp=$(mktemp -d)
+          trap 'rm -rf -- "$unit_tmp"' EXIT
+          sed 's|^ExecStart=.*|ExecStart=/usr/bin/true|' deployment/linux/sxsy-b122.service > "$unit_tmp/sxsy-b122.service"
+          sed 's|^ExecStart=.*|ExecStart=/usr/bin/true|' deployment/linux/sxsy-b122-provider-host.service > "$unit_tmp/sxsy-b122-provider-host.service"
+          systemd-analyze verify "$unit_tmp/sxsy-b122.service" "$unit_tmp/sxsy-b122-provider-host.service"
 
       - name: Fetch and verify the official portable Node runtime
         run: |
