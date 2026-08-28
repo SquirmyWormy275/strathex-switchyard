@@ -119,6 +119,12 @@ function Snapshot-Tree([int]$RootProcessId){
   return @($selected|ForEach-Object{$_})
 }
 function Same-Identity($Identity){$candidate=Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Identity.processId)" -ErrorAction SilentlyContinue;if($null-eq$candidate){return $false};return(Process-Start $candidate)-ceq[string]$Identity.startedAt}
+function Stop-ExactIdentity($Identity){
+  if(-not(Same-Identity $Identity)){return}
+  $taskkill=Join-Path $env:SystemRoot 'System32\taskkill.exe';$info=New-Object Diagnostics.ProcessStartInfo;$info.FileName=$taskkill;$info.Arguments=('/PID {0} /T /F'-f[int]$Identity.processId);$info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+  $killer=New-Object Diagnostics.Process;$killer.StartInfo=$info
+  try{if($killer.Start()){$stdout=$killer.StandardOutput.ReadToEndAsync();$stderr=$killer.StandardError.ReadToEndAsync();if(-not$killer.WaitForExit(10000)){try{$killer.Kill()}catch{};$killer.WaitForExit(5000)|Out-Null};try{$stdout.GetAwaiter().GetResult()|Out-Null;$stderr.GetAwaiter().GetResult()|Out-Null}catch{}}}catch{}finally{$killer.Dispose()}
+}
 function Wait-TreeExit($Tree,[int]$Seconds){$deadline=[DateTime]::UtcNow.AddSeconds($Seconds);do{$survivors=@($Tree|Where-Object{Same-Identity $_});if(-not$survivors.Count){return @()};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow-lt$deadline);return @($Tree|Where-Object{Same-Identity $_})}
 function Stop-HostedProcess($Record){
   $process=Exact-Process $Record;if($null-eq$process){Remove-Record;return [ordered]@{processId=if($null-ne$Record.processId){[int]$Record.processId}else{$null};gracefulShutdownAcknowledged=$false;forcedFallback=$false;treeCaptured=0;treeExited=0;treeSurvivors=@()}}
@@ -126,8 +132,8 @@ function Stop-HostedProcess($Record){
   $ack=$null;try{$ack=Invoke-Health $Record -Shutdown}catch{$ack=$null}
   $survivors=@(Wait-TreeExit $tree 10);$forced=$false
   if($survivors.Count){
-    $forced=$true;$taskkill=Join-Path $env:SystemRoot 'System32\taskkill.exe'
-    foreach($survivor in $survivors){if(Same-Identity $survivor){& $taskkill /PID ([string][int]$survivor.processId) /T /F *> $null}}
+    $forced=$true
+    foreach($survivor in $survivors){Stop-ExactIdentity $survivor}
     $survivors=@(Wait-TreeExit $tree 10)
   }
   if($survivors.Count){throw 'The exact provider-host process tree did not terminate within its bounded deadline.'}

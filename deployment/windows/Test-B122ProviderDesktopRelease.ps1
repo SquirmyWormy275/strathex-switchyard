@@ -188,7 +188,10 @@ function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Argume
   $child=New-Object Diagnostics.Process;$child.StartInfo=$start;if(-not$child.Start()){throw "The packaged provider fixture command could not start: $Executable"}
   $stdoutTask=$child.StandardOutput.ReadToEndAsync();$stderrTask=$child.StandardError.ReadToEndAsync()
   if(-not$child.WaitForExit($TimeoutSeconds*1000)){
-    & (Join-Path $env:SystemRoot 'System32\taskkill.exe') /PID ([string]$child.Id) /T /F *> $null;$child.WaitForExit(10000)|Out-Null
+    $killInfo=New-Object Diagnostics.ProcessStartInfo;$killInfo.FileName=(Join-Path $env:SystemRoot 'System32\taskkill.exe');$killInfo.Arguments=('/PID {0} /T /F'-f[int]$child.Id);$killInfo.UseShellExecute=$false;$killInfo.CreateNoWindow=$true;$killInfo.RedirectStandardOutput=$true;$killInfo.RedirectStandardError=$true
+    $killer=New-Object Diagnostics.Process;$killer.StartInfo=$killInfo
+    try{if($killer.Start()){$killOut=$killer.StandardOutput.ReadToEndAsync();$killErr=$killer.StandardError.ReadToEndAsync();if(-not$killer.WaitForExit(10000)){try{$killer.Kill()}catch{}};try{$killOut.GetAwaiter().GetResult()|Out-Null;$killErr.GetAwaiter().GetResult()|Out-Null}catch{}}}catch{}finally{$killer.Dispose()}
+    $child.WaitForExit(10000)|Out-Null
     throw "The packaged provider fixture command exceeded its $TimeoutSeconds-second bound: $Executable"
   }
   $child.WaitForExit();$output=$stdoutTask.GetAwaiter().GetResult();$detail=$stderrTask.GetAwaiter().GetResult();$exitCode=$child.ExitCode
