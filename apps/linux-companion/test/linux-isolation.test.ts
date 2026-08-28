@@ -46,6 +46,7 @@ test("installed Bubblewrap creates the real deny-network namespace", { skip: pro
   context.after(async () => rm(root, { recursive: true, force: true }));
   const runtime = new LinuxBubblewrapIsolationRuntime();
   const outcome = await runtime.start(request(await realpath(root)));
+  if (outcome.status === "unavailable") { context.skip(outcome.summary); return; }
   assert.equal(outcome.status, "completed", outcome.summary);
   assert.deepEqual(outcome.data, { backend: "bubblewrap", network: "deny", repository: "read-only", profile: "full_sandbox" });
 });

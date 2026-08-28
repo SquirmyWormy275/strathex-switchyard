@@ -95,7 +95,7 @@ function fixedProtector() {
   };
 }
 
-test("VS Code DPAPI reader zeroes task-owned input and output buffers", async () => {
+test("VS Code DPAPI reader zeroes task-owned input and output buffers", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   const inputs: Buffer[] = [];
   const outputs: Buffer[] = [];
   const runner: BoundedWindowsHostProcessRunner = async (request) => {
@@ -184,7 +184,7 @@ test("VS Code DPAPI reader drains an in-flight seal and withholds its result dur
   assert.equal(output.every((byte) => byte === 0), true);
 });
 
-test("VS Code DPAPI helper identity ignores a crafted inherited SystemRoot", async () => {
+test("VS Code DPAPI helper identity ignores a crafted inherited SystemRoot", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   let executable = "";
   const runner: BoundedWindowsHostProcessRunner = async (request) => {
     executable = request.executable;
