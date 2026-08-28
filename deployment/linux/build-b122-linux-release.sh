@@ -32,7 +32,8 @@ chmod 700 "$bundle/deployment/"*.sh "$bundle/runtime/bin/node"
 node deployment/linux/build-vsix.mjs apps/vscode-extension "$bundle/extension/sxsy-b122-switchyard.vsix"
 [ -s "$bundle/extension/sxsy-b122-switchyard.vsix" ] || fail "VS Code extension VSIX was not produced"
 printf '%s\n' "linux-x64-$(git rev-parse --short=12 HEAD)" > "$bundle/BUNDLE_ID"
-(cd "$bundle" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256)
+(cd "$bundle" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum) > "$stage/MANIFEST.sha256"
+mv "$stage/MANIFEST.sha256" "$bundle/MANIFEST.sha256"
 (cd "$bundle" && sha256sum --check --strict MANIFEST.sha256)
 mkdir -p "$(dirname "$output")"
 mv "$bundle" "$output"

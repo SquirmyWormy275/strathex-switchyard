@@ -4,7 +4,7 @@ fail() { printf '%s\n' "ERROR: $*" >&2; exit 1; }
 data_root="$HOME/.local/share/strathex-switchyard"
 config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}/systemd/user
 previous_file="$data_root/previous"
-[ -f "$previous_file" ] && [ ! -L "$previous_file" ] || fail "no safe previous bundle record exists"
+if [ ! -f "$previous_file" ] || [ -L "$previous_file" ]; then fail "no safe previous bundle record exists"; fi
 previous=$(cat "$previous_file")
 case "$previous" in ("$data_root"/versions/*) ;; (*) fail "previous bundle escaped the installation root";; esac
 previous=$(realpath "$previous")

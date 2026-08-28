@@ -29,7 +29,9 @@ sed -i 's/mediated companion/mediated companion release one/' "$first/deployment
 sed -i 's/mediated companion/mediated companion release two/' "$second/deployment/sxsy-b122.service"
 sed -i 's/mediated companion/mediated companion release three/' "$third/deployment/sxsy-b122.service"
 for candidate in "$first" "$second" "$third"; do
-  (cd "$candidate" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum > MANIFEST.sha256)
+  manifest="$root/$(basename "$candidate").manifest"
+  (cd "$candidate" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 sha256sum) > "$manifest"
+  mv "$manifest" "$candidate/MANIFEST.sha256"
 done
 
 "$first/deployment/install-b122-linux.sh" "$first"

@@ -24,7 +24,8 @@ versions="$data_root/versions"
 bundle_id=$(cat "$release/BUNDLE_ID")
 case "$bundle_id" in (*[!A-Za-z0-9._-]*|'') fail "bundle identity is invalid";; esac
 destination="$versions/$bundle_id"
-mkdir -p -m 700 "$versions" "$config_root"
+mkdir -p "$versions" "$config_root"
+chmod 700 "$data_root" "$versions" "$config_root"
 [ ! -e "$destination" ] || fail "bundle identity is already installed"
 temporary="$versions/.install-$bundle_id-$$"
 previous=""

@@ -13,5 +13,5 @@ grep -q '^PrivateTmp=yes$' "$release/deployment/sxsy-b122.service"
 grep -q '^Requires=sxsy-b122.service$' "$release/deployment/sxsy-b122-provider-host.service"
 grep -q '^NoNewPrivileges=yes$' "$release/deployment/sxsy-b122-provider-host.service"
 grep -q 'TAG+="uaccess"' "$release/deployment/99-sxsy-b122-hidraw.rules"
-! grep -q 'MODE="0666"' "$release/deployment/99-sxsy-b122-hidraw.rules"
+if grep -q 'MODE="0666"' "$release/deployment/99-sxsy-b122-hidraw.rules"; then exit 1; fi
 printf '%s\n' "Linux release structure and manifest verified."
