@@ -64,14 +64,22 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
     file: `apps/vscode-extension/test/${name}.test.ts`,
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));
-const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
+const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "workflow-context"]
   .map((name) => ({
     file: `apps/provider-adapter-host/test/${name}.test.ts`,
-    currentUserProfile: name === "tls-network-e2e",
-    safeTrace: name === "tls-network-e2e",
-    ...(name === "tls-network-e2e" ? { timeoutMs: 300_000, expectedSkipped: process.platform === "win32" ? 0 : 2 } : {}),
     ...(name === "linux-path-security" && process.platform !== "linux" ? { expectedSkipped: 1 } : {})
   }));
+const providerTlsNetworkTests = [
+  "provider secret generation validates and Initialize emits its exact ready-to-provision receipt",
+  "packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS"
+].map((pattern) => ({
+  file: "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+  pattern,
+  currentUserProfile: true,
+  safeTrace: true,
+  timeoutMs: 300_000,
+  expectedSkipped: process.platform === "win32" ? 0 : 1
+}));
 const linuxSkippedOnNonLinux = new Map([
   ["linux-isolation", 1],
   ["linux-lifecycle", 2],
@@ -127,7 +135,8 @@ export const requiredGroups = [
   ...mediatedGitTests,
   ...extensionTests,
   ...linuxCompanionTests,
-  ...providerHostTests
+  ...providerHostTests,
+  ...providerTlsNetworkTests
 ];
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;

@@ -73,8 +73,9 @@ test("receipt records failure, timeout, redacted bounded diagnostics, and exited
 test("only explicitly slow integration or release groups extend the bounded default timeout and receipts record the effective bound", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-group-timeout-"));
   try {
-    const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
-    assert.equal(tlsGroup?.timeoutMs, 300_000);
+    const tlsGroups = requiredGroups.filter((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
+    assert.equal(tlsGroups.length, 2);
+    assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
