@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,15 +17,26 @@ import {
 import { startProviderAdapterHttpsServer } from "./server.ts";
 import { ProviderAdapterHostService } from "./service.ts";
 import { createProviderHostStore } from "./state.ts";
+import { LinuxLibsecretCurrentUserProtector } from "../../linux-companion/src/linux-secret.ts";
 
 export async function runProviderAdapterHost(argv: readonly string[]): Promise<number> {
   if (argv.length === 1 && argv[0] === "--self-test") return selfTest();
   if (argv.length !== 4 || argv[0] !== "--config" || argv[2] !== "--lifecycle-nonce" || !/^[a-f0-9]{64}$/.test(argv[3]!)) throw new Error("Usage: sxsy-b122-provider-adapter-host --config <absolute-config.json> --lifecycle-nonce <64-lowercase-hex> | --self-test");
-  const configuration = await loadProviderHostConfiguration(argv[1]!);
+  const linuxProtector = process.platform === "linux" ? new LinuxLibsecretCurrentUserProtector() : undefined;
+  const configurationPath = argv[1]!;
+  let startupStage = "configuration";
+  await traceStartupStage(configurationPath, startupStage);
+  let configuration: Awaited<ReturnType<typeof loadProviderHostConfiguration>>;
+  try { configuration = await loadProviderHostConfiguration(argv[1]!, linuxProtector ? { secretProtector: linuxProtector } : {}); }
+  catch (error) { await linuxProtector?.dispose(); throw error; }
   let runtime: Awaited<ReturnType<typeof loadProviderBackendRuntime>> | undefined;
   let shutdownPromise: Promise<void> | undefined;
   try {
-    runtime = await loadInstalledProviderBackendRuntime(configuration);
+    startupStage = "backend-runtime";
+    await traceStartupStage(configurationPath, startupStage);
+    runtime = await loadInstalledProviderBackendRuntime(configuration, process.platform === "linux" ? {
+      loadMediatedFinalCurrent: (stateDirectory) => loadInstalledProviderMediatedFinalCurrentClient(stateDirectory, linuxProtector!)
+    } : {});
     let requestShutdown = (): void => {};
     const service = new ProviderAdapterHostService({
       authenticationToken: configuration.authenticationTokenText,
@@ -41,7 +52,11 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
       },
       lifecycle: { nonce: argv[3]!, processId: process.pid, configurationSha256: configuration.configurationSha256, requestShutdown: () => requestShutdown() }
     });
+    startupStage = "service-reconcile";
+    await traceStartupStage(configurationPath, startupStage);
     const reconciliation = await service.reconcile();
+    startupStage = "tls-listen";
+    await traceStartupStage(configurationPath, startupStage);
     const running = await startProviderAdapterHttpsServer({
       service, host: configuration.listen.host, port: configuration.listen.port,
       certificate: configuration.tls.certificate, privateKey: configuration.tls.privateKey
@@ -50,9 +65,16 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     configuration.authenticationToken.fill(0);
     configuration.journalAuthenticationKey.fill(0);
     configuration.dispatchLeaseAuthenticationKey.fill(0);
-    process.stdout.write(`${JSON.stringify({ schema: "sxsy-b122.provider-host-started", version: 1, host: running.host, port: running.port, providers: configuration.providers.map((entry) => entry.provider), processId: process.pid, lifecycleNonceSha256: sha256(argv[3]!), configurationSha256: configuration.configurationSha256, reconciliation })}\n`);
+    startupStage = "running";
+    await traceStartupStage(configurationPath, startupStage);
+    // The installed lifecycle proves readiness over authenticated pinned TLS.
+    // Console handles are startup-only and must not keep a management command
+    // or installer pipe open for the lifetime of this background service.
+    void reconciliation;
+    process.stdout.destroy();
+    process.stderr.destroy();
     const shutdown = (): Promise<void> => shutdownPromise ??= (async () => {
-      const results = await Promise.allSettled([running.close(), runtime!.close()]);
+      const results = await Promise.allSettled([running.close(), runtime!.close(), linuxProtector?.dispose()]);
       if (results.some((result) => result.status === "rejected")) throw new Error("Provider host shutdown failed closed.");
       process.exitCode = 0;
     })();
@@ -61,7 +83,9 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     process.once("SIGTERM", requestShutdown);
     return 0;
   } catch (error) {
+    if (startupStage !== "configuration") await traceStartupStage(configurationPath, `failed-${startupStage}`);
     await runtime?.close().catch(() => undefined);
+    await linuxProtector?.dispose();
     configuration.authenticationToken.fill(0);
     configuration.journalAuthenticationKey.fill(0);
     configuration.dispatchLeaseAuthenticationKey.fill(0);
@@ -70,6 +94,12 @@ export async function runProviderAdapterHost(argv: readonly string[]): Promise<n
     for (const driver of configuration.effectDrivers) driver.moduleSource.fill(0);
     throw error;
   }
+}
+
+async function traceStartupStage(configurationPath: string, stage: string): Promise<void> {
+  if (process.env.SXSY_PROVIDER_E2E_TRACE !== "1") return;
+  if (!/^(?:configuration|backend-runtime|service-reconcile|tls-listen|running|failed-(?:configuration|backend-runtime|service-reconcile|tls-listen))$/.test(stage)) return;
+  await writeFile(`${configurationPath}.startup-stage`, `${stage}\n`, { encoding: "ascii", mode: 0o600 }).catch(() => undefined);
 }
 
 export interface InstalledProviderBackendRuntimeDependencies {

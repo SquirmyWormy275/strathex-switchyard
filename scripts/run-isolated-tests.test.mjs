@@ -27,6 +27,20 @@ test("test groups fail closed on zero-match patterns, skipped tests, and todo te
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test("platform groups accept only their exact declared skip count", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-platform-skip-"));
+  try {
+    const fixture = await group(directory, "platform-skip", "import test from 'node:test'; test('portable',()=>{}); test('other platform',{skip:true},()=>{});");
+    const accepted = await verify([{ ...fixture, expectedSkipped: 1 }], directory);
+    assert.equal(accepted.receipt.success, true);
+    assert.equal(accepted.receipt.children[0].testCounts.skipped, 1);
+    const rejected = await verify([{ ...fixture, expectedSkipped: 2 }], directory);
+    assert.equal(rejected.receipt.success, false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("the required manifest exactly represents every repository test file", () => {
   const evidence = assertRequiredTestManifest();
   assert.equal(evidence.discovered, evidence.represented);
@@ -59,11 +73,12 @@ test("receipt records failure, timeout, redacted bounded diagnostics, and exited
 test("only explicitly slow integration or release groups extend the bounded default timeout and receipts record the effective bound", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-group-timeout-"));
   try {
-    const tlsGroup = requiredGroups.find((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
-    assert.equal(tlsGroup?.timeoutMs, 240_000);
+    const tlsGroups = requiredGroups.filter((candidate) => candidate.file === "apps/provider-adapter-host/test/tls-network-e2e.test.ts");
+    assert.equal(tlsGroups.length, 2);
+    assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
-    assert.deepEqual(overrides, new Map([
-      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 240_000],
+    const expected = [
+      ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
@@ -72,10 +87,11 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["apps/windows-companion/test/repository-runner-helper.test.ts", 240_000],
       ["deployment/windows/Test-B122ManifestGenerators.ps1", 180_000],
       ["deployment/windows/Test-B122InstallLifecycle.ps1", 240_000],
-      ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 240_000],
+      ["deployment/windows/Test-B122ProviderDesktopRelease.ps1", 300_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5", 300_000],
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
-    ]));
+    ];
+    assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });
     assert.equal(overridden.receipt.success, true);

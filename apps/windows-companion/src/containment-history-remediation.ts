@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { lstat, mkdir, open, readFile, realpath, rename, rm, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
   containmentIncidentReviewDigest,
@@ -658,12 +658,10 @@ export class AttestedContainmentHistoryRemediator {
 }
 
 export class SpawnContainmentHistoryGitRunner implements ContainmentHistoryGitRunner {
-  constructor(private readonly candidates: readonly string[] = [
-    "C:\\Program Files\\Git\\cmd\\git.exe",
-    "C:\\Program Files\\Git\\bin\\git.exe",
-    "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
-  ]) {
-    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("History remediation requires fixed absolute Git executable candidates.");
+  constructor(private readonly candidates: readonly string[] = process.platform === "win32" ? [
+    "C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
+  ] : ["/usr/bin/git"]) {
+    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !["git", "git.exe"].includes(basename(candidate).toLowerCase()))) throw new Error("History remediation requires fixed absolute Git executable candidates.");
   }
 
   async run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>>; stdin?: string }>): Promise<ContainmentHistoryGitResult> {
@@ -680,8 +678,7 @@ export class SpawnContainmentHistoryGitRunner implements ContainmentHistoryGitRu
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
         env: {
-          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
-          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }),
           GIT_OPTIONAL_LOCKS: "0",
           GIT_TERMINAL_PROMPT: "0",
           GCM_INTERACTIVE: "Never",

@@ -47,7 +47,7 @@ test("provisioned VS Code transport reads only the companion-owned sealed state 
     ? `\\\\.\\pipe\\sxsy-b122-vscode-state-${Date.now()}`
     : join(directory, "sxsy-b122-vscode-state.sock");
   const configurationPath = join(directory, "authenticated-pipe.json");
-  await writeFile(configurationPath, JSON.stringify({ version: 1, pipePath, sealedToken: "opaque-dpapi-envelope" }), "utf8");
+  await writeFile(configurationPath, JSON.stringify({ version: 1, pipePath, sealedToken: "opaque-dpapi-envelope" }), { encoding: "utf8", mode: 0o600 });
   await writeFile(`${configurationPath}.stale.tmp`, "{\"version\":", "utf8");
   const server = new AuthenticatedPipeServer({ version: 1, pipePath, sealedToken: "opaque-dpapi-envelope" }, fixedProtector(), { async handle(request) { return { version: 1, id: request.id, ok: true, result: { state: "ready" } }; } });
   await server.start();
@@ -55,6 +55,15 @@ test("provisioned VS Code transport reads only the companion-owned sealed state 
   const transport = new ProvisionedNamedPipeJsonLineTransport(configurationPath, new FakeSecretReader());
   const response = await transport.request(JSON.stringify({ version: 1, id: "state-ping", method: "ping" }));
   assert.equal((JSON.parse(response) as { id: string }).id, "state-ping");
+});
+
+test("provisioned VS Code transport rejects a broadly readable Linux endpoint record", { skip: process.platform !== "linux" }, async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-vscode-public-state-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const configurationPath = join(directory, "authenticated-pipe.json");
+  await writeFile(configurationPath, JSON.stringify({ version: 1, pipePath: join(directory, "companion.sock"), sealedToken: "opaque" }), { encoding: "utf8", mode: 0o644 });
+  const transport = new ProvisionedNamedPipeJsonLineTransport(configurationPath, new FakeSecretReader());
+  await assert.rejects(() => transport.request(JSON.stringify({ version: 1, id: "public-state", method: "ping" })), /not provisioned|unsafe|private/i);
 });
 
 test("provisioned VS Code transport rejects truncated, oversized, and extra-key endpoint records before connecting", async (context) => {
@@ -86,7 +95,7 @@ function fixedProtector() {
   };
 }
 
-test("VS Code DPAPI reader zeroes task-owned input and output buffers", async () => {
+test("VS Code DPAPI reader zeroes task-owned input and output buffers", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   const inputs: Buffer[] = [];
   const outputs: Buffer[] = [];
   const runner: BoundedWindowsHostProcessRunner = async (request) => {
@@ -175,7 +184,7 @@ test("VS Code DPAPI reader drains an in-flight seal and withholds its result dur
   assert.equal(output.every((byte) => byte === 0), true);
 });
 
-test("VS Code DPAPI helper identity ignores a crafted inherited SystemRoot", async () => {
+test("VS Code DPAPI helper identity ignores a crafted inherited SystemRoot", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   let executable = "";
   const runner: BoundedWindowsHostProcessRunner = async (request) => {
     executable = request.executable;

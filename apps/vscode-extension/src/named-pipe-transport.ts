@@ -451,7 +451,9 @@ export function isStoredConfiguration(value: unknown): value is StoredCompanionP
 
 async function readBoundedConfiguration(filePath: string): Promise<string> {
   const before = await lstat(filePath);
-  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > maximumPipeConfigurationBytes) throw new Error("invalid configuration file");
+  const uid = process.getuid?.();
+  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > maximumPipeConfigurationBytes
+    || process.platform === "linux" && (uid === undefined || before.uid !== uid || (before.mode & 0o077) !== 0)) throw new Error("invalid configuration file");
   const handle = await open(filePath, "r");
   const bytes = Buffer.alloc(maximumPipeConfigurationBytes + 1);
   try {

@@ -1453,7 +1453,10 @@ test("session refresh, operation observation, cancellation, cleanup, and restart
   }
 
   const port = new HangingBoundaryPort();
-  const setup = await fixture(context, port, 250);
+  // Keep the abort proof short, but leave enough budget for authenticated
+  // journal I/O on loaded hosted runners before each deliberately hanging
+  // provider call begins.
+  const setup = await fixture(context, port, 1_000);
   await setup.service.handle(request("/v1/b122/handshake/codex", handshake()));
 
   port.mode = "observeSession";

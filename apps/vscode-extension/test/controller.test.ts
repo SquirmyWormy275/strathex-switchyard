@@ -3110,7 +3110,7 @@ test("all four automation chords present the complete immutable manifest then di
       assert.ok(vscode.quickPickSurfaces.at(-1)!.items.filter((item) => typeof item !== "string" && item.label.startsWith("Exact proposal JSON")).length > 1);
       const manifestSurface = vscode.quickPickSurfaces.find((surface) => surface.placeHolder?.includes("Review every field of compound_capture"));
       assert.ok(manifestSurface);
-      const instructionRow = manifestSurface.items.find((item) => typeof item !== "string" && item.label === "Instruction-file edit • agents.md");
+      const instructionRow = manifestSurface.items.find((item) => typeof item !== "string" && item.label.toLowerCase() === "instruction-file edit • agents.md");
       assert.ok(instructionRow && typeof instructionRow !== "string", JSON.stringify({ proposal: review.manifest.proposal, labels: manifestSurface.items.map((item) => typeof item === "string" ? item : item.label) }));
       assert.match(`${instructionRow.description}\n${instructionRow.detail}`, new RegExp(`4{64}.*${instructionAfterDigest}`, "s"));
       const approvalRow = manifestSurface.items.find((item) => typeof item !== "string" && item.label.startsWith("Approve") && item.label.includes("instruction-file edit"));
@@ -3143,7 +3143,7 @@ test("Compound Capture instruction-file edit cancellation preserves the exact ma
   assert.equal(bridge.prepared.length, 1);
   assert.equal(bridge.dispatched.length, 0);
   const surface = vscode.quickPickSurfaces.find((candidate) => candidate.placeHolder?.includes("Review every field of compound_capture"))!;
-  assert.equal(surface.items.some((item) => typeof item !== "string" && item.label === "Instruction-file edit • claude.md"), true, JSON.stringify({ proposal: review.manifest.proposal, labels: surface.items.map((item) => typeof item === "string" ? item : item.label) }));
+  assert.equal(surface.items.some((item) => typeof item !== "string" && item.label.toLowerCase() === "instruction-file edit • claude.md"), true, JSON.stringify({ proposal: review.manifest.proposal, labels: surface.items.map((item) => typeof item === "string" ? item : item.label) }));
   assert.match(vscode.information.at(-1) ?? "", /did not approve.*no confirmation or dispatch/i);
   await controller.stop();
 });
@@ -4559,31 +4559,34 @@ test("blocked and finished queues expose only sessions from the exact host-actio
 });
 
 test("Shift Terminal never focuses an arbitrary active terminal and creates or reuses only the exact action workspace root", async () => {
-  const vscode = new FakeVscode(["Other root terminal"], ["C:\\one", "C:\\two"]);
+  const rootOne = process.platform === "win32" ? "C:\\one" : "/one";
+  const rootTwo = process.platform === "win32" ? "C:\\two" : "/two";
+  const outsideRoot = process.platform === "win32" ? "C:\\outside" : "/outside";
+  const vscode = new FakeVscode(["Other root terminal"], [rootOne, rootTwo]);
   const bridge = new FakeBridge();
   const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
-    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: "C:\\one" }, { gitRoot: "C:\\two" }]
+    idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: rootOne }, { gitRoot: rootTwo }]
   });
   await controller.start();
   bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
-    hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\two"
+    hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: rootTwo
   } };
-  vscode.choose("C:\\two");
+  vscode.choose(rootTwo);
   await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
 
   assert.equal(vscode.terminals[0]?.shown, 0, "the arbitrary active terminal from another/unbound root must remain untouched");
   assert.equal(vscode.createdTerminals.length, 1);
-  assert.equal(vscode.terminalOptions[0]?.cwd, "C:\\two");
+  assert.equal(vscode.terminalOptions[0]?.cwd, rootTwo);
   assert.equal(vscode.createdTerminals[0]?.shown, 1);
   const registered = bridge.registered.find((session) => session.metadata["sxsy-b122.terminalName"] === "SXSY-B122 Terminal");
-  assert.equal(registered?.workspaceRoot, "C:\\two");
+  assert.equal(registered?.workspaceRoot, rootTwo);
 
   await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
   assert.equal(vscode.createdTerminals.length, 1, "repeat must reuse the exact-root terminal rather than creating or focusing another root");
   assert.equal(vscode.createdTerminals[0]?.shown, 2);
 
   bridge.nextDispatch = { status: "running", summary: "Substituted root.", data: {
-    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: "C:\\outside"
+    hostActionId: `host-action:${"9".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: outsideRoot
   } };
   await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
   assert.equal(vscode.createdTerminals.length, 1);

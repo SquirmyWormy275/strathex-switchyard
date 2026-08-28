@@ -1,5 +1,11 @@
 # SXSY-B122 software-only completion audit
 
+> **Scope note:** This audit records the original Windows software-completion
+> boundary. The peer Linux implementation and its platform-specific evidence
+> are mapped separately in
+> [linux-software-completion-audit.md](linux-software-completion-audit.md).
+> Neither audit closes physical, live-provider, production, or acceptance gates.
+
 > **Status:** implementation and local-test audit only. This document does **not** mark any acceptance gate as passed or make a production-readiness claim. The accepted design and gate language remain authoritative in [SXSY-B122-complete-key-specification-and-audit.md](SXSY-B122-complete-key-specification-and-audit.md).
 
 ## Purpose and evidence standard

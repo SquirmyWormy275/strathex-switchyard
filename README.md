@@ -3,17 +3,19 @@
 > Route attention. Direct agents. Keep the operator in command.
 
 SXSY-B122 is a software-only safety control plane for a proposed 22-control
-operator keyboard for agentic software development. Its target platform is a
+operator keyboard for agentic software development. Its host platforms are
+Windows and systemd-based desktop Linux. Its physical target is a
 Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
 physical keyboard and its integration are not validated by this repository.
 
 **Current status:** the repository contains the hardware-independent B122
 implementation: the canonical protocol and firmware/Raw-HID host source; the
-mutually authenticated, single-instance Windows companion; the VS Code
+mutually authenticated Windows and Linux companions; the VS Code
 operator and provisioning surfaces; durable mediation, receipts, recovery,
-containment, and Council; host-attested repository recipes; DPAPI credential
-references; exact-route HTTPS; configured provider, GitHub/Git/CI and scanner
-adapters; the Windows Sandbox guest-worker/host-lifecycle boundary; an exhaustive
+containment, and Council; host-attested repository recipes; DPAPI or Linux
+Secret Service credential references; exact-route HTTPS; configured
+provider, GitHub/Git/CI and scanner adapters; Windows Sandbox and Linux
+Bubblewrap isolation boundaries; an exhaustive
 hardware-independent 176-chord Raw-HID product simulator; and content-verified,
 transactional per-user release tooling. Source availability is **not** production, hardware, provider,
 or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
@@ -60,6 +62,11 @@ safe and available in the current context.
   exercises all 65 assigned and 111 deliberately unassigned chord combinations,
   replay/epoch recovery, and corrupt framing without opening hardware or the
   network.
+- `apps/linux-companion/` — the Linux entry point for the same durable control
+  plane. It uses Secret Service-backed authenticated state, a private Unix
+  socket below `XDG_RUNTIME_DIR`, exact `/proc` process identity, and a
+  fail-closed Bubblewrap namespace adapter. No TCP or plaintext fallback is
+  present.
 - `apps/provider-adapter-host/` — an authenticated, TLS-pinned loopback host for
   the closed Claude/Codex command, observation, cancellation, Council, and
   reconciliation ports. It packages deterministic fixture backends for isolated
@@ -71,6 +78,9 @@ safe and available in the current context.
 - `deployment/windows/` — content-verified per-user build, install, update,
   rollback, start, health, and uninstall tooling with exact-root ownership,
   crash-recovery receipts, and authenticated companion/provider shutdown.
+- `deployment/linux/` — a manifest-verified portable Node bundle, reversible
+  per-user systemd installation/update/rollback, hardened service unit, VS Code
+  package, and narrow physical-device udev template.
 - `docs/` — the accepted specification, reconstructed interview history,
   adversarial review, project charter, attribution records, operational safety
   model, and source-linked software-only completion audit.
@@ -95,7 +105,7 @@ B122 signal / extension request
 The in-memory brokers and adapters are test harnesses and never contact a real
 system. The installed composition also contains concrete, fail-closed adapters.
 Those adapters can act only after the operator installs the exact repository
-manifest, Windows feature/helper, DPAPI credential reference, network policy,
+manifest, platform isolation runtime, OS-protected credential reference, network policy,
 provider handshake, external account, or scanner feed required by that route.
 Absent configuration or authorization is reported as unavailable; it is never
 replaced by an unreviewed fallback.
@@ -119,6 +129,7 @@ npm test
 npm run typecheck
 npm run build:vscode
 npm run build:companion
+npm run build:linux-companion
 npm run build:provider-host
 ```
 
@@ -163,6 +174,7 @@ particular:
 - [Software-only completion audit](docs/software-only-completion-audit.md)
 - [Local companion and VS Code guide](docs/local-companion.md)
 - [Windows release, installation, recovery, and uninstall guide](docs/windows-release-and-installation.md)
+- [Linux release, installation, recovery, and uninstall guide](docs/linux-release-and-installation.md)
 - [Operational safety model](docs/operational-safety-model.md)
 - [Acceptance-gate ledger](docs/acceptance-gates.md)
 - [Project charter](docs/01-project-charter.md)
@@ -181,7 +193,7 @@ OpenAI, Anthropic, or any other referenced project or company.
 
 The audit is the current evidence boundary: it documents source-controlled
 mechanisms and isolated tests, including the configured provider/GitHub,
-credential-reference, Raw-HID helper/simulator, and Windows Sandbox guest-worker
-plus host-lifecycle implementations. It
+credential-reference, Raw-HID helper/simulator, Windows Sandbox guest-worker,
+Linux Bubblewrap/process-group, and host-lifecycle implementations. It
 does not claim physical hardware, live external authorization, pipe-ACL or
 same-user adversarial acceptance, a signed release, or production readiness.

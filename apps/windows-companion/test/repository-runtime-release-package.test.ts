@@ -481,9 +481,10 @@ test("Windows release output is an authenticated exclusive leaf with no reparse 
     build.indexOf("function Remove-B122OwnedBuildTree"),
     build.indexOf("Assert-Child ([IO.Path]::GetFullPath((Join-Path $repo 'artifacts'))) $output"),
   );
-  const quarantineMove = cleanupFunction.indexOf("Move-Item -LiteralPath $tree -Destination $quarantine");
+  const quarantineMove = cleanupFunction.indexOf("[IO.Directory]::Move($tree,$quarantine)");
   const compiledDelete = cleanupFunction.indexOf("[SxsyB122ReleaseBuildV1.VerifiedTreeDeletion]::Delete($quarantine,$treeIdentity)");
   assert.ok(quarantineMove >= 0 && compiledDelete > quarantineMove);
+  assert.doesNotMatch(cleanupFunction, /Move-Item -LiteralPath \$tree/);
   assert.match(build, /public static class VerifiedTreeDeletion/);
   assert.match(build, /FileSystemIdentity\.Get\(entry\.Parent\)/);
   assert.match(build, /FileSystemIdentity\.Get\(entry\.Path\)/);

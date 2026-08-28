@@ -149,7 +149,7 @@ function Remove-B122OwnedBuildTree([string]$Path){
   $outputIdentity=[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($output);$treeItem=Get-Item -LiteralPath $tree -Force;if(-not$treeItem.PSIsContainer-or($treeItem.Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'Build cleanup target is not a concrete owned directory.'};$treeIdentity=[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($tree)
   $quarantine=Join-Path $output ('.cleanup-'+[guid]::NewGuid().ToString('N'));if(Test-Path -LiteralPath $quarantine){throw 'Build cleanup quarantine collision.'}
   if([SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($output)-cne$outputIdentity-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($tree)-cne$treeIdentity){throw 'Build cleanup target identity changed before quarantine.'}
-  Move-Item -LiteralPath $tree -Destination $quarantine
+  [IO.Directory]::Move($tree,$quarantine)
   if([SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($output)-cne$outputIdentity-or-not(Test-Path -LiteralPath $quarantine -PathType Container)-or[SxsyB122ReleaseBuildV1.FileSystemIdentity]::Get($quarantine)-cne$treeIdentity){throw 'Build cleanup quarantine did not retain the target directory identity.'}
   [SxsyB122ReleaseBuildV1.VerifiedTreeDeletion]::Delete($quarantine,$treeIdentity)
 }

@@ -12,7 +12,8 @@
     "fixtureBackendIncluded": true,
     "liveProviderCredentialsIncluded": false,
     "liveProviderAcceptanceIncluded": false,
-    "verifiedWindowsBundleBuilder": "deployment/windows/Build-B122Release.ps1"
+    "verifiedWindowsBundleBuilder": "deployment/windows/Build-B122Release.ps1",
+    "verifiedLinuxBundleBuilder": "deployment/linux/build-b122-linux-release.sh"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

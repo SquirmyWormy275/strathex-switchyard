@@ -188,7 +188,10 @@ function Invoke-B122ProviderFixtureProcess([string]$Executable,[string[]]$Argume
   $child=New-Object Diagnostics.Process;$child.StartInfo=$start;if(-not$child.Start()){throw "The packaged provider fixture command could not start: $Executable"}
   $stdoutTask=$child.StandardOutput.ReadToEndAsync();$stderrTask=$child.StandardError.ReadToEndAsync()
   if(-not$child.WaitForExit($TimeoutSeconds*1000)){
-    & (Join-Path $env:SystemRoot 'System32\taskkill.exe') /PID ([string]$child.Id) /T /F *> $null;$child.WaitForExit(10000)|Out-Null
+    $killInfo=New-Object Diagnostics.ProcessStartInfo;$killInfo.FileName=(Join-Path $env:SystemRoot 'System32\taskkill.exe');$killInfo.Arguments=('/PID {0} /T /F'-f[int]$child.Id);$killInfo.UseShellExecute=$false;$killInfo.CreateNoWindow=$true;$killInfo.RedirectStandardOutput=$true;$killInfo.RedirectStandardError=$true
+    $killer=New-Object Diagnostics.Process;$killer.StartInfo=$killInfo
+    try{if($killer.Start()){$killOut=$killer.StandardOutput.ReadToEndAsync();$killErr=$killer.StandardError.ReadToEndAsync();if(-not$killer.WaitForExit(10000)){try{$killer.Kill()}catch{}};try{$killOut.GetAwaiter().GetResult()|Out-Null;$killErr.GetAwaiter().GetResult()|Out-Null}catch{}}}catch{}finally{$killer.Dispose()}
+    $child.WaitForExit(10000)|Out-Null
     throw "The packaged provider fixture command exceeded its $TimeoutSeconds-second bound: $Executable"
   }
   $child.WaitForExit();$output=$stdoutTask.GetAwaiter().GetResult();$detail=$stderrTask.GetAwaiter().GetResult();$exitCode=$child.ExitCode
@@ -232,7 +235,16 @@ try {
   foreach ($name in @('Initialize-B122ProviderHost.ps1','Protect-B122ProviderHostSecret.ps1','New-B122LoopbackTlsIdentity.mjs','Get-B122TlsIdentity.mjs','Provision-B122ProviderHostCompanion.mjs','New-B122ProviderHostConfiguration.ps1','Test-B122ProviderHostConfiguration.ps1','Restore-B122ProviderHostConfiguration.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $providerBundle 'scripts\provisioning') }
   [IO.File]::WriteAllText((Join-Path $providerBundle 'release.json'),([ordered]@{schema='sxsy-b122.windows-release';version=1;sourceCommit=('a'*40)}|ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))
   Write-B122ProviderReleaseTrace 'fixture-copy-complete'
-  $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0);$listener.Start();try{$listenPort=([Net.IPEndPoint]$listener.LocalEndpoint).Port}finally{$listener.Stop()}
+  # Port 0 selects from Windows' outbound ephemeral range. This fixture then
+  # performs bounded provisioning before the provider binds, so a network-heavy
+  # aggregate run can reuse that released port. Probe the non-ephemeral range.
+  $listenPort=$null;$firstPort=Get-Random -Minimum 20000 -Maximum 40000
+  for($offset=0;$offset-lt20000;$offset++){
+    $candidate=20000+(($firstPort-20000+$offset)%20000)
+    $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,$candidate)
+    try{$listener.Start();$listenPort=$candidate;break}catch{ }finally{try{$listener.Stop()}catch{}}
+  }
+  if($null-eq$listenPort){throw 'No non-ephemeral loopback port is available for the packaged provider fixture.'}
   $initialize=Join-Path $providerBundle 'scripts\provisioning\Initialize-B122ProviderHost.ps1'
   $bootstrapRaw=Invoke-B122ProviderFixturePowerShell -Script $initialize -Arguments @('-RepositoryRoot',[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..')),'-InstanceName',$instanceName,'-ListenPort',[string]$listenPort,'-BundleRoot',$providerBundle)
   Write-B122ProviderReleaseTrace 'initialize-complete'
@@ -326,7 +338,10 @@ await writeFile(readyPath, JSON.stringify({ schema: "sxsy-b122.release-companion
   if($companionFixture.ExitCode-ne0-or(Test-B122FixtureProcessIdentityAlive $companionFixtureIdentity)){throw 'The packaged companion did not prove zero survivors after graceful shutdown.'}
   $companionFixture=$null
   Write-B122ProviderReleaseTrace 'companion-shutdown-complete'
-  $startedRaw=Invoke-B122ProviderFixturePowerShell -Script $providerLifecycle -Arguments @('-Action','Start','-BundleRoot',$providerBundle,'-ConfigurationPath',$providerConfiguration,'-WaitForHealth')
+  # The lifecycle manager permits a 120-second authenticated-health window
+  # under scanner contention. Leave bounded caller cleanup headroom instead
+  # of racing that exact internal deadline.
+  $startedRaw=Invoke-B122ProviderFixturePowerShell -Script $providerLifecycle -Arguments @('-Action','Start','-BundleRoot',$providerBundle,'-ConfigurationPath',$providerConfiguration,'-WaitForHealth') -TimeoutSeconds 240
   Write-B122ProviderReleaseTrace 'managed-start-complete'
   $started=$startedRaw|Select-Object -Last 1|ConvertFrom-Json
   if($started.schema-cne'sxsy-b122.provider-host-lifecycle'-or$started.status-cne'running'-or$started.authenticated-ne$true-or$started.tlsIdentityPinned-ne$true-or[int]$started.processId-lt1){throw 'The packaged provider host did not establish authenticated pinned-TLS health.'}

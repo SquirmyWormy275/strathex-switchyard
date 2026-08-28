@@ -36,8 +36,8 @@ export interface LocalGitRunner {
 /** Fixed-argv runner: no request field is ever interpreted as shell syntax. */
 export class SpawnLocalGitRunner implements LocalGitRunner {
   private readonly candidates: readonly string[];
-  constructor(candidates: readonly string[] = ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]) {
-    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Local Git mediation requires fixed absolute Git executable candidates.");
+  constructor(candidates: readonly string[] = defaultGitCandidates()) {
+    if (!candidates.length || candidates.some((candidate) => !fixedGitPath(candidate))) throw new Error("Local Git mediation requires fixed absolute Git executable candidates.");
     this.candidates = [...candidates];
   }
   async run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>> }>): Promise<LocalGitResult> {
@@ -53,8 +53,7 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
         // caller's index.  Required locks for actual index writes still work;
         // this only disables Git's optional index writes.
         env: {
-          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
-          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent" }),
           GIT_OPTIONAL_LOCKS: "0",
           GIT_TERMINAL_PROMPT: "0",
           GCM_INTERACTIVE: "Never",
@@ -96,6 +95,9 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
     throw new Error("A trusted absolute Git executable is unavailable.");
   }
 }
+
+function defaultGitCandidates(): readonly string[] { return process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"] : ["/usr/bin/git"]; }
+function fixedGitPath(candidate: string): boolean { const name = basename(candidate).toLowerCase(); return isAbsolute(candidate) && (name === "git" || name === "git.exe"); }
 
 export interface MediatedGitHandlerOptions {
   /** Host-owned state outside the repository; temp indices and locks live here. */

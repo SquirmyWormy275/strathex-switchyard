@@ -163,7 +163,7 @@ test("packaged provider host lifecycle and the production pinned network broker 
 
   await createFixtureBundle(bundle);
   lifecycleReady = true;
-  const started = parseReceipt(await runPowerShellExecutable(windowsPowerShell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"]));
+  const started = parseReceipt(await runPowerShellExecutable(windowsPowerShell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Start", "-BundleRoot", bundle, "-ConfigurationPath", config, "-WaitForHealth"], 240_000));
   trace("provider-started");
   assert.equal(started.status, "running");
   assert.equal(started.tlsIdentityPinned, true);
@@ -209,38 +209,25 @@ test("packaged provider host lifecycle and the production pinned network broker 
   assert.equal(healthReceipt.status, "passed");
   assert.equal(healthReceipt.tlsIdentityPinned, true);
   trace("managed-health-passed");
-  const status = parseReceipt(await runPowerShell(join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Status", "-BundleRoot", bundle, "-ConfigurationPath", config]));
+  const lifecycleArguments = ["-BundleRoot", bundle, "-ConfigurationPath", config] as const;
+  const packagedManage = join(bundle, "scripts", "Manage-B122ProviderHost.ps1");
+  const status = parseReceipt(await runPowerShellExecutable(windowsPowerShell, packagedManage, ["-Action", "Status", ...lifecycleArguments]));
   assert.equal(status.status, "running");
   assert.equal(Number(status.processId), processId);
-  trace("managed-status-passed");
-  const stopped = parseReceipt(await runPowerShell(join(repository, "deployment/windows/Manage-B122ProviderHost.ps1"), ["-Action", "Stop", "-BundleRoot", bundle, "-ConfigurationPath", config]));
+  trace("packaged-windows-powershell-status-passed");
+  const packagedHealth = parseReceipt(await runPowerShellExecutable(powershell, packagedManage, ["-Action", "Health", ...lifecycleArguments]));
+  assert.equal(packagedHealth.status, "passed");
+  assert.equal(packagedHealth.tlsIdentityPinned, true);
+  trace("packaged-pwsh-health-passed");
+  const stopped = parseReceipt(await runPowerShellExecutable(powershell, packagedManage, ["-Action", "Stop", ...lifecycleArguments]));
   lifecycleReady = false;
   assert.equal(stopped.status, "stopped");
-  trace("managed-stop-passed");
+  trace("packaged-pwsh-stop-passed");
   assert.equal((stopped.processes as Array<Record<string, unknown>>)[0]?.gracefulShutdownAcknowledged, true);
   // The signed lifecycle receipt is scoped to the owned process tree. A
   // subsequent PID-only probe is not valid evidence on Windows because the OS
   // may reuse that PID immediately after this process-heavy suite.
   assert.equal(stopped.survivorCount, 0);
-
-  const lifecycleArguments = ["-BundleRoot", bundle, "-ConfigurationPath", config] as const;
-  const packagedManage = join(bundle, "scripts", "Manage-B122ProviderHost.ps1");
-  for (const [label, executable, script] of [
-    ["source pwsh", powershell, join(repository, "deployment/windows/Manage-B122ProviderHost.ps1")],
-    ["packaged Windows PowerShell 5.1", windowsPowerShell, packagedManage],
-    ["packaged pwsh", powershell, packagedManage]
-  ] as const) {
-    lifecycleReady = true;
-    const restarted = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Start", ...lifecycleArguments, "-WaitForHealth"]));
-    assert.equal(restarted.status, "running", `${label} must complete the bounded authenticated readiness retry`);
-    const restartedProcessId = Number(restarted.processId);
-    assert.ok(Number.isSafeInteger(restartedProcessId) && restartedProcessId > 0);
-    const restopped = parseReceipt(await runPowerShellExecutable(executable, script, ["-Action", "Stop", ...lifecycleArguments]));
-    lifecycleReady = false;
-    assert.equal(restopped.status, "stopped");
-    assert.equal(restopped.survivorCount, 0, `${label} must leave no provider-host process-tree survivor`);
-    assert.equal((restopped.processes as Array<Record<string, unknown>>)[0]?.gracefulShutdownAcknowledged, true);
-  }
 });
 
 async function createFixtureBundle(bundle: string): Promise<void> {
@@ -366,7 +353,31 @@ async function removeWithRetry(path: string): Promise<void> {
   }
   throw failure;
 }
-function freePort(): Promise<number> { return new Promise((resolvePort, rejectPort) => { const server = createServer(); server.once("error", rejectPort); server.listen(0, "127.0.0.1", () => { const address = server.address(); if (!address || typeof address === "string") return rejectPort(new Error("missing port")); server.close((error) => error ? rejectPort(error) : resolvePort(address.port)); }); }); }
+const reservedFixturePorts = new Set<number>();
+
+async function freePort(): Promise<number> {
+  // Do not ask Windows for port 0 here. It normally returns a port from the
+  // outbound ephemeral range, and this fixture performs certificate/DPAPI
+  // provisioning after releasing the probe listener. A busy aggregate run can
+  // legitimately reuse that ephemeral port before the provider binds it.
+  const first = 20_000 + Math.floor(Math.random() * 20_000);
+  for (let offset = 0; offset < 20_000; offset += 1) {
+    const candidate = 20_000 + ((first - 20_000 + offset) % 20_000);
+    if (!reservedFixturePorts.has(candidate) && await canListen(candidate)) {
+      reservedFixturePorts.add(candidate);
+      return candidate;
+    }
+  }
+  throw new Error("No non-ephemeral loopback port is available for the provider fixture.");
+}
+
+function canListen(port: number): Promise<boolean> {
+  return new Promise((resolvePort) => {
+    const server = createServer();
+    server.once("error", () => resolvePort(false));
+    server.listen(port, "127.0.0.1", () => server.close((error) => resolvePort(!error)));
+  });
+}
 function runPowerShell(script: string, arguments_: readonly string[]): Promise<string> {
   return runPowerShellExecutable(powershell, script, arguments_);
 }

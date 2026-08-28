@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { basename, isAbsolute } from "node:path";
 
 import type { BrokerOutcome, GitRequest } from "../../../packages/control-plane/src/brokers.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
@@ -224,12 +224,12 @@ export interface GitPackRunner { pack(repositoryRoot: string, head: string, excl
 export class SpawnGitPackRunner implements GitPackRunner {
   private readonly candidates: readonly string[];
   private readonly maximumBytes: number;
-  constructor(candidates: readonly string[] | undefined = undefined, maximumBytes = defaultMaximumPushBytes) { const selected = candidates ?? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]; if (!selected.length || selected.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Git packer requires fixed absolute executables."); this.candidates = [...selected]; this.maximumBytes = boundedPushCap(maximumBytes); }
+  constructor(candidates: readonly string[] | undefined = undefined, maximumBytes = defaultMaximumPushBytes) { const selected = candidates ?? (process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"] : ["/usr/bin/git"]); if (!selected.length || selected.some((candidate) => !isAbsolute(candidate) || !["git", "git.exe"].includes(basename(candidate).toLowerCase()))) throw new Error("Git packer requires fixed absolute executables."); this.candidates = [...selected]; this.maximumBytes = boundedPushCap(maximumBytes); }
   async pack(repositoryRoot: string, head: string, exclude?: string): Promise<Buffer> {
     const executable = await fixedExecutable(this.candidates);
     const revisions = Buffer.from(`${head}\n${exclude ? `^${exclude}\n` : ""}`, "ascii");
     return new Promise<Buffer>((resolveResult, rejectResult) => {
-      const child = spawn(executable, ["pack-objects", "--stdout", "--revs", "--thin", "--delta-base-offset"], { cwd: repositoryRoot, shell: false, windowsHide: true, env: { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" }, stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn(executable, ["pack-objects", "--stdout", "--revs", "--thin", "--delta-base-offset"], { cwd: repositoryRoot, shell: false, windowsHide: true, env: { ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }), GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" }, stdio: ["pipe", "pipe", "pipe"] });
       const chunks: Buffer[] = []; let bytes = 0; let error = "";
       child.stdout.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes <= this.maximumBytes) chunks.push(Buffer.from(chunk)); else child.kill(); });
       child.stderr.on("data", (chunk: Buffer) => { if (error.length < 4096) error += chunk.toString("utf8").slice(0, 4096 - error.length); });

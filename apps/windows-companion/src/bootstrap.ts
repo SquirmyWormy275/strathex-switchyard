@@ -1,6 +1,6 @@
 import { commandForAction, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
 import { AuthorityLedger } from "../../../packages/control-plane/src/authority.ts";
-import type { AutomationRequest, EffectGuard, PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
+import type { AutomationRequest, EffectGuard, IsolationRuntime, PermitVerifier } from "../../../packages/control-plane/src/brokers.ts";
 import type { CommandDispatcherDependencies, DispatchReceiptEvidenceFactory, GitMutationFactory } from "../../../packages/control-plane/src/dispatch.ts";
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { DurableMediatedExecutor, type DurableMediatedExecutorOptions, type TargetResolver } from "../../../packages/control-plane/src/runtime.ts";
@@ -27,6 +27,10 @@ import { InstalledWorkflowContextPreparationCoordinator } from "./workflow-conte
 import type { UserSecretProtector } from "./windows-secret.ts";
 import { DurableGitMutationReviewQueue } from "./git-review.ts";
 import { DurableRepositoryRuntimeRegistry } from "./runtime-registry.ts";
+import type { RepositoryExecutionRootProvider } from "./repository-runtime.ts";
+import type { SandboxRepositoryRecipeRunner } from "./repository-runtime-broker.ts";
+import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
+import type { ScannerFixtureResolver } from "./scanner-fixtures.ts";
 import { AttestedRuntimePinCoordinator } from "./runtime-provisioning.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 import { AttestedSandboxInstallationCoordinator, DurableSandboxInstallationRegistry, InstalledWindowsSandboxIsolationRuntime } from "./sandbox-installation.ts";
@@ -72,7 +76,6 @@ import {
 import { HandoffPackageStore } from "../../../packages/control-plane/src/context-packages.ts";
 import { VoiceCoordinator } from "../../../packages/control-plane/src/voice.ts";
 import { HostValidatedRepositoryRecipeRunner } from "./repository-recipe-host-evidence.ts";
-import type { HostReceiptEvidenceIssuer } from "./receipt-evidence.ts";
 import { CouncilWorkspaceIsolationManager } from "./council-workspace-isolation.ts";
 import { CouncilResourceHost, VaultBackedCouncilCredentialCapabilityPort } from "./council-resource-host.ts";
 import { InstalledCouncilResourceBroker } from "./council-resource-broker.ts";
@@ -174,6 +177,16 @@ export interface DurableWindowsCompanionOptions {
   readonly runtimePinPresence?: WindowsUserPresenceRunner;
   /** Fixed-helper process supervisor used by installed repository recipes. */
   readonly repositoryProcessSupervisor?: RepositoryProcessSupervisor;
+  /** Host-native repository/disposable execution roots. */
+  readonly repositoryExecutionRoots?: RepositoryExecutionRootProvider;
+  /** Platform-native host-evidenced repository sandbox composition. */
+  readonly repositorySandboxFactory?: (input: Readonly<{
+    runtimes: DurableRepositoryRuntimeRegistry;
+    issuer: HostReceiptEvidenceIssuer;
+    scannerFixtures: ScannerFixtureResolver;
+  }>) => SandboxRepositoryRecipeRunner;
+  /** Host-native isolation implementation. Linux supplies Bubblewrap here. */
+  readonly hostIsolationRuntime?: IsolationRuntime;
   /** Fixed packaged b122-sandbox-worker.exe. Omit to keep OS isolation unavailable. */
   readonly sandboxHelperPath?: string;
   /** Fixed packaged strathex-b122-hid-helper.exe. Never supplied by a client. */
@@ -293,12 +306,19 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   const checkpointCapture = options.runtime?.checkpointCapture ?? new LocalCheckpointCapture({ stateDirectory: localStateDirectory });
   const checkpointVerifier = options.runtime?.checkpointVerifier ?? new LocalRecoveryArtifactVerifier(localStateDirectory);
   const credentialProtector = options.credentialProtector ?? unavailableCredentialProtector;
+  let containmentManager!: DurableContainmentManager;
   const repositoryRuntimes = new DurableRepositoryRuntimeRegistry(store, {
-    processSupervisor: options.repositoryProcessSupervisor ?? new UnavailableInstalledRepositoryProcessSupervisor()
+    processSupervisor: options.repositoryProcessSupervisor ?? new UnavailableInstalledRepositoryProcessSupervisor(),
+    ...(options.repositoryExecutionRoots ? { executionRoots: options.repositoryExecutionRoots } : {}),
+    effectGuard: {
+      async check(_action, repositoryRoot) {
+        if (!containmentManager) return { allowed: false, reason: "The installed containment guard is not initialized." };
+        return containmentManager.check(repositoryRoot, "execution");
+      }
+    }
   });
   const hardwareSignals = new DurableHardwareSignalInbox(store);
   let targetResolver!: TargetResolver;
-  let containmentManager!: DurableContainmentManager;
   let containmentRemote: InstalledContainmentRemoteCoordinator | undefined;
   let configuredNetwork!: DynamicConfiguredNetworkClient;
   let configuredProviderOperations: DurableConfiguredProviderOperationControl | undefined;
@@ -886,16 +906,18 @@ export function createDurableWindowsCompanion(options: DurableWindowsCompanionOp
   let defaultDependencies: Omit<CommandDispatcherDependencies, "policy" | "sessions" | "authorities" | "operations" | "receiptEvidence" | "governance"> | undefined;
   const dependencies = options.dependencies ?? ((context) => {
     if (!defaultDependencies) {
-      const installedSandbox = sandboxInstallationRegistry
+      const installedSandbox: IsolationRuntime | undefined = options.hostIsolationRuntime ?? (sandboxInstallationRegistry
         ? new InstalledWindowsSandboxIsolationRuntime(sandboxInstallationRegistry, options.localStateDirectory ?? dirname(store.filePath), context.policy)
-        : undefined;
+        : undefined);
       const receiptIssuer = hostReceiptEvidenceIssuer(options.receiptEvidence);
-      const repositorySandbox = installedSandbox && receiptIssuer && sandboxInstallationRegistry
-        ? new HostValidatedRepositoryRecipeRunner(installedSandbox, sandboxInstallationRegistry, receiptIssuer, {
+      const repositorySandbox = options.repositorySandboxFactory && receiptIssuer
+        ? options.repositorySandboxFactory({ runtimes: repositoryRuntimes, issuer: receiptIssuer, scannerFixtures })
+        : installedSandbox instanceof InstalledWindowsSandboxIsolationRuntime && receiptIssuer && sandboxInstallationRegistry
+          ? new HostValidatedRepositoryRecipeRunner(installedSandbox, sandboxInstallationRegistry, receiptIssuer, {
             stateDirectory: options.localStateDirectory ?? dirname(store.filePath),
             scannerFixtures
           })
-        : installedSandbox;
+          : undefined;
       const composed = createDefaultLocalComposition(
         context,
         store,

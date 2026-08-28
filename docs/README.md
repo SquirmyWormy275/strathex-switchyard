@@ -27,6 +27,12 @@
 - `windows-release-and-installation.md` defines the content-verified Windows
   bundle, per-user state boundary, checksums, SBOM, transactional lifecycle,
   and the limits of local installation evidence.
+- `linux-release-and-installation.md` defines the content-verified Linux x64
+  bundle, Secret Service/Unix-socket boundary, Bubblewrap/process supervision,
+  systemd user lifecycle, VSIX, and optional hidraw/provider prerequisites.
+- `linux-software-completion-audit.md` maps the Linux implementation to its
+  source, hosted verification, fail-closed configuration, and genuine external
+  or hardware residuals.
 - `SXSY-B122-operator-technical-manual.md` is the versioned first-install,
   daily-operation, recovery, and troubleshooting manual. Its embedded printable
   reference is mechanically generated from the canonical protocol and command

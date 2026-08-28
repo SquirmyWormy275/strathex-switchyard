@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual, X509Certificate } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest, type RequestOptions } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
-import { readFile } from "node:fs/promises";
+import { lstat, open } from "node:fs/promises";
 import { checkServerIdentity, type PeerCertificate } from "node:tls";
 
 import type { ContainmentCheck } from "../../../packages/control-plane/src/containment.ts";
@@ -362,8 +362,23 @@ export function createDirectConfiguredNetworkBroker(policy: ConfiguredNetworkPol
 }
 
 export async function loadConfiguredNetworkPolicy(filePath: string): Promise<ConfiguredNetworkPolicy> {
-  const candidate: unknown = JSON.parse(await readFile(filePath, "utf8"));
-  return validatePolicy(candidate);
+  const before = await lstat(filePath);
+  const uid = process.getuid?.();
+  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > 256 * 1024
+    || process.platform === "linux" && (uid === undefined || before.uid !== uid || (before.mode & 0o077) !== 0)) {
+    throw new Error("Configured network policy storage is unsafe or oversized.");
+  }
+  const handle = await open(filePath, "r");
+  const bytes = Buffer.alloc(before.size);
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.size !== before.size || opened.dev !== before.dev || opened.ino !== before.ino) throw new Error("Configured network policy changed during validation.");
+    let offset = 0;
+    while (offset < bytes.length) { const result = await handle.read(bytes, offset, bytes.length - offset, null); if (!result.bytesRead) break; offset += result.bytesRead; }
+    if (offset !== bytes.length) throw new Error("Configured network policy changed during validation.");
+    const candidate: unknown = JSON.parse(bytes.toString("utf8"));
+    return validatePolicy(candidate);
+  } finally { bytes.fill(0); await handle.close(); }
 }
 
 function validatePolicy(candidate: unknown): ConfiguredNetworkPolicy {

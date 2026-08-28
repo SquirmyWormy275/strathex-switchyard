@@ -3,6 +3,8 @@ import { isAbsolute, relative } from "node:path";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
+import { LinuxLibsecretCurrentUserProtector } from "../../linux-companion/src/linux-secret.ts";
+import type { ExtensionSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
 
 export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport, type RawHidDeviceIdentity, type RawHidInstallationPin, type RawHidRuntimeStatus, type HardwareSignalClaim } from "./companion-bridge.ts";
@@ -10,10 +12,11 @@ export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, Wind
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
 let controller: ManagedSessionController | undefined;
-let secretReader: WindowsDpapiSecretReader | undefined;
+interface HostSecretReader extends ExtensionSecretReader { seal(cleartext: Uint8Array): Promise<string>; dispose(): Promise<void>; }
+let secretReader: HostSecretReader | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const secretProtector = new WindowsDpapiSecretReader();
+  const secretProtector = hostSecretReader();
   secretReader = secretProtector;
   controller = new ManagedSessionController(
     vscode as unknown as VscodeLike,
@@ -38,13 +41,19 @@ export function activate(context: vscode.ExtensionContext): void {
  * unavailable; neither workspace settings nor an extension command selects an
  * endpoint.
  */
-export function configuredCompanionBridge(secretReader: WindowsDpapiSecretReader = new WindowsDpapiSecretReader()): ExtensionCompanionBridge {
-  if (process.platform !== "win32") return new UnavailableExtensionCompanionBridge("The SXSY-B122 companion is available only on Windows.");
+export function configuredCompanionBridge(secretReader: ExtensionSecretReader = hostSecretReader()): ExtensionCompanionBridge {
+  if (process.platform !== "win32" && process.platform !== "linux") return new UnavailableExtensionCompanionBridge("The SXSY-B122 companion is available only on Windows and Linux.");
   try {
     return new JsonLineCompanionBridge(new ProvisionedNamedPipeJsonLineTransport(undefined, secretReader));
   } catch {
     return new UnavailableExtensionCompanionBridge("The authenticated SXSY-B122 local companion pipe configuration is invalid.");
   }
+}
+
+function hostSecretReader(): HostSecretReader {
+  if (process.platform === "win32") return new WindowsDpapiSecretReader();
+  if (process.platform === "linux") return new LinuxLibsecretCurrentUserProtector();
+  throw new Error("No SXSY-B122 host secret protector exists for this platform.");
 }
 
 export async function deactivate(): Promise<void> {

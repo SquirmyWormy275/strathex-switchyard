@@ -3011,7 +3011,8 @@ export class ManagedSessionController {
         if (!action.workspaceRoot || !action.pythonInterpreter || !action.pythonInterpreterIdentity) throw new Error("The companion did not bind the Python environment to an exact workspace and protected interpreter identity.");
         const workspaceRoot = action.workspaceRoot;
         const interpreter = action.pythonInterpreter;
-        if (!samePath(resolve(workspaceRoot, ".venv", "Scripts", "python.exe"), interpreter)) throw new Error("The companion supplied a Python interpreter outside the exact repo-local .venv boundary.");
+        const allowedInterpreters = [resolve(workspaceRoot, ".venv", "Scripts", "python.exe"), resolve(workspaceRoot, ".venv", "bin", "python")];
+        if (!allowedInterpreters.some((candidate) => samePath(candidate, interpreter))) throw new Error("The companion supplied a Python interpreter outside the exact repo-local .venv boundary.");
         if (!samePath(action.pythonInterpreterIdentity.canonicalPath, interpreter)) throw new Error("The protected Python interpreter identity changed its canonical path.");
         const folder = (this.vscode.workspace.workspaceFolders ?? []).find((candidate) => samePath(candidate.uri.fsPath, workspaceRoot));
         if (!folder) throw new Error("The exact Python workspace is not open in this VS Code host.");

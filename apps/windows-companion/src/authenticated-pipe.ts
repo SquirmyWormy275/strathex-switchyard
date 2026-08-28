@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { lstat, open, rename, rm, unlink } from "node:fs/promises";
+import { chmod, lstat, open, rename, rm, unlink } from "node:fs/promises";
 import { createServer, connect, type Server, type Socket } from "node:net";
 import { dirname, isAbsolute, join } from "node:path";
 
@@ -82,7 +82,11 @@ export async function loadPipeConfiguration(filePath: string): Promise<Authentic
 
 async function readBoundedConfiguration(filePath: string): Promise<string> {
   const before = await lstat(filePath);
-  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > maximumPipeConfigurationBytes) throw new Error("The local pipe configuration file is invalid or oversized.");
+  const uid = process.getuid?.();
+  if (!before.isFile() || before.isSymbolicLink() || before.size < 2 || before.size > maximumPipeConfigurationBytes
+    || process.platform === "linux" && (uid === undefined || before.uid !== uid || (before.mode & 0o077) !== 0)) {
+    throw new Error("The local pipe configuration file is invalid, broad, or oversized.");
+  }
   const handle = await open(filePath, "r");
   const bytes = Buffer.alloc(maximumPipeConfigurationBytes + 1);
   try {
@@ -113,6 +117,7 @@ export class AuthenticatedPipeServer {
   private readonly activeRequestControllers = new Set<AbortController>();
   private stopping = false;
   private stopPromise?: Promise<void>;
+  private unixSocketIdentity?: Readonly<{ dev: bigint; ino: bigint; uid: number }>;
 
   constructor(configuration: AuthenticatedPipeConfiguration, protector: UserSecretProtector, handler: CompanionRequestHandler, options: AuthenticatedPipeServerOptions = {}) {
     if (!isPipeConfiguration(configuration)) throw new Error("The local pipe configuration is invalid.");
@@ -136,14 +141,24 @@ export class AuthenticatedPipeServer {
     this.stopPromise = undefined;
     this.token = token;
     try {
-      if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
+      if (process.platform !== "win32") await removeOwnedStaleUnixSocket(this.configuration.pipePath);
       this.server = createServer((socket) => this.accept(socket));
       await new Promise<void>((resolve, reject) => {
         this.server!.once("error", reject);
         this.server!.listen(this.configuration.pipePath, resolve);
       });
+      if (process.platform !== "win32") {
+        await chmod(this.configuration.pipePath, 0o600);
+        const socket = await lstat(this.configuration.pipePath, { bigint: true });
+        const uid = process.getuid?.();
+        if (!socket.isSocket() || socket.isSymbolicLink() || uid === undefined || Number(socket.uid) !== uid) {
+          throw new Error("The authenticated companion Unix socket does not have the expected current-user identity.");
+        }
+        this.unixSocketIdentity = { dev: socket.dev, ino: socket.ino, uid };
+      }
     } catch (error) {
       this.server = undefined;
+      this.unixSocketIdentity = undefined;
       this.token?.fill(0);
       this.token = undefined;
       throw error;
@@ -173,8 +188,21 @@ export class AuthenticatedPipeServer {
     try { await this.drainHandlers(); }
     catch (error) { failures.push(error instanceof Error ? error : new Error("The authenticated companion pipe handlers could not drain.")); }
     try {
-      if (process.platform !== "win32") await unlink(this.configuration.pipePath).catch(() => undefined);
+      if (process.platform !== "win32" && this.unixSocketIdentity) {
+        const expected = this.unixSocketIdentity;
+        const current = await lstat(this.configuration.pipePath, { bigint: true }).catch((error: unknown) => {
+          if (isMissing(error)) return undefined;
+          throw error;
+        });
+        if (current && current.isSocket() && !current.isSymbolicLink()
+          && current.dev === expected.dev && current.ino === expected.ino && Number(current.uid) === expected.uid) {
+          await unlink(this.configuration.pipePath);
+        } else if (current) {
+          failures.push(new Error("The authenticated companion Unix socket path changed before shutdown; the replacement was not unlinked."));
+        }
+      }
     } finally {
+      this.unixSocketIdentity = undefined;
       this.token?.fill(0);
       this.token = undefined;
     }
@@ -394,6 +422,19 @@ function isPipeConfiguration(value: unknown): value is AuthenticatedPipeConfigur
 function isAuthenticatedEnvelope(value: unknown): value is AuthenticatedEnvelope {
   return isRecord(value) && exactKeys(value, ["version", "clientNonce", "serverNonce", "proof", "request"]) && value.version === 2 && isNonce(value.clientNonce) && isNonce(value.serverNonce) && isProof(value.proof) && isCompanionRequest(value.request);
 }
+
+async function removeOwnedStaleUnixSocket(path: string): Promise<void> {
+  let metadata;
+  try { metadata = await lstat(path); }
+  catch (error) { if (isMissing(error)) return; throw error; }
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (!metadata.isSocket() || metadata.isSymbolicLink() || uid === undefined || metadata.uid !== uid) {
+    throw new Error("Refusing to replace an unsafe or foreign Unix-domain socket path.");
+  }
+  await unlink(path);
+}
+
+function isMissing(error: unknown): boolean { return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT"; }
 
 function isClientHello(value: unknown): value is ClientHello { return isRecord(value) && exactKeys(value, ["version", "clientNonce"]) && value.version === 2 && isNonce(value.clientNonce); }
 function isServerChallenge(value: unknown): value is ServerChallenge { return isRecord(value) && exactKeys(value, ["version", "clientNonce", "serverNonce", "proof"]) && value.version === 2 && isNonce(value.clientNonce) && isNonce(value.serverNonce) && isProof(value.proof); }

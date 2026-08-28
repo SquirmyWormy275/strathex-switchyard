@@ -1,0 +1,116 @@
+name: B122 Linux release verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b122-linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-linux-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      NODE_RUNTIME_VERSION: 24.14.0
+      NODE_RUNTIME_SHA256: 41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      npm_config_update_notifier: "false"
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned Node toolchain
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install Linux host prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends bubblewrap dbus-x11 espeak-ng gnome-keyring libsecret-tools pipewire-bin policykit-1 shellcheck unzip util-linux xz-utils zip
+          test "$(realpath "$(command -v bwrap)")" = /usr/bin/bwrap
+          test "$(realpath "$(command -v secret-tool)")" = /usr/bin/secret-tool
+          test "$(realpath "$(command -v flock)")" = /usr/bin/flock
+          test "$(realpath "$(command -v espeak-ng)")" = /usr/bin/espeak-ng
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Verify shared and native Linux control planes
+        run: |
+          npm run typecheck
+          for test_file in \
+            packages/protocol/test/*.test.ts \
+            packages/control-plane/test/*.test.ts \
+            apps/provider-adapter-host/test/*.test.ts \
+            apps/vscode-extension/test/*.test.ts \
+            apps/linux-companion/test/*.test.ts \
+            scripts/*.test.mjs \
+            firmware/*.test.mjs; do
+            timeout --signal=KILL 300s node --experimental-transform-types --test "$test_file"
+          done
+          npm run build:vscode
+          npm run build:companion
+          npm run build:linux-companion
+          npm run build:provider-host
+          npm run package:linux-companion:dry-run
+          npm run package:vscode:dry-run
+
+      - name: Lint Linux lifecycle scripts
+        run: |
+          shellcheck deployment/linux/*.sh
+          unit_tmp=$(mktemp -d)
+          trap 'rm -rf -- "$unit_tmp"' EXIT
+          sed 's|^ExecStart=.*|ExecStart=/usr/bin/true|' deployment/linux/sxsy-b122.service > "$unit_tmp/sxsy-b122.service"
+          sed 's|^ExecStart=.*|ExecStart=/usr/bin/true|' deployment/linux/sxsy-b122-provider-host.service > "$unit_tmp/sxsy-b122-provider-host.service"
+          systemd-analyze verify "$unit_tmp/sxsy-b122.service" "$unit_tmp/sxsy-b122-provider-host.service"
+
+      - name: Fetch and verify the official portable Node runtime
+        run: |
+          archive="$RUNNER_TEMP/node-v${NODE_RUNTIME_VERSION}-linux-x64.tar.xz"
+          curl --fail --location --proto '=https' --tlsv1.2 "https://nodejs.org/dist/v${NODE_RUNTIME_VERSION}/node-v${NODE_RUNTIME_VERSION}-linux-x64.tar.xz" --output "$archive"
+          echo "${NODE_RUNTIME_SHA256}  $archive" | sha256sum --check --strict
+          echo "NODE_RUNTIME_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Build and verify the complete Linux bundle
+        run: |
+          chmod +x deployment/linux/*.sh
+          deployment/linux/build-b122-linux-release.sh "$NODE_RUNTIME_ARCHIVE" "$NODE_RUNTIME_SHA256" "$RUNNER_TEMP/sxsy-b122-linux-x64"
+          deployment/linux/test-linux-release.sh "$RUNNER_TEMP/sxsy-b122-linux-x64"
+          deployment/linux/test-linux-install-lifecycle.sh "$RUNNER_TEMP/sxsy-b122-linux-x64"
+
+      - name: Smoke the installed companion boundary in a real Secret Service session
+        run: |
+          release="$RUNNER_TEMP/sxsy-b122-linux-x64"
+          dbus-run-session -- bash -euo pipefail -c '
+            test_root=$(mktemp -d)
+            companion_pid=""
+            trap '\''if test -n "$companion_pid"; then kill "$companion_pid" 2>/dev/null || true; fi; rm -rf "$test_root"'\'' EXIT
+            export HOME="$test_root/home" XDG_STATE_HOME="$test_root/state" XDG_RUNTIME_DIR="$test_root/runtime"
+            mkdir -m 700 "$HOME" "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
+            eval "$(printf '\''b122-ci-keyring\n'\'' | gnome-keyring-daemon --unlock --components=secrets)"
+            "$1/runtime/bin/node" "$1/app/dist/apps/linux-companion/src/main.js" &
+            companion_pid=$!
+            for attempt in $(seq 1 100); do
+              test -S "$XDG_RUNTIME_DIR/sxsy-b122/"*.sock && break
+              kill -0 "$companion_pid"
+              sleep 0.1
+            done
+            "$1/runtime/bin/node" deployment/linux/smoke-client.mjs "$1" "$XDG_STATE_HOME"
+            kill -TERM "$companion_pid"
+            wait "$companion_pid"
+          ' bash "$release"
+
+      - name: Prove generated source remains canonical
+        run: git diff --exit-code

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -46,6 +46,30 @@ test("authenticated local pipe carries the candidate bridge protocol without a c
   assert.deepEqual(seen, [request]);
   assert.equal(protector.opened.length, 2);
   assert.equal(protector.opened.every((buffer) => buffer.every((byte) => byte === 0)), true);
+});
+
+test("Unix socket startup refuses to unlink a regular file at the endpoint", { skip: process.platform === "win32" }, async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-unsafe-socket-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `unsafe-${Date.now()}`);
+  await writeFile(configuration.pipePath, "must-survive", { mode: 0o600 });
+  const server = new AuthenticatedPipeServer(configuration, protector, { async handle(candidate) { return { version: 1, id: candidate.id, ok: true }; } });
+  await assert.rejects(() => server.start(), /unsafe|foreign/i);
+  assert.equal(await readFile(configuration.pipePath, "utf8"), "must-survive");
+});
+
+test("Unix socket shutdown preserves a path swapped after listen", { skip: process.platform === "win32" }, async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-b122-swapped-socket-"));
+  context.after(async () => { await rm(directory, { recursive: true, force: true }); });
+  const protector = new FakeUserSecretProtector();
+  const configuration = await createPipeConfiguration(directory, protector, `swapped-${Date.now()}`);
+  const server = new AuthenticatedPipeServer(configuration, protector, { async handle(candidate) { return { version: 1, id: candidate.id, ok: true }; } });
+  await server.start();
+  await unlink(configuration.pipePath);
+  await writeFile(configuration.pipePath, "replacement-must-survive", { mode: 0o600 });
+  await assert.rejects(() => server.stop(), /changed before shutdown/i);
+  assert.equal(await readFile(configuration.pipePath, "utf8"), "replacement-must-survive");
 });
 
 test("authenticated local pipe admits the installed acceptance, scanner, and provider administration methods", async (context) => {
@@ -327,7 +351,7 @@ test("journal authenticator test harness detects a sealed tag from the wrong dig
   assert.equal(await authenticator.verify("b".repeat(64), tag), false);
 });
 
-test("DPAPI protector zeroes task-owned input and output buffers on both paths", async () => {
+test("DPAPI protector zeroes task-owned input and output buffers on both paths", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   const inputs: Buffer[] = [];
   const outputs: Buffer[] = [];
   const runner: BoundedWindowsProcessRunner = async (request) => {
@@ -349,7 +373,7 @@ test("DPAPI protector zeroes task-owned input and output buffers on both paths",
   assert.equal(outputs.every((buffer) => buffer.every((byte) => byte === 0)), true);
 });
 
-test("DPAPI helper identity is anchored to the loaded Windows kernel instead of inherited SystemRoot", async () => {
+test("DPAPI helper identity is anchored to the loaded Windows kernel instead of inherited SystemRoot", { skip: process.platform !== "win32" ? "Windows-only DPAPI boundary." : false }, async () => {
   let executable = "";
   const runner: BoundedWindowsProcessRunner = async (request) => {
     executable = request.executable;

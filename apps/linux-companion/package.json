@@ -1,0 +1,11 @@
+{
+  "name": "@strathex/switchyard-linux-companion",
+  "private": true,
+  "license": "UNLICENSED",
+  "version": "0.1.0",
+  "description": "SXSY-B122 durable Linux companion with authenticated Unix-socket IPC and fail-closed host adapters.",
+  "type": "module",
+  "bin": { "sxsy-b122-linux-companion": "dist/apps/linux-companion/src/main.js" },
+  "files": ["dist/apps", "dist/packages", "README.md", "package.json"],
+  "scripts": { "build": "tsc -p tsconfig.build.json" }
+}

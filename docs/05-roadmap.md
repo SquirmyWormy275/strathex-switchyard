@@ -36,11 +36,12 @@
 ## Phase 3 - implementation
 
 - [x] Logical Vial configuration source (physical import/acceptance remains Phase 4)
-- [x] TypeScript Windows companion and durable control plane
+- [x] TypeScript Windows/Linux companions and durable control plane
 - [x] VS Code lifecycle/bridge integration
 - [x] Agent/session, broker, and safe adapter interfaces
 - [x] Isolated automated tests and documented fail-closed recovery guidance
 - [x] Close all ordinary software residuals in the current audit and residual ledger
+- [x] Linux Secret Service, Unix-socket, Bubblewrap, systemd, package, and rollback implementation
 
 ## Phase 4 - physical commissioning
 

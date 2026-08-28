@@ -119,6 +119,12 @@ function Snapshot-Tree([int]$RootProcessId){
   return @($selected|ForEach-Object{$_})
 }
 function Same-Identity($Identity){$candidate=Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Identity.processId)" -ErrorAction SilentlyContinue;if($null-eq$candidate){return $false};return(Process-Start $candidate)-ceq[string]$Identity.startedAt}
+function Stop-ExactIdentity($Identity){
+  if(-not(Same-Identity $Identity)){return}
+  $taskkill=Join-Path $env:SystemRoot 'System32\taskkill.exe';$info=New-Object Diagnostics.ProcessStartInfo;$info.FileName=$taskkill;$info.Arguments=('/PID {0} /T /F'-f[int]$Identity.processId);$info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+  $killer=New-Object Diagnostics.Process;$killer.StartInfo=$info
+  try{if($killer.Start()){$stdout=$killer.StandardOutput.ReadToEndAsync();$stderr=$killer.StandardError.ReadToEndAsync();if(-not$killer.WaitForExit(10000)){try{$killer.Kill()}catch{};$killer.WaitForExit(5000)|Out-Null};try{$stdout.GetAwaiter().GetResult()|Out-Null;$stderr.GetAwaiter().GetResult()|Out-Null}catch{}}}catch{}finally{$killer.Dispose()}
+}
 function Wait-TreeExit($Tree,[int]$Seconds){$deadline=[DateTime]::UtcNow.AddSeconds($Seconds);do{$survivors=@($Tree|Where-Object{Same-Identity $_});if(-not$survivors.Count){return @()};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow-lt$deadline);return @($Tree|Where-Object{Same-Identity $_})}
 function Stop-HostedProcess($Record){
   $process=Exact-Process $Record;if($null-eq$process){Remove-Record;return [ordered]@{processId=if($null-ne$Record.processId){[int]$Record.processId}else{$null};gracefulShutdownAcknowledged=$false;forcedFallback=$false;treeCaptured=0;treeExited=0;treeSurvivors=@()}}
@@ -126,8 +132,8 @@ function Stop-HostedProcess($Record){
   $ack=$null;try{$ack=Invoke-Health $Record -Shutdown}catch{$ack=$null}
   $survivors=@(Wait-TreeExit $tree 10);$forced=$false
   if($survivors.Count){
-    if($null-eq(Exact-Process $Record)){throw 'The provider-host process identity changed before bounded fallback termination.'}
-    $forced=$true;$taskkill=Join-Path $env:SystemRoot 'System32\taskkill.exe';& $taskkill /PID ([string][int]$Record.processId) /T /F *> $null
+    $forced=$true
+    foreach($survivor in $survivors){Stop-ExactIdentity $survivor}
     $survivors=@(Wait-TreeExit $tree 10)
   }
   if($survivors.Count){throw 'The exact provider-host process tree did not terminate within its bounded deadline.'}
@@ -185,12 +191,37 @@ try{
   $record=[pscustomobject][ordered]@{schema='sxsy-b122.provider-host-process';version=2;state='starting';lifecycleNonce=$nonce;lifecycleNonceSha256=(Sha-Text $nonce);processId=$null;node=$node;main=$main;configurationPath=$config;configurationSha256=[string]$validation.configurationSha256;sourceCommit=$sourceCommit;intentStartedAt=$intentStartedAt;processStartedAt=$null}
   Write-Record $record
   try{
-    $startInfo=New-Object Diagnostics.ProcessStartInfo;$startInfo.FileName=$node;$startInfo.Arguments=('"{0}" --config "{1}" --lifecycle-nonce {2}' -f $main,$config,$nonce);$startInfo.WorkingDirectory=$bundle;$startInfo.UseShellExecute=$true;$startInfo.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
-    $process=[Diagnostics.Process]::Start($startInfo);if($null-eq$process){throw 'The provider-host process launch returned no exact identity.'}
-    $candidate=$null;$deadline=[DateTime]::UtcNow.AddSeconds(5);do{$candidate=Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$process.Id)" -ErrorAction SilentlyContinue;if($null-ne$candidate){break};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow-lt$deadline)
+    # The provider host receives only its exact OS/runtime boundary. In
+    # particular, never inherit ambient developer credentials, management
+    # pipe handles, or a ShellExecute-substituted profile environment.
+    $windowsRoot=[IO.Path]::GetFullPath([string]$env:SystemRoot)
+    foreach($value in @($windowsRoot,$local)){if([string]::IsNullOrWhiteSpace($value)-or$value-match'[\x00\r\n]'){throw 'The provider-host process environment is invalid.'}}
+    $environment=@("SystemRoot=$windowsRoot","WINDIR=$windowsRoot","LOCALAPPDATA=$local")
+    if($env:SXSY_TEST_MODE-ceq'1'){
+      $environment+=@('SXSY_TEST_MODE=1',"SXSY_TEST_ROOT=$test","SXSY_TEST_ROOT_SHA256=$(Sha-Text $test)","SXSY_TEST_LOCAL_SHA256=$(Sha-Text $local)")
+      if($env:SXSY_PROVIDER_E2E_TRACE-ceq'1'){$environment+='SXSY_PROVIDER_E2E_TRACE=1'}
+    }
+    $startup=New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow=[uint16]0;EnvironmentVariables=[string[]]$environment}
+    $commandLine=('"{0}" "{1}" --config "{2}" --lifecycle-nonce {3}' -f $node,$main,$config,$nonce)
+    $created=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=$commandLine;CurrentDirectory=$bundle;ProcessStartupInformation=$startup}
+    if($null-eq$created){throw 'The provider-host process launch returned no exact identity.'}
+    if([int]$created.ReturnValue-ne0-or[int]$created.ProcessId-lt1){throw "The provider-host process launch returned safe code $([int]$created.ReturnValue) without an exact identity."}
+    $candidate=$null;$deadline=[DateTime]::UtcNow.AddSeconds(5);do{$candidate=Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$created.ProcessId)" -ErrorAction SilentlyContinue;if($null-ne$candidate){break};Start-Sleep -Milliseconds 50}while([DateTime]::UtcNow-lt$deadline)
     if($null-eq$candidate-or-not(Exact-Arguments $candidate $nonce)){throw 'The provider host did not establish its exact process identity.'}
     $record=Adopt-Record $record $candidate
-    $healthReceipt=Wait-Healthy $record 60;if($null-eq$healthReceipt){throw 'The provider host did not pass authenticated pinned-TLS health within 60 seconds.'}
+    # A freshly extracted, signed bundle can be held briefly by host malware
+    # scanning before Node reaches the TLS listener. Keep this bounded beneath
+    # the 240-second release-test ceiling, but do not turn scanner contention
+    # into a false startup failure.
+    $healthReceipt=Wait-Healthy $record 120
+    if($null-eq$healthReceipt){
+      $stage='unreported';$stagePath=$config+'.startup-stage'
+      if($env:SXSY_PROVIDER_E2E_TRACE-ceq'1'-and(Test-Path -LiteralPath $stagePath -PathType Leaf)){
+        $stageItem=Get-Item -LiteralPath $stagePath -Force
+        if(($stageItem.Attributes-band[IO.FileAttributes]::ReparsePoint)-eq0-and$stageItem.Length-gt0-and$stageItem.Length-le128){$candidateStage=[string](Get-Content -LiteralPath $stagePath -Raw).Trim();if($candidateStage-cmatch'^(configuration|config-(read|paths|test-mode-absent|test-root-missing|test-local-missing|test-root-rewritten|test-local-rewritten|test-boundary-rewritten|test-path-invalid|test-local-equals-root|test-local-sibling|test-drive-diverged|test-boundary-valid|root-not-config-dir|file-and-root-outside-base|boundaries-diverged|allowed-base|owned-paths|providers|path-security|bearer-secret|journal-secret|dispatch-secret|tls-material)|backend-runtime|service-reconcile|tls-listen|running|failed-(backend-runtime|service-reconcile|tls-listen))$'){$stage=$candidateStage}}
+      }
+      throw "The provider host did not pass authenticated pinned-TLS health within 120 seconds (safe startup stage: $stage)."
+    }
     $record.state='running';Write-Record $record
     Emit 'running' @{processId=[int]$record.processId;lifecycleNonceSha256=[string]$record.lifecycleNonceSha256;configurationSha256=[string]$record.configurationSha256;tlsIdentityPinned=$true;authenticated=$true;startingIntentReconciled=$true};return
   }catch{

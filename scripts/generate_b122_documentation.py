@@ -382,6 +382,16 @@ def render_reference(
         ]
     )
     for index, assignment in enumerate(assignments, start=1):
+        if index in {12, 25, 38, 51, 59, 63}:
+            lines.extend(
+                [
+                    "",
+                    "<!-- B122-PDF-PAGE-BREAK -->",
+                    "",
+                    "| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |",
+                    "| ---: | --- | --- | --- |",
+                ]
+            )
         assignment_id = f"{assignment['control']}:{assignment['modifier']}"
         command = catalog_by_assignment[assignment_id]
         marker = f"<!-- B122-ASSIGNMENT {assignment_id} -->"
