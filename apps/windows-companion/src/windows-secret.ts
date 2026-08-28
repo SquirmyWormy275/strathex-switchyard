@@ -192,7 +192,7 @@ function decodeCanonicalBase64(value: string, maximumBytes: number, label: strin
 }
 
 /**
- * Small boundary around a Windows CurrentUser secret protector.  Callers may
+ * Small boundary around a current-user host secret protector. Callers may
  * persist only the returned opaque string; the clear value is held only for a
  * single local IPC round trip.  Tests inject a deterministic protector.
  */
@@ -269,8 +269,8 @@ export class WindowsDpapiCurrentUserProtector implements UserSecretProtector {
   }
 }
 
-/** Journal tags are DPAPI-encrypted digests, not a locally persisted signing key. */
-export class DpapiJournalAuthenticator implements JournalAuthenticator {
+/** Journal tags are host-protected digests, not a locally persisted signing key. */
+export class SecretProtectorJournalAuthenticator implements JournalAuthenticator {
   readonly provider: string;
   private readonly protector: UserSecretProtector;
 
@@ -298,6 +298,9 @@ export class DpapiJournalAuthenticator implements JournalAuthenticator {
     }
   }
 }
+
+/** Backward-compatible Windows name retained for the verified Windows bundle. */
+export class DpapiJournalAuthenticator extends SecretProtectorJournalAuthenticator {}
 
 export async function createSealedRandomToken(protector: UserSecretProtector): Promise<string> {
   const token = randomBytes(32);

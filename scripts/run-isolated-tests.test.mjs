@@ -27,6 +27,20 @@ test("test groups fail closed on zero-match patterns, skipped tests, and todo te
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test("platform groups accept only their exact declared skip count", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-platform-skip-"));
+  try {
+    const fixture = await group(directory, "platform-skip", "import test from 'node:test'; test('portable',()=>{}); test('other platform',{skip:true},()=>{});");
+    const accepted = await verify([{ ...fixture, expectedSkipped: 1 }], directory);
+    assert.equal(accepted.receipt.success, true);
+    assert.equal(accepted.receipt.children[0].testCounts.skipped, 1);
+    const rejected = await verify([{ ...fixture, expectedSkipped: 2 }], directory);
+    assert.equal(rejected.receipt.success, false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("the required manifest exactly represents every repository test file", () => {
   const evidence = assertRequiredTestManifest();
   assert.equal(evidence.discovered, evidence.represented);

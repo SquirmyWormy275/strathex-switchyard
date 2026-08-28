@@ -1,6 +1,6 @@
 # SXSY-B122 Operator, Technical, and Troubleshooting Manual
 
-**Document version:** 1.0.0
+**Document version:** 1.1.0
 
 **Product:** STRATHEX SWITCHYARD / SXSY-B122
 
@@ -11,7 +11,7 @@
 
 > This manual describes the repository-owned software mechanisms and their
 > fail-closed operation. It is not evidence that a physical keyboard, provider,
-> cloud account, Windows feature, scanner feed, or high-consequence workflow has
+> cloud account, Windows or Linux host feature, scanner feed, or high-consequence workflow has
 > been accepted. A B122 chord expresses intent. It is not authority,
 > authentication, confirmation, or permission to perform a side effect.
 
@@ -20,7 +20,7 @@
 ## 1.1 What this manual covers
 
 This is the first-install, daily-operation, recovery, and troubleshooting guide
-for the SXSY-B122 Windows companion, VS Code extension, provider-adapter host,
+for the SXSY-B122 Windows and Linux companions, VS Code extension, provider-adapter host,
 signal-only firmware source, and the protected local control plane. It also
 contains the mechanically generated printable reference for all 22 controls and
 65 settled chord assignments.
@@ -53,7 +53,7 @@ network route, and live acceptance. Missing prerequisites must remain
 - Emergency Containment blocks only wired broker paths, not arbitrary shells or
   already-running external work.
 - A green local test does not prove GitHub, CI, a provider, a scanner, Windows
-  Sandbox, or the physical keyboard.
+  Sandbox, Linux Bubblewrap policy, or the physical keyboard.
 - A successful package build is not a signed distribution or an accepted
   installation.
 - A quick-reference row or hardware chord never grants permission.
@@ -93,9 +93,9 @@ Physical B122 or simulated signal
             |
             | versioned control + modifier only
             v
-Windows companion and protected control plane
+Windows or Linux companion and protected control plane
             |
-            +-- authenticated local named pipe
+            +-- authenticated named pipe (Windows) or Unix socket (Linux)
             +-- exact target/session/authority registry
             +-- durable operations, receipts, budgets, and containment
             +-- VS Code extension and operator review surfaces
@@ -118,7 +118,7 @@ containment, budget, and gate checks applicable to that action.
 | Provider / repository / logs | Bounded data and typed observations after validation. | Instructions that alter authority, target, recipient, route, or gates. |
 | Broker / installed adapter | One typed, permit-bound action with a final-current guard. | Free-form shell text, ambient credentials, force semantics, or fallback providers. |
 
-A provider module never receives a DPAPI-opened credential, credential bearer,
+A provider module never receives an OS-opened credential, credential bearer,
 host endpoint, or companion broker. A separately configured, digest-pinned host
 effect driver is isolated from the provider module and receives only its fixed
 host identity plus the companion-issued bounded decision. Provider capability
@@ -143,7 +143,8 @@ before any stronger capability is recorded.
 
 ## 3.1 Supported software-only boundary
 
-The release workflow is Windows per-user. Product bytes live below:
+The verified release workflows are per-user on Windows and systemd-based x86-64
+Linux. Windows product bytes live below:
 
 ```text
 %LOCALAPPDATA%\STRATHEX\switchyard\install\versions\<source-commit>
@@ -153,6 +154,13 @@ Protected state lives below:
 
 ```text
 %LOCALAPPDATA%\STRATHEX\switchyard
+```
+
+Linux versioned bundles and protected state live below:
+
+```text
+$HOME/.local/share/strathex-switchyard/versions/<bundle-id>
+${XDG_STATE_HOME:-$HOME/.local/state}/STRATHEX/switchyard
 ```
 
 Repository files cannot redirect either location. A custom state root is for
@@ -241,12 +249,42 @@ node .\apps\windows-companion\dist\apps\windows-companion\src\main.js
 This is not a substitute for the verified Windows bundle. The npm package does
 not contain every native helper and is not release evidence.
 
+## 3.6 Linux build, install, and health
+
+Follow [`linux-release-and-installation.md`](linux-release-and-installation.md).
+The Linux builder requires the reviewed official Node v24.14.0 x64 archive and
+its exact SHA-256, builds a real VSIX, writes a complete `MANIFEST.sha256`, and
+packages systemd user units. Installation re-verifies the copied payload,
+atomically changes the current version, and requires `sxsy-b122.service` to be
+active. Update and rollback preserve the previous immutable bundle; uninstall
+retains protected state and versioned payloads for recovery.
+
+```sh
+deployment/linux/build-b122-linux-release.sh \
+  /reviewed/node-v24.14.0-linux-x64.tar.xz \
+  41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df \
+  artifacts/sxsy-b122-linux-x64
+artifacts/sxsy-b122-linux-x64/deployment/install-b122-linux.sh \
+  artifacts/sxsy-b122-linux-x64
+systemctl --user status sxsy-b122.service
+```
+
+Linux startup requires private current-user XDG state/runtime bases,
+`/usr/bin/secret-tool`, `/usr/bin/flock`, `/usr/bin/bwrap`, `/usr/bin/pw-record`,
+`/usr/bin/pw-play`, `/usr/bin/espeak-ng`, and a current-user Secret Service session. The companion uses
+a mode-`0600` authenticated Unix socket and stores only a Secret-Service-wrapped
+master key. It does not fall back to TCP, plaintext secrets, an ambient helper,
+or a copy-only sandbox. Voice capture begins each provider turn at frame sequence
+zero; only gateway-redacted response text reaches the trusted local `espeak-ng`
+to PipeWire synthesis path, and helper termination is deadline-bounded.
+
 # 4. First VS Code Setup
 
 ## 4.1 Verify the companion boundary
 
 The extension reads only the companion-created canonical endpoint record and
-opens its DPAPI CurrentUser-sealed token. It has no endpoint setting, TCP
+opens its DPAPI CurrentUser-sealed token on Windows or Secret-Service-sealed
+token on Linux. It has no endpoint setting, TCP
 fallback, stdio fallback, or workspace-controlled token.
 
 In the VS Code Command Palette:
@@ -262,11 +300,11 @@ In the VS Code Command Palette:
 
 ## 4.2 Trust-changing configuration
 
-Repository runtime manifests, Windows Sandbox catalogs, Raw-HID devices,
+Repository runtime manifests, Windows Sandbox catalogs, Linux Bubblewrap recipes, Raw-HID devices,
 credential references, exact HTTPS network policy, provider applications,
 provider handshakes, scanner fixtures, and acceptance evidence are installed
 through their named `SXSY-B122:` commands. Each installation requires reviewed
-source material and Windows user presence. A workspace file cannot silently
+source material and current-user presence (Windows Hello or Linux polkit). A workspace file cannot silently
 install or replace one of these records.
 
 Never install a manifest merely to make an unavailable chord look green. Review
@@ -313,8 +351,9 @@ Shift Authority Refresh is a two-phase broadcast:
    summary.
 3. Review the exact prepared artifact ID, artifact digest, recipient set, and
    `reviewScopeDigest`.
-4. Provide fresh Windows current-user confirmation bound to that exact artifact
-   ID, artifact digest, and `reviewScopeDigest` through the host UI.
+4. Provide fresh reviewed current-user confirmation (Windows Hello or Linux
+   polkit) bound to that exact artifact ID, artifact digest, and
+   `reviewScopeDigest` through the host UI.
 5. Send only if every recipient is still the selected exact session and all
    target/authority bindings remain current.
 
@@ -467,7 +506,8 @@ visible for reconciliation and does not select another repository or PID.
 - **Shield:** results preserve passed/failed/unavailable/incomplete/not-run
   distinctions. Emergency Containment is bounded to brokered paths.
 - **Sandbox:** `.venv` modes are not security isolation. Full Sandbox,
-  rebuild, and Quarantine require the pinned Windows boundary and gates.
+  rebuild, and Quarantine require the pinned Windows Sandbox or Linux
+  Bubblewrap boundary and gates.
   `.venv` creation/rebuild transitions before the host action, which re-attests
   the exact interpreter identity before configuration and terminal creation.
 
@@ -553,7 +593,7 @@ Before any manual recovery, preserve copies of these exact files if accessible:
 - the affected repository root and TargetSnapshot ID, without secret values;
 - provider/route/helper identities and digests, not bearer secrets.
 
-Never publish DPAPI envelopes, credential material, full voice transcripts, or
+Never publish OS-protected secret envelopes, credential material, full voice transcripts, or
 unredacted failure output.
 
 # 9. Firmware and Physical Device Boundary
@@ -597,7 +637,8 @@ The companion persists operation, action, session, provider, authority,
 TargetSnapshot, repository root, route, and external ID before dispatch. It does
 not fall back to raw provider network observation or redispatch merely because a
 response was lost. Native repository jobs are owned by the packaged Windows Job
-Object helper and settle only from its signed terminal receipt. A poisoned
+Object helper or exact Linux process-group/systemd boundary and settle only
+from protected terminal evidence. A poisoned
 runtime manifest may leave that one canonical repository scope ambiguous, but
 must not block status or recovery for healthy repository scopes.
 
@@ -621,11 +662,15 @@ Shield chord as a containment toggle.
 
 ## 11.1 Companion is unavailable
 
-1. Run the authenticated installed launcher with `-WaitForHealth`.
+1. On Windows, run the authenticated installed launcher with `-WaitForHealth`.
+   On Linux, run `systemctl --user status sxsy-b122.service` and inspect the
+   bounded user journal for that unit.
 2. Read the bounded companion stdout/stderr logs.
 3. Verify the current version and payload were not modified. Startup rejects
    missing, added, or changed payload files.
-4. Verify `%LOCALAPPDATA%\STRATHEX\switchyard\authenticated-pipe.json` exists,
+4. Verify `%LOCALAPPDATA%\STRATHEX\switchyard\authenticated-pipe.json` on
+   Windows or `${XDG_STATE_HOME:-$HOME/.local/state}/STRATHEX/switchyard/authenticated-pipe.json`
+   on Linux exists,
    but do not edit or decrypt it manually.
 5. If an install/update/rollback was interrupted, rerun the trusted installed
    launcher so lifecycle recovery runs.
@@ -652,7 +697,8 @@ This is often correct. Check the exact named prerequisite:
 - repository recipe and executable digest for Run/Pipeline/Shield;
 - exact HTTPS route, DNS pin, credential purpose, and containment state for
   network work;
-- Windows feature plus pinned catalog/helper/lifecycle identities for Sandbox;
+- Windows feature plus pinned catalog/helper/lifecycle identities, or fixed
+  `/usr/bin/bwrap` plus a typed pinned Linux recipe, for Sandbox;
 - physical device installation and manifest match for Raw HID.
 
 Never add an ambient `PATH`, proxy, credential helper, browser fallback, or
@@ -715,11 +761,11 @@ python -m pytest .\docs\tests\test_b122_documentation.py -q
 | 22 controls / 65 assignments / 111 unassigned | `packages/protocol/generated/b122-control-map.json` | Documentation generator and protocol tests; no physical signal evidence. |
 | Action, target, authority, confirmation, capability, gates | `packages/control-plane/src/command-catalog.ts` | Catalog/dispatch tests; no accepted external action. |
 | Durable policy/receipts/recovery | `packages/control-plane/src/` | Isolated control-plane tests and protected temporary stores. |
-| Windows companion and named pipe | `apps/windows-companion/src/` | Package/component tests and installed smoke; no same-user adversary acceptance. |
+| Windows/Linux companion and local IPC | `apps/windows-companion/src/` and `apps/linux-companion/src/` | Package/component tests and installed smoke; no same-user adversary acceptance. |
 | VS Code operator surface | `apps/vscode-extension/src/` | VS Code-shaped tests and package build; no universal end-user/provider acceptance. |
 | Provider host | `apps/provider-adapter-host/src/` | Deterministic fixtures and host contract tests; no bundled proprietary connector. |
 | Firmware / Raw HID | `firmware/` and `packages/protocol/src/raw-hid.ts` | Compiler/protocol simulator checks; no device evidence. |
-| Installation lifecycle | `deployment/windows/` | Isolated build/install/update/rollback/uninstall checks; no signed distribution claim. |
+| Installation lifecycle | `deployment/windows/` and `deployment/linux/` | Isolated build/install/update/rollback/uninstall checks; no signed distribution claim. |
 | Gate status | `docs/acceptance-gates.md` | All 27 NOT ACCEPTED. |
 
 The generated receipt at
@@ -733,8 +779,8 @@ statuses. The generator's `--check` mode fails when any generated output drifts.
 
 - Physical Raw-HID identity, firmware deployment, transport lifecycle, LEDs,
   legends, fit, chord ergonomics, and usability.
-- Actual Windows Sandbox availability and adversarial enforcement/cleanup on the
-  target host.
+- Actual Windows Sandbox or Linux Bubblewrap availability and adversarial
+  enforcement/cleanup on the target host.
 - Real provider, GitHub, CI, scanner, Voice, credential, and Compound accounts,
   modules, routes, feeds, and current authorization.
 - Signed distribution, independent OS/pipe/same-user review, and real install,
@@ -855,6 +901,11 @@ numbering below is documentation order only.
 | 9 | Agent Control Plane<br>Handoff<br>**Shift** | `handoff_queue`<br>Queue a blocker or decision packet.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `agent`<br>capabilities registered; complete exact target; scoped authority<br>Handler: `b122.HANDOFF:shift` <!-- B122-ASSIGNMENT HANDOFF:shift --> |
 | 10 | Agent Control Plane<br>Handoff<br>**Alt** | `handoff_immediate`<br>Focus the planner with the packet.<br>Provider workflow: deliver/focus the exact reviewed packet. | Route-only<br>Executor: `agent`<br>capabilities registered; complete exact target; scoped authority<br>Handler: `b122.HANDOFF:alt` <!-- B122-ASSIGNMENT HANDOFF:alt --> |
 | 11 | Agent Control Plane<br>Handoff<br>**Shift+Alt** | `handoff_routing_default`<br>Toggle queued versus immediate-focus handoff.<br>Reviewed durable routing-default change. | Route-only<br>Executor: `adapter`<br>complete exact target; exact review/confirmation<br>Handler: `b122.HANDOFF:shift_alt` <!-- B122-ASSIGNMENT HANDOFF:shift_alt --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 12 | Agent Control Plane<br>Find Blocked Agent<br>**Normal** | `focus_blocked_agent`<br>Focus the next verified blocked managed agent.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `agent`<br>capabilities registered+observable; complete exact target; scoped authority<br>Handler: `b122.FIND_BLOCKED_AGENT:normal` <!-- B122-ASSIGNMENT FIND_BLOCKED_AGENT:normal --> |
 | 13 | Agent Control Plane<br>Find Blocked Agent<br>**Shift** | `blocker_queue`<br>Open the blocker queue.<br>The picker exposes only verified-blocked sessions for the exact authorized repository; no exact match stops. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.FIND_BLOCKED_AGENT:shift` <!-- B122-ASSIGNMENT FIND_BLOCKED_AGENT:shift --> |
 | 14 | Agent Control Plane<br>Find Finished Agent<br>**Normal** | `focus_finished_agent`<br>Focus the next verified finished managed agent.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `agent`<br>capabilities registered+observable; complete exact target; scoped authority<br>Handler: `b122.FIND_FINISHED_AGENT:normal` <!-- B122-ASSIGNMENT FIND_FINISHED_AGENT:normal --> |
@@ -868,6 +919,11 @@ numbering below is documentation order only.
 | 22 | Workspace Command Bar<br>Claude<br>**Shift** | `fresh_claude`<br>Open a fresh Claude surface.<br>Fixed local route; a missing approved surface is unavailable. | Route-only<br>Executor: `adapter`<br>exact review/confirmation<br>Handler: `b122.CLAUDE:shift` <!-- B122-ASSIGNMENT CLAUDE:shift --> |
 | 23 | Workspace Command Bar<br>Claude<br>**Alt** | `open_managed_claude_terminal`<br>Open a managed Claude Code terminal in VS Code.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `adapter`<br>capabilities registered; complete exact target; scoped authority<br>Handler: `b122.CLAUDE:alt` <!-- B122-ASSIGNMENT CLAUDE:alt --> |
 | 24 | Workspace Command Bar<br>ChatGPT<br>**Normal** | `open_chatgpt`<br>Open or focus ChatGPT Desktop.<br>Fixed local route; a missing approved surface is unavailable. | Route-only<br>Executor: `adapter`<br>installed fixed host route; no repository target<br>Handler: `b122.CHATGPT:normal` <!-- B122-ASSIGNMENT CHATGPT:normal --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 25 | Workspace Command Bar<br>ChatGPT<br>**Shift** | `fresh_chatgpt`<br>Open a fresh ChatGPT surface.<br>Fixed local route; a missing approved surface is unavailable. | Route-only<br>Executor: `adapter`<br>exact review/confirmation<br>Handler: `b122.CHATGPT:shift` <!-- B122-ASSIGNMENT CHATGPT:shift --> |
 | 26 | Workspace Command Bar<br>ChatGPT<br>**Alt** | `open_managed_codex_terminal`<br>Open a managed Codex terminal in VS Code.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `adapter`<br>capabilities registered; complete exact target; scoped authority<br>Handler: `b122.CHATGPT:alt` <!-- B122-ASSIGNMENT CHATGPT:alt --> |
 | 27 | Workspace Command Bar<br>VS Code<br>**Normal** | `focus_vscode`<br>Focus the last-used VS Code window.<br>Focus or cycle only registered VS Code windows matching the exact repository; ambiguity never chooses another workspace. | Route-only<br>Executor: `adapter`<br>installed fixed host route; no repository target<br>Handler: `b122.VSCODE:normal` <!-- B122-ASSIGNMENT VSCODE:normal --> |
@@ -881,6 +937,11 @@ numbering below is documentation order only.
 | 35 | Workspace Command Bar<br>GitHub<br>**Normal** | `github_home`<br>Open the repository home.<br>Read-only route for one exact target; ambiguity stops or opens a picker. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.GITHUB:normal` <!-- B122-ASSIGNMENT GITHUB:normal --> |
 | 36 | Workspace Command Bar<br>GitHub<br>**Shift** | `github_pr`<br>Open the current-branch PR or PR list.<br>Read-only route for one exact target; ambiguity stops or opens a picker. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.GITHUB:shift` <!-- B122-ASSIGNMENT GITHUB:shift --> |
 | 37 | Workspace Command Bar<br>GitHub<br>**Alt** | `github_issues`<br>Open repository issues.<br>Read-only route for one exact target; ambiguity stops or opens a picker. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.GITHUB:alt` <!-- B122-ASSIGNMENT GITHUB:alt --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 38 | Workspace Command Bar<br>GitHub<br>**Shift+Alt** | `github_actions`<br>Open the current-branch Actions run or list.<br>Read-only route for one exact target; ambiguity stops or opens a picker. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.GITHUB:shift_alt` <!-- B122-ASSIGNMENT GITHUB:shift_alt --> |
 | 39 | Workspace Command Bar<br>Compound<br>**Normal** | `compound_capture`<br>Capture one durable learning.<br>Review one proposal-derived inert manifest, then apply only its exact host-local bytes and verify the host-observed target transition. | Mediation required<br>Executor: `automation`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation<br>Handler: `b122.COMPOUND:normal` <!-- B122-ASSIGNMENT COMPOUND:normal --> |
 | 40 | Workspace Command Bar<br>Compound<br>**Shift** | `compound_refresh`<br>Preview learning-store refresh scope.<br>Apply reviewed host-local file effects, then create the exact private-index local commit and verify the resulting transition. | Mediation required<br>Executor: `automation`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation<br>Handler: `b122.COMPOUND:shift` <!-- B122-ASSIGNMENT COMPOUND:shift --> |
@@ -894,6 +955,11 @@ numbering below is documentation order only.
 | 48 | Workspace Command Bar<br>Voice<br>**Shift** | `switch_voice_provider`<br>Choose the Claude or ChatGPT provider.<br>Fixed local route; a missing approved surface is unavailable. | Route-only<br>Executor: `adapter`<br>exact review/confirmation<br>Handler: `b122.VOICE:shift` <!-- B122-ASSIGNMENT VOICE:shift --> |
 | 49 | Workspace Command Bar<br>Voice<br>**Alt** | `bind_voice_session`<br>Bind voice only to a selected managed VS Code agent.<br>Bind through the canonical durable authority, confirmation, exact managed-session, effect, and receipt lifecycle. | Mediation required<br>Executor: `agent`<br>capabilities registered; complete exact target; scoped authority; exact review/confirmation<br>Handler: `b122.VOICE:alt` <!-- B122-ASSIGNMENT VOICE:alt --> |
 | 50 | Workspace Command Bar<br>Voice<br>**Shift+Alt** | `voice_session_picker`<br>Open the voice session picker.<br>Open the exact-repository picker; selection performs the reviewed durable single-session binding. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.VOICE:shift_alt` <!-- B122-ASSIGNMENT VOICE:shift_alt --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 51 | Workspace Command Bar<br>Pipeline<br>**Normal** | `pipeline_status`<br>Show non-mutating pipeline status.<br>Read-only route for one exact target; ambiguity stops or opens a picker. | Route-only<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.PIPELINE:normal` <!-- B122-ASSIGNMENT PIPELINE:normal --> |
 | 52 | Workspace Command Bar<br>Pipeline<br>**Shift** | `pipeline_local_gate`<br>Run a local gate through the test-environment broker.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `test_environment`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.PIPELINE:shift` <!-- B122-ASSIGNMENT PIPELINE:shift --> |
 | 53 | Workspace Command Bar<br>Pipeline<br>**Alt** | `pipeline_failure_trace`<br>Diagnose the selected failure.<br>Normal and Alt share one protected failure cursor over bounded local and hosted evidence; absent routes remain unavailable. | Mediation required<br>Executor: `adapter`<br>complete exact target<br>Handler: `b122.PIPELINE:alt` <!-- B122-ASSIGNMENT PIPELINE:alt --> |
@@ -902,10 +968,20 @@ numbering below is documentation order only.
 | 56 | Workspace Command Bar<br>Shield<br>**Normal** | `shield_change_scan`<br>Scan current changes using configured coverage.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `security`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.SHIELD:normal` <!-- B122-ASSIGNMENT SHIELD:normal --> |
 | 57 | Workspace Command Bar<br>Shield<br>**Shift** | `shield_codebase_audit`<br>Run a deeper codebase and history audit.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `security`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.SHIELD:shift` <!-- B122-ASSIGNMENT SHIELD:shift --> |
 | 58 | Workspace Command Bar<br>Shield<br>**Alt** | `shield_supply_chain`<br>Run configured supply-chain audit coverage.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `security`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.SHIELD:alt` <!-- B122-ASSIGNMENT SHIELD:alt --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 59 | Workspace Command Bar<br>Shield<br>**Shift+Alt** | `release_shield`<br>Prepare an exact-revision Release Shield receipt.<br>Durable typed result; missing mediation or configuration is unavailable/blocked. | Mediation required<br>Executor: `security`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.SHIELD:shift_alt` <!-- B122-ASSIGNMENT SHIELD:shift_alt --> |
 | 60 | Workspace Command Bar<br>Shield<br>**Ctrl+Shift+Alt** | `emergency_containment`<br>Containment release or emergency containment workflow.<br>Blocked unless independently accepted gates and all exact prerequisites are current. | Disabled pending gates<br>Executor: `containment`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation; gates 8, 20<br>Handler: `b122.SHIELD:ctrl_shift_alt` <!-- B122-ASSIGNMENT SHIELD:ctrl_shift_alt --> |
 | 61 | Workspace Command Bar<br>Sandbox<br>**Normal** | `venv`<br>Create or enter a repository-local virtual environment.<br>Complete the repo-local environment transition, then re-attest exact interpreter path, digest, and file identity before host selection. | Mediation required<br>Executor: `execution`<br>capabilities mediated; complete exact target; scoped authority<br>Handler: `b122.SANDBOX:normal` <!-- B122-ASSIGNMENT SANDBOX:normal --> |
 | 62 | Workspace Command Bar<br>Sandbox<br>**Shift** | `rebuild_venv`<br>Atomically rebuild and swap the repository virtual environment after exact review; preserve recovery state on failure.<br>Atomically rebuild the repo-local environment, then re-attest exact interpreter path, digest, and file identity before host selection. | Mediation required<br>Executor: `execution`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation<br>Handler: `b122.SANDBOX:shift` <!-- B122-ASSIGNMENT SANDBOX:shift --> |
+
+<!-- B122-PDF-PAGE-BREAK -->
+
+| # | Bank / key / chord | Action and settled behavior | Capability and safeguards |
+| ---: | --- | --- | --- |
 | 63 | Workspace Command Bar<br>Sandbox<br>**Alt** | `full_sandbox`<br>Create or enter a Full Sandbox.<br>Blocked unless independently accepted gates and all exact prerequisites are current. | Disabled pending gates<br>Executor: `isolation`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation; gates 5, 12, 19, 27<br>Handler: `b122.SANDBOX:alt` <!-- B122-ASSIGNMENT SANDBOX:alt --> |
 | 64 | Workspace Command Bar<br>Sandbox<br>**Shift+Alt** | `rebuild_full_sandbox`<br>Rebuild a Full Sandbox.<br>Blocked unless independently accepted gates and all exact prerequisites are current. | Disabled pending gates<br>Executor: `isolation`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation; gates 5, 12, 13, 19, 24, 27<br>Handler: `b122.SANDBOX:shift_alt` <!-- B122-ASSIGNMENT SANDBOX:shift_alt --> |
 | 65 | Workspace Command Bar<br>Sandbox<br>**Ctrl+Shift+Alt** | `quarantine`<br>Quarantine.<br>Blocked unless independently accepted gates and all exact prerequisites are current. | Disabled pending gates<br>Executor: `isolation`<br>capabilities mediated; complete exact target; scoped authority; exact review/confirmation; gates 5, 12, 19, 27<br>Handler: `b122.SANDBOX:ctrl_shift_alt` <!-- B122-ASSIGNMENT SANDBOX:ctrl_shift_alt --> |
@@ -936,6 +1012,7 @@ dispatcher must reject those combinations rather than inventing a fallback.
 - Operational safety model: `docs/operational-safety-model.md`
 - Provider adapter contract: `docs/provider-adapter-protocol.md`
 - Windows lifecycle guide: `docs/windows-release-and-installation.md`
+- Linux lifecycle guide: `docs/linux-release-and-installation.md`
 - Canonical protocol source: `packages/protocol/src/b122.ts`
 - Generated control map: `packages/protocol/generated/b122-control-map.json`
 - Command catalog: `packages/control-plane/src/command-catalog.ts`

@@ -366,7 +366,31 @@ async function removeWithRetry(path: string): Promise<void> {
   }
   throw failure;
 }
-function freePort(): Promise<number> { return new Promise((resolvePort, rejectPort) => { const server = createServer(); server.once("error", rejectPort); server.listen(0, "127.0.0.1", () => { const address = server.address(); if (!address || typeof address === "string") return rejectPort(new Error("missing port")); server.close((error) => error ? rejectPort(error) : resolvePort(address.port)); }); }); }
+const reservedFixturePorts = new Set<number>();
+
+async function freePort(): Promise<number> {
+  // Do not ask Windows for port 0 here. It normally returns a port from the
+  // outbound ephemeral range, and this fixture performs certificate/DPAPI
+  // provisioning after releasing the probe listener. A busy aggregate run can
+  // legitimately reuse that ephemeral port before the provider binds it.
+  const first = 20_000 + Math.floor(Math.random() * 20_000);
+  for (let offset = 0; offset < 20_000; offset += 1) {
+    const candidate = 20_000 + ((first - 20_000 + offset) % 20_000);
+    if (!reservedFixturePorts.has(candidate) && await canListen(candidate)) {
+      reservedFixturePorts.add(candidate);
+      return candidate;
+    }
+  }
+  throw new Error("No non-ephemeral loopback port is available for the provider fixture.");
+}
+
+function canListen(port: number): Promise<boolean> {
+  return new Promise((resolvePort) => {
+    const server = createServer();
+    server.once("error", () => resolvePort(false));
+    server.listen(port, "127.0.0.1", () => server.close((error) => resolvePort(!error)));
+  });
+}
 function runPowerShell(script: string, arguments_: readonly string[]): Promise<string> {
   return runPowerShellExecutable(powershell, script, arguments_);
 }

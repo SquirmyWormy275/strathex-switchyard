@@ -1,7 +1,7 @@
 # System Architecture
 
 > **Status:** This is the project-level architecture. The hardware-independent
-> implementation uses the TypeScript protocol, Windows companion, VS Code
+> implementation uses the TypeScript protocol, Windows and Linux companions, VS Code
 > bridge, and durable control-plane packages described in
 > [software-only-completion-audit.md](software-only-completion-audit.md). It
 > does not claim that the physical or provider layers are commissioned. The
@@ -14,7 +14,7 @@
 |---|---|---|
 | Physical | B122 switches, relegendable caps, solenoid, controller | hardware inventory, photos, fit tests |
 | Firmware/configuration | Unique physical signals and base layers | Vial export, signal map, firmware source if modified |
-| Dispatcher | Convert a signal plus verified context into an intent | TypeScript protocol, Windows companion, durable policy/runtime, tests |
+| Dispatcher | Convert a signal plus verified context into an intent | TypeScript protocol, Windows/Linux companions, durable policy/runtime, tests |
 | Adapters | Apply intents only through mediated boundaries | VS Code bridge, typed terminal/provider/Git/credential/network interfaces, safe mocks |
 | Safety | Deny unknown contexts; guard consequential actions | policy, confirmation state, interrupt tests |
 | Evidence | Record mappings, versions, outcomes, and trials | manifests, logs, benchmark summaries |

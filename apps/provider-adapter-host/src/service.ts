@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { exactHostAbsoluteRoot, hostRootKey } from "../../../packages/control-plane/src/host-path.ts";
 
 import type { Capability, EffectDisposition, ManagedSession, SessionStatus } from "../../../packages/control-plane/src/contracts.ts";
 import { commandActionIds, type CommandAction } from "../../../packages/control-plane/src/command-catalog.ts";
@@ -1480,7 +1481,7 @@ function safeIdentifier(value: unknown): value is string { return typeof value =
 function safeRoute(value: unknown): value is string { return typeof value === "string" && /^[a-z][a-z0-9_.-]{0,127}$/.test(value); }
 function digest(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{64}$/.test(value); }
 function sha40(value: unknown): value is string { return typeof value === "string" && /^[a-f0-9]{40}$/.test(value); }
-function absoluteRoot(value: unknown): value is string { return typeof value === "string" && value.length <= 4_096 && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value) && !/[\0\r\n]/.test(value); }
+function absoluteRoot(value: unknown): value is string { return exactHostAbsoluteRoot(value); }
 function safeBranch(value: unknown): value is string { return typeof value === "string" && value.length > 0 && value.length <= 240 && !/[\0\r\n~^:?*\\\[]/.test(value); }
 function safeSummary(value: unknown, maximum: number): value is string { return typeof value === "string" && value.trim().length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
 function safeBoundedText(value: unknown, maximum: number): value is string { return typeof value === "string" && value.length > 0 && value.length <= maximum && !/[\0\r\n]/.test(value); }
@@ -1493,7 +1494,7 @@ function boundedReportList(value: unknown): value is readonly string[] { return 
 function capabilities(value: unknown): readonly Capability[] { const list = stringList(value); if (!list.every((entry): entry is Capability => entry === "registered" || entry === "observable" || entry === "controllable" || entry === "mediated")) throw new Error("The provider capabilities are invalid."); return list; }
 function sessionStatus(value: unknown): SessionStatus { if (value !== "running" && value !== "verified_blocked" && value !== "verified_finished" && value !== "unreachable" && value !== "stale" && value !== "unknown") throw new Error("The provider status is invalid."); return value; }
 function safeAdapterVersion(value: unknown): string { if (typeof value !== "string" || !/^[A-Za-z0-9_.+-]{1,80}$/.test(value)) throw new Error("The provider adapter version is invalid."); return value; }
-function rootKey(value: string): string { return value.replaceAll("\\", "/").replace(/^\/\/?\?\//, "").replace(/\/+$/, "").toLowerCase(); }
+function rootKey(value: string): string { return hostRootKey(value); }
 function workflowContextKey(value: Pick<ProviderWorkflowContextObservation, "provider" | "sessionId" | "targetSnapshotId" | "repositoryRoot" | "taskId" | "planRevision">): string {
   return sha256(stableJson({ provider: value.provider, sessionId: value.sessionId, targetSnapshotId: value.targetSnapshotId, repositoryRoot: rootKey(value.repositoryRoot), taskId: value.taskId, planRevision: value.planRevision }));
 }

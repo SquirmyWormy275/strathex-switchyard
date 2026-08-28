@@ -1,10 +1,10 @@
 # SXSY-B122 Provider Adapter Protocol
 
-This protocol is the software boundary between the installed companion and an explicitly configured provider service. A repository, terminal, prompt, or VS Code setting cannot select an endpoint. The operator installs one exact-route HTTPS policy through Windows user presence and provisions DPAPI-protected credential references separately.
+This protocol is the software boundary between the installed companion and an explicitly configured provider service. A repository, terminal, prompt, or VS Code setting cannot select an endpoint. The operator installs one exact-route HTTPS policy through reviewed platform user presence and provisions OS-protected credential references separately: DPAPI CurrentUser on Windows or Secret Service-backed envelopes on Linux.
 
 The repository now ships the executable service implementation in
 [`apps/provider-adapter-host`](../apps/provider-adapter-host/README.md). It is
-packageable independently from the Windows companion and provides typed Claude
+packageable independently from either companion and provides typed Claude
 and Codex runtime ports, an authenticated durable journal, a credential-free
 loopback fixture, and an HTTPS listener. Proprietary credentials and live
 provider parity remain deployment evidence, not source-code claims.
@@ -18,7 +18,7 @@ execution, cancellation, and Council effects with HTTP 503. The repository's
 effectful fixture is constructible only by tests and is not an installed
 configuration kind.
 
-A provider module never receives a DPAPI-opened credential, bearer value, host
+A provider module never receives an OS-opened credential, bearer value, host
 endpoint, or broker implementation. It supplies only bounded provider-neutral
 decisions and observations. Effectful work belongs to a separately configured,
 digest-pinned host effect driver that is isolated from the provider module. The
@@ -65,7 +65,7 @@ The provider must return exactly these fields:
 
 ## Command and automation results
 
-Provider command routes are `provider.<action>` and automation routes are `automation.<action>`. Successful HTTP transport is not command success. The body must be an exact `sxsy-b122.remote-result` version 1 record with `status`, a bounded `summary`, and optional `externalId` and `data`. Malformed, extra-field, stale, cancelled, or target-inconsistent responses fail closed.
+Provider command-result routes are `provider.<action>`. Automation is proposal-only: the companion calls `/v1/b122/automation-proposal/<action>` through a configured `automation.proposal.<action>` route, validates the bounded proposal, and retains mediation authority locally. No provider-owned automation effect route exists. Successful HTTP transport is not command success. A command-result body must be an exact `sxsy-b122.remote-result` version 1 record with `status`, a bounded `summary`, and optional `externalId` and `data`. Malformed, extra-field, stale, cancelled, or target-inconsistent responses fail closed.
 
 ## Automatic Council
 
@@ -159,14 +159,14 @@ nonce fails closed. Credential-bearing in-process modules remain non-Mediated:
 this observation can supply coordinator evidence, but cannot authorize or
 execute any effect.
 
-## Windows configuration and lifecycle contracts
+## Configuration and lifecycle contracts
 
 The package executable is `sxsy-b122-provider-adapter-host`, compiled at
 `provider-adapter-host/dist/apps/provider-adapter-host/src/main.js`. Installed
 startup is exactly:
 
 ```text
-node.exe <main.js> --config <absolute-provider-host.json> --lifecycle-nonce <64-lowercase-hex>
+<reviewed-node> <main.js> --config <absolute-provider-host.json> --lifecycle-nonce <64-lowercase-hex>
 ```
 
 `provider-host.json` is exact schema `sxsy-b122.provider-host-config` version 1.
@@ -175,11 +175,13 @@ absolute certificate/private-key paths plus file and SPKI SHA-256 pins,
 separate `authenticationTokenEnvelopeFile` and
 `journalAuthenticationEnvelopeFile`, one absolute `stateFile`, one or two
 exact provider entries, and only the optional `allowFixtureBackends` flag.
-Every secret is a DPAPI CurrentUser envelope beneath the dedicated protected
-LocalAppData root. TLS validation requires a matching private key, current
+Every secret is a current-user envelope beneath the dedicated protected state
+root: DPAPI CurrentUser below LocalAppData on Windows, or AES-256-GCM below
+XDG state with only its random master key held in Secret Service on Linux. TLS
+validation requires a matching private key, current
 validity, a non-CA certificate, serverAuth EKU, and the `127.0.0.1` identity.
 
-The provisioning tools have these stable responsibilities:
+The Windows provisioning tools have these stable responsibilities:
 
 - `Protect-B122ProviderHostSecret.ps1` generates or validates the rotatable
   bearer token, stable journal key, and named provider credential envelopes.
@@ -220,10 +222,21 @@ configuration digest, TLS pinning, and authentication. The host health body is
 `sxsy-b122.provider-host-shutdown-ack` v1 only after all lifecycle bindings
 match.
 
+The Linux bundle installs an optional, disabled-by-default
+`sxsy-b122-provider-host.service`. Its fixed launcher derives the canonical XDG
+state configuration, creates a fresh lifecycle nonce, and invokes the bundled
+Node runtime in a separate systemd control group. Linux configuration and
+envelope files must be canonical, non-symlink, current-UID files below a
+mode-`0700` state root and use mode `0600`; the lifecycle-owned Secret Service
+protector is disposed on startup failure and shutdown. The service remains
+unavailable until separately authorized provider modules, TLS material,
+credentials, network policy, and companion final-current mediation are
+installed. See [linux-release-and-installation.md](linux-release-and-installation.md).
+
 Generate the currently supported route inventory with
 [`New-B122NetworkPolicy.ps1`](../deployment/windows/New-B122NetworkPolicy.ps1)
 and an exact `-ProviderBaseUri`. The generated policy retains fixed HTTPS URLs,
-one DPAPI-backed bearer credential reference, bounded request/response sizes,
+  one OS-protected bearer credential reference, bounded request/response sizes,
 and no provider redirect behavior. It includes the exact provider-specific
 Re-anchor apply/observe routes and all four proposal-only automation routes.
 Provider-owned automation effect routes remain deliberately absent: reviewed
@@ -240,10 +253,15 @@ host's package metadata and core implementation sources in the exact Git-commit
 source archive. Portable smoke runs `--self-test` with the bundled Node runtime
 and rejects a receipt that reports network or proprietary-credential access.
 
+The Linux release carries the same compiled host in `app/dist/`, pins it in
+`MANIFEST.sha256`, and installs but does not enable its systemd user unit.
+Linux release validation verifies the whole manifest before and after install;
+enabling a configured provider remains a separate operator authorization.
+
 ## GitHub and Git smart HTTP
 
 The configured GitHub adapter uses four exact routes: `github.graphql`, the metadata-only `github.repository` identity route, `git.receive-pack.advertise`, and `git.receive-pack`. Public GitHub binds the API route to `api.github.com` and the repository/Git routes to `github.com`; GitHub Enterprise binds all four to its exact installed host. The repository route names the PR base repository, while the receive-pack routes name the pushed head repository, so a reviewed fork PR cannot be confused with the same branch name in another fork. The companion never reads ambient Git credentials, proxy variables, credential helpers, or `PATH`. It creates a bounded pack with a fixed absolute Git executable, refuses non-fast-forward updates, and verifies the remote ref after receive-pack. PR upsert and merge verify exact base repository, head repository/branch/SHA, base branch, and provider state before and after the GraphQL mutation. An already-merged exact PR is observed idempotently rather than merged twice. Direct Main additionally requires the high-consequence acceptance gate and a fresh complete `release_shield` receipt for the same TargetSnapshot, and is unavailable when the configured push repository is a fork.
 
 GitHub navigation uses the same installed identity. Current-branch PR and current-head Actions controls query the authenticated GraphQL route, validate every returned URL against the exact web host/repository, and either open one exact result or return a bounded picker. Pipeline Failure Trace retrieves only bounded provider check output for the exact head, redacts it, records a protected restart-durable repeat cursor, and never treats log content as authority or an executable instruction.
 
-Use [New-B122NetworkPolicy.ps1](../deployment/windows/New-B122NetworkPolicy.ps1) to generate a secret-free policy for review. Git smart HTTP expects a separately protected Basic-auth credential value; the credential reference stores only DPAPI-sealed bytes and scope metadata.
+Use [New-B122NetworkPolicy.ps1](../deployment/windows/New-B122NetworkPolicy.ps1) to generate a secret-free Windows policy for review. Git smart HTTP expects a separately protected Basic-auth credential value; the credential reference stores only OS-sealed bytes and scope metadata.

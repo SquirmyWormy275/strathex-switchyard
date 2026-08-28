@@ -406,7 +406,7 @@ def test_manual_preserves_frozen_mediation_and_split_binding_contracts() -> None
         assert expected in normalized_template
 
     required_provider_text = [
-        "A provider module never receives a DPAPI-opened credential",
+        "A provider module never receives an OS-opened credential",
         "separately configured, digest-pinned host effect driver",
         "driver receives only its fixed host identity and the companion-issued bounded",
         "both the separately installed effect driver and a companion-authenticated final-current callback",

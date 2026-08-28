@@ -25,7 +25,7 @@ const controlPlaneTests = [
   "acceptance-evidence", "adapters", "automation-operation-manifest", "automation-proposal-protocol", "automation-protocol", "brokers", "budgets", "checkpoints",
   "child-saga-recovery", "command-catalog", "confirmations", "containment",
   "containment-incidents", "context-council", "dispatch", "durable-containment", "git-inspector",
-  "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
+  "host-path", "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
   "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts",
   "voice", "workflow-artifacts"
 ].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
@@ -48,6 +48,8 @@ const companionTests = [
 ].map((name) => ({
   file: `apps/windows-companion/test/${name}.test.ts`,
   currentUserProfile: name === "packaged-runtime",
+  ...(name === "authenticated-pipe" ? { expectedSkipped: process.platform === "win32" ? 2 : 3 } : {}),
+  ...(name === "packaged-runtime" && process.platform !== "win32" ? { expectedSkipped: 1 } : {}),
   ...(["authenticated-pipe", "companion-lifecycle-helper"].includes(name) ? { timeoutMs: 240_000 } : {}),
   ...(["council-workspace-isolation", "installed-automation-e2e", "repository-runner-helper"].includes(name) ? { timeoutMs: 240_000 } : {})
 }));
@@ -58,15 +60,37 @@ const mediatedGitTests = [
   "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
-  .map((name) => ({ file: `apps/vscode-extension/test/${name}.test.ts`, ...(name === "named-pipe-transport" ? { timeoutMs: 120_000 } : {}) }));
-const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "main", "reanchor", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
-  .map((name) => ({ file: `apps/provider-adapter-host/test/${name}.test.ts`, currentUserProfile: name === "tls-network-e2e", safeTrace: name === "tls-network-e2e", ...(name === "tls-network-e2e" ? { timeoutMs: 240_000 } : {}) }));
+  .map((name) => ({
+    file: `apps/vscode-extension/test/${name}.test.ts`,
+    ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 6 } : {})
+  }));
+const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "tls-network-e2e", "workflow-context"]
+  .map((name) => ({
+    file: `apps/provider-adapter-host/test/${name}.test.ts`,
+    currentUserProfile: name === "tls-network-e2e",
+    safeTrace: name === "tls-network-e2e",
+    ...(name === "tls-network-e2e" ? { timeoutMs: 240_000, expectedSkipped: process.platform === "win32" ? 0 : 2 } : {}),
+    ...(name === "linux-path-security" && process.platform !== "linux" ? { expectedSkipped: 1 } : {})
+  }));
+const linuxSkippedOnNonLinux = new Map([
+  ["linux-isolation", 1],
+  ["linux-lifecycle", 2],
+  ["linux-user-presence", 2],
+  ["linux-process-supervisor", 3],
+  ["linux-repository-runtime", 3]
+]);
+const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle", "linux-user-presence", "linux-pipewire-audio", "linux-hidraw", "linux-process-supervisor", "linux-repository-runtime"]
+  .map((name) => ({
+    file: `apps/linux-companion/test/${name}.test.ts`,
+    ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
+  }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
   { file: "firmware/verify-require-compiler.test.mjs" },
   { file: "build:companion", args: [npmCli, "run", "build:companion"] },
+  { file: "build:linux-companion", args: [npmCli, "run", "build:linux-companion"] },
   { file: "build:provider-host", args: [npmCli, "run", "build:provider-host"] },
   { file: "build:vscode", args: [npmCli, "run", "build:vscode"] },
   ...(process.platform === "win32" ? [{
@@ -102,6 +126,7 @@ export const requiredGroups = [
   ...companionTests,
   ...mediatedGitTests,
   ...extensionTests,
+  ...linuxCompanionTests,
   ...providerHostTests
 ];
 const limit = 64 * 1024;
@@ -129,7 +154,7 @@ function testCounts(output, isTestRun) {
 
 const manifestRoots = [
   "packages/control-plane/test", "packages/protocol/test", "apps/windows-companion/test",
-  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "scripts", "firmware"
+  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "scripts", "firmware"
 ];
 const portable = (value) => value.replaceAll("\\", "/");
 export function discoverRequiredTestFiles(cwd = root) {
@@ -207,6 +232,8 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000, cleanup = rm, sourceEnvironment = process.env } = {}) {
   const effectiveTimeoutMs = group.timeoutMs ?? timeoutMs;
   if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 300_000) throw new Error("An isolated test timeout must be an integer between 1 and 300000 milliseconds.");
+  const expectedSkipped = group.expectedSkipped ?? 0;
+  if (!Number.isSafeInteger(expectedSkipped) || expectedSkipped < 0) throw new Error("An isolated test expectedSkipped value must be a non-negative integer.");
   const childExecutable = group.executable ?? executable;
   const isTestRun = !group.args;
   const args = group.args ? [...group.args] : ["--experimental-transform-types", "--test", "--test-reporter=tap"]; const pattern = group.args ? undefined : patternArgument(group.pattern); if (pattern) args.push("--test-name-pattern", pattern); if (!group.args) args.push(group.file);
@@ -254,7 +281,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
           : [];
         const counts = testCounts(tapTail, isTestRun);
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
-        const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === 0 && counts.todo === 0;
+        const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed + counts.skipped === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === expectedSkipped && counts.todo === 0;
         const success = !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess;
         result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
       } catch {

@@ -1,0 +1,29 @@
+[Unit]
+Description=SXSY-B122 mediated companion
+Documentation=https://github.com/SquirmyWormy275/strathex-switchyard
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/strathex-switchyard/current/runtime/bin/node %h/.local/share/strathex-switchyard/current/app/dist/apps/linux-companion/src/main.js
+WorkingDirectory=%h/.local/share/strathex-switchyard/current/app
+Restart=on-failure
+RestartSec=2s
+KillMode=control-group
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target

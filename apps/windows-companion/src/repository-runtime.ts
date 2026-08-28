@@ -174,6 +174,9 @@ export interface RepositoryProcessStartRequest {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly repositoryRoot: string;
+  /** Exact host execution root selected by the verified isolation lease. */
+  readonly executionRoot?: string;
+  readonly isolation?: RepositoryRuntimeIsolation;
   readonly manifestSha256: string;
   readonly executable: string;
   readonly executableSha256: string;
@@ -452,8 +455,9 @@ function validatePythonRecipe(action: RepositoryProcessAction, value: unknown, e
   exactKeys(value, ["interpreter"], ["interpreter"], `${action}.python`, errors);
   const interpreter = boundedString(value.interpreter, `${action}.python.interpreter`, errors, 512) ? value.interpreter : "";
   const normalized = interpreter.replaceAll("\\", "/");
-  if (filesystemTraversal.test(normalized) || normalized.startsWith("/") || isAbsolute(interpreter) || normalized.toLowerCase() !== ".venv/scripts/python.exe") {
-    errors.push(`${action}.python.interpreter must be the exact repo-local .venv/Scripts/python.exe path.`);
+  if (filesystemTraversal.test(normalized) || normalized.startsWith("/") || isAbsolute(interpreter)
+    || ![".venv/scripts/python.exe", ".venv/bin/python"].includes(normalized.toLowerCase())) {
+    errors.push(`${action}.python.interpreter must be the exact repo-local .venv/Scripts/python.exe or .venv/bin/python path.`);
   }
   return { interpreter };
 }
@@ -894,6 +898,8 @@ export class RepositoryRuntime {
         ...(sessionId ? { sessionId } : {}),
         ...(authorityId ? { authorityId } : {}),
         repositoryRoot: this.verified.canonicalRepositoryRoot,
+        executionRoot: lease.root,
+        isolation: lease.isolation,
         manifestSha256: this.verified.digest,
         executable,
         executableSha256: expectedExecutable.sha256,

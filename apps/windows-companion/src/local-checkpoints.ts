@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { CheckpointArtifact, RecoveryArtifactVerifier } from "../../../packages/control-plane/src/checkpoints.ts";
 import type { CheckpointCaptureAdapter, CheckpointCaptureRequest, CheckpointCaptureResult } from "../../../packages/control-plane/src/runtime.ts";
@@ -28,13 +28,11 @@ export class SpawnCheckpointGitRunner implements CheckpointGitRunner {
   private readonly timeoutMs: number;
 
   constructor(options: Readonly<{ candidates?: readonly string[]; timeoutMs?: number }> = {}) {
-    this.candidates = options.candidates ?? [
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "C:\\Program Files\\Git\\bin\\git.exe",
-      "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
-    ];
+    this.candidates = options.candidates ?? (process.platform === "win32" ? [
+      "C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
+    ] : ["/usr/bin/git"]);
     this.timeoutMs = options.timeoutMs ?? 60_000;
-    if (!this.candidates.length || this.candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) throw new Error("Checkpoint capture requires fixed absolute Git executables.");
+    if (!this.candidates.length || this.candidates.some((candidate) => !isAbsolute(candidate) || !["git", "git.exe"].includes(basename(candidate).toLowerCase()))) throw new Error("Checkpoint capture requires fixed absolute Git executables.");
     if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1_000 || this.timeoutMs > 10 * 60_000) throw new Error("Checkpoint Git timeout is outside safe bounds.");
   }
 
@@ -48,10 +46,9 @@ export class SpawnCheckpointGitRunner implements CheckpointGitRunner {
         shell: false,
         windowsHide: true,
         env: {
-          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
-          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent" }),
           GIT_CONFIG_NOSYSTEM: "1",
-          GIT_CONFIG_GLOBAL: "NUL",
+          GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
           GIT_TERMINAL_PROMPT: "0",
           GCM_INTERACTIVE: "Never",
           GIT_OPTIONAL_LOCKS: "0",

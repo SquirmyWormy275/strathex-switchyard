@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -255,8 +255,13 @@ test("containment rechecks, cancellation, timeout, and response caps fail closed
 test("policy loader validates host-owned configuration without contacting the network", async (context) => {
   const setup = await fixture(context);
   const filePath = join(setup.directory, "network-policy.json");
-  await writeFile(filePath, JSON.stringify({ version: 1, proxy: "direct", routes: [route] }), "utf8");
+  await writeFile(filePath, JSON.stringify({ version: 1, proxy: "direct", routes: [route] }), { encoding: "utf8", mode: 0o600 });
+  await chmod(filePath, 0o600);
   assert.deepEqual(await loadConfiguredNetworkPolicy(filePath), { version: 1, proxy: "direct", routes: [route] });
+  if (process.platform === "linux") {
+    await chmod(filePath, 0o644);
+    await assert.rejects(() => loadConfiguredNetworkPolicy(filePath), /unsafe/i);
+  }
 });
 
 test("an install-owned provider route admits only an exact pinned literal loopback and preserves its explicit port", async (context) => {

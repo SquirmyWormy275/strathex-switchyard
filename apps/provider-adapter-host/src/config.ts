@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, timingSafeEqual, X509Certificate } from "node:crypto";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { WindowsDpapiCurrentUserProtector, type UserSecretProtector } from "../../windows-companion/src/windows-secret.ts";
 import {
@@ -17,6 +17,7 @@ import {
 } from "./backends.ts";
 import { openProviderHostSecretEnvelope } from "./secret-envelope.ts";
 import { WindowsCurrentUserProviderHostPathSecurity, type ProviderHostPathSecurity } from "./windows-path-security.ts";
+import { LinuxCurrentUserProviderHostPathSecurity } from "./linux-path-security.ts";
 import {
   InstalledProviderCouncilResourceLifecycle,
   wrapProviderRuntimeCouncilLifecycle,
@@ -83,6 +84,7 @@ export interface ProviderHostConfigurationLoadOptions {
 
 export async function loadProviderHostConfiguration(configurationPath: string, options: ProviderHostConfigurationLoadOptions = {}): Promise<LoadedProviderHostConfiguration> {
   const absoluteConfigurationPath = absolutePath(configurationPath, "configuration path");
+  await traceConfigurationStage(absoluteConfigurationPath, "config-read");
   const bytes = await boundedFile(absoluteConfigurationPath, maximumConfigurationBytes, "provider host configuration");
   const configurationSha256 = createHash("sha256").update(bytes).digest("hex");
   let value: unknown;
@@ -99,8 +101,20 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   }
 
   const protectedStateRoot = absolutePath(value.protectedStateRoot, "protected state root");
+  await traceConfigurationStage(absoluteConfigurationPath, "config-paths");
+  await traceWindowsTestBoundary(absoluteConfigurationPath);
   const allowedBase = resolve(options.allowedProtectedBaseRoot ?? await defaultProtectedBaseRoot());
-  if (!inside(allowedBase, protectedStateRoot)) throw new Error("The provider-host protected root must remain beneath the dedicated current-user LocalAppData boundary.");
+  if (!inside(allowedBase, protectedStateRoot)) {
+    const configurationDirectory = dirname(absoluteConfigurationPath);
+    const classification = inside(allowedBase, configurationDirectory)
+      ? "config-root-not-config-dir"
+      : inside(protectedStateRoot, absoluteConfigurationPath)
+        ? "config-file-and-root-outside-base"
+        : "config-boundaries-diverged";
+    await traceConfigurationStage(absoluteConfigurationPath, classification);
+    throw new Error("The provider-host protected root must remain beneath the dedicated current-user LocalAppData boundary.");
+  }
+  await traceConfigurationStage(absoluteConfigurationPath, "config-allowed-base");
   const host = hostName(value.listen.host);
   if (!loopback(host)) throw new Error("The provider host listener is restricted to an exact loopback address.");
   const port = portNumber(value.listen.port);
@@ -111,9 +125,11 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
   const dispatchLeaseEnvelopeFile = ownedPath(protectedStateRoot, value.dispatchLeaseAuthenticationEnvelopeFile, "dispatch-lease authentication envelope path");
   const stateFile = ownedPath(protectedStateRoot, value.stateFile, "provider state path");
   if (!inside(protectedStateRoot, absoluteConfigurationPath)) throw new Error("The provider-host configuration must remain beneath its protected state root.");
+  await traceConfigurationStage(absoluteConfigurationPath, "config-owned-paths");
 
+  if (process.platform === "linux" && !options.secretProtector) throw new Error("Linux provider-host configuration requires one lifecycle-owned Secret Service protector.");
   const protector = options.secretProtector ?? new WindowsDpapiCurrentUserProtector();
-  const pathSecurity = options.pathSecurity ?? new WindowsCurrentUserProviderHostPathSecurity();
+  const pathSecurity = options.pathSecurity ?? (process.platform === "linux" ? new LinuxCurrentUserProviderHostPathSecurity() : new WindowsCurrentUserProviderHostPathSecurity());
   const protectedExistingPaths = [absoluteConfigurationPath, privateKeyFile, tokenEnvelopeFile, journalEnvelopeFile, dispatchLeaseEnvelopeFile];
   const allowFixtureBackends = value.allowFixtureBackends === true;
   const providers: LoadedProviderConfiguration[] = [];
@@ -167,20 +183,25 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     }
     effectDrivers.push({ provider: entry.provider, kind: "module", modulePath, moduleSha256: entry.moduleSha256, moduleSource: moduleBytes });
   }
+  await traceConfigurationStage(absoluteConfigurationPath, "config-providers");
 
+  await traceConfigurationStage(absoluteConfigurationPath, "config-path-security");
   await pathSecurity.assertCurrentUserProtected(protectedStateRoot, protectedExistingPaths);
+  await traceConfigurationStage(absoluteConfigurationPath, "config-bearer-secret");
   const tokenBytes = await openProviderHostSecretEnvelope(tokenEnvelopeFile, protector);
   let token: string;
   try {
     token = Buffer.from(tokenBytes).toString("ascii");
     if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("The protected provider-host authentication token must contain exactly 256 canonical bits.");
   } finally { tokenBytes.fill(0); }
+  await traceConfigurationStage(absoluteConfigurationPath, "config-journal-secret");
   const journalBytes = await openProviderHostSecretEnvelope(journalEnvelopeFile, protector);
   let journalAuthenticationKey: string;
   try {
     journalAuthenticationKey = Buffer.from(journalBytes).toString("ascii");
     if (!/^[a-f0-9]{64}$/.test(journalAuthenticationKey)) throw new Error("The protected provider-host journal authentication key must contain exactly 256 canonical bits.");
   } finally { journalBytes.fill(0); }
+  await traceConfigurationStage(absoluteConfigurationPath, "config-dispatch-secret");
   const dispatchLeaseBytes = await openProviderHostSecretEnvelope(dispatchLeaseEnvelopeFile, protector);
   let dispatchLeaseAuthenticationKey: string;
   try {
@@ -200,6 +221,7 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     (provider as { credential: Uint8Array }).credential = credential;
   }
 
+  await traceConfigurationStage(absoluteConfigurationPath, "config-tls-material");
   const [certificate, privateKey] = await Promise.all([
     boundedFile(certificateFile, maximumTlsBytes, "TLS certificate"),
     boundedFile(privateKeyFile, maximumTlsBytes, "TLS private key")
@@ -241,6 +263,29 @@ export async function loadProviderHostConfiguration(configurationPath: string, o
     dispatchLeaseAuthenticationKey: Buffer.from(dispatchLeaseAuthenticationKey, "ascii"), dispatchLeaseAuthenticationKeyText: dispatchLeaseAuthenticationKey,
     stateFile, providers, effectDrivers
   };
+}
+
+async function traceConfigurationStage(configurationPath: string, stage: string): Promise<void> {
+  if (process.env.SXSY_PROVIDER_E2E_TRACE !== "1" || !/^config-(?:read|paths|test-mode-absent|test-root-missing|test-local-missing|test-root-rewritten|test-local-rewritten|test-boundary-rewritten|test-path-invalid|test-local-equals-root|test-local-sibling|test-drive-diverged|test-boundary-valid|root-not-config-dir|file-and-root-outside-base|boundaries-diverged|allowed-base|owned-paths|providers|path-security|bearer-secret|journal-secret|dispatch-secret|tls-material)$/.test(stage)) return;
+  await writeFile(`${configurationPath}.startup-stage`, `${stage}\n`, { encoding: "ascii", mode: 0o600 }).catch(() => undefined);
+}
+
+async function traceWindowsTestBoundary(configurationPath: string): Promise<void> {
+  if (process.platform !== "win32" || process.env.SXSY_PROVIDER_E2E_TRACE !== "1") return;
+  if (process.env.SXSY_TEST_MODE !== "1") return traceConfigurationStage(configurationPath, "config-test-mode-absent");
+  const rootValue = process.env.SXSY_TEST_ROOT;
+  const localValue = process.env.LOCALAPPDATA;
+  if (!rootValue) return traceConfigurationStage(configurationPath, "config-test-root-missing");
+  if (!localValue) return traceConfigurationStage(configurationPath, "config-test-local-missing");
+  const rootMatches = process.env.SXSY_TEST_ROOT_SHA256 === createHash("sha256").update(rootValue).digest("hex");
+  const localMatches = process.env.SXSY_TEST_LOCAL_SHA256 === createHash("sha256").update(localValue).digest("hex");
+  if (!rootMatches || !localMatches) return traceConfigurationStage(configurationPath, rootMatches ? "config-test-local-rewritten" : localMatches ? "config-test-root-rewritten" : "config-test-boundary-rewritten");
+  if (/[^\S ]|[\0\r\n]/.test(rootValue + localValue) || !isAbsolute(rootValue) || !isAbsolute(localValue)) return traceConfigurationStage(configurationPath, "config-test-path-invalid");
+  const suffix = relative(resolve(rootValue), resolve(localValue));
+  if (!suffix) return traceConfigurationStage(configurationPath, "config-test-local-equals-root");
+  if (suffix.startsWith("..")) return traceConfigurationStage(configurationPath, "config-test-local-sibling");
+  if (isAbsolute(suffix)) return traceConfigurationStage(configurationPath, "config-test-drive-diverged");
+  return traceConfigurationStage(configurationPath, "config-test-boundary-valid");
 }
 
 export interface LoadedProviderBackendRuntime {
@@ -390,11 +435,13 @@ async function boundedFile(path: string, maximum: number, label: string): Promis
   return new Uint8Array(bytes);
 }
 async function defaultProtectedBaseRoot(): Promise<string> {
-  const local = process.platform === "win32"
-    ? await windowsKnownLocalApplicationDataForRuntime()
-    : process.env.LOCALAPPDATA;
-  if (!local || /[\0\r\n]/.test(local) || !isAbsolute(local)) throw new Error("The current-user LocalAppData boundary is unavailable.");
-  return resolve(local, "STRATHEX", "switchyard", "provider-host");
+  if (process.platform === "win32") return resolve(await windowsKnownLocalApplicationDataForRuntime(), "STRATHEX", "switchyard", "provider-host");
+  if (process.platform === "linux") {
+    const state = process.env.XDG_STATE_HOME ?? (process.env.HOME ? resolve(process.env.HOME, ".local", "state") : undefined);
+    if (!state || /[\0\r\n]/.test(state) || !isAbsolute(state)) throw new Error("The Linux current-user state boundary is unavailable.");
+    return resolve(state, "STRATHEX", "switchyard", "provider-host");
+  }
+  throw new Error("The provider host has no reviewed protected-state boundary on this platform.");
 }
 
 async function windowsKnownLocalApplicationDataForRuntime(): Promise<string> {

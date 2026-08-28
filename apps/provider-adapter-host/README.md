@@ -37,7 +37,7 @@ provider or repository text as authority.
 
 From the repository root:
 
-```powershell
+```text
 npm run build:provider-host
 node --experimental-transform-types --test apps/provider-adapter-host/test/*.test.ts
 npm run package:provider-host:dry-run
@@ -47,8 +47,10 @@ node --experimental-transform-types apps/provider-adapter-host/src/main.ts --sel
 The package executable is `sxsy-b122-provider-adapter-host`.
 
 The verified Windows release places the independently runnable payload under
-`provider-adapter-host/` beside the companion. It includes the compiled host,
-package metadata, and this guide, and uses the bundle's reviewed Node runtime:
+`provider-adapter-host/` beside the companion. The Linux release places the
+same compiled host in the shared `app/dist/` tree and installs its optional,
+disabled-by-default systemd user unit. Both bundles use their reviewed Node
+runtime. The Windows credential-free self-test is:
 
 ```powershell
 .\runtime\node.exe .\provider-adapter-host\dist\apps\provider-adapter-host\src\main.js --self-test
@@ -70,6 +72,15 @@ current-user-protected configuration and one fresh 256-bit lifecycle nonce:
 ```powershell
 sxsy-b122-provider-adapter-host --config C:\Users\operator\AppData\Local\STRATHEX\switchyard\provider-host\provider-host.json --lifecycle-nonce <64-lowercase-hex>
 ```
+
+On Linux, `sxsy-b122-provider-host.service` invokes the same executable through
+the versioned bundle with a fresh nonce and reads the exact configuration from
+`${XDG_STATE_HOME:-$HOME/.local/state}/STRATHEX/switchyard/provider-host/provider-host.json`.
+The protected root and all private files must be canonical, non-symlink,
+current-UID objects with mode `0700` for directories and `0600` for files.
+Secret values are AES-256-GCM envelopes opened by a lifecycle-owned random
+master key held only in the desktop Secret Service. See
+[the Linux installation guide](../../docs/linux-release-and-installation.md).
 
 The nonce is held only in the protected lifecycle record. It is represented in
 health and logs only by SHA-256. `Manage-B122ProviderHost.ps1` is the supported
@@ -110,16 +121,18 @@ Exact configuration shape:
 ```
 
 The authentication token, independent durable-journal key, independent
-dispatch-lease key, and module credentials are exact DPAPI CurrentUser
-envelopes under the protected root. The three host keys must be pairwise
+dispatch-lease key, and module credentials are exact current-user envelopes
+under the protected root: DPAPI CurrentUser on Windows and Secret
+Service-backed AES-256-GCM on Linux. The three host keys must be pairwise
 distinct. The companion signs each effect lease with the dispatch-lease key;
 the host verifies the exact authority, full TargetSnapshot, session, route,
 operation, artifact, confirmation, clear-containment, running-host, and pinned
 module identities, then atomically records the lease ID and nonce before the
 provider boundary can run. Replay and cross-binding reuse fail closed.
-The validator requires that root and every private file be owned by the current
-Windows user, have inheritance disabled at the root, and grant access only to
-that user and SYSTEM. TLS is exact loopback-only, non-CA, currently valid,
+The validator requires that root and every private file satisfy the active
+platform's reviewed current-user ownership policy. Windows disables root ACL
+inheritance and permits only the user and SYSTEM; Linux requires the exact
+current UID and private modes. TLS is exact loopback-only, non-CA, currently valid,
 serverAuth EKU-bearing, SPKI-pinned, digest-pinned, and matched to its private
 key. Environment variables, `PATH`, proxy variables, repository files, and
 request bodies never select a module or credential.
@@ -200,7 +213,7 @@ replayed. On restart, `reconcile()` and `POST /v1/b122/reconcile` observe the
 provider's exact external operation or Council phase and settle only an exact
 acknowledgement. Reusing an operation or phase identity with changed content is
 rejected. The rotatable bearer token is cryptographically independent from the
-stable DPAPI-protected journal key, so authentication or TLS rotation does not
+stable OS-protected journal key, so authentication or TLS rotation does not
 invalidate durable recovery. TLS replacement uses a new certificate/key path;
 the previous exact configuration remains rollback-valid until the operator
 retires its identity and re-pins the companion policy.

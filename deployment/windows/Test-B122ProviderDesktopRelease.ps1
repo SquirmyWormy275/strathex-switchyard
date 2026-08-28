@@ -232,7 +232,16 @@ try {
   foreach ($name in @('Initialize-B122ProviderHost.ps1','Protect-B122ProviderHostSecret.ps1','New-B122LoopbackTlsIdentity.mjs','Get-B122TlsIdentity.mjs','Provision-B122ProviderHostCompanion.mjs','New-B122ProviderHostConfiguration.ps1','Test-B122ProviderHostConfiguration.ps1','Restore-B122ProviderHostConfiguration.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $providerBundle 'scripts\provisioning') }
   [IO.File]::WriteAllText((Join-Path $providerBundle 'release.json'),([ordered]@{schema='sxsy-b122.windows-release';version=1;sourceCommit=('a'*40)}|ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))
   Write-B122ProviderReleaseTrace 'fixture-copy-complete'
-  $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0);$listener.Start();try{$listenPort=([Net.IPEndPoint]$listener.LocalEndpoint).Port}finally{$listener.Stop()}
+  # Port 0 selects from Windows' outbound ephemeral range. This fixture then
+  # performs bounded provisioning before the provider binds, so a network-heavy
+  # aggregate run can reuse that released port. Probe the non-ephemeral range.
+  $listenPort=$null;$firstPort=Get-Random -Minimum 20000 -Maximum 40000
+  for($offset=0;$offset-lt20000;$offset++){
+    $candidate=20000+(($firstPort-20000+$offset)%20000)
+    $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,$candidate)
+    try{$listener.Start();$listenPort=$candidate;break}catch{ }finally{try{$listener.Stop()}catch{}}
+  }
+  if($null-eq$listenPort){throw 'No non-ephemeral loopback port is available for the packaged provider fixture.'}
   $initialize=Join-Path $providerBundle 'scripts\provisioning\Initialize-B122ProviderHost.ps1'
   $bootstrapRaw=Invoke-B122ProviderFixturePowerShell -Script $initialize -Arguments @('-RepositoryRoot',[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..')),'-InstanceName',$instanceName,'-ListenPort',[string]$listenPort,'-BundleRoot',$providerBundle)
   Write-B122ProviderReleaseTrace 'initialize-complete'

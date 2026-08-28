@@ -3,7 +3,7 @@
 **Revision:** hardware-independent implementation reconciliation. “Implemented
 in source” means executable code with isolated evidence and a defined
 fail-closed installation/configuration path. It does not assert physical
-hardware, live-provider, cloud-account, Windows-host, or operator acceptance.
+hardware, live-provider, cloud-account, Windows/Linux-host, or operator acceptance.
 
 The repository remains `UNLICENSED`. This ledger does not choose a license,
 resolve third-party redistribution or trademark questions, or authorize public
@@ -21,15 +21,15 @@ companion composes canonical filesystem and Git inspection; reviewed local and
 remote Git; host-attested repository recipes; managed processes; DPAPI
 credential references; exact-route HTTPS; an authenticated loopback provider
 host plus configured provider, GitHub/CI, scanner, and Council adapters; a
-digest-pinned Windows Sandbox/helper boundary; and the canonical Raw-HID helper
-protocol. The extension provides exact-target
+digest-pinned Windows Sandbox/helper or Linux Bubblewrap/process-group boundary;
+and the canonical Raw-HID helper/hidraw protocol. The extension provides exact-target
 selection, reviewed inputs, fixed host actions, and trust-changing provisioning
 through the mutually authenticated local pipe.
 
 That sentence inventories source-controlled mechanisms, not an assertion that
 every prerequisite is installed on this machine. A route that lacks its exact
 reviewed manifest, credential reference, host effect driver, provider module,
-network policy, Windows feature, account, or current external observation
+network policy, host feature, account, or current external observation
 remains `unavailable`, `incomplete`, or `blocked`.
 
 Extension registration remains **Registered only**. An exact-target provider
@@ -42,7 +42,7 @@ policy and acceptance gates remain independent of adapter availability.
 No known ordinary repository-owned software residual remains in the accepted
 65-assignment scope. The nine previously tracked gaps are closed in source and
 regression coverage. Missing physical-device evidence, separately authorized
-provider modules/accounts, credentials, target-host Windows features, scanner
+provider modules/accounts, credentials, target-host Windows/Linux features, scanner
 feeds, and gate acceptance remain external prerequisites and fail closed.
 
 Direct composition evidence is in `apps/windows-companion/src/bootstrap.ts`,
@@ -50,16 +50,17 @@ Direct composition evidence is in `apps/windows-companion/src/bootstrap.ts`,
 `remote-git.ts`, `pipeline-adapters.ts`, `council-runtime.ts`,
 `sandbox-installation.ts`, `raw-hid-protocol.ts`, `voice-gateway.ts`,
 `voice-runtime.ts`, and `windows-voice-transcript-vault.ts`; provider-host source
-is in `apps/provider-adapter-host/src/`, and the transactional per-user release
-boundary is in `deployment/windows/`. Isolated evidence includes
+is in `apps/provider-adapter-host/src/`; Linux host composition is in
+`apps/linux-companion/src/`; and transactional per-user release boundaries are
+in `deployment/windows/` and `deployment/linux/`. Isolated evidence includes
 `bootstrap.test.ts`, `repository-runtime.test.ts`, `remote-adapters.test.ts`,
 `remote-git.test.ts`, `pipeline-adapters.test.ts`, `council-runtime.test.ts`,
 `sandbox-installation.test.ts`, `raw-hid-protocol.test.ts`,
 `voice-gateway.test.ts`, `voice-runtime.test.ts`,
 `windows-voice-port.test.ts`, `windows-voice-transcript-vault.test.ts`,
 `authenticated-pipe.test.ts`, `packaged-runtime.test.ts`,
-`apps/provider-adapter-host/test/`, and the bounded Windows release-lifecycle
-test scripts.
+`apps/provider-adapter-host/test/`, `apps/linux-companion/test/`, and the
+bounded Windows/Linux release-lifecycle test scripts.
 
 This evidence is an enumerated behavioral suite, not a line/function/branch
 coverage percentage. No source-coverage threshold is claimed or inferred.
@@ -75,9 +76,9 @@ coverage percentage. No source-coverage threshold is claimed or inferred.
   authorized provider/account or vendor module, host-attested handshake, network
   route, scoped credential, and feed. Missing prerequisites return unavailable
   rather than simulating a success.
-- The Windows Sandbox catalog/helper and runtime are implemented and
-  digest-pinned. Actual Windows feature availability and adversarial isolation,
-  cleanup, and quarantine acceptance remain external evidence.
+- The Windows Sandbox catalog/helper and Linux Bubblewrap/runtime boundaries
+  are implemented and digest-pinned. Actual host feature availability and
+  adversarial isolation, cleanup, and quarantine acceptance remain external evidence.
 - High-consequence actions remain disabled until their documented acceptance
   evidence is independently collected; source mechanisms are not represented as
   operational enablement, acceptance, or permission to execute.
@@ -92,11 +93,11 @@ their adapter source is present.
 | Proof | normal, shift | Target-bound context/review packets and configured provider route | Live reviewer behavior acceptance |
 | Option Provider | normal, shift | Target-bound decision packets and configured provider route | Live provider response acceptance |
 | Plan Expander | normal | Target-bound alternatives packet and configured provider route | Live provider response acceptance |
-| Plan Approval | normal | Exact target/authority, reviewed transition, durable child observation, and Windows current-user confirmation | End-user execution acceptance |
+| Plan Approval | normal | Exact target/authority, reviewed transition, durable child observation, and Windows Hello/Linux polkit current-user confirmation | End-user execution acceptance |
 | Handoff | normal, shift, alt, shift-alt | Durable context packet and extension focus/queue routing | Live provider planner acceptance |
 | Find Blocked | normal, shift | Provider-verified status and repository-filtered queue | Live multi-provider observation evidence |
 | Find Finished | normal, shift | Provider-verified status and repository-filtered queue | Live multi-provider observation evidence |
-| Authority Refresh | normal, shift | Protected scoped authority, Windows user-presence preparation, and canonical refusal settlement | Independent identity/authority acceptance |
+| Authority Refresh | normal, shift | Protected scoped authority, current-user-presence preparation, and canonical refusal settlement | Independent identity/authority acceptance |
 | Council | normal, shift, alt | Durable conflicts, leases, epochs, and configured provider acknowledgements | Automatic mode remains gate-disabled pending live evidence |
 | Claude | normal, shift, alt | Fixed host actions, managed sessions, configured provider handshake | Installed Claude authorization/parity evidence |
 | ChatGPT | normal, shift, alt | Fixed host actions, managed sessions, configured provider handshake | Installed ChatGPT/Codex authorization/parity evidence |
@@ -108,7 +109,7 @@ their adapter source is present.
 | Run | normal, shift, alt, shift-alt | Host-attested run/debug/web plus exact debug and managed-process stop | Repository manifest installation and live acceptance |
 | Voice | normal, shift, alt, shift-alt | One durable host-action ownership path, provider runtime, and transcript vault source | Microphone/provider/deletion/single-target acceptance |
 | Pipeline | normal, shift, alt, shift-alt, ctrl-shift-alt | Local gates, shared selected-failure series, hosted trace adapter, Repair executor, and sandbox source | Routes/accounts; Repair remains gate-disabled pending acceptance |
-| Shield | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested scanner recipes, Windows Sandbox, protected receipts, configured feeds, attested local-history remediation, and signed complete-advertised-ref remote-evaluator evidence for credential-free public HTTPS | Live scanner/advisory freshness, any separately authorized private/authenticated remote adapter, and evaluator-host acceptance evidence; containment release gate-disabled |
+| Shield | normal, shift, alt, shift-alt, ctrl-shift-alt | Host-attested typed scanner recipes, Windows Sandbox/Linux Bubblewrap, protected receipts, configured feeds, attested local-history remediation, and signed complete-advertised-ref remote-evaluator evidence for credential-free public HTTPS | Live scanner/advisory freshness, any separately authorized private/authenticated remote adapter, and evaluator-host acceptance evidence; containment release gate-disabled |
 | Sandbox | normal, shift, alt, shift-alt, ctrl-shift-alt | Attested Sandbox helper plus atomic venv creation and re-attested interpreter identity | Target-host isolation acceptance; high-consequence modes gate-disabled |
 
 All rows map to the canonical 65 entries in
@@ -128,8 +129,8 @@ Automated evidence covers live temporary Git repositories, stale-target
 rejection, target-bound review, filesystem allowlists, sandbox release approval,
 isolated recipe denial, local IPC authentication, protected session persistence,
 default composition, crash-safe receipt persistence, duplicate dispatch, and
-configured provider/GitHub/CI and Windows Sandbox failure boundaries, provider
+configured provider/GitHub/CI and Windows Sandbox/Linux Bubblewrap failure boundaries, provider
 host TLS/lifecycle behavior, and transactional install/update/rollback recovery. Hardware,
 live provider/account authorization, real scanner-feed freshness, pipe-ACL and
-same-user adversary review, and end-user Windows/VS Code acceptance require
+same-user adversary review, and end-user Windows/Linux/VS Code acceptance require
 separate observed evidence.

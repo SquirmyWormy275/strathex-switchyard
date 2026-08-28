@@ -101,7 +101,7 @@ def draw_page_chrome(canvas: Any, document: BaseDocTemplate) -> None:
         PAGE_HEIGHT - 43,
         "SOFTWARE-ONLY / ALL 27 GATES NOT ACCEPTED",
     )
-    canvas.drawString(MARGIN, 37, "Document version 1.0.0")
+    canvas.drawString(MARGIN, 37, "Document version 1.1.0")
     canvas.drawRightString(PAGE_WIDTH - MARGIN, 37, f"Page {document.page}")
     canvas.restoreState()
 
@@ -243,6 +243,15 @@ def build_styles() -> dict[str, ParagraphStyle]:
             textColor=colors.HexColor("#111827"),
             wordWrap="CJK",
         ),
+        "table_bank_cell": ParagraphStyle(
+            "B122TableBankCell",
+            parent=sample["Normal"],
+            fontName="Helvetica",
+            fontSize=6,
+            leading=8,
+            textColor=colors.HexColor("#111827"),
+            wordWrap="CJK",
+        ),
         "toc_title": ParagraphStyle(
             "B122TocTitle",
             parent=sample["Heading1"],
@@ -298,9 +307,13 @@ def render_table(rows: list[list[str]], styles: dict[str, ParagraphStyle]) -> Lo
     column_count = max(len(row) for row in rows)
     normalized = [row + [""] * (column_count - len(row)) for row in rows]
     data: list[list[Paragraph]] = []
+    reference_table = column_count == 4 and "bank / key / chord" in " ".join(normalized[0]).lower()
     for row_index, row in enumerate(normalized):
-        style = styles["table_header"] if row_index == 0 else styles["table_cell"]
-        data.append([Paragraph(format_inline(cell), style) for cell in row])
+        cells: list[Paragraph] = []
+        for column_index, cell in enumerate(row):
+            style = styles["table_header"] if row_index == 0 else styles["table_bank_cell"] if reference_table and column_index == 1 else styles["table_cell"]
+            cells.append(Paragraph(format_inline(cell), style))
+        data.append(cells)
     table = LongTable(
         data,
         colWidths=table_widths(column_count, normalized[0]),
@@ -357,6 +370,11 @@ def parse_markdown(markdown_path: Path, styles: dict[str, ParagraphStyle]) -> li
         stripped = line.strip()
         if not stripped:
             flush_paragraph()
+            index += 1
+            continue
+        if stripped == "<!-- B122-PDF-PAGE-BREAK -->":
+            flush_paragraph()
+            story.append(CondPageBreak(8 * inch))
             index += 1
             continue
         if stripped.startswith("<!--"):
@@ -477,7 +495,7 @@ def cover_story(styles: dict[str, ParagraphStyle]) -> list[Any]:
             ["SOFTWARE SCOPE", "Hardware-independent source and local verification"],
             ["ACCEPTANCE", "All 27 gates are NOT ACCEPTED"],
             ["LICENSING", "Unresolved maintainer/legal decision"],
-            ["DOCUMENT", "Version 1.0.0"],
+            ["DOCUMENT", "Version 1.1.0"],
         ],
         colWidths=[112, CONTENT_WIDTH - 112],
     )

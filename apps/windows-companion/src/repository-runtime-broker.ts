@@ -334,7 +334,11 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
   }
 
   private async queueVerifiedPythonEnvironment(request: ExecutionRequest, interpreter: string, result: RepositoryRuntimeResult): Promise<BrokerOutcome> {
-    if (!samePath(interpreter, `${request.target.repositoryRoot}\\.venv\\Scripts\\python.exe`)) return { status: "blocked", summary: "The runtime produced a Python interpreter outside the exact repo-local .venv boundary.", effectDisposition: "committed" };
+    const allowedInterpreters = [
+      `${request.target.repositoryRoot}/.venv/bin/python`,
+      `${request.target.repositoryRoot}/.venv/Scripts/python.exe`
+    ];
+    if (!allowedInterpreters.some((candidate) => samePath(interpreter, candidate))) return { status: "blocked", summary: "The runtime produced a Python interpreter outside the exact repo-local .venv boundary.", effectDisposition: "committed" };
     const pythonInterpreterIdentity: RepositoryExecutableIdentity | undefined = result.pythonInterpreterIdentity;
     if (!pythonInterpreterIdentity || !samePath(pythonInterpreterIdentity.canonicalPath, interpreter)) return { status: "incomplete", summary: "The runtime did not preserve the exact post-build Python interpreter identity; VS Code configuration was not queued.", effectDisposition: "committed" };
     const fence = this.containment ? await this.containment.check(request.target.repositoryRoot, "adapter") : undefined;

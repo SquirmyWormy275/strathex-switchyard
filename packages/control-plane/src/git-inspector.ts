@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 
 import { trackedMissingFileDigest, type GitInspection, type GitInspector, type ManifestFile } from "./snapshot.ts";
@@ -43,12 +43,10 @@ export interface GitCliInspectorOptions {
 export class NodeGitCommandRunner implements GitCommandRunner {
   private readonly candidates: readonly string[];
 
-  constructor(candidates: readonly string[] = [
-    "C:\\Program Files\\Git\\cmd\\git.exe",
-    "C:\\Program Files\\Git\\bin\\git.exe",
-    "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
-  ]) {
-    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !candidate.toLowerCase().endsWith("git.exe"))) {
+  constructor(candidates: readonly string[] = process.platform === "win32" ? [
+    "C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
+  ] : ["/usr/bin/git"]) {
+    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !["git", "git.exe"].includes(basename(candidate).toLowerCase()))) {
       throw new Error("Target inspection requires fixed absolute Git executable candidates.");
     }
     this.candidates = [...candidates];
@@ -62,8 +60,7 @@ export class NodeGitCommandRunner implements GitCommandRunner {
         shell: false,
         windowsHide: true,
         env: {
-          SystemRoot: process.env.SystemRoot ?? "C:\\Windows",
-          WINDIR: process.env.WINDIR ?? "C:\\Windows",
+          ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }),
           GIT_CONFIG_NOSYSTEM: "1",
           GIT_TERMINAL_PROMPT: "0",
           GIT_OPTIONAL_LOCKS: "0",

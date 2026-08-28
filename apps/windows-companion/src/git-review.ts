@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { realpath, stat } from "node:fs/promises";
+import { basename, isAbsolute } from "node:path";
 
 import { canonicalRepositoryPath, type GitMutation } from "../../../packages/control-plane/src/brokers.ts";
 import { commandForAction, type CommandAction, type CommandDefinition } from "../../../packages/control-plane/src/command-catalog.ts";
@@ -202,10 +203,13 @@ export class DurableGitMutationReviewQueue implements GitMutationFactory {
   }
 }
 
-/** Fixed-candidate Windows Git inspection; never PATH search or repository command text. */
+/** Fixed-candidate host Git inspection; never PATH search or repository command text. */
 export class WindowsGitChangeInspector implements GitChangeInspector {
   private readonly candidates: readonly string[];
-  constructor(candidates: readonly string[] = ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"]) { this.candidates = candidates; }
+  constructor(candidates: readonly string[] = process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe", "C:\\Program Files (x86)\\Git\\cmd\\git.exe"] : ["/usr/bin/git"]) {
+    if (!candidates.length || candidates.some((candidate) => !isAbsolute(candidate) || !["git", "git.exe"].includes(basename(candidate).toLowerCase()))) throw new Error("Git review requires fixed absolute Git executables.");
+    this.candidates = candidates;
+  }
   async changedPaths(repositoryRoot: string): Promise<readonly string[]> {
     const executable = await this.resolveExecutable();
     const root = await realpath(repositoryRoot);
@@ -235,7 +239,7 @@ export class WindowsGitChangeInspector implements GitChangeInspector {
 
 function runGit(executable: string, cwd: string, args: readonly string[]): Promise<{ exitCode: number; stdout: string }> {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(executable, [...args], { cwd, shell: false, windowsHide: true, env: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" }, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(executable, [...args], { cwd, shell: false, windowsHide: true, env: { ...(process.platform === "win32" ? { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }), GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" }, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let bytes = 0;
     child.stdout.on("data", (chunk: Buffer) => { const remaining = 256 * 1024 - bytes; if (remaining > 0) { const part = chunk.subarray(0, remaining); stdout += part.toString("utf8"); bytes += part.byteLength; } });
     child.stderr.on("data", (chunk: Buffer) => { bytes += Math.min(chunk.byteLength, Math.max(0, 256 * 1024 - bytes)); });
