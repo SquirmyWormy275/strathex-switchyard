@@ -12,7 +12,7 @@ test("Omarchy identities load only from an exact owner-only artifact", async (co
   const path = join(root, "omarchy-surfaces.json");
   await writeFile(path, JSON.stringify({ version: 1, vscode: { version: 1, surface: "vscode", initialClass: "code" }, terminal: { version: 1, surface: "terminal", initialClass: "foot" } }), { mode: 0o600 });
   if (process.platform !== "linux") {
-    await assert.rejects(loadFixedOmarchySurfaceIdentities(path), /requires Linux/i);
+    await assert.rejects(loadFixedOmarchySurfaceIdentities(path), /require Linux/i);
     return;
   }
   assert.deepEqual(await loadFixedOmarchySurfaceIdentities(path), { version: 1, vscode: { version: 1, surface: "vscode", initialClass: "code" }, terminal: { version: 1, surface: "terminal", initialClass: "foot" } });
@@ -30,7 +30,7 @@ test("Omarchy identities reject unknown fields, swapped surfaces, and injection"
   if (process.platform !== "linux") {
     const path = join(root, "unsupported.json");
     await writeFile(path, JSON.stringify({ version: 1, terminal: { version: 1, surface: "terminal", initialClass: "foot" } }), { mode: 0o600 });
-    await assert.rejects(loadFixedOmarchySurfaceIdentities(path), /requires Linux/i);
+    await assert.rejects(loadFixedOmarchySurfaceIdentities(path), /require Linux/i);
     return;
   }
   for (const [name, value] of Object.entries({
