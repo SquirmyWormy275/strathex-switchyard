@@ -17,6 +17,10 @@ import { LinuxPipeWireAudioPort } from "./linux-pipewire-audio.ts";
 import { LinuxHidrawTransport, loadLinuxHidrawIdentity } from "./linux-hidraw.ts";
 import { LinuxProcessGroupSupervisor } from "./linux-process-supervisor.ts";
 import { LinuxBubblewrapRepositoryProcessSupervisor, LinuxDisposableExecutionRootProvider, LinuxHostValidatedRepositoryRecipeRunner } from "./linux-repository-runtime.ts";
+import { collectOmarchyHostEvidence } from "./omarchy-capabilities.ts";
+import { CompanionOmarchyHostActionConsumer } from "./omarchy-host-action-consumer.ts";
+import { NativeOmarchyHostActionAdapter } from "./omarchy-host-action.ts";
+import { loadFixedOmarchySurfaceIdentities } from "./omarchy-identity.ts";
 
 export async function runLinuxCompanion(): Promise<{ stop(): Promise<void> }> {
   if (process.platform !== "linux") throw new Error("The packaged Linux companion runs only on Linux.");
@@ -26,12 +30,14 @@ export async function runLinuxCompanion(): Promise<{ stop(): Promise<void> }> {
   let pipe: AuthenticatedPipeServer | undefined;
   let companion: ReturnType<typeof createDurableWindowsCompanion> | undefined;
   let hidraw: LinuxHidrawTransport | undefined;
+  let omarchyHostActions: CompanionOmarchyHostActionConsumer | undefined;
   let stopping: Promise<void> | undefined;
   const stop = (): Promise<void> => stopping ??= (async () => {
     const failures: unknown[] = [];
     for (const close of [
       () => pipe?.stop(),
       () => hidraw?.stop(),
+      () => omarchyHostActions?.stop(),
       () => companion?.hardwareSignalDispatcher.stop(),
       () => companion?.voiceRuntime.shutdown(),
       () => { companion?.transcriptVault.stopRetentionEnforcement(); },
@@ -50,6 +56,13 @@ export async function runLinuxCompanion(): Promise<{ stop(): Promise<void> }> {
     const processSupervisor = new LinuxProcessGroupSupervisor(store);
     companion = createDurableWindowsCompanion({ policyVersion: "b122-linux-v1", store, localStateDirectory: paths.stateDirectory, localGitStateDirectory: paths.stateDirectory, credentialProtector: protector, receiptEvidence, ...(networkPolicy ? { networkPolicy } : {}), runtime: { confirmationAttestor: new LinuxPolkitConfirmationAttestor(userPresence) }, runtimePinPresence: userPresence, repositoryProcessSupervisor: new LinuxBubblewrapRepositoryProcessSupervisor(processSupervisor), repositoryExecutionRoots: new LinuxDisposableExecutionRootProvider(paths.stateDirectory), repositorySandboxFactory: ({ runtimes, issuer, scannerFixtures }) => new LinuxHostValidatedRepositoryRecipeRunner(runtimes, issuer, scannerFixtures), hostIsolationRuntime: new LinuxBubblewrapIsolationRuntime(), voiceAudioPort: new LinuxPipeWireAudioPort(), snapshotEnvironmentFor: () => ({ toolVersions: { companion: "linux-0.1.0", node: process.version } }) });
     await companion.endpoint.ready();
+    const omarchyIdentities = await loadFixedOmarchySurfaceIdentities(join(paths.stateDirectory, "omarchy-surfaces.json"));
+    if (omarchyIdentities) {
+      omarchyHostActions = new CompanionOmarchyHostActionConsumer(store, companion.hostActions, companion.executor, new NativeOmarchyHostActionAdapter(), {
+        evidence: await collectOmarchyHostEvidence(), identities: omarchyIdentities
+      });
+      await omarchyHostActions.start();
+    }
     await companion.transcriptVault.startRetentionEnforcement({ onFailure: () => { void stop(); } });
     await companion.voiceRuntime.reconcile();
     await companion.hardwareSignalDispatcher.start();

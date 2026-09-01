@@ -35,6 +35,12 @@ export interface OmarchyHostActionPorts {
   readonly timeoutMs?: number;
 }
 
+export interface OmarchyHostActionExecutionOptions {
+  readonly signal: AbortSignal;
+  /** Durable single-use barrier supplied by the companion-owned consumer. */
+  readonly beforeEffect?: () => Promise<void>;
+}
+
 const requiredCapabilities: readonly OmarchyCapability[] = ["omarchy", "hyprland", "wayland"];
 
 /**
@@ -91,14 +97,22 @@ export class NativeOmarchyHostActionAdapter {
     action: OmarchyFocusAction,
     evidence: OmarchyHostEvidence,
     identities: Readonly<Partial<Record<OmarchySurface, FixedOmarchySurfaceIdentity>>>,
-    signal: AbortSignal
+    options: AbortSignal | OmarchyHostActionExecutionOptions
   ): Promise<OmarchyFocusExecution> {
+    const signal = options instanceof AbortSignal ? options : options.signal;
     if (signal.aborted) throw signal.reason ?? new Error("The Omarchy host action was cancelled.");
     const plan = planOmarchyFocus(action, evidence, identities);
+    const identity = identities[plan.surface]!;
+    const before = await this.run(plan.executable, ["clients", "-j"], { signal, timeoutMs: this.timeoutMs, maxBuffer: 64 * 1024 });
+    if (before.stderr.trim() || !mappedSurfaceExists(before.stdout, identity.initialClass)) throw new Error("The exact mapped Omarchy surface is unavailable.");
+    if (!(options instanceof AbortSignal) && options.beforeEffect) await options.beforeEffect();
+    if (signal.aborted) throw signal.reason ?? new Error("The Omarchy host action was cancelled at its durable boundary.");
     const result = await this.run(plan.executable, plan.arguments, { signal, timeoutMs: this.timeoutMs, maxBuffer: 4 * 1024 });
     if (result.stdout.trim() !== "ok" || result.stderr.trim() !== "") {
       throw new Error("Hyprland did not acknowledge the exact Omarchy focus action.");
     }
+    const after = await this.run(plan.executable, ["activewindow", "-j"], { signal, timeoutMs: this.timeoutMs, maxBuffer: 16 * 1024 });
+    if (after.stderr.trim() || !activeSurfaceMatches(after.stdout, identity.initialClass)) throw new Error("Hyprland did not verify the exact focused Omarchy surface.");
     return Object.freeze({
       action: plan.action,
       surface: plan.surface,
@@ -107,6 +121,18 @@ export class NativeOmarchyHostActionAdapter {
     });
   }
 }
+
+function mappedSurfaceExists(value: string, initialClass: string): boolean {
+  let clients: unknown; try { clients = JSON.parse(value); } catch { return false; }
+  return Array.isArray(clients) && clients.some((client) => record(client) && client.mapped === true && client.initialClass === initialClass);
+}
+
+function activeSurfaceMatches(value: string, initialClass: string): boolean {
+  let client: unknown; try { client = JSON.parse(value); } catch { return false; }
+  return record(client) && client.initialClass === initialClass;
+}
+
+function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 
 async function runHyprctl(
   executable: string,

@@ -111,10 +111,20 @@ acceptance evidence.
 ## Desktop integration boundary
 
 The installed VS Code extension can route and focus registered VS Code-hosted
-sessions through the authenticated companion. Linux has no universal,
-reviewed cross-compositor foreground-window consumer in this release: arbitrary
-global desktop focus across X11 and Wayland compositors is reported unavailable
-rather than delegated to shell commands or accessibility scraping.
+sessions through the authenticated companion. On an evidenced Omarchy,
+Hyprland, and Wayland host, the companion may also consume only the canonical
+targetless VS Code and external-terminal focus actions after exact live surface
+commissioning:
+
+```sh
+~/.local/share/strathex-switchyard/current/deployment/commission-b122-omarchy.sh
+```
+
+The resulting mode-`0600` identity artifact survives update and rollback in the
+separate protected state root. The release includes `omarchy-health.mjs` for a
+read-only capability/identity health check. No launch fallback, path, URL,
+repository value, arbitrary class, X11 fallback, or accessibility scraping is
+accepted. Other compositors and uncommissioned surfaces remain unavailable.
 
 ## Physical keyboard boundary
 
