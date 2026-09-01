@@ -11,6 +11,7 @@ export interface FixedOmarchySurfaceIdentities {
 
 /** Loads only an owner-controlled, no-follow commissioning artifact. */
 export async function loadFixedOmarchySurfaceIdentities(filePath: string): Promise<FixedOmarchySurfaceIdentities | undefined> {
+  if (process.platform !== "linux") throw new Error("Omarchy surface identities require Linux.");
   let handle;
   try { handle = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch (error) { if (missing(error)) return undefined; throw error; }
