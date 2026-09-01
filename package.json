@@ -14,6 +14,7 @@
     "build:provider-host": "node scripts/clean-provider-build.mjs && tsc -p apps/provider-adapter-host/tsconfig.build.json",
     "start:companion": "node --experimental-transform-types apps/windows-companion/src/main.ts",
     "start:linux-companion": "node --experimental-transform-types apps/linux-companion/src/main.ts",
+    "audit:omarchy-host": "node --experimental-transform-types apps/linux-companion/src/collect-omarchy-evidence.ts",
     "start:provider-host": "node --experimental-transform-types apps/provider-adapter-host/src/main.ts",
     "package:vscode:dry-run": "npm pack --dry-run --workspace @strathex/switchyard-vscode",
     "package:companion:dry-run": "npm run build:companion && npm pack --dry-run --workspace @strathex/switchyard-companion",
