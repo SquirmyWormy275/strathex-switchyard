@@ -87,7 +87,7 @@ const linuxSkippedOnNonLinux = new Map([
   ["linux-process-supervisor", 3],
   ["linux-repository-runtime", 3]
 ]);
-const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle", "linux-user-presence", "linux-pipewire-audio", "linux-hidraw", "linux-process-supervisor", "linux-repository-runtime"]
+const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle", "linux-user-presence", "linux-pipewire-audio", "linux-hidraw", "linux-process-supervisor", "linux-repository-runtime", "omarchy-capabilities"]
   .map((name) => ({
     file: `apps/linux-companion/test/${name}.test.ts`,
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
