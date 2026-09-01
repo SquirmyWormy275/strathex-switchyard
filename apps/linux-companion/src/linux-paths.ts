@@ -14,7 +14,10 @@ export async function provisionLinuxCompanionPaths(environment: Readonly<Record<
   const canonicalRuntimeBase = await realpath(resolve(runtimeBase));
   const [stateMetadata, runtimeMetadata] = await Promise.all([stat(canonicalStateBase), stat(canonicalRuntimeBase)]);
   const uid = process.getuid?.();
-  if (uid === undefined || [stateMetadata, runtimeMetadata].some((metadata) => !metadata.isDirectory() || metadata.uid !== uid || (metadata.mode & 0o077) !== 0)) throw new Error("The XDG state or runtime base is not a private current-user directory.");
+  if (uid === undefined || !stateMetadata.isDirectory() || stateMetadata.uid !== uid || (stateMetadata.mode & 0o022) !== 0
+    || !runtimeMetadata.isDirectory() || runtimeMetadata.uid !== uid || (runtimeMetadata.mode & 0o077) !== 0) {
+    throw new Error("The XDG state or runtime base does not have safe private current-user ownership and permissions.");
+  }
   const requestedState = resolve(canonicalStateBase, "STRATHEX", "switchyard");
   const requestedRuntime = resolve(canonicalRuntimeBase, "sxsy-b122");
   await mkdir(requestedState, { recursive: true, mode: 0o700 });

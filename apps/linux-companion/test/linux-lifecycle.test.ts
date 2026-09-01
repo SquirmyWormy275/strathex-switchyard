@@ -21,7 +21,7 @@ test("Linux companion paths and exact process lease remain private and single-in
   await replacement.release();
 });
 
-test("Linux companion paths reject state symlink escape and broad runtime permissions", { skip: process.platform !== "linux" }, async (context) => {
+test("Linux companion paths reject escapes and writable bases while accepting a standard read-only state base", { skip: process.platform !== "linux" }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-path-escape-"));
   context.after(async () => rm(root, { recursive: true, force: true }));
   const state = join(root, "state"); const runtime = join(root, "runtime"); const outside = join(root, "outside");
@@ -33,5 +33,8 @@ test("Linux companion paths reject state symlink escape and broad runtime permis
   await assert.rejects(() => provisionLinuxCompanionPaths({ HOME: root, XDG_STATE_HOME: state, XDG_RUNTIME_DIR: runtime }), /private/i);
   await chmod(runtime, 0o700);
   await chmod(state, 0o755);
+  const paths = await provisionLinuxCompanionPaths({ HOME: root, XDG_STATE_HOME: state, XDG_RUNTIME_DIR: runtime });
+  assert.match(paths.stateDirectory, /STRATHEX\/switchyard$/);
+  await chmod(state, 0o777);
   await assert.rejects(() => provisionLinuxCompanionPaths({ HOME: root, XDG_STATE_HOME: state, XDG_RUNTIME_DIR: runtime }), /private/i);
 });

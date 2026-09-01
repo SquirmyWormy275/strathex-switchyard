@@ -2,6 +2,10 @@
 set -eu
 release=$1
 [ -x "$release/runtime/bin/node" ]
+[ -x "$release/deployment/commission-b122-omarchy.sh" ]
+[ -f "$release/deployment/omarchy-health.mjs" ]
+[ -f "$release/app/dist/apps/linux-companion/src/commission-omarchy-surfaces.js" ]
+[ -f "$release/app/dist/apps/linux-companion/src/omarchy-host-action-consumer.js" ]
 [ -f "$release/app/dist/apps/linux-companion/src/main.js" ]
 [ -f "$release/extension/sxsy-b122-switchyard.vsix" ]
 (cd "$release" && /usr/bin/unzip -t extension/sxsy-b122-switchyard.vsix >/dev/null)
