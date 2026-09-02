@@ -3,6 +3,7 @@ set -eu
 release=$1
 [ -x "$release/runtime/bin/node" ]
 [ -x "$release/deployment/commission-b122-omarchy.sh" ]
+[ -x "$release/deployment/preflight-b122-linux.sh" ]
 [ -f "$release/deployment/omarchy-health.mjs" ]
 [ -f "$release/app/dist/apps/linux-companion/src/commission-omarchy-surfaces.js" ]
 [ -f "$release/app/dist/apps/linux-companion/src/omarchy-host-action-consumer.js" ]

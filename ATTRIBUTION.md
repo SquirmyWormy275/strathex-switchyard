@@ -2,7 +2,7 @@
 
 This register is a project control, not a ceremonial acknowledgements page. Add an entry before importing third-party code, artwork, geometry, photography, documentation, or firmware.
 
-Last reviewed: 2026-08-20.
+Last reviewed: 2026-09-02.
 
 ## Contributor lineage
 
@@ -61,8 +61,9 @@ See the Leyden Jar repository's “How the project started,” “Comparison wit
 - **Permission statement:** The included `ReadMe.txt` expressly welcomes editing, remixing, and redistribution and requests credit to “cyber_engineer” (`@Mates_ENGINEER`) for official distributions.
 - **License classification:** Informal written permission; no standard license identifier stated.
 - **Upstream notices visible in example PDF:** Template credit to cyber_engineer (GeekHack); some example icons credited to Remix Icon under the Apache License.
-- **Use here:** Geometry and production reference for SXSY-B122 insert prototypes.
-- **Files copied:** None in the initial repository foundation.
+- **Use here:** Authoritative A4 geometry and calibration reference for the generated SXSY-B122 insert kit.
+- **Files copied:** `third-party/cyber_engineer/ReadMe.txt` is byte-identical to the supplied package. The two PDFs are print-optimized distribution derivatives; their original and distributed SHA-256 values and exact transformation are recorded in the local README.
+- **Original SXSY-B122 derivatives:** `output/pdf/SXSY-B122-legends-*.pdf`, `output/pdf/SXSY-B122-legends-calibration.pdf`, and `legends/printable/individual/*.svg` contain original project typography and control labels over or derived from the supplied geometry. No example icons were copied into the generated inserts.
 - **Required treatment:** Preserve creator credit, the permission notice, calibration instructions, and any icon-level notices if upstream example artwork is distributed. Prefer original SXSY-B122 artwork over copying example icons.
 
 ### Remix Icon
@@ -70,7 +71,7 @@ See the Leyden Jar repository's “How the project started,” “Comparison wit
 - **Contribution:** Icons appearing in the upstream example template.
 - **Canonical source:** [Remix Icon](https://remixicon.com/)
 - **License reported by the template:** Apache License.
-- **Use here:** No Remix Icon artwork is currently copied or planned. Reassess if any icon is imported.
+- **Use here:** Remix Icon artwork remains visible only in the preserved upstream `example-template.pdf`; no Remix Icon artwork is copied into generated SXSY-B122 inserts.
 
 ## Registration template
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="140" viewBox="0 0 200 140" role="img" aria-labelledby="title desc">
+  <title id="title">VS CODE relegendable insert</title>
+  <desc id="desc">Logical ID W03; physical position remains unassigned within the workspace-command-bar.</desc>
+  <style>.id{font:700 8px sans-serif;fill:#fff}.name{font:700 12px sans-serif;fill:#fff}.mod{font:700 7px sans-serif;fill:#0B2E4F;text-anchor:middle}.action{font:700 5px sans-serif;fill:#0B2E4F;text-anchor:middle}</style>
+  <rect x="60" y="40" width="80" height="60" rx="4" fill="#0B2E4F"/>
+  <rect x="60" y="40" width="80" height="13" rx="4" fill="#68C4E8"/>
+  <text x="100" y="49" class="id" text-anchor="middle">W03</text>
+  <text x="100" y="74" class="name" text-anchor="middle">VS CODE</text>
+  <rect x="60" y="7" width="80" height="26" rx="4" fill="#A8D8E8"/><text x="100.0" y="17" class="mod">S</text><text x="100.0" y="27" class="action">NEW WINDOW</text><rect x="4" y="50" width="50" height="36" rx="4" fill="#EEEEEE"/><text x="29.0" y="60" class="mod">A</text><text x="29.0" y="70" class="action">RESERVED</text><rect x="146" y="50" width="50" height="36" rx="4" fill="#EEEEEE"/><text x="171.0" y="60" class="mod">S+A</text><text x="171.0" y="70" class="action">RESERVED</text><rect x="60" y="107" width="80" height="26" rx="4" fill="#EEEEEE"/><text x="100.0" y="117" class="mod">C+S+A</text><text x="100.0" y="127" class="action">RESERVED</text>
+</svg>

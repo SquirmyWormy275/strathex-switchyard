@@ -5,6 +5,9 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Hardware-independent SXSY-B122 firmware, mediated Windows and Linux companions, VS Code control surface, and release tooling",
+  "engines": {
+    "node": "24.14.0"
+  },
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -20,11 +23,16 @@
     "audit:omarchy-host": "node --experimental-transform-types apps/linux-companion/src/collect-omarchy-evidence.ts",
     "commission:omarchy-surfaces": "node --experimental-transform-types apps/linux-companion/src/commission-omarchy-surfaces.ts",
     "start:provider-host": "node --experimental-transform-types apps/provider-adapter-host/src/main.ts",
+    "generate:legends": "python scripts/generate_b122_legends.py",
+    "check:legends": "python scripts/generate_b122_legends.py --check",
+    "commission:b122": "node scripts/b122-commissioning.mjs",
+    "drill:prehardware": "node scripts/run-b122-prehardware-drill.mjs",
     "package:vscode:dry-run": "npm pack --dry-run --workspace @strathex/switchyard-vscode",
     "package:companion:dry-run": "npm run build:companion && npm pack --dry-run --workspace @strathex/switchyard-companion",
     "package:linux-companion:dry-run": "npm run build:linux-companion && npm pack --dry-run --workspace @strathex/switchyard-linux-companion",
     "package:provider-host:dry-run": "npm run build:provider-host && npm pack --dry-run --workspace @strathex/switchyard-provider-adapter-host",
     "test": "node scripts/run-isolated-tests.mjs",
+    "test:prehardware": "node --test scripts/b122-commissioning.test.mjs",
     "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests-windows.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

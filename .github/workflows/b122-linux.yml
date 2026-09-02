@@ -70,6 +70,7 @@ jobs:
       - name: Lint Linux lifecycle scripts
         run: |
           shellcheck deployment/linux/*.sh
+          deployment/linux/preflight-b122-linux.sh
           unit_tmp=$(mktemp -d)
           trap 'rm -rf -- "$unit_tmp"' EXIT
           sed 's|^ExecStart=.*|ExecStart=/usr/bin/true|' deployment/linux/sxsy-b122.service > "$unit_tmp/sxsy-b122.service"
