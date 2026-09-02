@@ -57,6 +57,7 @@ jobs:
         shell: pwsh
         run: |
           python .\scripts\generate_b122_documentation.py --check
+          python .\scripts\generate_b122_legends.py --check
           python -m pytest .\docs\tests\test_b122_documentation.py -q
 
       - name: Fetch and verify the official portable Node runtime

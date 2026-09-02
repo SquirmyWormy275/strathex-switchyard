@@ -94,6 +94,8 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/b122-commissioning.test.mjs" },
+  { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
   { file: "firmware/verify-require-compiler.test.mjs" },
@@ -218,6 +220,8 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
     ...environment,
     ...isolatedProfile,
     XDG_CONFIG_HOME: join(testRoot, ".config"),
+    XDG_STATE_HOME: join(testRoot, ".local", "state"),
+    XDG_RUNTIME_DIR: join(testRoot, ".runtime"),
     TEMP: testRoot,
     TMP: testRoot,
     TMPDIR: testRoot,
@@ -254,7 +258,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
-  await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.SXSY_B122_STATE_DIR].map((directory) => mkdir(directory, { recursive: true })));
+  await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.XDG_STATE_HOME, environment.XDG_RUNTIME_DIR, environment.SXSY_B122_STATE_DIR].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })));
   await Promise.all([environment.npm_config_userconfig, environment.npm_config_globalconfig].map((file) => writeFile(file, "", { encoding: "utf8", mode: 0o600 })));
   return new Promise((resolveChild) => {
     const child = spawn(childExecutable, args, { cwd, env: environment, detached: process.platform !== "win32", shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
