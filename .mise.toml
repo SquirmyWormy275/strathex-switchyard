@@ -1,5 +1,2 @@
 [tools]
 node = "24.14.0"
-
-[env]
-NODE_NO_WARNINGS = "1"

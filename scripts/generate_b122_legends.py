@@ -333,7 +333,9 @@ def individual_svg(item: Mapping, palette: Palette) -> str:
     panel_specs = (("shift", "S", 60, 7, 80, 26), ("alt", "A", 4, 50, 50, 36), ("shift_alt", "S+A", 146, 50, 50, 36), ("ctrl_shift_alt", "C+S+A", 60, 107, 80, 26))
     for modifier, prefix, x, y, width, height in panel_specs:
         action = SHORT_ACTIONS.get((item["control"], modifier), "RESERVED")
-        panels.append(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="4" fill="{hex_color(palette.light if action != "RESERVED" else HexColor("#EEEEEE"))}"/><text x="{x + width/2}" y="{y + 10}" class="mod">{prefix}</text><text x="{x + width/2}" y="{y + 20}" class="action">{escape_xml(action)}</text>')
+        panels.append(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="4" fill="{hex_color(palette.light if action != "RESERVED" else HexColor("#EEEEEE"))}"/><text x="{x + width/2}" y="{y + 10}" class="mod">{prefix}</text><text x="{x + width/2}" y="{y + 20}" class="action" textLength="{width - 5}" lengthAdjust="spacingAndGlyphs">{escape_xml(action)}</text>')
+    name_lines = balanced_svg_lines(item["displayName"])
+    name_markup = "".join(f'<text x="100" y="{74 + index * 14 - (len(name_lines) - 1) * 7}" class="name" text-anchor="middle">{escape_xml(line)}</text>' for index, line in enumerate(name_lines))
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="200" height="140" viewBox="0 0 200 140" role="img" aria-labelledby="title desc">
   <title id="title">{escape_xml(item['displayName'])} relegendable insert</title>
@@ -342,10 +344,18 @@ def individual_svg(item: Mapping, palette: Palette) -> str:
   <rect x="60" y="40" width="80" height="60" rx="4" fill="{hex_color(palette.dark)}"/>
   <rect x="60" y="40" width="80" height="13" rx="4" fill="{hex_color(palette.accent)}"/>
   <text x="100" y="49" class="id" text-anchor="middle">{item['logicalId']}</text>
-  <text x="100" y="74" class="name" text-anchor="middle">{escape_xml(item['displayName'])}</text>
+  {name_markup}
   {''.join(panels)}
 </svg>
 '''
+
+
+def balanced_svg_lines(text: str) -> list[str]:
+    words = text.split()
+    if len(text) <= 11 or len(words) == 1:
+        return [text]
+    candidates = [([" ".join(words[:index]), " ".join(words[index:])], abs(len(" ".join(words[:index])) - len(" ".join(words[index:])))) for index in range(1, len(words))]
+    return min(candidates, key=lambda candidate: candidate[1])[0]
 
 
 def make_calibration_pdf(destination: Path) -> None:
