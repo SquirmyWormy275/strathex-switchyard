@@ -47,6 +47,7 @@
 - [x] Read-only authenticated managed-session operator view in VS Code; no new chord or authority path
 - [x] Read-only local Codex thread inventory through App Server; stored threads remain unobserved, not finished
 - [x] Read-only live snapshot from the already-running local Codex daemon; threads remain unbound to managed tasks
+- [x] Linux task-bound Codex App Server thread start with exact returned ID and private local binding; no verified lifecycle promotion
 - [ ] Live native ChatGPT/Codex and Claude status adapters with versioned capability evidence
 - [x] Verify a Linux source test receipt and keep Windows-only runtime tests on the Windows lane
 

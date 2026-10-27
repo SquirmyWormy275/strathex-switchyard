@@ -5,7 +5,7 @@ import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
-import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadObservation } from "./operator-status.ts";
+import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadBinding, type CodexLocalThreadObservation } from "./operator-status.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -152,7 +152,11 @@ export interface ManagedSessionControllerOptions {
   /** Optional built-in Git adapter; an absent adapter is recorded as unknown. */
   readonly resolveGitRoots?: () => Promise<readonly GitRootRegistration[]>;
   /** Optional read-only local Codex daemon observation; never changes companion capability. */
-  readonly observeCodexThreads?: () => Promise<readonly CodexLocalThreadObservation[]>;
+  readonly observeCodexThreads?: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  readonly readCodexBindings?: () => Promise<readonly CodexLocalThreadBinding[]>;
+  readonly codexExecutable?: string;
   /** Real activation wires VS Code's URI API; tests inject a deterministic boundary. */
   readonly openExternal?: (url: string) => Promise<boolean>;
   /** Fixed VS Code commands only; B122 input never selects a command string. */
@@ -241,7 +245,11 @@ export class ManagedSessionController {
   private readonly idFactory: () => string;
   private readonly extensionVersion: string;
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
-  private readonly observeCodexThreads: () => Promise<readonly CodexLocalThreadObservation[]>;
+  private readonly observeCodexThreads: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  private readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  private readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  private readonly readCodexBindings: () => Promise<readonly CodexLocalThreadBinding[]>;
+  private readonly codexExecutable?: string;
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
@@ -300,6 +308,10 @@ export class ManagedSessionController {
     this.extensionVersion = boundedAdapterVersion(options.extensionVersion ?? "unpackaged-test");
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
     this.observeCodexThreads = options.observeCodexThreads ?? (async () => []);
+    this.startCodexThread = options.startCodexThread;
+    this.persistCodexBinding = options.persistCodexBinding;
+    this.readCodexBindings = options.readCodexBindings ?? (async () => []);
+    this.codexExecutable = options.codexExecutable;
     const openExternal = options.openExternal ?? (async () => false);
     this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
     const executeCommand = options.executeCommand ?? (async (command: string) => {
@@ -463,13 +475,15 @@ export class ManagedSessionController {
         await this.registerDebugConfigurations();
       }),
       this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
-        const [listed, codex] = await Promise.all([
+        const [listed, bindings] = await Promise.all([
           this.bridge.listSessions(),
-          this.observeCodexThreads().catch(() => [] as readonly CodexLocalThreadObservation[])
+          this.readCodexBindings().catch(() => [] as readonly CodexLocalThreadBinding[])
         ]);
+        const codex = await this.observeCodexThreads(bindings.map((binding) => binding.threadId))
+          .catch(() => [] as readonly CodexLocalThreadObservation[]);
         const items = [
           ...(listed.ok ? operatorSessionItems(listed.value) : []),
-          ...codexLocalThreadItems(codex)
+          ...codexLocalThreadItems(codex, bindings)
         ];
         if (!listed.ok && !items.length) {
           await this.vscode.window.showWarningMessage(`SXSY-B122 operator status is unavailable: ${listed.message}`);
@@ -479,7 +493,12 @@ export class ManagedSessionController {
           await this.vscode.window.showInformationMessage("SXSY-B122 has no authenticated managed sessions. Desktop windows and idle terminals are not inferred.");
           return;
         }
-        await this.vscode.window.showQuickPick(items, { placeHolder: "Managed sessions and unbound local Codex runtime; selecting a row performs no action" });
+        await this.vscode.window.showQuickPick(items, { placeHolder: "Managed sessions and local Codex runtime; selecting a row performs no action" });
+      }),
+      this.registerAdmittedCommand("sxsy-b122.startBoundCodexThread", async () => {
+        await this.startBoundCodexThread().catch(async (error) => {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 could not start the bound Codex thread: ${error instanceof Error ? error.message : "unknown error"}`);
+        });
       }),
       this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();
@@ -539,6 +558,82 @@ export class ManagedSessionController {
       this.ownLifecycleDisposables(this.registerAdmittedCommand(command.command, async (argument: unknown) => {
         await this.dispatchChord(command, parseInputArgument(argument));
       }));
+    }
+  }
+
+  /** Start one Codex thread first, then persist exactly the ID returned by App Server. */
+  private async startBoundCodexThread(): Promise<void> {
+    if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 local Codex thread start is available only with the Linux App Server integration.");
+      return;
+    }
+    const folders = this.vscode.workspace.workspaceFolders ?? [];
+    if (!folders.length || folders.length > 32) {
+      await this.vscode.window.showWarningMessage("Open one exact repository folder in VS Code before starting a bound Codex thread.");
+      return;
+    }
+    let chosen = folders[0];
+    if (folders.length > 1) {
+      const items = folders.map((folder) => ({ label: folder.uri.fsPath, description: "Exact VS Code workspace folder" }));
+      const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the repository for this Codex thread" });
+      if (!selected) return;
+      chosen = folders[items.indexOf(selected)];
+    }
+    if (!chosen) return;
+    const requested = resolve(chosen.uri.fsPath);
+    const link = await lstat(requested);
+    const root = await realpath(requested);
+    if (!link.isDirectory() || link.isSymbolicLink() || !samePath(root, requested)) throw new Error("The chosen repository folder is not an exact local directory.");
+    if (!this.gitRoots.some((candidate) => samePath(candidate.gitRoot, root))) throw new Error("The chosen folder is not an observed exact Git repository root.");
+    const taskId = await this.vscode.window.showInputBox?.({
+      prompt: "Short task ID for this Codex thread (no prompts or customer names)",
+      validateInput: (value) => /^[A-Za-z0-9_.:-]{1,128}$/.test(value) ? undefined : "Use 1–128 letters, digits, periods, colons, underscores, or hyphens."
+    });
+    if (!taskId) return;
+    if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("The task ID is not a bounded opaque identifier.");
+    const executable = await realpath(this.codexExecutable);
+    const executableInfo = await stat(executable);
+    if (!executableInfo.isFile() || (executableInfo.mode & 0o111) === 0) throw new Error("The reviewed Codex executable is unavailable.");
+    const before = await this.bridge.listSessions().catch(() => undefined);
+    const candidates = before?.ok ? before.value.filter((session) => session.provider === "codex" && session.taskId === taskId
+      && session.workspaceRoot && samePath(session.workspaceRoot, root) && session.targetSnapshotId && /^[a-f0-9]{64}$/.test(session.targetSnapshotId)) : [];
+    const source = candidates.length === 1 ? candidates[0] : undefined;
+    let threadId: string | undefined;
+    try {
+      this.assertAdmissionActive();
+      const started = await this.startCodexThread(root, taskId);
+      threadId = started.threadId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) throw new Error("Codex returned an invalid thread ID.");
+      const after = source ? await this.bridge.listSessions().catch(() => undefined) : undefined;
+      const target = source && after?.ok && after.value.some((session) => session.id === source.id && session.provider === "codex"
+        && session.taskId === taskId && session.targetSnapshotId === source.targetSnapshotId
+        && session.workspaceRoot && samePath(session.workspaceRoot, root)) ? source.targetSnapshotId! : null;
+      const binding: CodexLocalThreadBinding = {
+        threadId, taskId, sessionId: `codex-thread:${threadId}`, repositoryRoot: root,
+        targetSnapshotId: target, createdAt: this.now()
+      };
+      this.assertAdmissionActive();
+      await this.persistCodexBinding(binding);
+      const session: ExtensionManagedSession = {
+        ...this.makeSession(binding.sessionId, "codex", "vscode_terminal", "unknown", {
+          "sxsy-b122.kind": "codex-app-server-thread",
+          "sxsy-b122.codex.threadId": threadId,
+          "sxsy-b122.codex.binding": "local-thread-start-v1"
+        }, root),
+        taskId,
+        ...(target ? { targetSnapshotId: target } : {})
+      };
+      const registered = await this.bridge.registerSession(session, "terminal").catch(() => undefined);
+      this.assertAdmissionActive();
+      if (registered?.ok) this.sessions.set(session.id, registered.value);
+      const terminal = this.vscode.window.createTerminal({
+        name: `SXSY Codex · ${taskId}`, cwd: root, shellPath: executable,
+        shellArgs: ["resume", "--remote", "unix://", threadId]
+      });
+      terminal.show();
+      await this.vscode.window.showInformationMessage(`SXSY-B122 opened Codex thread ${threadId} for task ${taskId}; target ${target ?? "unverified"}. Its runtime status does not imply a verified Switchyard outcome.`);
+    } catch (error) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Codex thread start stopped${threadId ? ` after Codex created ${threadId}` : ""}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
 

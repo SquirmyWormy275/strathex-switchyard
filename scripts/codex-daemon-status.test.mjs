@@ -9,7 +9,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { readCodexDaemonThreads } = require("../apps/vscode-extension/src/codex-daemon-status.cjs");
+const { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads } = require("../apps/vscode-extension/src/codex-daemon-status.cjs");
 
 function textFrame(value) {
   const payload = Buffer.from(JSON.stringify(value));
@@ -48,6 +48,13 @@ test("live daemon observer performs only handshake and bounded thread/list", { s
           { id: "exact-active", name: "private title", status: { type: "active", activeFlags: [] } },
           { id: "exact-stored", preview: "private prompt", status: { type: "notLoaded" } }
         ], nextCursor: null } }));
+        else if (message.method === "thread/start") socket.write(textFrame({ id: 2, result: { thread: { id: "created-thread", cwd: message.params.cwd } } }));
+        else if (message.method === "thread/read") socket.write(textFrame({ id: 2, result: { thread: { id: message.params.threadId, status: { type: "idle" } } } }));
+        else if (message.method === "thread/inject_items") {
+          assert.equal(message.params.threadId, "created-thread");
+          assert.match(message.params.items[0].content[0].text, /task-7.*No user request/);
+          socket.write(textFrame({ id: 3, result: {} }));
+        }
       }
     });
   });
@@ -59,10 +66,27 @@ test("live daemon observer performs only handshake and bounded thread/list", { s
       { id: "exact-stored", observation: "not-observed" }
     ]);
     assert.deepEqual(methods, ["initialize", "initialized", "thread/list"]);
+    assert.deepEqual(await startCodexDaemonThread(path, "/exact/repository", "task-7"), { threadId: "created-thread" });
+    assert.deepEqual(methods, ["initialize", "initialized", "thread/list", "initialize", "initialized", "thread/start", "thread/inject_items"]);
+    assert.deepEqual(await readExactCodexDaemonThread(path, "created-thread"), { id: "created-thread", observation: "idle" });
+    assert.deepEqual(methods.slice(-3), ["initialize", "initialized", "thread/read"]);
   } finally {
     for (const socket of upgradedSockets) socket.destroy();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("exact Codex thread bindings persist privately without capability claims", { skip: process.platform === "win32" ? "Private Unix file mode is Linux-only" : false }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-codex-bindings-"));
+  const binding = {
+    threadId: "thread-exact", taskId: "task-switchyard", sessionId: "session:thread-exact",
+    repositoryRoot: "/exact/repository", targetSnapshotId: "a".repeat(64), createdAt: "2026-10-27T00:00:00.000Z"
+  };
+  try {
+    assert.deepEqual(await persistBoundCodexThread(binding, directory), binding);
+    assert.deepEqual(await readBoundCodexThreads(directory), [binding]);
+    await assert.rejects(() => persistBoundCodexThread(binding, directory), /EEXIST/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

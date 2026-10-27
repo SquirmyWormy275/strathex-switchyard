@@ -1,13 +1,15 @@
-/** Read-only live status from an already-running, same-user Codex App Server. */
+/** Bounded local thread status and explicit thread creation through the current-user Codex App Server. */
 const { createHash, randomBytes } = require("node:crypto");
-const { stat } = require("node:fs/promises");
-const { platform, userInfo } = require("node:os");
-const { isAbsolute } = require("node:path");
+const { mkdir, lstat, open, readFile, readdir, stat } = require("node:fs/promises");
+const { constants } = require("node:fs");
+const { homedir, platform, userInfo } = require("node:os");
+const { isAbsolute, join } = require("node:path");
 const { request } = require("node:http");
 
 const maxBytes = 1024 * 1024;
 const defaultDeadlineMs = 8_000;
-const threadListRequest = Object.freeze({ id: 2, method: "thread/list", params: { limit: 25, sortKey: "recency_at", sourceKinds: ["cli", "vscode", "appServer"] } });
+const maxBindings = 64;
+const threadListRequest = Object.freeze({ id: 2, method: "thread/list", params: { limit: 25, sortKey: "recency_at", sourceKinds: ["cli", "vscode", "appServer", "unknown"] } });
 
 function normalizeThreadList(value) {
   if (!value || typeof value !== "object" || !Array.isArray(value.data) || value.data.length > 25) throw new Error("Codex returned an invalid bounded thread list.");
@@ -35,7 +37,7 @@ function encodeFrame(value) {
   return Buffer.concat([header, masked]);
 }
 
-async function readCodexDaemonThreads(socketPath, { deadlineMs = defaultDeadlineMs } = {}) {
+async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs = defaultDeadlineMs, afterResult } = {}) {
   if (platform() === "win32") throw new Error("The local Codex Unix socket is unavailable on Windows.");
   if (typeof socketPath !== "string" || !isAbsolute(socketPath) || /[\0\r\n]/.test(socketPath)) throw new Error("Codex socket path must be absolute.");
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 100 || deadlineMs > 30_000) throw new Error("Codex observation deadline is invalid.");
@@ -46,6 +48,7 @@ async function readCodexDaemonThreads(socketPath, { deadlineMs = defaultDeadline
     let settled = false;
     let upgraded = false;
     let phase = "initialize";
+    let parsedResult;
     let received = Buffer.alloc(0);
     let connection;
     const timeout = setTimeout(() => finish(new Error("Codex daemon observation timed out.")), deadlineMs);
@@ -69,11 +72,22 @@ async function readCodexDaemonThreads(socketPath, { deadlineMs = defaultDeadline
         if (value.error || !value.result) { finish(new Error("Codex daemon initialization was unavailable.")); return; }
         phase = "list";
         send({ method: "initialized", params: {} });
-        send(threadListRequest);
+        send(command);
       } else if (phase === "list" && value.id === 2) {
-        if (value.error) { finish(new Error("Codex daemon thread listing was unavailable.")); return; }
-        try { finish(undefined, Object.freeze(normalizeThreadList(value.result))); }
+        if (value.error) { finish(new Error("Codex daemon request was unavailable.")); return; }
+        try {
+          parsedResult = parseResult(value.result);
+          if (afterResult) {
+            const followup = afterResult(parsedResult);
+            if (!followup || followup.id !== 3) throw new Error("Codex daemon follow-up request was invalid.");
+            phase = "followup";
+            send(followup);
+          } else finish(undefined, parsedResult);
+        }
         catch (error) { finish(error); }
+      } else if (phase === "followup" && value.id === 3) {
+        if (value.error) { finish(new Error("Codex did not persist the task-bound thread.")); return; }
+        finish(undefined, parsedResult);
       }
     }
     function accept(chunk) {
@@ -107,7 +121,7 @@ async function readCodexDaemonThreads(socketPath, { deadlineMs = defaultDeadline
       socket.on("data", accept);
       socket.on("error", () => finish(new Error("Codex daemon connection failed.")));
       socket.on("close", () => { if (!settled) finish(new Error("Codex daemon disconnected before the thread list arrived.")); });
-      send({ id: 1, method: "initialize", params: { clientInfo: { name: "sxsy_readonly_live_status", title: "Switchyard read-only live status", version: "0.1.0" } } });
+      send({ id: 1, method: "initialize", params: { clientInfo: { name: "sxsy_local_codex_integration", title: "Switchyard local Codex integration", version: "0.1.0" } } });
       if (head.length) accept(head);
     });
     upgrade.on("response", (response) => { response.resume(); finish(new Error("Codex daemon did not accept a WebSocket connection.")); });
@@ -117,4 +131,98 @@ async function readCodexDaemonThreads(socketPath, { deadlineMs = defaultDeadline
   });
 }
 
-module.exports = { readCodexDaemonThreads };
+async function readCodexDaemonThreads(socketPath, options = {}) {
+  return requestCodexDaemon(socketPath, threadListRequest, (result) => Object.freeze(normalizeThreadList(result)), options);
+}
+
+async function readExactCodexDaemonThread(socketPath, threadId, options = {}) {
+  if (typeof threadId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) throw new Error("Codex thread ID is invalid.");
+  return requestCodexDaemon(socketPath, { id: 2, method: "thread/read", params: { threadId, includeTurns: false } }, (result) => {
+    if (result?.thread?.id !== threadId) throw new Error("Codex returned a different exact thread identity.");
+    return normalizeThreadList({ data: [result.thread] })[0];
+  }, options);
+}
+
+async function startCodexDaemonThread(socketPath, repositoryRoot, taskId, options = {}) {
+  if (typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || /[\0\r\n]/.test(repositoryRoot) || repositoryRoot.length > 4096) {
+    throw new Error("Codex thread requires an exact absolute repository root.");
+  }
+  if (typeof taskId !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("Codex thread requires a bounded task ID.");
+  return requestCodexDaemon(socketPath, {
+    id: 2, method: "thread/start", params: { cwd: repositoryRoot, serviceName: "strathex-switchyard" }
+  }, (result) => {
+    const thread = result?.thread;
+    if (!thread || typeof thread.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(thread.id)
+      || (thread.cwd !== undefined && thread.cwd !== repositoryRoot)) {
+      throw new Error("Codex did not return an exact started thread identity.");
+    }
+    return Object.freeze({ threadId: thread.id });
+  }, {
+    ...options,
+    afterResult: ({ threadId }) => ({
+      id: 3, method: "thread/inject_items", params: {
+        threadId,
+        items: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: `Switchyard task binding: ${taskId}. No user request has been submitted. Await the operator's instructions.` }] }]
+      }
+    })
+  });
+}
+
+function exactBinding(value) {
+  if (!value || typeof value !== "object" || Object.keys(value).sort().join(",") !== ["createdAt", "repositoryRoot", "sessionId", "targetSnapshotId", "taskId", "threadId"].join(",")) {
+    throw new Error("The local Codex thread binding is malformed.");
+  }
+  if (![value.threadId, value.taskId, value.sessionId].every((item) => typeof item === "string" && /^[A-Za-z0-9_.:-]{1,128}$/.test(item))
+    || typeof value.repositoryRoot !== "string" || !isAbsolute(value.repositoryRoot) || /[\0\r\n]/.test(value.repositoryRoot) || value.repositoryRoot.length > 4096
+    || (value.targetSnapshotId !== null && (typeof value.targetSnapshotId !== "string" || !/^[a-f0-9]{64}$/.test(value.targetSnapshotId)))
+    || typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
+    throw new Error("The local Codex thread binding is invalid.");
+  }
+  return Object.freeze({ threadId: value.threadId, taskId: value.taskId, sessionId: value.sessionId,
+    repositoryRoot: value.repositoryRoot, targetSnapshotId: value.targetSnapshotId, createdAt: value.createdAt });
+}
+
+function defaultBindingDirectory() {
+  const state = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state");
+  if (!isAbsolute(state) || /[\0\r\n]/.test(state)) throw new Error("The local Codex binding state root is invalid.");
+  return join(state, "strathex-switchyard", "codex-bound-threads");
+}
+
+async function privateDirectory(directory, create) {
+  if (typeof directory !== "string" || !isAbsolute(directory) || /[\0\r\n]/.test(directory)) throw new Error("Codex binding directory must be absolute.");
+  if (create) await mkdir(directory, { recursive: true, mode: 0o700 });
+  const details = await lstat(directory);
+  if (!details.isDirectory() || details.uid !== userInfo().uid || (details.mode & 0o077) !== 0) throw new Error("Codex binding directory is not private to the current user.");
+}
+
+async function persistBoundCodexThread(value, directory = defaultBindingDirectory()) {
+  const binding = exactBinding(value);
+  await privateDirectory(directory, true);
+  const names = await readdir(directory);
+  if (names.filter((name) => name.endsWith(".json")).length >= maxBindings) throw new Error("The local Codex binding limit is reached.");
+  const path = join(directory, `${binding.threadId}.json`);
+  const handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  try { await handle.writeFile(`${JSON.stringify(binding)}\n`); await handle.sync(); }
+  finally { await handle.close(); }
+  return binding;
+}
+
+async function readBoundCodexThreads(directory = defaultBindingDirectory()) {
+  try { await privateDirectory(directory, false); }
+  catch (error) { if (error?.code === "ENOENT") return Object.freeze([]); throw error; }
+  const names = (await readdir(directory)).filter((name) => name.endsWith(".json")).sort();
+  if (names.length > maxBindings) throw new Error("The local Codex binding store exceeded its bounded entry count.");
+  const result = [];
+  for (const name of names) {
+    if (!/^[A-Za-z0-9_-]{1,128}\.json$/.test(name)) throw new Error("The local Codex binding filename is invalid.");
+    const path = join(directory, name);
+    const details = await lstat(path);
+    if (!details.isFile() || details.uid !== userInfo().uid || (details.mode & 0o077) !== 0 || details.size > 8_192) throw new Error("The local Codex binding file is not private and bounded.");
+    const binding = exactBinding(JSON.parse(await readFile(path, "utf8")));
+    if (`${binding.threadId}.json` !== name) throw new Error("The local Codex binding filename and thread identity differ.");
+    result.push(binding);
+  }
+  return Object.freeze(result);
+}
+
+module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };

@@ -26,6 +26,7 @@
     "onCommand:sxsy-b122.adoptTerminal",
     "onCommand:sxsy-b122.refreshManagedRegistry",
     "onCommand:sxsy-b122.showManagedSessions",
+    "onCommand:sxsy-b122.startBoundCodexThread",
     "onCommand:sxsy-b122.showQuickReference",
     "onCommand:sxsy-b122.connectProviderAdapter",
     "onCommand:sxsy-b122.installRepositoryRuntime",
@@ -133,6 +134,10 @@
       {
         "command": "sxsy-b122.showManagedSessions",
         "title": "SXSY-B122: Show Managed Sessions"
+      },
+      {
+        "command": "sxsy-b122.startBoundCodexThread",
+        "title": "SXSY-B122: Start Task-Bound Codex Thread"
       },
       {
         "command": "sxsy-b122.showQuickReference",

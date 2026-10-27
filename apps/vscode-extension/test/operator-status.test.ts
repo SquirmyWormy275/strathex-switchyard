@@ -38,3 +38,13 @@ test("local Codex runtime rows disclose their unbound status without becoming ma
   assert.match(items[0]!.label, /waiting-on-approval \(unbound\)/);
   assert.match(items[0]!.detail ?? "", /Thread thread-7.*no Switchyard task.*no verified session capability/);
 });
+
+test("exact local binding joins only its own Codex thread and keeps target uncertainty visible", () => {
+  const binding = { threadId: "thread-own", taskId: "task-1", sessionId: "codex-thread:thread-own", repositoryRoot: "/repo", targetSnapshotId: null, createdAt: "2026-10-27T00:00:00.000Z" };
+  const items = codexLocalThreadItems([
+    { id: "thread-other", observation: "active" }, { id: "thread-own", observation: "waiting-on-approval" }
+  ], [binding]);
+  assert.match(items[0]!.label, /waiting-on-approval \(task-bound\)/);
+  assert.match(items[0]!.detail ?? "", /task task-1.*repository \/repo.*target unverified.*no verified session capability/);
+  assert.match(items[1]!.label, /active \(unbound\)/);
+});
