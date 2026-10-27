@@ -1,5 +1,7 @@
 # Omarchy integration
 
+Omarchy Linux is the primary agent workstation. Its existing cross-application clipboard remains the ordinary quick-copy route; B122 Handoff adds exact task, plan, decision, target, and authority context only when a supported adapter can prove the binding. The native ChatGPT launcher and its main-window voice repair are host-specific; this repository currently has no accepted ChatGPT focus or voice adapter for that installation. Do not substitute a browser URL or enable a desktop overlay. See [the host capability matrix](platform-capability-matrix.md) and [workflow reassessment](workflow-reassessment-2026-10.md).
+
 The first integration gate is evidence, not desktop automation. The companion must establish which host capabilities are present before an Omarchy adapter is enabled.
 
 Run the read-only collector on the target workstation:

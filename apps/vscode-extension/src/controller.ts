@@ -5,6 +5,7 @@ import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
+import { operatorSessionItems } from "./operator-status.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -458,8 +459,16 @@ export class ManagedSessionController {
         await this.registerDebugConfigurations();
       }),
       this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
-        const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
-        await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
+        const listed = await this.bridge.listSessions();
+        if (!listed.ok) {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 operator status is unavailable: ${listed.message}`);
+          return;
+        }
+        if (!listed.value.length) {
+          await this.vscode.window.showInformationMessage("SXSY-B122 has no authenticated managed sessions. Desktop windows and idle terminals are not inferred.");
+          return;
+        }
+        await this.vscode.window.showQuickPick(operatorSessionItems(listed.value), { placeHolder: "Read-only companion status; selecting a row performs no action" });
       }),
       this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();
@@ -849,7 +858,7 @@ export class ManagedSessionController {
   private async provisionCredential(): Promise<void> {
     const root = await this.chooseGitRoot("Choose the exact Git root for this credential reference");
     const input = this.vscode.window.showInputBox;
-    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed Windows DPAPI host."); return; }
+    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed host secret protector."); return; }
     const reference = await input({ prompt: "Credential reference name", value: "github-token", validateInput: (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? undefined : "Use a bounded reference name." });
     const scopesText = reference ? await input({
       prompt: `Exact adapter/purpose scopes for ${root.gitRoot} (comma-separated)`,
@@ -857,16 +866,16 @@ export class ManagedSessionController {
       validateInput: (value) => parseCredentialScopePairs(value, root.gitRoot) ? undefined : "Enter 1-16 unique adapterId/purpose pairs."
     }) : undefined;
     const scopes = scopesText ? parseCredentialScopePairs(scopesText, root.gitRoot) : undefined;
-    const secretText = scopes ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
+    const secretText = scopes ? await input({ prompt: "Credential value (sealed by the host before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
     if (!reference || !scopes || !secretText) return;
     const bytes = Buffer.from(secretText, "utf8");
     let sealedSecret: string;
-    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with Windows DPAPI; nothing was sent."); return; } finally { bytes.fill(0); }
+    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with the host secret protector; nothing was sent."); return; } finally { bytes.fill(0); }
     const existing = await this.bridge.listCredentials();
     const replaceExisting = existing.ok && existing.value.some((item) => item.reference === reference && !item.revokedAt);
     const result = await this.bridge.provisionCredential({ reference, scopes, sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
     if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not provisioned: ${result.message}`);
-    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned host-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
   }
 
   private async listCredentials(): Promise<void> {

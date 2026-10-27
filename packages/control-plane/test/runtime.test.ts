@@ -18,7 +18,9 @@ import { SessionRegistry } from "../src/session-registry.ts";
 import { targetSnapshotDigest } from "../src/snapshot.ts";
 import { ProtectedJsonStore, sha256, stableJson } from "../src/store.ts";
 
-const now = "2026-08-23T12:00:00.000Z";
+const now = new Date(Date.now() + 60 * 60_000).toISOString();
+const authorityExpiry = new Date(Date.parse(now) + 24 * 60 * 60_000).toISOString();
+const oneSecondAfterNow = new Date(Date.parse(now) + 1_000).toISOString();
 const targetMaterial = {
   repositoryRoot: "C:/work/example", canonicalRemote: "https://github.com/example/repo.git",
   branch: "feature/runtime", upstream: "origin/feature/runtime", head: "abc", indexTree: "tree",
@@ -82,7 +84,7 @@ async function startRunningProof(
   const authorities = new AuthorityLedger(store, { clock: () => now });
   const authority = await authorities.issue({
     repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-    allowedActions: ["proof"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+    allowedActions: ["proof"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
   });
   const adapters = new AdapterRegistry();
   const proof = new InMemoryCommandAdapter();
@@ -124,7 +126,7 @@ async function startRunningExecution(
   const authorities = new AuthorityLedger(store, { clock: () => now });
   const authority = await authorities.issue({
     repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-    allowedActions: ["run_target"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+    allowedActions: ["run_target"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
   });
   let cancelledSchedules = 0;
   const runtime = new DurableMediatedExecutor({
@@ -161,7 +163,7 @@ test("durable mediated executor resolves protected session/authority/target stat
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-runtime" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["proof"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["proof"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     const adapters = new AdapterRegistry();
     const proofAdapter = new InMemoryCommandAdapter();
@@ -202,7 +204,7 @@ test("durable runtime issues and consumes a host-attested exact-scope confirmati
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-confirmation" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["proof_adversarial"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["proof_adversarial"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     const adapters = new AdapterRegistry();
     const adapter = new InMemoryCommandAdapter();
@@ -321,7 +323,7 @@ test("installed agent workflow preparation reuses only the protected exact autho
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-existing" });
     const existing = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["option_provider"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "prior-reviewed-user"
+      allowedActions: ["option_provider"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "prior-reviewed-user"
     });
     let preparedContexts = 0;
     const runtime = new DurableMediatedExecutor({
@@ -358,7 +360,7 @@ test("Authority Broadcast preparation returns reviewed-artifact authority withou
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-broadcast" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["authority_broadcast"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "reviewed-user"
+      allowedActions: ["authority_broadcast"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "reviewed-user"
     });
     let ceremonies = 0;
     const runtime = new DurableMediatedExecutor({
@@ -395,7 +397,7 @@ test("Plan Approval uses one current-user ceremony bound to the exact reviewed p
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-plan-approval" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["plan_approval"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "reviewed-user"
+      allowedActions: ["plan_approval"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "reviewed-user"
     });
     const scopeDigest = "e".repeat(64);
     const reviewSummary = "Review exact plan plan-7 (digest) and its protected provider context before execution.";
@@ -578,7 +580,7 @@ test("agent work receives a durable deadline signal and operation-ID cancellatio
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-cancel" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["proof"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["proof"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     const adapters = new AdapterRegistry();
     const proof = new InMemoryCommandAdapter();
@@ -627,7 +629,7 @@ test("a durable budget deadline invokes only the configured host cancellation ad
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-deadline" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["proof"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["proof"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     const adapters = new AdapterRegistry();
     const proof = new InMemoryCommandAdapter();
@@ -662,7 +664,7 @@ test("a durable budget deadline invokes only the configured host cancellation ad
     const started = await runtime.execute({ assignment, control: assignment.control, modifier: assignment.modifier, sessionId: session.id, authorityId: authority.id });
     assert.equal(started.status, "running");
     assert.ok(schedules[0]);
-    clockValue = "2026-08-23T12:00:01.000Z";
+    clockValue = oneSecondAfterNow;
     schedules[0]!.callback();
     await eventually(() => assert.equal(hostCancels, 1));
     assert.equal(await control?.isCancellationRequested(), true);
@@ -931,7 +933,7 @@ test("durable runtime captures a manual-only checkpoint and settles a running bu
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-git" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     let brokerCalls = 0;
     const runtime = new DurableMediatedExecutor({
@@ -1006,7 +1008,7 @@ test("a consequential broker is not called when its required checkpoint capture 
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-no-checkpoint" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     let brokerCalls = 0;
     const runtime = new DurableMediatedExecutor({
@@ -1044,7 +1046,7 @@ test("consequential work is revalidated after checkpoint capture and does not ru
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-revalidate" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     let resolves = 0;
     let brokerCalls = 0;
@@ -1101,7 +1103,7 @@ test("the final effect guard rejects managed-session or authority churn after ad
       const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => `authority-final-${changed}` });
       const authority = await authorities.issue({
         repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-        allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+        allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
       });
       let resolves = 0;
       let brokerCalls = 0;
@@ -1162,7 +1164,7 @@ test("a checkpoint with an unavailable or mismatched recovery artifact blocks it
     const authorities = new AuthorityLedger(store, { clock: () => now, idFactory: () => "authority-broken-checkpoint" });
     const authority = await authorities.issue({
       repositoryRoot: target.repositoryRoot, sessionId: session.id, taskId: session.taskId, planRevision: session.planRevision,
-      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: "2026-08-24T12:00:00.000Z", issuedBy: "authenticated-user"
+      allowedActions: ["local_commit"], prohibitedActions: [], expiresAt: authorityExpiry, issuedBy: "authenticated-user"
     });
     let brokerCalls = 0;
     const runtime = new DurableMediatedExecutor({

@@ -18,9 +18,11 @@
 ## Phase 1 - workflow evidence
 
 - [ ] Structured operator interview
-- [ ] Baseline observation schema and capture method
+- [x] Baseline observation schema and local capture method (session sample remains open)
 - [ ] Representative session sample
 - [ ] Candidate-control scoring
+- [x] Retrospective August workflow and platform reassessment, without changing the 65 assignments
+- [ ] Ten prospective Linux-first sessions, including native task resume, status review, and cross-machine handoff
 - [x] Design-level adversarial threat and misuse analysis (no acceptance claim)
 
 ## Phase 2 - control design
@@ -42,12 +44,19 @@
 - [x] Isolated automated tests and documented fail-closed recovery guidance
 - [x] Close all ordinary software residuals in the current audit and residual ledger
 - [x] Linux Secret Service, Unix-socket, Bubblewrap, systemd, package, and rollback implementation
+- [x] Read-only authenticated managed-session operator view in VS Code; no new chord or authority path
+- [ ] Live native ChatGPT/Codex and Claude status adapters with versioned capability evidence
+- [x] Verify a Linux source test receipt and keep Windows-only runtime tests on the Windows lane
 
 ## Phase 4 - physical commissioning
+
+The owner expects the B122 in **January 2027**. Complete source, documentation, simulator, and optional host work before then; begin device inventory, factory backup, matrix integration, and Windows plug-and-type acceptance after it arrives. Do not treat the currently connected F77 as B122 acceptance evidence.
 
 - [ ] Hardware inventory and photographs
 - [ ] Firmware/configuration backup
 - [ ] Signal verification
+- [ ] Preserve and verify the complete ordinary typing map; prove plug-and-type on an unconfigured Windows host with the companion absent
+- [ ] Prove the optional Windows companion can be installed for the current user without changing ordinary keyboard use
 - [ ] Insert print and fit test
 - [ ] Re-anchor, managed Run Stop, containment, and physical safety acceptance tests
 - [ ] Unit 001 equipment plate

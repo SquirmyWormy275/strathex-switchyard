@@ -59,7 +59,7 @@ const mediatedGitTests = [
   "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target",
   "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
-const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
+const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
@@ -94,6 +94,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
   { file: "firmware/verify-require-compiler.test.mjs" },
@@ -138,6 +139,9 @@ export const requiredGroups = [
   ...providerHostTests,
   ...providerTlsNetworkTests
 ];
+/** The native Linux source lane omits Windows-only runtime contracts. */
+export const linuxGroups = requiredGroups
+  .filter((group) => !group.file.startsWith("apps/windows-companion/") && !group.file.startsWith("deployment/windows/"));
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {
@@ -218,6 +222,7 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
     ...environment,
     ...isolatedProfile,
     XDG_CONFIG_HOME: join(testRoot, ".config"),
+    XDG_RUNTIME_DIR: join(testRoot, "runtime"),
     TEMP: testRoot,
     TMP: testRoot,
     TMPDIR: testRoot,
@@ -254,7 +259,7 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
-  await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.SXSY_B122_STATE_DIR].map((directory) => mkdir(directory, { recursive: true })));
+  await Promise.all([environment.APPDATA, environment.LOCALAPPDATA, environment.XDG_CONFIG_HOME, environment.SXSY_B122_STATE_DIR, environment.XDG_RUNTIME_DIR].map((directory) => mkdir(directory, { recursive: true, mode: 0o700 })));
   await Promise.all([environment.npm_config_userconfig, environment.npm_config_globalconfig].map((file) => writeFile(file, "", { encoding: "utf8", mode: 0o600 })));
   return new Promise((resolveChild) => {
     const child = spawn(childExecutable, args, { cwd, env: environment, detached: process.platform !== "win32", shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -292,9 +297,9 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
         const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed + counts.skipped === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === expectedSkipped && counts.todo === 0;
         const success = !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess;
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v3", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
       } catch {
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v3", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
         try {
           await cleanupIsolatedRoot(cleanup, testRoot, testParent);

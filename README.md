@@ -3,9 +3,9 @@
 > Route attention. Direct agents. Keep the operator in command.
 
 SXSY-B122 is a software-only safety control plane for a proposed 22-control
-operator keyboard for agentic software development. Its host platforms are
-Windows and systemd-based desktop Linux. Its physical target is a
-Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
+operator keyboard for agentic software development. Its primary agent host is
+Omarchy/systemd desktop Linux; Windows is an ordinary keyboard host with optional
+agent controls. Its physical target is a Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
 physical keyboard and its integration are not validated by this repository.
 
 **Current status:** the repository contains the hardware-independent B122
@@ -118,8 +118,13 @@ pushes, merges, force-pushes, approves a permission, or submits a prompt.
 
 ## Local development
 
-Use a current Node.js runtime that supports TypeScript transformation (the test
-scripts use `node --experimental-transform-types`). Tests use temporary files,
+Use the reviewed Node.js **24.14.0** runtime recorded in `.node-version` (for
+example, `mise exec node@24.14.0 -- npm test`). Node 26 removed the
+transformation flag used by these source tests. `npm test` runs the supported
+host lane: shared and native Linux groups on Linux, and the full Windows lane
+on Windows. `npm run test:all` retains the cross-host diagnostic suite and can
+expose Windows-only failures on Linux. Test receipts record every group and
+host skip. Tests use temporary files,
 fakes, and in-memory brokers; they must never use a production database,
 credentials, data, or endpoint.
 
@@ -132,6 +137,12 @@ npm run build:companion
 npm run build:linux-companion
 npm run build:provider-host
 ```
+
+The read-only **SXSY-B122: Show Managed Sessions** command in VS Code refreshes the authenticated companion registry and displays exact task, plan, repository, target, capability, and reported status. It performs no host or agent action. Native ChatGPT and Claude sessions remain unknown until an authorized adapter proves their identity and observation capability.
+
+Before the B122 arrives, `npm run workflow -- start linux` begins an opt-in local workflow-study session; `npm run workflow -- help` lists bounded event fields, and `npm run workflow -- report` summarizes them. This recorder captures no prompts, code, clipboard, window titles, or automatic agent status. See [workflow capture](docs/workflow-capture.md).
+
+The commissioned keyboard must retain a complete standard USB typing map. On a Windows computer without Switchyard installed, ordinary keys must work immediately and the advanced controls must have no agent effect. The owner expects the B122 in **January 2027**; the current 22-control QMK overlay is not a complete typing keymap, and plug-and-type validation is scheduled after the device arrives. See the [host capability matrix](docs/platform-capability-matrix.md).
 
 `npm run start:companion` starts the reviewed per-user companion, not a Windows
 service or service-account boundary. The standalone entry point supplies the
@@ -180,6 +191,7 @@ particular:
 - [Project charter](docs/01-project-charter.md)
 - [Hardware and software architecture](docs/02-system-architecture.md)
 - [Workflow study protocol](docs/03-workflow-study.md)
+- [August workflow reassessment](docs/workflow-reassessment-2026-10.md) and [Linux/Windows capability matrix](docs/platform-capability-matrix.md)
 - [Control taxonomy requirements](docs/04-control-taxonomy.md)
 - [Publication roadmap](docs/05-roadmap.md) and [publication gate](docs/06-publication-gate.md)
 - [Documentation provenance](docs/README.md)
