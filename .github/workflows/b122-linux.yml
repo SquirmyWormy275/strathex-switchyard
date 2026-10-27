@@ -2,6 +2,7 @@ name: B122 Linux release verification
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -114,3 +115,21 @@ jobs:
 
       - name: Prove generated source remains canonical
         run: git diff --exit-code
+
+      - name: Package the verified preview for download
+        run: |
+          tar -C "$RUNNER_TEMP" -cJf "$RUNNER_TEMP/sxsy-b122-linux-x64.tar.xz" sxsy-b122-linux-x64
+          (cd "$RUNNER_TEMP" && sha256sum sxsy-b122-linux-x64.tar.xz > sxsy-b122-linux-x64.tar.xz.sha256)
+          cp "$RUNNER_TEMP/sxsy-b122-linux-x64/extension/sxsy-b122-switchyard.vsix" "$RUNNER_TEMP/sxsy-b122-switchyard.vsix"
+
+      - name: Upload the verified Linux preview
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sxsy-b122-linux-preview-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz
+            ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz.sha256
+            ${{ runner.temp }}/sxsy-b122-switchyard.vsix
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

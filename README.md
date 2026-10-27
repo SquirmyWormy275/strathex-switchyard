@@ -8,6 +8,13 @@ Omarchy/systemd desktop Linux; Windows is an ordinary keyboard host with optiona
 agent controls. Its physical target is a Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
 physical keyboard and its integration are not validated by this repository.
 
+**Try the software before the B122 arrives:** [Start with the Omarchy workflow
+recorder or the VS Code Codex thread command](docs/try-switchyard.md). The guide
+gives a repeatable install, the exact keys and commands, and the current limits.
+GitHub Actions builds a downloadable Linux preview from an exact commit after
+verification. Repository access is currently limited to invited collaborators;
+no public release or license has been approved.
+
 **Current status:** the repository contains the hardware-independent B122
 implementation: the canonical protocol and firmware/Raw-HID host source; the
 mutually authenticated Windows and Linux companions; the VS Code
@@ -146,7 +153,7 @@ The read-only **SXSY-B122: Show Managed Sessions** command in VS Code refreshes 
 
 On Linux, **SXSY-B122: Start Task-Bound Codex Thread** in VS Code creates a Codex thread for the chosen exact Git root, records Codex's returned thread ID with a short task ID, and opens that thread in a terminal. **Show Managed Sessions** displays its live local status beside the task binding; an unavailable companion target stays `unverified`. See [Codex thread inventory and binding](docs/codex-thread-inventory.md).
 
-Before the B122 arrives, **Super+Alt+R** on the owner's Omarchy workstation toggles an opt-in local workflow study. A temporary user service counts only broad foreground app categories and time while active; it does not infer agent status. `npm run workflow -- help` lists deliberate event fields, `npm run workflow -- report` summarizes the study, and `npm run workflow -- path` shows the private log and its size. The 10 MiB log cap prevents unbounded growth. This recorder captures no prompts, code, clipboard, or window titles. See [workflow capture](docs/workflow-capture.md).
+Before the B122 arrives, **Super+Alt+R** can toggle an opt-in local workflow study on an Omarchy workstation after installing the portable shortcut. A temporary user service counts only broad foreground app categories and time while active; it does not infer agent status. `npm run workflow -- help` lists deliberate event fields, `npm run workflow -- report` summarizes the study, and `npm run workflow -- path` shows the private log and its size. The 10 MiB log cap prevents unbounded growth. This recorder captures no prompts, code, clipboard, or window titles. See [workflow capture](docs/workflow-capture.md).
 
 The commissioned keyboard must retain a complete standard USB typing map. On a Windows computer without Switchyard installed, ordinary keys must work immediately and the advanced controls must have no agent effect. The owner expects the B122 in **January 2027**; the current 22-control QMK overlay is not a complete typing keymap, and plug-and-type validation is scheduled after the device arrives. See the [host capability matrix](docs/platform-capability-matrix.md).
 

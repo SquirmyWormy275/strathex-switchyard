@@ -16,7 +16,7 @@ npm run build:provider-host
 stage=$(mktemp -d)
 trap 'rm -rf -- "$stage"' EXIT HUP INT TERM
 bundle="$stage/sxsy-b122-linux-x64"
-mkdir -p "$bundle/app" "$bundle/runtime" "$bundle/deployment" "$bundle/extension"
+mkdir -p "$bundle/app" "$bundle/runtime" "$bundle/deployment" "$bundle/extension" "$bundle/scripts"
 tar -xJf "$archive" -C "$bundle/runtime" --strip-components=1
 cp -a apps/linux-companion/dist/. "$bundle/app/dist/"
 cp -a apps/provider-adapter-host/dist/. "$bundle/app/dist/"
@@ -29,7 +29,9 @@ cp deployment/linux/org.strathex.switchyard.policy "$bundle/deployment/"
 cp deployment/linux/smoke-client.mjs "$bundle/deployment/"
 cp deployment/linux/omarchy-health.mjs "$bundle/deployment/"
 cp deployment/linux/install-b122-linux.sh deployment/linux/rollback-b122-linux.sh deployment/linux/uninstall-b122-linux.sh deployment/linux/commission-b122-omarchy.sh "$bundle/deployment/"
+cp scripts/workflow-capture.mjs scripts/workflow-monitor.mjs scripts/workflow-toggle.sh scripts/install-workflow-shortcut.mjs "$bundle/scripts/"
 chmod 700 "$bundle/deployment/"*.sh "$bundle/runtime/bin/node"
+chmod 700 "$bundle/scripts/workflow-toggle.sh"
 node deployment/linux/build-vsix.mjs apps/vscode-extension "$bundle/extension/sxsy-b122-switchyard.vsix"
 [ -s "$bundle/extension/sxsy-b122-switchyard.vsix" ] || fail "VS Code extension VSIX was not produced"
 printf '%s\n' "linux-x64-$(git rev-parse --short=12 HEAD)" > "$bundle/BUNDLE_ID"

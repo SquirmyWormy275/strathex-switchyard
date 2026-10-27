@@ -94,6 +94,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
   { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { existsSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { homedir } from "node:os";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
@@ -46,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
       startCodexThread: (repositoryRoot, taskId) => startCodexDaemonThread(codexSocket, repositoryRoot, taskId),
       persistCodexBinding: (binding) => persistBoundCodexThread(binding),
       readCodexBindings: () => readBoundCodexThreads(),
-      codexExecutable: join(homedir(), ".local", "share", "mise", "installs", "codex", "latest", "bin", "codex"),
+      codexExecutable: installedCodexExecutable(),
       openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
       executeCommand: async (command) => { await vscode.commands.executeCommand(command); },
       sealSecret: (cleartext) => secretProtector.seal(cleartext),
@@ -56,6 +57,16 @@ export function activate(context: vscode.ExtensionContext): void {
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
   });
+}
+
+/** Fixed current-user/system locations; workspace settings never select an executable. */
+function installedCodexExecutable(): string | undefined {
+  return [
+    join(homedir(), ".local", "share", "mise", "installs", "codex", "latest", "bin", "codex"),
+    join(homedir(), ".local", "bin", "codex"),
+    "/usr/local/bin/codex",
+    "/usr/bin/codex"
+  ].find((candidate) => existsSync(candidate));
 }
 
 /**

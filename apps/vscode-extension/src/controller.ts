@@ -564,7 +564,7 @@ export class ManagedSessionController {
   /** Start one Codex thread first, then persist exactly the ID returned by App Server. */
   private async startBoundCodexThread(): Promise<void> {
     if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable) {
-      await this.vscode.window.showWarningMessage("SXSY-B122 local Codex thread start is available only with the Linux App Server integration.");
+      await this.vscode.window.showWarningMessage("SXSY-B122 task-bound Codex requires Linux, the local App Server, and a Codex CLI in a supported user or system location.");
       return;
     }
     const folders = this.vscode.workspace.workspaceFolders ?? [];
