@@ -1,6 +1,6 @@
 # Documentation provenance
 
-Current workflow and platform guidance: [August 2026 reassessment](workflow-reassessment-2026-10.md), [Linux/Windows capability matrix](platform-capability-matrix.md), and [local baseline workflow capture](workflow-capture.md). They preserve the canonical 65 assigned chords and keep uncommissioned physical behavior unaccepted.
+Current workflow and platform guidance: [August 2026 reassessment](workflow-reassessment-2026-10.md), [Linux/Windows capability matrix](platform-capability-matrix.md), [local baseline workflow capture](workflow-capture.md), and [read-only Codex thread inventory](codex-thread-inventory.md). They preserve the canonical 65 assigned chords and keep uncommissioned physical behavior unaccepted.
 
 - `SXSY-B122-complete-key-specification-and-audit.md` is the accepted complete
   22-key specification and includes its full adversarial review and 27 gates.

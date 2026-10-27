@@ -95,6 +95,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/workflow-capture.test.mjs" },
+  { file: "scripts/codex-thread-status.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
   { file: "firmware/verify-require-compiler.test.mjs" },
