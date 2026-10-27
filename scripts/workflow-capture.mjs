@@ -5,6 +5,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, rm } from "node:fs/promises";
 import { homedir, platform } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const kinds = ["resume", "switch", "handoff", "status", "review", "approval", "run", "failure", "recovery", "other"];
 const surfaces = ["codex", "claude", "chatgpt", "vscode", "terminal", "browser", "system", "other"];
@@ -29,6 +30,7 @@ function usage() {
   node scripts/workflow-capture.mjs start linux|windows [task-alias]
   node scripts/workflow-capture.mjs event KIND SURFACE METHOD OUTCOME DURATION_MS FRICTION EVIDENCE
   node scripts/workflow-capture.mjs end
+  node scripts/workflow-capture.mjs toggle
   node scripts/workflow-capture.mjs status
   node scripts/workflow-capture.mjs path
   node scripts/workflow-capture.mjs report
@@ -112,11 +114,26 @@ async function event(args) {
   await append(record);
   process.stdout.write(`Recorded ${record.kind} (${record.outcome}); evidence: ${record.evidence}.\n`);
 }
+export async function recordFocus(surface, durationMs) {
+  const record = {
+    type: "focus", version: 1, sessionId: (await readActive()).id, at: new Date().toISOString(),
+    surface: oneOf(surface, surfaces, "Surface"), durationMs: integer(durationMs, 0, 60_000, "Focus duration")
+  };
+  await append(record);
+}
 async function end() {
   const session = await readActive();
   await append({ type: "end", version: 1, sessionId: session.id, at: new Date().toISOString() });
   await rm(activePath);
   process.stdout.write(`Ended local workflow session ${session.id}\n`);
+}
+async function toggle() {
+  try { await readActive(); }
+  catch (error) {
+    if (error?.message?.startsWith("No workflow session")) { await start(["linux"]); return; }
+    throw error;
+  }
+  await end();
 }
 async function status() {
   try {
@@ -152,7 +169,12 @@ async function report() {
   const starts = records.filter((record) => record.type === "start");
   const ends = new Set(records.filter((record) => record.type === "end").map((record) => record.sessionId));
   const observations = records.filter((record) => record.type === "event");
-  const summary = { sessionsStarted: starts.length, sessionsCompleted: starts.filter((record) => ends.has(record.id)).length, events: observations.length, byKind: {} };
+  const focus = records.filter((record) => record.type === "focus");
+  const summary = { sessionsStarted: starts.length, sessionsCompleted: starts.filter((record) => ends.has(record.id)).length, events: observations.length, focusIntervals: focus.length, focusDurationMs: {}, byKind: {} };
+  for (const surface of surfaces) {
+    const duration = focus.filter((record) => record.surface === surface).reduce((sum, record) => sum + record.durationMs, 0);
+    if (duration) summary.focusDurationMs[surface] = duration;
+  }
   for (const kind of kinds) {
     const entries = observations.filter((record) => record.kind === kind);
     if (entries.length) summary.byKind[kind] = { count: entries.length, retriesOrBlocked: entries.filter((record) => record.outcome === "retry" || record.outcome === "blocked").length, totalDurationMs: entries.reduce((sum, record) => sum + record.durationMs, 0), averageFriction: Number((entries.reduce((sum, record) => sum + record.friction, 0) / entries.length).toFixed(1)) };
@@ -161,11 +183,12 @@ async function report() {
 }
 
 const [command, ...args] = process.argv.slice(2);
-try {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) try {
   if (!command || command === "help" || command === "--help") process.stdout.write(`${usage()}\n`);
   else if (command === "start") await start(args);
   else if (command === "event") await event(args);
   else if (command === "end" && args.length === 0) await end();
+  else if (command === "toggle" && args.length === 0) await toggle();
   else if (command === "status" && args.length === 0) await status();
   else if (command === "path" && args.length === 0) await path();
   else if (command === "report" && args.length === 0) await report();
