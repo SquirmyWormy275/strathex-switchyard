@@ -54,7 +54,7 @@ deployment/linux/build-b122-linux-release.sh \
 deployment/linux/test-linux-release.sh artifacts/sxsy-b122-linux-x64
 ```
 
-The builder compiles from the current checkout, packages the extension and opt-in workflow-study tools, embeds the reviewed runtime, and generates `MANIFEST.sha256`. A release intended for distribution must be built by the Linux GitHub workflow from a clean exact commit; a local directory is development evidence only. After its tests pass, that workflow uploads a Linux bundle archive, its SHA-256 sidecar, and the VSIX as a 14-day GitHub Actions artifact. The [first-use guide](try-switchyard.md) gives the download and verification steps. The repository is currently private, so only invited collaborators can access that artifact.
+The builder compiles from the current checkout, packages the extension and opt-in workflow-study tools, embeds the reviewed runtime, and generates `MANIFEST.sha256`. A public or production release must be built by the Linux GitHub workflow from a clean exact commit; a local directory is development evidence only. A **private software-only collaborator preview** may be built from a clean exact commit after the full local Linux suite, release structure, installation lifecycle, and manifest pass; its release notes must label hosted verification unavailable if Actions did not run. When its budget permits, the GitHub workflow uploads a Linux bundle archive, checksums, and VSIX as a 14-day artifact after all checks pass. The [first-use guide](try-switchyard.md) gives the download and verification steps. The repository is currently private, so only invited collaborators can access these files.
 
 ## Install, update, rollback, uninstall
 

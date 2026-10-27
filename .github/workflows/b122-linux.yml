@@ -122,6 +122,7 @@ jobs:
           tar -C "$RUNNER_TEMP" -cJf "$RUNNER_TEMP/sxsy-b122-linux-x64.tar.xz" sxsy-b122-linux-x64
           (cd "$RUNNER_TEMP" && sha256sum sxsy-b122-linux-x64.tar.xz > sxsy-b122-linux-x64.tar.xz.sha256)
           cp "$RUNNER_TEMP/sxsy-b122-linux-x64/extension/sxsy-b122-switchyard.vsix" "$RUNNER_TEMP/sxsy-b122-switchyard.vsix"
+          (cd "$RUNNER_TEMP" && sha256sum sxsy-b122-linux-x64.tar.xz sxsy-b122-switchyard.vsix > SHA256SUMS)
 
       - name: Upload the verified Linux preview
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -131,6 +132,7 @@ jobs:
             ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz
             ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz.sha256
             ${{ runner.temp }}/sxsy-b122-switchyard.vsix
+            ${{ runner.temp }}/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

@@ -11,8 +11,9 @@ physical keyboard and its integration are not validated by this repository.
 **Try the software before the B122 arrives:** [Start with the Omarchy workflow
 recorder or the VS Code Codex thread command](docs/try-switchyard.md). The guide
 gives a repeatable install, the exact keys and commands, and the current limits.
-GitHub Actions builds a downloadable Linux preview from an exact commit after
-verification. Repository access is currently limited to invited collaborators;
+The private GitHub preview provides a downloadable Linux bundle and VSIX from
+an exact commit. GitHub Actions also builds an artifact when its budget permits.
+Repository access is currently limited to invited collaborators;
 no public release or license has been approved.
 
 **Current status:** the repository contains the hardware-independent B122

@@ -22,18 +22,22 @@ task-bound thread command currently supports Codex on Linux. Existing Claude
 terminals can be labelled **Registered** through **Adopt Terminal Once**, but
 Switchyard does not yet read their exact live task state.
 
-## Install from a verified Linux workflow artifact
+## Install a private Linux software preview
 
-From a successful [B122 Linux release verification workflow](https://github.com/SquirmyWormy275/strathex-switchyard/actions/workflows/b122-linux.yml)
-run, download its `sxsy-b122-linux-preview-<commit>` artifact. Extract the
-GitHub artifact ZIP, then run these commands in the extracted directory:
+Download `sxsy-b122-linux-x64.tar.xz`, `sxsy-b122-switchyard.vsix`, and
+`SHA256SUMS` from the private [GitHub Releases page](https://github.com/SquirmyWormy275/strathex-switchyard/releases).
+The release notes identify the exact source commit and whether hosted GitHub
+Actions verification ran. A successful [B122 Linux release verification workflow](https://github.com/SquirmyWormy275/strathex-switchyard/actions/workflows/b122-linux.yml)
+also provides the same files in a 14-day artifact when Actions is available.
+Extract a downloaded workflow artifact ZIP first. Run these commands in the
+directory containing the three files:
 
 ```sh
-sha256sum --check sxsy-b122-linux-x64.tar.xz.sha256
+sha256sum --check SHA256SUMS
 tar -xJf sxsy-b122-linux-x64.tar.xz
 ./sxsy-b122-linux-x64/deployment/preflight-b122-linux.sh
 ./sxsy-b122-linux-x64/deployment/install-b122-linux.sh ./sxsy-b122-linux-x64
-code --install-extension ./sxsy-b122-linux-x64/extension/sxsy-b122-switchyard.vsix --force
+code --install-extension ./sxsy-b122-switchyard.vsix --force
 ```
 
 The Linux bundle needs a systemd user session, Secret Service (`secret-tool`),
@@ -103,7 +107,8 @@ mise exec node@24.14.0 -- node scripts/install-workflow-shortcut.mjs
 ```
 
 Keep the checkout at the same path while using its shortcut. The VSIX builder
-needs `zip` and `unzip`. Source builds are development evidence; the workflow
-artifact is built and verified from an exact Git commit. Ordinary USB keyboard
+needs `zip` and `unzip`. Source builds are development evidence; the private
+preview and workflow artifacts identify their exact Git commit and verification
+limits. Ordinary USB keyboard
 typing on Windows remains a hardware acceptance test for the B122 after it
 arrives. No companion is required for ordinary typing.
