@@ -5,7 +5,7 @@ import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
-import { operatorSessionItems } from "./operator-status.ts";
+import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadObservation } from "./operator-status.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -151,6 +151,8 @@ export interface ManagedSessionControllerOptions {
   readonly extensionVersion?: string;
   /** Optional built-in Git adapter; an absent adapter is recorded as unknown. */
   readonly resolveGitRoots?: () => Promise<readonly GitRootRegistration[]>;
+  /** Optional read-only local Codex daemon observation; never changes companion capability. */
+  readonly observeCodexThreads?: () => Promise<readonly CodexLocalThreadObservation[]>;
   /** Real activation wires VS Code's URI API; tests inject a deterministic boundary. */
   readonly openExternal?: (url: string) => Promise<boolean>;
   /** Fixed VS Code commands only; B122 input never selects a command string. */
@@ -239,6 +241,7 @@ export class ManagedSessionController {
   private readonly idFactory: () => string;
   private readonly extensionVersion: string;
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
+  private readonly observeCodexThreads: () => Promise<readonly CodexLocalThreadObservation[]>;
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
@@ -296,6 +299,7 @@ export class ManagedSessionController {
     this.idFactory = options.idFactory ?? (() => `vscode-${Date.now().toString(36)}-${++counter}`);
     this.extensionVersion = boundedAdapterVersion(options.extensionVersion ?? "unpackaged-test");
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
+    this.observeCodexThreads = options.observeCodexThreads ?? (async () => []);
     const openExternal = options.openExternal ?? (async () => false);
     this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
     const executeCommand = options.executeCommand ?? (async (command: string) => {
@@ -459,16 +463,23 @@ export class ManagedSessionController {
         await this.registerDebugConfigurations();
       }),
       this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
-        const listed = await this.bridge.listSessions();
-        if (!listed.ok) {
+        const [listed, codex] = await Promise.all([
+          this.bridge.listSessions(),
+          this.observeCodexThreads().catch(() => [] as readonly CodexLocalThreadObservation[])
+        ]);
+        const items = [
+          ...(listed.ok ? operatorSessionItems(listed.value) : []),
+          ...codexLocalThreadItems(codex)
+        ];
+        if (!listed.ok && !items.length) {
           await this.vscode.window.showWarningMessage(`SXSY-B122 operator status is unavailable: ${listed.message}`);
           return;
         }
-        if (!listed.value.length) {
+        if (!items.length) {
           await this.vscode.window.showInformationMessage("SXSY-B122 has no authenticated managed sessions. Desktop windows and idle terminals are not inferred.");
           return;
         }
-        await this.vscode.window.showQuickPick(operatorSessionItems(listed.value), { placeHolder: "Read-only companion status; selecting a row performs no action" });
+        await this.vscode.window.showQuickPick(items, { placeHolder: "Managed sessions and unbound local Codex runtime; selecting a row performs no action" });
       }),
       this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();

@@ -1141,6 +1141,27 @@ test("registers VS Code window, workspace, terminals, and debug configurations w
   assert.match(vscode.warnings.at(-1) ?? "", /already been adopted/i);
 });
 
+test("operator command shows unbound live Codex runtime without changing authenticated sessions", async () => {
+  const vscode = new FakeVscode([], []);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    observeCodexThreads: async () => [
+      { id: "live-thread", observation: "active" },
+      { id: "stored-thread", observation: "not-observed" }
+    ]
+  });
+  await controller.start();
+  bridge.listedSessions = [];
+  await vscode.invoke("sxsy-b122.showManagedSessions");
+  const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
+  assert.equal(rows.length, 1);
+  assert.match((rows[0] as QuickPickItemLike).label, /active \(unbound\)/);
+  assert.match((rows[0] as QuickPickItemLike).detail ?? "", /no verified session capability/);
+  assert.equal(bridge.statuses.length, 0);
+  await controller.stop();
+});
+
 test("credential provisioning sends only operator-entered exact adapter/purpose triples for the selected repository", async () => {
   const vscode = new FakeVscode([], ["C:\\repo"]);
   const bridge = new FakeBridge();

@@ -138,9 +138,11 @@ npm run build:linux-companion
 npm run build:provider-host
 ```
 
-The read-only **SXSY-B122: Show Managed Sessions** command in VS Code refreshes the authenticated companion registry and displays exact task, plan, repository, target, capability, and reported status. It performs no host or agent action. Native ChatGPT and Claude sessions remain unknown until an authorized adapter proves their identity and observation capability.
+The read-only **SXSY-B122: Show Managed Sessions** command in VS Code refreshes the authenticated companion registry and displays exact task, plan, repository, target, capability, and reported status. On Linux it also includes loaded local Codex daemon threads as explicitly **unbound** runtime rows, without changing a managed session's capability or status. It performs no host or agent action. Native ChatGPT and Claude sessions remain unknown until an authorized adapter proves their identity and observation capability.
 
 `npm run codex:threads` gives a separate read-only [Codex thread inventory](docs/codex-thread-inventory.md) through the local App Server. It discards titles and previews and labels stored threads `not-observed`; it does not register them as verified Switchyard sessions.
+
+`npm run codex:live` reads runtime status from an already-running current-user Codex daemon on Linux. It shows local thread IDs and status without promoting unbound threads into managed sessions.
 
 Before the B122 arrives, **Super+Alt+R** on the owner's Omarchy workstation toggles an opt-in local workflow study. A temporary user service counts only broad foreground app categories and time while active; it does not infer agent status. `npm run workflow -- help` lists deliberate event fields, `npm run workflow -- report` summarizes the study, and `npm run workflow -- path` shows the private log and its size. The 10 MiB log cap prevents unbounded growth. This recorder captures no prompts, code, clipboard, or window titles. See [workflow capture](docs/workflow-capture.md).
 

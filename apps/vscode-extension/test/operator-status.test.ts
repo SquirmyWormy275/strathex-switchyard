@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { operatorSessionItems } from "../src/operator-status.ts";
+import { codexLocalThreadItems, operatorSessionItems } from "../src/operator-status.ts";
 import type { ExtensionManagedSession } from "../src/companion-bridge.ts";
 
 function session(overrides: Partial<ExtensionManagedSession>): ExtensionManagedSession {
@@ -30,4 +30,11 @@ test("operator view prioritizes verified blockers and preserves exact task and t
   assert.match(items[0]!.label, /claude · verified blocked/);
   assert.match(items[0]!.detail ?? "", /Session blocked.*task task-7.*plan plan-2.*repository \/work\/project.*target a{64}.*Controllable/);
   assert.match(items[1]!.label, /running/);
+});
+
+test("local Codex runtime rows disclose their unbound status without becoming managed sessions", () => {
+  const items = codexLocalThreadItems([{ id: "stored", observation: "not-observed" }, { id: "thread-7", observation: "waiting-on-approval" }]);
+  assert.equal(items.length, 1);
+  assert.match(items[0]!.label, /waiting-on-approval \(unbound\)/);
+  assert.match(items[0]!.detail ?? "", /Thread thread-7.*no Switchyard task.*no verified session capability/);
 });

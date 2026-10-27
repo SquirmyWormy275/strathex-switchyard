@@ -46,6 +46,7 @@
 - [x] Linux Secret Service, Unix-socket, Bubblewrap, systemd, package, and rollback implementation
 - [x] Read-only authenticated managed-session operator view in VS Code; no new chord or authority path
 - [x] Read-only local Codex thread inventory through App Server; stored threads remain unobserved, not finished
+- [x] Read-only live snapshot from the already-running local Codex daemon; threads remain unbound to managed tasks
 - [ ] Live native ChatGPT/Codex and Claude status adapters with versioned capability evidence
 - [x] Verify a Linux source test receipt and keep Windows-only runtime tests on the Windows lane
 

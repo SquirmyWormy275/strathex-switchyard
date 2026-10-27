@@ -96,6 +96,7 @@ export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
+  { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
   { file: "scripts/b122-scanner-fixture.test.mjs" },
   { file: "firmware/verify-require-compiler.test.mjs" },

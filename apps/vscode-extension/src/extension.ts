@@ -1,11 +1,17 @@
 import * as vscode from "vscode";
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
+import { homedir } from "node:os";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import { LinuxLibsecretCurrentUserProtector } from "../../linux-companion/src/linux-secret.ts";
 import type { ExtensionSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
+import type { CodexLocalThreadObservation } from "./operator-status.ts";
+
+const { readCodexDaemonThreads } = require("./codex-daemon-status.cjs") as {
+  readCodexDaemonThreads(socketPath: string): Promise<readonly CodexLocalThreadObservation[]>;
+};
 
 export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport, type RawHidDeviceIdentity, type RawHidInstallationPin, type RawHidRuntimeStatus, type HardwareSignalClaim } from "./companion-bridge.ts";
 export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader, type ExtensionSecretReader, type StoredCompanionPipeConfiguration } from "./named-pipe-transport.ts";
@@ -24,6 +30,9 @@ export function activate(context: vscode.ExtensionContext): void {
     configuredCompanionBridge(secretProtector),
     {
       resolveGitRoots: createVscodeGitRootResolver(vscode),
+      observeCodexThreads: async () => process.platform === "linux"
+        ? readCodexDaemonThreads(join(homedir(), ".codex", "app-server-control", "app-server-control.sock"))
+        : [],
       openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
       executeCommand: async (command) => { await vscode.commands.executeCommand(command); },
       sealSecret: (cleartext) => secretProtector.seal(cleartext),
