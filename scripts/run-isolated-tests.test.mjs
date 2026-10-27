@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRequiredTestManifest, createStrictTestEnvironment, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
@@ -39,6 +39,13 @@ test("platform groups accept only their exact declared skip count", async () => 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Linux source lane keeps shared and native groups without claiming Windows runtime coverage", () => {
+  assert.ok(linuxGroups.some((group) => group.file === "packages/control-plane/test/runtime.test.ts"));
+  assert.ok(linuxGroups.some((group) => group.file === "apps/linux-companion/test/linux-secret.test.ts"));
+  assert.equal(linuxGroups.some((group) => group.file.startsWith("apps/windows-companion/")), false);
+  assert.equal(linuxGroups.find((group) => group.file === "apps/linux-companion/test/linux-isolation.test.ts")?.expectedSkipped, undefined);
 });
 
 test("the required manifest exactly represents every repository test file", () => {
@@ -189,7 +196,7 @@ test("strict child environments allowlist operating-system inputs and isolate te
     const code = "if(process.env.SXSY_AMBIENT_SECRET||process.env.DATABASE_URL||process.env.GH_TOKEN||process.env.NODE_OPTIONS||process.env.SXSY_TEST_MODE!=='1'||process.env.SXSY_NETWORK!=='deny'||!process.env.SXSY_TEST_ROOT||!process.env.SXSY_TEST_DATABASE)process.exit(19)";
     const result = await runVerification({ groups: [{ file: "strict-environment", args: ["-e", code] }], outputDirectory: directory, executable });
     assert.equal(result.receipt.success, true);
-    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v2");
+    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v3");
   } finally {
     delete process.env.SXSY_AMBIENT_SECRET;
     await rm(directory, { recursive: true, force: true });

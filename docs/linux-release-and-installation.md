@@ -54,7 +54,7 @@ deployment/linux/build-b122-linux-release.sh \
 deployment/linux/test-linux-release.sh artifacts/sxsy-b122-linux-x64
 ```
 
-The builder compiles from the current checkout, packages the extension, embeds the reviewed runtime, and generates `MANIFEST.sha256`. A release intended for distribution must be built by the Linux GitHub workflow from a clean exact commit; a local directory is development evidence only.
+The builder compiles from the current checkout, packages the extension and opt-in workflow-study tools, embeds the reviewed runtime, and generates `MANIFEST.sha256`. A public or production release must be built by the Linux GitHub workflow from a clean exact commit; a local directory is development evidence only. A **private software-only collaborator preview** may be built from a clean exact commit after the full local Linux suite, release structure, installation lifecycle, and manifest pass; its release notes must label hosted verification unavailable if Actions did not run. When its budget permits, the GitHub workflow uploads a Linux bundle archive, checksums, and VSIX as a 14-day artifact after all checks pass. The [first-use guide](try-switchyard.md) gives the download and verification steps. The repository is currently private, so only invited collaborators can access these files.
 
 ## Install, update, rollback, uninstall
 
@@ -83,6 +83,8 @@ Rollback verifies the previous immutable manifest before switching and restartin
 ## VS Code
 
 Install `extension/sxsy-b122-switchyard.vsix` with VS Code's **Install from VSIX** command or the reviewed VS Code CLI. The same extension package supports Windows and Linux: it selects DPAPI/named pipes on Windows and Secret Service/Unix sockets on Linux. It reads only the companion-owned endpoint record below `${XDG_STATE_HOME:-$HOME/.local/state}/STRATHEX/switchyard`.
+
+The optional `scripts/install-workflow-shortcut.mjs` adds Super+Alt+R to the current Omarchy user's `~/.config/hypr/bindings.lua` after checking for a collision. Run it with the installed bundle's `runtime/bin/node` after installation. It saves the prior file and reason in private local state, validates the live binding, and leaves the recorder stopped until the first keypress. The bundled workflow recorder is independent of the companion and retains its local study log outside the repository.
 
 ## Configured provider host
 

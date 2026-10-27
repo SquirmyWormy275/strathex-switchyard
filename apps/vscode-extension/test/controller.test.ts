@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import type { CodexLocalThreadBinding } from "../src/operator-status.ts";
 import {
   type BridgeResult,
   type ExtensionCompanionBridge,
@@ -1139,6 +1140,65 @@ test("registers VS Code window, workspace, terminals, and debug configurations w
   assert.equal(bridge.adopted[0].provider, "claude");
   await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Manual terminal", provider: "codex" });
   assert.match(vscode.warnings.at(-1) ?? "", /already been adopted/i);
+});
+
+test("operator command shows unbound live Codex runtime without changing authenticated sessions", async () => {
+  const vscode = new FakeVscode([], []);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    observeCodexThreads: async () => [
+      { id: "live-thread", observation: "active" },
+      { id: "stored-thread", observation: "not-observed" }
+    ]
+  });
+  await controller.start();
+  bridge.listedSessions = [];
+  await vscode.invoke("sxsy-b122.showManagedSessions");
+  const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
+  assert.equal(rows.length, 1);
+  assert.match((rows[0] as QuickPickItemLike).label, /active \(unbound\)/);
+  assert.match((rows[0] as QuickPickItemLike).detail ?? "", /no verified session capability/);
+  assert.equal(bridge.statuses.length, 0);
+  await controller.stop();
+});
+
+test("Linux Codex start binds the App Server thread ID, task, repository, and exact existing target before opening the TUI", { skip: process.platform !== "linux" }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "sxsy-codex-bound-root-"));
+  const vscode = new FakeVscode([], [root]);
+  const bridge = new FakeBridge();
+  let saved: CodexLocalThreadBinding | undefined;
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: root }],
+    codexExecutable: process.execPath,
+    startCodexThread: async (repositoryRoot, taskId) => { assert.equal(repositoryRoot, root); assert.equal(taskId, "task-7"); return { threadId: "thread-created" }; },
+    persistCodexBinding: async (binding) => { saved = binding; return binding; },
+    readCodexBindings: async () => saved ? [saved] : [],
+    observeCodexThreads: async (boundThreadIds) => { assert.deepEqual(boundThreadIds, ["thread-created"]); return [{ id: "thread-created", observation: "active" }]; }
+  });
+  try {
+    await controller.start();
+    bridge.listedSessions = [{
+      id: "source-session", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown",
+      workspaceRoot: root, targetSnapshotId: "a".repeat(64), taskId: "task-7", plannedFiles: [],
+      lastHeartbeat: "2026-10-27T00:00:00.000Z", adapterVersion: "fixture", metadata: {}
+    }];
+    vscode.input("task-7");
+    await vscode.invoke("sxsy-b122.startBoundCodexThread");
+    assert.equal(saved?.threadId, "thread-created");
+    assert.equal(saved?.taskId, "task-7");
+    assert.equal(saved?.targetSnapshotId, "a".repeat(64));
+    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix://", "thread-created"]);
+    assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "thread-created");
+    assert.deepEqual(bridge.registered.at(-1)?.capabilities, ["registered"]);
+    await vscode.invoke("sxsy-b122.showManagedSessions");
+    const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
+    assert.ok(rows.some((row) => typeof row !== "string" && /active \(task-bound\)/.test(row.label) && row.detail?.includes("task task-7")));
+  } finally {
+    await controller.stop();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("credential provisioning sends only operator-entered exact adapter/purpose triples for the selected repository", async () => {

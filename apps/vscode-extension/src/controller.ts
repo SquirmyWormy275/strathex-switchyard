@@ -5,6 +5,7 @@ import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
+import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadBinding, type CodexLocalThreadObservation } from "./operator-status.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -150,6 +151,12 @@ export interface ManagedSessionControllerOptions {
   readonly extensionVersion?: string;
   /** Optional built-in Git adapter; an absent adapter is recorded as unknown. */
   readonly resolveGitRoots?: () => Promise<readonly GitRootRegistration[]>;
+  /** Optional read-only local Codex daemon observation; never changes companion capability. */
+  readonly observeCodexThreads?: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  readonly readCodexBindings?: () => Promise<readonly CodexLocalThreadBinding[]>;
+  readonly codexExecutable?: string;
   /** Real activation wires VS Code's URI API; tests inject a deterministic boundary. */
   readonly openExternal?: (url: string) => Promise<boolean>;
   /** Fixed VS Code commands only; B122 input never selects a command string. */
@@ -238,6 +245,11 @@ export class ManagedSessionController {
   private readonly idFactory: () => string;
   private readonly extensionVersion: string;
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
+  private readonly observeCodexThreads: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  private readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  private readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  private readonly readCodexBindings: () => Promise<readonly CodexLocalThreadBinding[]>;
+  private readonly codexExecutable?: string;
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
@@ -295,6 +307,11 @@ export class ManagedSessionController {
     this.idFactory = options.idFactory ?? (() => `vscode-${Date.now().toString(36)}-${++counter}`);
     this.extensionVersion = boundedAdapterVersion(options.extensionVersion ?? "unpackaged-test");
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
+    this.observeCodexThreads = options.observeCodexThreads ?? (async () => []);
+    this.startCodexThread = options.startCodexThread;
+    this.persistCodexBinding = options.persistCodexBinding;
+    this.readCodexBindings = options.readCodexBindings ?? (async () => []);
+    this.codexExecutable = options.codexExecutable;
     const openExternal = options.openExternal ?? (async () => false);
     this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
     const executeCommand = options.executeCommand ?? (async (command: string) => {
@@ -458,8 +475,30 @@ export class ManagedSessionController {
         await this.registerDebugConfigurations();
       }),
       this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
-        const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
-        await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
+        const [listed, bindings] = await Promise.all([
+          this.bridge.listSessions(),
+          this.readCodexBindings().catch(() => [] as readonly CodexLocalThreadBinding[])
+        ]);
+        const codex = await this.observeCodexThreads(bindings.map((binding) => binding.threadId))
+          .catch(() => [] as readonly CodexLocalThreadObservation[]);
+        const items = [
+          ...(listed.ok ? operatorSessionItems(listed.value) : []),
+          ...codexLocalThreadItems(codex, bindings)
+        ];
+        if (!listed.ok && !items.length) {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 operator status is unavailable: ${listed.message}`);
+          return;
+        }
+        if (!items.length) {
+          await this.vscode.window.showInformationMessage("SXSY-B122 has no authenticated managed sessions. Desktop windows and idle terminals are not inferred.");
+          return;
+        }
+        await this.vscode.window.showQuickPick(items, { placeHolder: "Managed sessions and local Codex runtime; selecting a row performs no action" });
+      }),
+      this.registerAdmittedCommand("sxsy-b122.startBoundCodexThread", async () => {
+        await this.startBoundCodexThread().catch(async (error) => {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 could not start the bound Codex thread: ${error instanceof Error ? error.message : "unknown error"}`);
+        });
       }),
       this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();
@@ -519,6 +558,82 @@ export class ManagedSessionController {
       this.ownLifecycleDisposables(this.registerAdmittedCommand(command.command, async (argument: unknown) => {
         await this.dispatchChord(command, parseInputArgument(argument));
       }));
+    }
+  }
+
+  /** Start one Codex thread first, then persist exactly the ID returned by App Server. */
+  private async startBoundCodexThread(): Promise<void> {
+    if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 task-bound Codex requires Linux, the local App Server, and a Codex CLI in a supported user or system location.");
+      return;
+    }
+    const folders = this.vscode.workspace.workspaceFolders ?? [];
+    if (!folders.length || folders.length > 32) {
+      await this.vscode.window.showWarningMessage("Open one exact repository folder in VS Code before starting a bound Codex thread.");
+      return;
+    }
+    let chosen = folders[0];
+    if (folders.length > 1) {
+      const items = folders.map((folder) => ({ label: folder.uri.fsPath, description: "Exact VS Code workspace folder" }));
+      const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the repository for this Codex thread" });
+      if (!selected) return;
+      chosen = folders[items.indexOf(selected)];
+    }
+    if (!chosen) return;
+    const requested = resolve(chosen.uri.fsPath);
+    const link = await lstat(requested);
+    const root = await realpath(requested);
+    if (!link.isDirectory() || link.isSymbolicLink() || !samePath(root, requested)) throw new Error("The chosen repository folder is not an exact local directory.");
+    if (!this.gitRoots.some((candidate) => samePath(candidate.gitRoot, root))) throw new Error("The chosen folder is not an observed exact Git repository root.");
+    const taskId = await this.vscode.window.showInputBox?.({
+      prompt: "Short task ID for this Codex thread (no prompts or customer names)",
+      validateInput: (value) => /^[A-Za-z0-9_.:-]{1,128}$/.test(value) ? undefined : "Use 1–128 letters, digits, periods, colons, underscores, or hyphens."
+    });
+    if (!taskId) return;
+    if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("The task ID is not a bounded opaque identifier.");
+    const executable = await realpath(this.codexExecutable);
+    const executableInfo = await stat(executable);
+    if (!executableInfo.isFile() || (executableInfo.mode & 0o111) === 0) throw new Error("The reviewed Codex executable is unavailable.");
+    const before = await this.bridge.listSessions().catch(() => undefined);
+    const candidates = before?.ok ? before.value.filter((session) => session.provider === "codex" && session.taskId === taskId
+      && session.workspaceRoot && samePath(session.workspaceRoot, root) && session.targetSnapshotId && /^[a-f0-9]{64}$/.test(session.targetSnapshotId)) : [];
+    const source = candidates.length === 1 ? candidates[0] : undefined;
+    let threadId: string | undefined;
+    try {
+      this.assertAdmissionActive();
+      const started = await this.startCodexThread(root, taskId);
+      threadId = started.threadId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) throw new Error("Codex returned an invalid thread ID.");
+      const after = source ? await this.bridge.listSessions().catch(() => undefined) : undefined;
+      const target = source && after?.ok && after.value.some((session) => session.id === source.id && session.provider === "codex"
+        && session.taskId === taskId && session.targetSnapshotId === source.targetSnapshotId
+        && session.workspaceRoot && samePath(session.workspaceRoot, root)) ? source.targetSnapshotId! : null;
+      const binding: CodexLocalThreadBinding = {
+        threadId, taskId, sessionId: `codex-thread:${threadId}`, repositoryRoot: root,
+        targetSnapshotId: target, createdAt: this.now()
+      };
+      this.assertAdmissionActive();
+      await this.persistCodexBinding(binding);
+      const session: ExtensionManagedSession = {
+        ...this.makeSession(binding.sessionId, "codex", "vscode_terminal", "unknown", {
+          "sxsy-b122.kind": "codex-app-server-thread",
+          "sxsy-b122.codex.threadId": threadId,
+          "sxsy-b122.codex.binding": "local-thread-start-v1"
+        }, root),
+        taskId,
+        ...(target ? { targetSnapshotId: target } : {})
+      };
+      const registered = await this.bridge.registerSession(session, "terminal").catch(() => undefined);
+      this.assertAdmissionActive();
+      if (registered?.ok) this.sessions.set(session.id, registered.value);
+      const terminal = this.vscode.window.createTerminal({
+        name: `SXSY Codex · ${taskId}`, cwd: root, shellPath: executable,
+        shellArgs: ["resume", "--remote", "unix://", threadId]
+      });
+      terminal.show();
+      await this.vscode.window.showInformationMessage(`SXSY-B122 opened Codex thread ${threadId} for task ${taskId}; target ${target ?? "unverified"}. Its runtime status does not imply a verified Switchyard outcome.`);
+    } catch (error) {
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Codex thread start stopped${threadId ? ` after Codex created ${threadId}` : ""}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
 
@@ -849,7 +964,7 @@ export class ManagedSessionController {
   private async provisionCredential(): Promise<void> {
     const root = await this.chooseGitRoot("Choose the exact Git root for this credential reference");
     const input = this.vscode.window.showInputBox;
-    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed Windows DPAPI host."); return; }
+    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed host secret protector."); return; }
     const reference = await input({ prompt: "Credential reference name", value: "github-token", validateInput: (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? undefined : "Use a bounded reference name." });
     const scopesText = reference ? await input({
       prompt: `Exact adapter/purpose scopes for ${root.gitRoot} (comma-separated)`,
@@ -857,16 +972,16 @@ export class ManagedSessionController {
       validateInput: (value) => parseCredentialScopePairs(value, root.gitRoot) ? undefined : "Enter 1-16 unique adapterId/purpose pairs."
     }) : undefined;
     const scopes = scopesText ? parseCredentialScopePairs(scopesText, root.gitRoot) : undefined;
-    const secretText = scopes ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
+    const secretText = scopes ? await input({ prompt: "Credential value (sealed by the host before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
     if (!reference || !scopes || !secretText) return;
     const bytes = Buffer.from(secretText, "utf8");
     let sealedSecret: string;
-    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with Windows DPAPI; nothing was sent."); return; } finally { bytes.fill(0); }
+    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with the host secret protector; nothing was sent."); return; } finally { bytes.fill(0); }
     const existing = await this.bridge.listCredentials();
     const replaceExisting = existing.ok && existing.value.some((item) => item.reference === reference && !item.revokedAt);
     const result = await this.bridge.provisionCredential({ reference, scopes, sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
     if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not provisioned: ${result.message}`);
-    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned host-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
   }
 
   private async listCredentials(): Promise<void> {

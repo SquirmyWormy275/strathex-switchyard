@@ -13,7 +13,10 @@
     "apps/*"
   ],
   "scripts": {
-    "build:vscode": "node scripts/clean-vscode-build.mjs && tsc -p apps/vscode-extension/tsconfig.build.json",
+    "workflow": "node scripts/workflow-capture.mjs",
+    "codex:threads": "node scripts/codex-thread-status.mjs",
+    "codex:live": "node scripts/codex-daemon-status.mjs",
+    "build:vscode": "node scripts/clean-vscode-build.mjs && tsc -p apps/vscode-extension/tsconfig.build.json && node scripts/copy-vscode-runtime.mjs",
     "build:protocol": "tsc -p packages/protocol/tsconfig.build.json",
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
     "build:linux-companion": "npm run build:protocol && node scripts/clean-linux-build.mjs && tsc -p apps/linux-companion/tsconfig.build.json",
@@ -31,7 +34,8 @@
     "package:companion:dry-run": "npm run build:companion && npm pack --dry-run --workspace @strathex/switchyard-companion",
     "package:linux-companion:dry-run": "npm run build:linux-companion && npm pack --dry-run --workspace @strathex/switchyard-linux-companion",
     "package:provider-host:dry-run": "npm run build:provider-host && npm pack --dry-run --workspace @strathex/switchyard-provider-adapter-host",
-    "test": "node scripts/run-isolated-tests.mjs",
+    "test": "node scripts/run-platform-tests.mjs",
+    "test:all": "node scripts/run-isolated-tests.mjs",
     "test:prehardware": "node --test scripts/b122-commissioning.test.mjs",
     "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-tests-windows.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.json"

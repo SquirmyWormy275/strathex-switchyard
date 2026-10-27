@@ -1,5 +1,11 @@
 # Windows Release and Installation
 
+## Plain keyboard use
+
+The commissioned B122 must enumerate and type as a standard USB keyboard when plugged into any supported Windows computer. Ordinary typing requires **no Switchyard installer, sign-in, per-computer mapping, service, or provider setup**. The 22 advanced controls have no agent effect when the optional companion is absent. This is a physical acceptance requirement; the current logical 22-control firmware overlay does not yet include or prove the full B122 typing map. Do not flash that overlay as a replacement for the manufacturer's complete keymap. See [the host capability matrix](platform-capability-matrix.md).
+
+Install the per-user Windows bundle only when the operator wants advanced agent functions on that machine. The installation must preserve normal typing and cannot inherit Linux credentials, personal provider accounts, or protected state. Each effectful integration still requires its own exact authorization; an unconfigured route reports unavailable.
+
 The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, fixed repository-runtime Job-Object helper, fixed native Raw-HID helper, fixed native provider-desktop helper, fixed native voice helper, VS Code VSIX, a portable QMK/Vial source overlay, the runtime/sandbox/voice provisioning tools and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, the pinned self-contained .NET runtime license and third-party notices, checksums, a portable-startup receipt, a compiler-bound firmware verification receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. Any supplied prebuilt native helper requires its reviewed SHA-256 value.
 
 On a clean checkout, provision the repository-local .NET SDK and offline package feed before building. `Provision-B122DotnetToolchain.ps1` downloads only the exact Microsoft SDK archive and NuGet packages recorded in `dotnet-toolchain.json`, verifies their reviewed digests, and prepares the cache used by the test harness. `-VerifyExisting` performs the same identity checks without network access.
