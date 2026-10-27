@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, open, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -28,8 +28,26 @@ test("local baseline records bounded metadata and summarizes completed sessions"
       }
     });
     const content = await readFile(join(directory, "events.jsonl"), "utf8");
+    assert.match(run("path").stdout, /Size: [1-9][0-9]* \/ 10485760 bytes/);
     assert.doesNotMatch(content, /prompt|clipboard|repositoryRoot|windowTitle/);
     if (process.platform !== "win32") assert.equal((await stat(join(directory, "events.jsonl"))).mode & 0o777, 0o600);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("recorder stops at 10 MiB and leaves room to end the active session", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-workflow-study-"));
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], {
+    encoding: "utf8", env: { ...process.env, SXSY_WORKFLOW_STUDY_DIR: directory }
+  });
+  try {
+    assert.equal(run("start", "linux").status, 0);
+    const handle = await open(join(directory, "events.jsonl"), "r+");
+    try { await handle.truncate(10 * 1024 * 1024 - 1024); } finally { await handle.close(); }
+    const denied = run("event", "resume", "codex", "keyboard", "success", "100", "1", "user");
+    assert.equal(denied.status, 1);
+    assert.match(denied.stderr, /10 MiB cap/);
+    assert.equal(run("end").status, 0);
+    assert.ok((await stat(join(directory, "events.jsonl"))).size <= 10 * 1024 * 1024);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

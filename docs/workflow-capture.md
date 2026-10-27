@@ -10,11 +10,12 @@ mise exec node@24.14.0 -- node scripts/workflow-capture.mjs event resume codex k
 mise exec node@24.14.0 -- node scripts/workflow-capture.mjs event status codex palette blocked 800 4 none
 mise exec node@24.14.0 -- node scripts/workflow-capture.mjs end
 mise exec node@24.14.0 -- node scripts/workflow-capture.mjs report
+mise exec node@24.14.0 -- node scripts/workflow-capture.mjs path
 ```
 
 `event` fields are `kind surface method outcome duration_ms friction evidence`. Run `help` for the closed values. Duration is the measured time from intent to confirmed result in milliseconds; friction is 1–5. Use `provider` only for an exact provider observation, `companion` only for an authenticated companion observation, `user` for your own observation, and `none` when status cannot be proved. The recorder never upgrades an event into a verified agent status.
 
-Records live outside the repository at `${XDG_STATE_HOME:-$HOME/.local/state}/strathex-switchyard/workflow-study` on Linux or `%LOCALAPPDATA%\strathex-switchyard\workflow-study` on Windows. The Linux directory and files must remain private (`0700`/`0600`). `SXSY_WORKFLOW_STUDY_DIR` can select an absolute local path for a controlled study. The JSONL log contains time, a generated session ID, machine, optional short task alias, and the closed event fields. Reports aggregate counts, retries or blocks, total duration, and average friction by event kind. No background process or autostart is installed.
+Records live outside the repository at `${XDG_STATE_HOME:-$HOME/.local/state}/strathex-switchyard/workflow-study` on Linux or `%LOCALAPPDATA%\strathex-switchyard\workflow-study` on Windows. Run `npm run workflow -- path` to print the exact location and size on the current machine. The Linux directory and files must remain private (`0700`/`0600`). `SXSY_WORKFLOW_STUDY_DIR` can select an absolute local path for a controlled study. The JSONL log contains time, a generated session ID, machine, optional short task alias, and the closed event fields. Reports aggregate counts, retries or blocks, total duration, and average friction by event kind. No background process or autostart is installed. Each record is at most 2 KiB, and recording stops at 10 MiB while reserving room to end the active session. The tool never deletes or rotates study data automatically; preserve or move the log when it reaches the cap.
 
 Use a pseudonymous task alias; never enter a customer, repository, person, prompt, file path, credential, or proprietary name. Capture at least ten representative sessions and note relevant omissions in a separate reviewed study record. The aggregate can guide implementation priority while the current 65 chord assignments stay fixed. See [the study protocol](03-workflow-study.md).
 

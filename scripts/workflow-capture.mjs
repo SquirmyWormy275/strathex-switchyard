@@ -11,6 +11,8 @@ const surfaces = ["codex", "claude", "chatgpt", "vscode", "terminal", "browser",
 const methods = ["keyboard", "mouse", "palette", "command", "automatic", "mixed"];
 const outcomes = ["success", "retry", "blocked", "unknown"];
 const evidenceLevels = ["provider", "companion", "user", "none"];
+const maxRecordBytes = 2048;
+const maxLogBytes = 10 * 1024 * 1024;
 const stateRoot = process.env.SXSY_WORKFLOW_STUDY_DIR || join(
   platform() === "win32"
     ? absoluteOr(process.env.LOCALAPPDATA, join(homedir(), "AppData", "Local"))
@@ -28,6 +30,7 @@ function usage() {
   node scripts/workflow-capture.mjs event KIND SURFACE METHOD OUTCOME DURATION_MS FRICTION EVIDENCE
   node scripts/workflow-capture.mjs end
   node scripts/workflow-capture.mjs status
+  node scripts/workflow-capture.mjs path
   node scripts/workflow-capture.mjs report
 
 KIND: ${kinds.join("| ")}
@@ -67,9 +70,17 @@ async function readActive() {
 }
 async function append(record) {
   const line = `${JSON.stringify(record)}\n`;
-  if (Buffer.byteLength(line) > 2048) throw new Error("Workflow record exceeds the bounded event size.");
+  const bytes = Buffer.byteLength(line);
+  if (bytes > maxRecordBytes) throw new Error("Workflow record exceeds the bounded event size.");
   const handle = await open(eventsPath, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | (constants.O_NOFOLLOW ?? 0), 0o600);
-  try { await assertPrivateFile(handle); await handle.writeFile(line); } finally { await handle.close(); }
+  try {
+    await assertPrivateFile(handle);
+    const reserveForEnd = record.type === "end" ? 0 : maxRecordBytes;
+    if ((await handle.stat()).size + bytes + reserveForEnd > maxLogBytes) {
+      throw new Error("Workflow log reached its 10 MiB cap. Preserve or move events.jsonl before recording more sessions.");
+    }
+    await handle.writeFile(line);
+  } finally { await handle.close(); }
 }
 async function assertPrivateFile(handle) {
   const identity = await handle.stat();
@@ -116,6 +127,15 @@ async function status() {
     else throw error;
   }
 }
+async function path() {
+  let bytes = 0;
+  try {
+    const identity = await lstat(eventsPath);
+    if (!identity.isFile() || identity.isSymbolicLink()) throw new Error("Workflow log is not a regular file.");
+    bytes = identity.size;
+  } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  process.stdout.write(`Directory: ${stateRoot}\nLog: ${eventsPath}\nSize: ${bytes} / ${maxLogBytes} bytes\n`);
+}
 async function report() {
   await ensureStateRoot();
   let content;
@@ -123,7 +143,7 @@ async function report() {
   try {
     handle = await open(eventsPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     await assertPrivateFile(handle);
-    if ((await handle.stat()).size > 10 * 1024 * 1024) throw new Error("Workflow log exceeds the 10 MiB report limit; archive it before continuing.");
+    if ((await handle.stat()).size > maxLogBytes) throw new Error("Workflow log exceeds the 10 MiB report limit; archive it before continuing.");
     content = await handle.readFile("utf8");
   }
   catch (error) { if (error?.code === "ENOENT") { process.stdout.write("No workflow observations recorded.\n"); return; } throw error; }
@@ -147,6 +167,7 @@ try {
   else if (command === "event") await event(args);
   else if (command === "end" && args.length === 0) await end();
   else if (command === "status" && args.length === 0) await status();
+  else if (command === "path" && args.length === 0) await path();
   else if (command === "report" && args.length === 0) await report();
   else throw new Error(usage());
 } catch (error) {
