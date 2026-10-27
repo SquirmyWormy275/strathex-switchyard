@@ -31,6 +31,7 @@ GitHub artifact ZIP, then run these commands in the extracted directory:
 ```sh
 sha256sum --check sxsy-b122-linux-x64.tar.xz.sha256
 tar -xJf sxsy-b122-linux-x64.tar.xz
+./sxsy-b122-linux-x64/deployment/preflight-b122-linux.sh
 ./sxsy-b122-linux-x64/deployment/install-b122-linux.sh ./sxsy-b122-linux-x64
 code --install-extension ./sxsy-b122-linux-x64/extension/sxsy-b122-switchyard.vsix --force
 ```

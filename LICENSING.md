@@ -11,7 +11,7 @@ No repository-wide license has been selected yet. This avoids accidentally relic
 | Original legends, diagrams, and photographs | CC BY 4.0 or rights reserved, by directory/file notice |
 | Vial/QMK-derived firmware | Applicable GPL terms with corresponding source and preserved notices |
 | Leyden Jar-derived material | GPL-3.0 and upstream exceptions/notices as applicable |
-| cyber_engineer templates | Informal redistribution permission plus requested creator credit; no SPDX identifier asserted |
+| cyber_engineer templates and geometry-derived sheets | Informal redistribution permission plus requested creator credit; no SPDX identifier asserted |
 | Other third-party assets | Their own verified license and attribution requirements |
 
 ## Rules
@@ -21,5 +21,6 @@ No repository-wide license has been selected yet. This avoids accidentally relic
 3. Every imported file must be listed in `ATTRIBUTION.md` and, where useful, accompanied by a local notice.
 4. Modified GPL firmware must be distributed with the corresponding source, build instructions, modification notice, and applicable license text.
 5. Public visibility is not a substitute for a license.
+6. The preserved `cyber_engineer` source package and its generated geometry-derived sheets must retain the creator credit and package instructions. The example sheet's Remix Icon notice must remain with that source file; generated SXSY-B122 artwork does not reuse those icons.
 
 This document is project administration, not legal advice.

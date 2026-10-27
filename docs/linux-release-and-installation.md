@@ -43,7 +43,7 @@ an unsigned fixture, or a failed namespace returns incomplete or unavailable.
 
 ## Build
 
-Use the reviewed Node v24.14.0 Linux x64 archive. Its SHA-256 in the official Node release manifest is `41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df`.
+The repository pins Node.js 24.14.0 in `.nvmrc`, `.mise.toml`, package metadata, CI, and bundled runtimes. Use the reviewed Node v24.14.0 Linux x64 archive. Its SHA-256 in the official Node release manifest is `41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df`.
 
 ```sh
 npm ci --ignore-scripts
@@ -57,6 +57,14 @@ deployment/linux/test-linux-release.sh artifacts/sxsy-b122-linux-x64
 The builder compiles from the current checkout, packages the extension and opt-in workflow-study tools, embeds the reviewed runtime, and generates `MANIFEST.sha256`. A release intended for distribution must be built by the Linux GitHub workflow from a clean exact commit; a local directory is development evidence only. After its tests pass, that workflow uploads a Linux bundle archive, its SHA-256 sidecar, and the VSIX as a 14-day GitHub Actions artifact. The [first-use guide](try-switchyard.md) gives the download and verification steps. The repository is currently private, so only invited collaborators can access that artifact.
 
 ## Install, update, rollback, uninstall
+
+Run the bundled read-only prerequisite check before installation:
+
+```sh
+artifacts/sxsy-b122-linux-x64/deployment/preflight-b122-linux.sh
+```
+
+It reports the exact reviewed executable path and package name for Secret Service, Bubblewrap, flock, espeak-ng, and systemd. It never installs packages or changes the host.
 
 ```sh
 artifacts/sxsy-b122-linux-x64/deployment/install-b122-linux.sh \

@@ -189,7 +189,8 @@ test("strict child environments allowlist operating-system inputs and isolate te
     assert.equal(environment.SXSY_NETWORK, "deny");
     assert.match(environment.SXSY_TEST_DATABASE, /^sxsy_test_/);
     assert.equal(environment.TEMP, join(directory, "child"));
-    assert.equal(environment.XDG_RUNTIME_DIR, join(directory, "child", "runtime"));
+    assert.equal(environment.XDG_STATE_HOME, join(directory, "child", ".local", "state"));
+    assert.equal(environment.XDG_RUNTIME_DIR, join(directory, "child", ".runtime"));
 
     process.env.SXSY_AMBIENT_SECRET = "must-not-cross";
     const code = "if(process.env.SXSY_AMBIENT_SECRET||process.env.DATABASE_URL||process.env.GH_TOKEN||process.env.NODE_OPTIONS||process.env.SXSY_TEST_MODE!=='1'||process.env.SXSY_NETWORK!=='deny'||!process.env.SXSY_TEST_ROOT||!process.env.SXSY_TEST_DATABASE)process.exit(19)";
