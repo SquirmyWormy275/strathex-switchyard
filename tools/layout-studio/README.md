@@ -19,6 +19,20 @@ firmware, write Vial settings, or install OS shortcuts.
    key and modifier, review warnings, then download the JSON plan and Markdown
    review sheet.
 
+**Optional workflow evidence:** On a checkout with the Switchyard workflow
+recorder, run `node scripts/workflow-capture.mjs report` and save its JSON
+output to a local file. Import that file through **Aggregate study report**, or
+use **Load illustrative observations** to try the flow. The studio retains
+only completed/started session counts and broad deliberate-event summaries;
+it discards focus durations, timestamps, task aliases, and unknown fields.
+It accepts no raw JSONL log. Suggested intent names are starting points:
+select **Use as draft**, enter your own times-per-day and seconds-saved
+estimates, then add and place the action yourself. A `resume` count does not
+prove an exact agent task was resumed, and a focus interval says nothing about
+agent status. Suggestions are sorted by a simple heuristic (count × average
+friction + 2 × retry/blocked count), not measured time savings. The exported
+review sheet states the evidence boundary.
+
 The server binds only to `127.0.0.1` and serves fixed files. Imported data
 stays in the browser tab until you download it; no account, database, or
 external service is used. Closing the terminal stops the server.
@@ -70,6 +84,8 @@ keymap.
 - An unmodified agent action that would replace a recorded ordinary keycode.
 - A high-consequence action without an explicit confirmation step.
 - Missing typing-layer evidence or actions that have not been placed.
+- Optional aggregate workflow evidence, with incomplete-session counts and
+  broad event kinds kept separate from self-reported daily estimates.
 - Ctrl+Alt chords that may act as AltGr, and Super/Windows chords that may
   collide with desktop shortcuts. Test both on the actual target systems.
 

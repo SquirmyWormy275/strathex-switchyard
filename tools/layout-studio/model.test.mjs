@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { analyzePlan, attachQmkBaseLayer, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, planMarkdown } from "./model.mjs";
+import { analyzePlan, attachQmkBaseLayer, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, parseStudyReport, planMarkdown, studySuggestions } from "./model.mjs";
 import { createStudioServer } from "./serve.mjs";
 
 const sample = (name) => readFile(fileURLToPath(new URL(name, import.meta.url)), "utf8").then(JSON.parse);
@@ -59,6 +59,28 @@ test("cross-platform modifiers are reviewable and flag AltGr or OS shortcut risk
   assert.ok(review.issues.some((issue) => /operating-system shortcut/.test(issue.message)));
 });
 
+test("aggregate study evidence suggests intents without retaining focus data or task aliases", async () => {
+  const report = await sample("./sample-study-report.json");
+  report.taskAlias = "private-client";
+  const summary = parseStudyReport(report);
+  assert.equal(summary.sessionsCompleted, 3);
+  assert.equal(summary.focusDurationMs, undefined);
+  assert.equal(summary.taskAlias, undefined);
+  assert.deepEqual(studySuggestions(summary).map((item) => item.kind), ["resume", "failure", "review"]);
+  const plan = newPlan(attachQmkBaseLayer(parseQmkInfo(await sample("./sample-info.json")), await sample("./sample-keymap.json")));
+  plan.study = summary;
+  const saved = parsePlan(JSON.parse(JSON.stringify(plan)));
+  assert.equal(saved.study.events, 5);
+  assert.match(planMarkdown(saved), /Counts describe observed event kinds, not exact intents or daily frequency/);
+});
+
+test("study importer rejects raw logs and inconsistent aggregate counts", async () => {
+  const report = await sample("./sample-study-report.json");
+  assert.throws(() => parseStudyReport([{ type: "event", kind: "resume" }]), /must be an object/);
+  assert.throws(() => parseStudyReport({ ...report, events: 4 }), /do not match/);
+  assert.throws(() => parseStudyReport({ ...report, byKind: { ...report.byKind, unknown: { count: 1 } } }), /unknown action kind/);
+});
+
 test("import rejects ambiguous layouts, wrong keymap, duplicate matrix positions, and Vial definitions", async () => {
   const info = await sample("./sample-info.json");
   const profile = parseQmkInfo(info);
@@ -89,6 +111,9 @@ test("studio serves only fixed local assets over loopback", async () => {
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
     assert.match(await page.text(), /Build an agentic keyboard layout/);
+    const example = await fetch(`${base}/sample-study-report.json`);
+    assert.equal(example.status, 200);
+    assert.equal(parseStudyReport(await example.json()).events, 5);
     assert.equal((await fetch(`${base}/secret`)).status, 404);
     assert.equal((await fetch(base, { method: "POST", body: "test" })).status, 404);
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }

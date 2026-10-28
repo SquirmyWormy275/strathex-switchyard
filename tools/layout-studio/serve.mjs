@@ -12,7 +12,8 @@ const files = new Map([
   ["/model.mjs", ["model.mjs", "text/javascript; charset=utf-8"]],
   ["/style.css", ["style.css", "text/css; charset=utf-8"]],
   ["/sample-info.json", ["sample-info.json", "application/json; charset=utf-8"]],
-  ["/sample-keymap.json", ["sample-keymap.json", "application/json; charset=utf-8"]]
+  ["/sample-keymap.json", ["sample-keymap.json", "application/json; charset=utf-8"]],
+  ["/sample-study-report.json", ["sample-study-report.json", "application/json; charset=utf-8"]]
 ]);
 
 export function createStudioServer() {
