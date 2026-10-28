@@ -3,67 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Switchyard Layout Studio</title>
+  <meta name="theme-color" content="#0b1118">
+  <title>Layout Studio · STRATHEX SWITCHYARD</title>
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.mjs"></script>
 </head>
 <body>
-  <header>
-    <p class="eyebrow">STRATHEX SWITCHYARD · OFFLINE DESIGN TOOL</p>
-    <h1>Build an agentic keyboard layout around your work.</h1>
-    <p class="lede">Bring a physical layout, keep its normal keys visible, then map the actions you use most. Export a plan for review before touching firmware or host shortcuts.</p>
-  </header>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Switchyard Layout Studio, back to top"><span class="brand-mark" aria-hidden="true">S<span>↗</span></span><span><strong>SWITCHYARD</strong><small>LAYOUT STUDIO</small></span></a>
+      <nav class="top-nav" aria-label="Studio sections"><a href="#board">Keyboard</a><a href="#patterns">Workflow</a><a href="#mapping">Layout</a><a href="#review">Review</a></nav>
+      <span class="local-badge"><span aria-hidden="true"></span> LOCAL · PRIVATE</span>
+    </header>
 
-  <main>
-    <section class="panel" aria-labelledby="board-title">
-      <div class="section-heading"><span class="step">01</span><div><h2 id="board-title">Choose the keyboard</h2><p>Import the exact QMK <code>info.json</code>, or a manually reviewed Switchyard board profile. No model matrix is guessed.</p></div></div>
-      <div class="controls">
-        <label class="file-control">QMK info.json <input id="info-file" type="file" accept=".json,application/json"></label>
-        <label class="file-control">QMK keymap.json <input id="keymap-file" type="file" accept=".json,application/json"></label>
-        <label class="file-control">Board profile or saved plan <input id="plan-file" type="file" accept=".json,application/json"></label>
-        <button id="sample-button" type="button" class="secondary">Load illustrative sample</button>
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">DESIGN FOR THE WAY YOU ACTUALLY WORK</p>
+        <h1 id="hero-title">Turn agent workflows into a keyboard you can trust.</h1>
+        <p class="lede">Start with the exact physical board. Find the actions you repeat. Try the chords, inspect the tradeoffs, and export a plan you can review before changing a single key.</p>
+        <div class="hero-actions"><button id="hero-sample-button" type="button">Explore the demo <span aria-hidden="true">↗</span></button><a class="button-link ghost" href="#board">Use my keyboard</a></div>
+        <p class="hero-note">No account. No uploads. No firmware writes.</p>
       </div>
-      <label id="layout-picker-wrap" hidden>Physical layout <select id="layout-picker"></select></label>
-      <div id="board-summary" class="summary">Load a board to begin. The sample is illustrative and is not a Model F matrix.</div>
-      <div id="keyboard" class="keyboard" role="group" aria-label="Physical keyboard preview"></div>
+      <div class="hero-art" aria-hidden="true"><div class="art-label">WORKFLOW / PHYSICAL CONTROL</div><div class="art-grid"><span>RESUME</span><span>REVIEW</span><span>ROUTE</span><span>HANDOFF</span><span>PROOF</span><span>RECOVER</span></div><div class="art-caption">YOUR LAYOUT, YOUR INTENT.</div></div>
     </section>
 
-    <section class="panel" aria-labelledby="actions-title">
-      <div class="section-heading"><span class="step">02</span><div><h2 id="actions-title">Inventory your agent actions</h2><p>Use intent names that will survive a change of agent or app. Times and savings are your estimates, not measured evidence.</p></div></div>
-      <form id="action-form" class="action-form">
-        <label>Action <input id="action-label" maxlength="80" required placeholder="Review next finished agent"></label>
-        <label>Family <select id="action-family"></select></label>
-        <label>Times per day <input id="action-frequency" type="number" min="0" max="1000" step="1" value="5" required></label>
-        <label>Seconds saved <input id="action-savings" type="number" min="0" max="3600" step="1" value="10" required></label>
-        <label>Consequence <select id="action-consequence"></select></label>
-        <label class="checkbox"><input id="action-confirmation" type="checkbox"> Explicit confirmation planned</label>
-        <button type="submit">Add action</button>
-      </form>
-      <div class="study-panel">
-        <h3>Learn from observed workflows</h3>
-        <p>Optionally import the recorder's aggregate JSON report. Only session counts and broad event kinds enter the plan; raw focus intervals, task aliases, and event timestamps are discarded.</p>
-        <div class="controls">
-          <label class="file-control">Aggregate study report <input id="study-file" type="file" accept=".json,application/json" disabled></label>
-          <button id="sample-study-button" type="button" class="secondary" disabled>Load illustrative observations</button>
+    <main>
+      <div class="progress" aria-label="Design progress"><div id="progress-board"><span>01</span><strong>Bring your board</strong></div><div id="progress-patterns"><span>02</span><strong>Explore patterns</strong></div><div id="progress-mapping"><span>03</span><strong>Map the actions</strong></div><div id="progress-review"><span>04</span><strong>Review &amp; export</strong></div></div>
+
+      <section class="stage" id="board" aria-labelledby="board-title">
+        <div class="stage-heading"><span class="stage-number">01 / THE HARDWARE</span><h2 id="board-title">Start with the keyboard you own.</h2><p>A layout is only useful when its key positions and normal typing layer are right. Import your exact QMK files or a reviewed profile.</p></div>
+        <div class="board-setup">
+          <div class="source-card"><div class="source-heading"><span class="source-icon" aria-hidden="true">⌘</span><div><h3>Explore first</h3><p>Try a tiny illustrative board and see how assigning a chord works.</p></div></div><button id="sample-button" type="button" class="secondary full">Load demo keyboard</button></div>
+          <div class="source-card"><div class="source-heading"><span class="source-icon" aria-hidden="true">⌁</span><div><h3>Bring your board</h3><p>Use the physical layout and typing layer from your own configuration.</p></div></div><div class="import-grid"><label class="file-control">QMK info.json <input id="info-file" type="file" accept=".json,application/json"><small>Physical key positions</small></label><label class="file-control">QMK keymap.json <input id="keymap-file" type="file" accept=".json,application/json" disabled><small>Normal typing layer</small></label></div><label id="layout-picker-wrap" class="layout-picker" hidden>Choose physical layout <select id="layout-picker"></select></label></div>
+          <div class="source-card"><div class="source-heading"><span class="source-icon" aria-hidden="true">↥</span><div><h3>Continue a plan</h3><p>Bring back a saved layout, or import a manually checked board profile.</p></div></div><label class="file-control">Plan or board profile <input id="plan-file" type="file" accept=".json,application/json"><small>Local JSON file</small></label></div>
         </div>
-        <div id="study-summary" class="summary">Import an aggregate report to see evidence-backed starting points. No raw event log is needed.</div>
-        <div id="study-suggestions" class="suggestions"></div>
-      </div>
-      <div class="table-wrap"><table><thead><tr><th>Action</th><th>Priority estimate</th><th>Physical key</th><th>Modifier</th><th></th></tr></thead><tbody id="actions-body"></tbody></table></div>
-    </section>
+        <div class="board-workspace"><div class="board-topline"><div><span class="overline">PHYSICAL PREVIEW</span><h3 id="board-summary">Load a board to begin.</h3></div><span id="board-base-badge" class="status-pill">Awaiting keyboard</span></div><div id="keyboard" class="keyboard" role="group" aria-label="Physical keyboard preview"><div class="board-empty">Your keyboard will appear here.</div></div><p id="pick-help" class="board-help">Choose “Pick on board” beside an action, then select a key here. You can also use the key dropdown in its card.</p></div>
+      </section>
 
-    <section class="panel" aria-labelledby="review-title">
-      <div class="section-heading"><span class="step">03</span><div><h2 id="review-title">Review and export</h2><p>Conflicts and typing-layer changes are flagged before the plan leaves your machine.</p></div></div>
-      <div id="review-summary" class="summary">No plan loaded.</div>
-      <ul id="issues" class="issues"></ul>
-      <div class="controls">
-        <button id="export-json" type="button" disabled>Download plan JSON</button>
-        <button id="export-markdown" type="button" class="secondary" disabled>Download review sheet</button>
-      </div>
-      <p class="boundary">This tool never uploads your files, flashes a keyboard, installs a shortcut, or grants an agent permission. A reviewed QMK base layer is needed to judge ordinary typing impact. Vial definitions use a different format and are not interchangeable with QMK <code>info.json</code>.</p>
-    </section>
-  </main>
-  <footer><a href="https://github.com/SquirmyWormy275/strathex-switchyard">Source and limitations</a> · Local browser session only · No analytics</footer>
+      <section class="stage" id="patterns" aria-labelledby="patterns-title"><div class="stage-heading"><span class="stage-number">02 / THE WORKFLOW</span><h2 id="patterns-title">See what keeps coming up.</h2><p>Optional evidence from the Switchyard recorder can surface broad patterns. It never knows the exact task you meant, so every suggestion stays yours to edit.</p></div><div class="study-layout"><div class="study-intro"><span class="overline">PRIVATE BY DESIGN</span><h3>Import an aggregate report</h3><p>The studio keeps only session counts and broad event summaries. Raw focus intervals, task aliases, and timestamps are discarded.</p><div class="controls"><label class="file-control">Aggregate study report <input id="study-file" type="file" accept=".json,application/json" disabled><small>Recorder report JSON</small></label><button id="sample-study-button" type="button" class="secondary" disabled>Try sample observations</button></div><p id="study-summary" class="supporting">Load a keyboard first, then import a report or try the sample.</p></div><div class="suggestion-area"><div class="area-heading"><span class="overline">PATTERN SUGGESTIONS</span><span>Use as a draft, then set your own estimates</span></div><div id="study-suggestions" class="suggestions"><div class="empty-state">Suggestions will appear here after a report is loaded.</div></div></div></div></section>
+
+      <section class="stage" id="mapping" aria-labelledby="mapping-title"><div class="stage-heading"><span class="stage-number">03 / THE LAYOUT</span><h2 id="mapping-title">Give important actions a place.</h2><p>Name the intent rather than an app command. Keep normal keys visible, then choose a modifier and a physical key.</p></div><div class="mapping-layout"><div class="editor-card"><div class="editor-heading"><span class="overline">ACTION EDITOR</span><h3 id="form-title">Add an action</h3><p>Estimates help you compare ideas. They are never treated as measured savings.</p></div><form id="action-form" class="action-form"><label>What do you want to do? <input id="action-label" maxlength="80" required placeholder="e.g. Review finished work"></label><div class="form-pair"><label>Action family <select id="action-family"></select></label><label>Consequence <select id="action-consequence"></select></label></div><p id="consequence-help" class="field-help">Navigation only changes what you see or focus.</p><div class="form-pair"><label>Times per day <input id="action-frequency" type="number" min="0" max="1000" step="1" value="5" required></label><label>Seconds saved each time <input id="action-savings" type="number" min="0" max="3600" step="1" value="10" required></label></div><label class="checkbox"><input id="action-confirmation" type="checkbox"> Plan an explicit confirmation step</label><div class="form-actions"><button id="action-submit" type="submit" disabled>Add action</button><button id="action-cancel" type="button" class="text-button" hidden>Cancel edit</button></div></form></div><div class="action-area"><div class="area-heading"><span class="overline">YOUR ACTIONS</span><span id="action-count">0 actions</span></div><div id="action-empty" class="empty-state">Choose a keyboard, then add your first action or use a workflow suggestion.</div><div id="actions-body" class="action-list"></div></div></div></section>
+
+      <section class="stage review-stage" id="review" aria-labelledby="review-title"><div class="stage-heading"><span class="stage-number">04 / THE DECISION</span><h2 id="review-title">See the tradeoffs before you export.</h2><p>Structural conflicts are flagged here. The final layout still needs physical, operating-system, and controller checks on your keyboard.</p></div><div class="review-layout"><div class="review-card"><span class="overline">LAYOUT HEALTH</span><h3 id="review-summary" aria-live="polite">No plan loaded.</h3><ul id="issues" class="issues"><li>Load a board to start reviewing.</li></ul></div><div class="export-card"><span class="overline">TAKE YOUR PLAN WITH YOU</span><h3>Keep a copy you can inspect.</h3><p>Download the editable JSON to continue later. The Markdown sheet is for sharing or reviewing a proposed layout.</p><button id="export-json" type="button" disabled>Download editable plan <span aria-hidden="true">↧</span></button><button id="export-markdown" type="button" class="secondary" disabled>Download review sheet <span aria-hidden="true">↧</span></button><p id="save-status" class="save-status" role="status">Your work stays in this tab until you download the plan.</p></div></div><p class="boundary">A key expresses intent. This tool never flashes firmware, installs a shortcut, uploads your files, or grants an agent permission. A QMK base layer is needed to judge ordinary typing impact; a <a href="https://get.vial.today/docs/porting-to-vial.html">Vial definition</a> is a different format.</p></section>
+    </main>
+    <footer><div class="brand footer-brand"><span class="brand-mark" aria-hidden="true">S<span>↗</span></span><span><strong>SWITCHYARD</strong><small>LAYOUT STUDIO</small></span></div><p>Built for intentional control over agentic work.</p><a href="https://github.com/SquirmyWormy275/strathex-switchyard">Source, guide, and limitations ↗</a></footer>
+  </div>
   <div id="notice" role="status" aria-live="polite"></div>
 </body>
 </html>
