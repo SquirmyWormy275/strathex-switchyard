@@ -110,11 +110,21 @@ test("studio serves only fixed local assets over loopback", async () => {
     const page = await fetch(base);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
-    assert.match(await page.text(), /Build an agentic keyboard layout/);
+    assert.match(await page.text(), /Turn agent workflows into a keyboard you can trust/);
     const example = await fetch(`${base}/sample-study-report.json`);
     assert.equal(example.status, 200);
     assert.equal(parseStudyReport(await example.json()).events, 5);
     assert.equal((await fetch(`${base}/secret`)).status, 404);
     assert.equal((await fetch(base, { method: "POST", body: "test" })).status, 404);
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+});
+
+test("studio controls referenced by the browser module exist in the page", async () => {
+  const html = await readFile(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8");
+  const script = await readFile(fileURLToPath(new URL("./app.mjs", import.meta.url)), "utf8");
+  const allIds = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+  const ids = new Set(allIds);
+  assert.equal(ids.size, allIds.length, "UI IDs must be unique");
+  for (const match of script.matchAll(/\$\("([^"]+)"\)/g)) assert.ok(ids.has(match[1]), `Missing UI control ${match[1]}`);
+  for (const stage of ["board", "patterns", "mapping", "review"]) assert.match(html, new RegExp(`id="${stage}"`));
 });

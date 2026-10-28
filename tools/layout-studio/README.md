@@ -11,18 +11,19 @@ firmware, write Vial settings, or install OS shortcuts.
    On this Linux workstation, `mise exec node@24.14.0 -- npm run layout:studio`
    selects that runtime. The same npm command works on Windows with Node.js
    24.14.0 installed.
-2. Open the loopback URL printed in the terminal. Use **Load illustrative
-   sample** to learn the interface, or import the exact QMK `info.json` for
+2. Open the loopback URL printed in the terminal. Use **Explore the demo** to
+   learn the interface, or import the exact QMK `info.json` for
    your keyboard and select its physical `LAYOUT_*`.
 3. Import that keyboard's matching QMK `keymap.json` to record the ordinary
    base layer. Add actions, estimate how often you use them, assign each to a
    key and modifier, review warnings, then download the JSON plan and Markdown
-   review sheet.
+   review sheet. Action cards can be edited after creation; a removed action
+   has a brief Undo option.
 
 **Optional workflow evidence:** On a checkout with the Switchyard workflow
 recorder, run `node scripts/workflow-capture.mjs report` and save its JSON
 output to a local file. Import that file through **Aggregate study report**, or
-use **Load illustrative observations** to try the flow. The studio retains
+use **Try sample observations** to try the flow. The studio retains
 only completed/started session counts and broad deliberate-event summaries;
 it discards focus durations, timestamps, task aliases, and unknown fields.
 It accepts no raw JSONL log. Suggested intent names are starting points:
@@ -35,7 +36,23 @@ review sheet states the evidence boundary.
 
 The server binds only to `127.0.0.1` and serves fixed files. Imported data
 stays in the browser tab until you download it; no account, database, or
-external service is used. Closing the terminal stops the server.
+external service is used. The studio marks unsaved changes and warns before
+replacing an unsaved plan. Download **editable plan** before closing the tab;
+the Markdown review sheet is a separate reading copy. Closing the terminal
+stops the server.
+
+## Interface decisions
+
+- The four visible stages keep the path from keyboard evidence to review in
+  one place. Workflow observations are optional, and the action editor is
+  available as soon as a board is loaded.
+- The keyboard preview and action cards offer both visual key picking and
+  labelled dropdowns. The dropdown path works without pointer precision.
+- Editing preserves a binding, Escape cancels a key pick, and removing an
+  action offers Undo. The review and unsaved-state messages remain visible
+  before export. Reduced-motion settings disable smooth scrolling.
+- Action priority is labelled as an estimate, while layout health names
+  structural issues. Neither indicator claims physical acceptance.
 
 ## Use another Model F Labs keyboard
 
@@ -52,7 +69,7 @@ layout or key count, and compares keyboard IDs when `info.json` provides one.
 If it does not, the owner must verify that the files came from the same board.
 
 If there is no suitable QMK `info.json`, make a reviewed Switchyard board
-profile yourself and import it through **Board profile or saved plan**. Its
+profile yourself and import it through **Plan or board profile**. Its
 minimal shape is:
 
 ```json
