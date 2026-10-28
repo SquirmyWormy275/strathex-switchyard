@@ -1,0 +1,95 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { once } from "node:events";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { analyzePlan, attachQmkBaseLayer, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, planMarkdown } from "./model.mjs";
+import { createStudioServer } from "./serve.mjs";
+
+const sample = (name) => readFile(fileURLToPath(new URL(name, import.meta.url)), "utf8").then(JSON.parse);
+const action = (binding, overrides = {}) => ({ id: "review-1", label: "Review finished agent", family: "review", consequence: "read_only",
+  confirmation: false, frequencyPerDay: 8, secondsSaved: 20, binding, ...overrides });
+
+test("QMK geometry and exact base layer produce a reviewable, non-flashable plan", async () => {
+  const info = await sample("./sample-info.json");
+  const keymap = await sample("./sample-keymap.json");
+  const profile = attachQmkBaseLayer(parseQmkInfo(info, "LAYOUT_sample"), keymap);
+  assert.equal(profile.keys.length, 8);
+  assert.deepEqual(profile.keys[0].matrix, [0, 0]);
+  assert.equal(profile.keys[0].baseKeycode, "KC_F1");
+  const plan = newPlan(profile);
+  plan.actions.push(action({ keyId: "m0_0", modifier: "ctrl_shift" }));
+  const review = analyzePlan(plan);
+  assert.equal(review.readyForReview, true);
+  assert.deepEqual(review.issues, []);
+  assert.equal(review.estimatedMinutesPerDay, 8 * 20 / 60);
+  assert.match(planMarkdown(plan), /does not flash firmware/);
+  assert.deepEqual(parsePlan(JSON.parse(JSON.stringify(plan))), parsePlan(plan));
+});
+
+test("planner detects duplicate chords, normal typing override, and missing high-consequence confirmation", async () => {
+  const profile = attachQmkBaseLayer(parseQmkInfo(await sample("./sample-info.json"), "LAYOUT_sample"), await sample("./sample-keymap.json"));
+  const plan = newPlan(profile);
+  plan.actions.push(action({ keyId: "m0_0", modifier: "none" }));
+  plan.actions.push(action({ keyId: "m0_0", modifier: "none" }, { id: "approval-1", label: "Approve mutation", family: "authority", consequence: "high_consequence" }));
+  const findings = analyzePlan(plan).issues;
+  assert.ok(findings.some((issue) => issue.severity === "error" && /both use/.test(issue.message)));
+  assert.ok(findings.some((issue) => issue.severity === "error" && /replace ordinary KC_F1/.test(issue.message)));
+  assert.ok(findings.some((issue) => issue.severity === "error" && /no explicit confirmation/.test(issue.message)));
+  assert.equal(analyzePlan(plan).readyForReview, false);
+});
+
+test("missing typing evidence and unassigned actions remain visible", async () => {
+  const plan = newPlan(parseQmkInfo(await sample("./sample-info.json")));
+  plan.actions.push(action(null));
+  const review = analyzePlan(plan);
+  assert.equal(review.readyForReview, false);
+  assert.ok(review.issues.some((issue) => /typing layer/.test(issue.message)));
+  assert.ok(review.issues.some((issue) => /no key assignment/.test(issue.message)));
+});
+
+test("cross-platform modifiers are reviewable and flag AltGr or OS shortcut risks", async () => {
+  const profile = attachQmkBaseLayer(parseQmkInfo(await sample("./sample-info.json")), await sample("./sample-keymap.json"));
+  const plan = newPlan(profile);
+  plan.actions.push(action({ keyId: "m0_0", modifier: "ctrl_alt" }));
+  plan.actions.push(action({ keyId: "m0_1", modifier: "gui_shift" }, { id: "review-2", label: "Route to second agent" }));
+  const review = analyzePlan(plan);
+  assert.equal(review.readyForReview, true);
+  assert.ok(review.issues.some((issue) => /AltGr/.test(issue.message)));
+  assert.ok(review.issues.some((issue) => /operating-system shortcut/.test(issue.message)));
+});
+
+test("import rejects ambiguous layouts, wrong keymap, duplicate matrix positions, and Vial definitions", async () => {
+  const info = await sample("./sample-info.json");
+  const profile = parseQmkInfo(info);
+  const keymap = await sample("./sample-keymap.json");
+  assert.throws(() => attachQmkBaseLayer(profile, { ...keymap, keyboard: "some/other-board" }), /keyboard ID does not match/);
+  assert.throws(() => attachQmkBaseLayer(profile, { layout: "LAYOUT_other", layers: [[]] }), /does not match/);
+  assert.throws(() => parseBoardProfile({ ...profile, keys: [profile.keys[0], { ...profile.keys[0], id: "other" }] }), /Matrix position/);
+  assert.throws(() => parseQmkInfo({ layouts: { LAYOUT_a: { layout: [] }, LAYOUT_b: { layout: [] } } }), /Choose one QMK layout/);
+  assert.throws(() => parseQmkInfo({ matrix: { rows: 8, cols: 18 }, layouts: { keymap: [] } }), /no supported physical layout/);
+});
+
+test("review sheet escapes imported labels and remains plain data", async () => {
+  const profile = attachQmkBaseLayer(parseQmkInfo(await sample("./sample-info.json")), await sample("./sample-keymap.json"));
+  const plan = newPlan(profile);
+  plan.actions.push(action({ keyId: "m0_1", modifier: "shift_alt" }, { label: "Review | <draft>" }));
+  assert.match(planMarkdown(plan), /Review \\\| &lt;draft>/);
+});
+
+test("studio serves only fixed local assets over loopback", async () => {
+  const server = createStudioServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    const address = server.address();
+    assert.equal(address.address, "127.0.0.1");
+    const base = `http://127.0.0.1:${address.port}`;
+    const page = await fetch(base);
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
+    assert.match(await page.text(), /Build an agentic keyboard layout/);
+    assert.equal((await fetch(`${base}/secret`)).status, 404);
+    assert.equal((await fetch(base, { method: "POST", body: "test" })).status, 404);
+  } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+});

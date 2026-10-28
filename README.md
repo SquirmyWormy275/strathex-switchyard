@@ -8,6 +8,11 @@ Windows and systemd-based desktop Linux. Its physical target is a
 Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
 physical keyboard and its integration are not validated by this repository.
 
+**Design your own bindings:** [Switchyard Layout Studio](tools/layout-studio/README.md)
+is an offline planner for importing an exact QMK physical layout, inventorying
+agent actions, testing chord assignments, and exporting a reviewable plan. It
+is a software-only design tool; the accepted B122 65-chord map is unchanged.
+
 **Current status:** the repository contains the hardware-independent B122
 implementation: the canonical protocol and firmware/Raw-HID host source; the
 mutually authenticated Windows and Linux companions; the VS Code
@@ -43,6 +48,10 @@ safe and available in the current context.
 - `firmware/qmk/` — QMK-compatible reference firmware that emits bounded,
   versioned Raw HID signals only. It does not run Git, a terminal, a browser,
   or desktop automation.
+- `tools/layout-studio/` — a local browser planner for importing a board's
+  physical layout and ordinary key layer, ranking agent actions, checking
+  binding conflicts, and exporting a review sheet. It makes no firmware or
+  host changes.
 - `packages/protocol/` — the canonical 22-control / 65-behavior manifest,
   packet validation, and a closed command map. Unknown, forged, and
   intentionally unassigned chords have no fallback action.
@@ -170,6 +179,7 @@ particular:
 
 ## Documentation, attribution, and governance
 
+- [Layout Studio quick start, profile format, and limitations](tools/layout-studio/README.md)
 - [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
 - [Software-only completion audit](docs/software-only-completion-audit.md)
 - [Local companion and VS Code guide](docs/local-companion.md)
