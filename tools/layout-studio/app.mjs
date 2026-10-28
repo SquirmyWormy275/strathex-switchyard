@@ -218,7 +218,7 @@ function studyCards() {
     const details = document.createElement("div");
     const title = document.createElement("strong"); title.textContent = suggestion.label;
     const stats = document.createElement("small");
-    stats.textContent = `${suggestion.count} ${suggestion.kind} events · ${suggestion.retriesOrBlocked} retry/blocked · friction ${suggestion.averageFriction.toFixed(1)}/5${suggestion.perCompletedSession === null ? "" : ` · ${suggestion.perCompletedSession.toFixed(1)}/completed session`}`;
+    stats.textContent = `${suggestion.count} ${suggestion.kind} ${suggestion.count === 1 ? "event" : "events"} · ${suggestion.retriesOrBlocked} retry/blocked · friction ${suggestion.averageFriction.toFixed(1)}/5${suggestion.perCompletedSession === null ? "" : ` · ${suggestion.perCompletedSession.toFixed(1)} per completed session`}`;
     details.append(title, stats);
     const use = document.createElement("button"); use.type = "button"; use.className = "secondary"; use.textContent = "Use as draft";
     use.setAttribute("aria-label", `Use ${suggestion.label} as draft`);
@@ -260,13 +260,14 @@ function render() {
   else {
     const review = analyzePlan(plan);
     $("progress-review").className = review.readyForReview ? "done" : "";
-    $("review-summary").textContent = `${review.readyForReview ? "Ready for human review" : "Needs more work"} · ${plan.actions.length} actions · ${shortNumber(review.estimatedMinutesPerDay)} estimated min/day`;
+    $("review-summary").textContent = `${review.readyForReview ? "Ready for human review" : "Needs more work"} · ${plan.actions.length} ${plan.actions.length === 1 ? "action" : "actions"} · ${shortNumber(review.estimatedMinutesPerDay)} estimated min/day`;
     for (const issue of review.issues) { const item = document.createElement("li"); item.className = issue.severity; item.textContent = `${issue.severity.toUpperCase()}: ${issue.message}`; list.append(item); }
     if (!review.issues.length) { const item = document.createElement("li"); item.textContent = "No structural issues found. Ergonomics and physical behavior still need review."; list.append(item); }
   }
   if (!plan) $("progress-review").className = "";
   $("export-json").disabled = !plan;
   $("export-markdown").disabled = !plan;
+  $("copy-json").disabled = !plan;
   if (!dirty) $("save-status").textContent = plan?.actions.length ? "Current plan is loaded. Download a fresh copy after any changes." : "Your work stays in this tab until you download the plan.";
 }
 
@@ -321,6 +322,14 @@ $("action-form").addEventListener("submit", (event) => {
 $("action-cancel").addEventListener("click", resetEditor);
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && selectedActionId) { selectedActionId = null; render(); notify("Key selection cancelled."); } });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
-$("export-json").addEventListener("click", () => { if (plan) { download("agentic-layout-plan.json", `${JSON.stringify(parsePlan(plan), null, 2)}\n`, "application/json"); dirty = false; $("save-status").textContent = "Download requested. Check your Downloads folder before closing this tab."; } });
+$("export-json").addEventListener("click", () => { if (plan) { download("agentic-layout-plan.json", `${JSON.stringify(parsePlan(plan), null, 2)}\n`, "application/json"); $("save-status").textContent = "Download requested. Confirm the file exists before closing this tab."; } });
 $("export-markdown").addEventListener("click", () => { if (plan) download("agentic-layout-review.md", planMarkdown(plan), "text/markdown"); });
+$("copy-json").addEventListener("click", async () => {
+  if (!plan) return;
+  try {
+    await navigator.clipboard.writeText(`${JSON.stringify(parsePlan(plan), null, 2)}\n`);
+    $("save-status").textContent = "Plan JSON copied. Paste it into a local file to keep it.";
+    notify("Plan JSON copied to clipboard.");
+  } catch { notify("Clipboard access was blocked. Use Download editable plan instead."); }
+});
 render();

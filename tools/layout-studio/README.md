@@ -38,8 +38,9 @@ The server binds only to `127.0.0.1` and serves fixed files. Imported data
 stays in the browser tab until you download it; no account, database, or
 external service is used. The studio marks unsaved changes and warns before
 replacing an unsaved plan. Download **editable plan** before closing the tab;
-the Markdown review sheet is a separate reading copy. Closing the terminal
-stops the server.
+the Markdown review sheet is a separate reading copy. **Copy plan JSON** is a
+fallback when a browser blocks a download; paste that text into a local file.
+Closing the terminal stops the server.
 
 ## Interface decisions
 
