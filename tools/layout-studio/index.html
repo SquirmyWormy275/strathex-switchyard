@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Switchyard Layout Studio</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">STRATHEX SWITCHYARD · OFFLINE DESIGN TOOL</p>
+    <h1>Build an agentic keyboard layout around your work.</h1>
+    <p class="lede">Bring a physical layout, keep its normal keys visible, then map the actions you use most. Export a plan for review before touching firmware or host shortcuts.</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="board-title">
+      <div class="section-heading"><span class="step">01</span><div><h2 id="board-title">Choose the keyboard</h2><p>Import the exact QMK <code>info.json</code>, or a manually reviewed Switchyard board profile. No model matrix is guessed.</p></div></div>
+      <div class="controls">
+        <label class="file-control">QMK info.json <input id="info-file" type="file" accept=".json,application/json"></label>
+        <label class="file-control">QMK keymap.json <input id="keymap-file" type="file" accept=".json,application/json"></label>
+        <label class="file-control">Board profile or saved plan <input id="plan-file" type="file" accept=".json,application/json"></label>
+        <button id="sample-button" type="button" class="secondary">Load illustrative sample</button>
+      </div>
+      <label id="layout-picker-wrap" hidden>Physical layout <select id="layout-picker"></select></label>
+      <div id="board-summary" class="summary">Load a board to begin. The sample is illustrative and is not a Model F matrix.</div>
+      <div id="keyboard" class="keyboard" role="group" aria-label="Physical keyboard preview"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="actions-title">
+      <div class="section-heading"><span class="step">02</span><div><h2 id="actions-title">Inventory your agent actions</h2><p>Use intent names that will survive a change of agent or app. Times and savings are your estimates, not measured evidence.</p></div></div>
+      <form id="action-form" class="action-form">
+        <label>Action <input id="action-label" maxlength="80" required placeholder="Review next finished agent"></label>
+        <label>Family <select id="action-family"></select></label>
+        <label>Times per day <input id="action-frequency" type="number" min="0" max="1000" step="1" value="5" required></label>
+        <label>Seconds saved <input id="action-savings" type="number" min="0" max="3600" step="1" value="10" required></label>
+        <label>Consequence <select id="action-consequence"></select></label>
+        <label class="checkbox"><input id="action-confirmation" type="checkbox"> Explicit confirmation planned</label>
+        <button type="submit">Add action</button>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Action</th><th>Priority estimate</th><th>Physical key</th><th>Modifier</th><th></th></tr></thead><tbody id="actions-body"></tbody></table></div>
+    </section>
+
+    <section class="panel" aria-labelledby="review-title">
+      <div class="section-heading"><span class="step">03</span><div><h2 id="review-title">Review and export</h2><p>Conflicts and typing-layer changes are flagged before the plan leaves your machine.</p></div></div>
+      <div id="review-summary" class="summary">No plan loaded.</div>
+      <ul id="issues" class="issues"></ul>
+      <div class="controls">
+        <button id="export-json" type="button" disabled>Download plan JSON</button>
+        <button id="export-markdown" type="button" class="secondary" disabled>Download review sheet</button>
+      </div>
+      <p class="boundary">This tool never uploads your files, flashes a keyboard, installs a shortcut, or grants an agent permission. A reviewed QMK base layer is needed to judge ordinary typing impact. Vial definitions use a different format and are not interchangeable with QMK <code>info.json</code>.</p>
+    </section>
+  </main>
+  <footer><a href="https://github.com/SquirmyWormy275/strathex-switchyard">Source and limitations</a> · Local browser session only · No analytics</footer>
+  <div id="notice" role="status" aria-live="polite"></div>
+</body>
+</html>

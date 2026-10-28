@@ -98,6 +98,7 @@ export const requiredGroups = [
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
   { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
+  { file: "tools/layout-studio/model.test.mjs" },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
@@ -172,7 +173,7 @@ function testCounts(output, isTestRun) {
 
 const manifestRoots = [
   "packages/control-plane/test", "packages/protocol/test", "apps/windows-companion/test",
-  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "scripts", "firmware"
+  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "tools/layout-studio", "scripts", "firmware"
 ];
 const portable = (value) => value.replaceAll("\\", "/");
 export function discoverRequiredTestFiles(cwd = root) {

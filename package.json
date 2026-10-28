@@ -17,6 +17,7 @@
     "codex:threads": "node scripts/codex-thread-status.mjs",
     "codex:live": "node scripts/codex-daemon-status.mjs",
     "build:vscode": "node scripts/clean-vscode-build.mjs && tsc -p apps/vscode-extension/tsconfig.build.json && node scripts/copy-vscode-runtime.mjs",
+    "layout:studio": "node tools/layout-studio/serve.mjs",
     "build:protocol": "tsc -p packages/protocol/tsconfig.build.json",
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
     "build:linux-companion": "npm run build:protocol && node scripts/clean-linux-build.mjs && tsc -p apps/linux-companion/tsconfig.build.json",
