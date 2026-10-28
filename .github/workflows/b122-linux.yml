@@ -56,6 +56,7 @@ jobs:
             apps/provider-adapter-host/test/*.test.ts \
             apps/vscode-extension/test/*.test.ts \
             apps/linux-companion/test/*.test.ts \
+            tools/layout-studio/*.test.mjs \
             scripts/*.test.mjs \
             firmware/*.test.mjs; do
             timeout --signal=KILL 300s node --experimental-transform-types --test "$test_file"

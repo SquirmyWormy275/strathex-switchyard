@@ -13,6 +13,7 @@
     "apps/*"
   ],
   "scripts": {
+    "layout:studio": "node tools/layout-studio/serve.mjs",
     "build:vscode": "node scripts/clean-vscode-build.mjs && tsc -p apps/vscode-extension/tsconfig.build.json",
     "build:protocol": "tsc -p packages/protocol/tsconfig.build.json",
     "build:companion": "npm run build:protocol && tsc -p apps/windows-companion/tsconfig.build.json",
