@@ -17,7 +17,8 @@ Repository access is currently limited to invited collaborators;
 no public release or license has been approved.
 **Design your own bindings:** [Switchyard Layout Studio](tools/layout-studio/README.md)
 is an offline planner for importing an exact QMK physical layout, inventorying
-agent actions, testing chord assignments, and exporting a reviewable plan. It
+agent actions, reviewing optional aggregate workflow observations, testing
+chord assignments, and exporting a reviewable plan. It
 is a software-only design tool; the accepted B122 65-chord map is unchanged.
 
 **Current status:** the repository contains the hardware-independent B122

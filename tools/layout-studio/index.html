@@ -39,6 +39,16 @@
         <label class="checkbox"><input id="action-confirmation" type="checkbox"> Explicit confirmation planned</label>
         <button type="submit">Add action</button>
       </form>
+      <div class="study-panel">
+        <h3>Learn from observed workflows</h3>
+        <p>Optionally import the recorder's aggregate JSON report. Only session counts and broad event kinds enter the plan; raw focus intervals, task aliases, and event timestamps are discarded.</p>
+        <div class="controls">
+          <label class="file-control">Aggregate study report <input id="study-file" type="file" accept=".json,application/json" disabled></label>
+          <button id="sample-study-button" type="button" class="secondary" disabled>Load illustrative observations</button>
+        </div>
+        <div id="study-summary" class="summary">Import an aggregate report to see evidence-backed starting points. No raw event log is needed.</div>
+        <div id="study-suggestions" class="suggestions"></div>
+      </div>
       <div class="table-wrap"><table><thead><tr><th>Action</th><th>Priority estimate</th><th>Physical key</th><th>Modifier</th><th></th></tr></thead><tbody id="actions-body"></tbody></table></div>
     </section>
 

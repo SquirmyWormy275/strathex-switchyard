@@ -1,4 +1,4 @@
-import { analyzePlan, attachQmkBaseLayer, consequences, families, modifiers, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, planMarkdown } from "/model.mjs";
+import { analyzePlan, attachQmkBaseLayer, consequences, families, modifiers, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, parseStudyReport, planMarkdown, studySuggestions } from "/model.mjs";
 
 const $ = (id) => document.getElementById(id);
 let plan = null;
@@ -59,6 +59,11 @@ function importSaved(value) {
   nextAction = plan.actions.length + 1;
   $("layout-picker-wrap").hidden = true;
   render();
+}
+function importStudy(value) {
+  if (!plan) throw new Error("Load a keyboard profile before importing workflow observations.");
+  plan.study = parseStudyReport(value);
+  render(); notify("Aggregate observations loaded. Choose a suggestion to prepare an action for review.");
 }
 
 function keyboardPreview() {
@@ -128,11 +133,41 @@ function actionRows() {
   }
 }
 
+function studyCards() {
+  const surface = $("study-suggestions"); surface.replaceChildren();
+  $("study-file").disabled = !plan;
+  $("sample-study-button").disabled = !plan;
+  if (!plan?.study) { $("study-summary").textContent = "Import an aggregate report to see evidence-backed starting points. No raw event log is needed."; return; }
+  const report = plan.study;
+  $("study-summary").textContent = `${report.events} deliberate events across ${report.sessionsCompleted} completed of ${report.sessionsStarted} started sessions. Suggestions are starter labels, not inferred exact intents or daily rates.`;
+  for (const suggestion of studySuggestions(report)) {
+    const card = document.createElement("div"); card.className = "suggestion";
+    const details = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = suggestion.label;
+    const stats = document.createElement("small");
+    stats.textContent = `${suggestion.count} ${suggestion.kind} events · ${suggestion.retriesOrBlocked} retry/blocked · friction ${suggestion.averageFriction.toFixed(1)}/5${suggestion.perCompletedSession === null ? "" : ` · ${suggestion.perCompletedSession.toFixed(1)}/completed session`}`;
+    details.append(title, stats);
+    const use = document.createElement("button"); use.type = "button"; use.className = "secondary"; use.textContent = "Use as draft";
+    use.setAttribute("aria-label", `Use ${suggestion.label} as draft`);
+    use.addEventListener("click", () => {
+      $("action-label").value = suggestion.label;
+      $("action-family").value = suggestion.family;
+      $("action-consequence").value = "read_only";
+      $("action-frequency").value = "0";
+      $("action-savings").value = "0";
+      $("action-confirmation").checked = false;
+      $("action-label").focus();
+      notify("Draft prepared. Enter your own daily frequency and time saving, then add the action.");
+    });
+    card.append(details, use); surface.append(card);
+  }
+}
+
 function render() {
   const board = $("board-summary");
   if (!plan) board.textContent = "Load a board to begin. The sample is illustrative and is not a Model F matrix.";
   else board.textContent = `${plan.profile.name} · ${plan.profile.layout} · ${plan.profile.keys.length} keys · controller ${plan.profile.controller} · ${plan.profile.keys.every((key) => key.baseKeycode !== null) ? "base typing layer recorded" : "base typing layer incomplete"}`;
-  keyboardPreview(); actionRows();
+  keyboardPreview(); actionRows(); studyCards();
   const list = $("issues"); list.replaceChildren();
   if (!plan) { $("review-summary").textContent = "No plan loaded."; }
   else {
@@ -156,6 +191,7 @@ for (const consequence of consequences) $("action-consequence").append(option(co
 fileInput("info-file", importInfo);
 fileInput("keymap-file", importKeymap);
 fileInput("plan-file", importSaved);
+fileInput("study-file", importStudy);
 $("layout-picker").addEventListener("change", (event) => { if (event.target.value && pendingInfo) { try { loadInfo(pendingInfo, event.target.value); } catch (error) { notify(error.message); } } });
 $("sample-button").addEventListener("click", async () => {
   try {
@@ -164,6 +200,10 @@ $("sample-button").addEventListener("click", async () => {
     $("layout-picker-wrap").hidden = true; loadInfo(pendingInfo, "LAYOUT_sample");
     notify("Illustrative sample loaded. Import the exact profile for your keyboard before relying on a plan.");
   } catch (error) { notify(error.message); }
+});
+$("sample-study-button").addEventListener("click", async () => {
+  try { importStudy(await (await fetch("/sample-study-report.json")).json()); }
+  catch (error) { notify(error.message); }
 });
 $("action-form").addEventListener("submit", (event) => {
   event.preventDefault();

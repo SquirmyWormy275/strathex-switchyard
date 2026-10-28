@@ -34,6 +34,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .action-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; align-items: end; }
 .action-form label:first-child { grid-column: span 2; }
 .action-form .checkbox { display: flex; align-items: center; gap: 8px; min-height: 41px; }
+.study-panel { margin-top: 25px; padding: 19px; border: 1px solid #36505d; border-radius: 12px; background: #14222b; }
+.study-panel h3 { margin: 0; font-size: 1.12rem; }
+.study-panel p { margin: 5px 0 12px; color: #b4c8d0; }
+.suggestions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.suggestion { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #3c5762; border-radius: 9px; padding: 10px; }
+.suggestion strong, .suggestion small { display: block; }
+.suggestion small { color: #aec1c9; font-size: .77rem; }
+.suggestion button { flex: 0 0 auto; font-size: .78rem; }
 .table-wrap { overflow-x: auto; margin-top: 20px; }
 table { border-collapse: collapse; width: 100%; min-width: 650px; }
 th, td { padding: 10px; text-align: left; border-bottom: 1px solid #36505d; vertical-align: middle; }

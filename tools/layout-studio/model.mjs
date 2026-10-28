@@ -8,6 +8,14 @@ export const modifiers = Object.freeze([
 export const families = Object.freeze(["routing", "lifecycle", "review", "context", "repository", "authority", "recovery", "other"]);
 export const consequences = Object.freeze(["navigation", "read_only", "mutating", "high_consequence"]);
 export const controllers = Object.freeze(["unknown", "xwhatsit", "leyden_jar"]);
+export const studyKinds = Object.freeze(["resume", "switch", "handoff", "status", "review", "approval", "run", "failure", "recovery", "other"]);
+const studyIntents = Object.freeze({
+  resume: ["Resume exact task", "lifecycle"], switch: ["Switch agent context", "routing"],
+  handoff: ["Prepare agent handoff", "context"], status: ["Inspect agent status", "review"],
+  review: ["Review finished work", "review"], approval: ["Inspect pending approval", "authority"],
+  run: ["Inspect running work", "review"], failure: ["Inspect failed work", "recovery"],
+  recovery: ["Open recovery context", "recovery"], other: ["Review other repeated work", "other"]
+});
 const idPattern = /^[A-Za-z0-9_.:-]{1,64}$/;
 const keycodePattern = /^[_A-Z][_A-Z0-9()|, ]{0,63}$/;
 
@@ -93,7 +101,49 @@ export function attachQmkBaseLayer(profileInput, keymapInput) {
 }
 
 export function newPlan(profileInput) {
-  return { schema: planSchema, profile: parseBoardProfile(profileInput), actions: [] };
+  return { schema: planSchema, profile: parseBoardProfile(profileInput), actions: [], study: null };
+}
+
+/** Accept only the aggregate report fields. Raw events and task aliases are never retained. */
+export function parseStudyReport(input) {
+  const source = object(input, "Workflow study report");
+  const whole = (value, label, max = 1_000_000) => {
+    const result = finite(value, label, 0, max);
+    if (!Number.isSafeInteger(result)) throw new Error(`${label} must be a whole number.`);
+    return result;
+  };
+  const sessionsStarted = whole(source.sessionsStarted, "Started sessions");
+  const sessionsCompleted = whole(source.sessionsCompleted, "Completed sessions");
+  const events = whole(source.events, "Deliberate events");
+  if (sessionsCompleted > sessionsStarted) throw new Error("Completed sessions exceed started sessions.");
+  const rawKinds = object(source.byKind, "Workflow kinds");
+  if (Object.keys(rawKinds).some((kind) => !studyKinds.includes(kind))) throw new Error("Workflow report contains an unknown action kind.");
+  const byKind = {};
+  let counted = 0;
+  for (const kind of studyKinds) {
+    if (rawKinds[kind] === undefined) continue;
+    const row = object(rawKinds[kind], `${kind} observations`);
+    const count = whole(row.count, `${kind} count`);
+    const retriesOrBlocked = whole(row.retriesOrBlocked, `${kind} retries`);
+    const totalDurationMs = whole(row.totalDurationMs, `${kind} duration`, 3_600_000_000);
+    const averageFriction = finite(row.averageFriction, `${kind} friction`, 1, 5);
+    if (retriesOrBlocked > count || count === 0) throw new Error(`${kind} observations have inconsistent counts.`);
+    counted += count;
+    byKind[kind] = { count, retriesOrBlocked, totalDurationMs, averageFriction };
+  }
+  if (counted !== events) throw new Error("Workflow kind counts do not match the event total.");
+  return { sessionsStarted, sessionsCompleted, events, byKind };
+}
+
+export function studySuggestions(input) {
+  const report = parseStudyReport(input);
+  return Object.entries(report.byKind).map(([kind, row]) => ({
+    kind, label: studyIntents[kind][0], family: studyIntents[kind][1],
+    count: row.count, retriesOrBlocked: row.retriesOrBlocked,
+    averageFriction: row.averageFriction,
+    perCompletedSession: report.sessionsCompleted ? row.count / report.sessionsCompleted : null,
+    opportunity: row.count * row.averageFriction + 2 * row.retriesOrBlocked
+  })).sort((a, b) => b.opportunity - a.opportunity);
 }
 
 export function parsePlan(input) {
@@ -124,7 +174,7 @@ export function parsePlan(input) {
     return { id, label, family: action.family, consequence: action.consequence, confirmation: action.confirmation,
       frequencyPerDay, secondsSaved, binding };
   });
-  return { schema: planSchema, profile, actions };
+  return { schema: planSchema, profile, actions, study: source.study == null ? null : parseStudyReport(source.study) };
 }
 
 export function analyzePlan(input) {
@@ -167,6 +217,14 @@ export function planMarkdown(input) {
   for (const action of plan.actions) {
     const key = plan.profile.keys.find((item) => item.id === action.binding?.keyId);
     lines.push(`| ${cell(action.label)} | ${action.family} | ${key ? `${cell(key.label)} + ${action.binding.modifier}` : "unassigned"} | ${cell(key?.baseKeycode ?? "unknown")} | ${action.frequencyPerDay} | ${action.consequence} | ${action.confirmation ? "yes" : "no"} |`);
+  }
+  if (plan.study) {
+    lines.push("", "## Workflow evidence", "",
+      `${plan.study.sessionsCompleted} of ${plan.study.sessionsStarted} study sessions completed; ${plan.study.events} deliberate events.`,
+      "Counts describe observed event kinds, not exact intents or daily frequency. Focus intervals are excluded.", "",
+      "| Kind | Events | Retry/blocked | Average friction |",
+      "| --- | ---: | ---: | ---: |");
+    for (const [kind, row] of Object.entries(plan.study.byKind)) lines.push(`| ${kind} | ${row.count} | ${row.retriesOrBlocked} | ${row.averageFriction.toFixed(1)} |`);
   }
   lines.push("", "## Review findings", "");
   lines.push(...(issues.length ? issues.map((issue) => `- **${issue.severity}:** ${cell(issue.message)}`) : ["- No structural issues found. Physical ergonomics, controller compatibility, and host behavior remain untested."]));
