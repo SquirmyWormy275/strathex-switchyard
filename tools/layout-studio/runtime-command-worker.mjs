@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 if (process.platform !== "linux") throw new Error("The Linux runtime guardian requires its native session boundary.");
 const lines = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 let request, child, parentGone = false, ready = false, started = false, finished = false, inputBytes = 0;
-process.stdin.on("data", (b) => { inputBytes += b.length; if (inputBytes > 65536) loseParent(); });
+process.stdin.on("data", (b) => { inputBytes += b.length; if (inputBytes > 1048576 + 4096) loseParent(); });
 function loseParent() { parentGone = true; if (started) process.kill(-process.pid, "SIGKILL"); else process.exit(2); }
 lines.once("close", loseParent);
 const write = (value) => new Promise((resolve) => process.stdout.write(JSON.stringify(value) + "\n", resolve));
@@ -61,10 +61,11 @@ async function run() {
   process.exit(treeExitVerified ? 0 : 3);
 }
 lines.on("line", (line) => { void (async () => {
+  if (Buffer.byteLength(line) > 1048576) throw new Error("The private runtime request exceeds its bound");
   if (!request) {
     request = JSON.parse(line);
     const r = request;
-    if (r.inputBase64 !== undefined && (typeof r.inputBase64 !== "string" || Buffer.from(r.inputBase64, "base64").toString("base64") !== r.inputBase64 || Buffer.from(r.inputBase64, "base64").length > 12000) || r.maxStderrBytes !== undefined && (!Number.isSafeInteger(r.maxStderrBytes) || r.maxStderrBytes < 0 || r.maxStderrBytes > 16384)) throw new Error("Invalid bounded private command input");
+    if (r.inputBase64 !== undefined && (typeof r.inputBase64 !== "string" || Buffer.from(r.inputBase64, "base64").toString("base64") !== r.inputBase64 || Buffer.from(r.inputBase64, "base64").length > 524288) || r.maxStderrBytes !== undefined && (!Number.isSafeInteger(r.maxStderrBytes) || r.maxStderrBytes < 0 || r.maxStderrBytes > 16384)) throw new Error("Invalid bounded private command input");
     if (r.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(r.id) || !isAbsolute(r.executable) || !isAbsolute(r.cwd) || !/^[a-f0-9]{64}$/.test(r.executableSha256) || !Array.isArray(r.args) || r.args.length > 32 || r.args.some((a) => typeof a !== "string" || a.length > 8192 || /[\0\r\n]/.test(a)) || !Number.isSafeInteger(r.timeoutMs) || r.timeoutMs < 1 || r.timeoutMs > 600000 || !Number.isSafeInteger(r.maxOutputBytes) || r.maxOutputBytes < 1 || r.maxOutputBytes > 524288 || !r.environment || typeof r.environment !== "object" || Object.keys(r.environment).length > 64 || Object.entries(r.environment).some(([k,v]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) || typeof v !== "string" || v.length > 8192 || v.includes("\0"))) throw new Error("Invalid runtime command scope");
     const self = await readFile(`/proc/${process.pid}/stat`, "utf8"), fields = self.slice(self.lastIndexOf(") ") + 2).split(" ");
     if (+fields[2] !== process.pid || +fields[3] !== process.pid) throw new Error("The guardian has no private native session");
@@ -74,7 +75,7 @@ lines.on("line", (line) => { void (async () => {
     if (hash.digest("hex") !== r.executableSha256) throw new Error("Runtime executable identity changed");
     if (parentGone) return;
     ready = true;
-    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session", capabilities: ["bounded-stdin", "bounded-stderr"] });
+    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session", capabilities: ["bounded-stdin", "bounded-stdin-512k", "bounded-stderr"] });
   } else {
     const ack = JSON.parse(line);
     if (!ready || started || ack.schema !== request.schema || ack.id !== request.id || ack.start !== true) throw new Error("Invalid runtime start acknowledgement");

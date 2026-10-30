@@ -74,8 +74,13 @@ rebuilt merely to demonstrate an installer.
 
 ## Private text input for native providers
 
-The guardian protocol now supports an optional maximum 12,000-byte UTF-8 stdin
-payload and explicitly requested diagnostics capped at 16 KiB. Text travels in
+The guardian protocol supports an optional maximum 512 KiB UTF-8 stdin
+payload and explicitly requested diagnostics capped at 16 KiB. Reviewed coding
+turns retain their separate 12,000-byte product limit; the larger internal bound
+supports complete keyboard/workflow designer context. Payloads above 12,000 bytes
+require the additional `bounded-stdin-512k` native capability before start.
+The encoded request is capped at 1 MiB, with a small separate acknowledgement
+allowance on the Linux owner stream. Text travels in
 private pipes, never a process argument or log. Readiness must advertise these
 capabilities before the parent may acknowledge start; older helpers cannot
 silently ignore the input contract. Default installer calls still return bounded

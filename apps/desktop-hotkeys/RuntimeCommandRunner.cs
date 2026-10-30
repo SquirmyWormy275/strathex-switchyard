@@ -21,7 +21,7 @@ internal static class RuntimeCommandRunner
         while (await reader.ReadAsync(buffer.AsMemory()) != 0)
         {
             if (buffer[0] == '\n') return value.ToString();
-            if (buffer[0] == '\r' || value.Length >= 65536) throw NativeError();
+            if (buffer[0] == '\r' || value.Length >= 1048576) throw NativeError();
             value.Append(buffer[0]);
         }
         return value.Length == 0 ? null : throw NativeError();
@@ -68,7 +68,7 @@ internal static class RuntimeCommandRunner
         {
             string encoded = inputValue.GetString() ?? throw NativeError();
             inputBytes = Convert.FromBase64String(encoded);
-            if (inputBytes.Length > 12000 || Convert.ToBase64String(inputBytes) != encoded) throw NativeError();
+            if (inputBytes.Length > 524288 || Convert.ToBase64String(inputBytes) != encoded) throw NativeError();
         }
         int stderrLimit = request.TryGetProperty("maxStderrBytes", out var stderrValue) ? stderrValue.GetInt32() : 0;
         if (stderrLimit < 0 || stderrLimit > 16384) throw NativeError();
@@ -86,7 +86,7 @@ internal static class RuntimeCommandRunner
         using var executableLock = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (Convert.ToHexString(SHA256.HashData(executableLock)).ToLowerInvariant() != digest) throw NativeError();
         using var job = CreateJob(id);
-        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stderr" } });
+        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr" } });
         using var ack = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         if (ack.RootElement.GetProperty("schema").GetString() != Schema || ack.RootElement.GetProperty("id").GetString() != id || !ack.RootElement.GetProperty("start").GetBoolean()) throw NativeError();
         _ = Task.Run(async () =>

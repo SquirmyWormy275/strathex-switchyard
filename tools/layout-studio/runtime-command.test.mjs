@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
+import { createHash } from "node:crypto";
 
 const windowsHelper = process.env.SWITCHYARD_TEST_RUNTIME_HELPER;
 const options = { env: runtimeEnvironment(), ...(windowsHelper ? { windowsHelper } : {}) };
@@ -48,8 +49,14 @@ test("reviewed native text crosses only a bounded UTF-8 pipe after guardian read
 test("a pre-cancelled or oversized native input cannot start an owned guardian", { skip }, async () => {
   const controller = new AbortController(); controller.abort(); let started = false;
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, signal: controller.signal, onGuardianChild: () => { started = true; } }), /cancelled before startup/);
-  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(4001), onGuardianChild: () => { started = true; } }), /bounded private input/);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(174763), onGuardianChild: () => { started = true; } }), /bounded private input/);
   assert.equal(started, false);
+});
+test("a complete bounded designer context crosses the private pipe at the exact UTF-8 byte limit after readiness", { skip }, async () => {
+  const inputText = "界".repeat(174762) + "é", expected = createHash("sha256").update(inputText).digest("hex"); let scope;
+  assert.equal(Buffer.byteLength(inputText), 524288);
+  const result = await runRuntimeCommand(process.execPath, ["-e", "let bytes=0;const hash=require('node:crypto').createHash('sha256');process.stdin.on('data',b=>{bytes+=b.length;hash.update(b)});process.stdin.on('end',()=>process.stdout.write(JSON.stringify({bytes,digest:hash.digest('hex'),argv:process.argv.slice(1)})))"], { ...options, inputText, detailed: true, maxOutputBytes: 1024, onGuardianReady: frame => { assert.ok(frame.capabilities.includes("bounded-stdin-512k")); scope = frame; } });
+  assert.deepEqual(JSON.parse(result.stdout), { bytes: 524288, digest: expected, argv: [] }); assert.equal(result.inputDelivered, true); assert.equal(result.treeExitVerified, true); assert.equal(await runtimeGuardianStopped(scope, options), true);
 });
 test("owned text resources commit exact guardian scope before execution and durable exit before releasing ownership", { skip }, () => fixture(async (root) => {
   const resource = { clients: new Set() }, marker = join(root, "ran"); let saved, stopped = false;

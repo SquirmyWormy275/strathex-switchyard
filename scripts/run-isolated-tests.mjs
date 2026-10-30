@@ -132,7 +132,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
   // The separate native CI helper step executes all fourteen boundary cases.
   // Source-only Windows groups have no built helper and must skip exactly these.
-  { file: "tools/layout-studio/runtime-command.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 14 } : {}) },
+  { file: "tools/layout-studio/runtime-command.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 15 } : {}) },
   { file: "tools/layout-studio/runtime-lifecycle.test.mjs" },
   { file: "tools/layout-studio/runtime-consumers.test.mjs" },
   { file: "tools/layout-studio/private-fs.test.mjs" },

@@ -1476,3 +1476,22 @@ pass using CI's pinned Python 3.13.3. A new compression-variant test also checks
 that a one-pixel change cannot be hidden. The temporary Python installations and
 dependency environments are removed after this verification. Complete native
 Windows acceptance remains pending; software failures are not hardware blockers.
+
+## Bounded complete designer context transport
+
+The internal native guardian now accepts at most 512 KiB of UTF-8 stdin, with
+an encoded request bounded to 1 MiB. Input above the existing 12,000-byte size
+requires an additional advertised capability before start. The Linux reader
+also bounds the total owner stream including its acknowledgement; the Windows
+helper validates the same decoded input bound. Reviewed coding-task text keeps
+its separate 12,000-byte product limit. This prepares full keyboard/workflow
+context for supervised configuration design; that designer model-process
+migration is still unfinished at this checkpoint.
+
+An actual native exact-limit multibyte test verified the byte count and SHA-256
+after readiness, with no text in argv and independently verified guardian exit.
+An over-limit input cannot start a guardian. All 56 focused transport, runner,
+metadata, coding and indicator tests pass; TypeScript checks pass and the native
+Windows helper builds with zero warnings/errors. The source-only Windows skip
+inventory is now 15, matching the separately built helper's native test group.
+Actual Windows large-input acceptance awaits CI.
