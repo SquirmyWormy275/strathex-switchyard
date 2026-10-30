@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **101/101 groups passed; 697 tests, 688 passed and 9
+- Integrated native Linux run: **102/102 groups passed; 706 tests, 697 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-d562beee-1549-4e75-b58a-42493ab10d03.json`.
+  `.sxsy-verification/isolated-test-1b6548c2-2676-48b7-8ea8-7b5d366412b9.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -352,7 +352,7 @@ and its dated installation backups are described above.
    retain exact Codex/Claude identities, process ownership and explicit missing
    capabilities. Connect approved task submissions to the existing authority
    machinery without foreground typing or accidental background copies.
-2. Complete remaining controller capabilities: encoder, key-override and alternate-repeat
+2. Complete remaining controller capabilities: key-override and alternate-repeat
    transactions, exact source/model reconciliation and their failure/recovery
    tests. Keep all physical F77/B122 checks separately pending.
 3. Finish complete Windows release verification, automatic connection restoration
@@ -507,3 +507,12 @@ unrelated-edit preflight, failed backups, old protocols and bad readback.
 No hardware writes occurred; the F77 remains absent. Encoder, key-override,
 alternate-repeat and broader verified controller features remain implementation
 work, alongside their frontend controls. [Protocol guide](device-configuration-contract.md).
+
+
+Definition-advertised encoder direction read/write/recovery is now implemented.
+Nine additional tests pass, including sparse indices, KLE normalization, exact BE
+packets, retained unowned directions, partial words, unplug and TD reference
+restoration order. The shared test transport is explicitly excluded from release
+bundles. Physical encoder behavior and UI controls remain open. Key-override,
+alternate-repeat and remaining source-verified controller capabilities are still
+implementation work.

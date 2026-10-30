@@ -10,7 +10,7 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   const manifest = await verifySuiteRelease(bundle.directory, { expectedId: bundle.id, platform: "linux", checkRuntime: true });
   assert.ok(bundle.bytes < 4 * 1024 * 1024); assert.equal(manifest.integrity, "sha256-content-manifest-not-signed");
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
-  assert.equal(manifest.files.some((f) => /(?:\.test\.|\.sealed\.|\.git\/|node_modules\/|\.venv\/|__pycache__\/|\.pyc$|base\.en\/)/.test(f.path)), false);
+  assert.equal(manifest.files.some((f) => /(?:\.test\.|test-support\/|\.sealed\.|\.git\/|node_modules\/|\.venv\/|__pycache__\/|\.pyc$|base\.en\/)/.test(f.path)), false);
   assert.equal((await buildSuiteRelease(options)).id, bundle.id, "rebuilding identical inputs must reuse one verified bundle");
   const serve = pathToFileURL(join(bundle.directory, "tools/layout-studio/serve.mjs")).href;
   const script = `import{createStudioServer}from ${JSON.stringify(serve)};const s=createStudioServer({assetRoot:${JSON.stringify(join(bundle.directory, "frontend"))}});s.listen(0,'127.0.0.1',async()=>{try{let r=await fetch('http://127.0.0.1:'+s.address().port+'/');if(r.status!==200||!(await r.text()).includes('Switchyard'))throw Error('missing frontend');r=await fetch('http://127.0.0.1:'+s.address().port+'/api/discovery');if(r.status!==401)throw Error('missing authorization');}catch(e){console.error(e.message);process.exitCode=1;}finally{s.closeAllConnections();s.close();}});`;

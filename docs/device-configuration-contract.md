@@ -184,3 +184,47 @@ The wire contract follows the pinned GUI's
 and [combo](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/combo.py)
 code and the matching [firmware command handlers](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/vial.c).
 Switchyard implements the codecs independently; no upstream firmware is copied.
+
+
+## Encoder directions
+
+Snapshots now read both directions on each layer for indices explicitly declared
+by Vial's KLE encoder markers. Missing indices are not probed. The decoder checks
+normalized index/marker positions for KLE alignments 0 and 4; malformed or
+unsupported centered encoder definitions leave encoder writes unavailable.
+An echoed unsupported GET response also leaves writes unavailable. Existing
+opaque values in other indices/directions are preserved.
+
+Add direction changes to the same `configuration` object, using actual readout:
+
+```json
+{
+  "encoders": [{
+    "layer": 0, "index": 0, "direction": 0, "before": 4,
+    "after": { "kind": "modified", "modifiers": 1, "keycode": 6 }
+  }]
+}
+```
+
+This is a synthetic example, not evidence that the F77 has an encoder. Directions
+0/1 are the firmware indices; physical rotation needs a hardware trial. Each
+proposal checks the advertised index, exact layer/direction and current value.
+The existing baseline/unlock/review/replay/readback/restoration path applies.
+Writes use the documented big-endian keycode payload and verify both the response
+scope and fresh direction readback. Partial words are recoverable only within
+the exact before/after bytes. Unrelated owned-direction edits stop all restoration
+writes; unowned directions retain their latest values. New encoder TD references
+restore before their tap tables.
+
+Nine additional fault tests exercise label decoding, advertised-index gaps,
+big-endian packets, unsupported reads, permission/baseline failures, interrupted
+writes, unplug/reconnect, unrelated changes and combined TD restoration. The
+shared synthetic transport stays outside production bundles. Actual knob behavior
+and the corresponding frontend controls remain unaccepted/unimplemented,
+respectively.
+
+Source checks use the pinned GUI's
+[KLE label normalization](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/kle_serial.py),
+[encoder identification/read/write](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/keyboard_comm.py)
+and the already linked firmware handlers. No layout labels are treated as host
+commands or authority.
