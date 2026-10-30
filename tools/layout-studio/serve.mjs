@@ -45,9 +45,10 @@ export function createStudioServer({ token = randomBytes(32).toString("base64url
     const allowedAuthorities = new Set([`127.0.0.1:${server.address()?.port}`, `localhost:${server.address()?.port}`]);
     const json = (status, value) => { response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" }); response.end(JSON.stringify(value)); };
     if (!allowedAuthorities.has(authority) || (request.headers.origin && request.headers.origin !== `http://${authority}`) || ["cross-site", "same-site"].includes(request.headers["sec-fetch-site"])) { json(403, { error: "This request is outside the local workspace origin." }); return; }
-    if (request.url?.startsWith("/agent/v1/")) {
+    if (request.url?.startsWith("/agent/")) {
       if (request.method !== "POST" || request.headers["content-type"] !== "application/json" || request.headers.origin) { json(403, { error: "The scoped agent bridge accepts only authenticated non-browser JSON clients." }); return; }
-      try { const chunks = []; let size = 0; for await (const chunk of request) { size += chunk.length; if (size > 32768) throw new Error("Agent request exceeds 32 KiB."); chunks.push(chunk); } const body = JSON.parse(Buffer.concat(chunks).toString("utf8")); json(200, await suite.agentMessage(request.url, body, request.headers["x-switchyard-signature"])); }
+      if (!request.url.startsWith("/agent/v2/")) { json(426, { error: "This agent contract is unsupported. Use the current v2 SDK; no alternate action was executed." }); return; }
+      try { const chunks = []; let size = 0; for await (const chunk of request) { size += chunk.length; if (size > 32768) throw new Error("Agent request exceeds 32 KiB."); chunks.push(chunk); } const raw = Buffer.concat(chunks).toString("utf8"), body = JSON.parse(raw), result = await suite.agentMessage(request.url, body, request.headers["x-switchyard-signature"], raw); response.setHeader("X-Switchyard-Response-Signature", result.signature); json(200, result.payload); }
       catch { json(403, { error: "Agent request authentication, scope, freshness, sequence or contract was rejected." }); }
       return;
     }
@@ -96,6 +97,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   server.listen(Number(args[1] ?? 0), "127.0.0.1", async () => {
     const address = server.address();
     const url = process.env.XDG_RUNTIME_DIR ? await publishEndpoint(server) : `http://127.0.0.1:${address.port}/#access=${server.accessToken}`;
-    process.stdout.write(`Switchyard Layout Studio: ${url}\nPress Ctrl+C to stop. Host changes require review and Apply. No files leave this machine.\n`);
+    process.stdout.write(`Switchyard Layout Studio: ${url}\nPress Ctrl+C to stop. Host/device changes require review and Apply. Provider requests use your explicitly selected connection.\n`);
   });
 }

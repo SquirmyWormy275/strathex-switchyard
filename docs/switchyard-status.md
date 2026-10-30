@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **90/90 groups passed; 612 tests, 603 passed and 9
+- Integrated native Linux run: **90/90 groups passed; 616 tests, 607 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-4b00536a-57e8-45e1-99af-51e640031fd7.json`.
+  `.sxsy-verification/isolated-test-d60cfcef-a760-4381-b79a-8d17355847e3.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -96,6 +96,13 @@ Tests use synthetic/fault transports unless identified below. The older B122
 - Real custom Node and Python LangChain Runnable examples registered distinct
   sessions, received an authenticated review intent and acknowledged completion.
   An example's acknowledgement is self-report, not verified coding-task evidence.
+- Both actual examples passed the v2 contract over authenticated local HTTP at
+  `2026-10-30T08:35:08Z`, then their owned processes stopped in keyboard-only mode.
+  Requests and responses bind exact raw bytes, route, sequence and session. The
+  counter and effect commit atomically; a replaced session cannot poll new work.
+  Tests reject route substitution, replay and unauthenticated/mis-scoped responses.
+  [The SDK contract](../integrations/README.md) documents upgrades and uncertain
+  claims; v1 receives HTTP 426. No model prompt or keyboard interface was used.
 - Local CPU faster-whisper transcribed synthetic speech without an external API.
   Recognition was imperfect; transcript correction remains part of the flow.
   A live microphone conversation has not yet been accepted.
@@ -142,8 +149,8 @@ for links and verifies filesystem identity while accepting those native aliases.
 Network/device paths and traversal remain rejected, as do Unix path aliases.
 Linux regression checks pass. The native Windows backend step passed on CI run
 `41020239038` at source checkpoint `bfe4efe` and again on `41021780480` at
-`77c098b`, including the task-binding logic; its larger release build is still
-in progress. The newer daemon-resume logic awaits its own native Windows test run;
+`77c098b`, and again on `41025130927` at `7812082`, including daemon-resume logic;
+its larger release build is still in progress.
 the general Codex Unix transport is Linux-only and Windows task transport remains
 unfinished implementation.
 

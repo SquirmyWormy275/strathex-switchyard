@@ -88,7 +88,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   }
   return {
     store, agents,
-    agentMessage: (path, body, signature) => custom.message(path, body, signature),
+    agentMessage: (path, body, signature, raw) => custom.message(path, body, signature, raw),
     async handle(path, body = {}) {
       if (closed) throw new Error("This local suite is closed.");
       const compartment = body.compartment ?? "personal";
