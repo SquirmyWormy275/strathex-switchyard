@@ -1495,3 +1495,22 @@ metadata, coding and indicator tests pass; TypeScript checks pass and the native
 Windows helper builds with zero warnings/errors. The source-only Windows skip
 inventory is now 15, matching the separately built helper's native test group.
 Actual Windows large-input acceptance awaits CI.
+
+## Supervised configuration designer process
+
+Claude's configuration designer now uses the owned native guardian for the model
+process as well as metadata. The exact scope is committed to its encrypted
+conversation before model execution and verified exit is recorded before a
+proposal is retained. Complete context is bounded before any native request.
+Structured success, permission-denial absence, exact native UUID and stable
+account checks remain required; proposals still undergo independent validation.
+Cancellation and workspace shutdown stop the exact owned resource. Unverified
+ownership survives retention and restart and blocks provider replacement until
+independent exact exit reconciliation. Shutdown reports an unconfirmed owned exit.
+
+Four additional tests cover pre-start durable scope, full-board continuation,
+cancelled late output, restart/retention and oversized context. All 42 affected
+designer/text/suite/binding checks and typecheck pass. The installed API journey
+now checks two synthetic replies, distinct exited guardians, protected ownership,
+authentication, keyboard-only cleanup and preserved definitions. Its actual run
+is next; no Windows native agent/account acceptance is inferred.
