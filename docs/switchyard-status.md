@@ -1075,3 +1075,22 @@ records and private directory were removed. The native CLI retains its small
 synthetic history entry. No original daemon session was displaced, file/command
 authority granted or external coding-task completion inferred. Newer native
 Windows/account acceptance and corresponding frontend controls remain separate.
+
+
+## Fresh native Windows optional runtime
+
+Release CI now includes an actual fresh optional-runtime check after its native
+helper/guardian verification. It verifies the pinned upstream uv 0.12.7 archive,
+uses the production Windows Job Object guardian, installs Python 3.12.14 and the
+universal hash-locked dependencies, downloads the pinned model and requires
+native AV/HID/Whisper/LangChain imports, an actual Runnable and offline CPU model
+load. A second inventory/import/model check must verify the same release. This
+requires neither hardware nor a provider account, so it is not deferred to those
+external gates. Its native result is pending CI.
+
+The disposable software/model stage is removed only after owned exit is verified;
+uncertain guardian recovery data is preserved. CI retains a bounded JSON receipt
+for seven days, not an environment/model copy. Three orchestration/failure tests
+and all sixteen runner-contract checks pass. No additional runtime or model was
+downloaded onto the pilot machine. The complete Windows release and interactive
+native-account/window acceptance remain separately reported.

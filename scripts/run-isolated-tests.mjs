@@ -99,6 +99,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
 }
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/application.test.mjs" },
   { file: "deployment/suite/runtime-maintenance.test.mjs" },

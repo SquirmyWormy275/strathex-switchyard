@@ -127,6 +127,44 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Verify a fresh optional runtime with native imports and offline CPU model
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uvStage = Join-Path $env:RUNNER_TEMP 'switchyard-uv-0.12.7'
+          $uvArchive = Join-Path $env:RUNNER_TEMP 'switchyard-uv-0.12.7.zip'
+          $receipt = Join-Path $env:RUNNER_TEMP 'switchyard-native-runtime-verification.json'
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          # Pinned upstream archive checksum: releases.astral.sh/github/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip.sha256
+          try {
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://releases.astral.sh/github/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip' -OutFile $uvArchive
+            $actual = (Get-FileHash -LiteralPath $uvArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne 'bf1518af459a3915511a11fdc6e2f43ef9a2afa138b9d498eeb9642fe9d85218') { throw 'The pinned uv Windows archive digest did not verify.' }
+            Expand-Archive -LiteralPath $uvArchive -DestinationPath $uvStage
+            $candidates = @(Get-ChildItem -LiteralPath $uvStage -Filter 'uv.exe' -File -Recurse)
+            if ($candidates.Count -ne 1) { throw 'The verified uv archive did not contain one native executable.' }
+            $uv = $candidates[0].FullName
+            $version = & $uv --version
+            if ($LASTEXITCODE -ne 0 -or $version -notmatch '^uv 0\.12\.7(?:\s|$)') { throw 'The pinned native uv version did not verify.' }
+            & node .\scripts\verify-runtime-platform.mjs --uv $uv --helper $exe --receipt $receipt
+            if ($LASTEXITCODE -ne 0) { throw 'Fresh native Windows dependency/import/offline CPU model verification failed; inspect the bounded receipt.' }
+          } finally {
+            if (Test-Path -LiteralPath $uvArchive) { Remove-Item -LiteralPath $uvArchive -Force }
+            if ((Test-Path -LiteralPath $receipt) -and (Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json).temporaryRuntimeRemoved -eq $true) {
+              Remove-Item -LiteralPath $uvStage -Recurse -Force
+            }
+          }
+
+      - name: Retain the bounded native runtime acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-native-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-native-runtime-verification.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Package the integrated suite with its native helper and unchanged frontend
         shell: pwsh
         run: |

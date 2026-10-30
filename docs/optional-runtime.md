@@ -90,3 +90,21 @@ does not establish native imports or interactive acceptance. A matching working
 runtime is verified/reused rather than rebuilt.
 
 The locking/install strategy follows [uv's hash-lock and environment documentation](https://docs.astral.sh/uv/pip/compile/).
+
+
+## Native Windows fresh-install evidence
+
+Windows release CI now downloads the pinned **uv 0.12.7** archive and verifies its
+[upstream checksum](https://releases.astral.sh/github/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip.sha256)
+before invoking it. A disposable runtime uses the production Windows Job Object
+guardian and the same Python 3.12.14, universal hash lock and pinned model as the
+application. Native imports, a real LangChain Runnable and offline CPU model load
+must pass both installation and a second inventory check. No device, microphone
+or provider account is opened.
+
+`scripts/verify-runtime-platform.mjs` writes one bounded receipt, removes its own
+software/model stage after verified exit and preserves recovery data if the
+native guardian is uncertain. CI retains only that receipt for seven days; it does
+not upload the environment or model. The orchestration/recovery tests pass; the
+fresh native Windows result is pending its CI run. This work does not download a
+second runtime onto the pilot workstation.
