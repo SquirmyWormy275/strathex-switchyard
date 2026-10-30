@@ -895,3 +895,30 @@ coding task, general process-tree containment or Windows runtime acceptance.
 Legacy conversation account-binding review remains unfinished. New conversations
 work; older unbound context is preserved until deliberate review. The frozen
 frontend and currently installed source remain unchanged during this checkpoint.
+
+The Claude checkpoint passed **113 Linux groups, 797 tests: 788 passed and 9
+expected platform skips**, receipt `54e9788c-70ed-48b4-9c53-fc6f974d0169`.
+
+## Deliberate recovery of legacy conversation bindings
+
+The backend now offers authenticated `conversation/binding/review` and
+`conversation/binding/bind` routes for older Codex/Claude configuration
+conversations that have no account fingerprint. Review shows the exact saved
+context and currently verified destination. It explicitly reports that the
+original account is unknown. A known account binding cannot be overwritten.
+No model prompt, resume or native-session existence claim follows from binding.
+
+Approval uses the protected five-minute one-use ledger, scoped to the workspace,
+provider, native session, destination login, saved context, mode, policy and
+account enrollment. Consumption survives restart. Context is checked again under
+the state lease before binding; stale content, changed enrollment/login, expired
+or replayed approvals and cross-workspace tokens are refused. Saved messages,
+proposal and original session identity are preserved. The additional local
+confirmation domain does not add physical commands or grant tool authority.
+
+The binding/conversation/control-plane groups pass **26 focused tests** and
+TypeScript typecheck passes. `scripts/verify-conversation-binding-host.mjs
+--synthetic` prepares repeatable installed-route acceptance using invented legacy
+session UUIDs and actual native login checks; installed acceptance is pending.
+Its synthetic records are removed afterward and modes/definitions are checked.
+Frontend exposure remains pending the frozen design review.

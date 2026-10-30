@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { deniedCodexServerRequest } from "./codex-requests.mjs";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { readClaudeDesignLogin } from "./claude-account.mjs";
+import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -123,7 +124,7 @@ export class CodexClient extends EventEmitter {
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }
 
-export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin } = {}) {
+export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin, now = () => Date.now() } = {}) {
   const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map(), auxiliaryChildren = new Map();
   let closed = false;
   const confirmStop = async (child) => { try { return (await stopChild(child)).stopped === true; } catch { return false; } };
@@ -183,8 +184,53 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     if (!auxiliaryChildren.get(compartment)?.size) auxiliaryChildren.delete(compartment);
     return { stopped: results.every((r) => r.stopped), ownedProcesses: results.length, taskCompletionVerified: false };
   }
+  function legacyConversation(state, id) {
+    const c = state.conversations.find((c) => c.id === id);
+    if (!c || !["codex", "claude-code"].includes(c.provider) || typeof c.sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(c.sessionId)) throw new Error("Choose an exact saved native configuration conversation.");
+    if (c.accountFingerprint != null) throw new Error("This conversation already has an account binding. A different login cannot replace it through legacy review.");
+    return c;
+  }
+  const legacyDigest = (state, c) => scopeHash(["legacy-context/v1", c, state.policy, state.mode, state.accounts]);
+  async function legacyScope(compartment, id) {
+    const generation = generations.get(compartment) ?? 0; currentGeneration(compartment, generation);
+    if ([...busy].some((key) => key.startsWith(`${compartment}:`))) throw new Error("Wait or cancel the active design request before reviewing a legacy binding.");
+    const state = await store.snapshot(compartment), conversation = legacyConversation(state, id), provider = conversation.provider;
+    await store.authorize(compartment, { provider }); await settleUnconfirmed(compartment); currentGeneration(compartment, generation);
+    let fingerprint;
+    if (provider === "codex") { const client = await codex(compartment); await client.recheckAccount(); fingerprint = client.accountFingerprint; }
+    else { const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd); fingerprint = (await claudeLogin(compartment, await resolveCli(provider), cwd, generation)).fingerprint; }
+    currentGeneration(compartment, generation);
+    if (!/^[a-f0-9]{64}$/.test(fingerprint ?? "")) throw new Error("The current native account identity did not verify.");
+    const digest = legacyDigest(state, conversation);
+    return { conversation, provider, fingerprint, digest, generation,
+      confirmationScope: { action: "bind_legacy_conversation", sessionId: conversation.sessionId,
+        targetSnapshotId: scopeHash(["legacy-conversation-binding/v1", compartment, provider, id, conversation.sessionId, fingerprint]), scopeDigest: digest } };
+  }
   return {
     stopCompartment,
+    async reviewLegacyBinding(compartment, id) {
+      const scope = await legacyScope(compartment, id);
+      const confirmation = await suiteConfirmations(store, compartment, scope.provider, now).issue({ ...scope.confirmationScope,
+        reason: "The original account is unknown. Review this saved context before allowing its exact native conversation to continue under the currently verified login. This does not verify an employer, transfer a known account binding, submit context or grant tools.", reauthenticated: false });
+      currentGeneration(compartment, scope.generation);
+      return { status: "requires-confirmation", confirmation, scope: { conversationId: id, provider: scope.provider, sessionId: scope.conversation.sessionId,
+        currentAccountFingerprint: scope.fingerprint, originalAccountVerified: false, contextDigest: scope.digest,
+        messages: structuredClone(scope.conversation.messages ?? []), proposal: structuredClone(scope.conversation.proposal ?? null) }, modelPromptSubmitted: false };
+    },
+    async bindLegacy(compartment, { conversationId, token }) {
+      if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(token ?? "")) throw new Error("Use the exact one-use token from reviewing this legacy conversation and current native account.");
+      const scope = await legacyScope(compartment, conversationId);
+      const decision = await suiteConfirmations(store, compartment, scope.provider, now).consume({ ...scope.confirmationScope, token });
+      if (!decision.allowed) throw new Error(decision.reason);
+      currentGeneration(compartment, scope.generation);
+      await store.claimSession(compartment, { provider: scope.provider, sessionId: scope.conversation.sessionId });
+      return store.update(compartment, "legacy-conversation-binding", (s) => {
+        currentGeneration(compartment, scope.generation); const c = legacyConversation(s, conversationId);
+        if (legacyDigest(s, c) !== scope.digest) throw new Error("The reviewed legacy context or workspace policy changed. Review it again; saved context was preserved.");
+        c.accountFingerprint = scope.fingerprint; c.legacyBindingReviewedAt = now(); c.originalAccountVerified = false;
+        return { status: "bound-after-review", conversationId, sessionId: c.sessionId, provider: c.provider, originalAccountVerified: false, modelPromptSubmitted: false };
+      }, { provider: scope.provider });
+    },
     async discovery() {
       return Promise.all(["codex", "claude-code"].map(async (id) => { try { await resolveCli(id); return { id, installed: true, capabilities: ["design-conversation", "exact-owned-session", "status", "cancel"], auth: "checked-on-use", provenance: "fixed native CLI installation" }; } catch { return { id, installed: false, capabilities: [], auth: "unavailable" }; } }));
     },

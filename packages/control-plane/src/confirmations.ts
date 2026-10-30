@@ -4,8 +4,11 @@ import type { CommandAction } from "./command-catalog.ts";
 import { redactText } from "./redaction.ts";
 import { sha256, type JournalEntry, type JsonStoreTransaction, ProtectedJsonStore } from "./store.ts";
 
+/** Local review domains do not add physical commands or grant execution authority. */
+export type ConfirmationAction = CommandAction | "bind_legacy_conversation";
+
 export interface DurableConfirmationRequest {
-  readonly action: CommandAction;
+  readonly action: ConfirmationAction;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;
@@ -33,7 +36,7 @@ export interface IssuedConfirmation {
 
 export interface ConfirmationConsumeRequest {
   readonly token: string;
-  readonly action: CommandAction;
+  readonly action: ConfirmationAction;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;

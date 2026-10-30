@@ -250,6 +250,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId }); }
       if (path === "/api/suite/design/cancel") return agents.cancel(compartment, body.conversationId);
       if (path === "/api/suite/design/status") return agents.status(compartment, body.conversationId);
+      if (path === "/api/suite/conversation/binding/review") return agents.reviewLegacyBinding(compartment, body.conversationId);
+      if (path === "/api/suite/conversation/binding/bind") return agents.bindLegacy(compartment, body);
       if (path === "/api/suite/conversation/delete") return store.update(compartment, "conversation-delete", (s) => { s.conversations = s.conversations.filter((c) => c.id !== body.id); return { deleted: true }; });
       if (path === "/api/suite/observation/start") {
         const sources = body.sources;
