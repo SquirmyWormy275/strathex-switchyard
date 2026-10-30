@@ -1149,3 +1149,13 @@ target. No reply text, credentials, email or account/org data is copied into tho
 diagnostics. This permits contract diagnosis without guessing a new target or
 silently rebinding the task. The fifteen focused provider tests pass. Installed
 acceptance is continuing; neither failure is reported as task completion.
+
+The protected Claude diagnostic confirmed a native process exit with no JSON
+result, while preserving the original task and refusing to retain a reply.
+Receipt: `claude-envelope-diagnostic-1793379516989.json`. Native stderr is now
+bounded and reduced to fixed error categories and known option names; raw text
+and secrets are not persisted. This distinguishes CLI preconditions from reply
+identity errors without exposing provider diagnostics. A verified empty-output
+workspace-trust rejection is now recorded as `creation-rejected`, without claiming
+an unknown background job or automatically retrying it. These changes preserve
+native trust settings. Native continuation acceptance remains in progress.

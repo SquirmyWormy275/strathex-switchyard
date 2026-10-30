@@ -14,20 +14,20 @@ async function fixture(fn) {
   const store = createSuiteStore({ root: stateRoot, secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => { keys.set(`${c}:${p}`, v); } } });
   await store.initialize("personal"); await store.initialize("other"); await store.initialize("company", "work");
   for (const c of ["personal", "other"]) await store.update(c, "mode-select", (s) => { s.mode = "personal-companion"; });
-  let login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false, beforeFocus = () => {}, focusEffects = 0;
+  let login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false, failTrust = false, beforeFocus = () => {}, focusEffects = 0;
   const run = async (_, args, options) => {
     calls.push([...args]);
     if (args[0] === "--version") return "2.1.308 (Claude Code)\n";
     if (args[0] === "auth") return JSON.stringify(login);
     if (args[0] === "agents") { if (failInventory) { failInventory = false; throw new Error("Synthetic inventory interruption"); } return JSON.stringify(rows); }
-    if (args[0] === "--background") { const id = (++count).toString(16).padStart(8, "0"), row = { id, cwd: options.cwd, kind: "background", state: "blocked", startedAt: clock, pid: 12345 + count, status: "idle", sessionId: randomUUID(), name: "private provider name never imported" }; rows.push(row); return omitIdentity ? "Synthetic unexpected CLI output" : `backgrounded · ${id} · switchyard\n`; }
+    if (args[0] === "--background") { if (failTrust) throw Object.assign(new Error("Synthetic native workspace trust rejection"), { code: "CLAUDE_WORKSPACE_TRUST_REQUIRED", noEffectVerified: true }); const id = (++count).toString(16).padStart(8, "0"), row = { id, cwd: options.cwd, kind: "background", state: "blocked", startedAt: clock, pid: 12345 + count, status: "idle", sessionId: randomUUID(), name: "private provider name never imported" }; rows.push(row); return omitIdentity ? "Synthetic unexpected CLI output" : `backgrounded · ${id} · switchyard\n`; }
     if (args[0] === "stop") { if (failStop) throw new Error("Synthetic uncertain stop"); const row = rows.find((r) => r.id === args[1]); assert.ok(row); row.state = "stopped"; row.startedAt -= 37; delete row.pid; delete row.status; return "stopped\n"; }
     throw new Error("Unexpected native CLI operation");
   };
   const windows = { focus: async ({ verifySession }) => { beforeFocus(); await verifySession(); focusEffects++; await verifySession(); return { effect: "exact-interactive-session-focused", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false }; } };
   const options = { store, run, windows, platform: "linux", resolveCli: async () => "/synthetic/native/claude", now: () => clock }, service = createClaudeCoding(options);
   const input = () => ({ requestId: randomUUID(), repositoryRoot, label: "Local label never sent to provider" });
-  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
+  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, rejectTrust: () => { failTrust = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
   finally { await service.close(); await rm(root, { recursive: true, force: true }); }
 }
 
@@ -47,6 +47,12 @@ test("a replacement repository cannot inherit an exact Claude task, stop review 
   await assert.rejects(service.reviewStop("personal", task.id), /directory was replaced/);
   await assert.rejects(service.focus("personal", task.id), /directory was replaced/);
   assert.equal(calls.some((args) => args[0] === "agents" || args[0] === "stop"), false);
+}));
+
+test("a verified native workspace rejection is preserved without claiming an unknown background job or retrying it", () => fixture(async ({ store, service, calls, input, rejectTrust }) => {
+  rejectTrust(); const request = input(); await assert.rejects(service.create("personal", request), /workspace gate rejected/);
+  const task = (await store.snapshot("personal")).codingSessions[0]; assert.equal(task.status, "creation-rejected"); assert.equal(task.noEffectVerified, true); assert.equal(task.sessionId, null); assert.equal(task.backgroundId, null);
+  assert.equal((await service.create("personal", request)).duplicatePrevented, true); assert.equal(calls.filter((args) => args[0] === "--background").length, 1); assert.equal((await service.stopCompartment("personal")).stopped, true);
 }));
 
 test("Claude creates one empty background session per durable request, preserves native identities and requires explicit current-account binding", () => fixture(async ({ service, options, store, calls, input, stateRoot, changeAccount }) => {

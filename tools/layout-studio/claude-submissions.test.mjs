@@ -20,11 +20,11 @@ async function fixture(fn) {
   const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", status: "registered", label: "Synthetic stopped task", sessionId: randomUUID(), backgroundId: "1234abcd", startedAt: Date.now(), launchPolicy: "tools-disabled/plan", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot), accountFingerprint: claudeAccount(login) };
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });
   await store.initialize("personal"); await store.initialize("company", "work"); await store.update("personal", "synthetic-task", (s) => { s.mode = "personal-companion"; s.codingSessions = [task]; });
-  const settings = { login, version: "2.1.308 (Claude Code)", row: { id: task.backgroundId, cwd: repositoryRoot, kind: "background", state: "stopped", startedAt: task.startedAt, sessionId: task.sessionId }, wrongSession: false, denied: false, delay: false, afterPrint: () => {}, beforePrint: () => {} };
+  const settings = { login, version: "2.1.308 (Claude Code)", row: { id: task.backgroundId, cwd: repositoryRoot, kind: "background", state: "stopped", startedAt: task.startedAt, sessionId: task.sessionId }, wrongSession: false, denied: false, delay: false, stderr: "", emptyOutput: false, exitCode: 0, afterPrint: () => {}, beforePrint: () => {} };
   const spawnProcess = (_, args, options) => {
     calls.push({ args, options }); const print = args.includes("-p");
     const value = args[0] === "--version" ? settings.version : args[0] === "auth" ? JSON.stringify(settings.login) : args[0] === "agents" ? JSON.stringify([settings.row]) : JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: settings.wrongSession ? randomUUID() : task.sessionId, result: "Ready", permission_denials: settings.denied ? [{ synthetic: "denied" }] : [] });
-    const child = spawn(process.execPath, ["-e", `const s=JSON.parse(process.argv[1]);if(s.print){process.stdin.resume();process.stdin.on('end',()=>{if(s.delay)setTimeout(()=>process.stdout.write(s.value),30000);else process.stdout.write(s.value)})}else process.stdout.write(s.value)`, JSON.stringify({ value, print, delay: settings.delay })], options);
+    const child = spawn(process.execPath, ["-e", `const s=JSON.parse(process.argv[1]);if(s.print){process.stdin.resume();process.stdin.on('end',()=>{if(s.stderr)process.stderr.write(s.stderr);process.exitCode=s.exitCode;if(s.delay)setTimeout(()=>process.stdout.write(s.value),30000);else process.stdout.write(s.value)})}else process.stdout.write(s.value)`, JSON.stringify({ value: print && settings.emptyOutput ? "" : value, print, delay: settings.delay, stderr: print ? settings.stderr : "", exitCode: print ? settings.exitCode : 0 })], options);
     children.push(child); if (print) { settings.beforePrint(); settings.afterPrint(); } return child;
   };
   const options = { store, resolveCli: async () => "/synthetic/claude", spawnProcess }, service = createClaudeSubmissions(options), input = { taskId: task.id, text: "Synthetic reviewed native text" };
@@ -68,4 +68,12 @@ test("native providers cannot consume or delete each other's protected text reco
   const id = randomUUID(); await store.update("personal", "synthetic-codex-history", (s) => { s.codingTurns = [{ id, provider: "codex", taskId: input.taskId, promptSha256: scopeHash(input.text), status: "provider-turn-completed", updatedAt: Date.now() }]; });
   assert.deepEqual(await service.list("personal"), []); await assert.rejects(service.remove("personal", id), /Only completed/); await assert.rejects(service.reviewOutcome("personal", id), /unresolved saved outcome/); await assert.rejects(submit(await review(), { requestId: id }), /different reviewed text/);
   const codex = createCodexSubmissions({ store }); try { assert.equal((await codex.list("personal")).length, 1); } finally { await codex.close(); }
+}));
+
+test("stderr-only native refusal retains structural categories and flag names without copying sensitive diagnostic text", () => fixture(async ({ store, settings, review, submit }) => {
+  const approval = await review(); settings.emptyOutput = true; settings.exitCode = 1; settings.stderr = "Error: --resume requires using attach for this session. Token=validation-only-secret";
+  await assert.rejects(submit(approval), /native session/);
+  const turn = (await store.snapshot("personal")).codingTurns[0], summary = turn.nativeResultSummary;
+  assert.equal(summary.parsed, false); assert.equal(summary.stdoutBytes, 0); assert.equal(summary.stderrBytes, Buffer.byteLength(settings.stderr)); assert.equal(summary.exitCode, 1); assert.deepEqual(summary.referencedFlags, ["--resume"]); assert.ok(summary.stderrCategories.includes("session-in-use"));
+  assert.equal(JSON.stringify(summary).includes("validation-only-secret"), false); assert.equal(turn.reply, null);
 }));

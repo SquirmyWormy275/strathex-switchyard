@@ -53,6 +53,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     if (run) return run(executable, args, { cwd });
     return new Promise((resolve, reject) => {
       const child = spawn(executable, args, { cwd, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...runtimeEnvironment(), DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" } });
+      child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
       const owned = { child, compartment: c }; children.add(owned);
       let stdout = "", stderr = "", failed = false;
       const fail = () => { if (!failed) { failed = true; reject(new Error("The native Claude command did not complete within its bounded contract. Its outcome is uncertain; no fallback or automatic retry was selected.")); void stopOwnedChild(child); } };
@@ -60,7 +61,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
       child.stdout.on("data", (b) => { stdout += b; if (Buffer.byteLength(stdout) > 256 * 1024) fail(); });
       child.stderr.on("data", (b) => { stderr += b; if (Buffer.byteLength(stderr) > 65536) fail(); });
       child.on("error", fail);
-      child.on("close", (code) => { clearTimeout(timer); children.delete(owned); if (failed) return; if (code !== 0) { reject(new Error(/Workspace not trusted/.test(stderr) ? "Open Claude in this exact directory once and review its native workspace trust dialog before starting a background task." : "The native Claude command was rejected. Check the installed CLI and its local account; no provider fallback was selected.")); } else resolve(stdout); });
+      child.on("close", (code) => { clearTimeout(timer); children.delete(owned); if (failed) return; if (code !== 0) { const trustRejected = args[0] === "--background" && !stdout.trim() && /Workspace not trusted/.test(stderr); reject(Object.assign(new Error(trustRejected ? "Open Claude in this exact directory once and review its native workspace trust dialog before starting a background task." : "The native Claude command was rejected. Check the installed CLI and its local account; no provider fallback was selected."), trustRejected ? { code: "CLAUDE_WORKSPACE_TRUST_REQUIRED", noEffectVerified: true } : {})); } else resolve(stdout); });
     });
   }
   async function account(c, generation = fence(c)) { supportedVersion(await execute(c, ["--version"], undefined, generation)); const result = claudeAccount(JSON.parse(await execute(c, ["auth", "status", "--json"], undefined, generation))); current(c, generation); return result; }
@@ -157,7 +158,11 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
         await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
         await store.claimSession(c, { provider: "claude-code", sessionId: row.sessionId }); current(c, generation);
         return store.update(c, "claude-create-bind", (s) => { const t = taskIn(s, requestId); t.status = "registered"; t.observation = observation(row); return { ...view(t), modelPromptSubmitted: false }; }, { provider: "claude-code" });
-      } catch (e) { await store.update(c, "claude-create-uncertain", (s) => { taskIn(s, requestId).status = "creation-uncertain"; }).catch(() => {}); throw new Error(`${e.message} Creation is uncertain; this request will not create another background session automatically.`); }
+      } catch (e) {
+        const rejected = e.code === "CLAUDE_WORKSPACE_TRUST_REQUIRED" && e.noEffectVerified === true;
+        await store.update(c, "claude-create-uncertain", (s) => { const t = taskIn(s, requestId); if (rejected && !t.sessionId && !t.backgroundId) { t.status = "creation-rejected"; t.noEffectVerified = true; t.creationRejection = "native-workspace-trust-required"; } else t.status = "creation-uncertain"; }).catch(() => {});
+        throw new Error(`${e.message} ${rejected ? "The native workspace gate rejected creation before a job identity was returned; native trust settings were preserved." : "Creation is uncertain; this request will not create another background session automatically."}`);
+      }
     },
     async status(c, id) {
       const { task, row } = await exact(c, id);
