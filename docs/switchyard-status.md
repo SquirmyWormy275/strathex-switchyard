@@ -1271,3 +1271,20 @@ are queued separately. This is owned-session/Job containment, not a general OS
 sandbox or proof of containment for deliberately detached Linux processes.
 Metadata probes, native shared background services, broader terminal attachment
 and execution-authority integration remain distinct unfinished work.
+
+The normal installed guarded-Claude journey passed **ten checks** at f2d11f3,
+with two separately reviewed native turns, distinct saved guardian scopes and
+verified exit before reply retention. Duplicate/replay checks, unchanged Git
+state and keyboard-only cleanup passed; synthetic local records and disposable
+bundle staging were removed. Receipt:
+installed-reviewed-claude-text-1793381931590.json. Configuration interface discovery
+still returns zero devices; no HID operation was written.
+
+The later integrated run 5dc771ba-0657-4a05-846f-a5bba9864838 was **not accepted**:
+116/117 groups passed and every test body passed, but the runner correctly rejected
+a new unexpected Linux skip. The environment-name test now verifies Linux rejection
+of Windows-only identifiers rather than skipping there. The source-only Windows
+lane's exact helper-absence skip allowance is updated from eight to fourteen,
+matching the expanded boundary cases that run for real in its separate built-helper
+CI step. The corrected full run is being rerun; the previous accepted integrated
+receipt remains 70559d96-91a8-421e-9760-7c194fa07f4d.

@@ -87,5 +87,9 @@ Object contain owned descendants; this is not a general OS sandbox or proof that
 a deliberately detached Linux process could not escape. Linux tests cover exact
 multibyte input, a nonzero exit with opt-in diagnostics, cancellation, output
 overflow and owner loss. The updated helper builds without warnings; actual
-Windows stdin/diagnostic tests await its next native CI run. Wiring the provider
-text path and durable recovery scope into this transport is the next step.
+Windows stdin/diagnostic tests await its next native CI run. Claude reviewed
+text now uses this transport with durable guardian readiness and exit records.
+Recovery blocks replacement after restart, local outcome review and retention
+until exact native exit is verified. The updated installed journey is being
+checked; metadata probes and shared background services retain their separate
+lifecycle limits.
