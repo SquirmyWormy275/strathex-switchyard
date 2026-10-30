@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **100/100 groups passed; 688 tests, 679 passed and 9
+- Integrated native Linux run: **101/101 groups passed; 697 tests, 688 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-13812547-147e-46cb-99d6-fa1db2fb7ebd.json`.
+  `.sxsy-verification/isolated-test-d562beee-1549-4e75-b58a-42493ab10d03.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -352,7 +352,7 @@ and its dated installation backups are described above.
    retain exact Codex/Claude identities, process ownership and explicit missing
    capabilities. Connect approved task submissions to the existing authority
    machinery without foreground typing or accidental background copies.
-2. Complete remaining controller capabilities: tap-dance/combo/encoder/settings
+2. Complete remaining controller capabilities: encoder, key-override and alternate-repeat
    transactions, exact source/model reconciliation and their failure/recovery
    tests. Keep all physical F77/B122 checks separately pending.
 3. Finish complete Windows release verification, automatic connection restoration
@@ -494,3 +494,16 @@ attempted. Private receipt:
 `runtime-verification/installed-update-1793360642868.json`.
 The verified disposable bundle was removed. Only the current program and one
 rollback copy remain; optional runtime and protected data were reused.
+
+
+## Dynamic controller entries
+
+Vial 4–6 tap-dance/combo advertisement, exact readout, bounded proposals,
+physical-unlock writes, acknowledgement/readback and before/after restoration are
+implemented. Combined TD/key changes retain the ordinary tap fallback and restore
+key references before table entries. Unedited opaque slots are preserved. Nine
+new fault tests pass, including interrupted entry bytes, unplug/reconnect,
+unrelated-edit preflight, failed backups, old protocols and bad readback.
+No hardware writes occurred; the F77 remains absent. Encoder, key-override,
+alternate-repeat and broader verified controller features remain implementation
+work, alongside their frontend controls. [Protocol guide](device-configuration-contract.md).

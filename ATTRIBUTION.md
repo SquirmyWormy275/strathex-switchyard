@@ -56,7 +56,7 @@ See the Leyden Jar repository's “How the project started,” “Comparison wit
 - **Contribution:** Real-time keyboard configuration GUI and Vial-specific QMK fork.
 - **Canonical sources:** [vial-kb/vial-gui](https://github.com/vial-kb/vial-gui), [vial-kb/vial-qmk](https://github.com/vial-kb/vial-qmk)
 - **License reported upstream:** GPL-2.0 for Vial GUI; Vial-QMK contains GPL-2.0 and component-specific notices that must be preserved file by file.
-- **Use here:** Planned configuration and possible firmware integration.
+- **Use here:** Source-verified protocol interoperability for local configuration read/review/write/restore. Bounded codecs are implemented independently; firmware integration remains separate.
 - **Files copied:** None.
 
 ### QMK community

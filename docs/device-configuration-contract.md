@@ -124,3 +124,63 @@ failure, interrupted writes, rejected readback, unrelated edits and restart
 restoration, setting-query bounds, partial setting writes and preserved unknown
 bits. They are software evidence; real key output, unlock, hot-plug and
 typing behavior require the relevant physical keyboard.
+
+
+## Tap-dance and combo transactions
+
+A Vial 4+ snapshot now reads the advertised dynamic-entry counts and bounded
+five-word tap-dance/combo records. It preserves unknown outputs in unedited
+slots. Malformed advertisements, failed reads and older protocols do not enable
+these writes. Key overrides and alternate-repeat entries are reported as
+unimplemented, with their advertised counts; they are not silently treated as
+supported.
+
+Add `tapDances` or `combos` to the same reviewed `configuration` object:
+
+```json
+{
+  "tapDances": [{
+    "index": 0, "before": [0, 0, 0, 0, 200],
+    "tap": 4, "hold": { "kind": "momentary-layer", "layer": 1 },
+    "doubleTap": 6, "tapHold": 0, "termMs": 250
+  }],
+  "changes": [{
+    "layer": 0, "row": 0, "col": 0, "before": 4,
+    "after": { "kind": "tap-dance", "index": 0 }
+  }],
+  "combos": [{
+    "index": 0, "before": [0, 0, 0, 0, 0],
+    "keys": [4, 5], "output": 6
+  }]
+}
+```
+
+This is a synthetic two-key example. It is not a configuration recommendation for
+the disconnected F77. Use exact advertised indices, current entry words and
+recorded keycodes. A combo can be cleared with only `index`, exact `before` and
+`"disable": true`. Dynamic outputs reject raw firmware controls, HID error codes
+and nested tap-dances. Combo triggers must be distinct ordinary keys present in
+the recorded keymap.
+
+A new TD key reference is checked against the proposed tap table so the ordinary
+base-layer fallback remains available. A TD already referenced on the typing
+layer must retain its tap output; move that reference through a separate review
+before changing the tap meaning. Applying installs verified table entries before
+new key references. Restoration removes those references before restoring their
+tables. Every write requires physical unlock, exact current/baseline comparison,
+status acknowledgement and readback. Interrupted byte mixtures remain recoverable
+only within the transaction's before/after values; unrelated edits stop recovery
+before any restoration write.
+
+Nine additional fault-transport tests cover exact packing and protocol bounds,
+combined TD/key changes, opaque slots, combo clearing, typing fallback, locked or
+failed backups, partial writes, unplug/reconnect, bad readback and preflight of
+unrelated edits. Physical typing, tap timing, chords and unlock acceptance remain
+pending on real hardware. The frozen frontend does not expose these controls yet.
+
+The wire contract follows the pinned GUI's
+[dynamic advertisement](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/dynamic.py),
+[tap-dance](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/tap_dance.py)
+and [combo](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/combo.py)
+code and the matching [firmware command handlers](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/vial.c).
+Switchyard implements the codecs independently; no upstream firmware is copied.
