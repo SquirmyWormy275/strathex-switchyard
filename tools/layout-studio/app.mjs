@@ -1,4 +1,7 @@
 import { analyzePlan, attachQmkBaseLayer, consequences, families, modifiers, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, parseStudyReport, planMarkdown, studySuggestions } from "/model.mjs";
+import { importProfile, portableProfile, proposalContext, reviewProposal } from "/workspace.mjs";
+import { connectWorkspace } from "/connection.mjs";
+import { importVialSnapshot, snapshotChoices } from "/vial-snapshot.mjs";
 
 const $ = (id) => document.getElementById(id);
 let plan = null;
@@ -9,6 +12,10 @@ let editingActionId = null;
 let nextAction = 1;
 let noticeTimer;
 let dirty = false;
+let connection;
+let pendingProposal = null;
+let profileIdentity = { id: "my-workflow", name: null };
+let pendingSnapshot = null;
 
 function option(value, label = value) { const item = document.createElement("option"); item.value = value; item.textContent = label; return item; }
 function notify(message, undo) {
@@ -22,7 +29,7 @@ function notify(message, undo) {
   clearTimeout(noticeTimer); noticeTimer = setTimeout(() => surface.classList.remove("visible"), 6000);
 }
 function shortNumber(value) { return Number.isFinite(value) ? value.toFixed(1) : "0.0"; }
-function markDirty() { dirty = true; $("save-status").textContent = "Changes in this tab are unsaved. Download the editable plan to keep them."; }
+function markDirty() { dirty = true; pendingProposal = null; $("adopt-proposal").disabled = true; connection?.invalidate(); $("save-status").textContent = "Changes in this tab are unsaved. Download the editable plan to keep them."; }
 function mayReplacePlan() { return !dirty || window.confirm("Replace the current unsaved layout? Download its editable plan first if you want to keep it."); }
 function updateConsequenceHelp() {
   const help = {
@@ -58,6 +65,7 @@ function loadInfo(info, layout) {
   let profile = parseQmkInfo(info, layout);
   if (pendingKeymap) profile = attachQmkBaseLayer(profile, pendingKeymap);
   plan = newPlan(profile);
+  profileIdentity = { id: "my-workflow", name: null };
   nextAction = 1;
   selectedActionId = null;
   resetEditor(); dirty = false;
@@ -85,7 +93,9 @@ function importKeymap(keymap) {
 function importSaved(value) {
   if (!mayReplacePlan()) return;
   let imported;
-  if (value?.schema === "sxsy-agentic-layout-plan/v1") imported = parsePlan(value);
+  if (["sxsy-agentic-layout-plan/v1", "switchyard-profile/v1"].includes(value?.schema)) {
+    const portable = importProfile(value); imported = portable.plan; profileIdentity = { id: portable.id, name: portable.name };
+  }
   else imported = newPlan(parseBoardProfile(value));
   plan = imported;
   pendingInfo = null; pendingKeymap = null; selectedActionId = null;
@@ -240,6 +250,10 @@ function studyCards() {
 }
 
 function render() {
+  connection?.invalidate();
+  $("copy-assistant-context").disabled = !plan;
+  $("preview-proposal").disabled = !plan;
+  $("proposal-file").disabled = !plan;
   const board = $("board-summary");
   if (!plan) board.textContent = "Load a board to begin.";
   else board.textContent = `${plan.profile.name} · ${plan.profile.layout} · ${plan.profile.keys.length} keys · ${plan.profile.controller} controller`;
@@ -322,14 +336,81 @@ $("action-form").addEventListener("submit", (event) => {
 $("action-cancel").addEventListener("click", resetEditor);
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && selectedActionId) { selectedActionId = null; render(); notify("Key selection cancelled."); } });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
-$("export-json").addEventListener("click", () => { if (plan) { download("agentic-layout-plan.json", `${JSON.stringify(parsePlan(plan), null, 2)}\n`, "application/json"); $("save-status").textContent = "Download requested. Confirm the file exists before closing this tab."; } });
+const portable = () => portableProfile(plan, profileIdentity.id, profileIdentity.name ?? plan.profile.name);
+$("export-json").addEventListener("click", () => { if (plan) { download("switchyard-profile.json", `${JSON.stringify(portable(), null, 2)}\n`, "application/json"); $("save-status").textContent = "Download requested. Confirm the file exists before closing this tab."; } });
 $("export-markdown").addEventListener("click", () => { if (plan) download("agentic-layout-review.md", planMarkdown(plan), "text/markdown"); });
 $("copy-json").addEventListener("click", async () => {
   if (!plan) return;
   try {
-    await navigator.clipboard.writeText(`${JSON.stringify(parsePlan(plan), null, 2)}\n`);
+    await navigator.clipboard.writeText(`${JSON.stringify(portable(), null, 2)}\n`);
     $("save-status").textContent = "Plan JSON copied. Paste it into a local file to keep it.";
     notify("Plan JSON copied to clipboard.");
   } catch { notify("Clipboard access was blocked. Use Download editable plan instead."); }
 });
+function previewProposal(value) {
+  pendingProposal = null; $("adopt-proposal").disabled = true; $("proposal-changes").replaceChildren();
+  if (!plan) throw new Error("Choose a keyboard first.");
+  const result = reviewProposal(value, plan);
+  pendingProposal = value;
+  $("proposal-summary").textContent = result.summary;
+  $("proposal-changes").replaceChildren(...result.changes.map((text) => { const li = document.createElement("li"); li.textContent = text; return li; }));
+  $("adopt-proposal").disabled = false;
+}
+fileInput("snapshot-file", (value) => {
+  const choices = snapshotChoices(value);
+  pendingSnapshot = value;
+  $("snapshot-choices").replaceChildren(...choices.map((choice, i) => {
+    const label = document.createElement("label"); label.textContent = choice.label;
+    const select = document.createElement("select"); select.id = `snapshot-choice-${i}`;
+    select.append(option("", "Choose physical arrangement"), ...choice.options.map((name, index) => option(String(index), name)));
+    label.append(select); return label;
+  }));
+  $("snapshot-options").hidden = false;
+  notify("Review the physical arrangement. Saved keycodes are historical evidence, not a live device read.");
+});
+$("load-snapshot").addEventListener("click", () => {
+  if (!pendingSnapshot) return;
+  try {
+    const selects = [...$("snapshot-choices").querySelectorAll("select")];
+    if (selects.some((s) => s.value === "")) throw new Error("Review every physical layout choice first.");
+    const profile = importVialSnapshot(pendingSnapshot, selects.map((s) => Number(s.value)));
+    if (!mayReplacePlan()) return;
+    plan = newPlan(profile); profileIdentity = { id: "saved-keyboard", name: profile.name };
+    pendingInfo = null; pendingKeymap = null; selectedActionId = null; pendingProposal = null;
+    resetEditor(); dirty = false; render();
+    notify("Saved geometry and layer zero loaded. Device firmware, controller, current layout and physical arrangement remain unverified.");
+  } catch (error) { notify(error.message); }
+});
+fileInput("proposal-file", previewProposal);
+$("preview-proposal").addEventListener("click", () => {
+  try { const source = $("proposal-text").value; if (source.length > 256 * 1024) throw new Error("Choose a proposal smaller than 256 KiB."); previewProposal(JSON.parse(source)); }
+  catch (error) { $("proposal-summary").textContent = error.message; notify(error.message); }
+});
+$("adopt-proposal").addEventListener("click", () => {
+  try {
+    const reviewed = reviewProposal(pendingProposal, plan);
+    plan = reviewed.plan; pendingProposal = null; selectedActionId = null; resetEditor(); markDirty(); render();
+    $("proposal-summary").textContent = "Proposal adopted into your editable layout. Host and device changes still require separate review.";
+    $("proposal-changes").replaceChildren();
+    notify("Proposal adopted. Direct editing and assistant proposals now show the same layout.");
+  } catch (error) { notify(error.message); }
+});
+$("copy-assistant-context").addEventListener("click", async () => {
+  if (!plan) return;
+  try { await navigator.clipboard.writeText(JSON.stringify(proposalContext(plan), null, 2)); notify("Context copied. Tell your existing assistant what to improve, then paste or import its proposal here."); }
+  catch { notify("Clipboard access was blocked. Download your editable profile for your assistant instead."); }
+});
+$("chatgpt-preset").addEventListener("click", () => {
+  if (!plan) { notify("Load your keyboard or the clearly labelled demo first."); return; }
+  try {
+    let id = "show-chatgpt";
+    for (let n = 2; plan.actions.some((a) => a.id === id); n++) id = `show-chatgpt-${n}`;
+    plan = parsePlan({ ...plan, actions: [...plan.actions, { id, label: "Show ChatGPT", family: "routing", consequence: "navigation", confirmation: false, frequencyPerDay: 0, secondsSaved: 0, binding: null }] });
+    markDirty(); render(); selectedActionId = id; render();
+    $("board").scrollIntoView({ block: "start" });
+    $("keyboard").querySelector("button")?.focus();
+    notify("Choose its physical key, then select Super + Alt in its action card. Normal typing stays available.");
+  } catch (error) { notify(error.message); }
+});
+connection = connectWorkspace({ getPlan: () => plan, notify });
 render();

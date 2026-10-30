@@ -1,6 +1,6 @@
 # Switchyard build sequence
 
-All accepted requirements remain tracked here. See the
+Revision 2 supersedes any earlier first-slice ceiling. All required suite modules must be implemented; the stages are dependency order, not stopping points. The authoritative statuses are in [the requirement ledger](switchyard-requirements.md). All accepted requirements remain tracked here. See the
 [continuation record](switchyard-status.md) for current receipts and next tasks.
 
 | Milestone | Work | Dependency / status |
@@ -9,7 +9,8 @@ All accepted requirements remain tracked here. See the
 | B | Shared proposal/direct model; compatibility review; private baseline; bounded host apply/readback/trial/restore; F77 identity and configuration | Host loop first; F77 currently absent |
 | C | Agent-authored proposals; workflow aggregates; exact Codex task controls; Claude Code hooks and exact sessions; Microsoft 365 Copilot investigation | Existing inventory retained; new adapter controls pending |
 | D | Portable profile migration; guest/keyboard-only and Copilot-only scenarios; Windows shortcuts/device access; native Windows verification | Portable model first; Windows host unavailable |
-| E | Leyden Jar variants; physical B122; original xwhatsit; solenoid/Num Lock evidence; broader observation and voice; SDK; macOS | Exact hardware and firmware evidence required |
+| E | Required controller adapters, broader observation/voice, SDK, policy/storage, Linux/Windows installation | Implement now; hardware/provider acceptance is separate |
+| Future/external | Physical B122, Windows/tenant host acceptance, independent assessment, macOS, optional external hardware | Only these checks/future targets are deferred by design |
 | Managed security | Enforced provider/account/endpoint policy; independent compartment keys; credential store; AEAD and key recovery; scoped handoffs; retention/deletion; redacted logs | Designed; no managed-client-data acceptance |
 | Distribution | Installer/update/uninstall/rollback; signed releases and key lifecycle; licensing and publication | Existing private B122 preview retained; new product packaging pending |
 | UX | One keyboard workspace; direct and conversation consistency; no mandatory model; accessible selection and responsive geometry; failures preserve work | First implementation in progress |

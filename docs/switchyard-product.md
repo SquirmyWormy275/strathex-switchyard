@@ -5,7 +5,7 @@ controls, connect supported tools, and try and refine the result. Direct editing
 and proposals from an existing assistant edit the same configuration. Neither an
 account nor an LLM is required for basic configuration.
 
-Alex authorized this product direction in the October 29, 2026 build handover.
+Alex authorized this product direction in Revision 2 of the October 29, 2026 full-suite handover. The full integrated suite is required; the F77 is its pilot device, not its scope limit. A single-action demonstration is an intermediate test only.
 The reusable product extends the earlier B122 control-plane scope. The canonical
 22-control/65-assignment B122 protocol remains a versioned specialist preset;
 its 27 acceptance gates remain open. They do not gate independent F77 or host
@@ -33,3 +33,5 @@ voice repair, click protection, and unrelated work.
 Start with the [configuration tutorial](switchyard-configuration.md),
 [architecture decision](decisions/001-switchyard-configuration.md),
 [build sequence](switchyard-build-plan.md), and [continuation record](switchyard-status.md).
+
+The [authoritative requirement ledger](switchyard-requirements.md) tracks implementation separately from validation. Missing hardware or accounts block their exact acceptance checks, not independently executable implementation.

@@ -16,13 +16,18 @@
       <span class="local-badge"><span aria-hidden="true"></span> LOCAL · PRIVATE</span>
     </header>
 
+    <aside class="discovery-strip" aria-label="This computer">
+      <div><strong id="discovery-status" role="status">Checking this computer…</strong><p id="discovery-detail">Offline design is available while discovery runs.</p></div>
+      <button id="refresh-discovery" type="button" class="secondary">Check again</button>
+    </aside>
+
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow">DESIGN FOR THE WAY YOU ACTUALLY WORK</p>
         <h1 id="hero-title">Turn agent workflows into a keyboard you can trust.</h1>
-        <p class="lede">Start with the exact physical board. Find the actions you repeat. Try the chords, inspect the tradeoffs, and export a plan you can review before changing a single key.</p>
+        <p class="lede">Describe the work. Give it a place. Connect a supported action, try it, and keep what feels right.</p>
         <div class="hero-actions"><button id="hero-sample-button" type="button">Explore the demo <span aria-hidden="true">↗</span></button><a class="button-link ghost" href="#board">Use my keyboard</a></div>
-        <p class="hero-note">No account. No uploads. No firmware writes.</p>
+        <p class="hero-note">No account or model required. Host changes are reviewed and reversible.</p>
       </div>
       <div class="hero-art" aria-hidden="true"><div class="art-label">WORKFLOW / PHYSICAL CONTROL</div><div class="art-grid"><span>RESUME</span><span>REVIEW</span><span>ROUTE</span><span>HANDOFF</span><span>PROOF</span><span>RECOVER</span></div><div class="art-caption">YOUR LAYOUT, YOUR INTENT.</div></div>
     </section>
@@ -37,17 +42,54 @@
           <div class="source-card"><div class="source-heading"><span class="source-icon" aria-hidden="true">⌁</span><div><h3>Bring your board</h3><p>Use the physical layout and typing layer from your own configuration.</p></div></div><div class="import-grid"><label class="file-control">QMK info.json <input id="info-file" type="file" accept=".json,application/json"><small>Physical key positions</small></label><label class="file-control">QMK keymap.json <input id="keymap-file" type="file" accept=".json,application/json" disabled><small>Normal typing layer</small></label></div><label id="layout-picker-wrap" class="layout-picker" hidden>Choose physical layout <select id="layout-picker"></select></label></div>
           <div class="source-card"><div class="source-heading"><span class="source-icon" aria-hidden="true">↥</span><div><h3>Continue a plan</h3><p>Bring back a saved layout, or import a manually checked board profile.</p></div></div><label class="file-control">Plan or board profile <input id="plan-file" type="file" accept=".json,application/json"><small>Local JSON file</small></label></div>
         </div>
+        <details class="snapshot-import"><summary>Use a saved Vial configuration</summary>
+          <p>Load a saved configuration readout with its definition and raw keymap. Choose the physical options before previewing. This imports historical evidence; it does not connect or write to a keyboard.</p>
+          <label class="file-control">Saved Vial snapshot <input id="snapshot-file" type="file" accept=".json,application/json"></label>
+          <div id="snapshot-options" hidden><div id="snapshot-choices" class="snapshot-choices"></div><button id="load-snapshot" type="button" class="secondary">Load saved keyboard preview</button></div>
+        </details>
         <div class="board-workspace"><div class="board-topline"><div><span class="overline">PHYSICAL PREVIEW</span><h3 id="board-summary">Load a board to begin.</h3></div><span id="board-base-badge" class="status-pill">Awaiting keyboard</span></div><div id="keyboard" class="keyboard" role="group" aria-label="Physical keyboard preview"><div class="board-empty">Your keyboard will appear here.</div></div><p id="pick-help" class="board-help">Choose “Pick on board” beside an action, then select a key here. You can also use the key dropdown in its card.</p></div>
+        <div class="design-workspace">
+          <article class="assistant-card">
+            <span class="overline">TELL ME · DESIGN TOGETHER</span>
+            <h3>Bring your assistant into the layout.</h3>
+            <p>Copy this plan to Codex, Claude, or your preferred assistant. Explain the workflow you want to improve, then bring its proposal back here. You can also edit every action directly below.</p>
+            <div class="form-actions"><button id="copy-assistant-context" type="button" class="secondary" disabled>Copy context for my assistant</button><button id="chatgpt-preset" type="button" class="text-button">Start with Show ChatGPT</button></div>
+            <details><summary>Import an assistant proposal</summary>
+              <label class="file-control">Proposal JSON file <input id="proposal-file" type="file" accept=".json,application/json" disabled></label>
+              <label>Or paste the proposal <textarea id="proposal-text" rows="5" maxlength="262144" placeholder="Paste your assistant's structured proposal here. No new model account needed."></textarea></label>
+              <button id="preview-proposal" type="button" class="secondary" disabled>Preview proposal</button>
+            </details>
+            <p id="proposal-summary" role="status">A proposal changes your draft only after you review and adopt it.</p>
+            <ul id="proposal-changes"></ul>
+            <button id="adopt-proposal" type="button" disabled>Adopt into layout</button>
+          </article>
+          <article class="connection-card">
+            <span class="overline">CONNECT · TRY · REFINE</span>
+            <h3>Make one useful action work.</h3>
+            <p>Connect a navigation action to <strong>Show ChatGPT</strong>. It focuses the verified native main window. Choose a key with Super plus another modifier to keep ordinary typing available.</p>
+            <label>Action to connect <select id="connection-action"><option value="">Choose a navigation action</option></select></label>
+            <button id="review-connection" type="button" disabled>Review desktop shortcut</button>
+            <p id="connection-message" class="connection-message" role="status"></p>
+            <p id="connection-receipt" class="supporting" role="status"></p>
+            <div class="form-actions"><button id="trial-connection" type="button" class="secondary" disabled>Try action</button><button id="keep-connection" type="button" class="secondary" disabled>Keep</button><button id="restore-connection" type="button" class="text-button" disabled>Restore previous setup</button></div>
+            <p class="field-help">This connection stays on this computer. Portable profiles carry the layout. Device writes, exact task resume, and managed work compartments are pending.</p>
+          </article>
+        </div>
       </section>
 
       <section class="stage" id="patterns" aria-labelledby="patterns-title"><div class="stage-heading"><span class="stage-number">02 / THE WORKFLOW</span><h2 id="patterns-title">See what keeps coming up.</h2><p>Optional evidence from the Switchyard recorder can surface broad patterns. It never knows the exact task you meant, so every suggestion stays yours to edit.</p></div><div class="study-layout"><div class="study-intro"><span class="overline">PRIVATE BY DESIGN</span><h3>Import an aggregate report</h3><p>The studio keeps only session counts and broad event summaries. Raw focus intervals, task aliases, and timestamps are discarded.</p><div class="controls"><label class="file-control">Aggregate study report <input id="study-file" type="file" accept=".json,application/json" disabled><small>Recorder report JSON</small></label><button id="sample-study-button" type="button" class="secondary" disabled>Try sample observations</button></div><p id="study-summary" class="supporting">Load a keyboard first, then import a report or try the sample.</p></div><div class="suggestion-area"><div class="area-heading"><span class="overline">PATTERN SUGGESTIONS</span><span>Use as a draft, then set your own estimates</span></div><div id="study-suggestions" class="suggestions"><div class="empty-state">Suggestions will appear here after a report is loaded.</div></div></div></div></section>
 
       <section class="stage" id="mapping" aria-labelledby="mapping-title"><div class="stage-heading"><span class="stage-number">03 / THE LAYOUT</span><h2 id="mapping-title">Give important actions a place.</h2><p>Name the intent rather than an app command. Keep normal keys visible, then choose a modifier and a physical key.</p></div><div class="mapping-layout"><div class="editor-card"><div class="editor-heading"><span class="overline">ACTION EDITOR</span><h3 id="form-title">Add an action</h3><p>Estimates help you compare ideas. They are never treated as measured savings.</p></div><form id="action-form" class="action-form"><label>What do you want to do? <input id="action-label" maxlength="80" required placeholder="e.g. Review finished work"></label><div class="form-pair"><label>Action family <select id="action-family"></select></label><label>Consequence <select id="action-consequence"></select></label></div><p id="consequence-help" class="field-help">Navigation only changes what you see or focus.</p><div class="form-pair"><label>Times per day <input id="action-frequency" type="number" min="0" max="1000" step="1" value="5" required></label><label>Seconds saved each time <input id="action-savings" type="number" min="0" max="3600" step="1" value="10" required></label></div><label class="checkbox"><input id="action-confirmation" type="checkbox"> Plan an explicit confirmation step</label><div class="form-actions"><button id="action-submit" type="submit" disabled>Add action</button><button id="action-cancel" type="button" class="text-button" hidden>Cancel edit</button></div></form></div><div class="action-area"><div class="area-heading"><span class="overline">YOUR ACTIONS</span><span id="action-count">0 actions</span></div><div id="action-empty" class="empty-state">Choose a keyboard, then add your first action or use a workflow suggestion.</div><div id="actions-body" class="action-list"></div></div></div></section>
 
-      <section class="stage review-stage" id="review" aria-labelledby="review-title"><div class="stage-heading"><span class="stage-number">04 / THE DECISION</span><h2 id="review-title">See the tradeoffs before you export.</h2><p>Structural conflicts are flagged here. The final layout still needs physical, operating-system, and controller checks on your keyboard.</p></div><div class="review-layout"><div class="review-card"><span class="overline">LAYOUT HEALTH</span><h3 id="review-summary" aria-live="polite">No plan loaded.</h3><ul id="issues" class="issues"><li>Load a board to start reviewing.</li></ul></div><div class="export-card"><span class="overline">TAKE YOUR PLAN WITH YOU</span><h3>Keep a copy you can inspect.</h3><p>Download the editable JSON to continue later. The Markdown sheet is for sharing or reviewing a proposed layout.</p><button id="export-json" type="button" disabled>Download editable plan <span aria-hidden="true">↧</span></button><button id="export-markdown" type="button" class="secondary" disabled>Download review sheet <span aria-hidden="true">↧</span></button><button id="copy-json" type="button" class="text-button" disabled>Copy plan JSON</button><p id="save-status" class="save-status" role="status">Your work stays in this tab until you download the plan.</p></div></div><p class="boundary">A key expresses intent. This tool never flashes firmware, installs a shortcut, uploads your files, or grants an agent permission. A QMK base layer is needed to judge ordinary typing impact; a <a href="https://get.vial.today/docs/porting-to-vial.html">Vial definition</a> is a different format.</p></section>
+      <section class="stage review-stage" id="review" aria-labelledby="review-title"><div class="stage-heading"><span class="stage-number">04 / THE DECISION</span><h2 id="review-title">See the tradeoffs before you export.</h2><p>Structural conflicts are flagged here. The final layout still needs physical, operating-system, and controller checks on your keyboard.</p></div><div class="review-layout"><div class="review-card"><span class="overline">LAYOUT HEALTH</span><h3 id="review-summary" aria-live="polite">No plan loaded.</h3><ul id="issues" class="issues"><li>Load a board to start reviewing.</li></ul></div><div class="export-card"><span class="overline">TAKE YOUR PLAN WITH YOU</span><h3>Keep a copy you can inspect.</h3><p>Download the editable JSON to continue later. The Markdown sheet is for sharing or reviewing a proposed layout.</p><button id="export-json" type="button" disabled>Download editable plan <span aria-hidden="true">↧</span></button><button id="export-markdown" type="button" class="secondary" disabled>Download review sheet <span aria-hidden="true">↧</span></button><button id="copy-json" type="button" class="text-button" disabled>Copy plan JSON</button><p id="save-status" class="save-status" role="status">Your work stays in this tab until you download the plan.</p></div></div><p class="boundary">A key expresses intent. Firmware writes are unavailable. A supported host shortcut is installed only through Review and Apply above; local backups and Restore remain available. No uploads or agent permission grants occur. A QMK base layer is needed to judge ordinary typing impact; a <a href="https://get.vial.today/docs/porting-to-vial.html">Vial definition</a> is a different format.</p></section>
     </main>
     <footer><div class="brand footer-brand"><span class="brand-mark" aria-hidden="true">S<span>↗</span></span><span><strong>SWITCHYARD</strong><small>LAYOUT STUDIO</small></span></div><p>Built for intentional control over agentic work.</p><a href="https://github.com/SquirmyWormy275/strathex-switchyard">Source, guide, and limitations ↗</a></footer>
   </div>
   <div id="notice" role="status" aria-live="polite"></div>
+  <dialog id="host-review-dialog" aria-labelledby="host-review-title">
+    <p class="overline">REVIEW THE CHANGE</p><h2 id="host-review-title">Desktop shortcut</h2>
+    <ul id="host-review-changes"></ul><p>This review expires in two minutes. Any configuration change requires a fresh review.</p>
+    <div class="form-actions"><button id="apply-connection" type="button" disabled>Apply shortcut</button><button id="cancel-connection" type="button" class="secondary">Cancel</button></div>
+  </dialog>
 </body>
 </html>

@@ -99,6 +99,7 @@ export const requiredGroups = [
   { file: "scripts/codex-thread-status.test.mjs" },
   { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/model.test.mjs" },
+  { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },

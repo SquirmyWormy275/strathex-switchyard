@@ -30,3 +30,5 @@ Next three executable tasks:
 1. Implement and test versioned profile/proposal import against the existing plan.
 2. Connect authenticated review/apply/readback/restore for a bounded host shortcut.
 3. Exercise real UI tasks and host rollback; update this record with exact receipts.
+
+Revision 2 received during implementation: full suite required. See the [authoritative ledger](switchyard-requirements.md). The current source is partial; the host focus loop is only an intermediate test. Updated handover SHA-256 is `8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`. Focused model/transaction/API tests: 24/24 passed. Integrated baseline Studio/recorder/shortcut tests: 18/18; baseline typecheck passed. Native UI and live host application have not yet been exercised.
