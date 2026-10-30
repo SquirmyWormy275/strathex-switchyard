@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileConnection } from "./workspace.mjs";
 import { dispatchPhysicalIntent, intentArguments, waitIntentReceipt } from "./physical-intent.mjs";
+import { withStateLock } from "./state-lock.mjs";
 
 const exec = promisify(execFile);
 const uid = userInfo().uid;
@@ -47,14 +48,21 @@ export async function focusNativeChatgpt(hypr = runHypr) {
 }
 
 async function ownedFile(path, privateFile = false) {
-  const meta = await lstat(path);
-  if (!meta.isFile() || meta.isSymbolicLink() || meta.uid !== uid || (meta.mode & 0o022) || (privateFile && (meta.mode & 0o077))) throw new Error("The configuration or recovery file is not an owner-controlled regular file.");
-  if (meta.size > 1024 * 1024) throw new Error("The local file exceeds the supported size.");
+  const meta = await lstat(path, { bigint: true });
+  if (!meta.isFile() || meta.isSymbolicLink() || Number(meta.uid) !== uid || (Number(meta.mode) & 0o022) || (privateFile && (Number(meta.mode) & 0o077))) throw new Error("The configuration or recovery file is not an owner-controlled regular file.");
+  if (meta.size > 1024n * 1024n) throw new Error("The local file exceeds the supported size.");
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    const opened = await handle.stat();
+    const opened = await handle.stat({ bigint: true });
     if (opened.ino !== meta.ino || opened.dev !== meta.dev) throw new Error("The local file changed while it was opened.");
-    return { text: await handle.readFile("utf8"), mode: meta.mode & 0o777 };
+    const bytes = Buffer.alloc(1024 * 1024 + 1); let length = 0;
+    while (length < bytes.length) { const read = await handle.read(bytes, length, bytes.length - length); if (!read.bytesRead) break; length += read.bytesRead; }
+    if (length > 1024 * 1024) throw new Error("The local file exceeds the supported size.");
+    const after = await handle.stat({ bigint: true }), named = await lstat(path, { bigint: true });
+    if (opened.size !== after.size || opened.mtimeNs !== after.mtimeNs || opened.ctimeNs !== after.ctimeNs || named.ino !== opened.ino || named.dev !== opened.dev || !named.isFile()) throw new Error("The local file changed while it was read.");
+    const text = bytes.subarray(0, length).toString("utf8");
+    if (!Buffer.from(text).equals(bytes.subarray(0, length))) throw new Error("The local configuration must be valid UTF-8; its bytes were preserved.");
+    return { text, mode: Number(meta.mode) & 0o777 };
   } finally { await handle.close(); }
 }
 
@@ -124,11 +132,7 @@ export function createHostBridge({
   }
   async function lock(fn) {
     await root();
-    let handle;
-    try { handle = await open(join(stateRoot, "transaction.lock"), "wx", 0o600); }
-    catch { throw new Error("Another configuration operation owns the recovery lock. Inspect private transaction state before retrying."); }
-    try { await handle.writeFile(String(process.pid)); return await fn(); }
-    finally { await handle.close(); await rm(join(stateRoot, "transaction.lock")); }
+    return withStateLock(stateRoot, "host", fn);
   }
   const save = async (tx) => atomicFile(join(stateRoot, tx.id, "receipt.json"), `${JSON.stringify(tx, null, 2)}\n`);
   async function load(id) {
@@ -160,7 +164,14 @@ export function createHostBridge({
       restored = current.text.slice(0, first) + current.text.slice(first + tx.block.length);
     }
     if ((await config()).text !== current.text) throw new Error("The configuration changed during restoration. Retry after reviewing it.");
-    await atomicFile(configPath, restored, current.mode);
+    if (restored !== current.text) {
+      const directory = join(stateRoot, "restorations", `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID()}`);
+      await mkdir(directory, { recursive: true, mode: 0o700 }); await ownedDirectory(directory, true);
+      await writeFile(join(directory, "bindings.lua.before"), current.text, { flag: "wx", mode: 0o600 });
+      await writeFile(join(directory, "reason.json"), JSON.stringify({ schema: "switchyard-host-restoration/v1", at: new Date().toISOString(), transaction: tx.id, beforeHash: hash(current.text), afterHash: hash(restored), mode: current.mode, reason: "Remove the exact owned Switchyard shortcut while preserving all unrelated current bindings." }), { flag: "wx", mode: 0o600 });
+      if ((await ownedFile(join(directory, "bindings.lua.before"), true)).text !== current.text || (await config()).text !== current.text) throw new Error("The restoration backup or current configuration changed; its bytes were preserved.");
+      await atomicFile(configPath, restored, current.mode);
+    }
     await verify(tx.connection, false);
     if (tx.connection.callbackName && (await hypr("eval", `${callbackName(tx.connection)} = nil`)).trim() !== "ok") throw new Error("The owned shortcut callback could not be cleared.");
     if ((await config()).text !== restored) throw new Error("Restored file readback failed.");

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { once } from "node:events";
 import { request } from "node:http";
-import { mkdtemp, readFile, writeFile, readdir, rm, symlink, chmod } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, symlink, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { newPlan, parseBoardProfile } from "./model.mjs";
@@ -157,6 +157,17 @@ test("Linux host transaction faults and durable restoration", { skip: process.pl
     const loader = join(directory, "application launch.mjs"), stable = createHostBridge({ ...options, intentEntry: [process.execPath, loader] });
     const tx = await stable.apply((await review(stable)).reviewId), written = await readFile(configPath, "utf8");
     assert.ok(written.includes("application launch.mjs")); assert.equal(written.includes("versions/"), false); await stable.restore(tx.id);
+  }));
+  await t.test("an abandoned legacy PID file cannot permanently block the kernel-owned host transaction lease", () => fixture(async ({ bridge, stateRoot }) => {
+    await mkdir(stateRoot, { mode: 0o700 }); await writeFile(join(stateRoot, "transaction.lock"), "99999999", { mode: 0o600 });
+    const tx = await bridge.apply((await review(bridge)).reviewId); await bridge.restore(tx.id);
+    assert.equal(await readFile(join(stateRoot, "transaction.lock"), "utf8"), "99999999");
+  }));
+  await t.test("restoration saves a dated copy of the complete current configuration and its reason", () => fixture(async ({ bridge, stateRoot, configPath }) => {
+    const tx = await bridge.apply((await review(bridge)).reviewId), current = (await readFile(configPath, "utf8")) + "-- later user edit\n"; await writeFile(configPath, current); await bridge.restore(tx.id);
+    const directories = await readdir(join(stateRoot, "restorations")); assert.equal(directories.length, 1);
+    const directory = join(stateRoot, "restorations", directories[0]); assert.equal(await readFile(join(directory, "bindings.lua.before"), "utf8"), current);
+    const reason = JSON.parse(await readFile(join(directory, "reason.json"))); assert.equal(reason.transaction, tx.id); assert.match(reason.reason, /preserving all unrelated/);
   }));
   await t.test("failed reload restores and verifies the complete previous file", () => fixture(async ({ bridge, configPath, before, failReload }) => {
     const r = await review(bridge); failReload();
