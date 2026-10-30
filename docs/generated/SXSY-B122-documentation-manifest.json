@@ -326,15 +326,15 @@
   "schema": "sxsy-b122.documentation-manifest/v1",
   "simulationOnly": true,
   "sourceDigests": {
-    "docs/SXSY-B122-complete-key-specification-and-audit.md": "a90fbb888855f33393d379fc6863e8c7149d622e5780653cbbfe1434c96a6d27",
-    "docs/acceptance-gates.md": "9ee321a0f0b1a050d08e84ff5146cbb4d9e911f86217d6c4f6dd387e4d39816c",
-    "docs/adversarial-review.md": "fa438e3fca69143ad323968319c2d61518bcba889abe3d3a58a4504879b37377",
-    "docs/historical-interview-notes-reconstructed.md": "43d0ac4af6285d591232d88987a3be02e844b6143ffbe8999cded2cefb10a243",
+    "docs/SXSY-B122-complete-key-specification-and-audit.md": "9ad138c742d5398306b2cd8aff5a305a9c80f0c4686f8f5f5e6f7fc1c45a0c9b",
+    "docs/acceptance-gates.md": "940ddcfc0c6aa3f02d828472f7453a2024a46b3a670244426784cbeddf403c9b",
+    "docs/adversarial-review.md": "0cca9970f40a1cad4b032033c6729a9bae3b450f1920f991db79d72c02994380",
+    "docs/historical-interview-notes-reconstructed.md": "67c7a5c04ab8145949c3dff1b751e66031c948b036c3f15d231e9d9218a6d418",
     "docs/templates/SXSY-B122-operator-technical-manual.template.md": "8bd084a92fe98e47b0e92c2bbb04da79ff8dafa0cca1e1187bd1926c58e9de22",
-    "packages/control-plane/src/command-catalog.ts": "d1901b6176da1c50e1a52e8c423be277798b9beb58a7c704a7a22922c7c7f025",
+    "packages/control-plane/src/command-catalog.ts": "9527edd13d906a94e6706805de2ff0b1f24d6e7347ee5f75f407dcaa34e49d9d",
     "packages/protocol/generated/b122-control-map.json": "9a6c7fe24b1c4d0be68a926c16b9b10d0addc3ae0f4d5cd9e36887d127abb534",
     "scripts/build_b122_manual_pdf.py": "cf9c0ba4dc89274cce4e6031ecb49d2dc96635eefae5a4985c371ac1c237f4c2",
-    "scripts/generate_b122_documentation.py": "ae8c84b5010a92297377d1f874cd9e80fa77748c80dad65ba98050d6c14d9d6d"
+    "scripts/generate_b122_documentation.py": "ac90c8cd3fd4a07181aaa284df9f097e445f2a863a2194ad4b5c90c79961e42c"
   },
   "version": "1.0.0"
 }

@@ -1446,6 +1446,33 @@ are removed from auxiliary ownership tracking.
 
 Six new shared-metadata boundary tests plus the affected design/text, suite,
 native guardian and verification-runner tests pass: 74 focused checks with no
-skips. Typecheck passes. Native shared-probe and installed text regression are
-next. Configuration designer model subprocess containment remains unfinished;
+skips. Typecheck passes. The normal installed metadata demonstration passed eight
+checks with nine actual distinct guardians independently verified exited,
+including shared designer/text-task probes. Temporary isolated encrypted state
+was removed. Receipt: installed-claude-commands-1793385399492.json. The installed
+Claude text journey also passed all 13 checks again (three tiny separately
+reviewed prompts, exact create/continue/recover, unchanged source, keyboard-only
+cleanup and removal of successful synthetic local records); receipt
+installed-reviewed-claude-text-1793385438049.json. Complete Linux acceptance at
+`468b9ac`: 120/120 groups, 864 tests, 855 passed and nine platform skips; receipt
+a118038d-3ce9-4fa8-af43-ee3dc6f07b6e. Fresh normal installed device enumeration at
+18:37 UTC still returned zero configuration interfaces; no device was opened.
+Configuration designer model subprocess containment remains unfinished;
 this checkpoint does not claim general provider containment is complete.
+
+## Canonical documentation fingerprints and raster encoding
+
+The Windows backend step passed at `30168d3`, then strict documentation checking
+correctly rejected a remaining stale source-digest manifest. The LF checkout
+rule fixed text output mismatches; the manifest now records actual current
+source bytes. Linux's PNG compression library also emitted a different byte
+stream for identical pixels. Generation now retains the committed small demo PNG
+only after an exact bounded RGB pixel comparison; the manifest still hashes the
+original complete encoded bytes. A changed pixel or invalid image forces a new
+render and fails a stale check. No PDF, SVG or demo PNG content was changed.
+
+Both documentation/legend generator checks and all 27 Python documentation tests
+pass using CI's pinned Python 3.13.3. A new compression-variant test also checks
+that a one-pixel change cannot be hidden. The temporary Python installations and
+dependency environments are removed after this verification. Complete native
+Windows acceptance remains pending; software failures are not hardware blockers.

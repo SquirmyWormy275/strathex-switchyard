@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import hashlib
 import re
 import subprocess
@@ -16,6 +17,25 @@ PDF_BUILDER = REPOSITORY_ROOT / "scripts" / "build_b122_manual_pdf.py"
 CANONICAL_MANIFEST = (
     REPOSITORY_ROOT / "packages" / "protocol" / "generated" / "b122-control-map.json"
 )
+
+
+def test_png_compression_variants_preserve_canonical_bytes_only_when_every_pixel_matches(monkeypatch) -> None:
+    from PIL import Image
+    monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
+    from generate_b122_documentation import preserve_demo_png_encoding
+
+    image = Image.new("RGB", (1600, 900), "white")
+    fast, dense = io.BytesIO(), io.BytesIO()
+    image.save(fast, format="PNG", compress_level=1)
+    image.save(dense, format="PNG", compress_level=9)
+    assert fast.getvalue() != dense.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), fast.getvalue()) == fast.getvalue()
+    image.putpixel((1599, 899), (0, 0, 0))
+    changed = io.BytesIO()
+    image.save(changed, format="PNG")
+    assert preserve_demo_png_encoding(changed.getvalue(), fast.getvalue()) == changed.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), None) == dense.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), b"invalid PNG") == dense.getvalue()
 
 
 def test_legend_ink_respects_literal_faces_and_all_sixty_flap_clip_boundaries(monkeypatch) -> None:
