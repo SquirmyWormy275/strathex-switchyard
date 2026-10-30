@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **102/102 groups passed; 706 tests, 697 passed and 9
+- Integrated native Linux run: **102/102 groups passed; 708 tests, 699 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-1b6548c2-2676-48b7-8ea8-7b5d366412b9.json`.
+  `.sxsy-verification/isolated-test-432a7bd3-6205-40d0-a7de-7ddab2c0c26e.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -516,3 +516,19 @@ restoration order. The shared test transport is explicitly excluded from release
 bundles. Physical encoder behavior and UI controls remain open. Key-override,
 alternate-repeat and remaining source-verified controller capabilities are still
 implementation work.
+
+
+The next complete Windows run also passed: source `fe34548`, run `41048512916`,
+**209 passing groups**, zero failed groups, receipt
+`31e0ac57-0549-447b-8cb6-2c79113d5be2`. It includes portable v2 and the explicit
+no-start installer behavior. Source `4cab102` subsequently passed the native
+Windows backend step, including the owned stdio task and controller fault tests;
+its complete release is still running. Interactive Windows acceptance remains open.
+
+Release/model verification now compares full 64-bit file IDs and refuses
+no-follow link substitutions before reading. Two fault tests use distinct IDs
+that collide as JavaScript Numbers, plus valid-file controls. Actual shared
+runtime verification passed Python 3.12.14, all 48 package pins, no extra
+distributions and offline model load with the exact-ID reader. Private receipt:
+`runtime-verification/runtime-files-1793362554804.json`. It reused the existing
+runtime/model; no software copy, device or microphone was created/opened.

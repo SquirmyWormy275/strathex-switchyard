@@ -19,11 +19,11 @@ async function ownedDirectory(path, create = false) {
   const s = await directoryIdentity(path);
   if (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid || Number(s.mode) & 0o022)) throw new Error("The runtime directory has unsafe ownership, links or write permissions.");
 }
-export async function hashRuntimeFile(path, expectedSize) {
-  const f = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+export async function hashRuntimeFile(path, expectedSize, { openFile = open, statName = lstat } = {}) {
+  const f = await openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
-    const s = await f.stat(), named = await lstat(path);
-    if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size !== expectedSize || (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022))) throw new Error("A runtime model file is unsafe or differs in size.");
+    const s = await f.stat({ bigint: true }), named = await statName(path, { bigint: true });
+    if (!s.isFile() || !named.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size !== BigInt(expectedSize) || (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid || Number(s.mode) & 0o022))) throw new Error("A runtime model file is unsafe or differs in size.");
     const hash = createHash("sha256");
     for await (const chunk of f.createReadStream({ autoClose: false })) hash.update(chunk);
     return hash.digest("hex");

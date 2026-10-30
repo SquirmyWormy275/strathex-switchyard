@@ -1,5 +1,6 @@
 /** Small, offline application bundles; protected data and optional runtimes stay separate. */
 import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import { mkdir, lstat, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { userInfo } from "node:os";
@@ -16,14 +17,15 @@ async function directory(path) {
   const s = await lstat(path);
   if (!s.isDirectory() || s.isSymbolicLink() || (process.platform !== "win32" && (s.uid !== userInfo().uid && s.uid !== 0 || s.mode & 0o022))) throw new Error("Release directories must be local, owned and not writable by other users.");
 }
-async function bytes(path) {
-  const f = await open(path, "r");
+export async function readReleaseFile(path, { openFile = open, statName = lstat } = {}) {
+  const f = await openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
-    const s = await f.stat(), named = await lstat(path);
-    if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size > maxTotal || (process.platform !== "win32" && (s.uid !== userInfo().uid && s.uid !== 0 || s.mode & 0o022))) throw new Error("A release file is unsafe, changed or oversized.");
+    const s = await f.stat({ bigint: true }), named = await statName(path, { bigint: true });
+    if (!s.isFile() || !named.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size > BigInt(maxTotal) || (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid && Number(s.uid) !== 0 || Number(s.mode) & 0o022))) throw new Error("A release file is unsafe, changed or oversized.");
     const b = await f.readFile(); if (b.length > maxTotal) throw new Error("A release file is oversized."); return b;
   } finally { await f.close(); }
 }
+const bytes = readReleaseFile;
 async function walk(root, at = "") {
   await directory(join(root, at)); const found = [];
   for (const entry of await readdir(join(root, at), { withFileTypes: true })) {

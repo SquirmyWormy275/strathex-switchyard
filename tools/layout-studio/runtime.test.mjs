@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, symlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join, basename, dirname } from "node:path";
 import test from "node:test";
-import { setupRuntime, runtimePython, downloadRuntimeModel, verifyRuntimeModel, validateRuntimeModel, runtimeEnvironment } from "./runtime-setup.mjs";
+import { setupRuntime, runtimePython, downloadRuntimeModel, verifyRuntimeModel, validateRuntimeModel, runtimeEnvironment, hashRuntimeFile } from "./runtime-setup.mjs";
 
 const sha = (v) => createHash("sha256").update(v).digest("hex");
+test("model verification rejects adjacent 64-bit file-ID substitution before streaming any bytes", async () => {
+  const original = 2n ** 60n, replacement = original + 1n; assert.equal(Number(original), Number(replacement));
+  let swapped = true, streams = 0, closed = 0;
+  const stats = (id, options) => ({ ino: options?.bigint ? id : Number(id), dev: options?.bigint ? 1n : 1, size: options?.bigint ? 4n : 4, uid: options?.bigint ? BigInt(userInfo().uid) : userInfo().uid, mode: options?.bigint ? 0o600n : 0o600, isFile: () => true, isSymbolicLink: () => false });
+  const options = { openFile: async () => ({ stat: async (o) => stats(original, o), async *createReadStream() { streams++; yield Buffer.from("safe"); }, close: async () => { closed++; } }), statName: async (_, o) => stats(swapped ? replacement : original, o) };
+  await assert.rejects(hashRuntimeFile("synthetic", 4, options), /unsafe/); assert.equal(streams, 0); assert.equal(closed, 1);
+  swapped = false; assert.equal(await hashRuntimeFile("synthetic", 4, options), sha("safe")); assert.equal(closed, 2);
+});
 test("optional setup omits provider credentials, custom package indexes and Python injection while disabling external tracing", () => {
   const names = ["OPENAI_API_KEY", "UV_PYTHON_PREFERENCE", "PIP_EXTRA_INDEX_URL", "PYTHONPATH", "HF_TOKEN", "LANGSMITH_API_KEY"], before = Object.fromEntries(names.map((n) => [n, process.env[n]]));
   try {

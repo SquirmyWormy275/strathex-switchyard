@@ -62,9 +62,10 @@ no model prompts and do not establish completion of coding work.
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 208 test/build groups at `29b8e47`, including
-managed startup, installer, bootstrap and automation checks. Newer profile/task
-changes await their Windows rerun; interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
+The complete Windows release passed 209 test/build groups at `fe34548`, including
+managed startup, installer, bootstrap, portable profiles and automation checks.
+The newer task/controller backend also passes native Windows tests; its complete
+release is running. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
