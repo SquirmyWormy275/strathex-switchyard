@@ -1413,5 +1413,21 @@ ownership of a CLI command is not general sandbox or shared-daemon ownership.
 
 Three additional lifecycle tests pass alongside the existing native coding,
 reviewed text, suite and guardian checks (58 focused tests total); typecheck
-passes. A real metadata-only CLI demonstration is prepared. Designer subprocess
-and metadata paths outside this coding-task service still require lifecycle work.
+passes. The normal installed metadata-only demonstration passed seven checks,
+including six distinct actual native guardians independently verified exited,
+Work rejection before launch and preserved installed state/selection/private URL.
+Receipt: installed-claude-commands-1793385000379.json. A trailing directory
+separator in the first verification attempt was rejected by the canonical-path
+fence; the script now resolves the actual repository path before querying it.
+Temporary isolated encrypted state was removed on both attempts.
+
+The new installed empty-background regression also passed both scenarios with
+no model prompt: the newly created task remained observable after its creator
+guardian exited, and its separately reviewed exact stop read back stopped and
+rejected replay. Its durable request lives in a dedicated keyboard-only validation
+workspace, preventing accidental duplicate creation on rerun. Receipt:
+claude-suite-1793385128325.json. No external session or native trust setting was
+changed. Complete Linux acceptance at `dc5f699` is 119/119 groups, 858 tests:
+849 passed and nine platform skips; receipt 775a1344-2f6b-4a7e-9be1-0126fa7df482.
+Designer subprocess and metadata paths outside this coding-task service still
+require lifecycle work.

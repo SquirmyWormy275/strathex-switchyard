@@ -2,7 +2,7 @@
 /** Real native metadata under guardians plus installed discovery; no model prompt. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +32,7 @@ let failure;
 try {
   const installed = await api("coding/claude/discovery"); assert.equal(installed.available, true); assert.equal(installed.permitted, true); checks.push("normal installed Claude discovery verifies the native supported version and account");
   assert.equal((await service.discovery("personal")).available, true); checks.push("actual native version and first-party account verified through supervised commands");
-  const rows = await service.inventory("personal", { repositoryRoot: fileURLToPath(new URL("../", import.meta.url)) }); assert.ok(Array.isArray(rows)); checks.push("actual native inventory queried for the exact repository without exposing session content");
+  const rows = await service.inventory("personal", { repositoryRoot: await realpath(fileURLToPath(new URL("../", import.meta.url))) }); assert.ok(Array.isArray(rows)); checks.push("actual native inventory queried for the exact repository without exposing session content");
   assert.ok(frames.length >= 6); assert.equal(frames.length, commands.length); assert.equal(new Set(frames.map((f) => f.id)).size, frames.length);
   for (const frame of frames) assert.equal(await runtimeGuardianStopped(frame), true); checks.push("every distinct recorded native guardian independently verified stopped");
   const count = commands.length; assert.equal((await service.discovery("work")).permitted, false); assert.equal(commands.length, count); checks.push("Work policy rejected native metadata before launching a command");
