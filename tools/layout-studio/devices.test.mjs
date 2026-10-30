@@ -4,12 +4,15 @@ import { createDeviceService, VialDevice, validateDeviceChanges } from "./device
 import { compileMacro, editMacroBuffer } from "./vial-macros.mjs";
 import { editLayoutOptions } from "./device-proposal.mjs";
 import { compileDeviceKey } from "./vial-keycodes.mjs";
+import { qmkSettings, readQmkSettings } from "./vial-settings.mjs";
 
 function fixture() {
   const deviceId = "a".repeat(64), definition = { name: "Synthetic configuration device", matrix: { rows: 1, cols: 2 }, layouts: { keymap: [["0,0", "0,1"]], labels: [["Enter", "ANSI", "ISO", "Big"], "Split"] } };
   const raw = [[[4, 5]], [[1, 1]]], state = { deviceTransactions: [], deviceSnapshots: [] };
   const macro = Buffer.alloc(96); Buffer.from([88, 0, 1, 5, 19, 2, 0, 0]).copy(macro);
   const macroWrites = [], withDeviceLock = async (_, fn) => fn({ assert() {} });
+  const settings = new Map([[7, 200], [21, 0x80000000], [22, 0], [900, 123]]), settingPackets = [];
+  let interruptSetting = false, unplugSetting = false, corruptSettingRead = false, settingChanged = false;
   let layoutOptions = 0x80000000, locked = false, disconnected = false, wrong = false, partialFailure = false, writes = 0, baselineFailure = false, protocolVersion = 4, macroFailure = false, unplugMacro = false, corruptMacroRead = false;
   const store = { snapshot: async () => structuredClone(state), update: async (_, op, fn) => { if (baselineFailure && op === "device-baseline") throw new Error("Synthetic backup failure"); const draft = structuredClone(state); const result = await fn(draft); Object.assign(state, draft); return result; } };
   const transportFactory = () => ({
@@ -29,6 +32,9 @@ function fixture() {
         else if (r[1] === 1) { r.fill(0); r.writeUInt32LE(1); }
         else if (r[1] === 2) { r.fill(0); r[0] = 42; }
         else if (r[1] === 5) { r.fill(255); r[0] = locked ? 0 : 1; r[1] = 0; }
+        else if (r[1] === 9) { settingPackets.push([...r]); const cursor = r.readUInt16LE(2); r.fill(255); [...settings.keys()].filter((id) => id > cursor).slice(0, 16).forEach((id, i) => r.writeUInt16LE(id, i * 2)); }
+        else if (r[1] === 10) { settingPackets.push([...r]); const id = r.readUInt16LE(2); assert.ok(qmkSettings[id], "Unknown setting IDs must not be read"); r.fill(0); r.writeUIntLE(settings.get(id), 1, qmkSettings[id].width); if (corruptSettingRead && settingChanged) { r[1] ^= 1; corruptSettingRead = false; } }
+        else if (r[1] === 11) { settingPackets.push([...r]); writes++; const id = r.readUInt16LE(2), value = r.readUIntLE(4, qmkSettings[id].width); settingChanged = true; if (interruptSetting) { interruptSetting = false; settings.set(id, (settings.get(id) & 0xffffff00) + (value & 255)); if (unplugSetting) disconnected = true; throw new Error("Synthetic interrupted setting write"); } settings.set(id, value); r.fill(0); }
         return r;
       }
       if (r[0] === 0x11) { r[1] = 2; return r; }
@@ -48,7 +54,7 @@ function fixture() {
       throw new Error("Unexpected protocol command");
     }
   });
-  return { deviceId, raw, macro, macroWrites, state, store, transportFactory, withDeviceLock, service: createDeviceService({ store, transportFactory, withDeviceLock }), layout: () => layoutOptions, setLayout: (v) => { layoutOptions = v; }, reconnect: () => { disconnected = false; macroFailure = false; }, corruptMacroRead: () => { corruptMacroRead = true; }, interruptMacro: (unplug = false) => { macroFailure = true; unplugMacro = unplug; }, lock: () => { locked = true; }, disconnect: () => { disconnected = true; }, wrongDevice: () => { wrong = true; }, partialFailure: () => { partialFailure = true; }, baselineFailure: () => { baselineFailure = true; }, unsupported: () => { protocolVersion = 99; }, writes: () => writes };
+  return { deviceId, raw, macro, macroWrites, settings, settingPackets, state, store, transportFactory, withDeviceLock, service: createDeviceService({ store, transportFactory, withDeviceLock }), layout: () => layoutOptions, setLayout: (v) => { layoutOptions = v; }, reconnect: () => { disconnected = false; macroFailure = false; }, corruptMacroRead: () => { corruptMacroRead = true; }, corruptSettingRead: () => { corruptSettingRead = true; }, interruptSetting: (unplug = false) => { interruptSetting = true; unplugSetting = unplug; }, interruptMacro: (unplug = false) => { macroFailure = true; unplugMacro = unplug; }, lock: () => { locked = true; }, disconnect: () => { disconnected = true; }, wrongDevice: () => { wrong = true; }, partialFailure: () => { partialFailure = true; }, baselineFailure: () => { baselineFailure = true; }, protocol: (v) => { protocolVersion = v; }, unsupported: () => { protocolVersion = 99; }, writes: () => writes };
 }
 const change = (col = 0, after = 104) => ({ layer: 1, row: 0, col, before: 1, after });
 
@@ -176,4 +182,52 @@ test("macro backup failures write nothing, and recovery detects all key/macro co
     const written = f.writes(); await assert.rejects(f.service.restore("personal", tx.id), /outside this transaction/);
     assert.equal(f.writes(), written); assert.equal(f.state.deviceTransactions[0].status, "recovery-pending");
   }
+});
+
+test("standard QMK discovery reads only advertised known IDs and gates old protocols, vendor IDs and bounded values", async () => {
+  const f = fixture(), snapshot = await f.service.read("personal", f.deviceId);
+  assert.equal(snapshot.qmkSettings.availability, "verified"); assert.deepEqual(snapshot.qmkSettings.unsupportedIds, [900]);
+  assert.deepEqual(snapshot.qmkSettings.values, { 7: 200, 21: 0x80000000, 22: 0 }); assert.equal(f.writes(), 0);
+  for (const edit of [{ id: 900, before: 123, value: 1 }, { id: 7, before: 200, value: 10001 }, { id: 7, before: 199, value: 300 }, { id: 21, before: 0x80000000, value: 1024 }]) await assert.rejects(f.service.review("personal", f.deviceId, { qmkSettings: [edit] }));
+  await assert.rejects(f.service.review("personal", f.deviceId, { qmkSettings: [{ id: 7, before: 200, value: 300 }, { id: 7, before: 200, value: 400 }] }), /twice/);
+  f.protocol(3); const older = await f.service.read("personal", f.deviceId); assert.equal(older.qmkSettings.availability, "not-supported");
+  await assert.rejects(f.service.review("personal", f.deviceId, { qmkSettings: [{ id: 7, before: 200, value: 300 }] }), /Vial 4/); assert.equal(f.writes(), 0);
+});
+
+test("setting query loops are bounded and malformed/unsupported responses never enable writes", async () => {
+  for (const advancing of [false, true]) {
+    let calls = 0;
+    const result = await readQmkSettings({ exchange: async (data) => { calls++; const p = Buffer.from(data); assert.equal(p[1], 9); const r = Buffer.alloc(32), cursor = p.readUInt16LE(2); if (advancing) for (let i = 0; i < 16; i++) r.writeUInt16LE(cursor + i + 1, i * 2); return r; } }, 4);
+    assert.equal(result.availability, "unverified"); assert.equal(calls, advancing ? 16 : 1); assert.deepEqual(result.values, {});
+  }
+  let calls = 0; assert.equal((await readQmkSettings({ exchange: async () => { calls++; throw new Error("No probe on old Vial"); } }, 3)).availability, "not-supported"); assert.equal(calls, 0);
+});
+
+test("combined QMK/key/macro transaction reads back and restores across restart while preserving unowned setting bits", async () => {
+  const f = fixture(), review = await f.service.review("personal", f.deviceId, { changes: [change()], macros: [{ index: 0, actions: [{ type: "text", text: "Review" }] }], qmkSettings: [{ id: 7, before: 200, value: 350 }, { id: 21, before: 0x80000000, value: 1 }] });
+  assert.equal(review.qmkSettings[1].after, 0x80000001);
+  const tx = await f.service.apply("personal", review.reviewId); assert.equal(f.settings.get(7), 350); assert.equal(f.settings.get(21), 0x80000001);
+  assert.equal(f.state.deviceTransactions[0].baseline.qmkSettings.values[7], 200);
+  f.settings.set(21, 0xc0000001);
+  const restarted = createDeviceService({ store: f.store, transportFactory: f.transportFactory, withDeviceLock: f.withDeviceLock }); await restarted.restore("personal", tx.id);
+  assert.equal(f.settings.get(7), 200); assert.equal(f.settings.get(21), 0xc0000000); assert.equal(f.raw[1][0][0], 1);
+  assert.equal(f.settingPackets.some((p) => p[1] === 12), false, "No QMK reset command may be sent");
+});
+
+test("partial setting writes restore known bytes, or remain recoverable after unplug, without replaying a review", async () => {
+  for (const unplug of [false, true]) {
+    const f = fixture(), review = await f.service.review("personal", f.deviceId, { qmkSettings: [{ id: 7, before: 200, value: 0x1234 }] }); f.interruptSetting(unplug);
+    await assert.rejects(f.service.apply("personal", review.reviewId), unplug ? /Restoration is pending/ : /interrupted setting/);
+    await assert.rejects(f.service.apply("personal", review.reviewId), /already used/);
+    if (unplug) { assert.equal(f.state.deviceTransactions[0].status, "recovery-pending"); assert.equal(f.settings.get(7), 0x34); f.reconnect(); await f.service.restore("personal", f.state.deviceTransactions[0].id); }
+    assert.equal(f.settings.get(7), 200); assert.equal(f.state.deviceTransactions[0].status, "restored");
+  }
+});
+
+test("setting backup/readback failures recover safely and all setting conflicts are checked before any restore write", async () => {
+  const input = { qmkSettings: [{ id: 7, before: 200, value: 350 }, { id: 22, before: 0, value: 1 }] };
+  const backup = fixture(), r = await backup.service.review("personal", backup.deviceId, input); backup.baselineFailure(); await assert.rejects(backup.service.apply("personal", r.reviewId), /backup failure/); assert.equal(backup.writes(), 0);
+  const readback = fixture(), review = await readback.service.review("personal", readback.deviceId, input); readback.corruptSettingRead(); await assert.rejects(readback.service.apply("personal", review.reviewId), /acknowledged and read back/); assert.equal(readback.settings.get(7), 200);
+  const conflict = fixture(), tx = await conflict.service.apply("personal", (await conflict.service.review("personal", conflict.deviceId, { ...input, changes: [change()] })).reviewId);
+  conflict.settings.set(7, 0x5656); const written = conflict.writes(); await assert.rejects(conflict.service.restore("personal", tx.id), /outside this transaction/); assert.equal(conflict.writes(), written); assert.equal(conflict.raw[1][0][0], 104);
 });

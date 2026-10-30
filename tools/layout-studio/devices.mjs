@@ -8,6 +8,7 @@ import { additionalDeviceChanges, validateAdditionalRestore, restoredLayoutOptio
 import { withStateLock } from "./state-lock.mjs";
 import { compileDeviceKey, baseTypingCode } from "./vial-keycodes.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
+import { readQmkSettings, writeQmkSetting, settingsReadback } from "./vial-settings.mjs";
 
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const integer = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
@@ -69,7 +70,8 @@ export class VialDevice {
     const macro = macroBytes ? (await this.readBuffer(0x0E, macroBytes)).toString("base64") : "";
     const layout = await this.transport.exchange(packet(2, 2));
     if (layout[0] !== 2 || layout[1] !== 2) throw new Error("Layout option readback is unsupported.");
-    return { schema: "switchyard-device-snapshot/v1", identity, capturedAt: new Date().toISOString(), definition, rows, cols, layers, keymap_raw, macroCount, macroBytes, macro, layoutOptions: layout.readUInt32BE(2), configurationOnly: true };
+    const qmkSettings = await readQmkSettings(this.transport, identity.vialProtocol);
+    return { schema: "switchyard-device-snapshot/v1", identity, capturedAt: new Date().toISOString(), definition, rows, cols, layers, keymap_raw, macroCount, macroBytes, macro, layoutOptions: layout.readUInt32BE(2), qmkSettings, configurationOnly: true };
   }
   async readBuffer(command, length) { const chunks = []; for (let offset = 0; offset < length; offset += 28) { const size = Math.min(28, length - offset), r = await this.transport.exchange(packet(command, offset >> 8, offset & 255, size)); if (r[0] !== command || r[1] !== (offset >> 8) || r[2] !== (offset & 255) || r[3] !== size) throw new Error("Device buffer response does not match the requested range."); chunks.push(r.subarray(4, 4 + size)); } return Buffer.concat(chunks); }
   async writeKey(change) { const r = await this.transport.exchange(packet(5, change.layer, change.row, change.col, change.after >> 8, change.after & 255)); if (r[0] !== 5) throw new Error("The device rejected a keymap write."); const check = await this.transport.exchange(packet(4, change.layer, change.row, change.col)); if (check[0] !== 4 || check.readUInt16BE(4) !== change.after) throw new Error("Keymap write readback mismatch."); }
@@ -98,6 +100,7 @@ export class VialDevice {
     const check = await this.transport.exchange(packet(2, 2));
     if (check[0] !== 2 || check[1] !== 2 || check.readUInt32BE(2) !== value) throw new Error("Physical layout write readback mismatch.");
   }
+  async writeSetting(change, target = "after") { if (!await this.unlocked()) throw new Error("Unlock the keyboard physically before changing a standard QMK setting."); return writeQmkSetting(this.transport, change, target); }
 }
 
 /** Original 0.9.0 has 8-byte state streams and 8-bit scancodes, not Vial. */
@@ -168,6 +171,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
         if (device instanceof VialDevice && !await device.unlocked()) throw new Error("The keyboard is locked. Complete physical unlock before restoration.");
         for (const c of tx.changes) if (![c.before, c.after].includes(current.keymap_raw[c.layer][c.row][c.col])) throw new Error("A key changed outside this transaction. Review before restoring.");
         validateAdditionalRestore(current, tx);
+        for (const c of tx.qmkSettings ?? []) await device.writeSetting(c, "before");
         if (tx.macro && current.macro !== tx.macro.before) await device.writeMacros(Buffer.from(tx.macro.before, "base64"), tx.baseline);
         if (tx.layout) { const value = restoredLayoutOptions(current.layoutOptions, tx.layout); if (value !== current.layoutOptions) await device.writeLayoutOptions(value); }
         for (const c of tx.changes) if (current.keymap_raw[c.layer][c.row][c.col] !== c.before) await device.writeKey({ ...c, after: c.before });
@@ -175,6 +179,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
         for (const c of tx.changes) if (readback.keymap_raw[c.layer][c.row][c.col] !== c.before) throw new Error("Restoration readback failed.");
         if (tx.macro && readback.macro !== tx.macro.before) throw new Error("Macro restoration readback failed.");
         if (tx.layout && readback.layoutOptions !== restoredLayoutOptions(current.layoutOptions, tx.layout)) throw new Error("Layout option restoration readback failed.");
+        settingsReadback(readback, tx.qmkSettings, "before");
         await store.update(compartment, "device-restore", (s) => { s.deviceTransactions.find((t) => t.id === id).status = "restored"; });
         return { id, status: "restored", hardwareAcceptance: "readback only; ordinary typing and physical trial still required" };
       } catch (e) { await store.update(compartment, "device-recovery-pending", (s) => { s.deviceTransactions.find((t) => t.id === id).status = "recovery-pending"; }); throw e; }
@@ -185,11 +190,11 @@ export function createDeviceService({ store, transportFactory = () => new Native
     async read(compartment, deviceId) { return using(deviceId, async (d) => { const snapshot = await d.snapshot(); await store.update(compartment, "device-read", (s) => { s.deviceSnapshots ??= []; s.deviceSnapshots = [...s.deviceSnapshots.filter((v) => v.identity.deviceId !== deviceId), snapshot].slice(-16); }); return snapshot; }); },
     async review(compartment, deviceId, value) {
       const input = Array.isArray(value) ? { changes: value } : value;
-      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["changes", "macros", "layoutOptions"].includes(k))) throw new Error("Review a supported bounded configuration proposal.");
+      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["changes", "macros", "layoutOptions", "qmkSettings"].includes(k))) throw new Error("Review a supported bounded configuration proposal.");
       const baseline = await this.read(compartment, deviceId), parsed = input.changes === undefined ? [] : validateDeviceChanges(baseline, input.changes), additional = additionalDeviceChanges(baseline, input), id = randomUUID();
-      if (!parsed.length && !additional.macro && !additional.layout) throw new Error("The configuration proposal is empty.");
+      if (!parsed.length && !additional.macro && !additional.layout && !additional.qmkSettings.length) throw new Error("The configuration proposal is empty.");
       reviews.set(id, { compartment, baseline, changes: parsed, ...additional, expires: now() + 120000 });
-      return { reviewId: id, changes: parsed, macros: additional.macro?.slots ?? [], layoutOptions: additional.layout, configurationOnly: true, note: "Release all keys and close other keyboard configuration tools. Complete physical unlock if required. The exact baseline is saved encrypted before any write. Onboard macros type into the foreground; they are not session-aware agent controls. Layout choices do not move physical keys. Firmware/solenoid/bootloader operations are excluded." };
+      return { reviewId: id, changes: parsed, macros: additional.macro?.slots ?? [], layoutOptions: additional.layout, qmkSettings: additional.qmkSettings, configurationOnly: true, note: "Release all keys and close other keyboard configuration tools. Complete physical unlock if required. The exact baseline is saved encrypted before any write. Onboard macros type into the foreground; they are not session-aware agent controls. Layout choices do not move physical keys. Settings can change tap/hold, repeat, modifier and rollover behavior; verify ordinary typing afterward. Firmware/solenoid/bootloader operations are excluded." };
     },
     async apply(compartment, reviewId) {
       const r = reviews.get(reviewId); reviews.delete(reviewId);
@@ -200,7 +205,8 @@ export function createDeviceService({ store, transportFactory = () => new Native
           const current = await d.snapshot();
           if (digest({ ...current, capturedAt: null }) !== digest({ ...r.baseline, capturedAt: null })) throw new Error("Device configuration or identity changed after review. Nothing was written.");
           if (d instanceof VialDevice && !await d.unlocked()) throw new Error("Configuration is locked. Perform the device's physical unlock and review again.");
-          await store.update(compartment, "device-baseline", (s) => { s.deviceTransactions ??= []; s.deviceTransactions.push({ id, baseline: r.baseline, changes: r.changes, macro: r.macro, layout: r.layout, status: "applying", createdAt: Date.now() }); });
+          await store.update(compartment, "device-baseline", (s) => { s.deviceTransactions ??= []; s.deviceTransactions.push({ id, baseline: r.baseline, changes: r.changes, macro: r.macro, layout: r.layout, qmkSettings: r.qmkSettings, status: "applying", createdAt: Date.now() }); });
+          for (const c of r.qmkSettings ?? []) await d.writeSetting(c);
           if (r.macro) await d.writeMacros(Buffer.from(r.macro.after, "base64"), r.baseline);
           if (r.layout) await d.writeLayoutOptions(r.layout.after);
           for (const change of r.changes) await d.writeKey(change);
@@ -208,6 +214,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
           for (const c of r.changes) if (after.keymap_raw[c.layer][c.row][c.col] !== c.after) throw new Error("Device write readback mismatch.");
           if (r.macro && after.macro !== r.macro.after) throw new Error("Device macro readback mismatch.");
           if (r.layout && after.layoutOptions !== r.layout.after) throw new Error("Device layout option readback mismatch.");
+          settingsReadback(after, r.qmkSettings);
           await store.update(compartment, "device-apply", (s) => { s.deviceTransactions.find((t) => t.id === id).status = "applied"; });
           return { id, status: "applied", ordinaryTypingTrial: "pending" };
         });

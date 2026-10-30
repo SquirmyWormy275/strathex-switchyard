@@ -1,7 +1,8 @@
 # Device configuration transactions
 
 The authenticated local suite accepts reviewed key, onboard macro and physical
-layout-option changes through the same baseline/apply/readback/restore path.
+layout-option and advertised standard QMK setting changes through the same
+baseline/apply/readback/restore path.
 These backend capabilities are implemented; the frozen morning frontend still
 exposes only ordinary key edits. Expanded editing controls are unfinished UI work.
 
@@ -24,7 +25,21 @@ type into the foreground; they do not identify or control an agent session.
 Physical layout choices use the definition's reverse-packed option bits and
 preserve unknown higher bits. Choosing a layout does not rearrange physical keys.
 Recovery checks its owned option bits and preserves unrelated changes outside
-that mask. Tap-dance/combo/encoder/settings editing remains unfinished.
+that mask. Tap-dance/combo/encoder editing remains unfinished.
+
+Vial 4+ standard QMK settings are queried in bounded advancing pages. Only the
+advertised IDs with a known codec can be read or edited: standard IDs 1–27 cover
+tap/hold timing, modifier flags, repeat, mouse/wheel keys and rollover. Per-field
+width/range checks apply; unknown/vendor IDs, reset, calibration and solenoid
+commands cannot be selected. Missing or malformed optional setting replies leave
+keymap/macros readable but setting writes unavailable. Pre-4 firmware is not probed.
+
+Setting proposals require the exact current `before` value and an explicit
+reviewed `value`. Known bitfield masks preserve unknown bits. Protected baselines
+record a versioned setting codec. A partial multi-byte write can restore only
+bytes matching its known before/after values; unrelated edits fail before any
+recovery write. Restore preserves unowned bits, even if another tool changed them.
+Changes to timing/modifier/rollover behavior require an ordinary-typing trial.
 
 Original xwhatsit 0.9.0 remains a separate 8-byte, 8-bit-scancode adapter. Vial
 macro/layer-option requests are rejected on that protocol. No compatibility is
@@ -78,6 +93,11 @@ continue to work.
 }
 ```
 
+To include an advertised timing setting, add
+`"qmkSettings": [{"id": 7, "before": 200, "value": 250}]` inside
+`configuration`. These numbers are a synthetic API example, not a recommended
+timing or permission to alter a connected keyboard. Use its actual readout.
+
 POST to `/api/suite/devices/review`, inspect the returned changes, then use its
 `reviewId` with `/api/suite/devices/apply`. `/api/suite/devices/restore` accepts the
 resulting transaction `id`. A review never writes configuration.
@@ -93,9 +113,14 @@ and [Vial 6 keycodes](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a18
 The commit guard follows
 [Vial QMK dynamic macro storage](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/dynamic_keymap.c).
 These are independently implemented protocol operations, not copied firmware.
+Setting IDs, bounds and packing were checked against the same pinned GUI's
+[settings catalog](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/resources/base/qmk_settings.json)
+and the pinned firmware's
+[query/get/set implementation](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/qmk_settings.c).
 
 Fault-transport tests cover exact wire-version boundaries, combined changes,
 unknown option bits, opaque macros, storage overflow, typing fallback, backup
 failure, interrupted writes, rejected readback, unrelated edits and restart
-restoration. They are software evidence; real key output, unlock, hot-plug and
+restoration, setting-query bounds, partial setting writes and preserved unknown
+bits. They are software evidence; real key output, unlock, hot-plug and
 typing behavior require the relevant physical keyboard.

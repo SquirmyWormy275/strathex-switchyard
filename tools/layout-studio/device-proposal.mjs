@@ -1,5 +1,6 @@
 import { layoutChoices, unpackChoices } from "./geometry.mjs";
 import { editMacroBuffer } from "./vial-macros.mjs";
+import { settingChanges, validateSettingsRestore } from "./vial-settings.mjs";
 
 export function editLayoutOptions(snapshot, selections) {
   if (!snapshot.identity.vialProtocol) throw new Error("Layout options require a verified Vial interface.");
@@ -19,11 +20,12 @@ export function editLayoutOptions(snapshot, selections) {
 export function additionalDeviceChanges(snapshot, input) {
   const macro = input.macros === undefined ? null : editMacroBuffer(snapshot, input.macros);
   const layout = input.layoutOptions === undefined ? null : editLayoutOptions(snapshot, input.layoutOptions);
-  return { macro, layout };
+  return { macro, layout, qmkSettings: settingChanges(snapshot, input.qmkSettings) };
 }
 
 /** Reject unrelated edits before any recovery write; preserve unowned options. */
 export function validateAdditionalRestore(current, transaction) {
+  validateSettingsRestore(current, transaction.qmkSettings);
   const { macro, layout } = transaction;
   if (macro) {
     const found = Buffer.from(current.macro, "base64"), before = Buffer.from(macro.before, "base64"), after = Buffer.from(macro.after, "base64");

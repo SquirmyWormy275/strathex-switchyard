@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **92/92 groups passed; 634 tests, 625 passed and 9
+- Integrated native Linux run: **92/92 groups passed; 639 tests, 630 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-1ec94a7a-84f6-47b2-b415-305be67d2d44.json`.
+  `.sxsy-verification/isolated-test-42f8ad4d-32fd-4f48-b7b9-5ada1e19fe54.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -188,7 +188,9 @@ Windows promotion case. Its full release build remains separate; the newer
 Claude adapter still needs its own native Windows rerun.
 The Claude backend's native Windows software step subsequently passed at
 `c8a6ffd` on run `41030491650`. Its actual Windows CLI/account/window acceptance
-remains open; the newer Linux window-focus adapter still needs its CI rerun.
+remains open. The newer Linux focus logic also passed the native Windows software
+step at `cbfd69c` on run `41031976085`; it still rejects actual Windows window
+focus as unimplemented.
 
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and
@@ -219,7 +221,12 @@ transactions capture encrypted baselines, guard macro execution during partial
 writes, read back and restore across restart, and reject unrelated changes before
 recovery writes. Kernel locks coordinate Switchyard device access across processes.
 See the [device contract and remaining UI/settings work](device-configuration-contract.md).
-The 12 device checks use fault transports; no hardware write is claimed.
+Standard Vial 4+ QMK settings now use that same protected transaction path, with
+advertised-ID discovery, verified field widths/ranges, preserved unowned bits,
+versioned recovery and bounded query loops. Unknown/vendor IDs and reset,
+calibration or solenoid commands are excluded. All 17 device checks use fault
+transports; no hardware write is claimed. A fresh actual USB configuration
+inventory still returned zero candidates, without opening an interface.
 
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; expanded layer/macro editing UI and device settings
