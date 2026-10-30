@@ -43,6 +43,9 @@ components live under `versions/<uuid>`; unchanged environments/models are
 shared. Atomic selection retains the current and previous records. Each app
 resolves the retained runtime matching its own exact specification. Roll back an
 application before selecting a runtime requiring that older application.
+An owned legacy `0755` root is migrated to `0700` after recording its previous
+mode and the reason in a dated private receipt. Unsafe ownership or group/world
+write access is rejected; runtime/model contents are preserved.
 
 Stored inventories bind regular file content, modes and known uv interpreter
 links using exact 64-bit file identities while reading. Destructive cleanup

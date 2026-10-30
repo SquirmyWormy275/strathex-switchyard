@@ -1,6 +1,7 @@
 /** Optional software maintenance: immutable components, atomic selection, durable recovery. */
 import { randomUUID } from "node:crypto";
-import { lstat, readdir, rm, rmdir } from "node:fs/promises";
+import { chmod, lstat, readdir, rm, rmdir } from "node:fs/promises";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 import { privateDirectory, privateRead, privateWrite, directoryIdentity } from "./private-fs.mjs";
 import { withStateLock } from "./state-lock.mjs";
@@ -18,6 +19,17 @@ export function createRuntimeLifecycle({ root = runtimeRoot(), spec, command = r
   let coordinated = false;
   async function maintain(fn) { if (coordinated) return fn(); return coordinate(async () => { coordinated = true; try { return await fn(); } finally { coordinated = false; } }); }
   const currentSpec = async () => validateRuntimeSpec(spec ?? await requiredRuntimeSpec());
+  async function ensureRoot() {
+    if (!await exists(root)) return privateDirectory(root);
+    const stat = await directoryIdentity(root), mode = Number(stat.mode) & 0o777;
+    if (process.platform !== "win32" && (Number(stat.uid) !== userInfo().uid || mode & 0o022)) throw new Error("The existing runtime root has unsafe ownership/write permissions; its content was preserved.");
+    if (process.platform !== "win32" && mode & 0o077) {
+      const at = new Date().toISOString();
+      await privateWrite(join(meta, `root-permissions-${at.replace(/[:.]/g, "-")}-${randomUUID()}.json`), JSON.stringify({ schema: "switchyard-runtime-permissions/v1", at, before: mode, after: 0o700, reason: "Adopt the owned legacy software root into private versioned maintenance without copying or modifying its runtime/model files." }));
+      await chmod(root, 0o700);
+    }
+    await privateDirectory(root);
+  }
   async function readJson(path) { try { return JSON.parse(await privateRead(path)); } catch (error) { if (error.code === "ENOENT") return null; throw error; } }
   async function writeJson(path, value) { await privateWrite(path, JSON.stringify(value)); }
   async function records() {
@@ -136,7 +148,7 @@ export function createRuntimeLifecycle({ root = runtimeRoot(), spec, command = r
     lease.assert(); await rm(pendingPath); return { recovered: true, outcome, ...await prune(lease) };
   }
   async function locked(fn) {
-    await privateDirectory(root);
+    await ensureRoot();
     return withStateLock(meta, "runtime", async lease => {
       const run = async () => { await recover(lease); return fn(lease); };
       return await exists(pendingPath) || await exists(cleanupPath) || await exists(join(meta, "application-resume.json")) ? maintain(run) : run();
@@ -206,7 +218,7 @@ export function createRuntimeLifecycle({ root = runtimeRoot(), spec, command = r
   return {
     root, install, update: install,
     check: () => locked(async () => { const value = await currentSpec(), selection = await readRuntimeSelection(root); const record = (await retained(selection)).find(record => record.spec.id === value.id); if (!record) throw new Error("No managed optional runtime matches this application. Run switchyard runtime install to verify/adopt an existing runtime or install missing components."); return { status: "verified", releaseId: record.id, selected: selection.current === record.id, ...await verifyRecord(record) }; }),
-    recover: () => withStateLock(meta, "runtime", lease => maintain(() => recover(lease))),
+    recover: async () => { await ensureRoot(); return withStateLock(meta, "runtime", lease => maintain(() => recover(lease))); },
     rollback: () => locked(async lease => {
       const before = await readRuntimeSelection(root); if (!before?.previous) throw new Error("No previous optional runtime is retained.");
       const record = await readRuntimeRelease(root, before.previous), value = await currentSpec();

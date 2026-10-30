@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, readFile, writeFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, chmod, lstat } from "node:fs/promises";
 import { join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { createRuntimeLifecycle } from "./runtime-lifecycle.mjs";
@@ -44,6 +44,14 @@ test("legacy runtime adoption reuses both components in place and preserves unre
   await mkdir(root, { mode: 0o700 }); await python(join(root, "venv")); await downloader(join(root, "base.en"), specification().model); await writeFile(join(root, "model-receipt.json"), "legacy receipt");
   const result = await manager().install(); assert.deepEqual(result.installedComponents, []); assert.deepEqual(result.reusedComponents, ["python", "model"]); assert.equal(downloads.length, 1); assert.ok(!commands.some(c => c.args[0] === "venv"));
   const paths = await resolveRuntimePaths({ root, spec: specification() }); assert.equal(paths.model, join(root, "base.en")); assert.equal(await readFile(join(root, "model-receipt.json"), "utf8"), "legacy receipt");
+}));
+test("legacy root adoption records a necessary Unix permission migration without changing existing content", () => fixture(async ({ root, manager, python, downloader }) => {
+  await mkdir(root, { mode: 0o700 }); await python(join(root, "venv")); await downloader(join(root, "base.en"), specification().model); await writeFile(join(root, "user-note.txt"), "preserve this");
+  if (process.platform !== "win32") await chmod(root, 0o755);
+  const result = await manager().install(); assert.deepEqual(result.installedComponents, []); assert.equal(await readFile(join(root, "user-note.txt"), "utf8"), "preserve this");
+  const receipts = (await readdir(join(root, ".maintenance"))).filter(name => name.startsWith("root-permissions-"));
+  if (process.platform !== "win32") { assert.equal((await lstat(root)).mode & 0o777, 0o700); assert.equal(receipts.length, 1); const receipt = JSON.parse(await readFile(join(root, ".maintenance", receipts[0]))); assert.equal(receipt.before, 0o755); assert.equal(receipt.after, 0o700); }
+  else assert.deepEqual(receipts, []);
 }));
 test("updates share an unchanged model, retain one previous environment and support matching application rollback", () => fixture(async ({ root, manager, downloads, commands }) => {
   const first = await manager().install(), second = await manager(specification(2)).update();
