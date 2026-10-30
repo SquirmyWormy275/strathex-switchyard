@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **86/86 groups passed; 579 tests, 570 passed and 9
+- Integrated native Linux run: **86/86 groups passed; 586 tests, 577 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-0844b4df-2c01-4caf-b1ce-b9146c9e2174.json`.
+  `.sxsy-verification/isolated-test-7950872d-81b7-4168-a224-6a38c57bac6c.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -129,8 +129,16 @@ Workflow text edits now retain role/step identities through reordering. A rename
 role gets a new identity rather than inheriting its old session authority. Saving
 a workflow updates its active profile, saved library entry and history atomically.
 
+The device backend now includes semantic macro/layer/modifier assignments,
+bounded onboard macro editing and documented physical layout options. Combined
+transactions capture encrypted baselines, guard macro execution during partial
+writes, read back and restore across restart, and reject unrelated changes before
+recovery writes. Kernel locks coordinate Switchyard device access across processes.
+See the [device contract and remaining UI/settings work](device-configuration-contract.md).
+The 12 device checks use fault transports; no hardware write is claimed.
+
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
-session control beyond configuration conversations; full layer/macro/settings
+session control beyond configuration conversations; expanded layer/macro editing UI and device settings
 editing; Windows interactive acceptance and packaging; install/update/rollback/uninstall and
 a normal launcher; interprocess coordination and child supervision; profile-library visual acceptance; reproducible optional dependency installation; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.

@@ -141,7 +141,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/profile/select") return store.selectProfile(compartment, body.profileId, body.revision ?? null);
       if (path === "/api/suite/devices/list") return devices.list();
       if (path === "/api/suite/devices/read") return devices.read(compartment, body.deviceId);
-      if (path === "/api/suite/devices/review") return devices.review(compartment, body.deviceId, body.changes);
+      if (path === "/api/suite/devices/review") return devices.review(compartment, body.deviceId, body.configuration ?? body.changes);
       if (path === "/api/suite/devices/apply") return devices.apply(compartment, body.reviewId);
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
