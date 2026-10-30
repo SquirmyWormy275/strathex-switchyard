@@ -73,6 +73,13 @@ test("active host connections block uninstall before any application stop or per
   const install = make({ application: { status: async () => ({ status: "ready" }), stop: async () => { stops++; } }, beforeRemove: async () => { throw new Error("Synthetic active connection needs restoration"); } });
   await assert.rejects(install.uninstall(), /active connection needs restoration/); assert.equal(stops, 0); assert.deepEqual(await snapshots(paths), before);
 }));
+test("an explicit no-start update stops the previous generation without restarting the new one", () => installFixture(async ({ make, first, second }) => {
+  let running = false, starts = 0, stops = 0;
+  const install = make({ application: { status: async () => ({ status: running ? "ready" : "not-started" }), stop: async () => { stops++; running = false; }, launch: async () => { starts++; running = true; } } });
+  await install.install(first.directory, first.id, { start: true }); assert.equal(running, true);
+  await install.install(second.directory, second.id, { start: false });
+  assert.equal((await install.inspect()).current, second.id); assert.equal(running, false); assert.equal(starts, 1); assert.equal(stops, 1);
+}));
 test("the stable installed loader verifies and addresses the actual application across update and rollback", () => installFixture(async ({ root, home, make, first, second, options, paths }) => {
   const environment = applicationEnvironment({ ...process.env, HOME: home, USERPROFILE: home, XDG_DATA_HOME: join(root, "d"), APPDATA: join(root, "d"), LOCALAPPDATA: join(root, "l"), XDG_STATE_HOME: join(root, "s"), XDG_RUNTIME_DIR: join(root, "r") });
   await mkdir(environment.XDG_RUNTIME_DIR, { mode: 0o700 });

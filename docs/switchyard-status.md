@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **99/99 groups passed; 679 tests, 670 passed and 9
+- Integrated native Linux run: **99/99 groups passed; 680 tests, 671 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-bc4313b1-b598-43b9-8ca9-bf25190befab.json`.
+  `.sxsy-verification/isolated-test-aca502bb-ade8-406c-a826-eaf75e0a0761.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -433,3 +433,19 @@ store restart. Portable output excludes credentials, paths, task/session IDs,
 local account references and connection authority. The frozen v1 frontend keeps
 working; v2 metadata/review UI and second-machine/hardware acceptance remain open.
 See [portable profiles](portable-profiles.md).
+
+
+The v2 path also passed an actual normal installed-application demonstration at
+`2026-10-30T11:26:00.935Z` on source `fc298e8`, release `4e39a88c4bef…`.
+Eight checks cover migration, stale review, preferred-mode nonactivation,
+metadata round-trip, unknown-version preservation, unauthenticated rejection,
+normal restart and unchanged Personal definitions. The private review link was
+retained; the validation workspace remained keyboard-only. No HID, microphone,
+provider or browser visual acceptance is claimed. Private receipt:
+`runtime-verification/profile-1793359560936.json`. The reproducible developer
+script is `scripts/verify-profile-host.mjs --synthetic`. The verified disposable
+bundle was removed; current plus rollback installed copies total about 6 MiB.
+
+The installer now distinguishes an omitted start preference (preserve the prior
+running state) from explicit `--no-start` (leave a changed installation stopped).
+A native fixture checks this transition without altering the live pilot.

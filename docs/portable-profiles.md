@@ -68,3 +68,25 @@ stale reviews, role-ID collisions, restart/export policy and actual authenticate
 HTTP import/export. Hardware compatibility and second-machine interactive
 acceptance remain open. Frontend controls for the new metadata/review are still
 implementation work after the frozen frontend review.
+
+## Installed pilot demonstration
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-profile-host.mjs --synthetic
+```
+
+This uses the normal installed application and a dedicated `profile-validation`
+keyboard-only workspace with synthetic definitions. It exercises legacy
+migration, rejection after a concurrent edit, preferred-mode nonactivation,
+stable metadata export, unknown-version preservation and unauthorized rejection.
+It then stops/restarts through the normal installed command and reads the same
+package back. Personal definitions are checked before/after; the existing review
+link is retained. It opens no HID interface, microphone or provider account and
+does not claim UI/physical acceptance.
+
+The actual October 30 pilot passed all eight checks on installed source
+`fc298e8`, release
+`4e39a88c4bef8cd89ef62c1f69e4c62ae3f5a53815d3980e59c28ed2f82d8a1e`.
+Private receipt: `runtime-verification/profile-1793359560936.json`.
+The disposable build copy was verified and removed after installation; only the
+current installed program and one rollback version remain (about 6 MiB).

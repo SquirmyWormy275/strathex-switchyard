@@ -128,7 +128,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
     for (const e of [...plan.entries].reverse()) { lease.assert(); if (current.get(e.role) !== (e.before?.sha256 ?? null)) await replaceOwnedFile(e.path, e.before ? await readFile(join(backups, plan.id, `${e.role}.before`)) : null, e.before?.mode ?? 0o600, current.get(e.role)); }
     lease.assert(); await finish(plan, "restored"); return { recovered: true, backup: join(backups, plan.id), previous: plan.previous, wasRunning: plan.wasRunning };
   }
-  async function operation(action, prepare, { start = false } = {}) {
+  async function operation(action, prepare, { start } = {}) {
     await privateDirectory(root);
     return withStateLock(join(stateRoot, "installation"), "installation", async (lease) => {
       await recoverStage(lease); await recover(lease); const old = await ownedRecord(), next = await prepare(old, lease), live = await application.status(), wasRunning = ["ready", "stopping"].includes(live.status);
@@ -138,7 +138,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
       try {
         if (wasRunning) await application.stop();
         for (const e of plan.entries) { lease.assert(); const replacement = next.replacements[e.role]; await replaceOwnedFile(e.path, replacement?.bytes ?? null, replacement?.mode ?? 0o600, e.before?.sha256 ?? null); await afterWrite(e.role, action); }
-        lease.assert(); if (next.current && (start || wasRunning)) await application.launch(bundle(next.current));
+        lease.assert(); if (next.current && (start === true || start === undefined && wasRunning)) await application.launch(bundle(next.current));
         await finish(plan, "committed");
         let removedVersions = [], cleanupPending = null;
         try { removedVersions = await prune([next.current, next.previous]); } catch (e) { cleanupPending = e.message; }
