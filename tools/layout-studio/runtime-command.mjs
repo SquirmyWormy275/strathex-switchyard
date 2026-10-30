@@ -37,7 +37,9 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
   if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288) throw new Error("Choose a supported, bounded runtime operation.");
   const resolved = await realpath(executable), digest = createHash("sha256");
   for await (const chunk of createReadStream(resolved)) digest.update(chunk);
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable: resolved, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes };
+  // Hash the native target but preserve the invocation path: Python locates
+  // pyvenv.cfg beside its venv alias, and argv[0] is meaningful to native tools.
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes };
   if (Buffer.byteLength(JSON.stringify(request)) > 65536) throw new Error("The fixed runtime request exceeds its protocol bound.");
   const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
   let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting;

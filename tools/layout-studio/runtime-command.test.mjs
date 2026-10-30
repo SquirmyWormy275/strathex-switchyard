@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
@@ -14,11 +14,13 @@ async function fixture(fn) { const root = await mkdtemp(join(tmpdir(), "switchya
 async function waitFor(fn, ms = 8000) { const end = Date.now() + ms; do { try { const value = await fn(); if (value) return value; } catch (e) { if (e.code !== "ENOENT") throw e; } await new Promise(r => setTimeout(r, 20)); } while (Date.now() < end); throw new Error("Owned process fixture did not reach its expected state"); }
 async function gone(pid) { try { process.kill(pid, 0); if (process.platform === "linux") return (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1).startsWith("Z "); return false; } catch (e) { if (["ENOENT", "ESRCH"].includes(e.code)) return true; throw e; } }
 
-test("runtime guardian commits readiness before execution and returns only bounded stdout", { skip }, () => fixture(async (root) => {
+test("runtime guardian commits readiness, preserves invocation identity and returns only bounded stdout", { skip }, () => fixture(async (root) => {
   const marker = join(root, "ran"), secret = "synthetic-private-installer-url";
+  const executable = process.platform === "linux" ? join(root, "native-alias") : process.execPath;
+  if (process.platform === "linux") await symlink(process.execPath, executable);
   let ready = false, scope;
-  const output = await runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write(${JSON.stringify(secret)});process.stdout.write('verified')`], { ...options, onGuardianReady: async (frame) => { scope = frame; assert.ok(frame.guardianPid > 0); assert.equal(await runtimeGuardianStopped(frame, options), false); await assert.rejects(readFile(marker), { code: "ENOENT" }); ready = true; await new Promise(r => setTimeout(r, 50)); } });
-  assert.equal(ready, true); assert.equal(output, "verified"); assert.equal(await readFile(marker, "utf8"), "yes"); assert.ok(!output.includes(secret));
+  const output = await runRuntimeCommand(executable, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write(${JSON.stringify(secret)});process.stdout.write(JSON.stringify({value:'verified',invokedAs:process.argv0}))`], { ...options, onGuardianReady: async (frame) => { scope = frame; assert.ok(frame.guardianPid > 0); assert.equal(await runtimeGuardianStopped(frame, options), false); await assert.rejects(readFile(marker), { code: "ENOENT" }); ready = true; await new Promise(r => setTimeout(r, 50)); } });
+  assert.equal(ready, true); assert.deepEqual(JSON.parse(output), { value: "verified", invokedAs: executable }); assert.equal(await readFile(marker, "utf8"), "yes"); assert.ok(!output.includes(secret));
   assert.equal(await runtimeGuardianStopped(scope, options), true);
 }));
 test("runtime guardian cannot execute when the durable start acknowledgement fails", { skip }, () => fixture(async (root) => {

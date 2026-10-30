@@ -70,7 +70,6 @@ lines.on("line", (line) => { void (async () => {
     if (!s.isFile() || ![0, userInfo().uid].includes(s.uid) || s.mode & 0o6022) throw new Error("Unsafe native runtime executable");
     const hash = createHash("sha256"); for await (const b of createReadStream(executable)) hash.update(b);
     if (hash.digest("hex") !== r.executableSha256) throw new Error("Runtime executable identity changed");
-    r.executable = executable;
     if (parentGone) return;
     ready = true;
     await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session" });
