@@ -131,9 +131,8 @@ typing behavior require the relevant physical keyboard.
 A Vial 4+ snapshot now reads the advertised dynamic-entry counts and bounded
 five-word tap-dance/combo records. It preserves unknown outputs in unedited
 slots. Malformed advertisements, failed reads and older protocols do not enable
-these writes. Key overrides and alternate-repeat entries are reported as
-unimplemented, with their advertised counts; they are not silently treated as
-supported.
+these writes. Key-override and alternate-repeat tables use the same transaction
+boundary with their distinct mixed-width codecs; see the rule section below.
 
 Add `tapDances` or `combos` to the same reviewed `configuration` object:
 
@@ -228,3 +227,77 @@ Source checks use the pinned GUI's
 [encoder identification/read/write](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/keyboard_comm.py)
 and the already linked firmware handlers. No layout labels are treated as host
 commands or authority.
+
+## Key overrides and alternate repeat
+
+All four dynamic table counts are read from the same Vial advertisement and
+bounded to 64 entries per kind. Key overrides transfer three little-endian
+16-bit fields and four bytes (10 bytes); alternate repeat transfers two
+little-endian 16-bit fields and two bytes (6 bytes). GET operations are 5/7 and
+SET operations 6/8 within `FE 0D`. Reads require status zero; writes require status
+and exact subsequent GET readback. Restoration compares every owned byte against
+its before/after values, so an interrupted 16-bit field can be recovered without
+accepting an unrelated third value. Raw unedited entries remain unchanged.
+
+Add `keyOverrides` or `alternateRepeatKeys` to the same reviewed configuration
+object. Every edit names its exact advertised index and raw `before` entry from
+the fresh readout. Unknown/reserved option bits make that entry read-only unless
+it is explicitly cleared with the exclusive `{index, before, disable: true}`
+form. Each option is a required named boolean; extra or omitted fields fail
+before a device write. Modifier lists use `lctrl`, `lshift`, `lalt`, `lgui`,
+`rctrl`, `rshift`, `ralt`, `rgui`, without duplicates.
+
+An override names a trigger already present in the keymap, an ordinary/no-op or
+modified ordinary replacement, explicit layers 0–15 within the device's actual
+layer count, and required/negative/suppressed modifiers. An enabled rule on the
+typing layer must require a modifier unless its recorded trigger already embeds
+one. Conflicting required/negative masks and enabled rules without an activation
+event are rejected. This preserves plain unmodified typing. Macro, layer, nested
+rule and firmware-control outputs are not accepted as override replacements.
+
+For example, after reading an actual empty override slot on a keyboard that
+contains Backspace, this proposal maps either Shift+Backspace to Delete on layer
+zero. `oneModifier` makes either Shift sufficient:
+
+```json
+{
+  "keyOverrides": [{
+    "index": 0, "before": [0, 0, 0, 0, 0, 0, 0],
+    "trigger": 42, "replacement": 76, "layers": [0],
+    "triggerMods": ["lshift", "rshift"],
+    "negativeMods": [], "suppressedMods": ["lshift", "rshift"],
+    "options": {
+      "activateOnTrigger": true, "activateOnRequiredModifier": false,
+      "activateOnNegativeModifierRelease": false, "oneModifier": true,
+      "noReregisterTrigger": false, "keepOnOtherKeyDown": false, "enabled": true
+    }
+  }]
+}
+```
+
+Alternate-repeat edits require Vial 6. Their fields are `key`, `alternate`,
+`allowedMods`, and options `defaultToAlternate`, `bidirectional`,
+`ignoreModifierHandedness`, `enabled`. Keys are ordinary HID values or the
+existing closed `modified` form. A default mapping may explicitly use no-op as
+its trigger; other triggers must have an ordinary meaning present in the
+recorded keymap. The dedicated repeat action must still be assigned to a key
+or encoder and tried physically. This is a foreground keyboard function, not an
+exact agent-session resume action.
+
+Vial 6 also accepts the closed semantic key forms `{kind: "repeat"}` and
+`{kind: "alternate-repeat"}` when a verified alternate-repeat table is
+advertised. `{kind: "caps-word"}` and `{kind: "layer-lock"}` require the
+corresponding advertised feature bits. Older GUI migration sentinels are never
+sent as firmware keycodes. The ordinary base-layer fallback check still applies
+to assignments of these controls. Unsupported firmware cannot gain a feature
+merely by putting its name in a proposal.
+
+The independently implemented codecs are checked against the pinned upstream
+[wire structures and options](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/vial.h),
+[override GUI protocol](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/key_override.py),
+[alternate-repeat GUI protocol](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/alt_repeat_key.py)
+and [Vial 6 keycode values](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/keycodes/keycodes_v6.py).
+Tests assert literal wire packets, guarded proposals, partial-field recovery,
+unplug/reconnect, readback failure, unrelated edits, reserved-bit preservation,
+physical unlock, failed backup and consumed-review rejection. These are software
+fault transports; no physical typing, repeat or modifier behavior is accepted.

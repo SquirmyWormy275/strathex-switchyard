@@ -2,6 +2,7 @@ import { createDeviceService } from "../devices.mjs";
 export function vialFixture() {
   const deviceId = "d".repeat(64), raw = [[[4, 5]], [[1, 1]]], tapDances = [[0, 0, 0, 0, 200], [0x7777, 0x8888, 0x9999, 0xaaaa, 230]], combos = [[0, 0, 0, 0, 0], [0x7777, 0, 0, 0, 0x8888]], writes = [], state = { deviceTransactions: [], deviceSnapshots: [] };
   const definition = { matrix: { rows: 1, cols: 2 }, layouts: { keymap: [["0,0", "0,1"]] } }, encoders = new Map([["0:0", [4, 5]], ["0:2", [0x7777, 0x8888]], ["1:0", [0, 1]], ["1:2", [6, 7]]]), encoderReads = [];
+  const keyOverrides = [[0, 0, 0, 0, 0, 0, 0], [0x7777, 0x8888, 0xabcd, 255, 255, 255, 64]], alternateRepeatKeys = [[0, 0, 0, 0], [0x7777, 0x8888, 255, 128]]; let rulesEnabled = false;
   let disconnected = false, locked = false, failBaseline = false, interrupt = false, unplug = false, corrupt = false, changed = false, protocol = 4;
   let interruptEncoder = false, unplugEncoder = false, corruptEncoder = false, encoderChanged = false;
   const store = { snapshot: async () => structuredClone(state), update: async (_, operation, fn) => { if (operation === "device-baseline" && failBaseline) throw new Error("Synthetic backup failure"); const draft = structuredClone(state), result = await fn(draft); Object.assign(state, draft); return result; } };
@@ -23,16 +24,19 @@ export function vialFixture() {
       else if (command === 5) { r.fill(255); r[0] = locked ? 0 : 1; r[1] = 0; }
       else if (command === 9) r.fill(255);
       else if (command === 13) {
-        if (operation === 0) { r.fill(0); r[0] = tapDances.length; r[1] = combos.length; r[31] = 3; }
+        if (operation === 0) { r.fill(0); r[0] = tapDances.length; r[1] = combos.length; r[2] = rulesEnabled ? keyOverrides.length : 0; r[3] = rulesEnabled ? alternateRepeatKeys.length : 0; r[31] = 3; }
         else {
-          const entries = operation <= 2 ? tapDances : combos;
-          if (operation === 1 || operation === 3) { r.fill(0); entries[index].forEach((v, i) => r.writeUInt16LE(v, 1 + i * 2)); if (corrupt && changed) { corrupt = false; r[1] ^= 1; } }
-          else if (operation === 2 || operation === 4) {
-            writes.push({ kind: operation === 2 ? "tap-dance" : "combo", index, packet: [...r] }); changed = true;
-            const after = Array.from({ length: 5 }, (_, i) => r.readUInt16LE(4 + i * 2));
-            if (interrupt) { interrupt = false; const partial = Buffer.alloc(10); entries[index].forEach((v, i) => partial.writeUInt16LE(v, i * 2)); r.copy(partial, 0, 4, 7); entries[index] = Array.from({ length: 5 }, (_, i) => partial.readUInt16LE(i * 2)); if (unplug) disconnected = true; throw Error("Synthetic interrupted dynamic entry"); }
-            entries[index] = after; r.fill(0);
-          } else throw Error("Unexpected dynamic operation");
+          const table = operation <= 2 ? tapDances : operation <= 4 ? combos : operation <= 6 && rulesEnabled ? keyOverrides : operation <= 8 && rulesEnabled ? alternateRepeatKeys : null;
+          if (!table) throw Error("Unexpected dynamic table");
+          const widths = operation <= 4 ? [2, 2, 2, 2, 2] : operation <= 6 ? [2, 2, 2, 1, 1, 1, 1] : [2, 2, 1, 1];
+          const decode = (bytes, offset) => widths.map(width => { const value = bytes.readUIntLE(offset, width); offset += width; return value; });
+          if (operation % 2 === 1) { r.fill(0); let at = 1; table[index].forEach((value, i) => { r.writeUIntLE(value, at, widths[i]); at += widths[i]; }); if (corrupt && changed) { corrupt = false; r[1] ^= 1; } }
+          else {
+            writes.push({ kind: operation === 2 ? "tap-dance" : operation === 4 ? "combo" : operation === 6 ? "key-override" : "alternate-repeat", index, packet: [...r] }); changed = true;
+            const after = decode(r, 4);
+            if (interrupt) { interrupt = false; const partial = Buffer.alloc(widths.reduce((n, width) => n + width, 0)); let at = 0; table[index].forEach((value, i) => { partial.writeUIntLE(value, at, widths[i]); at += widths[i]; }); r.copy(partial, 0, 4, 7); table[index] = decode(partial, 0); if (unplug) disconnected = true; throw Error("Synthetic interrupted dynamic entry"); }
+            table[index] = after; r.fill(0);
+          }
         }
       } else throw Error("Unexpected Vial command");
       return r;
@@ -47,5 +51,5 @@ export function vialFixture() {
     throw Error("Unexpected VIA command");
   } });
   const options = { store, transportFactory, withDeviceLock };
-  return { deviceId, raw, definition, encoders, encoderReads, tapDances, combos, writes, state, options, service: createDeviceService(options), interrupt: (disconnect = false) => { interrupt = true; unplug = disconnect; }, interruptEncoder: (disconnect = false) => { interruptEncoder = true; unplugEncoder = disconnect; }, corruptEncoder: () => { corruptEncoder = true; }, reconnect: () => { disconnected = false; }, corrupt: () => { corrupt = true; }, locked: () => { locked = true; }, backupFailure: () => { failBaseline = true; }, protocol: (v) => { protocol = v; } };
+  return { deviceId, raw, keyOverrides, alternateRepeatKeys, enableRules: () => { rulesEnabled = true; }, definition, encoders, encoderReads, tapDances, combos, writes, state, options, service: createDeviceService(options), interrupt: (disconnect = false) => { interrupt = true; unplug = disconnect; }, interruptEncoder: (disconnect = false) => { interruptEncoder = true; unplugEncoder = disconnect; }, corruptEncoder: () => { corruptEncoder = true; }, reconnect: () => { disconnected = false; }, corrupt: () => { corrupt = true; }, locked: () => { locked = true; }, backupFailure: () => { failBaseline = true; }, protocol: (v) => { protocol = v; } };
 }

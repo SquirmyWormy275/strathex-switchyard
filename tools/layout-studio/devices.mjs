@@ -209,7 +209,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
     async read(compartment, deviceId) { return using(deviceId, async (d) => { const snapshot = await d.snapshot(); await store.update(compartment, "device-read", (s) => { s.deviceSnapshots ??= []; s.deviceSnapshots = [...s.deviceSnapshots.filter((v) => v.identity.deviceId !== deviceId), snapshot].slice(-16); }); return snapshot; }); },
     async review(compartment, deviceId, value) {
       const input = Array.isArray(value) ? { changes: value } : value;
-      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["changes", "macros", "layoutOptions", "qmkSettings", "tapDances", "combos", "encoders"].includes(k))) throw new Error("Review a supported bounded configuration proposal.");
+      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["changes", "macros", "layoutOptions", "qmkSettings", "tapDances", "combos", "keyOverrides", "alternateRepeatKeys", "encoders"].includes(k))) throw new Error("Review a supported bounded configuration proposal.");
       const baseline = await this.read(compartment, deviceId), additional = additionalDeviceChanges(baseline, input), meaning = dynamicCandidate(baseline, additional.dynamic), parsed = input.changes === undefined ? [] : validateDeviceChanges(baseline, input.changes, meaning), id = randomUUID();
       if (!parsed.length && !additional.macro && !additional.layout && !additional.qmkSettings.length && !additional.dynamic.length && !additional.encoders.length) throw new Error("The configuration proposal is empty.");
       reviews.set(id, { compartment, baseline, changes: parsed, ...additional, expires: now() + 120000 });

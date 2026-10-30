@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **107/107 groups passed; 754 tests, 745 passed and 9
+- Integrated native Linux run: **108/108 groups passed; 763 tests, 754 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-786042b0-bd8e-4bfb-8422-57c20264af4d.json`.
+  `.sxsy-verification/isolated-test-2b3abb60-fa51-4bce-91ee-7a2f425588a8.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -642,3 +642,23 @@ removed. The earlier native backend, read-only helper and eight runtime guardian
 checks passed. The complete release remains failed until the next run verifies
 the correction; this is a software verification issue, not absent hardware or
 an account blocker.
+
+## Additional Vial rule capabilities
+
+Key-override and alternate-repeat table read/review/write/readback/restore are
+implemented against the same pinned Vial GUI/QMK contracts. Their mixed 16/8-bit
+wire formats are distinct, options/modifiers/layers are closed and explicit,
+plain base typing remains protected, and opaque unused slots are preserved.
+Vial 6 repeat/alternate-repeat, Caps Word and Layer Lock key forms are gated by
+actual advertised tables/bits; older migration sentinels cannot become wire
+values. Nine new fault tests bring device/dynamic/encoder/rule coverage to
+44 passing cases, including literal packets and mixed-byte partial restoration.
+Integrated checks are running. UI exposure, source/model reconciliation and
+physical acceptance remain separate unfinished/external work. No HID write
+occurred on the pilot: the last actual interface inventory remains empty.
+
+The integrated rule-capability run passes **108 groups, 763 tests: 754 passed,
+9 expected platform skips**, receipt
+`2b3abb60-fa51-4bce-91ee-7a2f425588a8`. TypeScript typecheck passed. The isolated
+test-runner checks also pass after the bounded Windows Claude allowance and
+expanded failure diagnostics. Native Windows full verification remains pending.

@@ -6,6 +6,10 @@ export function compileDeviceKey(snapshot, value) {
   if (!value || typeof value !== "object" || Array.isArray(value) || !snapshot.identity.vialProtocol) throw new Error("Use ordinary HID keys or a supported semantic Vial key. Firmware control codes are prohibited.");
   const protocol = snapshot.identity.vialProtocol;
   if (protocol < 1 || protocol > 6) throw new Error("The Vial keycode version is unsupported.");
+  if (protocol === 6 && Object.keys(value).length === 1 && snapshot.dynamic?.schema === "switchyard-vial-dynamic/v1" && snapshot.dynamic.availability === "verified") {
+    if (["repeat", "alternate-repeat"].includes(value.kind) && snapshot.dynamic.alternateRepeatKeys?.length > 0) return value.kind === "repeat" ? 0x7c79 : 0x7c7a;
+    if (Number.isInteger(snapshot.dynamic.featureBits) && (value.kind === "caps-word" && snapshot.dynamic.featureBits & 1 || value.kind === "layer-lock" && snapshot.dynamic.featureBits & 2)) return value.kind === "caps-word" ? 0x7c73 : 0x7c7b;
+  }
   if (value.kind === "macro" && Number.isInteger(value.index) && value.index >= 0 && value.index < snapshot.macroCount) return (protocol === 6 ? 0x7700 : 0x5f12) + value.index;
   if (value.kind === "tap-dance" && protocol >= 4 && snapshot.dynamic?.schema === "switchyard-vial-dynamic/v1" && snapshot.dynamic.availability === "verified" && Number.isInteger(value.index) && value.index >= 0 && value.index < snapshot.dynamic.tapDances.length) return 0x5700 + value.index;
   if (value.kind === "momentary-layer" && Number.isInteger(value.layer) && value.layer > 0 && value.layer < snapshot.layers) return (protocol === 6 ? 0x5220 : 0x5100) + value.layer;
