@@ -51,7 +51,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
     if (binding.targetKind === "coding-task") {
       const task = state.codingSessions?.find((t) => t.id === binding.targetId && t.provider === binding.provider && t.sessionId === binding.sessionId && t.schema === "switchyard-coding-session/v1");
-      if (binding.provider !== "codex" || intent !== "status" || !task) throw new Error("This exact coding-task binding currently supports runtime status only. No alternate session action was selected.");
+      if (binding.provider !== "codex" || !task || (intent !== "status" && !(intent === "resume" && task.launchPolicy === "read-only/on-request" && task.status === "registered"))) throw new Error("This exact coding-task binding supports runtime status only, plus daemon resume for owned read-only tasks. No alternate session action was selected.");
     } else if (binding.provider === "custom-agent") {
       const a = state.agents.find((a) => a.id === binding.targetId && a.sessionId === binding.sessionId);
       if (!a || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
@@ -97,6 +97,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/codex/bind") return coding.bind(compartment, body);
       if (path === "/api/suite/coding/codex/create") return coding.create(compartment, body);
       if (path === "/api/suite/coding/codex/status") return coding.status(compartment, body.id);
+      if (path === "/api/suite/coding/codex/resume") return coding.resume(compartment, body.id);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
       if (path === "/api/suite/agents/example/stop") {
@@ -205,7 +206,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       await store.authorize(compartment, { provider: b.provider });
       let result;
-      if (b.targetKind === "coding-task") result = await coding.status(compartment, b.targetId);
+      if (b.targetKind === "coding-task") result = await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
       else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
@@ -229,7 +230,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (connection.implementation !== "switchyard.role/v1") throw new Error("This physical connection is outside the closed action map.");
       const state = await store.snapshot(compartment), binding = roleTarget(state, connection.roleId, connection.intent);
       await store.authorize(compartment, { provider: binding.provider });
-      return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status only, without completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
+      return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
     async close() { for (const timer of monitors.values()) clearInterval(timer); for (const child of examples.values()) child.kill(); agents.close(); }
   };

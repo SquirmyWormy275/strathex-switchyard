@@ -160,6 +160,14 @@ async function readCodexDaemonAccount(socketPath, options = {}) {
   }, options);
 }
 
+async function resumeExactCodexDaemonThread(socketPath, threadId, repositoryRoot, options = {}) {
+  if (typeof threadId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(threadId) || typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || repositoryRoot.length > 4096 || /[\0\r\n]/.test(repositoryRoot)) throw new Error("An exact thread and repository root are required for Codex resume.");
+  return requestCodexDaemon(socketPath, { id: 2, method: "thread/resume", params: { threadId, excludeTurns: true, sandbox: "read-only", approvalPolicy: "on-request" } }, (result) => {
+    if (result?.thread?.id !== threadId || result.thread.cwd !== repositoryRoot || result.cwd !== repositoryRoot || result.sandbox?.type !== "readOnly" || result.approvalPolicy !== "on-request") throw new Error("Codex resume did not verify the exact directory/thread and read-only permissions.");
+    return Object.freeze({ ...normalizeThreadList({ data: [result.thread] })[0], repositoryRoot, permissions: "read-only/on-request", modelPromptSubmitted: false });
+  }, options);
+}
+
 async function startCodexDaemonThread(socketPath, repositoryRoot, taskId, options = {}) {
   if (typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || /[\0\r\n]/.test(repositoryRoot) || repositoryRoot.length > 4096) {
     throw new Error("Codex thread requires an exact absolute repository root.");
@@ -242,4 +250,4 @@ async function readBoundCodexThreads(directory = defaultBindingDirectory()) {
   return Object.freeze(result);
 }
 
-module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };
+module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, resumeExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };

@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **89/89 groups passed; 605 tests, 596 passed and 9
+- Integrated native Linux run: **89/89 groups passed; 606 tests, 597 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-c152b7a3-4558-41ca-8cf8-31aec674700f.json`.
+  `.sxsy-verification/isolated-test-8fee91b3-7573-4d8e-832a-769324f0de07.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -113,6 +113,10 @@ Tests use synthetic/fault transports unless identified below. The older B122
   prevented duplicate creation and read back `idle`. No model prompt was sent;
   no coding outcome was inferred. [Task scope and remaining controls](coding-task-bindings.md)
   are separate from configuration conversations.
+- That same owned read-only coding thread passed an actual daemon-resume HTTP
+  check. Exact directory/login/permissions were verified, history excluded from
+  the response and no model prompt submitted. Window focus, interactive client
+  resumption and verified task completion remain separate unaccepted capabilities.
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -137,8 +141,9 @@ against DOS/case aliases. The corrected storage boundary checks every ancestor
 for links and verifies filesystem identity while accepting those native aliases.
 Network/device paths and traversal remain rejected, as do Unix path aliases.
 Linux regression checks pass. The native Windows backend step passed on CI run
-`41020239038` at source checkpoint `bfe4efe`; its larger release build is still
-in progress. The newer coding-task logic awaits its own native Windows test run;
+`41020239038` at source checkpoint `bfe4efe` and again on `41021780480` at
+`77c098b`, including the task-binding logic; its larger release build is still
+in progress. The newer daemon-resume logic awaits its own native Windows test run;
 the general Codex Unix transport is Linux-only and Windows task transport remains
 unfinished implementation.
 

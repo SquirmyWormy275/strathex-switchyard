@@ -7,6 +7,12 @@ existing exact thread, create one empty read-only thread per durable request, an
 refresh its runtime status. The frozen frontend does not expose this task panel
 yet. General coding-task integration is still in progress.
 
+Switchyard-created read-only threads can also resume their exact daemon runtime.
+This verifies directory, login and permissions again, excludes transcript history
+from the reply, and submits no model prompt. Active or approval-waiting tasks are
+left alone. Binding an existing external task does not grant this resume capability
+or change its permissions. Window focus and coding execution are separate.
+
 ## Scope and authority
 
 The first adapter is `switchyard.codex-daemon/v1`, using Codex's private
@@ -47,8 +53,8 @@ Observations expire after 30 seconds. Refresh rechecks the current local login,
 the exact thread and the exact working directory. A changed login is rejected.
 `idle`, `active`, `waiting-on-approval`, `error` and `not-observed` describe provider
 runtime state; none verifies a coding outcome. The capability response keeps
-focus, launch, resume, task control, cancellation and mediation false until those
-paths are implemented and verified.
+focus, launch, task control, cancellation and mediation false. Daemon resume is
+offered only for the owned read-only contract.
 
 ## Backend surface
 
@@ -61,10 +67,12 @@ The authenticated local API exposes these POST routes:
 | `bind` | Validate `sessionId`, `repositoryRoot` and a short local `label` |
 | `create` | Reserve `requestId` (UUID), directory and label, then create one empty thread |
 | `status` | Revalidate a saved local binding by its `id` |
+| `resume` | Resume an owned read-only runtime by its saved `id`, without prompting |
 
 Every request is scoped by `compartment`. A workflow role can bind
-`targetKind: "coding-task"`, provider `codex`, exact target ID and intent `status`.
-The same closed physical-intent gateway then refreshes that exact coding task.
+`targetKind: "coding-task"`, provider `codex`, exact target ID and intent `status`
+or the supported owned-runtime `resume`. The same closed physical-intent gateway
+then addresses that exact coding task.
 Unsupported role intents are rejected instead of being reinterpreted as a
 configuration conversation or sent into the foreground window.
 
@@ -76,12 +84,15 @@ binding, prevented a second creation and read back `idle`. The thread used
 read-only/on-request permissions and received no model prompt. Exact IDs and
 receipts remain in private local state. This is provider-runtime evidence, not
 proof of a completed coding task.
+An additional real HTTP check resumed the same thread and read back idle with
+read-only/on-request permissions. Model prompting, window focus and task
+completion were explicitly false.
 
 Tests cover directory/account mismatch, Work prohibition before provider access,
 staleness, cross-compartment ownership, tampering, concurrent/restarted duplicate
 requests, partial creation and exact role routing.
 
-Native task-window focus, exact interactive resumption, supervised terminal
+Native task-window focus, exact interactive client resumption, supervised terminal
 lifecycle, approved review/handoff submission, cancellation and integration with
 the existing exact-scope authority broker remain unfinished. Claude Code task
 inventory/control and the Windows general coding-task transport are also

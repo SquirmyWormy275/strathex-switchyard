@@ -7,7 +7,7 @@ import { isAbsolute, join } from "node:path";
 import { trustedCli } from "./agents.mjs";
 import { directoryIdentity } from "./private-fs.mjs";
 
-const { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, startCodexDaemonThread } = createRequire(import.meta.url)("../../apps/vscode-extension/src/codex-daemon-status.cjs");
+const { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, resumeExactCodexDaemonThread, startCodexDaemonThread } = createRequire(import.meta.url)("../../apps/vscode-extension/src/codex-daemon-status.cjs");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const thread = /^[A-Za-z0-9_-]{1,128}$/;
 const fingerprint = /^[a-f0-9]{64}$/;
@@ -20,7 +20,8 @@ async function repository(value) {
   return root;
 }
 export function createCodingSessions({ store, resolveCli = trustedCli, platform = process.platform, now = () => Date.now(), daemon, socketPath = join(homedir(), ".codex/app-server-control/app-server-control.sock") } = {}) {
-  daemon ??= { list: () => readCodexDaemonThreads(socketPath), account: () => readCodexDaemonAccount(socketPath), read: (sessionId, root) => readExactCodexDaemonThread(socketPath, sessionId, { expectedRepositoryRoot: root }), start: (root, taskId) => startCodexDaemonThread(socketPath, root, taskId, { readOnly: true }) };
+  daemon ??= { list: () => readCodexDaemonThreads(socketPath), account: () => readCodexDaemonAccount(socketPath), read: (sessionId, root) => readExactCodexDaemonThread(socketPath, sessionId, { expectedRepositoryRoot: root }), resume: (sessionId, root) => resumeExactCodexDaemonThread(socketPath, sessionId, root), start: (root, taskId) => startCodexDaemonThread(socketPath, root, taskId, { readOnly: true }) };
+  const resuming = new Map();
   async function access(compartment) {
     await store.authorize(compartment, { provider: "codex" });
     if (platform !== "linux") throw new Error("General Codex task bindings currently use its supported local Unix daemon contract. The Windows coding-task transport is unfinished.");
@@ -38,7 +39,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
   }
   function view(task) {
     const fresh = Boolean(task.observation && now() - task.observation.observedAt >= 0 && now() - task.observation.observedAt <= 30000);
-    return { ...task, observation: fresh ? task.observation : { status: "stale", observedAt: task.observation?.observedAt ?? null, provenance: "Refresh this exact binding; no runtime state inferred", completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(task.sessionId), observable: Boolean(task.sessionId), focusable: false, launchable: false, resumable: false, controllable: false, cancellable: false, mediated: false }, accountScope: { type: "local ChatGPT login fingerprint", organizationVerified: false } };
+    return { ...task, observation: fresh ? task.observation : { status: "stale", observedAt: task.observation?.observedAt ?? null, provenance: "Refresh this exact binding; no runtime state inferred", completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(task.sessionId), observable: Boolean(task.sessionId), focusable: false, launchable: false, resumable: task.status === "registered" && task.launchPolicy === "read-only/on-request", controllable: false, cancellable: false, mediated: false }, accountScope: { type: "local ChatGPT login fingerprint", organizationVerified: false } };
   }
   return {
     async discovery(compartment) {
@@ -46,7 +47,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       try { await store.authorize(compartment, { provider: "codex" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
       if (platform !== "linux") return { ...result, permitted: true, reason: "The Windows general coding-task transport is unfinished." };
       try { await resolveCli("codex"); } catch (e) { return { ...result, permitted: true, installed: false, running: false, reason: e.message }; }
-      try { const rows = await daemon.list(); return { ...result, permitted: true, installed: true, running: true, available: true, recentThreads: rows.length, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-thread"], provenance: "Supported local daemon inventory; no thread content, model prompt or outcome inferred" }; }
+      try { const rows = await daemon.list(); return { ...result, permitted: true, installed: true, running: true, available: true, recentThreads: rows.length, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-thread", "resume-owned-read-only-runtime"], provenance: "Supported local daemon inventory; no thread content, model prompt or outcome inferred" }; }
       catch (e) { return { ...result, permitted: true, installed: true, running: false, reason: e.message }; }
     },
     async list(compartment) { await access(compartment); return ((await store.snapshot(compartment)).codingSessions ?? []).map(view); },
@@ -98,6 +99,36 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       const observation = await exact(task.sessionId, task.repositoryRoot);
       if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during task observation.");
       return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; return view(current); }, { provider: "codex" });
+    },
+    async resume(compartment, id) {
+      await store.authorize(compartment, { provider: "codex" });
+      const key = `${compartment}:${id}`;
+      if (resuming.has(key)) return resuming.get(key);
+      const pending = (async () => {
+        const login = await account(compartment), task = (await store.snapshot(compartment)).codingSessions?.find((t) => t.id === id);
+        if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex" || task.status !== "registered" || task.launchPolicy !== "read-only/on-request") throw new Error("Runtime resume is implemented only for exact read-only tasks created by Switchyard. Existing task permissions are not changed.");
+        if (task.accountFingerprint !== login.fingerprint) throw new Error("The local Codex login changed. This task was not resumed in another account.");
+        await store.claimSession(compartment, { provider: "codex", sessionId: task.sessionId });
+        const before = await exact(task.sessionId, task.repositoryRoot);
+        if (["active", "waiting-on-approval"].includes(before.status)) throw new Error("This exact task is already active or awaiting approval. Its running permissions were preserved.");
+        try {
+          const result = await daemon.resume(task.sessionId, task.repositoryRoot);
+          if (result.id !== task.sessionId || result.repositoryRoot !== task.repositoryRoot || result.permissions !== task.launchPolicy || result.modelPromptSubmitted !== false || !states.includes(result.observation)) throw new Error("Codex did not verify the exact resumed runtime and permissions.");
+          if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during resume.");
+          return store.update(compartment, "coding-runtime-resume", (s) => {
+            const current = s.codingSessions.find((t) => t.id === id);
+            if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The saved task binding changed during resume.");
+            current.observation = { status: result.observation, observedAt: now(), provenance: "Exact Codex daemon thread resumed with read-only/on-request permissions; task completion unverified", completionVerified: false };
+            current.lastResume = { at: now(), status: "acknowledged" };
+            return { ...view(current), effect: "runtime-resumed", modelPromptSubmitted: false, windowFocusVerified: false };
+          }, { provider: "codex" });
+        } catch (error) {
+          await store.update(compartment, "coding-resume-uncertain", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current) current.lastResume = { at: now(), status: "uncertain" }; }).catch(() => {});
+          throw error;
+        }
+      })();
+      resuming.set(key, pending);
+      try { return await pending; } finally { if (resuming.get(key) === pending) resuming.delete(key); }
     }
   };
 }

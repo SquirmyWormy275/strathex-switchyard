@@ -13,10 +13,10 @@ async function fixture(fn) {
   await mkdir(join(repositoryRoot, ".git"), { recursive: true });
   const store = createSuiteStore({ root: stateRoot, secrets: { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); } } });
   await store.initialize("personal"); await store.initialize("other-client"); await store.initialize("company", "work");
-  let accountId = "a".repeat(64), providerRoot = repositoryRoot, failStart = false, failedIdentity = false, failRead = false, observation = "active", clock = Date.now();
-  const daemon = { account: async () => { calls.push("account"); return { type: "chatgpt", fingerprint: accountId, organizationVerified: false }; }, list: async () => { calls.push("list"); return [{ id: "synthetic-thread", observation }]; }, read: async (id) => { calls.push("read"); if (failRead) throw new Error("Synthetic unavailable thread"); return { id, repositoryRoot: providerRoot, observation }; }, start: async () => { calls.push("start"); if (failStart) throw Object.assign(new Error("Synthetic uncertain create"), { createdThreadId: failedIdentity ? "synthetic-created-thread" : undefined }); return { threadId: "synthetic-created-thread" }; } };
+  let accountId = "a".repeat(64), providerRoot = repositoryRoot, failStart = false, failedIdentity = false, failRead = false, badResume = false, observation = "active", clock = Date.now();
+  const daemon = { account: async () => { calls.push("account"); return { type: "chatgpt", fingerprint: accountId, organizationVerified: false }; }, list: async () => { calls.push("list"); return [{ id: "synthetic-thread", observation }]; }, read: async (id) => { calls.push("read"); if (failRead) throw new Error("Synthetic unavailable thread"); return { id, repositoryRoot: providerRoot, observation }; }, resume: async (id) => { calls.push("resume"); await new Promise((r) => setTimeout(r, 20)); return { id, repositoryRoot: providerRoot, observation: "idle", permissions: badResume ? "danger-full-access" : "read-only/on-request", modelPromptSubmitted: false }; }, start: async () => { calls.push("start"); if (failStart) throw Object.assign(new Error("Synthetic uncertain create"), { createdThreadId: failedIdentity ? "synthetic-created-thread" : undefined }); return { threadId: "synthetic-created-thread" }; } };
   const options = { store, daemon, platform: "linux", resolveCli: async () => "/synthetic/codex", now: () => clock }, service = createCodingSessions(options);
-  try { await fn({ root, stateRoot, repositoryRoot, store, calls, service, options, account: (v) => { accountId = v; }, wrongRoot: () => { providerRoot = join(root, "wrong-root"); }, failStart: (identity = false) => { failStart = true; failedIdentity = identity; }, failRead: (v) => { failRead = v; }, idle: () => { observation = "idle"; }, stale: () => { clock += 31000; } }); }
+  try { await fn({ root, stateRoot, repositoryRoot, store, calls, service, options, account: (v) => { accountId = v; }, wrongRoot: () => { providerRoot = join(root, "wrong-root"); }, badResume: () => { badResume = true; }, failStart: (identity = false) => { failStart = true; failedIdentity = identity; }, failRead: (v) => { failRead = v; }, idle: () => { observation = "idle"; }, stale: () => { clock += 31000; } }); }
   finally { await rm(root, { recursive: true, force: true }); }
 }
 const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
@@ -57,6 +57,16 @@ test("a failed provider follow-up retains the already-created thread identity fo
   await assert.rejects(service.create("personal", { requestId, repositoryRoot, label: "Partial create" }), /Creation is uncertain/);
   assert.equal((await service.list("personal"))[0].sessionId, "synthetic-created-thread");
   assert.equal((await service.status("personal", requestId)).status, "registered"); assert.equal(calls.filter((c) => c === "start").length, 1);
+}));
+test("only owned read-only tasks can resume; active turns are preserved, parallel requests share an acknowledgement and bad permission readback stays uncertain", () => fixture(async ({ service, repositoryRoot, store, calls, idle, badResume }) => {
+  const bound = await service.bind("personal", existing(repositoryRoot));
+  await assert.rejects(service.resume("personal", bound.id), /only for exact read-only/);
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Owned runtime" }); assert.equal(task.capabilities.resumable, true);
+  await assert.rejects(service.resume("personal", task.id), /already active/); assert.equal(calls.includes("resume"), false);
+  idle(); const result = await Promise.all([service.resume("personal", task.id), service.resume("personal", task.id)]);
+  assert.equal(calls.filter((c) => c === "resume").length, 1); assert.ok(result.every((r) => r.effect === "runtime-resumed" && !r.modelPromptSubmitted && !r.windowFocusVerified && !r.observation.completionVerified));
+  badResume(); await assert.rejects(service.resume("personal", task.id), /did not verify/);
+  assert.equal((await store.snapshot("personal")).codingSessions.find((t) => t.id === task.id).lastResume.status, "uncertain");
 }));
 test("external session ownership is compartment-scoped, authenticated and retained through restart without plaintext session IDs", () => fixture(async ({ service, repositoryRoot, store, stateRoot }) => {
   await service.bind("personal", existing(repositoryRoot));
