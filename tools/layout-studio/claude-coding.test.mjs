@@ -14,7 +14,7 @@ async function fixture(fn) {
   const store = createSuiteStore({ root: stateRoot, secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => { keys.set(`${c}:${p}`, v); } } });
   await store.initialize("personal"); await store.initialize("other"); await store.initialize("company", "work");
   for (const c of ["personal", "other"]) await store.update(c, "mode-select", (s) => { s.mode = "personal-companion"; });
-  let login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false;
+  let login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false, beforeFocus = () => {}, focusEffects = 0;
   const run = async (_, args, options) => {
     calls.push([...args]);
     if (args[0] === "--version") return "2.1.308 (Claude Code)\n";
@@ -24,9 +24,10 @@ async function fixture(fn) {
     if (args[0] === "stop") { if (failStop) throw new Error("Synthetic uncertain stop"); const row = rows.find((r) => r.id === args[1]); assert.ok(row); row.state = "stopped"; row.startedAt -= 37; delete row.pid; delete row.status; return "stopped\n"; }
     throw new Error("Unexpected native CLI operation");
   };
-  const options = { store, run, platform: "linux", resolveCli: async () => "/synthetic/native/claude", now: () => clock }, service = createClaudeCoding(options);
+  const windows = { focus: async ({ verifySession }) => { beforeFocus(); await verifySession(); focusEffects++; await verifySession(); return { effect: "exact-interactive-session-focused", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false }; } };
+  const options = { store, run, windows, platform: "linux", resolveCli: async () => "/synthetic/native/claude", now: () => clock }, service = createClaudeCoding(options);
   const input = () => ({ requestId: randomUUID(), repositoryRoot, label: "Local label never sent to provider" });
-  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, advance: (n) => { clock += n; } }); }
+  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
   finally { await service.close(); await rm(root, { recursive: true, force: true }); }
 }
 
@@ -110,5 +111,23 @@ test("physical role status routes to the exact Claude task without substituting 
     await suite.handle("/api/suite/roles/bind", { roleId: "reviewer", intent: "status", provider: "claude-code", targetKind: "coding-task", targetId: task.id });
     const r = await suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "reviewer", intent: "status" }); assert.equal(r.sessionId, task.sessionId); assert.equal(r.observation.completionVerified, false);
     await assert.rejects(suite.handle("/api/suite/roles/bind", { roleId: "reviewer", intent: "resume", provider: "claude-code", targetKind: "coding-task", targetId: task.id }), /runtime status only/);
+  } finally { await suite.close(); }
+}));
+
+test("Claude interactive summon revalidates native session identity and cannot turn a background PID into a window", () => fixture(async ({ service, rows, repositoryRoot, input, beforeFocus, focusEffects, store }) => {
+  const row = { cwd: repositoryRoot, kind: "interactive", startedAt: Date.now(), pid: 6789, status: "idle", sessionId: randomUUID() }; rows.push(row);
+  const task = await service.bind("personal", { sessionId: row.sessionId, repositoryRoot, label: "Interactive task" });
+  const result = await service.focus("personal", task.id); assert.equal(result.sessionId, row.sessionId); assert.equal(result.windowFocusVerified, true); assert.equal(result.taskResumptionVerified, false);
+  assert.equal((await service.list("personal"))[0].capabilities.focusable, true);
+  const background = await service.create("personal", input());
+  await assert.rejects(service.focus("personal", background.id), /Background worker PIDs/);
+  const suite = createSuite({ store, claudeCoding: service, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await store.saveWorkflow("personal", { name: "Loop", roles: [{ id: "builder", label: "Builder" }], steps: [] });
+    await suite.handle("/api/suite/roles/bind", { roleId: "builder", intent: "summon", provider: "claude-code", targetKind: "coding-task", targetId: task.id });
+    const focused = await suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "builder", intent: "summon" }); assert.equal(focused.sessionId, row.sessionId);
+    const effects = focusEffects(); beforeFocus(() => { row.sessionId = randomUUID(); });
+    await assert.rejects(service.focus("personal", task.id), /session changed/); assert.equal(focusEffects(), effects);
+    assert.equal((await service.status("personal", task.id)).capabilities.focusable, false);
   } finally { await suite.close(); }
 }));

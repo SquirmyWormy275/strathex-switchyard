@@ -8,6 +8,7 @@ import { directoryIdentity } from "./private-fs.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
+import { createTaskWindow } from "./task-window.mjs";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const shortId = /^[a-f0-9]{8}$/;
@@ -21,7 +22,16 @@ export function claudeAccount(value) {
 export function claudeInventory(value, root) {
   if (!Array.isArray(value) || value.length > 256) throw new Error("Claude inventory exceeds its supported contract.");
   const rows = value.filter((v) => v?.cwd === root).map((v) => {
-    if (!["interactive", "background"].includes(v.kind) || !Number.isSafeInteger(v.startedAt) || v.startedAt < 0 || v.sessionId != null && !uuid.test(v.sessionId) || v.kind === "background" && (!shortId.test(v.id ?? "") || !["working", "blocked", "done", "failed", "stopped"].includes(v.state)) || v.pid != null && (!Number.isSafeInteger(v.pid) || v.pid < 1 || !["busy", "waiting", "idle"].includes(v.status))) throw new Error("Claude returned an unsupported session identity or runtime state.");
+    const invalid = [
+      !["interactive", "background"].includes(v.kind) && "session kind",
+      (!Number.isSafeInteger(v.startedAt) || v.startedAt < 0) && "start time",
+      v.sessionId != null && !uuid.test(v.sessionId) && "session UUID",
+      v.kind === "background" && !shortId.test(v.id ?? "") && "background ID",
+      v.kind === "background" && !["working", "blocked", "done", "failed", "stopped"].includes(v.state) && "background runtime state",
+      v.pid != null && (!Number.isSafeInteger(v.pid) || v.pid < 1) && "process ID",
+      v.pid != null && !["busy", "waiting", "idle"].includes(v.status) && "process runtime state"
+    ].filter(Boolean);
+    if (invalid.length) throw new Error(`Claude returned an unsupported or not-yet-verified ${invalid.join(", ")}. Refresh native inventory after startup; no session was guessed.`);
     return { kind: v.kind, sessionId: v.sessionId ?? null, backgroundId: v.kind === "background" ? v.id : null, repositoryRoot: root, startedAt: v.startedAt, pid: v.pid ?? null, processStatus: v.pid == null ? null : v.status, state: v.kind === "background" ? v.state : null, waitingFor: v.status === "waiting" && ["permission prompt", "input needed", "sandbox request", "worker request", "dialog open"].includes(v.waitingFor) ? v.waitingFor : null };
   });
   if (new Set(rows.filter((r) => r.sessionId).map((r) => r.sessionId)).size !== rows.filter((r) => r.sessionId).length || new Set(rows.filter((r) => r.backgroundId).map((r) => r.backgroundId)).size !== rows.filter((r) => r.backgroundId).length) throw new Error("Claude returned ambiguous exact session identities.");
@@ -33,7 +43,7 @@ async function repository(value) {
   if (git.isSymbolicLink() || !git.isDirectory() && !git.isFile()) throw new Error("The selected directory has unsupported Git metadata.");
   return root;
 }
-export function createClaudeCoding({ store, resolveCli = trustedCli, run, platform = process.platform, now = () => Date.now() } = {}) {
+export function createClaudeCoding({ store, resolveCli = trustedCli, run, platform = process.platform, now = () => Date.now(), windows = createTaskWindow({ platform }) } = {}) {
   const children = new Set(), generations = new Map(), seen = new Set(); let closed = false;
   const fence = (c) => generations.get(c) ?? 0;
   function current(c, generation) { if (closed || fence(c) !== generation) throw new Error("This Claude operation was stopped before its next effect."); }
@@ -58,9 +68,13 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
   async function inventory(c, root, generation = fence(c), cleanup = false) { return claudeInventory(JSON.parse(await execute(c, ["agents", "--json", "--all", "--cwd", root], root, generation, cleanup)), root); }
   function observation(row) {
     const status = !row ? "not-observed" : row.state === "stopped" ? "stopped" : row.state === "failed" ? "error" : row.state === "done" ? "provider-turn-finished" : row.state === "blocked" || row.processStatus === "waiting" ? row.waitingFor === "permission prompt" ? "waiting-on-approval" : "waiting-for-input" : row.state === "working" || row.processStatus === "busy" ? "active" : row.processStatus === "idle" ? "idle" : "unknown";
-    return { status, observedAt: now(), providerState: row?.state ?? null, processStatus: row?.processStatus ?? null, provenance: "Claude Code native CLI inventory; provider turn state is not independent task-completion evidence", completionVerified: false };
+    return { status, observedAt: now(), providerState: row?.state ?? null, processStatus: row?.processStatus ?? null, processId: row?.pid ?? null, processStartedAt: row?.pid ? row.startedAt : null, sessionKind: row?.kind ?? null, provenance: "Claude Code native CLI inventory; provider turn state is not independent task-completion evidence", completionVerified: false };
   }
-  function view(t) { const fresh = t.observation && now() - t.observation.observedAt >= 0 && now() - t.observation.observedAt <= 30000; return { ...t, observation: fresh ? t.observation : { status: "stale", observedAt: t.observation?.observedAt ?? null, completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(t.sessionId), observable: Boolean(t.sessionId || t.backgroundId), focusable: false, launchable: false, resumable: false, controllable: false, cancellable: t.status === "registered" && t.launchPolicy === "tools-disabled/plan" && Boolean(t.backgroundId), mediated: false }, accountScope: { type: "local first-party login fingerprint", organizationVerified: false } }; }
+  function view(t) {
+    const fresh = t.observation && now() - t.observation.observedAt >= 0 && now() - t.observation.observedAt <= 30000;
+    const focused = fresh && t.lastWindowFocus?.status === "verified" && t.lastWindowFocus.sessionId === t.sessionId && t.lastWindowFocus.processId === t.observation.processId && t.lastWindowFocus.processStartedAt === t.observation.processStartedAt && now() - t.lastWindowFocus.at >= 0 && now() - t.lastWindowFocus.at <= 30000;
+    return { ...t, observation: fresh ? t.observation : { status: "stale", observedAt: t.observation?.observedAt ?? null, completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(t.sessionId), observable: Boolean(t.sessionId || t.backgroundId), focusable: Boolean(focused), launchable: false, resumable: false, controllable: false, cancellable: t.status === "registered" && t.launchPolicy === "tools-disabled/plan" && Boolean(t.backgroundId), mediated: false }, accountScope: { type: "local first-party login fingerprint", organizationVerified: false } };
+  }
   function taskIn(s, id) { const task = s.codingSessions?.find((t) => t.id === id && t.provider === "claude-code" && t.schema === "switchyard-coding-session/v1"); if (!task) throw new Error("Choose an exact saved Claude coding task."); return task; }
   async function exact(c, id, generation = fence(c)) {
     const login = await account(c, generation), task = taskIn(await store.snapshot(c), id);
@@ -97,7 +111,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     async discovery(c) {
       const result = { adapter, provider: "claude-code", installed: null, available: false };
       try { await store.authorize(c, { provider: "claude-code" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
-      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-tools-disabled-background", "reviewed-owned-background-stop"] }; }
+      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window"] : [])] }; }
       catch (e) { return { ...result, permitted: true, reason: e.message }; }
     },
     async inventory(c, { repositoryRoot }) { const root = await repository(repositoryRoot); await account(c); return inventory(c, root); },
@@ -152,6 +166,12 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
       if (row.state === "stopped" && row.pid === null) return { effect: "already-stopped", taskCompletionVerified: false };
       const confirmation = await suiteConfirmations(store, c, "claude-code", now).issue({ ...reviewed(c, task, row), reason: "Stop this exact owned Claude background session; retain its conversation. Previous effects and task completion remain unverified.", reauthenticated: false });
       return { status: "requires-confirmation", taskId: id, confirmation, scope: { provider: "claude-code", label: task.label, repositoryRoot: task.repositoryRoot, sessionId: task.sessionId, backgroundId: task.backgroundId, processId: row.pid }, taskCompletionVerified: false };
+    },
+    async focus(c, id) {
+      const generation = fence(c), { task, row } = await exact(c, id, generation), executable = await access(c);
+      if (row?.kind !== "interactive" || !row.pid) throw new Error("Only a live exact interactive Claude session can be focused. Background worker PIDs are not attached-terminal identities.");
+      const result = await windows.focus({ row, executable, repositoryRoot: task.repositoryRoot, verifySession: async () => { const check = await exact(c, id, generation); if (!check.row || check.row.kind !== row.kind || check.row.sessionId !== row.sessionId || check.row.pid !== row.pid || check.row.startedAt !== row.startedAt) throw new Error("Claude's exact interactive session changed during native window focus."); } });
+      return store.update(c, "claude-window-focus", (s) => { const t = taskIn(s, id); t.lastWindowFocus = { at: now(), status: "verified", sessionId: task.sessionId, processId: row.pid, processStartedAt: row.startedAt }; t.observation = observation(row); return { id, sessionId: task.sessionId, ...result }; }, { provider: "claude-code" });
     },
     async stop(c, { id, token }) {
       if (!uuid.test(token ?? "")) throw new Error("Use the exact one-use confirmation token from reviewing this owned session stop.");

@@ -23,6 +23,11 @@ frontend does not expose this task panel yet.
 - Review and stop a background task created by Switchyard. External bindings
   are observation-only. Stopping retains the conversation and does not undo
   previous effects or prove completion.
+- Focus a live interactive Claude session in a direct Foot window on Linux.
+  The adapter verifies the exact current native session/PID, executable, user,
+  directory, foreground process group, process start identity, terminal ancestry
+  and compositor address before dispatch, then verifies native session and focus
+  readback again. A second summon reuses that same session and window.
 
 Creation reserves a stable request UUID in encrypted state before launch.
 Repeated requests reuse it. Claude's `--bg` owns its session ID and **ignores
@@ -79,11 +84,13 @@ Authenticated same-origin POST routes under `/api/suite/coding/claude/`:
 | `bind` | Full `sessionId`, exact directory, local `label` |
 | `create` | Stable `requestId` UUID, directory and label; one empty task |
 | `status` | Saved task `id`; recheck identity and account |
+| `focus` | Live interactive task `id`; verify/focus its exact direct Foot window |
 | `stop/review` | Owned task `id`; exact scope and one-use confirmation |
 | `stop` | Same `id` and returned `token`; stop and verify readback |
 
 All requests name `compartment`. Roles support provider `claude-code`,
-`targetKind: "coding-task"` and intent `status`. Other task-role intents fail
+`targetKind: "coding-task"` and intent `status`, plus `summon` for live
+interactive bindings. Other task-role intents fail
 without selecting a configuration conversation.
 
 ## Evidence and unfinished controls
@@ -96,9 +103,18 @@ only the empty private contract directory was trusted.
 
 Tests cover inventory/account rejection, compartment ownership, uncertain
 creation/reconciliation, expiry, changed scope/PID, replay, uncertain stops,
-owned-only cleanup and exact role status routing. Native window focus, terminal
-attachment, approved review/handoff submission and broader mediated execution
-remain implementation work. Background `--resume` can create a copy when a
+owned-only cleanup and exact role routing. A real native Foot/Claude trial passed
+focus and repeat-summon against the same session; its owned terminal exited and
+the original desktop focus was restored. Startup produced one not-yet-verified
+inventory response; only read-only inventory was retried, and no focus occurred
+until identity was verified. No model prompt or terminal text was sent.
+
+This is exact-session **focus**, with `taskResumptionVerified: false`. It does
+not submit work, restart a stopped task, identify a background attachment window,
+or support tmux/screen, shared Foot servers, other terminals or Windows windows.
+These cases fail explicitly without title matching or foreground typing.
+Terminal attachment, approved review/handoff submission and broader mediated
+execution remain implementation work. Background `--resume` can create a copy when a
 conversation is running, so it is not used as an exact-resume shortcut. Native
 `attach <id>` is the supported direction for the unfinished terminal adapter.
 

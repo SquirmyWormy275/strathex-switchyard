@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **91/91 groups passed; 628 tests, 619 passed and 9
+- Integrated native Linux run: **92/92 groups passed; 634 tests, 625 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-fd2cbd8b-29e3-4656-a2dc-dc16d409bd70.json`.
+  `.sxsy-verification/isolated-test-1ec94a7a-84f6-47b2-b415-305be67d2d44.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -138,6 +138,14 @@ Tests use synthetic/fault transports unless identified below. The older B122
   trial caught the CLI's changing `startedAt` field; the returned UUID/job ID and
   exact directory/account bind the task instead. See [scope and remaining
   controls](claude-task-bindings.md).
+- A real native Foot/Claude trial at `2026-10-30T09:11:50Z` focused the same
+  interactive session twice through authenticated HTTP. Executable/user/root,
+  foreground process group, PID start identity, terminal ancestry, current native
+  session and compositor readback were verified. The owned terminal exited and
+  the original desktop focus was restored. No model prompt or terminal text was
+  submitted; task resumption and completion were explicitly not claimed. Shared
+  or multiplexed terminals, background attachment windows and Windows focus stay
+  unavailable rather than selecting a guessed window.
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -178,6 +186,9 @@ Checkpoints `6dcb776` and `d1c5d43` carry this fix. The native backend step
 passed at `d1c5d43` on run `41030056076`, including the actual reader-held
 Windows promotion case. Its full release build remains separate; the newer
 Claude adapter still needs its own native Windows rerun.
+The Claude backend's native Windows software step subsequently passed at
+`c8a6ffd` on run `41030491650`. Its actual Windows CLI/account/window acceptance
+remains open; the newer Linux window-focus adapter still needs its CI rerun.
 
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and

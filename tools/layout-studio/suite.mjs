@@ -67,7 +67,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
     if (binding.targetKind === "coding-task") {
       const task = state.codingSessions?.find((t) => t.id === binding.targetId && t.provider === binding.provider && t.sessionId === binding.sessionId && t.schema === "switchyard-coding-session/v1");
-      if (!task || !(intent === "status" && ["codex", "claude-code"].includes(binding.provider) || binding.provider === "codex" && intent === "resume" && task.launchPolicy === "read-only/on-request" && task.status === "registered")) throw new Error("This exact coding-task binding supports runtime status only, plus Codex daemon resume for owned read-only tasks. No alternate session action was selected.");
+      if (!task || !(intent === "status" && ["codex", "claude-code"].includes(binding.provider) || binding.provider === "claude-code" && intent === "summon" && task.backgroundId === null && task.status === "registered" || binding.provider === "codex" && intent === "resume" && task.launchPolicy === "read-only/on-request" && task.status === "registered")) throw new Error("This exact coding-task binding supports runtime status only, plus verified live Claude focus or owned read-only Codex daemon resume. No alternate session action was selected.");
     } else if (binding.provider === "custom-agent") {
       const a = state.agents.find((a) => a.id === binding.targetId && a.sessionId === binding.sessionId);
       if (!a || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
@@ -135,6 +135,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/claude/bind") return claudeCoding.bind(compartment, body);
       if (path === "/api/suite/coding/claude/create") return claudeCoding.create(compartment, body);
       if (path === "/api/suite/coding/claude/status") return claudeCoding.status(compartment, body.id);
+      if (path === "/api/suite/coding/claude/focus") return claudeCoding.focus(compartment, body.id);
       if (path === "/api/suite/coding/claude/stop/review") return claudeCoding.reviewStop(compartment, body.id);
       if (path === "/api/suite/coding/claude/stop") return claudeCoding.stop(compartment, body);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
@@ -254,7 +255,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       await store.authorize(compartment, { provider: b.provider });
       let result;
-      if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await claudeCoding.status(compartment, b.targetId) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
+      if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
       else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
