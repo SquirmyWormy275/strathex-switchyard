@@ -33,6 +33,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   CPU voice, configuration HID and LangChain environment from pinned hashes.
 - [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
   stable intents and migration before connecting a second computer.
+- [Assignment references and legends](docs/assignment-legends.md): export saved
+  controls and source-sized relegendable-cap sheets; the frontend control is pending.
 - [Application packaging](docs/suite-installation.md): build the private suite
   directory, verify its contents and run it independently of the checkout.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
@@ -62,7 +64,7 @@ no model prompts and do not establish completion of coding work.
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 209 test/build groups at `fe34548`, including
+The complete Windows release passed 212 test/build groups at `4cab102`, including
 managed startup, installer, bootstrap, portable profiles and automation checks.
 The newer task/controller backend also passes native Windows tests; its complete
 release is running. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122

@@ -671,3 +671,23 @@ schema. Unknown requests receive a protocol error. Malformed frames close the
 owned connection and late buffered data cannot restore it. Real-pipe fault tests
 and the task/service suites pass **32 tests**. This grants no execution authority;
 reviewed general task submissions and native client attachment remain unfinished.
+
+## Profile-derived assignment legends
+
+Authenticated saved-profile export now produces a self-contained assignment
+reference and relegendable-cap HTML/SVG sheets. V2 role/intents, modifier meanings,
+unassigned actions and review issues remain explicit. Export follows compartment
+policy, includes no local account/session authority and has no device/host effect.
+The retained cyber_engineer source is hash-verified, its full vector geometry and
+credit are preserved, and ink uses exact source face rectangles. Long labels
+require an explicit shorter print label rather than splitting words or omitting
+meaning. Pagination includes every assigned action.
+
+The actual F77 Dvorak catalog export rendered to an A4 PDF and was visually
+inspected after correcting approximate overlay coordinates and word wrapping.
+No printer scaling, cap fit, hardware or frontend acceptance is claimed. The
+frozen frontend is unchanged; its export control remains implementation work.
+The older canonical B122 overlays are a separate generator and still need their
+face/panel coordinates reconciled. See [assignment legends](assignment-legends.md).
+The export and packaged release checks pass **11 focused tests**; TypeScript
+typecheck passes. Integrated Linux verification is running.

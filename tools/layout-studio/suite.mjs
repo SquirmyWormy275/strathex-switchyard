@@ -19,6 +19,7 @@ import { createCodingSessions } from "./coding-sessions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createClaudeCoding } from "./claude-coding.mjs";
 import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
+import { exportAssignmentLegends } from "./legend-export.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
@@ -225,6 +226,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
       if (path === "/api/suite/profile/export") return store.exportProfile(compartment);
+      if (path === "/api/suite/profile/legends/export") return exportAssignmentLegends((await store.exportProfilePackage(compartment)).document, body.options);
       if (path === "/api/suite/profile/package/export") return store.exportProfilePackage(compartment, body.preferences ?? null);
       if (path === "/api/suite/profile/package/review") return store.reviewProfilePackage(compartment, body.document);
       if (path === "/api/suite/profile/package/import") return store.importProfilePackage(compartment, body.document, body.reviewId);

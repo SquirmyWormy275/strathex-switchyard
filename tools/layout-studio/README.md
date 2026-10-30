@@ -11,13 +11,15 @@ mise exec node@24.14.0 -- npm run layout:studio
 
 Open the private loopback link printed at startup. That session connects local
 protected storage and supported installed tools. Without the connection, the
-catalog and planner still work. The standalone desktop launcher and complete
-packaging remain unfinished.
+catalog and planner still work. The [normal installation](../../docs/suite-installation.md)
+provides the desktop launcher, verified backend releases and runtime maintenance.
+Interactive device/account acceptance remains separate.
 
 - [Model catalog, variants and 126-profile export](../../docs/model-f-standard-configurations.md)
 - [Configuration walkthrough](../../docs/switchyard-configuration.md)
 - [Exact implementation and evidence](../../docs/switchyard-status.md)
 - [Full suite requirement ledger](../../docs/switchyard-requirements.md)
+- [Assignment reference and print legends](../../docs/assignment-legends.md)
 - [Product direction](../../docs/switchyard-product.md)
 
 The server listens on loopback and uses an exact-origin bearer boundary. Profiles
