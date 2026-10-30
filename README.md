@@ -20,6 +20,9 @@ setup** loads four planned controls and the *Keep my place* workflow. Browse the
 catalog without an assistant account. Read/import your actual keyboard
 configuration before connecting a host shortcut; a reference preset cannot
 establish your current firmware or typing layout.
+First use stays in keyboard-only mode. Select Personal companion in Settings
+when you are ready to connect personal tools; a Work workspace uses its managed,
+Copilot-only policy. Imported layouts never enable providers or recording.
 
 - [Model F Labs configurations](docs/model-f-standard-configurations.md): 19 listed
   model/case/round combinations, 104 named references, physical options, Dvorak

@@ -110,6 +110,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/private-fs.test.mjs" },
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
+  { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },

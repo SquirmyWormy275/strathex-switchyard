@@ -23,6 +23,7 @@ test("independent compartment encryption rejects swapping and tampering, with pr
   await assert.rejects(store.initialize("invalid", "constructor"), /Choose Personal/);
   await assert.rejects(store.initialize("invalid", ["work"]), /Choose Personal/);
   await store.initialize("personal", "personal"); await store.initialize("work", "work");
+  await store.update("work", "mode-select", (s) => { s.mode = "managed-companion"; });
   assert.notEqual(keys.get("personal:storage-key"), keys.get("work:storage-key"));
   await store.update("personal", "synthetic-content", (s) => { s.workflow.name = "private synthetic content"; });
   const raw = await readFile(join(root, "personal.sealed.json"), "utf8");
@@ -49,6 +50,38 @@ test("concurrent suite bootstrap recovers a compartment once and never silently 
     assert.equal(recoveries, 1);
     await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "personal", policy: "work" }), /policy differs/);
     assert.equal((await store.snapshot("personal")).policy, "personal");
+  } finally { await suite.close(); }
+}));
+
+test("new and legacy workspaces start keyboard-only; portable imports cannot enable providers and companion modes must match policy", () => fixture(async ({ store }) => {
+  let providerCalls = 0;
+  const suite = createSuite({ store, agents: { discovery: async () => [], design: async () => { providerCalls++; }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    assert.equal((await suite.handle("/api/suite/snapshot")).mode, "keyboard-only");
+    await store.saveProfile("personal", { ...portableProfile(samplePlan()), mode: "personal-companion" });
+    await assert.rejects(suite.handle("/api/suite/design", { provider: "codex", plan: samplePlan(), message: "Blocked" }), /Keyboard-only/); assert.equal(providerCalls, 0);
+    await store.update("personal", "synthetic-legacy-mode", (s) => { delete s.mode; });
+    assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+    await assert.rejects(suite.handle("/api/suite/mode", { mode: "managed-companion" }), /matching this workspace/);
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await suite.handle("/api/suite/design", { provider: "codex", plan: samplePlan(), message: "Explicitly permitted" }); assert.equal(providerCalls, 1);
+    await suite.handle("/api/suite/compartment/create", { compartment: "company", policy: "work" });
+    assert.equal((await store.snapshot("company")).mode, "keyboard-only");
+    await assert.rejects(suite.handle("/api/suite/mode", { compartment: "company", mode: "personal-companion" }), /matching this workspace/);
+  } finally { await suite.close(); }
+}));
+
+test("keyboard-only selection pauses backend sources and stops only this compartment's owned provider processes", () => fixture(async ({ store }) => {
+  const stopped = [];
+  const suite = createSuite({ store, agents: { discovery: async () => [], stopCompartment: async (id) => { stopped.push(`agent:${id}`); return { stopped: true }; }, close() {} }, voice: { discovery: async () => ({ available: true }), stopCompartment: async (id) => { stopped.push(`voice:${id}`); return { stopped: true }; } } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await suite.handle("/api/suite/observation/start", { sources: ["deliberate"], exclusions: [], consent: true });
+    await suite.handle("/api/suite/voice/start", { consent: true });
+    const response = await suite.handle("/api/suite/mode", { mode: "keyboard-only" }), state = await store.snapshot("personal");
+    assert.equal(response.ownedProcessesStopped, true); assert.equal(state.observations[0].status, "paused"); assert.equal(state.voice[0].status, "paused"); assert.deepEqual(stopped.sort(), ["agent:personal", "voice:personal"]);
+    await assert.rejects(suite.handle("/api/suite/voice/start", { consent: true }), /Keyboard-only/);
   } finally { await suite.close(); }
 }));
 
@@ -115,6 +148,7 @@ test("observation and voice expose explicit sources, pause/restart recovery, del
   const suite = createSuite({ store, voice, agents });
   try {
     await suite.handle("/api/suite/bootstrap");
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
     await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
     await assert.rejects(suite.handle("/api/suite/voice/start", { compartment: "work", consent: true }), /prohibited/);
     await assert.rejects(suite.handle("/api/suite/observation/start", { compartment: "personal", sources: ["deliberate"], exclusions: [] }), /explicitly/);
@@ -145,6 +179,7 @@ test("observation and voice expose explicit sources, pause/restart recovery, del
 
 test("Codex design binds an exact returned session, rejects unsafe outputs and never switches providers", () => fixture(async ({ store, root }) => {
   await store.initialize("personal"); await store.initialize("work", "work");
+  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
   const calls = [];
   const fake = new EventEmitter(); fake.closed = false; fake.initialize = async () => {}; fake.close = () => { fake.closed = true; };
   fake.request = async (method, params) => {
@@ -182,6 +217,7 @@ test("Codex design reads back complete tool restrictions and fails closed for en
 
 test("concurrent exact-session reads share initialization, and a failed connection can be retried without leaking a second runtime", () => fixture(async ({ store, root }) => {
   await store.initialize("personal");
+  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
   await store.update("personal", "synthetic-bound-conversation", (s) => { s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", updatedAt: Date.now(), messages: [] }]; });
   let created = 0, closed = 0, fail = true;
   const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [], codexFactory: () => {
@@ -194,4 +230,15 @@ test("concurrent exact-session reads share initialization, and a failed connecti
     assert.equal(created, 2); assert.ok(retried.every((r) => r.sessionId === "exact-thread"));
   } finally { service.close(); }
   assert.equal(closed, 2);
+}));
+
+test("stopping a compartment invalidates pending native connection work without closing future permitted connections", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); await store.update("personal", "synthetic-connected-session", (s) => { s.mode = "personal-companion"; s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", updatedAt: Date.now(), messages: [] }]; });
+  let release, entered; const gate = new Promise((r) => { release = r; }), reached = new Promise((r) => { entered = r; }); let resolved = 0, spawned = 0;
+  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => { if (++resolved === 1) { entered(); await gate; } return "/synthetic/codex"; }, resolveMcp: async () => [], codexFactory: () => { spawned++; return { closed: false, initialize: async () => {}, close() { this.closed = true; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) }; } });
+  try {
+    const pending = service.status("personal", "owned"); const rejected = assert.rejects(pending, /stopped/); await reached;
+    await service.stopCompartment("personal"); release(); await rejected; assert.equal(spawned, 0);
+    assert.equal((await service.status("personal", "owned")).sessionId, "exact-thread"); assert.equal(spawned, 1);
+  } finally { release(); await service.close(); }
 }));

@@ -18,6 +18,7 @@ const plan = { schema: "sxsy-agentic-layout-plan/v1", profile: { schema: "sxsy-b
 let failure;
 try {
   await api("/api/suite/compartment/create", { compartment, policy: "personal" }); await api("/api/suite/compartment/select", { compartment });
+  await api("/api/suite/mode", { compartment, mode: "personal-companion" });
   await api("/api/suite/workflow/save", { compartment, workflow: { name: "Synthetic host verification", roles: [{ id: "builder", label: "Synthetic builder" }], steps: ["Check registered dispatch"] } });
   await api("/api/suite/agents/example", { compartment, example: "custom" });
   const deadline = Date.now() + 10000; let agent;
@@ -34,6 +35,7 @@ try {
     results.push({ actionId, shortcut: trial.shortcut, transactionId: tx.id, registration: trial.status, dispatch: trial.trial, boundary: "compositor dispatcher and authenticated local intent; no physical keyboard or external task completion claim" });
   }
   await api("/api/suite/compartment/create", { compartment: "host-work-policy", policy: "work" });
+  await api("/api/suite/mode", { compartment: "host-work-policy", mode: "managed-companion" });
   await api("/api/suite/compartment/select", { compartment: "host-work-policy" });
   let rejected = false; try { await dispatchPhysicalIntent({ implementation: "native-chatgpt.focus/v1" }); } catch { rejected = true; }
   if (!rejected) throw new Error("Work policy did not reject the personal physical intent.");

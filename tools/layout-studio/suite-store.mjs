@@ -103,12 +103,14 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   function permit(state, { provider, account, operation, destination } = {}) {
     const policy = templates[state.policy];
     if (typeof state.policy !== "string" || !Object.hasOwn(templates, state.policy)) throw new Error("Compartment policy is unsupported.");
-    if (state.mode === "keyboard-only" && (provider || operation === "record")) throw new Error("Keyboard-only mode has no provider or recording effects. Choose companion mode deliberately to connect local actions.");
     if (provider && !policy.providers.includes(provider)) throw new Error("This provider is prohibited in the selected compartment.");
     if (account && !state.accounts.includes(account)) throw new Error("This account is not enrolled in the selected compartment.");
     if (operation === "export" && !policy.export) throw new Error("Exports are prohibited in this compartment.");
     if (operation === "record" && !policy.recording) throw new Error("Recording is prohibited in this compartment.");
     if (destination && destination !== state.id && !policy.crossCompartment) throw new Error("Cross-compartment content routing is prohibited.");
+    const mode = state.mode ?? "keyboard-only";
+    if (!["keyboard-only", "personal-companion", "managed-companion"].includes(mode)) throw new Error("The saved operating mode is unsupported. Preserve the original state.");
+    if (mode === "keyboard-only" && (provider || operation === "record")) throw new Error("Keyboard-only mode has no provider or recording effects. Choose companion mode deliberately to connect local actions.");
     return true;
   }
   function prune(state) {
@@ -141,7 +143,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
         policy ??= id === "work" ? "work" : "personal";
         lease.assert(); await key(id, true);
         lease.assert();
-        await write(id, { schema: "switchyard-suite-state/v1", id, policy, accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
+        await write(id, { schema: "switchyard-suite-state/v1", id, policy, mode: "keyboard-only", accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
         return { id, policy };
       });
     },
@@ -150,7 +152,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       const ids = (await readdir(root)).filter((n) => /^[a-z][a-z0-9-]{0,47}\.sealed\.json$/.test(n)).map((n) => n.replace(/\.sealed\.json$/, ""));
       return ids.slice(0, 32).map((id) => ({ id }));
     },
-    async snapshot(id) { const s = await read(id); permit(s); prune(s); return { ...s, policyRules: templates[s.policy] }; },
+    async snapshot(id) { const s = await read(id); permit(s); prune(s); return { ...s, mode: s.mode ?? "keyboard-only", policyRules: templates[s.policy] }; },
     async authorize(id, request) { const s = await read(id); return permit(s, request); },
     async claimSession(id, { provider, sessionId }) {
       if (!["codex", "claude-code"].includes(provider) || typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("External session ownership requires a supported provider and exact session ID.");

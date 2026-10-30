@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **89/89 groups passed; 606 tests, 597 passed and 9
+- Integrated native Linux run: **90/90 groups passed; 612 tests, 603 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-8fee91b3-7573-4d8e-832a-769324f0de07.json`.
+  `.sxsy-verification/isolated-test-4b00536a-57e8-45e1-99af-51e640031fd7.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -155,6 +155,16 @@ DPAPI/lifecycle checks need a Windows host. Actual Microsoft 365 Graph account,
 license and permissions acceptance needs an approved tenant/account.
 
 ## Unfinished implementation
+
+New workspaces and legacy state without an explicit mode now default to keyboard-only.
+Portable imports cannot turn providers on. Companion selections must match the
+workspace's Personal or Work policy. Switching back pauses backend observation and
+voice, closes that compartment's owned design clients and example processes, and
+blocks pending native connection work from restarting after the stop. A real HTTP
+check started both bundled examples, switched the dedicated validation workspace
+to keyboard-only, verified both owned processes exited, and rejected another
+provider start. No keyboard interface or microphone was opened. Shared external
+coding runtimes are not killed by this cleanup; they remain outside its ownership.
 
 Workflow text edits now retain role/step identities through reordering. A renamed
 role gets a new identity rather than inheriting its old session authority. Saving

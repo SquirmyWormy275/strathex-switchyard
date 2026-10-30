@@ -15,6 +15,7 @@ import { createCopilot } from "./copilot.mjs";
 import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding } = {}) {
@@ -23,11 +24,23 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   copilot ??= createCopilot({ store });
   coding ??= createCodingSessions({ store });
   const custom = createCustomAgents({ store });
-  const examples = new Map();
+  const examples = new Map(), exampleGenerations = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
   let selectionLoaded = false;
   let selectionLoading;
+  let closed = false;
+  async function stopExample(compartment, example) {
+    const key = `${compartment}:${example}`, child = examples.get(key);
+    exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1);
+    const result = await stopOwnedChild(child);
+    if (child && result.stopped && examples.get(key) === child) examples.delete(key);
+    await store.update(compartment, "example-stopped", (s) => {
+      const a = s.agents.find((a) => a.id === `${example}-example`);
+      if (a) { a.reportedStatus = child && result.stopped ? "stopped" : "unknown"; a.lastSeen = null; a.provenance = child && result.stopped ? "owned bundled example process exited; external task outcome unverified" : "no owned example process observed in this runtime"; }
+    });
+    return { status: result.stopped ? (child ? "stopped" : "not-observed") : "stop-unconfirmed", evidence: result.evidence, taskCompletionVerified: false };
+  }
   async function initialize(id, policy) {
     if (started.has(id)) { if (policy !== undefined) await store.initialize(id, policy); return; }
     if (initializing.has(id)) { await initializing.get(id); if (policy !== undefined) await store.initialize(id, policy); return; }
@@ -77,6 +90,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     store, agents,
     agentMessage: (path, body, signature) => custom.message(path, body, signature),
     async handle(path, body = {}) {
+      if (closed) throw new Error("This local suite is closed.");
       const compartment = body.compartment ?? "personal";
       if (path === "/api/suite/bootstrap") {
         await loadSelection();
@@ -91,7 +105,21 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         }
         await store.selection(compartment); activeCompartment = compartment; return { id: compartment };
       }
-      if (path === "/api/suite/mode") { if (!["keyboard-only", "personal-companion", "managed-companion"].includes(body.mode)) throw new Error("Choose an explicit supported operating mode."); return store.update(compartment, "mode-select", (s) => { s.mode = body.mode; return { mode: s.mode, policyStillEnforced: true }; }); }
+      if (path === "/api/suite/mode") {
+        const result = await store.update(compartment, "mode-select", (s) => {
+          if (!["keyboard-only", s.policy === "work" ? "managed-companion" : "personal-companion"].includes(body.mode)) throw new Error("Choose keyboard-only or the companion mode matching this workspace's policy.");
+          s.mode = body.mode; s.modeSelectedAt = Date.now();
+          if (body.mode === "keyboard-only") { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; }
+          return { mode: s.mode, policyStillEnforced: true };
+        });
+        if (body.mode === "keyboard-only") {
+          clearInterval(monitors.get(compartment)); monitors.delete(compartment);
+          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voice.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
+          if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
+        }
+        return result;
+      }
       if (path === "/api/suite/coding/codex/discovery") return coding.discovery(compartment);
       if (path === "/api/suite/coding/codex/list") return coding.list(compartment);
       if (path === "/api/suite/coding/codex/bind") return coding.bind(compartment, body);
@@ -102,17 +130,13 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
       if (path === "/api/suite/agents/example/stop") {
         if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose a bundled owned example.");
-        await store.authorize(compartment, { provider: "custom-agent" });
-        const key = `${compartment}:${body.example}`, child = examples.get(key);
-        if (child && child.exitCode === null) await new Promise((resolve) => { const timer = setTimeout(() => { child.kill("SIGKILL"); }, 3000); child.once("close", () => { clearTimeout(timer); resolve(); }); child.kill(); });
-        examples.delete(key);
-        await store.update(compartment, "example-stopped", (s) => { const a = s.agents.find((a) => a.id === `${body.example}-example`); if (a) { a.reportedStatus = "stopped"; a.lastSeen = null; a.provenance = "owned example process stopped; external task outcome unverified"; } }, { provider: "custom-agent" });
-        return { status: "stopped", evidence: "owned bundled example process; not external task cancellation" };
+        return stopExample(compartment, body.example);
       }
       if (path === "/api/suite/agents/example") {
-        await store.authorize(compartment, { provider: "custom-agent" });
         if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose the bundled custom or LangChain example.");
         const key = `${compartment}:${body.example}`, existing = examples.get(key);
+        const generation = exampleGenerations.get(key) ?? 0;
+        await store.authorize(compartment, { provider: "custom-agent" });
         if (existing && existing.exitCode === null) return { status: "already-running", duplicatePrevented: true };
         const id = `${body.example}-example`, state = await store.snapshot(compartment);
         let enrollment;
@@ -122,6 +146,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         if (base.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(base.hostname) || base.pathname !== "/" || base.username || base.password) throw new Error("The example requires this workspace's loopback origin.");
         const file = fileURLToPath(new URL(body.example === "custom" ? "../../examples/custom-agent/agent.mjs" : "../../examples/langchain-agent/agent.py", import.meta.url));
         const executable = body.example === "custom" ? process.execPath : join(homedir(), ".local/share/strathex-switchyard/voice", process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python");
+        await store.authorize(compartment, { provider: "custom-agent" });
+        if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped before startup.");
         const child = spawn(executable, [...(body.example === "langchain" ? ["-I"] : []), file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: runtimeEnvironment() });
         examples.set(key, child); child.stdin.on("error", () => {}); child.on("error", () => { examples.delete(key); }); child.stdin.end(JSON.stringify({ ...enrollment, baseUrl: base.href }));
         return { status: "starting", agentId: id, provenance: "Wait for authenticated ready event before claiming availability" };
@@ -164,7 +190,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/copilot/discovery") return copilot.discovery(compartment);
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);
       if (path === "/api/suite/copilot/poll") return copilot.pollLogin(compartment, body.loginId);
-      if (path === "/api/suite/design") return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId });
+      if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId }); }
       if (path === "/api/suite/design/cancel") return agents.cancel(compartment, body.conversationId);
       if (path === "/api/suite/design/status") return agents.status(compartment, body.conversationId);
       if (path === "/api/suite/conversation/delete") return store.update(compartment, "conversation-delete", (s) => { s.conversations = s.conversations.filter((c) => c.id !== body.id); return { deleted: true }; });
@@ -192,7 +218,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         let chunk;
         await store.update(compartment, "voice-segment", (s) => { const v = voiceSession(s, body.id); const existing = v.chunks.find((c) => c.id === body.chunkId); if (existing) { chunk = existing; return; } if (!["recording", "paused"].includes(v.status)) throw new Error("This voice session cannot accept new audio."); if (v.chunks.length >= 1000) throw new Error("Voice session limit reached. Review this transcript and start a new session."); chunk = { id: body.chunkId, audio: body.audio, text: null, status: "pending" }; v.chunks.push(chunk); v.updatedAt = Date.now(); }, { operation: "record", provider: "local-transcription" });
         if (chunk.status === "transcribed") return { text: chunk.text, duplicate: true };
-        const transcription = await voice.transcribe(chunk.audio);
+        const transcription = await voice.transcribe(chunk.audio, { compartment, beforeStart: () => store.authorize(compartment, { operation: "record", provider: "local-transcription" }) });
         return store.update(compartment, "voice-transcribe", (s) => { const v = voiceSession(s, body.id), c = v.chunks.find((c) => c.id === body.chunkId); if (!c) throw new Error("Audio was deleted while transcription was running."); c.text = transcription.text; c.audio = null; c.status = "transcribed"; v.transcript = v.chunks.map((c) => c.text ?? "").join(" ").trim().slice(0, 160000); v.updatedAt = Date.now(); return { transcript: v.transcript, text: c.text, destination: "Local CPU; audio removed after successful transcription" }; }, { provider: "local-transcription" });
       }
       if (path === "/api/suite/voice/retry") { const s = await store.snapshot(compartment), v = voiceSession(s, body.id); for (const chunk of v.chunks.filter((c) => c.audio && c.status === "pending")) await this.handle("/api/suite/voice/segment", { compartment, id: v.id, audio: chunk.audio, chunkId: chunk.id }); return { retried: true }; }
@@ -232,6 +258,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { for (const timer of monitors.values()) clearInterval(timer); for (const child of examples.values()) child.kill(); agents.close(); }
+    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of examples.keys()) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.all([agents.close(), voice.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }
