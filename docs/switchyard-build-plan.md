@@ -1,0 +1,26 @@
+# Switchyard build sequence
+
+All accepted requirements remain tracked here. See the
+[continuation record](switchyard-status.md) for current receipts and next tasks.
+
+| Milestone | Work | Dependency / status |
+| --- | --- | --- |
+| A | Isolated integration; product split; runnable Studio; recorder and Codex work retained; live device discovery | In progress |
+| B | Shared proposal/direct model; compatibility review; private baseline; bounded host apply/readback/trial/restore; F77 identity and configuration | Host loop first; F77 currently absent |
+| C | Agent-authored proposals; workflow aggregates; exact Codex task controls; Claude Code hooks and exact sessions; Microsoft 365 Copilot investigation | Existing inventory retained; new adapter controls pending |
+| D | Portable profile migration; guest/keyboard-only and Copilot-only scenarios; Windows shortcuts/device access; native Windows verification | Portable model first; Windows host unavailable |
+| E | Leyden Jar variants; physical B122; original xwhatsit; solenoid/Num Lock evidence; broader observation and voice; SDK; macOS | Exact hardware and firmware evidence required |
+| Managed security | Enforced provider/account/endpoint policy; independent compartment keys; credential store; AEAD and key recovery; scoped handoffs; retention/deletion; redacted logs | Designed; no managed-client-data acceptance |
+| Distribution | Installer/update/uninstall/rollback; signed releases and key lifecycle; licensing and publication | Existing private B122 preview retained; new product packaging pending |
+| UX | One keyboard workspace; direct and conversation consistency; no mandatory model; accessible selection and responsive geometry; failures preserve work | First implementation in progress |
+| Observation | Tell me / Watch me / preset; optional recording sources; consent, pause/stop/review/delete/exclusions; reviewable transcripts and long-session recovery | Aggregate recorder retained; native audio/screen capture pending |
+| Integration breadth | Separate Codex, Claude Code/desktop, M365/GitHub Copilot, Cursor, Figma, LangChain/custom adapters; truthful capability/staleness reporting; no silent provider fallback | Closed focus action first; SDK and vendor controls pending |
+
+Tests must cover model migration, unsafe imports, conflicts, stale review,
+baseline failure, partial application/readback mismatch, recovery, and actual UI
+task completion. Use synthetic observations. Preserve Windows failures as
+platform-specific evidence rather than modifying Windows code to pass on Linux.
+
+No new files are moved solely for directory symmetry. Learn through
+[Use Switchyard](switchyard-configuration.md), [Alex's F77](../examples/alex-f77/README.md),
+and [Alex's B122](../examples/alex-b122/README.md).
