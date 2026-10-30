@@ -113,8 +113,10 @@ This is exact-session **focus**, with `taskResumptionVerified: false`. It does
 not submit work, restart a stopped task, identify a background attachment window,
 or support tmux/screen, shared Foot servers, other terminals or Windows windows.
 These cases fail explicitly without title matching or foreground typing.
-Terminal attachment, approved review/handoff submission and broader mediated
-execution remain implementation work. Background `--resume` can create a copy when a
+Terminal attachment and broader mediated execution remain implementation work.
+Stopped owned tasks now have a separate reviewed text-continuation backend; see
+the [native task walkthrough](native-coding-tasks.md). Its installed acceptance is
+running. Background `--resume` can create a copy when a
 conversation is running, so it is not used as an exact-resume shortcut. Native
 `attach <id>` is the supported direction for the unfinished terminal adapter.
 

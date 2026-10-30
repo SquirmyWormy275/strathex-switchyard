@@ -12,8 +12,8 @@ fallback account. File changes and command execution are outside this route.
 Saved native conversation context can be used by the model.
 
 The task controls below are backend APIs. The frontend is frozen for review;
-these new controls are not yet exposed there. Claude coding-task text submission,
-general interactive attachment and broader execution-authority mediation remain
+these new controls are not yet exposed there. Claude stopped-task text continuation uses the same protected review lifecycle;
+its native acceptance is running. General interactive attachment and broader execution-authority mediation remain
 unfinished. Claude configuration-design continuation is a separate working path.
 
 ## Follow one task
@@ -82,3 +82,40 @@ synthetic local records and staging. An uncertain outcome retains recovery data.
 It never claims external task completion or physical-key acceptance. See the
 [evidence and remaining work](switchyard-status.md) and
 [full requirement ledger](switchyard-requirements.md).
+
+
+## Continue a stopped Claude task
+
+Claude Code uses its separate `coding/claude/turns/` routes with the same
+`review`, `submit`, `list`, `cancel`, `outcome/review`, `outcome/resolve` and `delete`
+operations. The reviewed native version is 2.1.308. The target must be a registered
+Switchyard-created tools-disabled/plan background task with its full session UUID,
+original account/org fingerprint and native directory identity. Stop it first
+through the separate `coding/claude/stop/review` and `coding/claude/stop` route.
+Live, waiting and externally bound clients cannot receive text through this path.
+
+Each review/submission checks native auth and inventory. Print continuation uses
+safe mode, no tools/MCP/hooks/Chrome, plan mode and denied permission prompts.
+The returned native UUID must match, with a successful bounded result and no
+permission denials. Its provider envelope verifies the session; this contract has
+no Codex-style native turn acknowledgement. Records explicitly keep `turnId: null`
+and `nativeTurnIdSupported: false`; a local request UUID is not relabelled as a
+native turn ID. A changed post-turn account or wrong-session reply is not retained.
+
+The two providers share the protected approval/idempotency/retention/recovery
+code but retain distinct native adapters and action scopes. They cannot consume
+or delete each other's text records. Keyboard-only shutdown stops an owned print
+before reconciling its original background inventory. This is direct-child stop
+evidence; broader provider-tree containment remains separate implementation work.
+
+Run the installed journey in a Git directory already trusted by the native CLI:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-claude-submission-host.mjs --synthetic
+```
+
+It creates/stops one empty owned task, reviews one tiny prompt, checks the exact
+reply and duplicate/replay behavior, then restores keyboard-only mode and removes
+its synthetic local records. It never changes native workspace-trust settings,
+deletes native user history or grants file/command authority. Its native result
+is pending; the five Claude pipe/policy/recovery checks pass.

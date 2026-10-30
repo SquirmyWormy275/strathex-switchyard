@@ -85,7 +85,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
-      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions"].map((name) => [`tools/layout-studio/${name}.test.mjs`, 120_000]) : []),
+      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => [`tools/layout-studio/${name}.test.mjs`, 120_000]) : []),
       ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
@@ -101,7 +101,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];
     assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
-    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions"]) {
+    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"]) {
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "win32"), { timeoutMs: 120_000 });
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "linux"), {});
     }

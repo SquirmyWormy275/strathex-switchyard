@@ -1094,3 +1094,33 @@ for seven days, not an environment/model copy. Three orchestration/failure tests
 and all sixteen runner-contract checks pass. No additional runtime or model was
 downloaded onto the pilot machine. The complete Windows release and interactive
 native-account/window acceptance remain separately reported.
+
+
+The fresh-runtime manifest checkpoint passed **116 Linux groups, 820 tests: 811
+passed and 9 expected platform skips**, receipt
+`68f6caaf-f384-4e3c-94c7-a6ae2e89e7ee`. GitHub Linux verification also passed at
+2c2fec7 (run `41090133820`). Its native Windows run is queued as `41090133750`.
+
+## Reviewed stopped-task Claude text
+
+The separate Claude task-text adapter now verifies the original native account/
+org, exact directory identity and full UUID of a stopped Switchyard-owned
+background task. Live/waiting/external clients are refused. Continuation uses the
+reviewed 2.1.308 CLI with safe mode, tools/MCP/hooks/Chrome disabled, plan mode and
+denied permission prompts. The final successful JSON result must match the exact
+session, stay within its output bound and contain no permission denials. Auth is
+checked again before retaining the reply.
+
+This native envelope supplies a session UUID, not a Codex-style turn
+acknowledgement. Records explicitly report `nativeTurnIdSupported: false` and
+never invent a turn ID. Provider completion still does not verify coding-task
+completion. Both providers now use the same protected review/reservation/
+idempotency/retention/outcome lifecycle with distinct action/provider scopes;
+foreign-provider history cannot be consumed or deleted through another adapter.
+
+Workspace shutdown stops the owned print before reconciling background inventory,
+while preserving local uncertainty. Five Claude pipe/policy/identity/recovery
+checks and the shared Codex regressions pass. The combined native text,
+conversation and runner groups pass **52 focused tests**; TypeScript typecheck
+passes. General provider-tree containment is still unfinished beyond direct-child
+exit. Full integrated and installed stopped-task text acceptance are running.

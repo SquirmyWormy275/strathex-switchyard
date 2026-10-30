@@ -17,6 +17,7 @@ import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { resolveRuntimePaths } from "./runtime-storage.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { createCodexSubmissions } from "./codex-submissions.mjs";
+import { createClaudeSubmissions } from "./claude-submissions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createClaudeCoding } from "./claude-coding.mjs";
 import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
@@ -26,12 +27,13 @@ import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
 import { createReadoutProfiles } from "./readout-profiles.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
   coding ??= createCodingSessions({ store });
   codexSubmissions ??= createCodexSubmissions({ store });
+  claudeSubmissions ??= createClaudeSubmissions({ store });
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
   const voiceQueue = createVoiceQueue({ store, voice });
@@ -140,7 +142,10 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           pauseMonitor(compartment);
-          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          // Stop the exact print continuation before reconciling the original
+          // background inventory, which can briefly report the same session.
+          const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
+          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -168,6 +173,13 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/claude/focus") return claudeCoding.focus(compartment, body.id);
       if (path === "/api/suite/coding/claude/stop/review") return claudeCoding.reviewStop(compartment, body.id);
       if (path === "/api/suite/coding/claude/stop") return claudeCoding.stop(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/list") return claudeSubmissions.list(compartment);
+      if (path === "/api/suite/coding/claude/turns/review") return claudeSubmissions.review(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/submit") return claudeSubmissions.submit(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/cancel") return claudeSubmissions.cancel(compartment, body.requestId);
+      if (path === "/api/suite/coding/claude/turns/outcome/review") return claudeSubmissions.reviewOutcome(compartment, body.id);
+      if (path === "/api/suite/coding/claude/turns/outcome/resolve") return claudeSubmissions.resolveOutcome(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/delete") return claudeSubmissions.remove(compartment, body.id);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
       if (path === "/api/suite/agents/example/stop") {
@@ -319,6 +331,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
   };
 }
