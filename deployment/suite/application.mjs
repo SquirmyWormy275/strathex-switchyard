@@ -1,8 +1,9 @@
 /** One verified application owner, with private authenticated startup and stop. */
 import { spawn } from "node:child_process";
+import { desktopEnvironment as applicationEnvironment } from "../../tools/layout-studio/process-environment.mjs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { verifySuiteRelease } from "./release.mjs";
 import { withStateLock } from "../../tools/layout-studio/state-lock.mjs";
 import { privateDirectory, privateRead, privateWrite } from "../../tools/layout-studio/private-fs.mjs";
@@ -13,10 +14,7 @@ import { readOwnedFile } from "./owned-files.mjs";
 
 export const applicationStateRoot = () => join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA || join(homedir(), "AppData/Local") : join(homedir(), ".local/state")), "strathex-switchyard/application");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-export function applicationEnvironment(source = process.env) {
-  const allowed = new Set(["PATH", "HOME", "USER", "LOGNAME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "OS", "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)", "COMMONPROGRAMW6432", "ALLUSERSPROFILE", "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER", "USERNAME", "USERDOMAIN", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_CURRENT_DESKTOP", "DBUS_SESSION_BUS_ADDRESS", "HYPRLAND_INSTANCE_SIGNATURE"]);
-  return Object.fromEntries(Object.entries(source).filter(([key]) => allowed.has(key.toUpperCase())));
-}
+export { desktopEnvironment as applicationEnvironment } from "../../tools/layout-studio/process-environment.mjs";
 async function savedEndpoint(stateRoot) {
   await privateDirectory(stateRoot);
   try { const e = JSON.parse(await privateRead(join(stateRoot, "endpoint.json"))); endpointIdentity(e); return e; }
@@ -41,7 +39,7 @@ export async function serveApplication({ bundleRoot, port = 43177, stateRoot = a
     let intentEntry;
     if (process.env.SWITCHYARD_INSTALLATION_ROOT) {
       const root = process.env.SWITCHYARD_INSTALLATION_ROOT, installed = JSON.parse((await readOwnedFile(join(root, "installed.json"))).bytes.toString("utf8")), loader = join(root, "launch.mjs");
-      if (installed.schema !== "switchyard-installation/v1" || installed.current !== manifest.id || join(root, "versions", manifest.id) !== bundleRoot || installed.runtime.path !== process.execPath || installed.managedFiles.find((f) => f.role === "loader")?.sha256 !== (await readOwnedFile(loader))?.sha256) throw new Error("The stable installed intent entry did not verify.");
+      if (installed.schema !== "switchyard-installation/v1" || installed.current !== manifest.id || join(root, "versions", manifest.id) !== bundleRoot || installed.runtime.path !== await realpath(process.execPath) || installed.managedFiles.find((f) => f.role === "loader")?.sha256 !== (await readOwnedFile(loader))?.sha256) throw new Error("The stable installed intent entry did not verify.");
       intentEntry = [process.execPath, loader];
     }
     let resolveLife, rejectLife, stopping;

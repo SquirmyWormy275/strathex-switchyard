@@ -110,6 +110,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/integrations.test.mjs" },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/instance.test.mjs" },
+  { file: "tools/layout-studio/foreground.test.mjs" },
   { file: "tools/layout-studio/windows-host.test.mjs" },
   { file: "tools/layout-studio/state-lock.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },

@@ -8,7 +8,7 @@ import { privateDirectory } from "../../tools/layout-studio/private-fs.mjs";
 const shellQuote = (s) => `'${s.replaceAll("'", `'"'"'`)}'`;
 const desktopQuote = (s) => `"${s.replaceAll("%", "%%").replace(/[\\"`$]/g, (c) => `\\${c}`)}"`;
 export const stableLoader = Buffer.from(`// Switchyard installed entry. Managed by the verified suite installer.
-import {readFile,lstat} from 'node:fs/promises';
+import {readFile,lstat,realpath} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
@@ -18,7 +18,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 let pending;try{pending=JSON.parse((await plain(join(root,'pending.json'))).toString('utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
 if(pending&&process.argv[2]!=='recover')throw Error('A Switchyard installation transaction needs recovery before launch. Run switchyard recover.');
 const state=pending?{schema:'switchyard-installation/v1',current:pending.recoveryVersion,runtime:pending.runtime}:JSON.parse((await plain(join(root,'installed.json'))).toString('utf8'));
-if(state.schema!=='switchyard-installation/v1'||!/^[a-f0-9]{64}$/.test(state.current)||state.runtime?.version!==process.versions.node||state.runtime.path!==process.execPath||hash(await plain(process.execPath))!==state.runtime.sha256)throw Error('The installed application/runtime identity did not verify.');
+if(state.schema!=='switchyard-installation/v1'||!/^[a-f0-9]{64}$/.test(state.current)||state.runtime?.version!==process.versions.node||state.runtime.path!==await realpath(process.execPath)||hash(await plain(process.execPath))!==state.runtime.sha256)throw Error('The installed application/runtime identity did not verify.');
 const bundle=join(root,'versions',state.current),manifest=JSON.parse((await plain(join(bundle,'switchyard-release.json'))).toString('utf8'));
 const {id,...identity}=manifest;if(id!==state.current||hash(JSON.stringify(identity))!==id)throw Error('The installed release identity did not verify.');
 const checker=join(bundle,'deployment/suite/release.mjs'),entry=manifest.files.find(f=>f.path==='deployment/suite/release.mjs');

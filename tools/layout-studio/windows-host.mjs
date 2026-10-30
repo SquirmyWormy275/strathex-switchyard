@@ -4,21 +4,23 @@ import { randomUUID, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { compileConnection } from "./workspace.mjs";
 import { closedIntent } from "./physical-intent.mjs";
+import { desktopEnvironment } from "./process-environment.mjs";
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 
 export class WindowsNativeHotkeys {
-  constructor({ origin, token, executable = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)), spawnProcess = spawn }) {
+  constructor({ origin, token, executable = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)), spawnProcess = spawn, readOnly = false }) {
     this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
-    this.child = spawnProcess(executable, [], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
+    this.child = spawnProcess(executable, [], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => { this.buffer += chunk; if (this.buffer.length > 65536) { this.close(); return; } let end; while ((end = this.buffer.indexOf("\n")) >= 0) { let m; try { m = JSON.parse(this.buffer.slice(0, end)); } catch { this.close(); return; } this.buffer = this.buffer.slice(end + 1); const p = this.pending.get(m.id); if (p) { this.pending.delete(m.id); clearTimeout(p.timer); m.error ? p.reject(new Error(m.error)) : p.resolve(m.result); } } });
     this.child.on("error", () => this.close()); this.child.on("close", () => this.close()); this.child.stdin.on("error", () => this.close());
-    this.ready = this.request("initialize", { origin, token, parentPid: process.pid });
+    this.readOnly = readOnly;
+    this.ready = this.request("initialize", { origin, token, parentPid: process.pid, readOnly }).then((r) => { if (readOnly && (r.readOnly !== true || r.protocolVersion !== 2)) { this.close(); throw new Error("The native helper did not verify its read-only observation contract."); } return r; });
     void this.ready.catch(() => {});
   }
   request(method, body = {}) { if (this.closed) return Promise.reject(new Error("The Windows hotkey helper is unavailable.")); return new Promise((resolve, reject) => { const id = ++this.sequence, timer = setTimeout(() => { this.pending.delete(id); reject(new Error("Windows hotkey helper timed out.")); }, 10000); this.pending.set(id, { resolve, reject, timer }); this.child.stdin.write(`${JSON.stringify({ id, method, ...body })}\n`); }); }
-  async register(connection) { await this.ready; return this.request("register", { bindingId: connection.nativeId, modifiers: connection.windowsModifiers, virtualKey: connection.virtualKey, body: { implementation: connection.implementation, ...(connection.roleId ? { roleId: connection.roleId, intent: connection.intent } : {}) } }); }
-  async unregister(nativeId) { await this.ready; return this.request("unregister", { bindingId: nativeId }); }
+  async register(connection) { if (this.readOnly) throw new Error("This helper session permits category observation only."); await this.ready; return this.request("register", { bindingId: connection.nativeId, modifiers: connection.windowsModifiers, virtualKey: connection.virtualKey, body: { implementation: connection.implementation, ...(connection.roleId ? { roleId: connection.roleId, intent: connection.intent } : {}) } }); }
+  async unregister(nativeId) { if (this.readOnly) throw new Error("This helper session permits category observation only."); await this.ready; return this.request("unregister", { bindingId: nativeId }); }
   async status() { await this.ready; return this.request("status"); }
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error("Windows hotkeys disconnected. Saved configuration remains available for recovery.")); } this.pending.clear(); }
 }

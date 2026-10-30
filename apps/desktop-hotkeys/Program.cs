@@ -16,6 +16,7 @@ internal static class Program
     private static readonly HashSet<string> Intents = new() { "summon", "resume", "review", "handoff", "status", "cancel" };
     private static Uri? Origin;
     private static string Token = "";
+    private static bool ReadOnly;
     private sealed record Binding(int Id, uint Modifiers, uint VirtualKey, string Body);
     [StructLayout(LayoutKind.Sequential)] private struct Point { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct Message { public IntPtr Hwnd; public uint Id; public UIntPtr WParam; public IntPtr LParam; public uint Time; public Point Point; public uint Private; }
@@ -38,6 +39,7 @@ internal static class Program
             switch (request.GetProperty("method").GetString())
             {
                 case "register":
+                    if (ReadOnly) throw new InvalidOperationException("This helper session permits category observation only");
                     var keyId = request.GetProperty("bindingId").GetInt32();
                     var modifiers = request.GetProperty("modifiers").GetUInt32();
                     var virtualKey = request.GetProperty("virtualKey").GetUInt32();
@@ -53,11 +55,33 @@ internal static class Program
                     Write(new { id, result = new { registered = true, bindingId = keyId, keyboardLayout = "US 0409" } });
                     break;
                 case "unregister":
+                    if (ReadOnly) throw new InvalidOperationException("This helper session permits category observation only");
                     var removeId = request.GetProperty("bindingId").GetInt32();
                     if (!Bindings.ContainsKey(removeId) || !UnregisterHotKey(IntPtr.Zero, removeId)) throw new InvalidOperationException("Exact hotkey unregistration failed");
                     Bindings.Remove(removeId); Write(new { id, result = new { removed = true } }); break;
                 case "status":
                     Write(new { id, result = new { bindings = Bindings.Values.Select(b => new { bindingId = b.Id, modifiers = b.Modifiers, virtualKey = b.VirtualKey, body = JsonSerializer.Deserialize<JsonElement>(b.Body) }).ToArray() } }); break;
+                case "foreground-category":
+                    var window = GetForegroundWindow();
+                    _ = GetWindowThreadProcessId(window, out var processId);
+                    if (window == IntPtr.Zero || processId == 0) { Write(new { id, result = new { available = false, category = (string?)null, provenance = "Windows foreground process filename; no task identity", reason = "No foreground window is available in this Windows session" } }); break; }
+                    try
+                    {
+                        using var foregroundProcess = Process.GetProcessById(checked((int)processId));
+                        // The name is used in memory for this closed classification,
+                        // then discarded. Never query titles, paths or arguments.
+                        var category = foregroundProcess.ProcessName.ToLowerInvariant() switch
+                        {
+                            "windowsterminal" or "openconsole" or "conhost" or "wezterm-gui" or "alacritty" or "mintty" or "cmd" or "powershell" or "pwsh" or "wsl" or "bash" => "terminal",
+                            "code" or "code-insiders" or "codium" or "vscodium" => "vscode",
+                            "chatgpt" => "chatgpt", "claude" => "claude", "codex" => "codex",
+                            "msedge" or "chrome" or "brave" or "firefox" or "opera" => "browser",
+                            _ => "other"
+                        };
+                        Write(new { id, result = new { available = true, category, provenance = "Windows foreground process filename; no task identity" } });
+                    }
+                    catch { Write(new { id, result = new { available = false, category = (string?)null, provenance = "Windows foreground process filename; no task identity", reason = "The foreground process changed or could not be read" } }); }
+                    break;
                 case "stop":
                     Write(new { id, result = new { stopping = true } }); PostThreadMessageW(GetCurrentThreadId(), WmQuit, UIntPtr.Zero, IntPtr.Zero); break;
                 default: throw new InvalidOperationException("Unsupported helper operation");
@@ -88,10 +112,11 @@ internal static class Program
         var init = initialization.RootElement;
         if (init.GetProperty("method").GetString() != "initialize" || !Uri.TryCreate(init.GetProperty("origin").GetString(), UriKind.Absolute, out Origin) || Origin.Scheme != "http" || !(Origin.Host == "127.0.0.1" || Origin.Host == "localhost") || Origin.AbsolutePath != "/" || Origin.UserInfo != "") return 2;
         Token = init.GetProperty("token").GetString() ?? ""; if (!Regex.IsMatch(Token, "^[A-Za-z0-9_-]{43}$")) return 2;
+        ReadOnly = init.TryGetProperty("readOnly", out var readOnly) && readOnly.GetBoolean();
         var parent = Process.GetProcessById(init.GetProperty("parentPid").GetInt32()); var parentStart = parent.StartTime;
         var thread = GetCurrentThreadId(); PeekMessageW(out _, IntPtr.Zero, 0, 0, 0);
         using var watcher = new Timer(_ => { try { if (parent.HasExited || parent.StartTime != parentStart) PostThreadMessageW(thread, WmQuit, UIntPtr.Zero, IntPtr.Zero); } catch { PostThreadMessageW(thread, WmQuit, UIntPtr.Zero, IntPtr.Zero); } }, null, 1000, 1000);
-        Write(new { id = init.GetProperty("id").GetInt32(), result = new { initialized = true, platform = "windows", effects = "closed authenticated local intents only" } });
+        Write(new { id = init.GetProperty("id").GetInt32(), result = new { initialized = true, platform = "windows", protocolVersion = 2, readOnly = ReadOnly, effects = ReadOnly ? "closed foreground category observation only; no hotkey or input effects" : "closed authenticated local intents only" } });
         _ = Task.Run(() => { try { string? line; while ((line = Console.ReadLine()) != null) { if (line.Length > 16384) break; using var json = JsonDocument.Parse(line); Requests.Enqueue(json.RootElement.Clone()); PostThreadMessageW(thread, WmControl, UIntPtr.Zero, IntPtr.Zero); } } finally { PostThreadMessageW(thread, WmQuit, UIntPtr.Zero, IntPtr.Zero); } });
         try { while (GetMessageW(out var message, IntPtr.Zero, 0, 0) > 0) { if (message.Id == WmControl) while (Requests.TryDequeue(out var request)) Handle(request); else if (message.Id == WmHotkey && Bindings.TryGetValue((int)message.WParam.ToUInt64(), out var binding)) _ = Fire(binding); } }
         finally { foreach (var id in Bindings.Keys) UnregisterHotKey(IntPtr.Zero, id); Bindings.Clear(); Token = ""; }

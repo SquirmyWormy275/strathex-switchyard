@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **97/97 groups passed; 667 tests, 658 passed and 9
+- Integrated native Linux run: **98/98 groups passed; 672 tests, 663 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-e7b22711-8cae-4797-8b88-f9c01355f2cc.json`.
+  `.sxsy-verification/isolated-test-dae9b346-a74c-4c5d-adcf-6f1bba267fa9.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -389,3 +389,29 @@ merge revision `69b75f5f2229fbe5d644626cf71b543b52af9945`. Its downloadable arti
 was checked against `SHA256SUMS` and the exact C# source, then local duplicate
 verification/publish files were removed. Artifact retention is seven days. This
 adds Windows build evidence, not interactive native-window/device acceptance.
+
+## Current Windows verification and category observation
+
+At `5405fa3`, the native Windows backend step passed on run `41043775967`,
+including managed application startup, installation/update/rollback, exclusive
+state leases and exact file identity handling. The complete release failed four
+groups: a stable installed runtime path comparison under the release build's
+SUBST drive, two trusted-bootstrap PowerShell fixtures and the installed
+Compound Refresh effect. These are software failures, not hardware/account gates.
+The next checkpoint canonicalizes the runtime executable before comparing its
+identity, shortens owned fixtures for deep release exports and includes protected
+synthetic journal errors in the failing effect assertion. A bounded bootstrap
+output reader now permits its still-running owned writer. Native rerun is required.
+
+Windows foreground observation now has a native read-only helper contract.
+Only broad categories cross its pipe; it does not read window titles, arguments,
+URLs or text. Read-only helpers reject registration before any hotkey/layout
+operation. Explicit observation consent and workspace policy are checked before
+and after each sample. Pause/off/switch closes the owned helper; unavailable
+sources stop sampling with truthful state. Other deliberate sources can continue.
+Five software tests pass. The actual C# source compiled locally with .NET 8.0.424
+without warnings/errors; private receipt
+`runtime-verification/windows-observer-build-1793358542437.json`.
+The Windows workflow now exercises the built helper's read-only handshake,
+category response, native registration rejection and process exit. Its result is
+pending and is distinct from interactive Windows acceptance.

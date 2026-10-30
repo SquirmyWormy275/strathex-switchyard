@@ -20,7 +20,7 @@ import { createClaudeCoding } from "./claude-coding.mjs";
 import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -28,6 +28,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
   const voiceQueue = createVoiceQueue({ store, voice });
+  foreground ??= process.platform === "linux" ? { implemented: true, read: async (c, beforeStart) => { await beforeStart(); return { available: true, category: surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), provenance: "Hyprland application class; no task identity" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} } : { implemented: false };
   const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
@@ -78,18 +79,30 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   }
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
   const voiceSession = (s, id) => { const found = s.voice.find((o) => o.id === id); if (!found) throw new Error("That voice session is unavailable in this compartment."); return found; };
+  function pauseMonitor(compartment) { if (monitors.has(compartment)) clearForeground(monitors.get(compartment)); monitors.delete(compartment); }
   function monitor(compartment, id) {
-    if (monitors.has(compartment)) clearInterval(monitors.get(compartment));
-    let pending = false, last = Date.now();
-    const timer = setInterval(async () => {
+    pauseMonitor(compartment);
+    let pending = false, last = Date.now(), unavailable = 0;
+    const current = () => !closed && monitors.get(compartment) === timer;
+    const authorize = async () => { if (!current()) throw new Error("Observation stopped."); await store.authorize(compartment, { operation: "record" }); if (!current()) throw new Error("Observation stopped."); };
+    const timer = scheduleForeground(async () => {
       if (pending) return; pending = true;
       try {
-        const category = surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), at = Date.now();
-        await store.update(compartment, "focus-category", (s) => { const o = session(s, id); if (o.status !== "recording" || !o.sources.includes("foreground-category") || o.exclusions.includes(category)) return; o.focusCategories[category] = (o.focusCategories[category] ?? 0) + Math.max(0, Math.min(60000, at - last)); o.updatedAt = at; }, { operation: "record" }); last = at;
-      } catch { clearInterval(timer); monitors.delete(compartment); }
+        await authorize(); const result = await foreground.read(compartment, authorize), at = Date.now(); await authorize();
+        if (!result.available) { last = at; if (++unavailable < 3) return; throw new Error("Foreground unavailable."); }
+        if (!["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"].includes(result.category)) throw new Error("Unsupported foreground category.");
+        unavailable = 0;
+        await store.update(compartment, "focus-category", (s) => { const o = session(s, id); if (!current() || o.status !== "recording" || !o.sources.includes("foreground-category")) return; o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "sampling", provenance: result.provenance, at, timing: "two-second sampled category estimate; no task or content inference" }; if (!o.exclusions.includes(result.category)) o.focusCategories[result.category] = (o.focusCategories[result.category] ?? 0) + Math.max(0, Math.min(60000, at - last)); o.updatedAt = at; }, { operation: "record" }); last = at;
+      } catch {
+        if (current()) {
+          pauseMonitor(compartment);
+          try { await store.update(compartment, "focus-unavailable", (s) => { const o = session(s, id); o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "unavailable", reason: "Foreground categories are unavailable. Pause and deliberately resume to retry.", at: Date.now() }; if (o.sources.length === 1 && o.status === "recording") o.status = "paused"; }, { operation: "record" }); } catch { /* A policy change or deletion wins over a late sample. */ }
+          try { await foreground.stopCompartment?.(compartment); } catch { /* The source is already marked unavailable; no automatic restart. */ }
+        }
+      }
       finally { pending = false; }
     }, 2000);
-    timer.unref(); monitors.set(compartment, timer);
+    timer.unref?.(); monitors.set(compartment, timer);
   }
   return {
     store, agents,
@@ -105,7 +118,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (!started.has(compartment)) { const list = await store.list(); if (!list.some((c) => c.id === compartment)) throw new Error("Choose or create this compartment first."); await initialize(compartment); }
       if (path === "/api/suite/compartment/select") {
         if (activeCompartment !== compartment) {
-          clearInterval(monitors.get(activeCompartment)); monitors.delete(activeCompartment);
+          pauseMonitor(activeCompartment); await foreground.stopCompartment?.(activeCompartment);
           await store.update(activeCompartment, "compartment-suspend-sources", (s) => { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; });
         }
         await store.selection(compartment); activeCompartment = compartment; return { id: compartment };
@@ -118,8 +131,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
           return { mode: s.mode, policyStillEnforced: true };
         });
         if (body.mode === "keyboard-only") {
-          clearInterval(monitors.get(compartment)); monitors.delete(compartment);
-          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          pauseMonitor(compartment);
+          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -222,14 +235,14 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/observation/start") {
         const sources = body.sources;
         if (body.consent !== true || !Array.isArray(sources) || !sources.length || sources.some((s) => !["deliberate", "foreground-category", "agent-events"].includes(s)) || !Array.isArray(body.exclusions) || body.exclusions.some((s) => !["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"].includes(s))) throw new Error("Choose observation sources and exclusions and explicitly start a session.");
-        if (process.platform !== "linux" && sources.includes("foreground-category")) throw new Error("Foreground category sampling is not yet implemented on this platform. Deliberate and agent-event observation remain available.");
+        if (!foreground.implemented && sources.includes("foreground-category")) throw new Error("Foreground category sampling requires the supported native platform adapter. Deliberate and agent-event observation remain available.");
         const o = { id: randomUUID(), status: "recording", sources, exclusions: body.exclusions, events: [], focusCategories: {}, createdAt: Date.now(), updatedAt: Date.now() };
         await store.update(compartment, "observation-start", (s) => { if (s.observations.some((o) => ["recording", "paused"].includes(o.status))) throw new Error("Stop or resume the existing session first."); s.observations.push(o); }, { operation: "record" });
         if (sources.includes("foreground-category")) monitor(compartment, o.id);
         return o;
       }
       if (path === "/api/suite/observation/mark") return store.update(compartment, "observation-mark", (s) => { const o = session(s, body.id); if (o.status !== "recording" || !o.sources.includes("deliberate") || !kinds.includes(body.kind)) throw new Error("Start deliberate observation and choose a supported event kind."); if (o.events.length >= 2000) throw new Error("Session event limit reached. Stop and review this session."); o.events.push({ kind: body.kind, provenance: "user-marked", at: Date.now() }); o.updatedAt = Date.now(); return observationSummary(o); }, { operation: "record" });
-      if (path === "/api/suite/observation/state") return store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); o.status = body.status; o.updatedAt = Date.now(); clearInterval(monitors.get(compartment)); monitors.delete(compartment); if (o.status === "recording" && o.sources.includes("foreground-category")) monitor(compartment, o.id); return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {});
+      if (path === "/api/suite/observation/state") { let shouldMonitor = false; const result = await store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); o.status = body.status; o.updatedAt = Date.now(); shouldMonitor = o.status === "recording" && o.sources.includes("foreground-category"); return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {}); pauseMonitor(compartment); if (shouldMonitor) monitor(compartment, body.id); else await foreground.stopCompartment?.(compartment); return result; }
       if (path === "/api/suite/observation/delete") return store.update(compartment, "observation-delete", (s) => { const o = session(s, body.id); if (o.status === "recording") throw new Error("Stop the session before deleting its data."); s.observations = s.observations.filter((o) => o.id !== body.id); return { deleted: true }; });
       if (path === "/api/suite/voice/start") {
         await store.authorize(compartment, { operation: "record", provider: "local-transcription" });
@@ -276,6 +289,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }
