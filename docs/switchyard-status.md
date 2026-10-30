@@ -1431,3 +1431,21 @@ changed. Complete Linux acceptance at `dc5f699` is 119/119 groups, 858 tests:
 849 passed and nine platform skips; receipt 775a1344-2f6b-4a7e-9be1-0126fa7df482.
 Designer subprocess and metadata paths outside this coding-task service still
 require lifecycle work.
+
+## Shared native Claude metadata supervision
+
+The shared version/account/inventory probes used by configuration conversations
+and reviewed coding text now use the same owned guardian. Their exact clients
+join the caller's existing stop/quarantine mechanism; unverified guardian exit
+retains the complete owned client rather than only its direct process. Policy
+and generation checks run again before target start and before retaining output.
+Fixed argument vectors, operation-specific output caps, no stdin and discarded
+stderr keep this a metadata-only contract. Ownership tracking failure prevents
+target start and closes its unused client. Successfully reconciled probe clients
+are removed from auxiliary ownership tracking.
+
+Six new shared-metadata boundary tests plus the affected design/text, suite,
+native guardian and verification-runner tests pass: 74 focused checks with no
+skips. Typecheck passes. Native shared-probe and installed text regression are
+next. Configuration designer model subprocess containment remains unfinished;
+this checkpoint does not claim general provider containment is complete.

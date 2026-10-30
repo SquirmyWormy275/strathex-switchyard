@@ -13,6 +13,16 @@ import { stopOwnedChild } from "./owned-process.mjs";
 
 const plan = () => newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] }));
 const response = { reply: "Synthetic reviewed process", summary: "Review", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] };
+function metadataCommand(spawnProcess) {
+  return async (exe, args, options) => {
+    await options.onGuardianReady({ schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 1234, birth: "1", containment: process.platform === "win32" ? "windows-job" : "owned-linux-session" });
+    const child = spawnProcess(exe, args, { cwd: options.cwd, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "ignore"], env: options.env }); options.onGuardianChild(child);
+    let stdout = ""; child.stdout.setEncoding("utf8"); child.stdout.on("data", b => { stdout += b; });
+    const closed = new Promise(resolve => child.once("close", resolve)), abort = () => child.kill(); options.signal.addEventListener("abort", abort, { once: true }); if (options.signal.aborted) abort();
+    try { const exitCode = await closed; return { status: exitCode === 0 ? "completed" : "failed", exitCode, stdout, stderr: "", treeExitVerified: true, inputDelivered: true }; }
+    finally { options.signal.removeEventListener("abort", abort); }
+  };
+}
 async function fixture(fn) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-claude-design-")), keys = new Map(), calls = [], children = [];
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });
@@ -25,7 +35,7 @@ async function fixture(fn) {
     const child = spawn(process.execPath, ["-e", `const s=JSON.parse(process.argv[1]);if(s.design){process.stdin.resume();process.stdin.on('end',()=>process.stdout.write(s.value))}else if(s.delay)setTimeout(()=>process.stdout.write(s.value),30000);else process.stdout.write(s.value)`, JSON.stringify({ design, delay: args[0] === "auth" && settings.delayAuth, value })], options);
     children.push(child); if (design) settings.afterDesign(); return child;
   };
-  const agents = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic/claude", spawnProcess });
+  const agents = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic/claude", spawnProcess, command: metadataCommand(spawnProcess), guardianStopped: async () => true });
   const design = (conversationId) => agents.design({ compartment: "personal", provider: "claude-code", message: "Synthetic text only", plan: plan(), conversationId });
   try { await fn({ store, agents, settings, calls, design, root, spawnProcess }); }
   finally { await agents.close(); for (const child of children) await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
@@ -62,6 +72,8 @@ test("workspace stop terminates an owned login probe before any native design pr
   assert.equal((await agents.stopCompartment("personal")).stopped, true); await rejected;
   assert.equal(calls.some((c) => c.args.includes("-p")), false);
 }));
-test("an unconfirmed Claude login probe exit retains its exact owned child for quarantine", () => fixture(async ({ root, spawnProcess }) => {
-  let observed; await assert.rejects(readClaudeDesignLogin("/synthetic/claude", root, { spawnProcess, onChild: (child) => { observed = child; }, stopChild: async () => ({ stopped: false }) }), (e) => /probe.*exit/.test(e.message) && e.ownedChild === observed);
+test("an unconfirmed Claude login probe exit retains its exact owned guardian client for quarantine", () => fixture(async ({ root, spawnProcess }) => {
+  let observed;
+  const base = metadataCommand(spawnProcess), command = async (...args) => ({ ...await base(...args), treeExitVerified: false });
+  await assert.rejects(readClaudeDesignLogin("/synthetic/claude", root, { command, onClient: (client) => { observed = client; }, guardianStopped: async () => false, stopChild: async () => ({ stopped: false }) }), (e) => /probe.*exit/.test(e.message) && e.ownedClient === observed);
 }));

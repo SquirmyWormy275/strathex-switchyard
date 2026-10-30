@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { deniedCodexServerRequest } from "./codex-requests.mjs";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { readClaudeDesignLogin } from "./claude-account.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
@@ -127,21 +128,22 @@ export class CodexClient extends EventEmitter {
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }
 
-export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin, now = () => Date.now() } = {}) {
+export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, now = () => Date.now() } = {}) {
   const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map(), auxiliaryChildren = new Map();
   let closed = false;
-  const confirmStop = async (child) => { try { return (await stopChild(child)).stopped === true; } catch { return false; } };
+  const confirmStop = async (child) => { try { return typeof child?.stop === "function" ? await child.stop() === true : (await stopChild(child)).stopped === true; } catch { return false; } };
   function retainUnconfirmed(compartment, child) { if (!child) return; const pending = unconfirmed.get(compartment) ?? new Set(); pending.add(child); unconfirmed.set(compartment, pending); }
   async function settleUnconfirmed(compartment) {
-    const remaining = new Set(); for (const child of unconfirmed.get(compartment) ?? []) if (!(await confirmStop(child))) remaining.add(child);
+    const remaining = new Set(); for (const child of unconfirmed.get(compartment) ?? []) { if (!(await confirmStop(child))) remaining.add(child); else auxiliaryChildren.get(compartment)?.delete(child); }
+    if (!auxiliaryChildren.get(compartment)?.size) auxiliaryChildren.delete(compartment);
     if (remaining.size) { unconfirmed.set(compartment, remaining); throw new Error("A previous owned provider process has not verified exit. No replacement was launched."); }
     unconfirmed.delete(compartment);
   }
   async function claudeLogin(compartment, executable, cwd, generation) {
-    try { return await readClaudeLogin(executable, cwd, { spawnProcess, stopChild, checkCurrent: () => currentGeneration(compartment, generation),
-      onChild: (child) => { const owned = auxiliaryChildren.get(compartment) ?? new Set(); owned.add(child); auxiliaryChildren.set(compartment, owned); },
-      onStopped: (child) => { const owned = auxiliaryChildren.get(compartment); owned?.delete(child); if (!owned?.size) auxiliaryChildren.delete(compartment); }
-    }); } catch (error) { retainUnconfirmed(compartment, error.ownedChild); throw error; }
+    try { return await readClaudeLogin(executable, cwd, { command, guardianStopped, stopChild, authorize: () => store.authorize(compartment, { provider: "claude-code" }), checkCurrent: () => currentGeneration(compartment, generation),
+      onClient: (child) => { const owned = auxiliaryChildren.get(compartment) ?? new Set(); owned.add(child); auxiliaryChildren.set(compartment, owned); },
+      onStoppedClient: (child) => { const owned = auxiliaryChildren.get(compartment); owned?.delete(child); if (!owned?.size) auxiliaryChildren.delete(compartment); }
+    }); } catch (error) { retainUnconfirmed(compartment, error.ownedClient ?? error.ownedChild); throw error; }
   }
   function currentGeneration(compartment, generation) { if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("This compartment's design request was stopped. Your draft is preserved."); }
   async function codex(compartment) {

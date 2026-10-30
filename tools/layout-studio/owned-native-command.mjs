@@ -23,7 +23,8 @@ export async function runOwnedNativeCommand({ executable, args, cwd, env, text, 
       this.closed = true; return true;
     }
   };
-  resource.clients.add(client);
+  try { resource.clients.add(client); }
+  catch (error) { controller.abort(); settled = true; signal?.removeEventListener("abort", aborted); throw error; }
   operation = Promise.resolve().then(() => command(executable, args, { cwd, env, inputText: text, signal: controller.signal, captureStderrBytes, maxOutputBytes, detailed: true, timeout,
     onGuardianChild: child => { client.child = child; },
     onGuardianReady: async frame => { scope = guardianScope(frame); await onReady(scope); }

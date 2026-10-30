@@ -142,6 +142,7 @@ export const requiredGroups = [
   // Protected Windows fault matrices each start many short native lock helpers.
   // Keep their cold-process allowance bounded without relaxing assertions/skips.
   { file: "tools/layout-studio/agents-claude.test.mjs", ...nativeTestOverrides("tools/layout-studio/agents-claude.test.mjs") },
+  { file: "tools/layout-studio/claude-account.test.mjs" },
   { file: "tools/layout-studio/conversation-bindings.test.mjs", ...nativeTestOverrides("tools/layout-studio/conversation-bindings.test.mjs") },
   { file: "tools/layout-studio/codex-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/codex-submissions.test.mjs") },
   { file: "tools/layout-studio/claude-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-submissions.test.mjs") },

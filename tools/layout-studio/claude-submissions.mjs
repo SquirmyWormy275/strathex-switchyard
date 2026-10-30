@@ -1,5 +1,4 @@
 /** Claude-specific stopped-session continuation; no native turn ID is invented. */
-import { spawn } from "node:child_process";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runOwnedNativeCommand, guardianScope } from "./owned-native-command.mjs";
 import { verifiedClaudeTaskReply } from "./claude-task-result.mjs";
@@ -11,7 +10,7 @@ import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { createReviewedTaskText } from "./reviewed-task-text.mjs";
 import { desktopEnvironment } from "./process-environment.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
-export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnProcess = spawn, stopChild = stopOwnedChild, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, now = () => Date.now() } = {}) {
+export function createClaudeSubmissions({ store, resolveCli = trustedCli, stopChild = stopOwnedChild, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, now = () => Date.now() } = {}) {
   async function reconcileSaved(compartment, authorize = async () => {}) {
     for (const saved of (await store.snapshot(compartment)).codingTurns ?? []) {
       if (saved.provider !== "claude-code" || !saved.ownedRuntime || saved.ownedRuntimeStoppedVerified === true) continue;
@@ -42,9 +41,7 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
     async openTask({ compartment, task, resource, current, authorize }) {
       await reconcileSaved(compartment, authorize);
       const executable = await resolveCli("claude-code"); await authorize();
-      const children = new Map();
-      const register = (child) => { const owned = { child, closed: false, close() { if (this.closed) return; this.closed = true; try { child.kill(); } catch { /* bounded owned stop determines exit */ } } }; children.set(child, owned); resource.clients.add(owned); };
-      const options = { spawnProcess, stopChild, checkCurrent: current, onChild: register, onStopped: (child) => { const owned = children.get(child); if (owned) { owned.closed = true; resource.clients.delete(owned); children.delete(child); } } };
+      const options = { command, guardianStopped, stopChild, resource, authorize, checkCurrent: current };
       async function login() {
         await authorize(); const login = await readClaudeDesignLogin(executable, task.repositoryRoot, options); await authorize();
         if (login.fingerprint !== task.accountFingerprint) throw new Error("The native Claude account changed. No task context was redirected.");
