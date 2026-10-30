@@ -9,7 +9,7 @@ const uid = userInfo().uid, maxBytes = 8 * 1024 * 1024;
 export async function directoryIdentity(path, { platform = process.platform, readStats = lstat, resolvePath = realpath } = {}) {
   if (typeof path !== "string" || /[\0\r\n]/.test(path)) throw new Error("Private storage directory path is invalid.");
   if (platform === "win32" && (!/^[A-Za-z]:[\\/]/.test(path) || path.slice(2).includes(":") || path.split(/[\\/]/).some((p) => p === "." || p === ".."))) throw new Error("Private storage needs a local drive path without directory redirection.");
-  const s = await readStats(path);
+  const s = await readStats(path, { bigint: true });
   if (!s.isDirectory() || s.isSymbolicLink()) throw new Error("Private storage ownership or permissions are invalid.");
   const canonical = await resolvePath(path);
   if (platform !== "win32") {
@@ -18,11 +18,11 @@ export async function directoryIdentity(path, { platform = process.platform, rea
     if (win32.parse(canonical).root.toLowerCase() !== win32.parse(path).root.toLowerCase()) throw new Error("Private storage needs a local drive path without directory redirection.");
     let current = win32.normalize(path);
     while (true) {
-      const entry = await readStats(current);
+      const entry = await readStats(current, { bigint: true });
       if (!entry.isDirectory() || entry.isSymbolicLink()) throw new Error("Private storage directory links are prohibited.");
       const parent = win32.dirname(current); if (parent === current) break; current = parent;
     }
-    const actual = await readStats(canonical);
+    const actual = await readStats(canonical, { bigint: true });
     if (actual.dev !== s.dev || actual.ino !== s.ino) throw new Error("Private storage directory identity changed during validation.");
   }
   return s;
@@ -31,14 +31,14 @@ export async function privateDirectory(path) {
   if (!isAbsolute(path)) throw new Error("Private storage needs an absolute path.");
   await mkdir(path, { recursive: true, mode: 0o700 });
   const s = await directoryIdentity(path);
-  if (process.platform !== "win32" && (s.uid !== uid || (s.mode & 0o077))) throw new Error("Private storage ownership or permissions are invalid.");
+  if (process.platform !== "win32" && (Number(s.uid) !== uid || (Number(s.mode) & 0o077))) throw new Error("Private storage ownership or permissions are invalid.");
 }
 export async function privateRead(path, { openFile = open, statName = lstat } = {}) {
-  const safe = (s) => s.isFile() && !s.isSymbolicLink() && s.size <= maxBytes && (process.platform === "win32" || s.uid === uid && !(s.mode & 0o077));
+  const safe = (s) => s.isFile() && !s.isSymbolicLink() && s.size <= maxBytes && (process.platform === "win32" || Number(s.uid) === uid && !(Number(s.mode) & 0o077));
   for (let attempt = 0; attempt < 4; attempt++) {
     const f = await openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     try {
-      const s = await f.stat(), named = await statName(path);
+      const s = await f.stat({ bigint: true }), named = await statName(path, { bigint: true });
       if (!safe(s) || !safe(named)) throw new Error("Private storage file is unsafe or oversized.");
       // An atomic writer can replace the name between open() and lstat(). Reopen
       // the new safe file, never accept an unverified descriptor or a link.

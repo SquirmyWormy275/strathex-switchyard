@@ -1,5 +1,9 @@
 $ErrorActionPreference = 'Stop'
-$text = [Console]::In.ReadToEnd()
+$utf8 = [Text.UTF8Encoding]::new($false)
+$inputPipe = [IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8)
+$outputPipe = [IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8)
+$outputPipe.AutoFlush = $true
+$text = $inputPipe.ReadToEnd()
 if ($text.Length -gt 8192) { throw 'Shortcut request exceeds its bound.' }
 $v = $text | ConvertFrom-Json
 foreach ($path in @($v.path, $v.nodePath, $v.loader, $v.directory)) {
@@ -21,5 +25,5 @@ try {
     try {
         if ($read.TargetPath -ine $v.nodePath -or $read.Arguments -cne $arguments -or $read.WorkingDirectory -ine $v.directory) { throw 'Native shortcut target readback failed.' }
     } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($read) | Out-Null }
-    [Console]::Out.WriteLine('VERIFIED')
+    $outputPipe.WriteLine('VERIFIED')
 } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, open, lstat, rename, readdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { directoryIdentity, privateWrite, privateRead } from "./private-fs.mjs";
 
@@ -35,13 +35,13 @@ test("a private read retries a changed safe name without treating an old descrip
       openFile: async (...args) => { const f = await open(...args); if (++calls === 1 && process.platform !== "win32") await privateWrite(path, '{"value":"after"}'); return f; },
       // Windows prevents replacing an open destination. Exercise the changed-
       // name check directly there; the next test covers its real sharing errors.
-      statName: async (p) => { const s = await lstat(p); if (process.platform === "win32" && calls === 1) s.ino += 1; return s; }
+      statName: async (p) => { const s = await lstat(p, { bigint: true }); if (process.platform === "win32" && calls === 1) s.ino += 1n; return s; }
     });
     assert.equal(value, process.platform === "win32" ? '{"value":"before"}' : '{"value":"after"}'); assert.equal(calls, 2);
     let attempts = 0;
-    await assert.rejects(privateRead(path, { statName: async (p) => { attempts++; const s = await lstat(p); s.ino += 1; return s; } }), /changed repeatedly/);
+    await assert.rejects(privateRead(path, { statName: async (p) => { attempts++; const s = await lstat(p, { bigint: true }); s.ino += 1n; return s; } }), /changed repeatedly/);
     assert.equal(attempts, 4);
-    await assert.rejects(privateRead(path, { statName: async (p) => { const s = await lstat(p); s.isSymbolicLink = () => true; return s; } }), /unsafe/);
+    await assert.rejects(privateRead(path, { statName: async (p) => { const s = await lstat(p, { bigint: true }); s.isSymbolicLink = () => true; return s; } }), /unsafe/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
@@ -63,4 +63,10 @@ test("Windows sharing failures retry atomic promotion with the old state intact,
     if (process.platform === "win32") assert.ok(attempts > 1, "native Windows must exercise retry while the destination is open");
     assert.equal(await privateRead(path), "native reader released");
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("private reads distinguish adjacent 64-bit file identities beyond JavaScript's safe integer range", async () => {
+  const first = 2n ** 60n, uid = BigInt(userInfo().uid), stats = (ino) => ({ ino, dev: 1n, uid, mode: 0o100600n, size: 2n, isFile: () => true, isSymbolicLink: () => false }); let calls = 0;
+  const value = await privateRead("synthetic-owned-path", { openFile: async () => { const ino = ++calls === 1 ? first : first + 1n; return { stat: async () => stats(ino), readFile: async () => "ok", close: async () => {} }; }, statName: async () => stats(first + 1n) });
+  assert.equal(Number(first), Number(first + 1n), "the fixture must exhibit lossy Number identity"); assert.equal(calls, 2); assert.equal(value, "ok");
 });

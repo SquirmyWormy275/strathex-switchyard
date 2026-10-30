@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **97/97 groups passed; 664 tests, 655 passed and 9
+- Integrated native Linux run: **97/97 groups passed; 667 tests, 658 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-989e853f-fe91-452e-838c-5210e570d2ad.json`.
+  `.sxsy-verification/isolated-test-c1579860-23fc-4385-b51b-22a68c0ca50f.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -289,8 +289,7 @@ Installed host commands use a verified stable loader rather than a retired
 version path. Uninstall retains protected data/runtime and refuses active host
 connections until they are restored, so automatic connection restoration remains
 unfinished. Pre-promotion crash cleanup and broader provider containment remain
-implementation work. The next step is actual installation/entry verification on
-the pilot workstation; no pilot installation is claimed by these fixture tests.
+implementation work. Actual pilot installation is recorded below.
 
 Windows CI at `880d1f2` failed the three managed-application startup cases before
 the complete release step. Existing backend cases continued to pass. Startup now
@@ -298,6 +297,27 @@ emits only bounded allowlisted stage labels over a separate private pipe, and
 temporary fixture cleanup tolerates a bounded delay for released Windows handles.
 The next native run must identify and fix the actual startup failure. It is a
 software defect, separate from unavailable interactive Windows hardware/accounts.
+
+At `2026-10-30T10:29:30Z`, the private pilot installation from `215f351` passed
+actual command launch, desktop-file validation, protected validation-workspace
+access, verified stop, restart and parallel-launch reuse. It serves the original
+frozen frontend at the same private review URL. Program release
+`009a13bacd20beea3c35b683a4444df786e641346973aa89068c11382442fd03`
+contains 347 files totaling 2,126,459 bytes. Only the installed working version
+was retained; the two source bundle copies were removed. Dated launcher evidence
+is under `application/installation-backups/2026-10-30T10-28-44.050Z-81b17b5f-f9cb-4ddf-835b-28bb6b895a08/`;
+the private host receipt is `runtime-verification/installed-suite-1793356170285.json`.
+Browser visual/click and actual keyboard acceptance remain open.
+
+Pre-promotion copy recovery now has a private exact-inventory descriptor and
+checks complete hashes or verified source prefixes before removing an interrupted
+copy. A forced-copy-exit test preserves unrelated content, then recovers the
+known partial copy without changing the active installation.
+The latest Windows run at `215f351` narrowed startup to the ownership handshake
+and exposed permission-field recovery and lossy numeric file-ID checks. Helpers
+now use explicit UTF-8 raw pipes, exact 64-bit file identities and platform-aware
+permission metadata. A detached/no-console kernel-lock test was added. Those
+Windows fixes still require the next native run; no pass is inferred.
 
 ## Branch and handover
 
@@ -307,7 +327,8 @@ worktrees. Integrated checkpoints precede the current continuation. Revision 2
 handover SHA-256:
 `8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`.
 No upstream merge, public release, firmware flash, reset, bootloader action,
-solenoid adjustment or persistent desktop modification has been performed here.
+solenoid adjustment has been performed here. The private pilot application entry
+and its dated installation backups are described above.
 
 ## Next three executable tasks
 
@@ -318,8 +339,7 @@ solenoid adjustment or persistent desktop modification has been performed here.
 2. Complete remaining controller capabilities: tap-dance/combo/encoder/settings
    transactions, exact source/model reconciliation and their failure/recovery
    tests. Keep all physical F77/B122 checks separately pending.
-3. Exercise the installed pilot entry, fix native Windows managed startup and
-   finish automatic connection restoration, pre-promotion cleanup and runtime
+3. Fix native Windows managed startup and finish automatic connection restoration and runtime
    maintenance. Then complete profile compatibility metadata and dynamic
    assignment legends. The frontend remains frozen for the user's morning review;
    task/device/role UI work is still required in the next frontend iteration.

@@ -109,6 +109,10 @@ journal precedes replacement. Failed writes restore the previous entry bytes;
 writing anything. A committed update whose final cleanup was interrupted is
 kept. Unowned or subsequently edited launchers are preserved. Unknown/modified
 program contents are retained and reported as pending cleanup.
+Pre-promotion recovery also records the exact staging inventory. Completed files
+must match their hashes; an incomplete copy must match the exact prefix of an
+independently verified source. Unrelated staging content is preserved before
+any deletion.
 
 Uninstall removes only matching owned launchers and verified program versions.
 Protected workspace data, OS credential entries and the shared optional runtime
@@ -120,11 +124,22 @@ restoration as part of uninstall is still unfinished.
 ## Implementation and acceptance still in progress
 
 Linux installer tests exercise real installed application processes through
-update and rollback, seven failure/recovery scenarios, a forced installer exit
-and preserved protected/runtime files. Actual pilot desktop-entry/launch
-acceptance is tracked separately. Native Windows managed startup currently fails
+update and rollback, eight failure/recovery scenarios, forced installer exits
+before and after promotion, and preserved protected/runtime files.
+The pilot installation from `215f351` passed actual command launch, desktop-file
+validation, authenticated protected-workspace access, stop/restart and simultaneous
+launch reuse on 2026-10-30. Its original frozen review URL was retained. Program
+files total 2,126,459 bytes; the duplicate source bundles were removed afterward.
+Browser visual/click acceptance is still open. Native Windows managed startup currently fails
 in CI and is being diagnosed; a Windows host is not the cause of that software
 failure. Native Windows shortcut/install execution must pass CI before acceptance
-is claimed. Complete optional-runtime maintenance, pre-promotion crash cleanup
+is claimed. Complete optional-runtime maintenance
 and broader owned-provider containment remain implementation work. Building a
 package changes no launcher or keyboard mapping by itself.
+
+The latest Windows diagnostics stop before ownership acknowledgement. Helpers now
+use explicit UTF-8 raw standard streams, following the
+[documented standard-stream API](https://learn.microsoft.com/en-us/dotnet/api/system.console.openstandardoutput?view=net-8.0),
+with a dedicated detached/no-console lock test. File identity comparisons use
+exact 64-bit integers, and Windows recovery does not interpret synthesized Unix
+permission bits as native ACL evidence. The next native run must verify the fixes.

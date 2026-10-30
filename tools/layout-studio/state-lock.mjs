@@ -30,7 +30,7 @@ export async function withStateLock(root, id, fn) {
       let output = ""; const timer = setTimeout(() => { child.kill(); reject(new Error("Private state lock timed out. Existing data was preserved.")); }, 15000);
       const fail = () => { clearTimeout(timer); reject(new Error("The private state lock is unavailable or busy. Existing data was preserved.")); };
       child.once("error", fail); child.once("close", fail);
-      child.stdout.setEncoding("utf8"); child.stdout.on("data", (chunk) => { output += chunk; if (output === "LOCKED\n" || output === "LOCKED\r\n") { clearTimeout(timer); child.removeListener("close", fail); child.removeListener("error", fail); child.on("error", () => { alive = false; }); resolve(); } else if (output.length > 128) { child.kill(); fail(); } });
+      child.stdout.setEncoding("utf8"); child.stdout.on("data", (chunk) => { output += chunk; if (output === "LOCKED\n" || output === "LOCKED\r\n") { clearTimeout(timer); child.removeListener("close", fail); child.removeListener("error", fail); child.on("error", () => { alive = false; }); resolve(); } else if (output.includes("\n") || output.length > 128) { child.kill(); fail(); } });
     });
     const lease = { assert() { if (!alive || child.exitCode !== null) throw new Error("The private state lock was lost. Existing data must be re-read before retrying."); } };
     lease.assert(); const result = await fn(lease); lease.assert(); return result;

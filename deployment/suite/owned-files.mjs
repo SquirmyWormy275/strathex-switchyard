@@ -9,17 +9,17 @@ export const fileDigest = (b) => createHash("sha256").update(b).digest("hex");
 export async function launcherDirectory(path) {
   if (!isAbsolute(path) || /[\0\r\n]/.test(path)) throw new Error("An absolute owned launcher directory is required.");
   await mkdir(path, { recursive: true, mode: 0o755 }); const s = await directoryIdentity(path);
-  if (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022)) throw new Error("Launcher directory ownership or write permissions are unsafe.");
+  if (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid || Number(s.mode) & 0o022)) throw new Error("Launcher directory ownership or write permissions are unsafe.");
 }
 export async function readOwnedFile(path) {
   try {
     await directoryIdentity(dirname(path));
     const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     try {
-      const s = await file.stat(), named = await lstat(path);
-      if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size > 1024 * 1024 || (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022))) throw new Error("An existing launcher is unsafe, changed or too large; it was preserved.");
+      const s = await file.stat({ bigint: true }), named = await lstat(path, { bigint: true });
+      if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size > 1024 * 1024 || (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid || Number(s.mode) & 0o022))) throw new Error("An existing launcher is unsafe, changed or too large; it was preserved.");
       const bytes = await file.readFile(); if (bytes.length > 1024 * 1024) throw new Error("The existing launcher exceeds its bound.");
-      return { bytes, sha256: fileDigest(bytes), mode: s.mode & 0o777 };
+      return { bytes, sha256: fileDigest(bytes), mode: process.platform === "win32" ? 0o600 : Number(s.mode) & 0o777 };
     } finally { await file.close(); }
   } catch (e) { if (e.code === "ENOENT") return null; throw e; }
 }

@@ -21,9 +21,9 @@ async function installFixture(fn) {
   }, process.platform);
 }
 async function snapshots(paths) { return Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([role, path]) => [role, await readFile(path).then(fileDigest).catch((e) => { if (e.code === "ENOENT") return null; throw e; })]))); }
-async function crashUpdate(options, release) {
+async function crashUpdate(options, release, boundary = "record") {
   const module = pathToFileURL(join(process.cwd(), "deployment/suite/installation.mjs")).href;
-  const program = `import{createInstallation}from ${JSON.stringify(module)};const options=${JSON.stringify({ root: options.root, stateRoot: options.stateRoot, paths: options.paths })};const i=createInstallation({...options,application:{status:async()=>({status:'not-started'}),stop:async()=>{},launch:async()=>{}},beforeRemove:async()=>{},afterWrite:async role=>{if(role==='record')process.exit(77)}});await i.install(${JSON.stringify(release.directory)},${JSON.stringify(release.id)});`;
+  const program = `import{createInstallation}from ${JSON.stringify(module)};const options=${JSON.stringify({ root: options.root, stateRoot: options.stateRoot, paths: options.paths })};const boundary=${JSON.stringify(boundary)};const i=createInstallation({...options,application:{status:async()=>({status:'not-started'}),stop:async()=>{},launch:async()=>{}},beforeRemove:async()=>{},afterWrite:async role=>{if(role===boundary)process.exit(77)},afterCopy:async()=>{if(boundary==='copy')process.exit(77)}});await i.install(${JSON.stringify(release.directory)},${JSON.stringify(release.id)});`;
   const code = await new Promise((resolve, reject) => { const child = spawn(process.execPath, ["--input-type=module", "-e", program], { shell: false, stdio: ["ignore", "ignore", "pipe"] }); let diagnostic = ""; const timer = setTimeout(() => child.kill("SIGKILL"), 20000); child.stderr.on("data", (b) => { if (diagnostic.length < 1024) diagnostic += b; }); child.once("error", reject); child.once("close", (n) => { clearTimeout(timer); n === 77 ? resolve(n) : reject(new Error(`Synthetic update did not reach its crash boundary: ${diagnostic}`)); }); });
   assert.equal(code, 77);
 }
@@ -87,4 +87,15 @@ test("the stable installed loader verifies and addresses the actual application 
     await install.rollback(); assert.equal((await command(["status"])).build, first.id);
     await install.uninstall(); assert.equal((await applicationStatus(appOptions)).status, "not-listening");
   } finally { await stopApplication(appOptions); }
+}));
+test("pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes", () => installFixture(async ({ make, first, second, options, paths }) => {
+  const install = make(); await install.install(first.directory, first.id); const before = await snapshots(paths);
+  await crashUpdate(options, second, "copy");
+  const descriptorPath = join(options.stateRoot, "installation-stage.json"), descriptor = JSON.parse(await readFile(descriptorPath, "utf8")), stage = join(options.root, "versions", `.install-${descriptor.stageId}`);
+  const unrelated = join(stage, "unrelated.txt"); await writeFile(unrelated, "Preserve an unrelated staging edit");
+  await assert.rejects(install.recover(), /unrelated content/); assert.equal(await readFile(unrelated, "utf8"), "Preserve an unrelated staging edit"); assert.deepEqual(await snapshots(paths), before);
+  await import("node:fs/promises").then(({ rm }) => rm(unrelated));
+  const copied = descriptor.files[0].path, complete = await readFile(join(stage, copied)); assert.ok(complete.length > 8); await writeFile(join(stage, copied), complete.subarray(0, 8));
+  assert.equal((await install.recover()).stageRecovered, true); assert.deepEqual(await snapshots(paths), before);
+  await assert.rejects(lstat(stage), { code: "ENOENT" }); await assert.rejects(lstat(descriptorPath), { code: "ENOENT" });
 }));

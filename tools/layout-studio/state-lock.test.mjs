@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
 import { withStateLock } from "./state-lock.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
 
 test("independent store instances serialize initialization and updates without replacing a compartment key or losing writes", async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-multi-store-")), keys = new Map(); let created = 0;
@@ -46,4 +47,15 @@ test("lock identity and symlink root are rejected before a protected mutation", 
     await assert.rejects(withStateLock(root, "personal", async () => { entered = true; }), /ownership|permissions/);
     assert.equal(entered, false);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("a detached owner with no console acquires the UTF-8 pipe lease and releases it on abrupt exit", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-detached-lock-")), moduleUrl = new URL("./state-lock.mjs", import.meta.url).href;
+  const program = `import{withStateLock}from ${JSON.stringify(moduleUrl)};import{writeSync}from 'node:fs';await withStateLock(${JSON.stringify(root)},'detached',async()=>{writeSync(3,'HELD\\n');await new Promise(()=>{});});`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", program], { detached: true, windowsHide: true, stdio: ["ignore", "ignore", "ignore", "pipe"] });
+  try {
+    await new Promise((resolve, reject) => { let output = ""; const timer = setTimeout(() => reject(new Error("The detached pipe-only lock owner did not become ready.")), 18000); child.once("error", reject); child.stdio[3].on("data", (b) => { output += b; if (output === "HELD\n") { clearTimeout(timer); resolve(); } }); child.once("exit", () => { clearTimeout(timer); reject(new Error("The detached lock owner exited before ready.")); }); });
+    const exited = once(child, "close"); child.kill("SIGKILL"); await exited; let acquired = false;
+    await withStateLock(root, "detached", async () => { acquired = true; }); assert.equal(acquired, true);
+  } finally { await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
 });

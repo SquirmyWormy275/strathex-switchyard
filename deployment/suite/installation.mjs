@@ -26,10 +26,10 @@ async function noActiveHostConnections() {
     for (const c of await store.list()) { const s = await store.snapshot(c.id); if (s.windowsHost?.bindings?.length) throw new Error("Restore saved Windows hotkey connections in the app before uninstalling. Their program and protected baselines were preserved."); }
   }
 }
-export function createInstallation({ root = installationRoot(), stateRoot = applicationStateRoot(), paths = installationPaths(root), platform = process.platform, application, beforeRemove = noActiveHostConnections, afterWrite = async () => {} } = {}) {
+export function createInstallation({ root = installationRoot(), stateRoot = applicationStateRoot(), paths = installationPaths(root), platform = process.platform, application, beforeRemove = noActiveHostConnections, afterWrite = async () => {}, afterCopy = async () => {} } = {}) {
   if (!["linux", "win32"].includes(platform) || new Set(Object.values(paths)).size !== 4 || Object.keys(paths).sort().join(",") !== "command,desktop,loader,record" || paths.record !== join(root, "installed.json") || paths.loader !== join(root, "launch.mjs")) throw new Error("The installation paths or platform are unsupported.");
   application ??= { status: () => applicationStatus({ stateRoot }), stop: () => stopApplication({ stateRoot }), launch: (bundleRoot) => launchApplication({ bundleRoot, stateRoot, installationRoot: root }) };
-  const versions = join(root, "versions"), pending = join(root, "pending.json"), backups = join(stateRoot, "installation-backups");
+  const versions = join(root, "versions"), pending = join(root, "pending.json"), backups = join(stateRoot, "installation-backups"), staging = join(stateRoot, "installation-stage.json");
   const bundle = (id) => { if (!idPattern.test(id)) throw new Error("The installed version identity is invalid."); return join(versions, id); };
   async function record() {
     const saved = await readOwnedFile(paths.record); if (!saved) return null;
@@ -43,17 +43,49 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
     return old;
   }
   async function copyBundle(source, expectedId, lease) {
+    source = await realpath(source);
     const manifest = await verifySuiteRelease(source, { expectedId, platform, checkRuntime: true });
     if (!["deployment/suite/manage.mjs", "deployment/suite/installation.mjs", "deployment/suite/cli.mjs"].every((path) => manifest.files.some((f) => f.path === path))) throw new Error("This older standalone development bundle has no supported installation contract.");
     await privateDirectory(versions); const destination = bundle(manifest.id);
     try { await lstat(destination); await verifySuiteRelease(destination, { expectedId: manifest.id, platform }); return destination; }
     catch (e) { if (e.code !== "ENOENT") throw e; }
-    const stage = join(versions, `.install-${randomUUID()}`);
+    const stageId = randomUUID(), stage = join(versions, `.install-${stageId}`), manifestBytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
+    const descriptor = { schema: "switchyard-installation-stage/v1", stageId, releaseId: manifest.id, source, files: [...manifest.files, { path: "switchyard-release.json", size: manifestBytes.length, sha256: fileDigest(manifestBytes) }] };
+    await privateWrite(staging, JSON.stringify(descriptor) + "\n");
     try {
       await privateDirectory(stage);
-      for (const name of [...manifest.files.map((f) => f.path), "switchyard-release.json"]) { const target = join(stage, name); await privateDirectory(join(target, "..")); await copyFile(join(source, name), target, constants.COPYFILE_FICLONE); await chmod(target, 0o600); lease.assert(); }
+      await writeFile(join(stage, "switchyard-release.json"), manifestBytes, { flag: "wx", mode: 0o600 });
+      for (const name of manifest.files.map((f) => f.path)) { const target = join(stage, name); await privateDirectory(join(target, "..")); await copyFile(join(source, name), target, constants.COPYFILE_FICLONE); await chmod(target, 0o600); lease.assert(); await afterCopy(name); }
       await verifySuiteRelease(stage, { expectedId: manifest.id, platform }); lease.assert(); await rename(stage, destination); return destination;
-    } finally { await rm(stage, { recursive: true, force: true }); }
+    } finally { await rm(stage, { recursive: true, force: true }); await rm(staging, { force: true }); }
+  }
+  async function recoverStage(lease) {
+    let v; try { v = JSON.parse(await privateRead(staging)); } catch (e) { if (e.code === "ENOENT") return { stageRecovered: false }; throw e; }
+    const safePath = (s) => typeof s === "string" && s.length <= 240 && s.split("/").every((p) => /^[A-Za-z0-9_.-]+$/.test(p) && !/^\.+$/.test(p));
+    if (v.schema !== "switchyard-installation-stage/v1" || !/^[a-f0-9-]{36}$/.test(v.stageId) || !idPattern.test(v.releaseId) || typeof v.source !== "string" || !Array.isArray(v.files) || v.files.length < 1 || v.files.length > 513 || v.files.some((f) => !safePath(f.path) || !idPattern.test(f.sha256) || !Number.isSafeInteger(f.size) || f.size < 0 || f.size > 128 * 1024 * 1024) || new Set(v.files.map((f) => f.path.toLowerCase())).size !== v.files.length) throw new Error("The interrupted stage descriptor is invalid; its files were preserved.");
+    const stage = join(versions, `.install-${v.stageId}`), files = new Map(v.files.map((f) => [f.path, f])), directories = new Set([""]);
+    for (const f of v.files) { const parts = f.path.split("/"); parts.pop(); while (parts.length) { directories.add(parts.join("/")); parts.pop(); } }
+    let sourceVerified = false, actual = 0;
+    async function inspect(at = "") {
+      const directory = join(stage, at), info = await lstat(directory); if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Interrupted staging contains a directory link or changed directory.");
+      for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const name = at ? `${at}/${entry.name}` : entry.name;
+        if (entry.isDirectory() && directories.has(name)) { await inspect(name); continue; }
+        const expected = files.get(name); if (!expected || !entry.isFile() || ++actual > v.files.length) throw new Error("Interrupted staging contains unrelated content. It was preserved.");
+        const path = join(stage, name), s = await lstat(path); if (!s.isFile() || s.isSymbolicLink() || s.size > expected.size) throw new Error("An interrupted stage file changed beyond its owned copy bound.");
+        const value = await readFile(path);
+        if (value.length === expected.size && fileDigest(value) === expected.sha256) continue;
+        // A killed copy can leave an incomplete file. Delete it only when its
+        // exact prefix still agrees with the independently verified source.
+        if (name === "switchyard-release.json") throw new Error("The stage manifest changed; recovery preserved it.");
+        if (!sourceVerified) { await verifySuiteRelease(v.source, { expectedId: v.releaseId, platform }); sourceVerified = true; }
+        const original = await readFile(join(v.source, name));
+        if (value.length >= original.length || !value.equals(original.subarray(0, value.length))) throw new Error("An interrupted stage file has unrelated edits. Recovery preserved it.");
+      }
+    }
+    try { await inspect(); }
+    catch (e) { if (e.code !== "ENOENT") throw e; if (await lstat(stage).catch((x) => { if (x.code === "ENOENT") return null; throw x; })) throw e; }
+    lease.assert(); await rm(stage, { recursive: true, force: true }); await rm(staging); return { stageRecovered: true, releaseId: v.releaseId };
   }
   async function prune(keep) {
     await privateDirectory(versions); const retained = new Set(keep.filter(Boolean)), removed = [];
@@ -99,7 +131,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
   async function operation(action, prepare, { start = false } = {}) {
     await privateDirectory(root);
     return withStateLock(join(stateRoot, "installation"), "installation", async (lease) => {
-      await recover(lease); const old = await ownedRecord(), next = await prepare(old, lease), live = await application.status(), wasRunning = ["ready", "stopping"].includes(live.status);
+      await recoverStage(lease); await recover(lease); const old = await ownedRecord(), next = await prepare(old, lease), live = await application.status(), wasRunning = ["ready", "stopping"].includes(live.status);
       if (next.unchanged) { if (start) await application.launch(bundle(old.current)); return { status: "unchanged", current: old.current }; }
       if (action === "uninstall") await beforeRemove();
       const plan = await journal(action, next.replacements, old, wasRunning);
@@ -130,7 +162,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
   return {
     root, paths,
     inspect: record,
-    recover: () => withStateLock(join(stateRoot, "installation"), "installation", recover),
+    recover: () => withStateLock(join(stateRoot, "installation"), "installation", async (lease) => ({ ...await recoverStage(lease), ...await recover(lease) })),
     install: (source, expectedId, options) => { if (!idPattern.test(expectedId)) throw new Error("An independently reviewed expected release identity is required."); return operation("install/update", async (old, lease) => { await copyBundle(source, expectedId, lease); if (old?.current === expectedId) return { unchanged: true }; return { current: expectedId, previous: old?.current ?? null, replacements: await replacements(expectedId, old?.current ?? null) }; }, options); },
     rollback: (options) => operation("rollback", async (old) => { if (!old?.previous) throw new Error("There is no retained previous application version."); await verifySuiteRelease(bundle(old.previous), { expectedId: old.previous, platform, checkRuntime: true }); return { current: old.previous, previous: old.current, replacements: await replacements(old.previous, old.current) }; }, options),
     uninstall: () => operation("uninstall", async (old) => { if (!old) throw new Error("No owned installation exists."); return { current: null, previous: null, replacements: { loader: null, command: null, desktop: null, record: null } }; })

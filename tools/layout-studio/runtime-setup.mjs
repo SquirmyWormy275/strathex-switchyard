@@ -17,7 +17,7 @@ async function ownedDirectory(path, create = false) {
   if (!isAbsolute(path) || /[\0\r\n]/.test(path)) throw new Error("The runtime needs an absolute local directory.");
   if (create) await mkdir(path, { recursive: true, mode: 0o700 });
   const s = await directoryIdentity(path);
-  if (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022)) throw new Error("The runtime directory has unsafe ownership, links or write permissions.");
+  if (process.platform !== "win32" && (Number(s.uid) !== userInfo().uid || Number(s.mode) & 0o022)) throw new Error("The runtime directory has unsafe ownership, links or write permissions.");
 }
 export async function hashRuntimeFile(path, expectedSize) {
   const f = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
