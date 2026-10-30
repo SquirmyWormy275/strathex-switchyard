@@ -983,3 +983,41 @@ project-document bytes zero, account stable and exact owned exit verified:
 tests pass, including complete disabled-transport arguments and rejection of
 enabled automatic project instructions. General text submission is being built
 separately and is not included in this compatibility checkpoint.
+
+
+## Reviewed Codex coding-task text
+
+The new [native task backend](native-coding-tasks.md) adds exact reviewed text
+submission to registered read-only tasks created by Switchyard, separate from
+keyboard design conversations. Each operation verifies its native account,
+repository device/inode identity, task/session ownership, effective restrictions
+and idle metadata. Review does not resume a task or submit text. A five-minute
+one-use approval binds the exact text, native identity, account, root and current
+workspace policy/enrollment. The native read-only sandbox and explicit shell,
+browser and MCP restrictions remain enforced. Saved native context may be used;
+this route grants no file-change or command-execution authority.
+
+A durable request is reserved before continuation, its exact returned turn ID is
+retained before accepting replies, and repeating a retained request UUID cannot
+submit again. Responses are bounded to 32 KiB and explicitly do not verify task
+completion. Cancellation and keyboard-only shutdown stop the owned connection
+without guessing an unacknowledged turn ID. Unconfirmed owned exit blocks a
+replacement in this component. This is not general provider-tree containment.
+
+Uncertain submissions survive restart and block new text for that task until
+explicit outcome review. Resolution never retries, reverses effects or infers
+completion; another turn still needs fresh approval and verified idle metadata.
+Completed private text follows retention; unresolved identities remain for
+recovery. History is bounded to 32 entries with storage headroom checked before
+prompting, and only completed/failed-before-turn/reviewed records can be deleted.
+
+Ten focused submission fault tests pass, including durable duplicates, stale
+scope, wrong permissions, account changes, uncertain exit, failed acknowledgement
+storage, pending-startup/mode fences and retention/quota behavior. The combined
+runner/binding/conversation checks pass, and TypeScript typecheck passes. Three
+new process-heavy Windows protected-state groups receive a bounded 120-second
+cold-start allowance, with both platform choices and the exact allowance list
+checked; Linux budgets/assertions/skips are unchanged. Full integrated and normal
+installed acceptance are running. The frontend stays frozen. Claude task text,
+interactive attachment and execution-authority mediation remain implementation
+work rather than hardware/account-blocked checks.

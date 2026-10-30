@@ -158,3 +158,15 @@ mise exec node@24.14.0 -- node scripts/verify-codex-stdio-host.mjs --read-only
 The transport follows the [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
 for JSON-lines initialization and metadata-only read/resume. Installed response
 fields are independently checked; API evolution cannot silently broaden permissions.
+
+
+## Reviewed text continuation
+
+[Follow the native task walkthrough](native-coding-tasks.md) for the new separate
+text-review/submission/outcome-recovery backend. It accepts only exact registered
+read-only tasks created by Switchyard, verifies native directory identity and
+first-party login, and uses a private restricted connection. The 34 feature
+restrictions, disabled generated MCP transports and zero automatic project-doc
+bytes are read back. It grants no execution authority and does not report a
+provider reply as verified task completion. Native interactive attachment and
+corresponding frontend controls remain unfinished.

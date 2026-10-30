@@ -94,7 +94,8 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
-  return platform === "win32" && file === "tools/layout-studio/claude-coding.test.mjs" ? { timeoutMs: 120_000 } : {};
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
@@ -133,8 +134,11 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/codex-turn.test.mjs" },
-  { file: "tools/layout-studio/agents-claude.test.mjs" },
-  { file: "tools/layout-studio/conversation-bindings.test.mjs" },
+  // Protected Windows fault matrices each start many short native lock helpers.
+  // Keep their cold-process allowance bounded without relaxing assertions/skips.
+  { file: "tools/layout-studio/agents-claude.test.mjs", ...nativeTestOverrides("tools/layout-studio/agents-claude.test.mjs") },
+  { file: "tools/layout-studio/conversation-bindings.test.mjs", ...nativeTestOverrides("tools/layout-studio/conversation-bindings.test.mjs") },
+  { file: "tools/layout-studio/codex-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/codex-submissions.test.mjs") },
   // Native Windows kernel leases start the system PowerShell helper per state
   // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
   // allow bounded process/pipe cleanup without relaxing any assertion or skip.

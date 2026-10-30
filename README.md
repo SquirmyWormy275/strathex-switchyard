@@ -40,6 +40,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
   bindings](docs/claude-task-bindings.md): exact native identities, actual host
   evidence and the controls still being implemented.
+- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
+  approve bounded text and recover an uncertain turn without automatic retry.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
@@ -58,16 +60,18 @@ requests have been exercised with Codex and Claude Code, and real custom and
 LangChain example processes have exchanged authenticated intents.
 The separate task backend has also created/resumed an empty read-only Codex
 thread and created/stopped a tools-disabled Claude background session, with
-exact identity checks and durable duplicate prevention. These host checks sent
-no model prompts and do not establish completion of coding work.
+exact identity checks and durable duplicate prevention. Those metadata/lifecycle host checks sent
+no model prompts and do not establish completion of coding work. Reviewed Codex
+text submission, exact cancellation and uncertain-outcome review are now
+software-tested; their normal installed acceptance is running.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 220 test/build groups at `51a8996`, including
+The complete Windows release passed 221 test/build groups for `3246b7a`, including
 managed startup, installer, bootstrap, portable profiles and automation checks.
-The newer task/controller backend also passes native Windows tests; its complete
-release is running. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
+Newer account-bound conversation and text-submission checkpoints await their
+complete Windows run. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
