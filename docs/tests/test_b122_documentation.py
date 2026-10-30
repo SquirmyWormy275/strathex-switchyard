@@ -84,6 +84,13 @@ def test_canonical_legend_outputs_are_reproducible_and_reject_changed_source(tmp
     monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
     from generate_b122_legends import build_all, make_legend_pdf, records, load_manifest, PALETTES
 
+    native_write = Path.write_text
+    def windows_default_write(path, content, *args, **kwargs):
+        if kwargs.get("newline") is None:
+            content = content.replace("\n", "\r\n")
+        return native_write(path, content, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", windows_default_write)
+
     output = build_all(tmp_path, REPOSITORY_ROOT / "third-party/cyber_engineer/pure-template.pdf")
     for path in output:
         assert path.read_bytes() == (REPOSITORY_ROOT / path.relative_to(tmp_path)).read_bytes()

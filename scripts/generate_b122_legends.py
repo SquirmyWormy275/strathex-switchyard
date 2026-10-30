@@ -195,11 +195,11 @@ def build_all(root: Path, template: Path) -> list[Path]:
         "physicalPositionStatus": "unassigned-within-bank",
         "template": {"sourcePdfSha256": PDF_SHA256, "sourceSvgSha256": SVG_SHA256, "units": "points", "inkInsetPoints": 0.5, "minimumFontPoints": MIN_LEGEND_FONT, "capFitVerified": False},
         "controls": items,
-    }, indent=2) + "\n", encoding="utf-8")
+    }, indent=2) + "\n", encoding="utf-8", newline="\n")
     outputs = [manifest_path]
     for item in items:
         destination = legends / "individual" / f"{item['logicalId']}-{item['control'].lower().replace('_', '-')}.svg"
-        destination.write_text(individual_svg(item, PALETTES["ibm-blue"], SHORT_ACTIONS), encoding="utf-8")
+        destination.write_text(individual_svg(item, PALETTES["ibm-blue"], SHORT_ACTIONS), encoding="utf-8", newline="\n")
         outputs.append(destination)
     for palette_name, palette in PALETTES.items():
         destination = pdfs / f"SXSY-B122-legends-{palette_name}.pdf"
