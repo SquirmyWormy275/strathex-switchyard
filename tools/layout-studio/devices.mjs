@@ -14,6 +14,7 @@ import { readQmkSettings, writeQmkSetting, settingsReadback } from "./vial-setti
 import { readVialDynamic, writeDynamicEntry, dynamicReadback, dynamicCandidate } from "./vial-dynamic.mjs";
 import { readVialEncoders, writeEncoder, encodersReadback } from "./vial-encoders.mjs";
 import { matrixDimensions, decodeMatrixState } from "./vial-matrix.mjs";
+import { decodeOriginalExpansion } from "./xwhatsit-expansion.mjs";
 
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const integer = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
@@ -144,26 +145,28 @@ export class VialDevice {
 /** Original 0.9.0 has 8-byte state streams and 8-bit scancodes, not Vial. */
 export class OriginalXwhatsitDevice {
   constructor(transport, deviceId) { this.transport = transport; this.deviceId = deviceId; }
-  async select(state) { await this.transport.exchange([0, 0, 0, 0, 0, 0, 0, 0], false); await this.transport.exchange([0, state, 0, 0, 0, 0, 0, 0], false); for (let n = 0; n < 64; n++) { const r = await this.transport.read(); if (r[0] === state) return r; } throw new Error("Original xwhatsit state stream did not synchronize."); }
+  async frame() { const r = await this.transport.read(); if (!Buffer.isBuffer(r) || r.length !== 8) throw new Error("The original xwhatsit state frame is malformed."); return r; }
+  async select(state) { await this.transport.exchange([0, 0, 0, 0, 0, 0, 0, 0], false); await this.transport.exchange([0, state, 0, 0, 0, 0, 0, 0], false); for (let n = 0; n < 64; n++) { const r = await this.frame(); if (r[0] === state) return r; } throw new Error("Original xwhatsit state stream did not synchronize."); }
   async snapshot() {
     const identity = await this.transport.request("open", { deviceId: this.deviceId });
     if (identity.candidateProtocol !== "original-xwhatsit-0.9") throw new Error("Original xwhatsit operations are prohibited on this interface.");
     try {
-      const version = (await this.select(9)).subarray(1, 7).toString("ascii").replace(/\0.*$/, "").trim();
+      const version = (await this.select(9)).subarray(1).toString("utf8").replace(/\0+$/, "");
       if (version !== "0.9.0") throw new Error("This original xwhatsit firmware version has not been verified by this adapter.");
       const info = await this.select(1), layers = info[1], cols = info[3], rows = info[4], type = info[5];
-      if (layers < 1 || layers > 4 || cols < 1 || cols > 32 || rows < 1 || rows > 8 || ![1, 2, 3].includes(type)) throw new Error("The original controller's reported model/matrix is unsupported.");
+      if (layers !== 4 || ![12, 16, 23].includes(cols) || ![4, 8].includes(rows) || ![1, 2, 3].includes(type) || ![0, 1].includes(info[6]) || info[7] !== 0) throw new Error("The original controller's reported model/matrix is unsupported.");
       const keymap_raw = Array.from({ length: layers }, () => Array.from({ length: rows }, () => Array(cols).fill(null)));
       let r = await this.select(7); const seen = new Set();
       for (let n = 0; n < layers * cols * 2 + 64; n++) {
-        if (r[0] === 7) { const layer = r[1] >> 6, slice = (r[1] >> 5) & 1, col = r[1] & 31; if (layer >= layers || col >= cols) throw new Error("Original keymap framing is invalid."); for (let i = 0; i < 4; i++) if (slice * 4 + i < rows) { keymap_raw[layer][slice * 4 + i][col] = r[i + 2]; seen.add(`${layer}:${slice * 4 + i}:${col}`); } }
-        if (seen.size === layers * rows * cols) break; r = await this.transport.read();
+        if (r[0] === 7) { const layer = r[1] >> 6, slice = (r[1] >> 5) & 1, col = r[1] & 31; if (layer >= layers || col >= cols || slice * 4 >= rows || r[6] !== 0 || r[7] !== 0) throw new Error("Original keymap framing is invalid."); for (let i = 0; i < 4; i++) { const row = slice * 4 + i, slot = `${layer}:${row}:${col}`; if (seen.has(slot) && keymap_raw[layer][row][col] !== r[i + 2]) throw new Error("The original keymap changed during its readout."); keymap_raw[layer][row][col] = r[i + 2]; seen.add(slot); } }
+        if (seen.size === layers * rows * cols) break; r = await this.frame();
       }
       if (seen.size !== layers * rows * cols) throw new Error("Original keymap snapshot is incomplete.");
-      return { schema: "switchyard-device-snapshot/v1", identity: { deviceId: this.deviceId, protocol: "original-xwhatsit-0.9", firmwareVersion: version, controller: "original xwhatsit protocol; hardware revision unverified", keyboardType: type }, rows, cols, layers, keymap_raw, configurationOnly: true, capturedAt: new Date().toISOString() };
+      const expansion = decodeOriginalExpansion(await this.select(10));
+      return { schema: "switchyard-device-snapshot/v1", identity: { deviceId: this.deviceId, protocol: "original-xwhatsit-0.9", firmwareVersion: version, controller: "original xwhatsit protocol; hardware revision unverified", keyboardType: type, capabilities: ["keymap-8bit", "expansion-configuration-read"] }, rows, cols, layers, keymap_raw, expansion, configurationOnly: true, capturedAt: new Date().toISOString() };
     } finally { await this.transport.exchange([0, 0, 0, 0, 0, 0, 0, 0], false).catch(() => {}); }
   }
-  async writeKey(change) { if (change.after > 255) throw new Error("Original xwhatsit uses 8-bit scancodes, not QMK keycodes."); await this.transport.exchange([5, (change.layer << 6) | change.col, change.row, change.after, 0, 0, 0, 0], false); await this.transport.exchange([8, 1, 0, 0, 0, 0, 0, 0], false); }
+  async writeKey(change) { if (change.after > 255) throw new Error("Original xwhatsit uses 8-bit scancodes, not QMK keycodes."); await this.transport.exchange([5, (change.layer << 6) | change.col, change.row, change.after, 0, 0, 0, 0], false); }
 }
 
 export function validateDeviceChanges(snapshot, changes, meaningSnapshot = snapshot) {
@@ -174,6 +177,7 @@ export function validateDeviceChanges(snapshot, changes, meaningSnapshot = snaps
     const slot = `${c.layer}:${c.row}:${c.col}`; if (seen.has(slot)) throw new Error("A device key is changed twice."); seen.add(slot);
     const before = snapshot.keymap_raw[c.layer][c.row][c.col];
     if (c.before !== before) throw new Error("The keymap changed since this proposal was prepared.");
+    if (snapshot.identity.protocol === "original-xwhatsit-0.9" && [1, 2, 3].includes(before)) throw new Error("Original firmware calibration-reference and expansion-control positions are preserved by this ordinary key editor.");
     const after = compileDeviceKey(meaningSnapshot, c.after);
     candidate[c.layer][c.row][c.col] = after; return { layer: c.layer, row: c.row, col: c.col, before, after };
   });

@@ -42,9 +42,18 @@ bytes matching its known before/after values; unrelated edits fail before any
 recovery write. Restore preserves unowned bits, even if another tool changed them.
 Changes to timing/modifier/rollover behavior require an ordinary-typing trial.
 
-Original xwhatsit 0.9.0 remains a separate 8-byte, 8-bit-scancode adapter. Vial
-macro/layer-option requests are rejected on that protocol. No compatibility is
-inferred from a Model F product name or catalog geometry.
+Original xwhatsit 0.9.0 remains a separate 8-byte, 8-bit-scancode adapter. Its
+source-verified readout includes all four keymap layers and the expansion-header
+configuration: solenoid/buzzer timing bytes, lock-switch contacts or LED mode.
+Configured values do not establish attached hardware, electrical limits or host
+lock state. Expansion writes are unavailable. Unknown modes retain their raw
+values. Its key setter writes EEPROM directly; no obsolete extra store command
+is sent. Calibration-reference and expansion-control positions are preserved,
+and codes 1–3 cannot inherit Vial transparent-key semantics. Existing opaque
+codes remain readable but unknown new assignments are rejected. Vial
+macro/layer-option requests remain unsupported. See the
+[original protocol contract](original-xwhatsit-protocol.md) for source hashes,
+framing and tests. No compatibility is inferred from a product label or geometry.
 
 ## Transaction behavior
 

@@ -116,6 +116,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/suite.test.mjs" },
   { file: "tools/layout-studio/devices.test.mjs" },
+  { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },
   { file: "tools/layout-studio/vial-dynamic.test.mjs" },
   { file: "tools/layout-studio/vial-encoders.test.mjs" },
   { file: "tools/layout-studio/vial-rules.test.mjs" },

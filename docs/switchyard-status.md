@@ -1521,3 +1521,23 @@ Complete Linux acceptance at `9781e6c`: 120/120 groups, 869 tests, 860 passed an
 nine platform skips; receipt dfd60a04-a929-4351-ad96-e24ad2a96765. The normal update
 preserved the frozen frontend and removed its disposable bundle. No Windows
 native agent/account acceptance is inferred.
+
+## Original 0.9.0 expansion readout and protocol hardening
+
+The vendor's pinned original source archive now establishes an independent
+expansion-configuration getter: diagnostic state 10 returns the mode and two
+timing bytes. The adapter reads it after the complete keymap, preserves unknown
+modes and reports configured values without claiming attached hardware, verified
+electrical limits or host lock state. No expansion setter was added. The source
+was inspected in memory; no archive or clone remains on the workstation.
+
+Direct legacy protocol tests also exposed two incorrect assumptions in the
+previous adapter. Codes 1–3 are calibration/expansion controls, not Vial keys;
+new assignments are rejected and existing control positions are preserved.
+The native key setter updates EEPROM directly, so the obsolete extra store
+packet is removed. Fixed frame lengths, exact version/dimensions, row slices,
+reserved bytes, complete coverage and duplicate consistency are now checked.
+Seven new tests and all 82 focused device/configuration checks pass, with
+typecheck passing. Key restoration preserves unowned expansion configuration.
+See original-xwhatsit-protocol.md for exact source hashes and remaining limits.
+Complete integration and physical legacy-controller acceptance remain next/open.

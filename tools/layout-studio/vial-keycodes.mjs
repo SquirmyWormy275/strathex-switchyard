@@ -2,7 +2,11 @@
 const ordinary = (v) => Number.isInteger(v) && v >= 4 && v <= 231;
 const masks = (v) => Number.isInteger(v) && v > 0 && v <= 31 && (v & 15) !== 0;
 export function compileDeviceKey(snapshot, value) {
-  if (Number.isInteger(value) && value >= 0 && value <= (snapshot.identity.protocol?.startsWith("original") ? 255 : 231)) return value;
+  if (snapshot.identity.protocol === "original-xwhatsit-0.9") {
+    if (Number.isInteger(value) && (value === 0 || value >= 4 && value <= 231)) return value;
+    throw new Error("Original firmware calibration, expansion-control and unknown scancodes cannot be assigned here. Use its supported ordinary 8-bit key codes.");
+  }
+  if (Number.isInteger(value) && value >= 0 && value <= 231) return value;
   if (!value || typeof value !== "object" || Array.isArray(value) || !snapshot.identity.vialProtocol) throw new Error("Use ordinary HID keys or a supported semantic Vial key. Firmware control codes are prohibited.");
   const protocol = snapshot.identity.vialProtocol;
   if (protocol < 1 || protocol > 6) throw new Error("The Vial keycode version is unsupported.");
