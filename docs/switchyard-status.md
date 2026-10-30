@@ -1288,3 +1288,13 @@ lane's exact helper-absence skip allowance is updated from eight to fourteen,
 matching the expanded boundary cases that run for real in its separate built-helper
 CI step. The corrected full run is being rerun; the previous accepted integrated
 receipt remains 70559d96-91a8-421e-9760-7c194fa07f4d.
+
+The corrected integrated Linux run is accepted: **117/117 groups, 839 tests,
+830 passed and nine expected platform skips**, receipt
+e1949f40-b7c5-4987-89c3-99151dc6786a. All fourteen native guardian tests run on
+Linux, including rejection of Windows-only environment identifiers before a
+target can start. Native Windows executes those boundary cases in its separate
+built-helper step; its source-only lane records the exact helper-absence skips.
+Malformed native lifecycle objects/capability fields now fail the owned command
+rather than escaping the response parser. The last normal installed backend is
+f2d11f3, with frozen frontend and private endpoint preserved.

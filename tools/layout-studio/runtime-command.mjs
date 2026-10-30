@@ -70,11 +70,13 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
     let end;
     while ((end = buffer.indexOf("\n")) >= 0) {
       let frame; try { frame = JSON.parse(buffer.slice(0, end)); } catch { fail("Invalid native runtime response."); return; } buffer = buffer.slice(end + 1);
+      if (!frame || typeof frame !== "object" || Array.isArray(frame)) { fail("Invalid native runtime response object."); return; }
       if (frame.schema !== request.schema || frame.id !== request.id || frame.containment !== (linux ? "owned-linux-session" : "windows-job")) { fail("Native runtime response scope changed."); return; }
       if (frame.event === "ready" && !ready) {
         ready = true; clearTimeout(readiness);
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
-        if ((inputText !== undefined && !frame.capabilities?.includes("bounded-stdin")) || (captureStderrBytes && !frame.capabilities?.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
+        const capabilities = Array.isArray(frame.capabilities) ? frame.capabilities : [];
+        if ((inputText !== undefined && !capabilities.includes("bounded-stdin")) || (captureStderrBytes && !capabilities.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
         guardianFrame = frame;
         guardianBirth = frame.birth;
         pendingReady = Promise.resolve().then(() => onGuardianReady(frame)).then(() => { readyCommitted = true; if (!failure && child.exitCode === null && child.signalCode === null) { acknowledged = true; child.stdin.write(JSON.stringify({ schema: request.schema, id: request.id, start: true }) + "\n"); } }).catch(() => { readyCommitted = true; fail("The runtime start acknowledgement was not committed."); });
