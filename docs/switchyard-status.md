@@ -808,3 +808,14 @@ The installed current/rollback program pair is about **8.3 MiB**. No runtime/mod
 copy or new dependency was added. The corrected Windows `51a8996` native backend,
 source-checkout, real helper/guardian and packaging steps have passed; complete
 release verification is still running. Newer adoption checks await their turn.
+
+The complete Windows release at **51a8996** subsequently passed **220 groups**
+(run `41073728335`, receipt `819d42a6-b0f2-4119-951e-609ed910af15`). That includes
+the corrected runner allowance, byte-preserving checkout, native backend, actual
+read-only helper/guardian checks and the complete build/bootstrap/automation
+verification. It does not accept newer uncommitted native-turn changes or
+interactive Windows hardware/accounts. Receipt upload exposed one retention
+gap: successful release cleanup removes the exported source tree before the
+workflow upload. The builder now copies bounded regular receipt files into
+verified build provenance first; the workflow collects that success path and
+the original failure path. This follow-up awaits Windows verification.
