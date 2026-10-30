@@ -44,6 +44,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   approve bounded text and recover an uncertain turn without automatic retry.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
+- [Verification at a glance](docs/verification.md): accepted checkpoints,
+  native demonstrations, reproducible checks and their practical limits.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
   requirement, including checks that require hardware or approved accounts.
 - [Earlier Omarchy tools](docs/try-switchyard.md): workflow recorder and existing
@@ -63,17 +65,22 @@ thread and created/stopped a tools-disabled Claude background session, with
 exact identity checks and durable duplicate prevention. Those metadata/lifecycle host checks sent
 no model prompts and do not establish completion of coding work. Reviewed Codex
 text submission, exact cancellation and uncertain-outcome review are now
-software-tested. The installed Codex API has also completed one actual reviewed
-text turn, retained its exact acknowledgement and rejected duplicate/replayed
-submission without claiming coding-task completion.
+software-tested. Both installed native task APIs now pass reviewed text journeys.
+Codex retains its exact turn acknowledgement; Claude supports exact creation,
+continuation and separately approved resume-only recovery after an uncertain
+first turn. Owned guardian exit, duplicate/replay handling and keyboard-only
+cleanup are verified. Provider replies do not establish coding-task completion.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 221 test/build groups for `3246b7a`, including
+The complete Windows release passed 225 test/build groups for `7aeb1e6`, including
 managed startup, installer, bootstrap, portable profiles and automation checks.
-Newer account-bound conversation and text-submission checkpoints await their
-complete Windows run. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
+Fresh native Windows installation/import/model/recheck and cleanup also passed
+with 49 exact distributions. Newer private-pipe and recovery checkpoints await
+their corrected complete Windows run. The latest accepted Linux run has 117 groups
+and 841 tests. [Verification details](docs/verification.md) distinguish each result
+and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
