@@ -55,6 +55,7 @@ test("wrong-session replies, permission denials and post-turn account changes re
     if (change === "login") settings.afterPrint = () => { settings.login.email = "changed@example.invalid"; };
     await assert.rejects(submit(approval), /native session|account changed/);
     const saved = (await store.snapshot("personal")).codingTurns[0]; assert.equal(saved.status, "outcome-unconfirmed"); assert.equal(saved.reply, null); assert.equal(saved.turnId, null);
+    if (change !== "login") { assert.equal(saved.nativeResultSummary.schema, "switchyard-claude-result-shape/v1"); assert.equal(saved.nativeResultSummary.exactSessionMatched, change !== "session"); assert.match(saved.observedSessionId, /^[a-f0-9-]{36}$/); assert.equal(JSON.stringify(saved.nativeResultSummary).includes("Ready"), false); }
   });
 });
 test("keyboard-only shutdown stops the owned Claude print and retains uncertainty for local outcome review", () => fixture(async ({ store, service, settings, children, input, review, submit }) => {

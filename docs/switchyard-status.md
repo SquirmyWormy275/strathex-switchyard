@@ -1124,3 +1124,28 @@ checks and the shared Codex regressions pass. The combined native text,
 conversation and runner groups pass **52 focused tests**; TypeScript typecheck
 passes. General provider-tree containment is still unfinished beyond direct-child
 exit. Full integrated and installed stopped-task text acceptance are running.
+
+The shared provider checkpoint passed **117 Linux groups, 825 tests: 816 passed
+and 9 expected platform skips**, receipt
+`e8f0c1f9-616e-4f74-a741-756125d6c28a`. Normal update/export passed six checks for
+source **e31e147**, release
+`527ac05e69dba36a531c9af89bc5c4ca1fbbd012d4b4b0d2b064e97bc4437dac`;
+its disposable bundle was removed. Receipt:
+`assignment-legends-1793378903351.json`.
+
+The app worktree has no native Claude workspace-trust approval. Its background
+creation was refused before a prompt, and the conservative uncertain fixture was
+preserved. Receipt: `installed-reviewed-claude-text-1793378924065.json`. No trust
+setting was changed. The earlier empty private contract repository was already
+approved and was reused instead. There, actual create, reviewed stop and text
+review passed; the native print result did not pass the expected envelope
+contract. Its exact request remains unresolved and its reply was not retained.
+Receipt: `installed-reviewed-claude-text-1793379061243.json`. This result is not
+accepted or attributed to missing hardware.
+
+Native result failures now retain bounded structural diagnostics and any valid
+returned session UUID inside the protected request, separately from its original
+target. No reply text, credentials, email or account/org data is copied into those
+diagnostics. This permits contract diagnosis without guessing a new target or
+silently rebinding the task. The fifteen focused provider tests pass. Installed
+acceptance is continuing; neither failure is reported as task completion.

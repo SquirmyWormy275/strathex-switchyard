@@ -11,7 +11,7 @@ import { privateRead, privateWrite } from "../tools/layout-studio/private-fs.mjs
 import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { desktopEnvironment } from "../tools/layout-studio/process-environment.mjs";
 if (process.platform !== "linux" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw new Error("Usage on the pilot: node scripts/verify-claude-submission-host.mjs --synthetic (normal app running; current Git directory must already be trusted by the native CLI; creates/stops one empty owned task and sends one tiny reviewed prompt, without changing native trust settings)");
-const repositoryRoot = await realpath(process.cwd()); assert.ok((await lstat(join(repositoryRoot, ".git"))).isDirectory());
+const repositoryRoot = await realpath(process.cwd()), git = await lstat(join(repositoryRoot, ".git")); assert.ok(!git.isSymbolicLink() && (git.isDirectory() || git.isFile()));
 const store = createSuiteStore(), compartment = "claude-coding-validation", taskId = randomUUID(), requestId = randomUUID(), checks = [];
 await store.initialize(compartment, "personal"); const baseline = await store.snapshot(compartment); assert.equal(baseline.mode, "keyboard-only");
 const endpoint = JSON.parse(await privateRead(join(applicationStateRoot(), "endpoint.json"))), url = new URL(endpoint.url), token = /^#access=([A-Za-z0-9_-]{43})$/.exec(url.hash)?.[1]; assert.ok(token && url.hostname === "127.0.0.1" && url.protocol === "http:");
@@ -21,7 +21,8 @@ async function api(path, body, expected = 200, authenticated = true) {
   const value = await r.json(); assert.equal(r.status, expected, `The installed ${path} check did not verify: ${typeof value.error === "string" ? value.error.slice(0, 600) : "unexpected HTTP status"}`); return value;
 }
 function sourceState() {
-  const values = [["status", "--porcelain=v1", "-z", "--untracked-files=normal"], ["diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--", "."]].map((args) => { const r = spawnSync("git", args, { cwd: repositoryRoot, shell: false, encoding: "utf8", maxBuffer: 4 * 1024 * 1024, env: desktopEnvironment() }); assert.equal(r.status, 0); return hash(r.stdout); });
+  const hasHead = spawnSync("git", ["rev-parse", "--verify", "HEAD"], { cwd: repositoryRoot, shell: false, stdio: "ignore", env: desktopEnvironment() }).status === 0;
+  const values = [["status", "--porcelain=v1", "-z", "--untracked-files=normal"], ["diff", "--no-ext-diff", "--no-textconv", "--binary", ...(hasHead ? ["HEAD"] : []), "--", "."]].map((args) => { const r = spawnSync("git", args, { cwd: repositoryRoot, shell: false, encoding: "utf8", maxBuffer: 4 * 1024 * 1024, env: desktopEnvironment() }); assert.equal(r.status, 0); return hash(r.stdout); });
   return digest(values);
 }
 const definitions = (s) => digest([s.profile, s.workflow, s.roleBindings ?? [], s.mode]), personal = definitions(await api("snapshot", { compartment: "personal" })), selection = await store.selection(), sourceBefore = sourceState();

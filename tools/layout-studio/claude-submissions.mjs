@@ -41,7 +41,7 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
           const value = await new Promise((resolve, reject) => {
             let output = "", bytes = 0, settled = false;
             const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener("abort", aborted); error ? reject(error) : resolve(value); };
-            const fail = (message, code) => { if (settled) return; children.get(child)?.close(); const error = new Error(message); error.code = code; finish(error); };
+            const fail = (message, code, metadata = {}) => { if (settled) return; children.get(child)?.close(); const error = new Error(message); error.code = code; Object.assign(error, metadata); finish(error); };
             const aborted = () => fail("Cancellation was requested for this exact owned Claude connection.", "CANCELLED");
             const timer = setTimeout(() => fail("The owned Claude text turn exceeded its bounded deadline.", "TURN_TIMEOUT"), 120000);
             signal?.addEventListener("abort", aborted, { once: true });
@@ -50,11 +50,17 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
             child.stdout.on("data", (chunk) => { bytes += Buffer.byteLength(chunk); if (bytes > 2 * 1024 * 1024) fail("The Claude result exceeded its bounded envelope.", "OUTPUT_BOUND"); else output += chunk; });
             child.once("close", (code) => {
               if (settled) return;
+              let r;
               try {
-                checkCurrent(); const r = JSON.parse(output);
+                checkCurrent(); r = JSON.parse(output);
                 if (code !== 0 || r.type !== "result" || r.subtype !== "success" || r.is_error !== false || r.session_id !== task.sessionId || typeof r.result !== "string" || !r.result.trim() || Buffer.byteLength(r.result) > 32768 || r.permission_denials != null && (!Array.isArray(r.permission_denials) || r.permission_denials.length)) throw new Error();
                 finish(null, r.result);
-              } catch { fail("The owned Claude result did not verify its exact native session and successful bounded reply. The original request remains for review.", "NATIVE_RESULT_UNCONFIRMED"); }
+              } catch {
+                const field = (v) => typeof v === "string" && /^[A-Za-z_-]{1,64}$/.test(v) ? v : "unverified";
+                const summary = { schema: "switchyard-claude-result-shape/v1", exitCode: code, parsed: r != null, rootType: Array.isArray(r) ? "array" : r === null ? "null" : typeof r, frameCount: Array.isArray(r) ? r.length : null, terminalType: Array.isArray(r) ? field(r.at(-1)?.type) : null, type: field(r?.type), subtype: field(r?.subtype), isError: typeof r?.is_error === "boolean" ? r.is_error : null, exactSessionMatched: r?.session_id === task.sessionId, resultType: typeof r?.result, resultBytes: typeof r?.result === "string" ? Buffer.byteLength(r.result) : null, permissionDenials: Array.isArray(r?.permission_denials) ? r.permission_denials.length : null };
+                const observedSessionId = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(r?.session_id ?? "") ? r.session_id : null;
+                fail("The owned Claude result did not verify its exact native session and successful bounded reply. The original request remains for review.", "NATIVE_RESULT_UNCONFIRMED", { nativeResultSummary: summary, observedSessionId });
+              }
             });
             if (signal?.aborted) { aborted(); return; }
             try { checkCurrent(); child.stdin.end(text); } catch { fail("The exact Claude request was stopped before its input was confirmed.", "SUBMISSION_UNCONFIRMED"); }
