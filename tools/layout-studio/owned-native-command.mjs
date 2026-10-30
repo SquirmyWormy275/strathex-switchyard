@@ -7,7 +7,7 @@ export function guardianScope(frame) {
   return { schema: frame.schema, id: frame.id, guardianPid: frame.guardianPid, birth: frame.birth, containment: frame.containment };
 }
 
-export async function runOwnedNativeCommand({ executable, args, cwd, env, text, signal, resource, onReady = async () => {}, onStopped = async () => {}, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, stopChild = stopOwnedChild } = {}) {
+export async function runOwnedNativeCommand({ executable, args, cwd, env, text, signal, resource, timeout = 120000, maxOutputBytes = 524288, captureStderrBytes = 16384, onReady = async () => {}, onStopped = async () => {}, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, stopChild = stopOwnedChild } = {}) {
   const controller = new AbortController(); let scope, settled = false, operation;
   const aborted = () => controller.abort(); signal?.addEventListener("abort", aborted, { once: true }); if (signal?.aborted) aborted();
   const client = {
@@ -24,7 +24,7 @@ export async function runOwnedNativeCommand({ executable, args, cwd, env, text, 
     }
   };
   resource.clients.add(client);
-  operation = Promise.resolve().then(() => command(executable, args, { cwd, env, inputText: text, signal: controller.signal, captureStderrBytes: 16384, maxOutputBytes: 524288, detailed: true, timeout: 120000,
+  operation = Promise.resolve().then(() => command(executable, args, { cwd, env, inputText: text, signal: controller.signal, captureStderrBytes, maxOutputBytes, detailed: true, timeout,
     onGuardianChild: child => { client.child = child; },
     onGuardianReady: async frame => { scope = guardianScope(frame); await onReady(scope); }
   })).then(async result => {

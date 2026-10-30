@@ -123,6 +123,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/instance.test.mjs" },
   { file: "tools/layout-studio/foreground.test.mjs" },
+  { file: "tools/layout-studio/keyboard-indicators.test.mjs" },
   { file: "tools/layout-studio/portable-package.test.mjs" },
   { file: "tools/layout-studio/legend-export.test.mjs" },
   { file: "tools/layout-studio/windows-host.test.mjs" },

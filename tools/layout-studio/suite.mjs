@@ -25,9 +25,10 @@ import { exportAssignmentLegends } from "./legend-export.mjs";
 import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
 import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
 import { createReadoutProfiles } from "./readout-profiles.mjs";
+import { createKeyboardIndicators } from "./keyboard-indicators.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -249,6 +250,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
       if (path === "/api/suite/profile/select") return store.selectProfile(compartment, body.profileId, body.revision ?? null);
       if (path === "/api/suite/devices/list") return devices.list();
+      if (path === "/api/suite/host/keyboard-indicators") return keyboardIndicators.read();
       if (path === "/api/suite/devices/identify") {
         if (typeof body.deviceId !== "string" || !/^[a-f0-9]{64}$/.test(body.deviceId)) throw new Error("Choose an exact previously read configuration interface.");
         const snapshots = ((await store.snapshot(compartment)).deviceSnapshots ?? []).filter((s) => s.identity.deviceId === body.deviceId);
@@ -335,6 +337,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
+    async close() { closed = true; readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
   };
 }

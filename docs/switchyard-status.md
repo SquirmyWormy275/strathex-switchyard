@@ -1338,3 +1338,27 @@ successful command to hide an earlier failure. See Microsoft's
 [preference-variable contract](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables).
 This closes an error-propagation gap; it does not retroactively accept old legend
 checks. The full Windows checkpoint still needs its corrected complete run.
+
+## Read-only host lock indicator backend
+
+The new authenticated host keyboard-indicator route separates OS output state
+from firmware keymaps. Linux reads bounded kernel lock LED nodes by input
+instance, preserving disagreements and null unknown values. The actual pilot
+reported one input instance with three readable indicators; no device is linked
+and no key or LED state was changed. Windows implements a separate fixed native
+GetKeyboardState mode under the existing owned guardian, returning only three
+toggle booleans with explicit calling-thread provenance and no live physical
+attestation. No hooks, input-thread attachment or input injection is added.
+
+Fifty focused indicator/suite/runner/native guardian tests and TypeScript checks
+pass; the native helper builds with zero warnings/errors. Windows observer CI
+now exercises the new contract after the helper is built. Actual Windows
+interactive state and device LED acceptance remain open. The normal installed
+Linux route/retention-preservation demonstration is being prepared.
+
+The latest Codex regression also passed all seven installed checks after the
+shared recovery refactor (one tiny native prompt, exact acknowledgement,
+duplicates/replay, unchanged repository and keyboard-only cleanup). Receipt:
+installed-reviewed-codex-text-1793382924738.json. Browser automation currently
+exposes no Switchyard tab; no browser navigation or frozen-frontend reload was
+performed.

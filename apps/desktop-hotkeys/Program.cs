@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 // Default mode: current-user closed hotkey intents, with no shell or input injection.
-// The separate private runtime guardian mode is used only by the native installer.
+// Separate private modes supervise owned commands and sample lock indicators.
 internal static class Program
 {
     private const uint WmHotkey = 0x0312, WmControl = 0x8001, WmQuit = 0x0012;
@@ -30,6 +30,23 @@ internal static class Program
     [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll")] private static extern IntPtr GetKeyboardLayout(uint thread);
+    [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetKeyboardState([Out] byte[] state);
+
+    private static int ReadKeyboardIndicators()
+    {
+        if (!OperatingSystem.IsWindows()) return 2;
+        // The documented API reports this calling thread's input-queue snapshot.
+        // Do not attach another thread, inject input or claim hardware LED readback.
+        PeekMessageW(out _, IntPtr.Zero, 0, 0, 0);
+        var state = new byte[256]; bool available = GetKeyboardState(state);
+        Write(new { schema = "switchyard-windows-keyboard-indicators/v1", available,
+            numLock = available ? (bool?)((state[0x90] & 1) != 0) : null,
+            capsLock = available ? (bool?)((state[0x14] & 1) != 0) : null,
+            scrollLock = available ? (bool?)((state[0x91] & 1) != 0) : null,
+            provenance = "Windows GetKeyboardState calling-thread snapshot",
+            physicalDeviceLinked = false, physicalLightVerified = false, liveDesktopStateVerified = false, keyboardWritten = false });
+        return 0;
+    }
 
     private static void Write(object message) { lock (OutputLock) Console.WriteLine(JsonSerializer.Serialize(message)); }
     private static void Handle(JsonElement request)
@@ -109,6 +126,7 @@ internal static class Program
     {
         if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();
         if (args.SequenceEqual(new[] { "--runtime-command-status" })) return RuntimeCommandRunner.ReadStatus();
+        if (args.SequenceEqual(new[] { "--keyboard-indicators" })) return ReadKeyboardIndicators();
         if (args.Length != 0) return 2;
         if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("Windows hotkeys require an interactive Windows user session."); return 2; }
         var first = Console.ReadLine(); if (first is null || first.Length > 8192) return 2;

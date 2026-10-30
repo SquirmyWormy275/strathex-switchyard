@@ -302,3 +302,32 @@ Tests assert literal wire packets, guarded proposals, partial-field recovery,
 unplug/reconnect, readback failure, unrelated edits, reserved-bit preservation,
 physical unlock, failed backup and consumed-review rejection. These are software
 fault transports; no physical typing, repeat or modifier behavior is accepted.
+
+## Host lock indicators
+
+`POST /api/suite/host/keyboard-indicators` performs an explicit one-shot read. It
+changes no keys, indicators, modes or firmware and does not retain a recording.
+Authentication and the exact local origin are still required. This read is usable
+in keyboard-only mode, independently of any assistant account. Frontend exposure
+is pending the frozen review.
+
+Linux reads only the kernel's `inputN::numlock`, `capslock` and `scrolllock` LED
+class brightness values. Reports preserve each input instance separately: two
+keyboards can disagree, and unavailable or malformed values remain null. There
+is no invented single global Num Lock value and no inferred F77 association.
+
+Windows uses a fixed read-only helper mode under the native Job guardian. Only
+three toggle booleans leave the native process; the 256-key bitmap stays in
+memory. Its scope is the documented
+[GetKeyboardState calling-thread snapshot](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getkeyboardstate),
+which is not claimed as live foreground-thread or physical LED attestation.
+The helper neither attaches another input thread nor injects key events. Its
+native API/field/cleanup check is included in the Windows observer CI step;
+actual interactive Num Lock behavior remains a separate acceptance check.
+
+Responses explicitly keep `physicalDeviceLinked`, `physicalLightVerified`,
+`liveDesktopStateVerified` and `keyboardWritten` false. A lock indicator read
+does not establish the keyboard's firmware Num Lock mapping. Read and identify
+the actual controller separately; its typing/host LED interaction still needs
+that device. The installed Linux check is
+`scripts/verify-keyboard-indicators-host.mjs --read-only`.
