@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **106/106 groups passed; 737 tests, 728 passed and 9
+- Integrated native Linux run: **106/106 groups passed; 738 tests, 729 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-fd1917bc-155d-4a7f-a4a1-a036756f3975.json`.
+  `.sxsy-verification/isolated-test-a5d29a59-0497-43b6-a680-1826cf2af743.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -557,3 +557,41 @@ The integrated runtime-lifecycle source check now passes **106/106 Linux groups,
 `fd1917bc-155d-4a7f-a4a1-a036756f3975`. TypeScript typecheck passed. The C# runtime
 guardian and read-only recovery status mode build with zero warnings/errors.
 Compiler bin/obj staging was removed; no additional environment/model was built.
+
+## Installed runtime acceptance — October 30, 2026
+
+Normal installed source **7fe13c0**, release
+`3eca9a019e950a25d24fbc40d9cb7283924f3cd336ffbdf22f9d8086df58dfb1`,
+passed the repeatable `scripts/verify-runtime-host.mjs --adopt` demonstration.
+Private receipt `runtime-lifecycle-1793365729575.json` records six checks:
+normal verified app update; adoption of the existing `venv` and `base.en` in
+place; 48 exact dependencies/no extras and offline CPU model load; exact
+installed-owner stop/restart; unchanged update with no downloads/rebuild/restart;
+selected voice paths/HID enumeration and preserved definitions/package/mode,
+private review URL and exact frozen Home bytes. Runtime record:
+`0607bac6765ed3570ddaa614f7d058e4cdab479c2f873c52b1c998d56d867faf`.
+Configuration-interface inventory remains **zero**. No physical write or UI
+acceptance is claimed.
+
+Two actual-setup issues were fixed before acceptance: the owned legacy `0755`
+software root needed a dated `0700` migration, and native target hashing must
+preserve Python's venv invocation alias. Earlier failed receipts remain private;
+these were software defects, not hardware/account blockers. Both have regression
+coverage, and the actual pilot interpreter retained its expected venv prefix.
+
+The selected runtime also passed the actual synthetic CPU/HTTP voice checks
+again (`voice-1793365765570.json`): duplicate prevention, correction continuity,
+audio erasure after successful saving, explicit review of later text and worker
+exit **14 ms** after abrupt owner loss. Temporary audio was removed and the
+validation workspace returned to keyboard-only. No microphone was opened.
+
+Integrated source **7fe13c0** passes **106 groups, 738 tests: 729 pass, 9 expected
+skips**, receipt `a5d29a59-0497-43b6-a680-1826cf2af743`. Typecheck and the native
+C# build passed. All disposable suite bundles and compiler bin/obj staging were
+removed. The installed current/rollback program pair is about 6.2 MiB; runtime
+inventories/journals occupy about 1.2 MiB. The existing shared runtime/model and
+one development SDK remain; no duplicate environment or model was created.
+
+Native Windows runtime guardian execution and dependency imports remain distinct
+acceptance items. Automatic host-connection restoration during application
+uninstall and broader provider containment remain implementation work.

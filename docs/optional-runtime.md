@@ -80,7 +80,10 @@ audio erasure after saving text and Python exit after abrupt owner loss.
 Suite packaging and normal application install/update/rollback are implemented
 and host-tested; see [application installation](suite-installation.md).
 Versioned optional-runtime maintenance, acknowledged worker supervision and
-normal CLI integration are implemented with software/fault coverage. The current
+normal CLI integration are implemented with software/fault coverage. Normal
+pilot adoption/check/reuse, exact app restart and selected-runtime synthetic
+CPU/HTTP transcription passed at source 7fe13c0 without rebuilding or downloading
+a model. The current
 pilot adoption and native Windows checks are recorded in the
 [evidence ledger](switchyard-status.md); Windows dependency-resolution evidence
 does not establish native imports or interactive acceptance. A matching working
