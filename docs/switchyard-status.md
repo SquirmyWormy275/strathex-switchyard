@@ -760,3 +760,13 @@ definitions and lossless literal vectors. Typecheck, source canonicality and
 updated integrated Linux verification are running. Frontend reconciliation,
 readout-derived profile adoption and actual device acceptance remain separate
 unfinished/external work.
+
+The corrected runner contract passed on Windows at `e4513cc`, exposing a later
+native-backend failure in five legend cases: checkout had converted the retained
+SVG's line endings, so its exact source hash correctly rejected it (run
+`41071678292`). A real local Git clone with `core.autocrlf=true` reproduced this
+failure. Retained template and upstream catalog sources now disable newline
+conversion, while the generated catalog pins LF for canonical regeneration.
+The regression verifies both original CRLF instructions and LF vectors/headers
+through an actual Windows-style checkout. Source hashes are unchanged and no
+integrity check is relaxed. Updated native Windows verification remains pending.

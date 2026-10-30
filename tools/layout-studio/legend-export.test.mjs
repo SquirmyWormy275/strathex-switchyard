@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, mkdir, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { desktopEnvironment } from "./process-environment.mjs";
 import test from "node:test";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile } from "./workspace.mjs";
@@ -65,6 +67,19 @@ test("HTML, SVG and output names escape untrusted text and reject control or amb
 });
 test("empty profiles preserve the blank source; no assignment or device position is invented", async () => {
   const result = await exportAssignmentLegends(sample(0), { format: "template-svg" }); assert.deepEqual(result.manifest.assignments, []); assert.equal(result.manifest.template.pageCount, 1); assert.equal(result.content.includes("<rect "), false);
+});
+test("Windows-style Git checkout preserves LF vectors, original CRLF instructions and pinned firmware source bytes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "sy-source-checkout-")), source = join(root, "source"), target = join(root, "checkout"), empty = join(root, "empty-config");
+  await mkdir(source); await writeFile(empty, "");
+  const options = { cwd: source, env: { ...desktopEnvironment(), GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: "1" }, encoding: "utf8", timeout: 15000, stdio: ["ignore", "pipe", "pipe"] };
+  const git = (...args) => execFileSync("git", ["-c", "core.autocrlf=true", "-c", "core.safecrlf=false", "-c", `core.hooksPath=${join(root, "no-hooks")}`, "-c", "init.templateDir=", "-c", "commit.gpgsign=false", ...args], options);
+  const inputs = [".gitattributes", "third-party/cyber_engineer/pure-template.svg", "third-party/cyber_engineer/ReadMe.txt", "third_party/model-f-catalog/ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/config.h", "third_party/model-f-catalog/mymakercorner/keyboards/leyden_jar/f77/keymaps/vial/config.h", "tools/layout-studio/model-f-catalog.json"];
+  try {
+    git("init", "--quiet");
+    for (const file of inputs) { await mkdir(dirname(join(source, file)), { recursive: true }); await writeFile(join(source, file), await readFile(new URL(`../../${file}`, import.meta.url))); }
+    git("add", "."); git("-c", "user.name=Switchyard fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "Pinned source checkout fixture"); git("clone", "--quiet", "--no-hardlinks", source, target);
+    for (const file of inputs.slice(1)) assert.ok((await readFile(join(target, file))).equals(await readFile(new URL(`../../${file}`, import.meta.url))), `Git changed retained source bytes: ${file}`);
+  } finally { await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 });
 test("portable v2 meanings retain exact roles/intents, while edited revisions cannot be printed as verified definitions", async () => {
   const document = sample(1); document.workflow = { name: "Coding", steps: [], roles: [{ id: "builder", label: "Builder" }] };
