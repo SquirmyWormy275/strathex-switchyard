@@ -25,7 +25,8 @@ type into the foreground; they do not identify or control an agent session.
 Physical layout choices use the definition's reverse-packed option bits and
 preserve unknown higher bits. Choosing a layout does not rearrange physical keys.
 Recovery checks its owned option bits and preserves unrelated changes outside
-that mask. Tap-dance/combo/encoder editing remains unfinished.
+that mask. Advertised tap-dance, combo and encoder transactions are implemented below;
+their expanded frontend editing controls remain unfinished.
 
 Vial 4+ standard QMK settings are queried in bounded advancing pages. Only the
 advertised IDs with a known codec can be read or edited: standard IDs 1–27 cover

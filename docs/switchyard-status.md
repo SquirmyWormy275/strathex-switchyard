@@ -1316,3 +1316,25 @@ normal installed journey now includes a synthetic lost-local-acceptance fault
 against an actual existing native conversation, then separate recovery approval;
 that expanded native acceptance is pending. This is not an automatic retry or
 proof of external task completion.
+
+The expanded installed Claude journey passed **13 checks** at 4eea520 with three
+separately reviewed synthetic prompts. It created/continued one native UUID,
+injected a loss of local first-creation acceptance, required outcome review,
+then recovered that exact existing native conversation through resume-only
+approval. Recovery/ordinary request-scope and duplicate checks passed; final
+keyboard-only cleanup removed the synthetic local records. Receipt:
+installed-reviewed-claude-text-1793382629147.json. This is a synthetic local
+fault injection against a real native conversation, not a claimed hardware crash.
+
+The complete Linux run at that checkpoint is accepted: **117/117 groups, 841
+tests, 832 passed and nine platform skips**, receipt
+6f8e3e9c-0c9e-4e84-8e06-832c1d334dbd. The normal application is release
+d3429262c8c69d6b348247f3c0f9d2dc5fd03b41efc789f8f258789f74232464;
+its six update/export checks preserved the exact frozen Home and private link.
+
+Windows CI now checks each native documentation-generator exit code immediately.
+PowerShell's default native-command error preference can otherwise allow a later
+successful command to hide an earlier failure. See Microsoft's
+[preference-variable contract](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables).
+This closes an error-propagation gap; it does not retroactively accept old legend
+checks. The full Windows checkpoint still needs its corrected complete run.

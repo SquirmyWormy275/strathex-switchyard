@@ -153,6 +153,8 @@ It restores
 keyboard-only mode and removes
 its synthetic local records. It never changes native workspace-trust settings,
 deletes native user history or grants file/command authority. Its native result
-passed nine normal installed checks with two synthetic prompts, exact UUID
-continuation, duplicate/replay rejection and keyboard-only cleanup. Native pipe,
+passed thirteen normal installed checks with three synthetic prompts, exact UUID
+creation/continuation, a synthetic lost-acceptance fault and separately approved
+resume-only recovery, verified owned guardians, duplicate/replay rejection and
+keyboard-only cleanup. Native pipe,
 policy, first-turn lifecycle and crash-recovery tests pass.

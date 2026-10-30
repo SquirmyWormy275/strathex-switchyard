@@ -70,9 +70,13 @@ jobs:
       - name: Verify generated documentation and the complete manual PDF
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           python .\scripts\generate_b122_documentation.py --check
+          if ($LASTEXITCODE -ne 0) { throw 'The canonical documentation sources are stale or invalid.' }
           python .\scripts\generate_b122_legends.py --check
+          if ($LASTEXITCODE -ne 0) { throw 'The canonical PDF/SVG legend sources are stale or invalid.' }
           python -m pytest .\docs\tests\test_b122_documentation.py -q
+          if ($LASTEXITCODE -ne 0) { throw 'The documentation and rendered-PDF verification tests failed.' }
 
       - name: Fetch and verify the official portable Node runtime
         shell: pwsh
