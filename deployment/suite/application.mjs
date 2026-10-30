@@ -110,9 +110,10 @@ export async function launchApplication({ bundleRoot, port = 43177, stateRoot = 
     }
   });
 }
-export async function stopApplication({ stateRoot = applicationStateRoot() } = {}) {
+export async function stopApplication({ stateRoot = applicationStateRoot(), expectedBuild, expectedInstanceId } = {}) {
   const endpoint = await savedEndpoint(stateRoot);
   if (!endpoint) return { status: "not-started", stopped: true };
+  if (expectedBuild !== undefined && endpoint.instance.build !== expectedBuild || expectedInstanceId !== undefined && endpoint.instance.id !== expectedInstanceId) throw new Error("The saved application generation changed before stop. The different owner was preserved.");
   let birth = null;
   try {
     process.kill(endpoint.pid, 0);

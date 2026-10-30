@@ -170,7 +170,7 @@ export function createHostBridge({
   async function verifyRemoved(connections) {
     if ((await hypr("reload")).trim() !== "ok" || (await hypr("configerrors")).trim()) throw new Error("The compositor could not validate the restored configuration.");
     const bindings = await live();
-    for (const connection of connections) if (bindings.some(binding => ours(binding, connection))) throw new Error("An owned shortcut remains in live compositor readback; restoration is unconfirmed.");
+    for (const connection of connections) if (bindings.some(binding => matches(binding, connection) && binding.description === connection.label)) throw new Error("An owned or ambiguous matching shortcut remains in live compositor readback; restoration is unconfirmed.");
     for (const connection of connections) if (connection.callbackName) {
       const name = callbackName(connection);
       if ((await hypr("eval", `${name} = nil`)).trim() !== "ok" || (await hypr("repl", `type(${name})`)).trim() !== "nil") throw new Error("The owned shortcut callback removal was not read back.");

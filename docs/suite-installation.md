@@ -114,38 +114,58 @@ must match their hashes; an incomplete copy must match the exact prefix of an
 independently verified source. Unrelated staging content is preserved before
 any deletion.
 
-Uninstall removes only matching owned launchers and verified program versions.
-Protected workspace data, OS credential entries and the shared optional runtime
-are retained. Active host connections must be restored in the app first; their
-program and recovery baseline remain available until that succeeds. This guard
-does not stop an application when it refuses removal. Automatic connection
-restoration as part of uninstall is still unfinished.
+Uninstall first verifies and stops the exact installed application, then holds
+its start/owner leases while restoring host connections and removing owned
+entries. Linux preflights every saved active shortcut, saves a dated copy of the
+complete current configuration, removes exact owned blocks, reloads and reads
+back shortcuts/callbacks. The host lease remains held through program removal.
+Windows clears exact owned saved re-registration preferences after the app/helper
+has exited; it preserves protected original baselines and creates no new helper
+or registration during removal.
 
-## Implementation and acceptance still in progress
+An edited/ambiguous binding, missing protected key, unconfirmed process exit or
+another registered instance preserves the program. A restoration conflict
+resumes the previous running app. Interrupted batch restoration uses an exact
+before/after journal; unrelated later edits stop recovery without overwriting
+them. Successful removal retains protected workspaces, OS credential entries,
+device recovery records and the optional runtime. Use the separate
+[optional-runtime maintenance command](optional-runtime.md) to remove generated
+Python/model components deliberately.
 
-Linux installer tests exercise real installed application processes through
-update and rollback, eight failure/recovery scenarios, forced installer exits
-before and after promotion, and preserved protected/runtime files.
-The pilot installation from `215f351` passed actual command launch, desktop-file
-validation, authenticated protected-workspace access, stop/restart and simultaneous
-launch reuse on 2026-10-30. Its original frozen review URL was retained. Program
-files total 2,126,459 bytes; the duplicate source bundles were removed afterward.
-Browser visual/click acceptance is still open. Native Windows managed startup currently fails
-in CI and is being diagnosed; a Windows host is not the cause of that software
-failure. Native Windows shortcut/install execution must pass CI before acceptance
-is claimed. Complete optional-runtime maintenance
-and broader owned-provider containment remain implementation work. Building a
-package changes no launcher or keyboard mapping by itself.
+Each installation journal also records `recoveryNode` and `recoveryEntry`: a
+small, dated verified recovery entry outside the program directory. If an
+interrupted uninstall already removed the main `switchyard` command, run the
+recorded Node executable with the recorded recovery entry and `recover` as its
+arguments. It verifies the pinned executable and retained release before loading
+recovery code, works outside the checkout, and restores exact owned entries.
+Restart failure keeps the recovery journal available for another attempt.
 
-The latest Windows diagnostics stop before ownership acknowledgement. Helpers now
-use explicit UTF-8 raw standard streams, following the
-[documented standard-stream API](https://learn.microsoft.com/en-us/dotnet/api/system.console.openstandardoutput?view=net-8.0),
-with a dedicated detached/no-console lock test. File identity comparisons use
-exact 64-bit integers, and Windows recovery does not interpret synthesized Unix
-permission bits as native ACL evidence. The next native run must verify the fixes.
-The native rerun passed those filesystem/recovery and detached-pipe cases; managed
-startup still failed. Its restricted environment now preserves required Windows
-system coordinates. Helpers import the built-in utility by its explicit system
-path instead of discovering user/third-party modules. This also avoids dependence
-on a pre-existing [PowerShell module analysis cache](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_windows_powershell_5.1).
-The next run must establish application startup before Windows acceptance.
+## Current evidence and remaining acceptance
+
+Integrated Linux tests cover actual installed application processes, normal
+update/rollback, exact-generation stop rejection, host-restoration ordering,
+conflict preservation, unconfirmed exit, failed removal/restart, and forced
+installer loss. A dated recovery entry has restored an interrupted uninstall
+from outside the checkout after the primary loader was removed. Linux shortcut
+batch tests use a synthetic compositor with actual subprocess/kernel-lease loss;
+they do not establish physical key or live-desktop removal acceptance.
+
+The pilot normal installation is source **7fe13c0**. Verified app update,
+in-place adoption of the existing shared runtime, 48 exact dependencies and
+offline CPU model load, exact app restart and unchanged runtime reuse passed
+on October 30, 2026. Saved definitions/package/modes, private review URL and
+frozen Home bytes were preserved. Selected-runtime synthetic CPU/HTTP voice and
+14 ms worker exit after abrupt parent loss passed too. No microphone or physical
+keyboard write was used. Disposable bundles and compiler staging were removed;
+the installed current/rollback pair occupies about 6.2 MiB.
+
+The complete Windows release passed **212 groups** at `4cab102`, including the
+previously failing alias/bootstrap/automation cases and native task/controller
+checks. At `7efce3a`, native backend tests, read-only category observation and
+runtime Job Object owner-loss checks also passed; that full release is still
+running. New removal code must pass the next native Windows run before its
+execution is accepted. Browser visual/click, interactive Windows device/account,
+voice capture and exact provider-task attachment remain separate acceptance or
+implementation items. See the [live requirement ledger](switchyard-requirements.md)
+and [evidence](switchyard-status.md). Building a package changes no launcher or
+keyboard mapping by itself.

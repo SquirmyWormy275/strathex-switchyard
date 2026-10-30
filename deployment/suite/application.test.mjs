@@ -23,6 +23,9 @@ test("parallel application launches share one authenticated owner, keep tokens p
   assert.equal(launches, 1); assert.equal(new Set(results.map((r) => r.instanceId)).size, 1); assert.equal(results.filter((r) => r.reused).length, 2);
   const status = await applicationStatus(options); assert.equal(status.authenticated, true); assert.equal(status.pid, results[0].pid); assert.equal(JSON.stringify(status).includes(new URL(results[0].url).hash.slice(8)), false);
   const response = await fetch(new URL(results[0].url).origin + "/"); assert.equal(response.status, 200);
+  await assert.rejects(stopApplication({ ...options, expectedBuild: "b".repeat(64) }), /generation changed/);
+  await assert.rejects(stopApplication({ ...options, expectedInstanceId: "00000000-0000-0000-0000-000000000000" }), /generation changed/);
+  assert.equal((await applicationStatus(options)).instanceId, results[0].instanceId);
   assert.equal((await stopApplication(options)).stopped, true); assert.equal((await stopApplication(options)).stopped, true);
 }));
 test("an abruptly exited application releases its kernel ownership lease; relaunch creates one new generation and preserves saved state", () => applicationFixture(async ({ root, options }) => {

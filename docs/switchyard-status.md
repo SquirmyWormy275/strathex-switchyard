@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **106/106 groups passed; 738 tests, 729 passed and 9
+- Integrated native Linux run: **107/107 groups passed; 754 tests, 745 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-a5d29a59-0497-43b6-a680-1826cf2af743.json`.
+  `.sxsy-verification/isolated-test-786042b0-bd8e-4bfb-8422-57c20264af4d.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -595,3 +595,30 @@ one development SDK remain; no duplicate environment or model was created.
 Native Windows runtime guardian execution and dependency imports remain distinct
 acceptance items. Automatic host-connection restoration during application
 uninstall and broader provider containment remain implementation work.
+
+## Connection restoration during removal
+
+Host operations now use a kernel lease instead of an abandoned-PID-file lock.
+Restoration saves a dated copy of the complete current bindings and its reason.
+Batch removal preflights all baselines/blocks before writing, journals exact
+before/after states and verifies live shortcut/callback removal. Actual forced
+process loss after the batch write recovers through a fresh lease in isolated
+fault tests; unrelated edits outside both states preserve the configuration.
+
+The installer now stops the exact authenticated generation, blocks other
+registered instances, holds application start/owner leases and the host lease
+through restoration and program removal. Windows preference restoration
+preflights all protected compartments, clears only exact owned re-registration
+entries after helper exit, and retains baselines. Missing keys and unowned
+bindings prevent removal. Restoration/write/restart failures preserve/recover
+the program. A dated verified recovery entry works outside the checkout even
+when an interrupted removal deleted the primary loader. These new paths have
+focused software/process tests; integrated Linux and native Windows follow-up
+checks are running. No live desktop or hardware removal is claimed.
+
+Integrated removal source passes **107/107 Linux groups, 754 tests: 745 passed
+and 9 expected platform skips**, receipt
+`786042b0-bd8e-4bfb-8422-57c20264af4d`. TypeScript typecheck passed. These checks
+include a real forced installer exit and invocation of the dated verified
+recovery entry from an unrelated working directory after primary-loader removal.
+The pilot app remains installed; no live user installation was removed.

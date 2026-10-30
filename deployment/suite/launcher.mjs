@@ -27,6 +27,13 @@ const {verifySuiteRelease}=await import(pathToFileURL(checker));await verifySuit
 if(pending){const {runInstallationCli}=await import(pathToFileURL(join(bundle,'deployment/suite/manage.mjs')));await runInstallationCli(['recover'],{root});}
 else {const {runApplicationCli}=await import(pathToFileURL(join(bundle,'deployment/suite/cli.mjs')));await runApplicationCli(process.argv.slice(2),bundle,{installationRoot:root});}
 `);
+/** Dated recovery entry remains callable if an interrupted uninstall removed the main command. */
+export function recoveryLoader(root) {
+  if (typeof root !== "string" || /[\0\r\n]/.test(root)) throw new Error("Unsupported recovery installation path.");
+  const source = stableLoader.toString("utf8"), pattern = /^const root=.*;$/m;
+  if (!pattern.test(source)) throw new Error("The stable recovery loader root could not be verified.");
+  return Buffer.from(source.replace(pattern, () => `const root=${JSON.stringify(root)};`));
+}
 export async function launcherContents({ root, nodePath, platform = process.platform, stateRoot }) {
   if ([root, nodePath, stateRoot].some((s) => typeof s !== "string" || /[\0\r\n]/.test(s))) throw new Error("Unsupported installation path.");
   const loader = join(root, "launch.mjs");

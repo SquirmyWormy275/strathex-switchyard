@@ -15,7 +15,7 @@ async function installFixture(fn) {
     const home = join(root, "h"), data = join(root, "d"), applicationRoot = join(root, "a"), stateRoot = join(root, "s/strathex-switchyard/application");
     await mkdir(home, { mode: 0o700 });
     const paths = { record: join(applicationRoot, "installed.json"), loader: join(applicationRoot, "launch.mjs"), command: process.platform === "win32" ? join(applicationRoot, "switchyard.cmd") : join(home, ".local/bin/switchyard"), desktop: process.platform === "win32" ? join(data, "Microsoft/Windows/Start Menu/Programs/Switchyard.lnk") : join(data, "applications/io.strathex.Switchyard.desktop") };
-    const options = { root: applicationRoot, stateRoot, paths, application: idle, beforeRemove: async () => {} }, make = (overrides = {}) => createInstallation({ ...options, ...overrides });
+    const options = { root: applicationRoot, stateRoot, paths, application: idle, beforeRemove: async () => {}, otherOwners: async () => [], withRestoredConnections: async continuation => continuation({ restored: [], readbackVerified: true }) }, make = (overrides = {}) => createInstallation({ ...options, ...overrides });
     const second = await buildSuiteRelease({ ...releaseOptions, sourceCommit: "b".repeat(40) });
     await fn({ root, home, options, make, first, second, releaseOptions, paths });
   }, process.platform);
@@ -72,6 +72,57 @@ test("active host connections block uninstall before any application stop or per
   await make().install(first.directory, first.id); const before = await snapshots(paths); let stops = 0;
   const install = make({ application: { status: async () => ({ status: "ready" }), stop: async () => { stops++; } }, beforeRemove: async () => { throw new Error("Synthetic active connection needs restoration"); } });
   await assert.rejects(install.uninstall(), /active connection needs restoration/); assert.equal(stops, 0); assert.deepEqual(await snapshots(paths), before);
+}));
+test("uninstall verifies exact owner exit and restores host connections before removing persistent program entries", () => installFixture(async ({ make, first, paths }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths), events = []; let running = true;
+  const install = make({
+    application: { status: async () => ({ status: running ? "ready" : "not-started", build: first.id, instanceId: "synthetic-owned-instance", pid: 1234 }), stop: async expected => { assert.equal(expected.expectedBuild, first.id); assert.equal(expected.expectedInstanceId, "synthetic-owned-instance"); events.push("stop"); running = false; return { stopped: true }; }, launch: async () => { throw new Error("Unexpected restart after successful removal"); } },
+    withRestoredConnections: async continuation => { assert.equal(running, false); assert.deepEqual(await snapshots(paths), before); events.push("restore-connections"); return continuation({ restored: [{ id: "synthetic-exact-connection", status: "restored" }], readbackVerified: true }); },
+    afterWrite: async role => events.push(`remove-${role}`)
+  });
+  const result = await install.uninstall(); assert.equal(result.status, "removed"); assert.equal(result.hostConnections.restored.length, 1); assert.deepEqual(events, ["stop", "restore-connections", "remove-loader", "remove-command", "remove-desktop", "remove-record"]);
+}));
+test("a restoration conflict retains all program entries and resumes the previous running application", () => installFixture(async ({ make, first, paths }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths); let running = true, restarts = 0;
+  const install = make({ application: { status: async () => ({ status: running ? "ready" : "not-started", build: first.id }), stop: async () => { running = false; return { stopped: true }; }, launch: async () => { running = true; restarts++; } }, withRestoredConnections: async () => { throw new Error("Synthetic edited host binding"); } });
+  await assert.rejects(install.uninstall(), /edited host binding/); assert.deepEqual(await snapshots(paths), before); assert.equal(running, true); assert.equal(restarts, 1);
+}));
+test("a second registered instance blocks uninstall without stopping either owner", () => installFixture(async ({ make, first, paths }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths); let stops = 0;
+  const install = make({ application: { status: async () => ({ status: "ready", build: first.id, pid: 1234 }), stop: async () => { stops++; }, launch: async () => {} }, otherOwners: async () => [{ pid: 9999, build: "b".repeat(64) }] });
+  await assert.rejects(install.uninstall(), /Another Switchyard instance/); assert.equal(stops, 0); assert.deepEqual(await snapshots(paths), before);
+}));
+test("unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery", () => installFixture(async ({ make, first, paths, options }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths); let running = true, restores = 0, restarts = 0;
+  const application = { status: async () => ({ status: running ? "ready" : "not-started", build: first.id }), stop: async () => ({ stopped: false }), launch: async () => { running = true; restarts++; } };
+  await assert.rejects(make({ application, withRestoredConnections: async () => { restores++; } }).uninstall(), { code: "APPLICATION_STOP_UNCONFIRMED" });
+  assert.equal(restores, 0); assert.deepEqual(await snapshots(paths), before); assert.ok(await readFile(join(options.root, "pending.json")));
+  running = false; assert.equal((await make({ application }).recover()).recovered, true); assert.equal(restarts, 1); assert.deepEqual(await snapshots(paths), before);
+}));
+test("a failed uninstall write restores the owned program and keeps restart recovery durable", () => installFixture(async ({ make, first, paths, options }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths); let running = true, failRestart = true, connectionsRestored = false;
+  const application = { status: async () => ({ status: running ? "ready" : "not-started", build: first.id }), stop: async () => { running = false; return { stopped: true }; }, launch: async () => { if (failRestart) throw new Error("Synthetic restart failure"); running = true; } };
+  const install = make({ application, withRestoredConnections: async continuation => { connectionsRestored = true; return continuation({ restored: [{ id: "synthetic" }], readbackVerified: true }); }, afterWrite: async (role, action) => { if (action === "uninstall" && role === "command") throw new Error("Synthetic uninstall write failure"); } });
+  await assert.rejects(install.uninstall(), /restart needs recovery/); assert.equal(connectionsRestored, true); assert.deepEqual(await snapshots(paths), before); assert.ok(await readFile(join(options.root, "pending.json")));
+  failRestart = false; await make({ application }).recover(); assert.equal(running, true); await assert.rejects(readFile(join(options.root, "pending.json")), { code: "ENOENT" });
+}));
+test("a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed", () => installFixture(async ({ make, first, options, paths, root, home }) => {
+  await make().install(first.directory, first.id); const before = await snapshots(paths);
+  const module = pathToFileURL(join(process.cwd(), "deployment/suite/installation.mjs")).href;
+  const program = `import{createInstallation}from ${JSON.stringify(module)};const install=createInstallation({...${JSON.stringify({ root: options.root, stateRoot: options.stateRoot, paths: options.paths })},application:{status:async()=>({status:'not-started'}),stop:async()=>({stopped:true}),launch:async()=>{}},otherOwners:async()=>[],withRestoredConnections:async fn=>fn({restored:[],readbackVerified:true}),afterWrite:async role=>{if(role==='loader')process.kill(process.pid,'SIGKILL')}});await install.uninstall();`;
+  const signal = await new Promise((resolve, reject) => { const child = spawn(process.execPath, ["--input-type=module", "-e", program], { shell: false, stdio: "ignore" }); child.once("error", reject); child.once("close", (code, signal) => resolve(signal)); });
+  assert.ok(signal === "SIGKILL" || process.platform === "win32" && signal === null);
+  await assert.rejects(readFile(paths.loader), { code: "ENOENT" });
+  const pending = JSON.parse(await readFile(join(options.root, "pending.json"))), directory = join(options.stateRoot, "installation-backups", pending.backup), plan = JSON.parse(await readFile(join(directory, "journal.json")));
+  const environment = applicationEnvironment({ ...process.env, HOME: home, USERPROFILE: home, XDG_STATE_HOME: join(root, "s"), XDG_DATA_HOME: join(root, "d"), APPDATA: join(root, "d"), LOCALAPPDATA: join(root, "l"), XDG_RUNTIME_DIR: join(root, "r") });
+  await mkdir(environment.XDG_RUNTIME_DIR, { mode: 0o700 });
+  const recovered = await new Promise((resolve, reject) => {
+    const child = spawn(plan.recoveryNode, [plan.recoveryEntry, "recover"], { cwd: home, env: environment, shell: false, stdio: ["ignore", "pipe", "pipe"] }); let output = "", errors = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), 30000);
+    child.stdout.on("data", bytes => { output += bytes; if (output.length > 65536) child.kill("SIGKILL"); }); child.stderr.on("data", bytes => { errors = (errors + bytes).slice(-2048); });
+    child.once("error", reject); child.once("close", code => { clearTimeout(timer); if (code) reject(new Error(`Dated recovery entry failed: ${errors}`)); else { try { resolve(JSON.parse(output)); } catch (error) { reject(error); } } });
+  });
+  assert.equal(recovered.recovered, true); assert.deepEqual(await snapshots(paths), before);
 }));
 test("an explicit no-start update stops the previous generation without restarting the new one", () => installFixture(async ({ make, first, second }) => {
   let running = false, starts = 0, stops = 0;

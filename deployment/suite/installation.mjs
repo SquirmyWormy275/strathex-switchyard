@@ -2,33 +2,26 @@
 import { constants } from "node:fs";
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, rename, rm, rmdir, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
 import { verifySuiteRelease, nodeVersion } from "./release.mjs";
-import { stableLoader, launcherContents } from "./launcher.mjs";
+import { stableLoader, recoveryLoader, launcherContents } from "./launcher.mjs";
 import { fileDigest, readOwnedFile, replaceOwnedFile } from "./owned-files.mjs";
 import { privateDirectory, privateRead, privateWrite } from "../../tools/layout-studio/private-fs.mjs";
 import { withStateLock } from "../../tools/layout-studio/state-lock.mjs";
 import { applicationStateRoot, applicationStatus, stopApplication, launchApplication } from "./application.mjs";
+import { connectionRestoration } from "./connection-restoration.mjs";
+import { otherRuntimeOwners } from "./instance-owners.mjs";
 
 const idPattern = /^[a-f0-9]{64}$/, backupPattern = /^[0-9TZ.-]+-[a-f0-9-]{36}$/;
 export const installationRoot = () => process.platform === "win32" ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData/Local"), "Programs/Switchyard") : join(process.env.XDG_DATA_HOME || join(homedir(), ".local/share"), "strathex-switchyard/application");
 export function installationPaths(root = installationRoot(), platform = process.platform) {
   return { record: join(root, "installed.json"), loader: join(root, "launch.mjs"), command: platform === "win32" ? join(root, "switchyard.cmd") : join(homedir(), ".local/bin/switchyard"), desktop: platform === "win32" ? join(process.env.APPDATA || join(homedir(), "AppData/Roaming"), "Microsoft/Windows/Start Menu/Programs/Switchyard.lnk") : join(process.env.XDG_DATA_HOME || join(homedir(), ".local/share"), "applications/io.strathex.Switchyard.desktop") };
 }
-async function noActiveHostConnections() {
-  if (process.platform === "linux") {
-    const { createHostBridge } = await import("../../tools/layout-studio/host.mjs");
-    const active = (await createHostBridge().transactions()).filter((t) => ["prepared", "applying", "applied", "kept", "recovery-pending"].includes(t.status));
-    if (active.length) throw new Error("Restore active Switchyard host connections in the app before uninstalling. Program files were retained so their exact baselines remain usable.");
-  } else {
-    const { createSuiteStore } = await import("../../tools/layout-studio/suite-store.mjs"), store = createSuiteStore();
-    for (const c of await store.list()) { const s = await store.snapshot(c.id); if (s.windowsHost?.bindings?.length) throw new Error("Restore saved Windows hotkey connections in the app before uninstalling. Their program and protected baselines were preserved."); }
-  }
-}
-export function createInstallation({ root = installationRoot(), stateRoot = applicationStateRoot(), paths = installationPaths(root), platform = process.platform, application, beforeRemove = noActiveHostConnections, afterWrite = async () => {}, afterCopy = async () => {} } = {}) {
+export function createInstallation({ root = installationRoot(), stateRoot = applicationStateRoot(), paths = installationPaths(root), platform = process.platform, application, beforeRemove = async () => {}, withRestoredConnections, otherOwners = otherRuntimeOwners, afterWrite = async () => {}, afterCopy = async () => {} } = {}) {
   if (!["linux", "win32"].includes(platform) || new Set(Object.values(paths)).size !== 4 || Object.keys(paths).sort().join(",") !== "command,desktop,loader,record" || paths.record !== join(root, "installed.json") || paths.loader !== join(root, "launch.mjs")) throw new Error("The installation paths or platform are unsupported.");
-  application ??= { status: () => applicationStatus({ stateRoot }), stop: () => stopApplication({ stateRoot }), launch: (bundleRoot) => launchApplication({ bundleRoot, stateRoot, installationRoot: root }) };
+  application ??= { status: () => applicationStatus({ stateRoot }), stop: (expected = {}) => stopApplication({ stateRoot, ...expected }), launch: (bundleRoot) => launchApplication({ bundleRoot, stateRoot, installationRoot: root }) };
+  withRestoredConnections ??= connectionRestoration({ platform });
   const versions = join(root, "versions"), pending = join(root, "pending.json"), backups = join(stateRoot, "installation-backups"), staging = join(stateRoot, "installation-stage.json");
   const bundle = (id) => { if (!idPattern.test(id)) throw new Error("The installed version identity is invalid."); return join(versions, id); };
   async function record() {
@@ -100,7 +93,9 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
       if (before) await writeFile(join(directory, `${role}.before`), before.bytes, { flag: "wx", mode: 0o600 });
       entries.push({ role, path: paths[role], before: before ? { sha256: before.sha256, mode: before.mode } : null, after: next ? { sha256: fileDigest(next.bytes), mode: next.mode } : null });
     }
-    const plan = { schema: "switchyard-installation-journal/v1", id, action, reason: `${action} the per-user Switchyard application; preserve dated launcher bytes before changing persistent entries. Protected workspaces, credentials and shared optional runtimes are excluded.`, previous, wasRunning, entries, createdAt: new Date().toISOString(), status: "prepared" };
+    const recoveryEntry = join(directory, "recover.mjs");
+    await writeFile(recoveryEntry, recoveryLoader(root), { flag: "wx", mode: 0o600 });
+    const plan = { schema: "switchyard-installation-journal/v1", id, action, reason: `${action} the per-user Switchyard application; preserve dated launcher bytes before changing persistent entries. Protected workspaces, credentials and shared optional runtimes are excluded.`, previous, wasRunning, entries, recoveryEntry, recoveryNode: await realpath(process.execPath), createdAt: new Date().toISOString(), status: "prepared" };
     await privateWrite(join(directory, "journal.json"), JSON.stringify(plan, null, 2) + "\n");
     const nextRecord = replacements.record ? JSON.parse(replacements.record.bytes.toString("utf8")) : null;
     await privateWrite(pending, JSON.stringify({ schema: "switchyard-installation-pending/v1", backup: id, recoveryVersion: previous?.current ?? nextRecord?.current, runtime: previous?.runtime ?? nextRecord?.runtime }) + "\n"); return plan;
@@ -124,28 +119,63 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
       if (plan.entries.some((e) => current.get(e.role) !== (e.after?.sha256 ?? null))) throw new Error("A committed installation changed before journal cleanup. Current files were preserved.");
       await rm(pending); return { recovered: true, committed: true, backup: join(backups, plan.id) };
     }
-    const live = await application.status(); if (["ready", "stopping"].includes(live.status)) await application.stop();
+    const needsRestore = plan.entries.some(e => current.get(e.role) !== (e.before?.sha256 ?? null));
+    if (needsRestore) {
+      const live = await application.status();
+      if (["ready", "stopping"].includes(live.status)) {
+        const recordFile = await readOwnedFile(paths.record), currentBuild = recordFile ? JSON.parse(recordFile.bytes.toString("utf8")).current : null;
+        if (live.build && ![plan.previous?.current, currentBuild].includes(live.build)) throw new Error("A different application build is running during recovery. It and all recovery files were preserved.");
+        const stopped = await application.stop({ expectedBuild: live.build, expectedInstanceId: live.instanceId });
+        if (stopped?.stopped === false) throw new Error("Application exit is unconfirmed during recovery. Its program files were preserved.");
+      }
+    }
     for (const e of [...plan.entries].reverse()) { lease.assert(); if (current.get(e.role) !== (e.before?.sha256 ?? null)) await replaceOwnedFile(e.path, e.before ? await readFile(join(backups, plan.id, `${e.role}.before`)) : null, e.before?.mode ?? 0o600, current.get(e.role)); }
     lease.assert(); await finish(plan, "restored"); return { recovered: true, backup: join(backups, plan.id), previous: plan.previous, wasRunning: plan.wasRunning };
   }
+  async function resumeRecovered(restored) {
+    if (!restored.wasRunning || !restored.previous?.current) return;
+    try { await application.launch(bundle(restored.previous.current)); }
+    catch (error) {
+      await privateWrite(pending, JSON.stringify({ schema: "switchyard-installation-pending/v1", backup: basename(restored.backup), recoveryVersion: restored.previous.current, runtime: restored.previous.runtime }) + "\n");
+      throw new Error(`The previous program files were restored, but application restart needs recovery: ${error.message}`);
+    }
+  }
   async function operation(action, prepare, { start } = {}) {
     await privateDirectory(root);
-    return withStateLock(join(stateRoot, "installation"), "installation", async (lease) => {
-      await recoverStage(lease); await recover(lease); const old = await ownedRecord(), next = await prepare(old, lease), live = await application.status(), wasRunning = ["ready", "stopping"].includes(live.status);
+    return withStateLock(join(stateRoot, "installation"), "installation", async lease => {
+      await recoverStage(lease); await resumeRecovered(await recover(lease)); const old = await ownedRecord(), next = await prepare(old, lease);
       if (next.unchanged) { if (start) await application.launch(bundle(old.current)); return { status: "unchanged", current: old.current }; }
       if (action === "uninstall") await beforeRemove();
-      const plan = await journal(action, next.replacements, old, wasRunning);
-      try {
-        if (wasRunning) await application.stop();
-        for (const e of plan.entries) { lease.assert(); const replacement = next.replacements[e.role]; await replaceOwnedFile(e.path, replacement?.bytes ?? null, replacement?.mode ?? 0o600, e.before?.sha256 ?? null); await afterWrite(e.role, action); }
-        lease.assert(); if (next.current && (start === true || start === undefined && wasRunning)) await application.launch(bundle(next.current));
-        await finish(plan, "committed");
-        let removedVersions = [], cleanupPending = null;
-        try { removedVersions = await prune([next.current, next.previous]); } catch (e) { cleanupPending = e.message; }
-        if (!next.current) { for (const path of [versions, root]) try { await rmdir(path); } catch (e) { if (!["ENOTEMPTY", "ENOENT"].includes(e.code)) throw e; } }
-        return { status: action === "uninstall" ? "removed" : "installed", current: next.current, previous: next.previous, backup: join(backups, plan.id), removedVersions, cleanupPending, protectedData: "retained", optionalRuntime: "retained" };
-      } catch (error) {
-        try { const restored = await recover(lease); if (restored.wasRunning && restored.previous?.current) await application.launch(bundle(restored.previous.current)); }
+      const execute = async () => {
+        const live = await application.status(), wasRunning = ["ready", "stopping"].includes(live.status);
+        if (wasRunning && live.build && live.build !== old?.current) throw new Error("A different application build is active. It and the installed program were preserved.");
+        if (action === "uninstall" && (await otherOwners(wasRunning ? live.pid : null)).length) throw new Error("Another Switchyard instance is active. Its bindings and the installed program were preserved.");
+        const plan = await journal(action, next.replacements, old, wasRunning);
+        if (wasRunning) {
+          try { const stopped = await application.stop({ expectedBuild: live.build, expectedInstanceId: live.instanceId }); if (action === "uninstall" && stopped?.stopped !== true) throw new Error("The exact application did not verify exit before removal."); }
+          catch (error) { if (action === "uninstall") error.code = "APPLICATION_STOP_UNCONFIRMED"; throw error; }
+        }
+        const write = async restoration => {
+          for (const e of plan.entries) { lease.assert(); const replacement = next.replacements[e.role]; await replaceOwnedFile(e.path, replacement?.bytes ?? null, replacement?.mode ?? 0o600, e.before?.sha256 ?? null); await afterWrite(e.role, action); }
+          lease.assert(); if (next.current && (start === true || start === undefined && wasRunning)) await application.launch(bundle(next.current));
+          await finish(plan, "committed");
+          let removedVersions = [], cleanupPending = null;
+          try { removedVersions = await prune([next.current, next.previous]); } catch (error) { cleanupPending = error.message; }
+          if (!next.current) { for (const path of [versions, root]) try { await rmdir(path); } catch (error) { if (!["ENOTEMPTY", "ENOENT"].includes(error.code)) throw error; } }
+          return { status: action === "uninstall" ? "removed" : "installed", current: next.current, previous: next.previous, backup: join(backups, plan.id), removedVersions, cleanupPending, protectedData: "retained", optionalRuntime: "retained", ...(restoration ? { hostConnections: restoration } : {}) };
+        };
+        if (action !== "uninstall") return write();
+        // Keep both start and owner boundaries through exact host restoration
+        // and program removal. A normal launcher cannot race re-registration.
+        return withStateLock(stateRoot, "application-owner", async ownerLease => {
+          if ((await otherOwners(null)).length) throw new Error("Another local instance appeared before host restoration. Its program was preserved.");
+          ownerLease.assert(); return withRestoredConnections(async report => { ownerLease.assert(); const value = await write(report); ownerLease.assert(); return value; });
+        });
+      };
+      try { return action === "uninstall" ? await withStateLock(stateRoot, "application-start", execute) : await execute(); }
+      catch (error) {
+        if (error.code === "APPLICATION_STOP_UNCONFIRMED") throw error;
+        try { await resumeRecovered(await recover(lease)); }
         catch (recovery) { throw new Error(`${error.message} Recovery remains pending: ${recovery.message}`); }
         throw error;
       }
@@ -162,7 +192,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
   return {
     root, paths,
     inspect: record,
-    recover: () => withStateLock(join(stateRoot, "installation"), "installation", async (lease) => ({ ...await recoverStage(lease), ...await recover(lease) })),
+    recover: () => withStateLock(join(stateRoot, "installation"), "installation", async lease => { const stage = await recoverStage(lease), restored = await recover(lease); await resumeRecovered(restored); return { ...stage, ...restored }; }),
     install: (source, expectedId, options) => { if (!idPattern.test(expectedId)) throw new Error("An independently reviewed expected release identity is required."); return operation("install/update", async (old, lease) => { await copyBundle(source, expectedId, lease); if (old?.current === expectedId) return { unchanged: true }; return { current: expectedId, previous: old?.current ?? null, replacements: await replacements(expectedId, old?.current ?? null) }; }, options); },
     rollback: (options) => operation("rollback", async (old) => { if (!old?.previous) throw new Error("There is no retained previous application version."); await verifySuiteRelease(bundle(old.previous), { expectedId: old.previous, platform, checkRuntime: true }); return { current: old.previous, previous: old.current, replacements: await replacements(old.previous, old.current) }; }, options),
     uninstall: () => operation("uninstall", async (old) => { if (!old) throw new Error("No owned installation exists."); return { current: null, previous: null, replacements: { loader: null, command: null, desktop: null, record: null } }; })

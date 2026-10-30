@@ -1,28 +1,17 @@
 /** Quiesce the verified installed owner while optional generated software changes. */
-import { readdir, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { createInstallation, installationRoot } from "./installation.mjs";
 import { verifySuiteRelease } from "./release.mjs";
 import { applicationStateRoot, applicationStatus, stopApplication, launchApplication } from "./application.mjs";
-import { runtimeDirectory } from "../../tools/layout-studio/physical-intent.mjs";
-import { requestInstance, endpointIdentity } from "../../tools/layout-studio/instance.mjs";
 import { privateRead, privateWrite } from "../../tools/layout-studio/private-fs.mjs";
 import { withStateLock } from "../../tools/layout-studio/state-lock.mjs";
+import { otherRuntimeOwners } from "./instance-owners.mjs";
+export { otherRuntimeOwners } from "./instance-owners.mjs";
 
-export async function otherRuntimeOwners(exceptPid, directory = runtimeDirectory()) {
-  let names; try { names = await readdir(directory); } catch (error) { if (error.code === "ENOENT") return []; throw error; }
-  if (names.length > 128) throw new Error("The local endpoint inventory exceeds its inspection bound. Preserve the existing application state.");
-  const active = [];
-  for (const name of names.filter(name => /^\d{1,5}\.json$/.test(name))) {
-    const endpoint = JSON.parse(await privateRead(join(directory, name))); endpointIdentity(endpoint);
-    try { const proof = await requestInstance(endpoint); if (proof.pid !== exceptPid) active.push({ pid: proof.pid, build: proof.build }); }
-    catch (error) { if (error.code !== "ECONNREFUSED") throw new Error("An existing local endpoint could not be verified. Runtime maintenance preserved it."); }
-  }
-  return active;
-}
 export function runtimeMaintenanceCoordinator({ root = installationRoot(), stateRoot = applicationStateRoot(), runtimeRoot, installed = () => createInstallation({ root, stateRoot }).inspect(), verifyBuild = bundle => verifySuiteRelease(bundle, { platform: process.platform, checkRuntime: true }), application, otherOwners = otherRuntimeOwners } = {}) {
   if (!runtimeRoot) throw new Error("The optional runtime maintenance directory is required.");
-  application ??= { status: () => applicationStatus({ stateRoot }), stop: () => stopApplication({ stateRoot }), launch: (bundleRoot, port) => launchApplication({ bundleRoot, stateRoot, port, installationRoot: root }) };
+  application ??= { status: () => applicationStatus({ stateRoot }), stop: (expected = {}) => stopApplication({ stateRoot, ...expected }), launch: (bundleRoot, port) => launchApplication({ bundleRoot, stateRoot, port, installationRoot: root }) };
   const journal = join(runtimeRoot, ".maintenance/application-resume.json");
   return fn => withStateLock(join(stateRoot, "installation"), "installation", async installationLease => {
     const record = await installed();
@@ -39,7 +28,7 @@ export function runtimeMaintenanceCoordinator({ root = installationRoot(), state
       resume ||= running;
       if (running && status.origin) port = Number(new URL(status.origin).port);
       await privateWrite(journal, JSON.stringify({ schema: "switchyard-runtime-resume/v1", root, build: record.current, wasRunning: resume, port, at: new Date().toISOString(), reason: "Quiesce the exact installed owner for optional runtime maintenance; restore its previous running state afterwards." }));
-      if (running && !(await application.stop()).stopped) throw new Error("The installed application did not verify exit. Runtime software was preserved.");
+      if (running && !(await application.stop({ expectedBuild: status.build, expectedInstanceId: status.instanceId })).stopped) throw new Error("The installed application did not verify exit. Runtime software was preserved.");
       await withStateLock(stateRoot, "application-owner", async ownerLease => {
         installationLease.assert(); startLease.assert(); ownerLease.assert();
         try { value = await fn(); } catch (error) { failure = error; }
