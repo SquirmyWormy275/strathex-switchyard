@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { compileConnection } from "./workspace.mjs";
+import { closedIntent } from "./physical-intent.mjs";
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 
 export class WindowsNativeHotkeys {
@@ -13,6 +14,7 @@ export class WindowsNativeHotkeys {
     this.child.stdout.on("data", (chunk) => { this.buffer += chunk; if (this.buffer.length > 65536) { this.close(); return; } let end; while ((end = this.buffer.indexOf("\n")) >= 0) { let m; try { m = JSON.parse(this.buffer.slice(0, end)); } catch { this.close(); return; } this.buffer = this.buffer.slice(end + 1); const p = this.pending.get(m.id); if (p) { this.pending.delete(m.id); clearTimeout(p.timer); m.error ? p.reject(new Error(m.error)) : p.resolve(m.result); } } });
     this.child.on("error", () => this.close()); this.child.on("close", () => this.close()); this.child.stdin.on("error", () => this.close());
     this.ready = this.request("initialize", { origin, token, parentPid: process.pid });
+    void this.ready.catch(() => {});
   }
   request(method, body = {}) { if (this.closed) return Promise.reject(new Error("The Windows hotkey helper is unavailable.")); return new Promise((resolve, reject) => { const id = ++this.sequence, timer = setTimeout(() => { this.pending.delete(id); reject(new Error("Windows hotkey helper timed out.")); }, 10000); this.pending.set(id, { resolve, reject, timer }); this.child.stdin.write(`${JSON.stringify({ id, method, ...body })}\n`); }); }
   async register(connection) { await this.ready; return this.request("register", { bindingId: connection.nativeId, modifiers: connection.windowsModifiers, virtualKey: connection.virtualKey, body: { implementation: connection.implementation, ...(connection.roleId ? { roleId: connection.roleId, intent: connection.intent } : {}) } }); }
@@ -34,11 +36,14 @@ export function createWindowsHostBridge({ store, driverFactory, verifyTarget = a
   async function ensure() {
     if (!driver || driver.closed) { driver = driverFactory(); hydrated = false; }
     if (hydrated) return;
+    await driver.ready;
     const s = await store.snapshot("personal"), config = own(s);
-    for (const binding of config.bindings) { await driver.register(binding); nextNativeId = Math.max(nextNativeId, binding.nativeId + 1); }
-    hydrated = true;
+    nextNativeId = Math.max(nextNativeId, ...config.transactions.map((t) => t.connection.nativeId + 1), 1);
+    try { for (const binding of config.bindings) { await driver.register(binding); nextNativeId = Math.max(nextNativeId, binding.nativeId + 1); } hydrated = true; }
+    catch (error) { driver.close(); driver = null; throw new Error(`Saved Windows registrations could not be fully restored; the owned helper was stopped. ${error.message}`); }
   }
-  async function readback(connection, present) { const r = await driver.status(); const matches = r.bindings.filter((b) => b.bindingId === connection.nativeId); if (present ? matches.length !== 1 || matches[0].modifiers !== connection.windowsModifiers || matches[0].virtualKey !== connection.virtualKey : matches.length !== 0) throw new Error("Windows native shortcut readback does not match the transaction."); }
+  const same = (b, c) => b.modifiers === c.windowsModifiers && b.virtualKey === c.virtualKey && JSON.stringify(closedIntent(b.body)) === JSON.stringify(closedIntent(c));
+  async function readback(connection, present) { const r = await driver.status(); const matches = r.bindings.filter((b) => b.bindingId === connection.nativeId); if (present ? matches.length !== 1 || !same(matches[0], connection) : matches.length !== 0) throw new Error("Windows native shortcut readback does not match the transaction."); }
   const receipt = (tx) => ({ id: tx.id, status: tx.status, actionId: tx.connection.actionId, shortcut: tx.connection.shortcut, label: tx.connection.label, trial: tx.trial ?? "not-tried", detail: tx.detail ?? null });
   return {
     async review(plan, actionId, implementation, target) {
@@ -73,11 +78,13 @@ export function createWindowsHostBridge({ store, driverFactory, verifyTarget = a
     },
     async transactions() { await ensure(); return own(await store.snapshot("personal")).transactions.slice(-64).reverse().map(receipt); },
     async trial(id) { await ensure(); const tx = own(await store.snapshot("personal")).transactions.find((t) => t.id === id); if (!tx || !["applied", "kept"].includes(tx.status)) throw new Error("Apply this exact Windows connection before trying it."); await readback(tx.connection, true); await dispatch(tx.connection); await store.update("personal", "windows-shortcut-trial", (s) => { own(s).transactions.find((t) => t.id === id).trial = "verified"; }); return receipt({ ...tx, trial: "verified" }); },
-    async keep(id) { const tx = own(await store.snapshot("personal")).transactions.find((t) => t.id === id); if (tx?.status !== "applied" || tx.trial !== "verified") throw new Error("Try and verify the exact action before keeping it."); await store.update("personal", "windows-shortcut-keep", (s) => { own(s).transactions.find((t) => t.id === id).status = "kept"; }); return receipt({ ...tx, status: "kept" }); },
+    async keep(id) { await ensure(); const tx = own(await store.snapshot("personal")).transactions.find((t) => t.id === id); if (tx?.status !== "applied" || tx.trial !== "verified") throw new Error("Try and verify the exact action before keeping it."); await readback(tx.connection, true); await store.update("personal", "windows-shortcut-keep", (s) => { own(s).transactions.find((t) => t.id === id).status = "kept"; }); return receipt({ ...tx, status: "kept" }); },
     async restore(id) {
       await ensure(); const tx = own(await store.snapshot("personal")).transactions.find((t) => t.id === id);
       if (!tx || !["applied", "kept", "applying", "recovery-pending"].includes(tx.status)) throw new Error("This Windows transaction is not active.");
-      await driver.unregister(tx.connection.nativeId); await readback(tx.connection, false);
+      const existing = (await driver.status()).bindings.find((b) => b.bindingId === tx.connection.nativeId);
+      if (existing) { if (!same(existing, tx.connection)) throw new Error("That native ID belongs to a different registration. Unrelated shortcuts were preserved."); await driver.unregister(tx.connection.nativeId); }
+      await readback(tx.connection, false);
       await store.update("personal", "windows-shortcut-restore", (s) => { const c = own(s); c.bindings = c.bindings.filter((b) => b.nativeId !== tx.connection.nativeId); c.transactions.find((t) => t.id === id).status = "restored"; });
       return receipt({ ...tx, status: "restored", detail: "Owned registration removed; later unrelated registrations preserved." });
     },

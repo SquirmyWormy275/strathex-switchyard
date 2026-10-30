@@ -143,11 +143,12 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   }
   return {
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
-    async initialize(id = "personal", policy = "personal") {
-      validate(id); if (!templates[policy]) throw new Error("Choose Personal or Copilot-only Work policy.");
+    async initialize(id = "personal", policy) {
+      validate(id); if (policy !== undefined && !templates[policy]) throw new Error("Choose Personal or Copilot-only Work policy.");
       await privateDirectory(root);
       let exists = false; try { await lstat(path(id)); exists = true; } catch (e) { if (e.code !== "ENOENT") throw e; }
-      if (exists) { const existing = await read(id); if (existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy }; }
+      if (exists) { const existing = await read(id); if (policy !== undefined && existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy: existing.policy }; }
+      policy ??= id === "work" ? "work" : "personal";
       await key(id, true);
       await write(id, { schema: "switchyard-suite-state/v1", id, policy, accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
       return { id, policy };

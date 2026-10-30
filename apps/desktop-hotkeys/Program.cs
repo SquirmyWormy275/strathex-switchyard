@@ -57,7 +57,7 @@ internal static class Program
                     if (!Bindings.ContainsKey(removeId) || !UnregisterHotKey(IntPtr.Zero, removeId)) throw new InvalidOperationException("Exact hotkey unregistration failed");
                     Bindings.Remove(removeId); Write(new { id, result = new { removed = true } }); break;
                 case "status":
-                    Write(new { id, result = new { bindings = Bindings.Values.Select(b => new { bindingId = b.Id, modifiers = b.Modifiers, virtualKey = b.VirtualKey }).ToArray() } }); break;
+                    Write(new { id, result = new { bindings = Bindings.Values.Select(b => new { bindingId = b.Id, modifiers = b.Modifiers, virtualKey = b.VirtualKey, body = JsonSerializer.Deserialize<JsonElement>(b.Body) }).ToArray() } }); break;
                 case "stop":
                     Write(new { id, result = new { stopping = true } }); PostThreadMessageW(GetCurrentThreadId(), WmQuit, UIntPtr.Zero, IntPtr.Zero); break;
                 default: throw new InvalidOperationException("Unsupported helper operation");

@@ -7,6 +7,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHostBridge, discoverHost } from "./host.mjs";
 import { createSuite } from "./suite.mjs";
+import { createWindowsHostBridge, WindowsNativeHotkeys } from "./windows-host.mjs";
+import { publishEndpoint } from "./physical-intent.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 export const studioAssets = new Map([
@@ -31,7 +33,8 @@ export const studioAssets = new Map([
   ["/sample-study-report.json", ["sample-study-report.json", "application/json; charset=utf-8"]]
 ]);
 
-export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge = createHostBridge(), discover = discoverHost, suite = createSuite(), assetRoot = directory } = {}) {
+export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge, discover = discoverHost, suite = createSuite(), assetRoot = directory, platform = process.platform, windowsDriverFactory } = {}) {
+  bridge ??= platform === "win32" ? createWindowsHostBridge({ store: suite.store, verifyTarget: (c) => suite.authorizeConnection(undefined, c), dispatch: (c) => suite.handle("/api/suite/intent", c), driverFactory: windowsDriverFactory ?? (() => new WindowsNativeHotkeys({ origin: `http://127.0.0.1:${server.address().port}/`, token })) }) : createHostBridge({ verifyTarget: (c) => suite.authorizeConnection(undefined, c) });
   const server = createServer(async (request, response) => {
     response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
     response.setHeader("X-Content-Type-Options", "nosniff");
@@ -62,11 +65,11 @@ export function createStudioServer({ token = randomBytes(32).toString("base64url
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { json(400, { error: "Choose valid proposal JSON." }); return; }
         if (!body || typeof body !== "object" || Array.isArray(body)) { json(400, { error: "A local action needs an object." }); return; }
         if (request.url.startsWith("/api/suite/")) json(200, await suite.handle(request.url, { ...body, workspaceBaseUrl: `http://${authority}/` }));
-        else if (request.url === "/api/review") { await suite.authorizeConnection(body.compartment); json(200, await bridge.review(body.plan, body.actionId, body.implementation)); }
-        else if (request.url === "/api/apply") { await suite.authorizeConnection(body.compartment); json(200, await bridge.apply(body.reviewId)); }
+        else if (request.url === "/api/review") { await suite.authorizeConnection(body.compartment, { implementation: body.implementation, roleId: body.target?.roleId, intent: body.target?.intent }); json(200, await bridge.review(body.plan, body.actionId, body.implementation, body.target)); }
+        else if (request.url === "/api/apply") json(200, await bridge.apply(body.reviewId));
         else if (request.url === "/api/restore") json(200, await bridge.restore(body.id));
         else if (request.url === "/api/keep") json(200, await bridge.keep(body.id));
-        else { await suite.authorizeConnection(body.compartment); json(200, await bridge.trial(body.id)); }
+        else json(200, await bridge.trial(body.id));
       } catch (error) { json(409, { error: error instanceof Error ? error.message : "The local action could not be verified. Your plan is preserved." }); }
       return;
     }
@@ -81,7 +84,7 @@ export function createStudioServer({ token = randomBytes(32).toString("base64url
   server.requestTimeout = 10000;
   server.headersTimeout = 10000;
   server.accessToken = token;
-  server.on("close", () => { void suite.close(); });
+  server.on("close", () => { bridge.close?.(); void suite.close(); });
   return server;
 }
 
@@ -92,12 +95,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { server.closeAllConnections(); server.close(); });
   server.listen(Number(args[1] ?? 0), "127.0.0.1", async () => {
     const address = server.address();
-    const url = `http://127.0.0.1:${address.port}/#access=${server.accessToken}`;
-    if (process.env.XDG_RUNTIME_DIR) {
-      const root = join(process.env.XDG_RUNTIME_DIR, "switchyard-studio");
-      await mkdir(root, { recursive: true, mode: 0o700 });
-      await writeFile(join(root, `${address.port}.json`), JSON.stringify({ url, pid: process.pid }), { mode: 0o600 });
-    }
+    const url = process.env.XDG_RUNTIME_DIR ? await publishEndpoint(server) : `http://127.0.0.1:${address.port}/#access=${server.accessToken}`;
     process.stdout.write(`Switchyard Layout Studio: ${url}\nPress Ctrl+C to stop. Host changes require review and Apply. No files leave this machine.\n`);
   });
 }

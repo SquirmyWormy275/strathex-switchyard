@@ -104,6 +104,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/suite.test.mjs" },
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/physical-intent.test.mjs" },
+  { file: "tools/layout-studio/windows-host.test.mjs" },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },

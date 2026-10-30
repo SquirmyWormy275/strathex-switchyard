@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { resolve, join } from "node:path";
 import { createStudioServer, studioAssets } from "../tools/layout-studio/serve.mjs";
+import { publishEndpoint } from "../tools/layout-studio/physical-intent.mjs";
 const args = process.argv.slice(2);
 if (args.length && (args.length !== 2 || args[0] !== "--port" || !/^\d+$/.test(args[1]) || +args[1] < 1024 || +args[1] > 65535)) throw new Error("Usage: npm run review:serve -- [--port 43177]");
 const root = fileURLToPath(new URL("../artifacts/frontend-review/", import.meta.url)), pointer = JSON.parse(await readFile(join(root, "current.json"), "utf8"));
@@ -17,7 +18,6 @@ if (createHash("sha256").update(JSON.stringify(manifest.files)).digest("hex") !=
 const server = createStudioServer({ assetRoot: pointer.directory });
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { server.closeAllConnections(); server.close(); });
 server.listen(Number(args[1] ?? 43177), "127.0.0.1", async () => {
-  const url = `http://127.0.0.1:${server.address().port}/#access=${server.accessToken}`;
-  if (process.env.XDG_RUNTIME_DIR) { const runtime = join(process.env.XDG_RUNTIME_DIR, "switchyard-studio"); await mkdir(runtime, { recursive: true, mode: 0o700 }); await writeFile(join(runtime, `${server.address().port}.json`), JSON.stringify({ url, pid: process.pid, review: pointer.digest }), { mode: 0o600 }); }
+  const url = process.env.XDG_RUNTIME_DIR ? await publishEndpoint(server, { review: pointer.digest }) : `http://127.0.0.1:${server.address().port}/#access=${server.accessToken}`;
   console.log(`Switchyard morning review: ${url}\nFrozen front end ${pointer.digest.slice(0, 12)} · current local backend.`);
 });

@@ -9,7 +9,7 @@ import { createAgentService } from "./agents.mjs";
 import { localVoice } from "./voice.mjs";
 import { parseWorkflow, observationSummary } from "./workflow.mjs";
 import { surfaceForClass } from "../../scripts/workflow-monitor.mjs";
-import { runHypr } from "./host.mjs";
+import { runHypr, nativeChatgptWindow } from "./host.mjs";
 import { createDeviceService } from "./devices.mjs";
 import { createCopilot } from "./copilot.mjs";
 import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
@@ -24,11 +24,28 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   const started = new Set(), monitors = new Map();
   let activeCompartment = "personal";
   let selectionLoaded = false;
-  async function initialize(id, policy = id === "work" ? "work" : "personal") {
+  let selectionLoading;
+  async function initialize(id, policy) {
     if (started.has(id)) return;
     await store.initialize(id, policy);
     await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; });
     started.add(id);
+  }
+  async function loadSelection() {
+    if (selectionLoaded) return;
+    selectionLoading ??= (async () => { await initialize("personal"); activeCompartment = await store.selection(); await initialize(activeCompartment); selectionLoaded = true; })().finally(() => { selectionLoading = null; });
+    await selectionLoading;
+  }
+  function roleTarget(state, roleId, intent) {
+    if (!agentIntents.includes(intent) || !state.workflow.roles.some((r) => r.id === roleId)) throw new Error("Choose an existing workflow role and supported intent.");
+    const binding = state.roleBindings?.find((b) => b.roleId === roleId && b.intent === intent);
+    if (!binding) throw new Error("Bind this role and intent to an exact permitted session first.");
+    if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
+    if (binding.provider === "custom-agent") {
+      const a = state.agents.find((a) => a.id === binding.targetId && a.sessionId === binding.sessionId);
+      if (!a || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
+    } else if (!state.conversations.some((c) => c.id === binding.targetId && c.provider === binding.provider && c.sessionId === binding.sessionId)) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
+    return binding;
   }
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
   const voiceSession = (s, id) => { const found = s.voice.find((o) => o.id === id); if (!found) throw new Error("That voice session is unavailable in this compartment."); return found; };
@@ -51,8 +68,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     async handle(path, body = {}) {
       const compartment = body.compartment ?? "personal";
       if (path === "/api/suite/bootstrap") {
-        await initialize("personal");
-        if (!selectionLoaded) { activeCompartment = await store.selection(); await initialize(activeCompartment); selectionLoaded = true; }
+        await loadSelection();
         return { compartments: await store.list(), activeCompartment, agents: await agents.discovery(), voice: await voice.discovery() };
       }
       if (path === "/api/suite/compartment/create") { await initialize(compartment, body.policy); return { id: compartment }; }
@@ -67,6 +83,15 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/mode") { if (!["keyboard-only", "personal-companion", "managed-companion"].includes(body.mode)) throw new Error("Choose an explicit supported operating mode."); return store.update(compartment, "mode-select", (s) => { s.mode = body.mode; return { mode: s.mode, policyStillEnforced: true }; }); }
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
+      if (path === "/api/suite/agents/example/stop") {
+        if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose a bundled owned example.");
+        await store.authorize(compartment, { provider: "custom-agent" });
+        const key = `${compartment}:${body.example}`, child = examples.get(key);
+        if (child && child.exitCode === null) await new Promise((resolve) => { const timer = setTimeout(() => { child.kill("SIGKILL"); }, 3000); child.once("close", () => { clearTimeout(timer); resolve(); }); child.kill(); });
+        examples.delete(key);
+        await store.update(compartment, "example-stopped", (s) => { const a = s.agents.find((a) => a.id === `${body.example}-example`); if (a) { a.reportedStatus = "stopped"; a.lastSeen = null; a.provenance = "owned example process stopped; external task outcome unverified"; } }, { provider: "custom-agent" });
+        return { status: "stopped", evidence: "owned bundled example process; not external task cancellation" };
+      }
       if (path === "/api/suite/agents/example") {
         await store.authorize(compartment, { provider: "custom-agent" });
         if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose the bundled custom or LangChain example.");
@@ -93,11 +118,12 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
           const target = provider === "custom-agent" ? s.agents.find((a) => a.id === body.targetId) : s.conversations.find((c) => c.id === body.targetId && c.provider === provider);
           if (!target?.sessionId) throw new Error("The role needs an exact connected session, not a window title or missing tool.");
           s.roleBindings ??= []; const binding = { roleId: role.id, provider, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
-          s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; return binding;
+          s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
         }, { provider: body.provider });
       }
       if (path === "/api/suite/roles/dispatch") return this.dispatchRole(compartment, body.roleId, body.intent, body.content);
       if (path === "/api/suite/intent") {
+        await loadSelection();
         if (body.implementation === "native-chatgpt.focus/v1") { await this.authorizeConnection(activeCompartment); const { focusNativeChatgpt } = await import("./host.mjs"); return focusNativeChatgpt(); }
         if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent);
         throw new Error("The physical intent is outside the closed implementation map.");
@@ -158,9 +184,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       throw new Error("That suite operation is unavailable. No alternate action was executed.");
     },
     async dispatchRole(compartment, roleId, intent, content) {
-      if (!agentIntents.includes(intent)) throw new Error("That role intent is unsupported.");
-      const s = await store.snapshot(compartment), b = s.roleBindings?.find((b) => b.roleId === roleId && b.intent === intent);
-      if (!b) throw new Error("Bind this role and intent to an exact permitted session first.");
+      const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       await store.authorize(compartment, { provider: b.provider });
       let result;
       if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
@@ -179,7 +203,15 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.update(compartment, "role-intent-result", (state) => { state.activeConversationId = b.provider === "custom-agent" ? state.activeConversationId ?? null : b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
       return result;
     },
-    async authorizeConnection(compartment = activeCompartment) { if (!started.has(compartment)) await initialize(compartment); return store.authorize(compartment, { provider: "native-chatgpt" }); },
+    async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {
+      await loadSelection(); compartment ??= activeCompartment;
+      if (compartment !== activeCompartment) throw new Error("Select this workspace before reviewing a physical shortcut. The active workspace policy controls every invocation.");
+      if (connection.implementation === "native-chatgpt.focus/v1") { await store.authorize(compartment, { provider: "native-chatgpt" }); if (process.platform !== "linux") throw new Error("Verified native ChatGPT window focus is not implemented on this platform. Bind a supported agent role instead."); return nativeChatgptWindow(hypr); }
+      if (connection.implementation !== "switchyard.role/v1") throw new Error("This physical connection is outside the closed action map.");
+      const state = await store.snapshot(compartment), binding = roleTarget(state, connection.roleId, connection.intent);
+      await store.authorize(compartment, { provider: binding.provider });
+      return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
+    },
     async close() { for (const timer of monitors.values()) clearInterval(timer); for (const child of examples.values()) child.kill(); agents.close(); }
   };
 }

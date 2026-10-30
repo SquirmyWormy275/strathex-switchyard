@@ -44,10 +44,10 @@ requests have been exercised with Codex and Claude Code, and real custom and
 LangChain example processes have exchanged authenticated intents.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
-controls, physical role shortcut wiring, desktop packaging, profile-library visual acceptance,
+controls, physical role shortcut selection in the frontend, desktop packaging, profile-library visual acceptance,
 complete device settings/macro editing and final UI acceptance remain unfinished.
-Windows hotkey helper source cross-builds; its suite integration and Windows host
-acceptance are incomplete. F77 physical acceptance awaits reconnection; B122
+Windows hotkey helper source cross-builds; its suite bridge is wired and software-tested, while Windows host
+acceptance and packaging remain incomplete. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 

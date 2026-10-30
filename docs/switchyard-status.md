@@ -30,14 +30,48 @@ ISO Enter shapes, rotated split thumb keys and displaced alternatives in their
 physical positions. Importing an actual typing layer can carry planned intents
 through unique matching keycodes; absent or ambiguous positions become unassigned.
 
+## Backend checkpoint: physical intents
+
+The physical path now enters the running suite's authenticated active-workspace
+policy on every invocation. It restores the persisted selection before the first
+physical request, even if the UI has not bootstrapped. A caller cannot redirect a
+physical intent to Personal by supplying another compartment in its request.
+Missing, stale, unsupported or prohibited exact role targets fail without fallback.
+Native ChatGPT's CLI entry also uses this policy path.
+
+The Windows bridge is wired into the server. Its native helper reads back the
+exact closed intent as well as modifiers/key, closes partial hydration on failure,
+and avoids reusing recovery IDs. Software tests cover restart, occupied chords,
+wrong-target readback, replay and interruption. Windows interactive acceptance is
+still open; the reviewed offline CI toolchain now builds the native helper too.
+
+A real Omarchy host check at `2026-10-30T06:12:45Z` registered Super+Ctrl+2 for an
+exact authenticated custom-agent status intent, invoked its owned named Lua
+callback, obtained a local receipt, then restored the full original bindings
+file. SHA-256 before and after was
+`ed787c4063c0d7150c9288227ce451be87bc2be968e707073e92e035360434f0`.
+The check also selected a separate Copilot-only Work policy and verified rejection
+of the personal native-app intent. No tenant was contacted. Native ChatGPT had no
+mapped window, so its focus scenario was recorded as unavailable, not passed.
+No F77 input, hardware write or external task completion is claimed. Dated private
+transaction baselines and redacted local acceptance receipts remain outside Git.
+
+Hyprland's numeric `__lua` callback IDs cannot be invoked through its public CLI.
+The adapter uses an owned named function passed to the binding and invokes that
+same function through documented `hyprctl eval`, then requires an authenticated
+receipt. See the [official CLI documentation](https://wiki.hypr.land/configuring/core/advanced-configuration/using-hyprctl/)
+and [upstream callback discussion](https://github.com/hyprwm/Hyprland/discussions/15059).
+The callback launches an external process and does no blocking network work in
+the compositor. Restoration removes its owned function too.
+
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **83/83 groups passed; 564 tests, 555 passed and 9
+- Integrated native Linux run: **85/85 groups passed; 571 tests, 562 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-df02ac4a-a3fe-4b8f-aaa0-560f3c8edf8e.json`.
+  `.sxsy-verification/isolated-test-9eb4e496-9915-4600-8049-5d43c291e66b.json`.
 - Current focused Studio run after typing-layer rebasing and microphone-release
-  changes: **42/42 tests passed**, no skips. This includes all 104 named catalog
+  changes: **47/47 tests passed**, no skips. This includes all 104 named catalog
   configurations, physical option variations, encrypted compartment boundaries,
   device fault/restore paths and SDK/OAuth contract tests.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -89,10 +123,9 @@ license and permissions acceptance needs an approved tenant/account.
 
 ## Unfinished implementation
 
-These are code/product work, not hardware/account blockers: physical role
-shortcut wiring and active-compartment CLI enforcement; general coding-task
+These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; full layer/macro/settings
-editing; Windows suite bridge integration; install/update/rollback/uninstall and
+editing; Windows interactive acceptance and packaging; install/update/rollback/uninstall and
 a normal launcher; interprocess coordination and child supervision; profile-library visual acceptance; reproducible optional dependency installation; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.
 
@@ -105,3 +138,15 @@ handover SHA-256:
 `8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`.
 No upstream merge, public release, firmware flash, reset, bootloader action,
 solenoid adjustment or persistent desktop modification has been performed here.
+
+## GitHub and local footprint
+
+All source checkpoints are pushed to `feat/switchyard-configuration-loop` and
+[draft PR #20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
+Continue committing and pushing tested working increments; keep the ledger and
+PR body current. The frozen morning frontend remains unchanged during backend
+work. Runtime credentials, models, local hardware snapshots and compiled binaries
+are excluded from source control. About 211 MiB of duplicate SDK download,
+redundant generated profiles and temporary research staging was removed after
+checksum/readback verification. Keep the installed SDK and local transcription
+runtime only while required for development/demo; retain small recovery receipts.

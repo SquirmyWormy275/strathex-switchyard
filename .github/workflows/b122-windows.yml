@@ -76,6 +76,29 @@ jobs:
         shell: pwsh
         run: .\deployment\windows\Provision-B122DotnetToolchain.ps1
 
+      - name: Build the Switchyard Windows hotkey helper from verified offline packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\apps\desktop-hotkeys\Switchyard.Hotkeys.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\.tools\dotnet\dotnet.exe restore $project -r win-x64 --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Switchyard helper offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe publish $project --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:RuntimeFrameworkVersion=8.0.30 -o $output
+          if ($LASTEXITCODE -ne 0) { throw 'Switchyard helper build failed.' }
+          $exe = Join-Path $output 'Switchyard.Hotkeys.exe'
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Switchyard.Hotkeys.exe" | Out-File (Join-Path $output 'SHA256SUMS') -Encoding ascii
+          @{ commit=$env:GITHUB_SHA; sdk='8.0.424'; runtime='8.0.30'; validation='Build only; interactive Windows acceptance remains open.' } | ConvertTo-Json | Out-File (Join-Path $output 'build-evidence.json') -Encoding utf8
+
+      - name: Retain the exact Windows helper checkpoint for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-windows-hotkeys-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-hotkeys
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Build and verify the complete Windows bundle
         shell: pwsh
         run: |

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileConnection } from "./workspace.mjs";
+import { dispatchPhysicalIntent, intentArguments, waitIntentReceipt } from "./physical-intent.mjs";
 
 const exec = promisify(execFile);
 const uid = userInfo().uid;
@@ -101,19 +102,19 @@ export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devic
 export function createHostBridge({
   configPath = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "hypr/bindings.lua"),
   stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/configuration-transactions"),
-  hypr = runHypr, verifyTarget = () => nativeChatgptWindow(hypr), focus = () => focusNativeChatgpt(hypr), now = () => Date.now()
+  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now()
 } = {}) {
   const reviews = new Map();
   const script = fileURLToPath(import.meta.url);
   if ([script, process.execPath].some((s) => /[\0\r\n]/.test(s))) throw new Error("The application path is unsupported.");
-  const command = `${quote(process.execPath)} ${quote(script)} focus-chatgpt`;
+  const command = (connection) => [process.execPath, script, ...intentArguments(connection)].map(quote).join(" ");
   const live = async () => {
     const list = JSON.parse(await hypr("binds", "-j"));
     if (!Array.isArray(list)) throw new Error("The compositor shortcut list is unavailable.");
     return list;
   };
   const matches = (b, c) => b.modmask === c.modmask && String(b.key).toUpperCase() === c.key;
-  const ours = (b, c) => matches(b, c) && b.description === c.label && b.dispatcher === "exec" && b.arg === command;
+  const ours = (b, c) => matches(b, c) && b.description === c.label && (b.dispatcher === "exec" && b.arg === command(c) || b.dispatcher === "__lua" && /^\d+$/.test(b.arg));
   const config = async () => { await ownedDirectory(dirname(configPath)); return ownedFile(configPath); };
   async function root() {
     await mkdir(stateRoot, { recursive: true, mode: 0o700 });
@@ -136,11 +137,13 @@ export function createHostBridge({
     return tx;
   }
   const publicReceipt = (tx) => ({ id: tx.id, status: tx.status, shortcut: tx.connection.shortcut, label: tx.connection.label, actionId: tx.connection.actionId, trial: tx.trial ?? "not-tried", detail: tx.detail ?? null });
+  const callbackName = (c) => { if (!/^__strathex_switchyard_[a-f0-9]{32}$/.test(c.callbackName)) throw new Error("The owned Lua callback identity is invalid. Restore and review the connection again."); return c.callbackName; };
   async function verify(c, present) {
     if ((await hypr("reload")).trim() !== "ok" || (await hypr("configerrors")).trim()) throw new Error("The compositor could not validate the configuration.");
     const bindings = await live();
     const count = bindings.filter((b) => matches(b, c));
     if (present ? count.length !== 1 || !ours(count[0], c) : count.some((b) => ours(b, c))) throw new Error("Live shortcut readback does not match the reviewed change.");
+    if (present && c.callbackName && (await hypr("repl", `type(${callbackName(c)})`)).trim() !== "function") throw new Error("The owned Lua shortcut callback was not loaded.");
   }
   async function restoreTx(tx) {
     const current = await config();
@@ -157,25 +160,27 @@ export function createHostBridge({
     if ((await config()).text !== current.text) throw new Error("The configuration changed during restoration. Retry after reviewing it.");
     await atomicFile(configPath, restored, current.mode);
     await verify(tx.connection, false);
+    if (tx.connection.callbackName && (await hypr("eval", `${callbackName(tx.connection)} = nil`)).trim() !== "ok") throw new Error("The owned shortcut callback could not be cleared.");
     if ((await config()).text !== restored) throw new Error("Restored file readback failed.");
     tx.status = "restored"; tx.detail = "Owned shortcut removed; previous configuration verified. Later unrelated edits are preserved.";
     await save(tx);
     return publicReceipt(tx);
   }
   return {
-    async review(plan, actionId, implementation) {
+    async review(plan, actionId, implementation, target = null) {
       if (process.platform !== "linux") throw new Error("Host application is currently implemented only for Omarchy Linux. Portable design remains available.");
-      const connection = compileConnection(plan, actionId, implementation);
-      await verifyTarget();
+      const connection = compileConnection(plan, actionId, implementation, target);
+      await verifyTarget(connection);
       if ((await hypr("configerrors")).trim()) throw new Error("Resolve existing compositor errors before applying a shortcut.");
       const before = await config();
       if ((await live()).some((b) => matches(b, connection))) throw new Error(`${connection.shortcut} is already assigned. Choose another chord; the existing binding will be preserved.`);
       const id = randomUUID();
-      const line = `o.bind(${JSON.stringify(connection.shortcut)}, ${JSON.stringify(connection.label)}, ${JSON.stringify(command)})`;
+      connection.callbackName = `__strathex_switchyard_${id.replaceAll("-", "")}`;
+      const line = `function ${connection.callbackName}()\n  hl.dispatch(hl.dsp.exec_cmd(${JSON.stringify(command(connection))}))\nend\no.bind(${JSON.stringify(connection.shortcut)}, ${JSON.stringify(connection.label)}, ${connection.callbackName})`;
       const review = { id, connection, line, beforeHash: hash(before.text), expires: now() + 120000 };
       if (reviews.size >= 16) reviews.delete(reviews.keys().next().value);
       reviews.set(id, review);
-      return { reviewId: id, expiresAt: review.expires, shortcut: connection.shortcut, label: connection.label, changes: [`Add ${connection.shortcut} → Show ChatGPT to your desktop shortcuts.`, "Save and verify a dated private baseline before writing.", "Focus the existing native main window; no firmware, launch, prompt, or exact task resume.", "Restore removes this shortcut and preserves unrelated later edits."] };
+      return { reviewId: id, expiresAt: review.expires, shortcut: connection.shortcut, label: connection.label, changes: [`Add ${connection.shortcut} → ${connection.label} to your desktop shortcuts.`, "Save and verify a dated private baseline before writing.", "Enter the running suite's active-compartment policy. Missing or prohibited targets never fall back.", "Restore removes this shortcut and preserves unrelated later edits."] };
     },
     async apply(reviewId) {
       const review = reviews.get(reviewId);
@@ -184,7 +189,7 @@ export function createHostBridge({
       return lock(async () => {
         const before = await config();
         if (hash(before.text) !== review.beforeHash) throw new Error("Desktop shortcuts changed after review. Review again; no changes were applied.");
-        await verifyTarget();
+        await verifyTarget(review.connection);
         if ((await hypr("configerrors")).trim() || (await live()).some((b) => matches(b, review.connection))) throw new Error("The shortcut is no longer available. Review again; no changes were applied.");
         const id = `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID()}`;
         await mkdir(join(stateRoot, id), { mode: 0o700 });
@@ -192,7 +197,7 @@ export function createHostBridge({
         const after = before.text + block;
         const tx = { schema: "switchyard-host-transaction/v1", id, status: "prepared", connection: review.connection, beforeHash: hash(before.text), afterHash: hash(after), block, createdAt: new Date().toISOString() };
         await writeFile(join(stateRoot, id, "bindings.lua.before"), before.text, { flag: "wx", mode: 0o600 });
-        await writeFile(join(stateRoot, id, "reason.txt"), `Review and trial ${review.connection.shortcut} to focus the verified native ChatGPT main window. Preserve ordinary typing and save the complete prior host bindings.\n`, { flag: "wx", mode: 0o600 });
+        await writeFile(join(stateRoot, id, "reason.txt"), `Review and trial ${review.connection.shortcut} for ${review.connection.label} through the authenticated active-compartment policy. Preserve ordinary typing and save the complete prior host bindings.\n`, { flag: "wx", mode: 0o600 });
         if ((await ownedFile(join(stateRoot, id, "bindings.lua.before"), true)).text !== before.text) throw new Error("Baseline verification failed; no configuration was changed.");
         await save(tx);
         try {
@@ -220,13 +225,24 @@ export function createHostBridge({
     },
     async restore(id) { return lock(async () => { const tx = await load(id); if (!activeStates.has(tx.status)) throw new Error("That transaction is not active."); return restoreTx(tx); }); },
     async keep(id) { return lock(async () => { const tx = await load(id); if (tx.status !== "applied" || tx.trial !== "verified") throw new Error("Try and verify the applied action before keeping it."); await verify(tx.connection, true); tx.status = "kept"; await save(tx); return publicReceipt(tx); }); },
-    async trial(id) { return lock(async () => { const tx = await load(id); if (!["applied", "kept"].includes(tx.status)) throw new Error("Apply this connection before trying it."); if (!(await config()).text.includes(tx.block) || !(await live()).some((b) => ours(b, tx.connection))) throw new Error("This connection changed since application. Review it before trying."); await focus(); tx.trial = "verified"; await save(tx); return publicReceipt(tx); }); }
+    async trial(id) { return lock(async () => {
+      const tx = await load(id); if (!["applied", "kept"].includes(tx.status)) throw new Error("Apply this connection before trying it.");
+      const binding = (await live()).find((b) => ours(b, tx.connection));
+      if (!(await config()).text.includes(tx.block) || !binding) throw new Error("This connection changed since application. Review it before trying.");
+      await verifyTarget(tx.connection);
+      if (focus) await focus(tx.connection);
+      else { const since = Date.now(); const result = await hypr("eval", `${callbackName(tx.connection)}()`); if (result.trim() !== "ok") throw new Error("The compositor rejected the owned registered Lua callback."); await waitIntentReceipt(tx.connection, since); }
+      tx.trial = "verified"; tx.trialEvidence = "owned named Lua callback bound to the chord and authenticated intent receipt; physical keyboard event and external task completion not established"; await save(tx); return publicReceipt(tx);
+    }); }
   };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  if (process.argv.length === 3 && process.argv[2] === "focus-chatgpt") {
-    try { await focusNativeChatgpt(); }
-    catch { process.stderr.write("Switchyard: native ChatGPT focus unavailable; open its safe main window.\n"); process.exitCode = 1; }
-  } else { process.stderr.write("This entry point supports only focus-chatgpt.\n"); process.exitCode = 1; }
+  const args = process.argv.slice(2);
+  try {
+    if (args.length === 1 && args[0] === "focus-chatgpt") await dispatchPhysicalIntent({ implementation: "native-chatgpt.focus/v1" });
+    else if (args[0] === "intent" && args.length === 2 && args[1] === "native-chatgpt.focus/v1") await dispatchPhysicalIntent({ implementation: args[1] });
+    else if (args[0] === "intent" && args.length === 4) await dispatchPhysicalIntent({ implementation: args[1], roleId: args[2], intent: args[3] });
+    else throw new Error("Only closed physical intents are supported.");
+  } catch { process.stderr.write("Switchyard: physical intent unavailable or rejected by the active workspace. Open the app and review its exact target and policy.\n"); process.exitCode = 1; }
 }

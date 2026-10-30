@@ -108,12 +108,16 @@ test("Linux host transaction faults and durable restoration", { skip: process.pl
     const hypr = async (...args) => {
       if (args[0] === "configerrors") return "";
       if (args[0] === "reload") { if (failReload) { failReload = false; throw new Error("Synthetic reload failure"); } return "ok\n"; }
+      if (args[0] === "repl") return "function\n";
+      if (args[0] === "eval" && /^__strathex_switchyard_[a-f0-9]{32} = nil$/.test(args[1])) return "ok\n";
       if (args[0] === "binds") {
         const text = await readFile(configPath, "utf8");
         const matches = [...text.matchAll(/^o.bind\((.*)\)$/gm)].map((m) => {
-          const [shortcut, description, arg] = JSON.parse(`[${m[1]}]`);
+          const fields = /^("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*"), (__strathex_switchyard_[a-f0-9]{32})$/.exec(m[1]);
+          if (!fields) throw new Error("Unexpected synthetic Lua binding source");
+          const [shortcut, description] = JSON.parse(`[${fields[1]},${fields[2]}]`);
           const parts = shortcut.split(" + "); const key = parts.pop();
-          return { key, modmask: parts.reduce((n, p) => n + ({ SUPER: 64, ALT: 8, SHIFT: 1, CTRL: 4 }[p]), 0), description, dispatcher: "exec", arg };
+          return { key, modmask: parts.reduce((n, p) => n + ({ SUPER: 64, ALT: 8, SHIFT: 1, CTRL: 4 }[p]), 0), description, dispatcher: "__lua", arg: "123" };
         });
         return JSON.stringify([...extra, ...(wrongReadback ? [] : matches)]);
       }
