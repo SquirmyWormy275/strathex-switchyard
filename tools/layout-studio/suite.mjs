@@ -21,15 +21,20 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   copilot ??= createCopilot({ store });
   const custom = createCustomAgents({ store });
   const examples = new Map();
-  const started = new Set(), monitors = new Map();
+  const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
   let selectionLoaded = false;
   let selectionLoading;
   async function initialize(id, policy) {
-    if (started.has(id)) return;
-    await store.initialize(id, policy);
-    await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; });
-    started.add(id);
+    if (started.has(id)) { if (policy !== undefined) await store.initialize(id, policy); return; }
+    if (initializing.has(id)) { await initializing.get(id); if (policy !== undefined) await store.initialize(id, policy); return; }
+    const pending = (async () => {
+      await store.initialize(id, policy);
+      await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; });
+      started.add(id);
+    })();
+    initializing.set(id, pending);
+    try { await pending; } finally { if (initializing.get(id) === pending) initializing.delete(id); }
   }
   async function loadSelection() {
     if (selectionLoaded) return;

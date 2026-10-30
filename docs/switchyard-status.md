@@ -67,11 +67,11 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **85/85 groups passed; 571 tests, 562 passed and 9
+- Integrated native Linux run: **86/86 groups passed; 575 tests, 566 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-9eb4e496-9915-4600-8049-5d43c291e66b.json`.
+  `.sxsy-verification/isolated-test-1482e6d6-8f89-4e9f-a909-9036f042e8e8.json`.
 - Current focused Studio run after typing-layer rebasing and microphone-release
-  changes: **47/47 tests passed**, no skips. This includes all 104 named catalog
+  changes: **51/51 tests passed**, no skips. This includes all 104 named catalog
   configurations, physical option variations, encrypted compartment boundaries,
   device fault/restore paths and SDK/OAuth contract tests.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -150,3 +150,21 @@ are excluded from source control. About 211 MiB of duplicate SDK download,
 redundant generated profiles and temporary research staging was removed after
 checksum/readback verification. Keep the installed SDK and local transcription
 runtime only while required for development/demo; retain small recovery receipts.
+
+## Protected-state concurrency checkpoint
+
+Compartment initialization and mutations now use cross-process kernel locks:
+Linux `flock` and Windows exclusive FileStream access. A second process cannot
+replace the storage key while another initializes the compartment or lose a
+concurrent profile/state write. Lock-holder exit releases the kernel lock; no
+stale PID record is deleted based on a guess. Tests exercise two independent
+store instances, concurrent updates and an abruptly killed owner. Linux checks
+passed; Windows execution remains part of remote CI, not interactive acceptance.
+Private file helpers are shared and reject links, foreign/writable state and
+oversized reads. The morning frontend is unchanged.
+
+The Windows helper also built successfully on GitHub's Windows runner at the PR
+merge revision `69b75f5f2229fbe5d644626cf71b543b52af9945`. Its downloadable artifact
+was checked against `SHA256SUMS` and the exact C# source, then local duplicate
+verification/publish files were removed. Artifact retention is seven days. This
+adds Windows build evidence, not interactive native-window/device acceptance.

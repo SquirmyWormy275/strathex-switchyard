@@ -25,3 +25,16 @@ platform-specific evidence rather than modifying Windows code to pass on Linux.
 No new files are moved solely for directory symmetry. Learn through
 [Use Switchyard](switchyard-configuration.md), [Alex's F77](../examples/alex-f77/README.md),
 and [Alex's B122](../examples/alex-b122/README.md).
+
+## Current execution agreement
+
+The user will review the frozen frontend in the morning while backend work
+continues. Keep review build `24100ef601b8` unchanged until that review; the live
+backend may advance behind it. GitHub is the working record: commit and push
+tested, coherent checkpoints to the feature branch, maintain draft PR #20 and
+keep the requirement ledger current. Do not leave another large unpushed local
+iteration. Keep only required runtimes/models, the current review build and small
+recovery/evidence files locally. Remove verified duplicate downloads, generated
+staging and build intermediates; never remove original worktrees, user recovery
+copies, credentials or irreplaceable data as cleanup. Remote CI artifacts have
+short retention and do not constitute a public release or hardware acceptance.

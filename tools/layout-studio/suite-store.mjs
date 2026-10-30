@@ -1,15 +1,16 @@
 /** Compartment-scoped authenticated encryption and policy enforcement. */
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, lstat, open, readFile, readdir, realpath, rename, rm } from "node:fs/promises";
-import { homedir, userInfo } from "node:os";
-import { dirname, join, isAbsolute } from "node:path";
+import { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
+import { withStateLock } from "./state-lock.mjs";
+export { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
+import { lstat, readdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { importProfile } from "./workspace.mjs";
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
-const uid = userInfo().uid;
-const maxBytes = 8 * 1024 * 1024;
 const templates = {
   personal: { providers: ["codex", "claude-code", "native-chatgpt", "custom-agent", "local-transcription"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
   work: { providers: ["microsoft-365-copilot"], accounts: [], export: false, recording: false, crossCompartment: false, retentionDays: 7 }
@@ -60,31 +61,6 @@ export function platformSecrets({ root }) {
   return { get: (id, purpose) => run("lookup", id, purpose), set: (id, purpose, value) => run("store", id, purpose, value) };
 }
 
-export async function privateDirectory(path) {
-  if (!isAbsolute(path)) throw new Error("Private storage needs an absolute path.");
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  const s = await lstat(path);
-  if (!s.isDirectory() || s.isSymbolicLink() || await realpath(path) !== path || (process.platform !== "win32" && (s.uid !== uid || (s.mode & 0o077)))) throw new Error("Private storage ownership or permissions are invalid.");
-}
-export async function privateRead(path) {
-  const f = await open(path, "r");
-  try {
-    const s = await f.stat(), named = await lstat(path);
-    if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.size > maxBytes || (process.platform !== "win32" && (s.uid !== uid || (s.mode & 0o077)))) throw new Error("Private storage file is unsafe or oversized.");
-    return await f.readFile("utf8");
-  } finally { await f.close(); }
-}
-export async function privateWrite(path, text) {
-  if (Buffer.byteLength(text) > maxBytes) throw new Error("Private storage limit reached. Review or delete older sessions.");
-  await privateDirectory(dirname(path));
-  const temporary = join(dirname(path), `.pending-${randomUUID()}`);
-  try {
-    const f = await open(temporary, "wx", 0o600);
-    try { await f.writeFile(text); await f.sync(); } finally { await f.close(); }
-    await rename(temporary, path);
-  } finally { await rm(temporary, { force: true }); }
-}
-
 export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA || homedir() : join(homedir(), ".local/state")), "strathex-switchyard/suite"), secrets, clock = () => Date.now() } = {}) {
   secrets ??= platformSecrets({ root: join(root, "credentials") });
   const queues = new Map();
@@ -119,13 +95,13 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   async function mutate(id, fn) {
     validate(id);
     const previous = queues.get(id) ?? Promise.resolve();
-    const pending = previous.catch(() => {}).then(async () => { const state = await read(id); const result = await fn(state); await write(id, state); return result; });
+    const pending = previous.catch(() => {}).then(() => withStateLock(root, id, async (lease) => { const state = await read(id); const result = await fn(state); lease.assert(); await write(id, state); return result; }));
     queues.set(id, pending);
     try { return await pending; } finally { if (queues.get(id) === pending) queues.delete(id); }
   }
   function permit(state, { provider, account, operation, destination } = {}) {
     const policy = templates[state.policy];
-    if (!policy) throw new Error("Compartment policy is unsupported.");
+    if (typeof state.policy !== "string" || !Object.hasOwn(templates, state.policy)) throw new Error("Compartment policy is unsupported.");
     if (state.mode === "keyboard-only" && (provider || operation === "record")) throw new Error("Keyboard-only mode has no provider or recording effects. Choose companion mode deliberately to connect local actions.");
     if (provider && !policy.providers.includes(provider)) throw new Error("This provider is prohibited in the selected compartment.");
     if (account && !state.accounts.includes(account)) throw new Error("This account is not enrolled in the selected compartment.");
@@ -144,14 +120,17 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   return {
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
     async initialize(id = "personal", policy) {
-      validate(id); if (policy !== undefined && !templates[policy]) throw new Error("Choose Personal or Copilot-only Work policy.");
-      await privateDirectory(root);
-      let exists = false; try { await lstat(path(id)); exists = true; } catch (e) { if (e.code !== "ENOENT") throw e; }
-      if (exists) { const existing = await read(id); if (policy !== undefined && existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy: existing.policy }; }
-      policy ??= id === "work" ? "work" : "personal";
-      await key(id, true);
-      await write(id, { schema: "switchyard-suite-state/v1", id, policy, accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
-      return { id, policy };
+      validate(id); if (policy !== undefined && (typeof policy !== "string" || !Object.hasOwn(templates, policy))) throw new Error("Choose Personal or Copilot-only Work policy.");
+      return withStateLock(root, id, async (lease) => {
+        await privateDirectory(root);
+        let exists = false; try { await lstat(path(id)); exists = true; } catch (e) { if (e.code !== "ENOENT") throw e; }
+        if (exists) { const existing = await read(id); if (policy !== undefined && existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy: existing.policy }; }
+        policy ??= id === "work" ? "work" : "personal";
+        lease.assert(); await key(id, true);
+        lease.assert();
+        await write(id, { schema: "switchyard-suite-state/v1", id, policy, accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
+        return { id, policy };
+      });
     },
     async list() {
       await privateDirectory(root);

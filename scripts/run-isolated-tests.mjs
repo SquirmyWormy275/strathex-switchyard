@@ -106,6 +106,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/integrations.test.mjs" },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/windows-host.test.mjs" },
+  { file: "tools/layout-studio/state-lock.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },

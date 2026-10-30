@@ -20,6 +20,8 @@ async function fixture(fn) {
 }
 
 test("independent compartment encryption rejects swapping and tampering, with provider/account/export/recording boundaries", () => fixture(async ({ root, store, keys }) => {
+  await assert.rejects(store.initialize("invalid", "constructor"), /Choose Personal/);
+  await assert.rejects(store.initialize("invalid", ["work"]), /Choose Personal/);
   await store.initialize("personal", "personal"); await store.initialize("work", "work");
   assert.notEqual(keys.get("personal:storage-key"), keys.get("work:storage-key"));
   await store.update("personal", "synthetic-content", (s) => { s.workflow.name = "private synthetic content"; });
@@ -36,6 +38,18 @@ test("independent compartment encryption rejects swapping and tampering, with pr
   const envelope = JSON.parse(raw); envelope.id = "work";
   await writeFile(join(root, "work.sealed.json"), JSON.stringify(envelope));
   await assert.rejects(store.snapshot("work"), /authenticate/);
+}));
+
+test("concurrent suite bootstrap recovers a compartment once and never silently changes its existing policy", () => fixture(async ({ store }) => {
+  let recoveries = 0; const update = store.update.bind(store);
+  store.update = async (id, operation, ...args) => { if (operation === "restart-recovery") recoveries++; return update(id, operation, ...args); };
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await Promise.all([suite.handle("/api/suite/bootstrap"), suite.handle("/api/suite/bootstrap")]);
+    assert.equal(recoveries, 1);
+    await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "personal", policy: "work" }), /policy differs/);
+    assert.equal((await store.snapshot("personal")).policy, "personal");
+  } finally { await suite.close(); }
 }));
 
 test("missing keys never replace existing data; saved profiles survive restart and omit local environment data", () => fixture(async ({ root, store, keys, secrets }) => {
