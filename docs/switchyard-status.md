@@ -922,3 +922,42 @@ TypeScript typecheck passes. `scripts/verify-conversation-binding-host.mjs
 session UUIDs and actual native login checks; installed acceptance is pending.
 Its synthetic records are removed afterward and modes/definitions are checked.
 Frontend exposure remains pending the frozen design review.
+
+The complete legacy-binding checkpoint passes **114 Linux groups, 801 tests:
+792 passed and 9 expected platform skips**, receipt
+`92b75c6c-7767-4bbb-822b-6115cded4799`. The normal installed application is now
+source **1a0f802**, release
+`5de40d90265a31856af4e1ee2c767c8fc71e844fda0451494f4f77e73b101999`.
+Its six update/export checks passed, preserving definitions, modes, the private
+link and frozen Home hash. The disposable bundle was removed. Private receipt:
+`assignment-legends-1793375445666.json`.
+
+The new installed-route check also passed **four checks** using the actual native
+Codex/Claude login probes and invented legacy session UUIDs. Exact context and
+identity were retained, replay and unauthenticated review were rejected, and the
+synthetic records were removed. Validation mode/definitions, Personal definitions
+and the private link were preserved. Receipt:
+`installed-legacy-binding-1793375470441.json`. No native session was resumed or
+prompted; existence of the invented IDs is explicitly unverified.
+
+The complete Windows release including readout workflow adoption passed **221
+groups** for PR head **3246b7a** (run `41076395406`, receipt
+`130127f2-b844-4e65-be1e-8c060e4e1cc8`). GitHub checks out its PR merge revision
+`97eaaa2` against unchanged main. This includes actual helper and eight guardian
+checks, packaging and complete build/bootstrap/automation. Newer conversation
+checkpoints and the successful-build receipt-retention follow-up await their
+own Windows run; interactive device/account/window acceptance remains separate.
+
+## Repository identity before native task continuation
+
+New Codex coding-task creation/binding records the native directory device/inode
+identity, preserving large file IDs as strings. Status and owned read-only resume
+recheck that identity, so a different repository placed at the same pathname is
+refused. Explicit binding can add the current directory identity to an older
+record that has none; it cannot replace a known identity. The source directory
+is checked again before saving a native observation/acknowledgement.
+
+The coding/stdio groups pass **21 focused tests**, including moving the original
+directory aside, creating a different Git directory at the same path and
+verifying that status, resume and rebinding cannot redirect its saved task.
+General approved text submission remains the next implementation step.

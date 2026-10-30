@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, readFile, readdir, writeFile, realpath } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, readdir, writeFile, realpath, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -21,6 +21,15 @@ async function fixture(fn) {
   finally { await rm(root, { recursive: true, force: true }); }
 }
 const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
+
+test("replacing a directory at the same path cannot redirect a saved native task", () => fixture(async ({ root, repositoryRoot, service, calls, idle }) => {
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic owned task" });
+  assert.match(task.repositoryIdentity.inode, /^[1-9]\d*$/); assert.match(task.repositoryIdentity.device, /^\d+$/);
+  await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); calls.length = 0; idle();
+  await assert.rejects(service.status("personal", task.id), /directory was replaced/); assert.equal(calls.includes("read"), false);
+  await assert.rejects(service.resume("personal", task.id), /directory was replaced/); assert.equal(calls.includes("resume"), false);
+  await assert.rejects(service.bind("personal", { ...existing(repositoryRoot), sessionId: task.sessionId }), /changed its working directory/);
+}));
 
 test("coding discovery distinguishes live inventory, exact bindings, staleness and task completion", () => fixture(async ({ service, repositoryRoot, store, stale, idle }) => {
   assert.equal((await service.discovery("personal")).recentThreads, 1);

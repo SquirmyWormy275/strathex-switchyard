@@ -7,6 +7,7 @@ import { isAbsolute, join } from "node:path";
 import { trustedCli } from "./agents.mjs";
 import { directoryIdentity } from "./private-fs.mjs";
 import { createCodexStdioTasks } from "./codex-stdio-tasks.mjs";
+import { repositoryIdentity, verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 
 const { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, resumeExactCodexDaemonThread, startCodexDaemonThread } = createRequire(import.meta.url)("../../apps/vscode-extension/src/codex-daemon-status.cjs");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -55,26 +56,27 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
     async bind(compartment, { sessionId, repositoryRoot, label }) {
       const login = await account(compartment);
       if (typeof sessionId !== "string" || !thread.test(sessionId) || typeof label !== "string" || !label.trim() || label.length > 100 || /[\0\r\n]/.test(label)) throw new Error("Choose an exact Codex session and a short local task label.");
-      const root = await repository(repositoryRoot), observation = await exact(sessionId, root, compartment);
+      const root = await repository(repositoryRoot), identity = await repositoryIdentity(root), observation = await exact(sessionId, root, compartment);
       if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed while binding the task.");
+      await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
       await store.claimSession(compartment, { provider: "codex", sessionId });
       return store.update(compartment, "coding-session-bind", (s) => {
         s.codingSessions ??= []; const existing = s.codingSessions.find((t) => t.provider === "codex" && t.sessionId === sessionId);
-        if (existing) { if (existing.repositoryRoot !== root || existing.accountFingerprint !== login.fingerprint) throw new Error("This saved binding changed its working directory or local login. Review it deliberately."); existing.observation = observation; return { ...view(existing), duplicatePrevented: true }; }
+        if (existing) { if (existing.repositoryRoot !== root || existing.accountFingerprint !== login.fingerprint || existing.repositoryIdentity && (existing.repositoryIdentity.device !== identity.device || existing.repositoryIdentity.inode !== identity.inode)) throw new Error("This saved binding changed its working directory or local login. Review it deliberately."); existing.repositoryIdentity ??= identity; existing.observation = observation; return { ...view(existing), duplicatePrevented: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached. Existing bindings are preserved.");
-        const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", label: label.trim(), repositoryRoot: root, sessionId, accountFingerprint: login.fingerprint, status: "registered", createdAt: now(), observation };
+        const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, sessionId, accountFingerprint: login.fingerprint, status: "registered", createdAt: now(), observation };
         s.codingSessions.push(task); return view(task);
       }, { provider: "codex" });
     },
     async create(compartment, { requestId, repositoryRoot, label }) {
       const login = await account(compartment);
       if (!uuid.test(requestId ?? "") || typeof label !== "string" || !label.trim() || label.length > 100 || /[\0\r\n]/.test(label)) throw new Error("An empty task needs a stable request UUID and a short local label.");
-      const root = await repository(repositoryRoot);
+      const root = await repository(repositoryRoot), identity = await repositoryIdentity(root);
       const reserved = await store.update(compartment, "coding-create-reserve", (s) => {
         s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.id === requestId);
         if (found) { if (found.provider !== "codex" || found.repositoryRoot !== root || found.accountFingerprint !== login.fingerprint) throw new Error("This request identity already names a different task or login."); return { task: view(found), duplicate: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
-        const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "codex", label: label.trim(), repositoryRoot: root, sessionId: null, accountFingerprint: login.fingerprint, launchPolicy: "read-only/on-request", status: "creating", createdAt: now(), observation: null };
+        const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, sessionId: null, accountFingerprint: login.fingerprint, launchPolicy: "read-only/on-request", status: "creating", createdAt: now(), observation: null };
         s.codingSessions.push(task); return { duplicate: false };
       }, { provider: "codex" });
       if (reserved.duplicate) return { ...reserved.task, duplicatePrevented: true };
@@ -88,6 +90,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         const observation = await exact(sessionId, root, compartment), current = await account(compartment);
         if (current.fingerprint !== login.fingerprint) throw new Error("The local login changed while creating the task.");
         await store.claimSession(compartment, { provider: "codex", sessionId });
+        await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
         return store.update(compartment, "coding-create-bind", (s) => { const task = s.codingSessions.find((t) => t.id === requestId); task.status = "registered"; task.observation = observation; return { ...view(task), modelPromptSubmitted: false }; }, { provider: "codex" });
       } catch (error) {
         await store.update(compartment, "coding-create-uncertain", (s) => { const task = s.codingSessions.find((t) => t.id === requestId), knownId = createdThreadId ?? error.createdThreadId; if (!task.sessionId && typeof knownId === "string" && thread.test(knownId)) task.sessionId = knownId; task.status = "creation-uncertain"; }).catch(() => {});
@@ -98,9 +101,11 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       const login = await account(compartment), task = (await store.snapshot(compartment)).codingSessions?.find((t) => t.id === id);
       if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex") throw new Error("Select an exact saved coding task first.");
       if (task.accountFingerprint !== login.fingerprint) throw new Error("The local Codex login changed. This task was not redirected to another account.");
+      await verifyRepositoryIdentity(task);
       await store.claimSession(compartment, { provider: "codex", sessionId: task.sessionId });
       const observation = await exact(task.sessionId, task.repositoryRoot, compartment);
       if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during task observation.");
+      await verifyRepositoryIdentity(task);
       return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; return view(current); }, { provider: "codex" });
     },
     async resume(compartment, id) {
@@ -111,6 +116,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         const login = await account(compartment), task = (await store.snapshot(compartment)).codingSessions?.find((t) => t.id === id);
         if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex" || task.status !== "registered" || task.launchPolicy !== "read-only/on-request") throw new Error("Runtime resume is implemented only for exact read-only tasks created by Switchyard. Existing task permissions are not changed.");
         if (task.accountFingerprint !== login.fingerprint) throw new Error("The local Codex login changed. This task was not resumed in another account.");
+        await verifyRepositoryIdentity(task);
         await store.claimSession(compartment, { provider: "codex", sessionId: task.sessionId });
         const before = await exact(task.sessionId, task.repositoryRoot, compartment);
         if (["active", "waiting-on-approval"].includes(before.status)) throw new Error("This exact task is already active or awaiting approval. Its running permissions were preserved.");
@@ -118,6 +124,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
           const result = await daemon.resume(task.sessionId, task.repositoryRoot, compartment);
           if (result.id !== task.sessionId || result.repositoryRoot !== task.repositoryRoot || result.permissions !== task.launchPolicy || result.modelPromptSubmitted !== false || !states.includes(result.observation)) throw new Error("Codex did not verify the exact resumed runtime and permissions.");
           if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during resume.");
+          await verifyRepositoryIdentity(task);
           return store.update(compartment, "coding-runtime-resume", (s) => {
             const current = s.codingSessions.find((t) => t.id === id);
             if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The saved task binding changed during resume.");
