@@ -6,7 +6,7 @@ import { lstat, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { setupRuntime } from "../tools/layout-studio/runtime-setup.mjs";
+import { setupRuntime, runtimeEnvironment } from "../tools/layout-studio/runtime-setup.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
 import { privateDirectory, privateWrite } from "../tools/layout-studio/private-fs.mjs";
 
@@ -44,8 +44,14 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   for (const path of [values["--uv"], values["--helper"]]) { const s = await lstat(path); if (!s.isFile() || s.isSymbolicLink()) throw new Error("The verified native executable is not a regular file."); }
   const uvSha256 = createHash("sha256").update(await readFile(values["--uv"])).digest("hex");
   const helperSha256 = createHash("sha256").update(await readFile(values["--helper"])).digest("hex");
-  const uvVersion = (await runRuntimeCommand(values["--uv"], ["--version"], { windowsHelper: values["--helper"], timeout: 10000 })).trim();
-  assert.match(uvVersion, /^uv 0\.12\.7(?:\s|$)/, "The native uv version did not match the reviewed CI pin.");
+  let uvVersion;
+  try {
+    uvVersion = (await runRuntimeCommand(values["--uv"], ["--version"], { env: runtimeEnvironment(), windowsHelper: values["--helper"], timeout: 10000 })).trim();
+    assert.match(uvVersion, /^uv 0\.12\.7(?:\s|$)/, "The native uv version did not match the reviewed CI pin.");
+  } catch (error) {
+    await privateWrite(values["--receipt"], JSON.stringify({ schema: "switchyard-fresh-platform-runtime/v1", at: new Date().toISOString(), platform: process.platform, phase: "tool-preflight", succeeded: false, runtimeNotCreated: true, temporaryRuntimeRemoved: false, hardwareOpened: false, providerAccountUsed: false, microphoneOpened: false, verifiedTools: { uvSha256, helperSha256 }, failure: error.message, failureCode: error.code ?? null }, null, 2) + "\n");
+    throw error;
+  }
   const receipt = await verifyFreshPlatformRuntime({ uv: values["--uv"], windowsHelper: values["--helper"], receiptFile: values["--receipt"] });
   receipt.verifiedTools = { uvVersion, uvSha256, helperSha256 };
   receipt.requirementSha256 = createHash("sha256").update(await readFile(new URL("../tools/layout-studio/runtime.requirements.lock", import.meta.url))).digest("hex");

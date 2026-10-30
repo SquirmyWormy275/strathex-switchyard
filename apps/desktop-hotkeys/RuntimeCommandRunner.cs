@@ -69,7 +69,9 @@ internal static class RuntimeCommandRunner
         foreach (var entry in env.EnumerateObject())
         {
             string value = entry.Value.GetString() ?? throw NativeError();
-            if (!Regex.IsMatch(entry.Name, "^[A-Za-z_][A-Za-z0-9_]*$") || value.Length > 8192 || value.Contains('\0') || !environment.TryAdd(entry.Name, value)) throw NativeError();
+            // These two standard Windows coordinates are present in the explicit
+            // desktop allowlist; parentheses are not valid POSIX identifiers.
+            if (!Regex.IsMatch(entry.Name, "^(?:[A-Za-z_][A-Za-z0-9_]*|ProgramFiles\\(x86\\)|CommonProgramFiles\\(x86\\))$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) || value.Length > 8192 || value.Contains('\0') || !environment.TryAdd(entry.Name, value)) throw NativeError();
         }
         if ((File.GetAttributes(executable) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) throw NativeError();
         using var executableLock = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);

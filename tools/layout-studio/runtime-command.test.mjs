@@ -28,6 +28,12 @@ test("runtime guardian cannot execute when the durable start acknowledgement fai
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes')`], { ...options, onGuardianReady: () => { throw new Error("synthetic disk failure"); } }), /acknowledgement/);
   await assert.rejects(readFile(marker), { code: "ENOENT" });
 }));
+test("Windows runtime guardian accepts standard x86 program-directory coordinates without admitting arbitrary environment names", { skip: process.platform !== "win32" ? "Native Windows environment block" : skip }, async () => {
+  const env = { ...options.env, "ProgramFiles(x86)": "C:\\Program Files (x86)", "CommonProgramFiles(x86)": "C:\\Program Files (x86)\\Common Files" };
+  const code = "process.stdout.write(JSON.stringify([process.env['ProgramFiles(x86)'],process.env['CommonProgramFiles(x86)']]))";
+  assert.deepEqual(JSON.parse(await runRuntimeCommand(process.execPath, ["-e", code], { ...options, env })), [env["ProgramFiles(x86)"], env["CommonProgramFiles(x86)"]]);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write('must-not-start')"], { ...options, env: { ...env, "Invalid(Name)": "rejected" } }));
+});
 test("runtime guardian reports a verified nonzero exit without returning sensitive stderr", { skip }, async () => {
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stderr.write('synthetic-secret');process.exit(17)"], options), (error) => { assert.match(error.message, /failed/); assert.ok(!error.message.includes("synthetic-secret")); assert.notEqual(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true; });
 });

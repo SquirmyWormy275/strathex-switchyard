@@ -14,7 +14,8 @@ Saved native conversation context can be used by the model.
 The task controls below are backend APIs. The frontend is frozen for review;
 these new controls are not yet exposed there. Claude text tasks use the same protected review lifecycle;
 first-turn creation and continuation have separate native contracts and their
-installed acceptance is running. General interactive attachment and broader execution-authority mediation remain
+installed acceptance passed native creation and continuation with two synthetic
+text turns; interactive client attachment remains separate. General interactive attachment and broader execution-authority mediation remain
 unfinished. Claude configuration-design continuation is a separate working path.
 
 ## Follow one task
@@ -134,4 +135,6 @@ creation and exact continuation plus duplicate/replay behavior, then restores
 keyboard-only mode and removes
 its synthetic local records. It never changes native workspace-trust settings,
 deletes native user history or grants file/command authority. Its native result
-is pending; native pipe, policy, first-turn lifecycle and crash-recovery tests pass.
+passed nine normal installed checks with two synthetic prompts, exact UUID
+continuation, duplicate/replay rejection and keyboard-only cleanup. Native pipe,
+policy, first-turn lifecycle and crash-recovery tests pass.

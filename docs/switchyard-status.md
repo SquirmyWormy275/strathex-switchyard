@@ -1179,3 +1179,28 @@ CI and is being diagnosed as a software/integration failure. It is not marked
 hardware/account-blocked or accepted. Linux integrated evidence at e31e147 is
 117 groups, 825 tests: 816 pass and nine platform skips (receipt
 e8f0c1f9-616e-4f74-a741-756125d6c28a).
+
+The normal installed Claude text journey now passed **nine checks** against
+43ac630: two separately reviewed synthetic prompts created and continued the
+same exact native UUID, repeated request IDs reused their saved reply, replay
+and unauthenticated review were rejected, Git state was preserved, and final
+keyboard-only cleanup removed the synthetic local records while retaining the
+small native conversation. Receipt:
+installed-reviewed-claude-text-1793380499845.json (private workstation evidence).
+No native turn ID, general tool authority or task-completion verification is
+claimed. The verifier compares existing task definitions independently of their
+expected refreshed observation timestamps.
+
+The fresh Windows runtime failed before native readiness: the verifier used the
+explicit desktop environment, which includes standard `ProgramFiles(x86)` and
+`CommonProgramFiles(x86)` names, while the guardian only accepted POSIX-style
+identifiers. The guardian now accepts those two Windows coordinates explicitly;
+other parenthesized names remain rejected. The verifier uses its narrower runtime
+environment and retains a bounded preflight failure receipt too. The native helper
+build passes with zero warnings/errors on the pilot; its actual Windows test is
+queued for CI. Eleven applicable guardian/runtime tests passed locally, with the
+one added Windows environment test correctly pending native Windows execution.
+
+The latest integrated Linux run passed all 117 groups: **832 tests, 823 pass and
+nine platform skips**, receipt 70559d96-91a8-421e-9760-7c194fa07f4d.
+The frozen frontend and installed private link are preserved.

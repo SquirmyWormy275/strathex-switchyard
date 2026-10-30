@@ -26,6 +26,7 @@ function sourceState() {
   return digest(values);
 }
 const definitions = (s) => digest([s.profile, s.workflow, s.roleBindings ?? [], s.mode]), personal = definitions(await api("snapshot", { compartment: "personal" })), selection = await store.selection(), sourceBefore = sourceState();
+const taskDefinitions = (tasks) => (tasks ?? []).map(({ observation, ...definition }) => definition);
 const evidence = { schema: "switchyard-installed-reviewed-claude-text/v1", at: new Date().toISOString(), checks, modelPromptsSubmitted: 0, nativeTurnIdSupported: false, taskCompletionVerified: false, keyboardWritten: false, windowsRuntimeAccepted: false };
 let failure;
 try {
@@ -51,7 +52,7 @@ finally {
     if (turn && !["provider-turn-completed", "failed-before-turn", "reviewed-unconfirmed"].includes(turn.status) || task && ["creating", "creation-uncertain"].includes(task.status)) throw new Error("The synthetic native outcome is unresolved; its protected identities were retained for deliberate review.");
     if ((state.codingTurns ?? []).some((t) => t.taskId === taskId && !["provider-turn-completed", "failed-before-turn", "reviewed-unconfirmed"].includes(t.status))) throw new Error("A synthetic continuation is unresolved; its protected identity was retained.");
     await store.update(compartment, "synthetic-claude-text-cleanup", (s) => { s.codingTurns = (s.codingTurns ?? []).filter((t) => t.taskId !== taskId); s.codingSessions = (s.codingSessions ?? []).filter((t) => t.id !== taskId); });
-    const restored = await api("snapshot", { compartment }); assert.equal(definitions(restored), definitions(baseline)); assert.deepEqual(restored.codingSessions ?? [], baseline.codingSessions ?? []); assert.deepEqual(restored.codingTurns ?? [], baseline.codingTurns ?? []);
+    const restored = await api("snapshot", { compartment }); assert.equal(definitions(restored), definitions(baseline)); assert.equal(digest(taskDefinitions(restored.codingSessions)), digest(taskDefinitions(baseline.codingSessions)), "Existing task definitions changed during cleanup."); assert.equal(digest(restored.codingTurns ?? []), digest(baseline.codingTurns ?? []), "Existing protected text records changed during cleanup.");
     assert.equal(definitions(await api("snapshot", { compartment: "personal" })), personal); assert.equal(await store.selection(), selection); assert.equal((JSON.parse(await privateRead(join(applicationStateRoot(), "endpoint.json")))).url, endpoint.url);
     evidence.syntheticRecordsRemoved = true; checks.push("keyboard-only cleanup preserved definitions, active selection and private link");
   } catch (error) { failure ??= error; evidence.cleanupFailure = error.message; }
