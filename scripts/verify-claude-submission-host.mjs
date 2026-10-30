@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Actual stopped-task Claude continuation through the normal installed API. */
+/** Actual first-turn creation and exact Claude continuation through the installed API. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -10,7 +10,7 @@ import { applicationStateRoot } from "../deployment/suite/application.mjs";
 import { privateRead, privateWrite } from "../tools/layout-studio/private-fs.mjs";
 import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { desktopEnvironment } from "../tools/layout-studio/process-environment.mjs";
-if (process.platform !== "linux" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw new Error("Usage on the pilot: node scripts/verify-claude-submission-host.mjs --synthetic (normal app running; current Git directory must already be trusted by the native CLI; creates/stops one empty owned task and sends one tiny reviewed prompt, without changing native trust settings)");
+if (process.platform !== "linux" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw new Error("Usage on the pilot: node scripts/verify-claude-submission-host.mjs --synthetic (normal app running; current Git directory must already be trusted by the native CLI; reserves one local task and sends two separately reviewed tiny prompts, without changing native trust settings)");
 const repositoryRoot = await realpath(process.cwd()), git = await lstat(join(repositoryRoot, ".git")); assert.ok(!git.isSymbolicLink() && (git.isDirectory() || git.isFile()));
 const store = createSuiteStore(), compartment = "claude-coding-validation", taskId = randomUUID(), requestId = randomUUID(), checks = [];
 await store.initialize(compartment, "personal"); const baseline = await store.snapshot(compartment); assert.equal(baseline.mode, "keyboard-only");
@@ -30,18 +30,18 @@ const evidence = { schema: "switchyard-installed-reviewed-claude-text/v1", at: n
 let failure;
 try {
   await api("mode", { compartment, mode: "personal-companion" });
-  const task = await api("coding/claude/create", { compartment, requestId: taskId, repositoryRoot, label: "Synthetic reviewed Claude text check" }); assert.equal(task.modelPromptSubmitted, false); checks.push("one exact owned account/directory-bound empty Claude task created without prompting");
-  const stopReview = await api("coding/claude/stop/review", { compartment, id: task.id });
-  if (stopReview.effect !== "already-stopped") { const stopped = await api("coding/claude/stop", { compartment, id: task.id, token: stopReview.confirmation.token }); assert.equal(stopped.effect, "provider-reported-stopped"); }
-  checks.push("the exact owned background task stopped through its separate reviewed native route");
+  const task = await api("coding/claude/text/create", { compartment, requestId: taskId, repositoryRoot, label: "Synthetic reviewed Claude text check" }); assert.equal(task.modelPromptSubmitted, false); assert.equal(task.nativeConversationCreated, false); assert.equal(task.nativeIdentityVerified, false); assert.equal(task.capabilities.sessionIdentifiable, false); checks.push("account/directory-bound local task reservation explicitly reports no native conversation yet");
+  const duplicateTask = await api("coding/claude/text/create", { compartment, requestId: taskId, repositoryRoot, label: "Synthetic reviewed Claude text check" }); assert.equal(duplicateTask.duplicatePrevented, true); assert.equal(duplicateTask.sessionId, task.sessionId); checks.push("durable duplicate task reservation preserves its requested UUID without a background worker");
   const input = { compartment, taskId: task.id, text: "Synthetic text transport check only. Reply with exactly the word Ready. Do not call tools, inspect files, execute commands or do other work." };
-  const review = await api("coding/claude/turns/review", input); assert.equal(review.modelPromptSubmitted, false); assert.equal(review.scope.sessionId, task.sessionId); checks.push("exact stopped-session text review issued approval without prompting");
+  const review = await api("coding/claude/turns/review", input); assert.equal(review.modelPromptSubmitted, false); assert.equal(review.scope.sessionId, task.sessionId); assert.equal(review.scope.nativeIdentityVerified, false); checks.push("first-turn review explicitly identifies the unverified requested UUID without prompting");
   const submission = { ...input, requestId, token: review.confirmation.token }; evidence.modelPromptsSubmitted = null;
   const result = await api("coding/claude/turns/submit", submission); evidence.modelPromptsSubmitted = 1;
   assert.equal(result.reply.trim(), "Ready"); assert.equal(result.status, "provider-turn-completed"); assert.equal(result.sessionId, task.sessionId); assert.equal(result.nativeSessionVerified, true); assert.equal(result.nativeTurnIdSupported, false); assert.equal(result.turnId, null); assert.equal(result.taskCompletionVerified, false);
   evidence.sessionIdSha256 = hash(result.sessionId); checks.push("actual native reply retained under the exact original UUID without an invented turn ID");
   const duplicate = await api("coding/claude/turns/submit", submission); assert.equal(duplicate.duplicatePrevented, true); assert.equal(duplicate.reply, result.reply); checks.push("duplicate request reused the saved reply without another native submission");
   await api("coding/claude/turns/submit", { ...submission, requestId: randomUUID() }, 409); await api("coding/claude/turns/review", input, 401, false); checks.push("consumed approval and unauthenticated review rejected");
+  const continuedInput = { ...input, text: "Synthetic continuation check only. Reply exactly Continued. Do not call tools, inspect files or do other work." }, continuedReview = await api("coding/claude/turns/review", continuedInput); assert.equal(continuedReview.scope.nativeIdentityVerified, true);
+  const continued = await api("coding/claude/turns/submit", { ...continuedInput, requestId: randomUUID(), token: continuedReview.confirmation.token }); evidence.modelPromptsSubmitted = 2; assert.equal(continued.sessionId, task.sessionId); assert.equal(continued.reply.trim(), "Continued"); assert.equal(continued.nativeSessionVerified, true); checks.push("second separately reviewed native turn resumed the same verified UUID");
   assert.equal(sourceState(), sourceBefore); checks.push("repository Git diff/status preserved");
 } catch (error) { failure = error; evidence.failure = error.message; }
 finally {
@@ -49,7 +49,8 @@ finally {
     await api("mode", { compartment, mode: "keyboard-only" });
     const state = await store.snapshot(compartment), turn = state.codingTurns?.find((t) => t.id === requestId), task = state.codingSessions?.find((t) => t.id === taskId);
     if (turn && !["provider-turn-completed", "failed-before-turn", "reviewed-unconfirmed"].includes(turn.status) || task && ["creating", "creation-uncertain"].includes(task.status)) throw new Error("The synthetic native outcome is unresolved; its protected identities were retained for deliberate review.");
-    await store.update(compartment, "synthetic-claude-text-cleanup", (s) => { s.codingTurns = (s.codingTurns ?? []).filter((t) => t.id !== requestId); s.codingSessions = (s.codingSessions ?? []).filter((t) => t.id !== taskId); });
+    if ((state.codingTurns ?? []).some((t) => t.taskId === taskId && !["provider-turn-completed", "failed-before-turn", "reviewed-unconfirmed"].includes(t.status))) throw new Error("A synthetic continuation is unresolved; its protected identity was retained.");
+    await store.update(compartment, "synthetic-claude-text-cleanup", (s) => { s.codingTurns = (s.codingTurns ?? []).filter((t) => t.taskId !== taskId); s.codingSessions = (s.codingSessions ?? []).filter((t) => t.id !== taskId); });
     const restored = await api("snapshot", { compartment }); assert.equal(definitions(restored), definitions(baseline)); assert.deepEqual(restored.codingSessions ?? [], baseline.codingSessions ?? []); assert.deepEqual(restored.codingTurns ?? [], baseline.codingTurns ?? []);
     assert.equal(definitions(await api("snapshot", { compartment: "personal" })), personal); assert.equal(await store.selection(), selection); assert.equal((JSON.parse(await privateRead(join(applicationStateRoot(), "endpoint.json")))).url, endpoint.url);
     evidence.syntheticRecordsRemoved = true; checks.push("keyboard-only cleanup preserved definitions, active selection and private link");

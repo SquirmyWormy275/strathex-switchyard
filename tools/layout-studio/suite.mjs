@@ -63,6 +63,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     const pending = (async () => {
       await store.initialize(id, policy);
       await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; for (const t of s.codingSessions ?? []) if (t.status === "creating") t.status = "creation-uncertain"; for (const t of s.codingTurns ?? []) if (["reserved", "submitting", "submitted", "cancellation-requested"].includes(t.status)) t.status = "outcome-unconfirmed"; });
+      await store.update(id, "claude-creation-recovery", (s) => { for (const task of s.codingSessions ?? []) if (task.provider === "claude-code" && task.nativeTransport === "owned-print" && task.nativeIdentityVerified === false && (s.codingTurns ?? []).some((turn) => turn.taskId === task.id && !["failed-before-turn"].includes(turn.status))) task.status = "creation-uncertain"; });
       started.add(id);
     })();
     initializing.set(id, pending);
@@ -169,6 +170,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/claude/list") return claudeCoding.list(compartment);
       if (path === "/api/suite/coding/claude/bind") return claudeCoding.bind(compartment, body);
       if (path === "/api/suite/coding/claude/create") return claudeCoding.create(compartment, body);
+      if (path === "/api/suite/coding/claude/text/create") return claudeCoding.createText(compartment, body);
       if (path === "/api/suite/coding/claude/status") return claudeCoding.status(compartment, body.id);
       if (path === "/api/suite/coding/claude/focus") return claudeCoding.focus(compartment, body.id);
       if (path === "/api/suite/coding/claude/stop/review") return claudeCoding.reviewStop(compartment, body.id);

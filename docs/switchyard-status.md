@@ -1159,3 +1159,23 @@ identity errors without exposing provider diagnostics. A verified empty-output
 workspace-trust rejection is now recorded as `creation-rejected`, without claiming
 an unknown background job or automatically retrying it. These changes preserve
 native trust settings. Native continuation acceptance remains in progress.
+
+## Claude first-turn lifecycle and Windows evidence checkpoint
+
+The stopped empty-background Claude trial was rejected with no result and a
+classified session-unavailable diagnostic. No reply or replacement identity was
+accepted. New `coding/claude/text/create` reservations now explicitly report that
+no native conversation exists yet. The first separately reviewed turn must verify
+its requested UUID; continuation then uses that exact native UUID. Uncertain
+first creation is blocked across outcome review and restart. Existing background
+identities are preserved. The 32 focused native task/lifecycle tests and
+TypeScript checks pass; installed first-turn/continuation acceptance is pending.
+
+The complete Windows release at 7aeb1e6 passed **225 groups** in run
+41086724429 (receipt a3672c96-9eca-49bd-a92b-e973ea7d8e94), including actual
+native guardian/owner-loss checks. Its bounded receipt artifact was retained
+correctly. The later fresh optional-runtime Windows check is failing in native
+CI and is being diagnosed as a software/integration failure. It is not marked
+hardware/account-blocked or accepted. Linux integrated evidence at e31e147 is
+117 groups, 825 tests: 816 pass and nine platform skips (receipt
+e8f0c1f9-616e-4f74-a741-756125d6c28a).

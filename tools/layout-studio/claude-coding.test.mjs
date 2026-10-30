@@ -69,6 +69,18 @@ test("Claude creates one empty background session per durable request, preserves
   assert.equal((await store.snapshot("personal")).codingSessions.length, 1);
 }));
 
+test("text-task reservation is durable and account-bound without claiming native creation or starting a background process", () => fixture(async ({ service, options, calls, input, store, changeAccount }) => {
+  const request = input(), task = await service.createText("personal", request);
+  assert.equal(task.nativeIdentityVerified, false); assert.equal(task.nativeConversationCreated, false); assert.equal(task.modelPromptSubmitted, false); assert.equal(task.capabilities.sessionIdentifiable, false); assert.equal(task.nativeTransport, "owned-print"); assert.equal(task.backgroundId, null);
+  const restarted = createClaudeCoding(options); const duplicate = await restarted.createText("personal", request); assert.equal(duplicate.duplicatePrevented, true); assert.equal(duplicate.sessionId, task.sessionId);
+  assert.equal((await service.status("personal", task.id)).observation.status, "reserved-locally");
+  await assert.rejects(service.createText("personal", { ...request, label: "Changed target" }), /already names another/);
+  assert.equal(calls.some((args) => args[0] === "--background" || args.includes("-p")), false);
+  await store.update("personal", "synthetic-uncertainty", (s) => { s.codingSessions[0].status = "creation-uncertain"; }); assert.equal((await service.stopCompartment("personal")).stopped, true);
+  changeAccount(); await assert.rejects(service.status("personal", task.id), /login changed/); await assert.rejects(service.createText("personal", request), /already names another/);
+  await restarted.close();
+}));
+
 test("retained Claude background identities reconcile after an interrupted follow-up without another launch", () => fixture(async ({ service, calls, input, failInventory, omitIdentity }) => {
   const first = input(); failInventory(); await assert.rejects(service.create("personal", first), /Creation is uncertain/);
   const partial = (await service.list("personal"))[0]; assert.ok(partial.backgroundId); assert.equal(partial.sessionId, null);

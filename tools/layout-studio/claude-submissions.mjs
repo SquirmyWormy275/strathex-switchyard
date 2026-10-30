@@ -11,10 +11,12 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
   return createReviewedTaskText({ store, stopChild, now, adapter: {
     provider: "claude-code", nativeVersion: "2.1.308", launchPolicy: "tools-disabled/plan", permissions: "native tools disabled; plan mode; permission prompts denied",
     submitAction: "submit_claude_text", resolveAction: "resolve_claude_text",
-    reviewReason: "Send this exact text to this stopped owned Claude session under its original verified account. Safe mode, an empty tool/MCP set and denied permission prompts remain enforced. Saved native context may be used. No execution authority, other provider or attached terminal is selected.",
+    reviewReason: "Send this exact text under this task's original verified Claude account. For a reserved new task, the first reply must verify its requested UUID before native creation is accepted; later turns resume that exact conversation. Stopped background tasks use their existing UUID. Safe mode, an empty tool/MCP set and denied permission prompts remain enforced. No execution authority, other provider or attached terminal is selected.",
     validateTask(task) {
-      if (!/^[a-f0-9]{8}$/.test(task.backgroundId ?? "") || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(task.sessionId)) throw new Error("Choose an exact owned Claude background task with its full native session UUID.");
+      if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(task.sessionId) || (task.nativeTransport === "owned-print" ? task.backgroundId !== null || typeof task.nativeIdentityVerified !== "boolean" : !/^[a-f0-9]{8}$/.test(task.backgroundId ?? ""))) throw new Error("Choose an exact owned Claude task with its full native or explicitly reserved session UUID.");
     },
+    acceptResult(task) { if (task.nativeTransport === "owned-print") task.nativeIdentityVerified = true; },
+    recordUnconfirmed(task) { if (task?.nativeTransport === "owned-print" && task.nativeIdentityVerified === false) task.status = "creation-uncertain"; },
     async openTask({ task, resource, current, authorize }) {
       const executable = await resolveCli("claude-code"); await authorize();
       const children = new Map();
@@ -27,6 +29,10 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
       async function stoppedSession() {
         await authorize(); await verifyRepositoryIdentity(task);
         let rows; try { rows = claudeInventory(JSON.parse(await readClaudeMetadata(executable, "inventory", task.repositoryRoot, options)), task.repositoryRoot); } catch (error) { if (error instanceof SyntaxError) throw new Error("The native Claude inventory did not verify. No task was guessed."); throw error; }
+        if (task.nativeTransport === "owned-print") {
+          if (rows.some((r) => r.sessionId === task.sessionId && (r.pid !== null || r.kind !== "background" || r.state !== "stopped"))) throw new Error("The exact Claude conversation has a live native client. Stop or detach it deliberately before reviewing text; no writer was displaced.");
+          await authorize(); return;
+        }
         const row = rows.find((r) => r.backgroundId === task.backgroundId);
         if (row?.sessionId !== task.sessionId || row.kind !== "background" || row.state !== "stopped" || row.pid !== null) throw new Error("Stop this exact owned Claude background task through its separate reviewed stop before sending text. Running, waiting and external clients were preserved.");
         await authorize();
@@ -36,7 +42,7 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, spawnP
         async prepareTurn() { await login(); await stoppedSession(); await login(); },
         async runTurn({ text, signal, checkCurrent }) {
           await authorize(); await verifyRepositoryIdentity(task);
-          const args = ["--safe-mode", "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}', "--setting-sources", "", "--permission-mode", "plan", "--permission-prompts", "none", "--no-chrome", "--resume", task.sessionId];
+          const args = ["--safe-mode", "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}', "--setting-sources", "", "--permission-mode", "plan", "--permission-prompts", "none", "--no-chrome", task.nativeTransport === "owned-print" && task.nativeIdentityVerified === false ? "--session-id" : "--resume", task.sessionId];
           const child = spawnProcess(executable, args, { cwd: task.repositoryRoot, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env: { ...desktopEnvironment(), DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" } }); register(child); child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
           const value = await new Promise((resolve, reject) => {
             let output = "", stderr = "", bytes = 0, stderrBytes = 0, settled = false;

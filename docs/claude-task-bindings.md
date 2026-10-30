@@ -82,7 +82,8 @@ Authenticated same-origin POST routes under `/api/suite/coding/claude/`:
 | `inventory` | `repositoryRoot`; normalized native identities/runtime fields |
 | `list` | Saved Claude bindings in this compartment |
 | `bind` | Full `sessionId`, exact directory, local `label` |
-| `create` | Stable `requestId` UUID, directory and label; one empty task |
+| `create` | Stable `requestId` UUID, directory and label; one empty background job |
+| `text/create` | Stable request UUID, directory and label; local reservation explicitly awaiting native creation |
 | `status` | Saved task `id`; recheck identity and account |
 | `focus` | Live interactive task `id`; verify/focus its exact direct Foot window |
 | `stop/review` | Owned task `id`; exact scope and one-use confirmation |
@@ -114,8 +115,10 @@ not submit work, restart a stopped task, identify a background attachment window
 or support tmux/screen, shared Foot servers, other terminals or Windows windows.
 These cases fail explicitly without title matching or foreground typing.
 Terminal attachment and broader mediated execution remain implementation work.
-Stopped owned tasks now have a separate reviewed text-continuation backend; see
-the [native task walkthrough](native-coding-tasks.md). Its installed acceptance is
+Reviewed text tasks have a separate first-turn reservation and exact native
+continuation backend; see the [native task walkthrough](native-coding-tasks.md).
+An empty background job stopped before its first turn has no resumable transcript
+and is never silently recreated. Installed first-turn/continuation acceptance is
 running. Background `--resume` can create a copy when a
 conversation is running, so it is not used as an exact-resume shortcut. Native
 `attach <id>` is the supported direction for the unfinished terminal adapter.

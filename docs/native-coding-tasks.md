@@ -12,8 +12,9 @@ fallback account. File changes and command execution are outside this route.
 Saved native conversation context can be used by the model.
 
 The task controls below are backend APIs. The frontend is frozen for review;
-these new controls are not yet exposed there. Claude stopped-task text continuation uses the same protected review lifecycle;
-its native acceptance is running. General interactive attachment and broader execution-authority mediation remain
+these new controls are not yet exposed there. Claude text tasks use the same protected review lifecycle;
+first-turn creation and continuation have separate native contracts and their
+installed acceptance is running. General interactive attachment and broader execution-authority mediation remain
 unfinished. Claude configuration-design continuation is a separate working path.
 
 ## Follow one task
@@ -84,15 +85,29 @@ It never claims external task completion or physical-key acceptance. See the
 [full requirement ledger](switchyard-requirements.md).
 
 
-## Continue a stopped Claude task
+## Create and continue a Claude text task
 
 Claude Code uses its separate `coding/claude/turns/` routes with the same
 `review`, `submit`, `list`, `cancel`, `outcome/review`, `outcome/resolve` and `delete`
-operations. The reviewed native version is 2.1.308. The target must be a registered
-Switchyard-created tools-disabled/plan background task with its full session UUID,
-original account/org fingerprint and native directory identity. Stop it first
-through the separate `coding/claude/stop/review` and `coding/claude/stop` route.
-Live, waiting and externally bound clients cannot receive text through this path.
+operations. The reviewed native version is 2.1.308. Use `coding/claude/text/create` with a stable request UUID, exact Git directory
+and local label. This reserves an account/directory-bound task and requested
+session UUID locally. It explicitly returns `nativeConversationCreated: false`,
+`nativeIdentityVerified: false` and `capabilities.sessionIdentifiable: false`; no
+native conversation, background worker or model prompt is created yet.
+
+The first reviewed turn uses `--session-id` with that requested UUID. Only an
+exact successful native reply marks the task
+`nativeIdentityVerified: true`; later turns use `--resume` with the same UUID. An
+interrupted or rejected first creation retains its requested identity and blocks
+another creation, including after restart or local outcome review. It never
+falls back from resume to creation or forks the conversation.
+
+The older `coding/claude/create` still creates an empty native background job.
+A background job stopped before its first turn has no saved conversation to
+resume. Its identity is preserved; it is not converted into a new print task.
+An existing owned background conversation must first be stopped through
+`coding/claude/stop/review` and `coding/claude/stop`. Live, waiting and externally
+bound clients cannot receive text through this path.
 
 Each review/submission checks native auth and inventory. Print continuation uses
 safe mode, no tools/MCP/hooks/Chrome, plan mode and denied permission prompts.
@@ -114,8 +129,9 @@ Run the installed journey in a Git directory already trusted by the native CLI:
 mise exec node@24.14.0 -- node scripts/verify-claude-submission-host.mjs --synthetic
 ```
 
-It creates/stops one empty owned task, reviews one tiny prompt, checks the exact
-reply and duplicate/replay behavior, then restores keyboard-only mode and removes
+It reserves one local task, separately reviews two tiny prompts, checks native
+creation and exact continuation plus duplicate/replay behavior, then restores
+keyboard-only mode and removes
 its synthetic local records. It never changes native workspace-trust settings,
 deletes native user history or grants file/command authority. Its native result
-is pending; the five Claude pipe/policy/recovery checks pass.
+is pending; native pipe, policy, first-turn lifecycle and crash-recovery tests pass.

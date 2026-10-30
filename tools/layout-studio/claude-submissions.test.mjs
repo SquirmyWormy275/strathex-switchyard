@@ -77,3 +77,34 @@ test("stderr-only native refusal retains structural categories and flag names wi
   assert.equal(summary.parsed, false); assert.equal(summary.stdoutBytes, 0); assert.equal(summary.stderrBytes, Buffer.byteLength(settings.stderr)); assert.equal(summary.exitCode, 1); assert.deepEqual(summary.referencedFlags, ["--resume"]); assert.ok(summary.stderrCategories.includes("session-in-use"));
   assert.equal(JSON.stringify(summary).includes("validation-only-secret"), false); assert.equal(turn.reply, null);
 }));
+
+test("a reserved print task uses its requested UUID once, then resumes only the verified native conversation", () => fixture(async ({ store, task, settings, calls, review, submit }) => {
+  await store.update("personal", "synthetic-local-reservation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false }); });
+  settings.row.sessionId = randomUUID();
+  const first = await review(); assert.equal(first.scope.nativeIdentityVerified, false);
+  const result = await submit(first); assert.equal(result.sessionId, task.sessionId);
+  const created = (await store.snapshot("personal")).codingSessions[0]; assert.equal(created.nativeIdentityVerified, true); assert.equal(created.sessionId, task.sessionId);
+  const second = await review(); assert.equal(second.scope.nativeIdentityVerified, true); await submit(second);
+  const prints = calls.filter((c) => c.args.includes("-p")); assert.equal(prints.length, 2); assert.equal(prints[0].args.at(-2), "--session-id"); assert.equal(prints[1].args.at(-2), "--resume"); assert.equal(prints[0].args.at(-1), task.sessionId); assert.equal(prints[1].args.at(-1), task.sessionId);
+}));
+
+test("an uncertain first Claude creation keeps its requested identity and cannot create or fork again after outcome review", () => fixture(async ({ store, service, settings, calls, input, review, submit }) => {
+  await store.update("personal", "synthetic-local-reservation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false }); });
+  settings.row.sessionId = randomUUID(); settings.wrongSession = true;
+  const approval = await review(); await assert.rejects(submit(approval), /native session/);
+  const state = await store.snapshot("personal"); assert.equal(state.codingSessions[0].status, "creation-uncertain"); assert.equal(state.codingSessions[0].nativeIdentityVerified, false); assert.equal(state.codingTurns[0].reply, null);
+  const outcome = await service.reviewOutcome("personal", state.codingTurns[0].id); await service.resolveOutcome("personal", { id: state.codingTurns[0].id, token: outcome.confirmation.token });
+  settings.wrongSession = false; await assert.rejects(service.review("personal", input), /uncertain tasks/); assert.equal(calls.filter((c) => c.args.includes("-p")).length, 1);
+}));
+
+test("a live native client blocks a reserved or verified print task before input reaches a model", () => fixture(async ({ store, settings, task, calls, review }) => {
+  await store.update("personal", "synthetic-local-reservation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: true }); });
+  settings.row.sessionId = task.sessionId; settings.row.pid = 12345; settings.row.status = "idle"; settings.row.state = "blocked";
+  await assert.rejects(review(), /live native client/); assert.equal(calls.some((c) => c.args.includes("-p")), false);
+}));
+
+test("restart preserves an interrupted first-creation UUID even after the saved outcome is deliberately reviewed", () => fixture(async ({ store, service, task, review, calls }) => {
+  const id = randomUUID(); await store.update("personal", "synthetic-interrupted-creation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false }); s.codingTurns = [{ id, taskId: task.id, provider: "claude-code", sessionId: task.sessionId, status: "submitting", updatedAt: Date.now() }]; });
+  const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) } });
+  try { await suite.handle("/api/suite/snapshot", { compartment: "personal" }); const state = await store.snapshot("personal"); assert.equal(state.codingSessions[0].status, "creation-uncertain"); assert.equal(state.codingTurns[0].status, "outcome-unconfirmed"); const outcome = await service.reviewOutcome("personal", id); await service.resolveOutcome("personal", { id, token: outcome.confirmation.token }); await assert.rejects(review(), /uncertain tasks/); assert.equal(calls.some((c) => c.args.includes("-p")), false); } finally { await suite.close(); }
+}));

@@ -73,7 +73,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
   function view(t) {
     const fresh = t.observation && now() - t.observation.observedAt >= 0 && now() - t.observation.observedAt <= 30000;
     const focused = fresh && t.lastWindowFocus?.status === "verified" && t.lastWindowFocus.sessionId === t.sessionId && t.lastWindowFocus.processId === t.observation.processId && t.lastWindowFocus.processStartedAt === t.observation.processStartedAt && now() - t.lastWindowFocus.at >= 0 && now() - t.lastWindowFocus.at <= 30000;
-    return { ...t, observation: fresh ? t.observation : { status: "stale", observedAt: t.observation?.observedAt ?? null, completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(t.sessionId), observable: Boolean(t.sessionId || t.backgroundId), focusable: Boolean(focused), launchable: false, resumable: false, controllable: false, cancellable: t.status === "registered" && t.launchPolicy === "tools-disabled/plan" && Boolean(t.backgroundId), mediated: false }, accountScope: { type: "local first-party login fingerprint", organizationVerified: false } };
+    return { ...t, observation: fresh ? t.observation : { status: "stale", observedAt: t.observation?.observedAt ?? null, completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(t.sessionId) && t.nativeIdentityVerified !== false, observable: Boolean(t.sessionId || t.backgroundId), textReviewAvailable: t.status === "registered" && t.launchPolicy === "tools-disabled/plan", focusable: Boolean(focused), launchable: false, resumable: false, controllable: false, cancellable: t.status === "registered" && t.launchPolicy === "tools-disabled/plan" && Boolean(t.backgroundId), mediated: false }, accountScope: { type: "local first-party login fingerprint", organizationVerified: false } };
   }
   function taskIn(s, id) { const task = s.codingSessions?.find((t) => t.id === id && t.provider === "claude-code" && t.schema === "switchyard-coding-session/v1"); if (!task) throw new Error("Choose an exact saved Claude coding task."); return task; }
   async function exact(c, id, generation = fence(c)) {
@@ -93,7 +93,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     generations.set(c, fence(c) + 1);
     const stopped = await Promise.all([...children].filter((r) => r.compartment === c).map((r) => stopOwnedChild(r.child)));
     let backgroundTasksStopped = true, backgroundTasks = 0;
-    const tasks = ((await store.snapshot(c)).codingSessions ?? []).filter((t) => t.provider === "claude-code" && t.launchPolicy === "tools-disabled/plan");
+    const tasks = ((await store.snapshot(c)).codingSessions ?? []).filter((t) => t.provider === "claude-code" && t.launchPolicy === "tools-disabled/plan" && t.nativeTransport !== "owned-print");
     for (const t of tasks) {
       if (!t.backgroundId || !t.sessionId || t.startedAt == null) { if (["creating", "creation-uncertain"].includes(t.status)) backgroundTasksStopped = false; continue; }
       try {
@@ -113,7 +113,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     async discovery(c) {
       const result = { adapter, provider: "claude-code", installed: null, available: false };
       try { await store.authorize(c, { provider: "claude-code" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
-      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window"] : [])] }; }
+      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "reserve-reviewed-text-task", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window"] : [])] }; }
       catch (e) { return { ...result, permitted: true, reason: e.message }; }
     },
     async inventory(c, { repositoryRoot }) { const root = await repository(repositoryRoot); await account(c); return inventory(c, root); },
@@ -132,6 +132,18 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
         const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId, backgroundId: row.backgroundId, startedAt: row.startedAt, status: "registered", createdAt: now(), observation: observation(row) };
         s.codingSessions.push(task); return view(task);
+      }, { provider: "claude-code" });
+    },
+    async createText(c, { requestId, repositoryRoot, label }) {
+      const generation = fence(c), login = await account(c, generation), root = await repository(repositoryRoot), identity = await repositoryIdentity(root);
+      if (!uuid.test(requestId ?? "") || !bounded(label, 100)) throw new Error("A reviewed Claude text task needs a stable request UUID and a short local label.");
+      current(c, generation); await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
+      return store.update(c, "claude-text-task-reserve", (s) => {
+        current(c, generation); s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.id === requestId);
+        if (found) { if (found.provider !== "claude-code" || found.nativeTransport !== "owned-print" || found.repositoryRoot !== root || found.accountFingerprint !== login || found.label !== label.trim() || found.repositoryIdentity?.device !== identity.device || found.repositoryIdentity?.inode !== identity.inode) throw new Error("This request already names another task, account or directory identity."); return { ...view(found), duplicatePrevented: true }; }
+        if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
+        const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId: randomUUID(), backgroundId: null, nativeTransport: "owned-print", nativeIdentityVerified: false, launchPolicy: "tools-disabled/plan", status: "registered", createdAt: now(), observation: { status: "reserved-locally", observedAt: now(), completionVerified: false, provenance: "Requested UUID only; native conversation creation requires its first reviewed reply" } };
+        s.codingSessions.push(task); return { ...view(task), modelPromptSubmitted: false, nativeConversationCreated: false };
       }, { provider: "claude-code" });
     },
     async create(c, { requestId, repositoryRoot, label }) {
@@ -165,6 +177,12 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
       }
     },
     async status(c, id) {
+      const saved = taskIn(await store.snapshot(c), id);
+      if (saved.nativeTransport === "owned-print") {
+        const generation = fence(c); if (await account(c, generation) !== saved.accountFingerprint) throw new Error("The local Claude login changed. This task was not redirected to another account.");
+        await verifyRepositoryIdentity(saved); current(c, generation);
+        return { ...view(saved), observation: { status: saved.nativeIdentityVerified ? "saved-conversation" : saved.status === "creation-uncertain" ? "creation-unconfirmed" : "reserved-locally", observedAt: now(), completionVerified: false, provenance: "Protected local reviewed-turn record; no live provider activity or task completion is inferred" } };
+      }
       const { task, row } = await exact(c, id);
       return store.update(c, "claude-coding-status", (s) => { const t = taskIn(s, id); if (t.sessionId !== task.sessionId || t.backgroundId !== task.backgroundId || t.accountFingerprint !== task.accountFingerprint) throw new Error("The saved Claude task changed during observation."); t.observation = observation(row); if (row?.sessionId) { t.sessionId = row.sessionId; t.startedAt = row.startedAt; t.status = "registered"; } return view(t); }, { provider: "claude-code" });
     },
