@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **88/88 groups passed; 598 tests, 589 passed and 9
+- Integrated native Linux run: **89/89 groups passed; 605 tests, 596 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-76e68cc3-ca64-4ca9-8a62-c918519a87cc.json`.
+  `.sxsy-verification/isolated-test-c152b7a3-4558-41ca-8cf8-31aec674700f.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -108,6 +108,11 @@ Tests use synthetic/fault transports unless identified below. The older B122
   examples completed authenticated synthetic review exchanges with duplicate
   prevention under the isolated runtime environment. This is example acknowledgement,
   not verified external coding-task completion. No HID interface was opened.
+- A new exact coding-task backend created one empty thread through the installed
+  Codex daemon over authenticated HTTP, verified its directory/local-login binding,
+  prevented duplicate creation and read back `idle`. No model prompt was sent;
+  no coding outcome was inferred. [Task scope and remaining controls](coding-task-bindings.md)
+  are separate from configuration conversations.
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -131,7 +136,11 @@ Early native Windows CI exposed overly strict string comparison of real paths
 against DOS/case aliases. The corrected storage boundary checks every ancestor
 for links and verifies filesystem identity while accepting those native aliases.
 Network/device paths and traversal remain rejected, as do Unix path aliases.
-Linux regression checks pass; the native Windows rerun is still pending.
+Linux regression checks pass. The native Windows backend step passed on CI run
+`41020239038` at source checkpoint `bfe4efe`; its larger release build is still
+in progress. The newer coding-task logic awaits its own native Windows test run;
+the general Codex Unix transport is Linux-only and Windows task transport remains
+unfinished implementation.
 
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and

@@ -62,7 +62,10 @@ async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs
       clearTimeout(timeout);
       connection?.destroy();
       upgrade.destroy();
-      if (error) reject(error); else resolve(result);
+      if (error) {
+        if (typeof parsedResult?.threadId === "string") error.createdThreadId = parsedResult.threadId;
+        reject(error);
+      } else resolve(result);
     }
     function send(value) { connection.write(encodeFrame(value)); }
     function message(data) {
@@ -137,9 +140,23 @@ async function readCodexDaemonThreads(socketPath, options = {}) {
 
 async function readExactCodexDaemonThread(socketPath, threadId, options = {}) {
   if (typeof threadId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) throw new Error("Codex thread ID is invalid.");
+  if (options.expectedRepositoryRoot !== undefined && (typeof options.expectedRepositoryRoot !== "string" || !isAbsolute(options.expectedRepositoryRoot) || /[\0\r\n]/.test(options.expectedRepositoryRoot) || options.expectedRepositoryRoot.length > 4096)) throw new Error("The expected Codex repository root is invalid.");
   return requestCodexDaemon(socketPath, { id: 2, method: "thread/read", params: { threadId, includeTurns: false } }, (result) => {
     if (result?.thread?.id !== threadId) throw new Error("Codex returned a different exact thread identity.");
-    return normalizeThreadList({ data: [result.thread] })[0];
+    if (options.expectedRepositoryRoot !== undefined && result.thread.cwd !== options.expectedRepositoryRoot) throw new Error("The exact Codex thread belongs to a different or unverified repository root.");
+    return Object.freeze({ ...normalizeThreadList({ data: [result.thread] })[0], ...(options.expectedRepositoryRoot === undefined ? {} : { repositoryRoot: options.expectedRepositoryRoot }) });
+  }, options);
+}
+
+async function readCodexDaemonAccount(socketPath, options = {}) {
+  return requestCodexDaemon(socketPath, { id: 2, method: "account/read", params: { refreshToken: false } }, (result) => {
+    const account = result?.account;
+    if (account == null) return Object.freeze({ type: "unavailable", fingerprint: null, organizationVerified: false });
+    if (!["chatgpt", "apiKey", "amazonBedrock", "gcp"].includes(account.type)) throw new Error("The Codex runtime account contract is unsupported.");
+    // An email fingerprint identifies this local login, never its organization.
+    // The API-key contract provides no account ID, so it cannot be guessed.
+    const identified = account.type === "chatgpt" && typeof account.email === "string" && account.email.length > 0 && account.email.length <= 320 && !/[\0\r\n]/.test(account.email);
+    return Object.freeze({ type: account.type, fingerprint: identified ? createHash("sha256").update(JSON.stringify([account.type, account.email.trim().toLowerCase()])).digest("hex") : null, organizationVerified: false });
   }, options);
 }
 
@@ -149,7 +166,7 @@ async function startCodexDaemonThread(socketPath, repositoryRoot, taskId, option
   }
   if (typeof taskId !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("Codex thread requires a bounded task ID.");
   return requestCodexDaemon(socketPath, {
-    id: 2, method: "thread/start", params: { cwd: repositoryRoot, serviceName: "strathex-switchyard" }
+    id: 2, method: "thread/start", params: { cwd: repositoryRoot, serviceName: "strathex-switchyard", ...(options.readOnly ? { sandbox: "read-only", approvalPolicy: "on-request" } : {}) }
   }, (result) => {
     const thread = result?.thread;
     if (!thread || typeof thread.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(thread.id)
@@ -225,4 +242,4 @@ async function readBoundCodexThreads(directory = defaultBindingDirectory()) {
   return Object.freeze(result);
 }
 
-module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };
+module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };

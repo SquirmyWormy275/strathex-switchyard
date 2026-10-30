@@ -9,7 +9,7 @@ import test from "node:test";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads } = require("../apps/vscode-extension/src/codex-daemon-status.cjs");
+const { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads } = require("../apps/vscode-extension/src/codex-daemon-status.cjs");
 
 function textFrame(value) {
   const payload = Buffer.from(JSON.stringify(value));
@@ -18,10 +18,11 @@ function textFrame(value) {
     : Buffer.from([0x81, 126, payload.length >> 8, payload.length & 0xff]), payload]);
 }
 
-test("live daemon observer performs only handshake and bounded thread/list", { skip: process.platform === "win32" ? "Unix Codex control socket is Linux-only" : false }, async () => {
+test("daemon inventory, exact thread scope and local login metadata keep bounded contracts and partial creation identity", { skip: process.platform === "win32" ? "Unix Codex control socket is Linux-only" : false }, async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-codex-daemon-"));
   const path = join(directory, "control.sock");
   const methods = [];
+  let rejectInjection = false;
   const upgradedSockets = new Set();
   const server = createServer();
   server.on("upgrade", (request, socket) => {
@@ -48,12 +49,13 @@ test("live daemon observer performs only handshake and bounded thread/list", { s
           { id: "exact-active", name: "private title", status: { type: "active", activeFlags: [] } },
           { id: "exact-stored", preview: "private prompt", status: { type: "notLoaded" } }
         ], nextCursor: null } }));
-        else if (message.method === "thread/start") socket.write(textFrame({ id: 2, result: { thread: { id: "created-thread", cwd: message.params.cwd } } }));
-        else if (message.method === "thread/read") socket.write(textFrame({ id: 2, result: { thread: { id: message.params.threadId, status: { type: "idle" } } } }));
+        else if (message.method === "thread/start") { if (rejectInjection) { assert.equal(message.params.sandbox, "read-only"); assert.equal(message.params.approvalPolicy, "on-request"); } socket.write(textFrame({ id: 2, result: { thread: { id: "created-thread", cwd: message.params.cwd } } })); }
+        else if (message.method === "thread/read") socket.write(textFrame({ id: 2, result: { thread: { id: message.params.threadId, cwd: "/exact/repository", status: { type: "idle" } } } }));
+        else if (message.method === "account/read") { assert.equal(message.params.refreshToken, false); socket.write(textFrame({ id: 2, result: { account: { type: "chatgpt", email: "synthetic@example.invalid" } } })); }
         else if (message.method === "thread/inject_items") {
           assert.equal(message.params.threadId, "created-thread");
           assert.match(message.params.items[0].content[0].text, /task-7.*No user request/);
-          socket.write(textFrame({ id: 3, result: {} }));
+          socket.write(textFrame(rejectInjection ? { id: 3, error: { message: "Synthetic metadata persistence failure" } } : { id: 3, result: {} }));
         }
       }
     });
@@ -70,6 +72,11 @@ test("live daemon observer performs only handshake and bounded thread/list", { s
     assert.deepEqual(methods, ["initialize", "initialized", "thread/list", "initialize", "initialized", "thread/start", "thread/inject_items"]);
     assert.deepEqual(await readExactCodexDaemonThread(path, "created-thread"), { id: "created-thread", observation: "idle" });
     assert.deepEqual(methods.slice(-3), ["initialize", "initialized", "thread/read"]);
+    assert.equal((await readExactCodexDaemonThread(path, "created-thread", { expectedRepositoryRoot: "/exact/repository" })).repositoryRoot, "/exact/repository");
+    await assert.rejects(readExactCodexDaemonThread(path, "created-thread", { expectedRepositoryRoot: "/other/repository" }), /different or unverified repository/);
+    const account = await readCodexDaemonAccount(path); assert.equal(account.type, "chatgpt"); assert.match(account.fingerprint, /^[a-f0-9]{64}$/); assert.equal(account.organizationVerified, false); assert.equal(JSON.stringify(account).includes("synthetic@"), false);
+    rejectInjection = true;
+    await assert.rejects(startCodexDaemonThread(path, "/exact/repository", "task-7", { readOnly: true }), (error) => error.createdThreadId === "created-thread" && /did not persist/.test(error.message));
   } finally {
     for (const socket of upgradedSockets) socket.destroy();
     server.closeAllConnections();

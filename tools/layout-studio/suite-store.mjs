@@ -1,5 +1,5 @@
 /** Compartment-scoped authenticated encryption and policy enforcement. */
-import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, timingSafeEqual, randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
 import { withStateLock } from "./state-lock.mjs";
@@ -152,6 +152,27 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     },
     async snapshot(id) { const s = await read(id); permit(s); prune(s); return { ...s, policyRules: templates[s.policy] }; },
     async authorize(id, request) { const s = await read(id); return permit(s, request); },
+    async claimSession(id, { provider, sessionId }) {
+      if (!["codex", "claude-code"].includes(provider) || typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("External session ownership requires a supported provider and exact session ID.");
+      permit(await read(id), { provider });
+      const sessionHash = createHash("sha256").update(JSON.stringify([provider, sessionId])).digest("hex"), ownerHash = createHash("sha256").update(id).digest("hex");
+      return withStateLock(root, "external-sessions", async (lease) => {
+        const directory = join(root, "external-sessions"), file = join(directory, `${sessionHash}.json`); await privateDirectory(directory);
+        const k = await key(id);
+        try {
+          const tag = createHmac("sha256", k).update(JSON.stringify(["switchyard-session-owner/v1", sessionHash, ownerHash])).digest("hex");
+          let existing; try { existing = JSON.parse(await privateRead(file)); } catch (error) { if (error.code !== "ENOENT") throw error; }
+          if (existing) {
+            if (existing.schema !== "switchyard-session-owner/v1" || existing.sessionHash !== sessionHash || existing.ownerHash !== ownerHash) throw new Error("This external session is already assigned outside this compartment or its ownership record is invalid. No content was routed.");
+            if (typeof existing.tag !== "string" || !/^[a-f0-9]{64}$/.test(existing.tag) || !timingSafeEqual(Buffer.from(existing.tag), Buffer.from(tag))) throw new Error("External session ownership failed authentication. Preserve the ownership record.");
+          } else {
+            if ((await readdir(directory)).length >= 512) throw new Error("External session ownership limit reached. Existing bindings were preserved.");
+            lease.assert(); await privateWrite(file, JSON.stringify({ schema: "switchyard-session-owner/v1", sessionHash, ownerHash, tag }));
+          }
+          return { claimed: true };
+        } finally { k.fill(0); }
+      });
+    },
     async saveProfile(id, value) {
       const p = importProfile(value);
       return mutate(id, (s) => putProfile(s, p));
