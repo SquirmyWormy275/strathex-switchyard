@@ -725,3 +725,18 @@ The Windows `e5e8ab0` run has passed its native backend, real read-only helper,
 eight actual Job Object/owner-loss tests and integrated suite packaging. Its
 complete release verification is still running; the earlier full-run Claude
 deadline correction is not accepted until that complete result arrives.
+
+That `e5e8ab0` full run finished with **217 groups passing and one failing**
+(run `41066193274`, receipt `f422a1db-24bf-4bee-8e03-393e2d8c7840`). Claude's group
+passed within its bounded allowance. The failure was the runner contract test's
+Windows-only expected-allowance list: it had not included the new Claude entry.
+The list is corrected; both platform choices are now directly checked, and CI
+runs the runner contract before the native backend to expose this class of
+failure early. Bounded verification receipts are retained for seven days even
+after a failed full build. The whole Windows release remains unaccepted until
+the corrected run completes. No assertion was removed or skip added.
+
+The repository-restriction checkpoint also passes **109 Linux groups, 773 tests:
+764 passed and 9 expected platform skips**, receipt
+`13dd0367-2656-44b1-8900-053b7b181bd9`. The corrected runner contract passes
+its **16 focused tests** locally; native Windows follow-up is pending.

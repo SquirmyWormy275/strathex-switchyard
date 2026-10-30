@@ -93,6 +93,9 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     file: `apps/linux-companion/test/${name}.test.ts`,
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
+export function nativeTestOverrides(file, platform = process.platform) {
+  return platform === "win32" && file === "tools/layout-studio/claude-coding.test.mjs" ? { timeoutMs: 120_000 } : {};
+}
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
@@ -130,7 +133,7 @@ export const requiredGroups = [
   // Native Windows kernel leases start the system PowerShell helper per state
   // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
   // allow bounded process/pipe cleanup without relaxing any assertion or skip.
-  { file: "tools/layout-studio/claude-coding.test.mjs", ...(process.platform === "win32" ? { timeoutMs: 120_000 } : {}) },
+  { file: "tools/layout-studio/claude-coding.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs") },
   { file: "tools/layout-studio/task-window.test.mjs" },
   { file: "tools/layout-studio/voice-queue.test.mjs" },
   { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },

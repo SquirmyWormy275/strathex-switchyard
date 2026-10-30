@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
@@ -85,6 +85,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
+      ...(process.platform === "win32" ? [["tools/layout-studio/claude-coding.test.mjs", 120_000]] : []),
       ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
@@ -100,6 +101,9 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];
     assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs", "win32"), { timeoutMs: 120_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs", "linux"), {});
+    assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });
     assert.equal(overridden.receipt.success, true);

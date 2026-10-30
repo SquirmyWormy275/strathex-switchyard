@@ -55,6 +55,8 @@ jobs:
         timeout-minutes: 15
         run: |
           $ErrorActionPreference = 'Stop'
+          & node --test scripts/run-isolated-tests.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'The native Windows isolated-runner contract failed.' }
           $tests = @(Get-ChildItem -LiteralPath '.\tools\layout-studio' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
           $tests += @(Get-ChildItem -LiteralPath '.\deployment\suite' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
           if ($tests.Count -lt 10) { throw 'The expected Switchyard backend tests are missing.' }
@@ -160,6 +162,16 @@ jobs:
             subst $buildDrive /d
             if ($LASTEXITCODE -ne 0) { throw 'The short release-build drive could not be removed.' }
           }
+
+      - name: Retain bounded verification receipts after success or failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-windows-verification-${{ github.sha }}
+          path: artifacts/b122-windows/.source-tree/.sxsy-verification/isolated-test-*.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Prove generated source remains canonical
         shell: pwsh
