@@ -26,6 +26,8 @@ establish your current firmware or typing layout.
   references, split boards and explicitly identified proposed designs.
 - [Configuration walkthrough](docs/switchyard-configuration.md): understand a
   proposal, review an exact local connection, and restore a change.
+- [Optional local runtime](docs/optional-runtime.md): install or verify the shared
+  CPU voice, configuration HID and LangChain environment from pinned hashes.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
@@ -45,7 +47,7 @@ LangChain example processes have exchanged authenticated intents.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, desktop packaging, profile-library visual acceptance,
-complete device settings/macro editing and final UI acceptance remain unfinished.
+expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
 Windows hotkey helper source cross-builds; its suite bridge is wired and software-tested, while Windows host
 acceptance and packaging remain incomplete. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122

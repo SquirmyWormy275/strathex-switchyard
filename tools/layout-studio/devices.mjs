@@ -7,6 +7,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { additionalDeviceChanges, validateAdditionalRestore, restoredLayoutOptions } from "./device-proposal.mjs";
 import { withStateLock } from "./state-lock.mjs";
 import { compileDeviceKey, baseTypingCode } from "./vial-keycodes.mjs";
+import { runtimeEnvironment } from "./runtime-setup.mjs";
 
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const integer = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
@@ -15,7 +16,7 @@ const packet = (...bytes) => { const b = Buffer.alloc(32); Buffer.from(bytes).co
 export class NativeHidTransport {
   constructor({ executable = join(homedir(), ".local/share/strathex-switchyard/voice", process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python"), spawnProcess = spawn } = {}) {
     this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
-    this.child = spawnProcess(executable, [fileURLToPath(new URL("./hid-bridge.py", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
+    this.child = spawnProcess(executable, ["-I", fileURLToPath(new URL("./hid-bridge.py", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: runtimeEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
       this.buffer += chunk; if (this.buffer.length > 1048576) { this.close(); return; }

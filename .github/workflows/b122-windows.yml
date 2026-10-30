@@ -49,6 +49,16 @@ jobs:
         shell: pwsh
         run: npm.cmd ci --ignore-scripts
 
+      - name: Verify the native Switchyard backend before the complete release build
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tests = @(Get-ChildItem -LiteralPath '.\tools\layout-studio' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
+          if ($tests.Count -lt 10) { throw 'The expected Switchyard backend tests are missing.' }
+          & node --test --test-concurrency=2 @tests
+          if ($LASTEXITCODE -ne 0) { throw 'The native Windows Switchyard backend tests failed.' }
+
       - name: Install pinned documentation dependencies
         shell: pwsh
         run: python -m pip install --disable-pip-version-check -r scripts/b122-docs-requirements.txt

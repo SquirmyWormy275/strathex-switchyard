@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **86/86 groups passed; 586 tests, 577 passed and 9
+- Integrated native Linux run: **87/87 groups passed; 593 tests, 584 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-7950872d-81b7-4168-a224-6a38c57bac6c.json`.
+  `.sxsy-verification/isolated-test-66f8afc8-a70d-4070-b102-90453f7ace4f.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -99,6 +99,11 @@ Tests use synthetic/fault transports unless identified below. The older B122
 - Local CPU faster-whisper transcribed synthetic speech without an external API.
   Recognition was imperfect; transcript correction remains part of the flow.
   A live microphone conversation has not yet been accepted.
+- The optional runtime now has a hash-locked installer and verifier. The existing
+  48-package runtime matched all pins without extra packages. A fresh disposable
+  Linux environment installed from the lock and loaded the CPU model; it was
+  removed after verification. Windows binary-wheel resolution passed a dry run.
+  See [setup, evidence and remaining lifecycle work](optional-runtime.md).
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -140,7 +145,7 @@ The 12 device checks use fault transports; no hardware write is claimed.
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; expanded layer/macro editing UI and device settings
 editing; Windows interactive acceptance and packaging; install/update/rollback/uninstall and
-a normal launcher; interprocess coordination and child supervision; profile-library visual acceptance; reproducible optional dependency installation; assignment legend export.
+a normal launcher; child supervision; profile-library visual acceptance; runtime update/recovery lifecycle; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.
 
 ## Branch and handover

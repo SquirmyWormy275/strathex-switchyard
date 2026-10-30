@@ -3,6 +3,7 @@ import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runtimeEnvironment } from "./runtime-setup.mjs";
 
 export function localVoice({ runtime = join(homedir(), ".local/share/strathex-switchyard/voice"), spawnProcess = spawn } = {}) {
   const executable = join(runtime, process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python");
@@ -13,7 +14,7 @@ export function localVoice({ runtime = join(homedir(), ".local/share/strathex-sw
       if (typeof audio !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(audio) || audio.length < 4 || audio.length > 1400000) throw new Error("Choose an audio segment smaller than 1 MiB.");
       if (!(await this.discovery()).available) throw new Error("The local transcription runtime is unavailable. The encrypted audio draft is preserved for retry.");
       return new Promise((resolve, reject) => {
-        const child = spawnProcess(executable, [fileURLToPath(new URL("./transcribe.py", import.meta.url)), model], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: { ...process.env, HF_HUB_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1" } });
+        const child = spawnProcess(executable, ["-I", fileURLToPath(new URL("./transcribe.py", import.meta.url)), model], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: runtimeEnvironment() });
         let output = "", settled = false;
         const timer = setTimeout(() => { child.kill(); finish(new Error("Local transcription timed out. Keep the saved audio and retry.")); }, 90000);
         function finish(error, result) { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(result); }

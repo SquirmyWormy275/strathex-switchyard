@@ -1,0 +1,6 @@
+# Optional local CPU voice, configuration HID, and runnable integration examples.
+# PyAV 19 failed on the pilot host; retain the verified 16.1 wheel contract.
+faster-whisper==1.2.1
+av==16.1.0
+hidapi==0.15.0
+langchain-core==1.7.3

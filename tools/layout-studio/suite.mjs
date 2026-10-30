@@ -13,6 +13,7 @@ import { runHypr, nativeChatgptWindow } from "./host.mjs";
 import { createDeviceService } from "./devices.mjs";
 import { createCopilot } from "./copilot.mjs";
 import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
+import { runtimeEnvironment } from "./runtime-setup.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot } = {}) {
@@ -110,7 +111,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         if (base.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(base.hostname) || base.pathname !== "/" || base.username || base.password) throw new Error("The example requires this workspace's loopback origin.");
         const file = fileURLToPath(new URL(body.example === "custom" ? "../../examples/custom-agent/agent.mjs" : "../../examples/langchain-agent/agent.py", import.meta.url));
         const executable = body.example === "custom" ? process.execPath : join(homedir(), ".local/share/strathex-switchyard/voice", process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python");
-        const child = spawn(executable, [file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: { ...process.env, LANGSMITH_TRACING: "false", LANGCHAIN_TRACING_V2: "false", LANGSMITH_API_KEY: "", LANGCHAIN_API_KEY: "" } });
+        const child = spawn(executable, [...(body.example === "langchain" ? ["-I"] : []), file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: runtimeEnvironment() });
         examples.set(key, child); child.stdin.on("error", () => {}); child.on("error", () => { examples.delete(key); }); child.stdin.end(JSON.stringify({ ...enrollment, baseUrl: base.href }));
         return { status: "starting", agentId: id, provenance: "Wait for authenticated ready event before claiming availability" };
       }
