@@ -31,6 +31,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   proposal, review an exact local connection, and restore a change.
 - [Optional local runtime](docs/optional-runtime.md): install or verify the shared
   CPU voice, configuration HID and LangChain environment from pinned hashes.
+- [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
+  stable intents and migration before connecting a second computer.
 - [Application packaging](docs/suite-installation.md): build the private suite
   directory, verify its contents and run it independently of the checkout.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
@@ -60,8 +62,9 @@ no model prompts and do not establish completion of coding work.
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-Windows hotkey helper source cross-builds; its suite bridge is wired and software-tested, while Windows host
-acceptance remain incomplete, with a managed-startup failure under diagnosis. F77 physical acceptance awaits reconnection; B122
+Native Windows backend and managed-startup tests pass in CI. The complete release
+still has separate installer/bootstrap/automation failures under correction; interactive
+Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 

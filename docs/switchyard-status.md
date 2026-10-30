@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **98/98 groups passed; 672 tests, 663 passed and 9
+- Integrated native Linux run: **99/99 groups passed; 679 tests, 670 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-dae9b346-a74c-4c5d-adcf-6f1bba267fa9.json`.
+  `.sxsy-verification/isolated-test-bc4313b1-b598-43b9-8ca9-bf25190befab.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -246,7 +246,7 @@ inventory still returned zero candidates, without opening an interface.
 
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; expanded layer/macro editing UI and device settings
-editing; Windows managed-startup correction and interactive acceptance;
+editing; complete Windows release correction and interactive acceptance;
 automatic connection restoration during uninstall; broader child supervision;
 profile-library visual acceptance; runtime update/recovery lifecycle; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.
@@ -355,9 +355,9 @@ and its dated installation backups are described above.
 2. Complete remaining controller capabilities: tap-dance/combo/encoder/settings
    transactions, exact source/model reconciliation and their failure/recovery
    tests. Keep all physical F77/B122 checks separately pending.
-3. Fix native Windows managed startup and finish automatic connection restoration and runtime
-   maintenance. Then complete profile compatibility metadata and dynamic
-   assignment legends. The frontend remains frozen for the user's morning review;
+3. Finish complete Windows release verification, automatic connection restoration
+   and runtime maintenance. Complete portable metadata UI and dynamic assignment
+   legends. The frontend remains frozen for the user's morning review;
    task/device/role UI work is still required in the next frontend iteration.
 
 ## GitHub and local footprint
@@ -409,9 +409,27 @@ URLs or text. Read-only helpers reject registration before any hotkey/layout
 operation. Explicit observation consent and workspace policy are checked before
 and after each sample. Pause/off/switch closes the owned helper; unavailable
 sources stop sampling with truthful state. Other deliberate sources can continue.
-Five software tests pass. The actual C# source compiled locally with .NET 8.0.424
+Five software tests pass. The actual Windows helper check passed at `29b8e47`
+on run `41047167365`, including native registration rejection and process exit. The actual C# source compiled locally with .NET 8.0.424
 without warnings/errors; private receipt
 `runtime-verification/windows-observer-build-1793358542437.json`.
 The Windows workflow now exercises the built helper's read-only handshake,
-category response, native registration rejection and process exit. Its result is
-pending and is distinct from interactive Windows acceptance.
+category response, native registration rejection and process exit. This is distinct from interactive Windows acceptance.
+
+## Portable profile metadata and reviewed migration
+
+The additive v2 package API carries exact geometry/matrix references, recorded
+base-layer completeness/digest, US-host-layout assumptions, preferred mode,
+stable role/action intent meanings and required capabilities. Legacy Studio
+plans/profiles become explicit migration candidates; unknown versions leave
+saved state untouched. Revisions detect changes without claiming a signature.
+Import review binds current definitions and local role connections. A concurrent
+edit invalidates review; adoption clears colliding local role connections and
+preserves local accounts, policy and explicitly selected mode. A fresh host
+remains keyboard-only. Work export restrictions apply to the new route too.
+
+Seven tests pass, including authenticated HTTP review/import/export and protected
+store restart. Portable output excludes credentials, paths, task/session IDs,
+local account references and connection authority. The frozen v1 frontend keeps
+working; v2 metadata/review UI and second-machine/hardware acceptance remain open.
+See [portable profiles](portable-profiles.md).

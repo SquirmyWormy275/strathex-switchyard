@@ -224,6 +224,9 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
       if (path === "/api/suite/profile/export") return store.exportProfile(compartment);
+      if (path === "/api/suite/profile/package/export") return store.exportProfilePackage(compartment, body.preferences ?? null);
+      if (path === "/api/suite/profile/package/review") return store.reviewProfilePackage(compartment, body.document);
+      if (path === "/api/suite/profile/package/import") return store.importProfilePackage(compartment, body.document, body.reviewId);
       if (path === "/api/suite/workflow/save") return store.saveWorkflow(compartment, body.workflow);
       if (path === "/api/suite/copilot/discovery") return copilot.discovery(compartment);
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);

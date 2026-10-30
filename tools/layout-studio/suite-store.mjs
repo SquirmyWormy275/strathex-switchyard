@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { importProfile } from "./workspace.mjs";
 import { reconcileWorkflow } from "./workflow.mjs";
+import { createPortablePackage, packageDefinition, portableDefinitionDigest, preparePortableImport } from "./portable-package.mjs";
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
 const templates = {
@@ -194,6 +195,32 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       });
     },
     async exportProfile(id) { const s = await read(id); permit(s, { operation: "export" }); if (!s.profile) throw new Error("Save a profile first."); return importProfile(s.profile); },
+    async reviewProfilePackage(id, value) {
+      const s = await read(id); permit(s);
+      return preparePortableImport(value, { currentProfile: s.profile, localBindings: s.roleBindings ?? [] });
+    },
+    async importProfilePackage(id, value, reviewId) {
+      return mutate(id, (s) => {
+        permit(s);
+        const review = preparePortableImport(value, { currentProfile: s.profile, localBindings: s.roleBindings ?? [] });
+        if (review.status !== "review-required" || typeof reviewId !== "string" || reviewId !== review.reviewId) throw new Error("Review this exact profile and current local connections before importing. Saved definitions are unchanged.");
+        const p = packageDefinition(review.document);
+        putProfile(s, p);
+        // Foreign role IDs, including collisions with existing IDs, never
+        // inherit an enrolled session from the destination workspace.
+        s.roleBindings = [];
+        s.portablePackages ??= [];
+        s.portablePackages = [...s.portablePackages.filter((entry) => entry.document.id !== p.id), { definitionDigest: portableDefinitionDigest(p), document: review.document }].slice(-32);
+        if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Saved profile storage limit reached. Existing state is preserved.");
+        return { imported: true, profile: s.profile, revision: review.document.revision, roleBindingsCleared: review.localConnections.disconnectedRoleBindings, localMode: s.mode ?? "keyboard-only", localConnectionsRequireReview: true };
+      });
+    },
+    async exportProfilePackage(id, preferences = null) {
+      const s = await read(id); permit(s, { operation: "export" });
+      if (!s.profile) throw new Error("Save a profile first.");
+      const saved = s.portablePackages?.find((p) => p.definitionDigest === portableDefinitionDigest(s.profile));
+      return { document: preferences ? createPortablePackage(s.profile, preferences) : saved?.document ?? createPortablePackage(s.profile), metadataStatus: preferences ? "explicit-export-preferences" : saved ? "preserved" : "derived-requires-review", localConnectionsIncluded: false };
+    },
     async update(id, operation, fn, request = {}) { return mutate(id, async (s) => { permit(s, request); prune(s); const result = await fn(s); if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Compartment data limit reached. Review retention and delete older sessions."); s.audit.push({ at: clock(), operation: /^[a-z-]{1,40}$/.test(operation) ? operation : "operation", outcome: "completed" }); return result; }); },
     async credential(id, purpose, value, request) { await this.authorize(id, request); if (value === undefined) return secrets.get(id, purpose); if (typeof value !== "string" || value.length < 1 || value.length > 16000) throw new Error("Credential is invalid."); await secrets.set(id, purpose, value); return { reference: `${id}:${purpose}` }; },
     async route(source, destination, content, provider) { await this.authorize(source, { destination, provider }); await this.authorize(destination, { provider }); return { source, destination, content }; },

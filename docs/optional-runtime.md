@@ -62,8 +62,10 @@ The [voice recovery demonstration](voice-recovery.md) also passed through the
 real CPU/HTTP path: concurrent duplicate handling, correction continuity,
 audio erasure after saving text and Python exit after abrupt owner loss.
 
-Suite packaging, runtime update/rollback/uninstall, recovery after a forced
-installer termination and managed installation policy remain unfinished lifecycle
+Suite packaging and normal application install/update/rollback are implemented
+and host-tested; see [application installation](suite-installation.md). Optional
+runtime update/rollback/uninstall, recovery after a forced runtime-installer
+termination and managed runtime installation policy remain unfinished lifecycle
 implementation. The initial setup command does not silently repair or replace a
 working runtime. Native Windows dependency imports still need a Windows host.
 
