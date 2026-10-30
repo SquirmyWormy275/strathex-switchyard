@@ -662,3 +662,12 @@ The integrated rule-capability run passes **108 groups, 763 tests: 754 passed,
 `2b3abb60-fa51-4bce-91ee-7a2f425588a8`. TypeScript typecheck passed. The isolated
 test-runner checks also pass after the bounded Windows Claude allowance and
 expanded failure diagnostics. Native Windows full verification remains pending.
+
+## Native request refusals
+
+The restricted Codex client now refuses each native approval, permission,
+elicitation, input and dynamic-tool request using that method's actual response
+schema. Unknown requests receive a protocol error. Malformed frames close the
+owned connection and late buffered data cannot restore it. Real-pipe fault tests
+and the task/service suites pass **32 tests**. This grants no execution authority;
+reviewed general task submissions and native client attachment remain unfinished.

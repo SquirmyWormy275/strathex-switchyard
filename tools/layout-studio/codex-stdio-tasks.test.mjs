@@ -9,6 +9,7 @@ import { CodexClient, codexDesignConfig } from "./agents.mjs";
 import { createCodexStdioTasks } from "./codex-stdio-tasks.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
 
 const childSource = `
 const readline=require('node:readline'), settings=JSON.parse(process.argv[1]);
@@ -18,7 +19,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  let result={};
  switch(m.method){
   case 'initialize':break;
-  case 'config/read':send({id:999,method:'item/commandExecution/requestApproval',params:{command:'never-executed'}});result={config:settings.config};break;
+  case 'config/read':if(Object.hasOwn(settings,'badFrame')){send(settings.badFrame);return;}for(const [id,method] of [[999,'item/commandExecution/requestApproval'],[1000,'item/fileChange/requestApproval'],[1001,'item/permissions/requestApproval'],[1002,'mcpServer/elicitation/request'],[1003,'item/tool/requestUserInput'],[1004,'item/tool/call'],[1005,'unknown/requestApproval']])send({id,method,params:{command:'never-executed'}});result={config:settings.config};break;
   case 'account/read':result={account:{type:'chatgpt',email:'synthetic@example.invalid'}};break;
   case 'thread/list':result={data:[{id:'synthetic-existing',preview:'never-return-preview',status:{type:'idle'}}]};break;
   case 'thread/read':result={thread:{id:settings.badId?77:m.params.threadId,cwd:settings.wrongRoot||settings.repositoryRoot,status:{type:'idle'},turns:settings.history?[{private:'never-return-history'}]:[]}};break;
@@ -50,10 +51,25 @@ test("real stdio framing verifies restricted initialization/account and returns 
   assert.deepEqual(await driver.list("personal"), [{ id: "synthetic-existing", observation: "idle" }]);
   const task = await driver.read("synthetic-existing", repositoryRoot, "personal"); assert.equal(task.repositoryRoot, repositoryRoot); assert.equal(task.observation, "idle");
   assert.ok(frames.some((m) => m.id === 999 && m.result?.decision === "cancel"));
+  assert.ok(frames.some((m) => m.id === 1000 && m.result?.decision === "cancel"));
+  assert.deepEqual(frames.find(m => m.id === 1001).result, { permissions: {}, scope: "turn" });
+  assert.deepEqual(frames.find(m => m.id === 1002).result, { action: "cancel", content: null });
+  assert.deepEqual(frames.find(m => m.id === 1003).result, { answers: {} });
+  assert.equal(frames.find(m => m.id === 1004).result.success, false); assert.equal(frames.find(m => m.id === 1005).error.code, -32601);
   assert.ok(frames.some((m) => m.method === "thread/read" && m.params.includeTurns === false));
   assert.equal(frames.some((m) => m.method === "turn/start"), false); assert.equal(children.length, 1);
   assert.equal((await driver.stopCompartment("personal")).stopped, true); assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
 }));
+test("malformed native frames close only the owned connection instead of crashing or granting authority", async () => {
+  for (const badFrame of [null, [], {}, { id: 1, method: 17 }, { id: 1, method: "" }, { id: { invalid: true }, method: "item/permissions/requestApproval" }]) {
+    const frames = [], client = new CodexClient(process.execPath, process.cwd(), [], { spawnProcess: (_, args, options) => {
+      const child = spawn(process.execPath, ["-e", childSource, JSON.stringify({ badFrame, config: codexDesignConfig() })], options), write = child.stdin.write.bind(child.stdin);
+      child.stdin.write = (value, ...rest) => { frames.push(JSON.parse(String(value))); return write(value, ...rest); }; return child;
+    } });
+    try { await assert.rejects(client.initialize(), /disconnected|stopped/i); assert.equal((await stopOwnedChild(client.child)).stopped, true); assert.equal(frames.some(frame => frame.result?.decision === "accept" || frame.result?.permissions?.network?.enabled === true), false); }
+    finally { client.close(); await stopOwnedChild(client.child); }
+  }
+});
 test("owned task creation persists only a local marker; resume reads back exact read-only permissions", () => fixture(async ({ repositoryRoot, driver, frames }) => {
   const result = await driver.start(repositoryRoot, "switchyard-synthetic", "personal"); assert.equal(result.threadId, "synthetic-created");
   const resumed = await driver.resume(result.threadId, repositoryRoot, "personal"); assert.equal(resumed.permissions, "read-only/on-request"); assert.equal(resumed.modelPromptSubmitted, false);

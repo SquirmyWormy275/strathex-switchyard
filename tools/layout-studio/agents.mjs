@@ -1,6 +1,7 @@
 /** Concrete, tool-restricted design adapters. Account state stays with installed CLIs. */
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { deniedCodexServerRequest } from "./codex-requests.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -75,14 +76,16 @@ export class CodexClient extends EventEmitter {
     this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
+      if (this.closed) return;
       this.buffer += chunk;
       if (Buffer.byteLength(this.buffer) > 2 * 1024 * 1024) { this.close(); return; }
       let end;
-      while ((end = this.buffer.indexOf("\n")) >= 0) {
+      while (!this.closed && (end = this.buffer.indexOf("\n")) >= 0) {
         const line = this.buffer.slice(0, end); this.buffer = this.buffer.slice(end + 1);
         let m; try { m = JSON.parse(line); } catch { this.close(); return; }
-        if (m.id !== undefined && !m.method) { const pending = this.pending.get(m.id); if (pending) { this.pending.delete(m.id); m.error ? pending.reject(new Error(`Codex rejected ${pending.method}: ${String(m.error.message).slice(0, 400)}`)) : pending.resolve(m.result); } }
-        else if (m.id !== undefined && m.method) { this.send({ id: m.id, result: m.method.includes("requestApproval") ? { decision: "cancel" } : { success: false, contentItems: [{ type: "inputText", text: "Configuration design cannot execute tools or grant authority." }] } }); }
+        if (!m || typeof m !== "object" || Array.isArray(m) || m.method !== undefined && (typeof m.method !== "string" || !m.method.length || m.method.length > 128 || /[\0\r\n]/.test(m.method)) || m.id !== undefined && !(Number.isSafeInteger(m.id) || typeof m.id === "string" && m.id.length > 0 && m.id.length <= 128 && !/[\0\r\n]/.test(m.id)) || m.id === undefined && m.method === undefined) { this.close(); return; }
+        if (m.id !== undefined && m.method === undefined) { const pending = this.pending.get(m.id); if (pending) { this.pending.delete(m.id); m.error ? pending.reject(new Error(`Codex rejected ${pending.method}: ${String(m.error.message).slice(0, 400)}`)) : pending.resolve(m.result); } }
+        else if (m.id !== undefined && m.method) this.send(deniedCodexServerRequest(m));
         else this.emit("notification", m);
       }
     });
