@@ -33,6 +33,22 @@ internal static class RuntimeCommandRunner
         try { return RunAsync().GetAwaiter().GetResult(); }
         catch { return 2; } // Paths, credentials and signed installer URLs are never logged.
     }
+    public static int ReadStatus()
+    {
+        if (!OperatingSystem.IsWindows()) return 2;
+        try
+        {
+            using var request = JsonDocument.Parse(ReadLineBounded(Console.In).GetAwaiter().GetResult() ?? throw NativeError());
+            string id = request.RootElement.GetProperty("id").GetString() ?? "";
+            if (request.RootElement.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(id, "D", out _)) throw NativeError();
+            using SafeJobHandle job = OpenJobObjectW(4, false, JobName(id));
+            if (job.IsInvalid && Marshal.GetLastWin32Error() != 2) throw NativeError();
+            Write(new { schema = Schema, id, activeProcesses = job.IsInvalid ? 0 : ActiveProcesses(job), containment = "windows-job" });
+            return 0;
+        }
+        catch { return 2; }
+    }
+    private static string JobName(string id) => "Local\\Switchyard.Runtime." + id;
     private static async Task<int> RunAsync()
     {
         using var document = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
@@ -58,7 +74,7 @@ internal static class RuntimeCommandRunner
         if ((File.GetAttributes(executable) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) throw NativeError();
         using var executableLock = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (Convert.ToHexString(SHA256.HashData(executableLock)).ToLowerInvariant() != digest) throw NativeError();
-        using var job = CreateJob();
+        using var job = CreateJob(id);
         Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job" });
         using var ack = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         if (ack.RootElement.GetProperty("schema").GetString() != Schema || ack.RootElement.GetProperty("id").GetString() != id || !ack.RootElement.GetProperty("start").GetBoolean()) throw NativeError();
@@ -147,10 +163,10 @@ internal static class RuntimeCommandRunner
             if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (handles != IntPtr.Zero) Marshal.FreeHGlobal(handles); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); if (env != IntPtr.Zero) Marshal.FreeHGlobal(env);
         }
     }
-    private static SafeJobHandle CreateJob()
+    private static SafeJobHandle CreateJob(string id)
     {
-        SafeJobHandle job = CreateJobObjectW(IntPtr.Zero, null);
-        if (job.IsInvalid) throw NativeError();
+        SafeJobHandle job = CreateJobObjectW(IntPtr.Zero, JobName(id));
+        if (job.IsInvalid || Marshal.GetLastWin32Error() == 183) { job.Dispose(); throw NativeError(); }
         var information = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };
         IntPtr pointer = Marshal.AllocHGlobal(Marshal.SizeOf<ExtendedLimits>());
         try { Marshal.StructureToPtr(information, pointer, false); if (!SetInformationJobObject(job, 9, pointer, (uint)Marshal.SizeOf<ExtendedLimits>())) { job.Dispose(); throw NativeError(); } }
@@ -174,6 +190,7 @@ internal static class RuntimeCommandRunner
     [StructLayout(LayoutKind.Sequential)] private struct ExtendedLimits { public BasicLimits Basic; public IoCounters Io; public UIntPtr ProcessMemory, JobMemory, PeakProcessMemory, PeakJobMemory; }
     [StructLayout(LayoutKind.Sequential)] private struct Accounting { public long UserTime, KernelTime, PeriodUserTime, PeriodKernelTime; public uint Faults, Total, Active, Terminated; }
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeJobHandle CreateJobObjectW(IntPtr attributes, string? name);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeJobHandle OpenJobObjectW(uint access, bool inherit, string name);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool SetInformationJobObject(SafeJobHandle job, int kind, IntPtr information, uint size);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool QueryInformationJobObject(SafeJobHandle job, int kind, IntPtr information, uint size, IntPtr returnedSize);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateJobObject(SafeJobHandle job, uint code);

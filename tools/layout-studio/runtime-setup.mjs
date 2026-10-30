@@ -1,13 +1,12 @@
 /** Reproducible optional runtime. Existing installations are verified, never overwritten. */
-import { spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, realpath, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, realpath, rm } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { privateDirectory, privateWrite, directoryIdentity } from "./private-fs.mjs";
-import { withStateLock } from "./state-lock.mjs";
+import { privateDirectory, directoryIdentity } from "./private-fs.mjs";
+import { runRuntimeCommand } from "./runtime-command.mjs";
 
 export const runtimeRoot = () => join(homedir(), ".local/share/strathex-switchyard/voice");
 const sourceRoot = fileURLToPath(new URL("./", import.meta.url));
@@ -43,17 +42,8 @@ export function runtimeEnvironment() {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => allowed.has(name.toUpperCase())));
   return { ...env, UV_NO_CACHE: "1", HF_HUB_OFFLINE: "1", HF_HUB_DISABLE_TELEMETRY: "1", LANGSMITH_TRACING: "false", LANGCHAIN_TRACING_V2: "false", LANGSMITH_API_KEY: "", LANGCHAIN_API_KEY: "" };
 }
-export async function runtimeCommand(executable, args, { timeout = 120000, env = runtimeEnvironment() } = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, { shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env });
-    const chunks = []; let bytes = 0, settled = false;
-    const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); };
-    const timer = setTimeout(() => { child.kill(); finish(new Error("The optional runtime operation timed out; existing installation was preserved.")); }, timeout);
-    child.stdout.on("data", (chunk) => { bytes += chunk.length; if (bytes > 512 * 1024) { child.kill(); finish(new Error("Runtime verification exceeded its output bound.")); } else chunks.push(chunk); });
-    child.stderr.on("data", () => {}); // Installer output can contain signed download URLs; never log it.
-    child.once("error", () => finish(new Error("A required local runtime executable is unavailable.")));
-    child.once("close", (code) => code ? finish(new Error("Optional runtime setup or verification failed. Existing components were preserved.")) : finish(null, Buffer.concat(chunks).toString("utf8")));
-  });
+export async function runtimeCommand(executable, args, { env = runtimeEnvironment(), ...options } = {}) {
+  return runRuntimeCommand(executable, args, { ...options, env });
 }
 export async function trustedUv() {
   const candidates = process.platform === "win32" ? [join(homedir(), ".local/bin/uv.exe"), join(process.env.LOCALAPPDATA || homedir(), "Programs/uv/uv.exe")] : [join(homedir(), ".local/bin/uv"), "/usr/bin/uv", "/usr/local/bin/uv"];
@@ -85,42 +75,10 @@ export async function downloadRuntimeModel(directory, model, fetcher = fetch) {
   await verifyRuntimeModel(directory, model);
 }
 
-export async function setupRuntime({ root = runtimeRoot(), install = false, command = runtimeCommand, uvResolver = trustedUv, downloader = downloadRuntimeModel, model = null, lock = join(sourceRoot, "runtime.requirements.lock"), lockOperation = (fn) => withStateLock(join(root, ".maintenance"), "runtime", fn) } = {}) {
-  if (!["linux", "win32"].includes(process.platform)) throw new Error("The optional runtime installer supports Linux and Windows.");
-  model = validateRuntimeModel(model ?? JSON.parse(await readFile(join(sourceRoot, "runtime-model.json"), "utf8")));
-  await ownedDirectory(root, install);
-  const probe = async (python, directory = null) => {
-    const value = JSON.parse(await command(python, ["-I", join(sourceRoot, "runtime-probe.py"), lock, ...(directory ? [directory] : [])]));
-    if (value.schema !== "switchyard-runtime-probe/v1" || value.python !== "3.12.14" || !Array.isArray(value.imports) || value.imports.length !== 4 || (directory && value.modelLoaded !== true)) throw new Error("The runtime probe did not verify its expected contract.");
-    return value;
-  };
-  const inspect = async () => { await verifyRuntimeModel(join(root, "base.en"), model); return probe(runtimePython(root), join(root, "base.en")); };
-  if (!install) return { status: "verified", ...(await inspect()), modelRevision: model.revision };
-  return lockOperation(async (lease) => {
-    const stage = join(root, `.install-${randomUUID()}`), promoted = [];
-    await privateDirectory(stage);
-    try {
-      const hasPython = await exists(join(root, "venv")), hasModel = await exists(join(root, "base.en"));
-      if (hasPython) { await ownedDirectory(join(root, "venv")); await probe(runtimePython(root)); }
-      if (hasModel) await verifyRuntimeModel(join(root, "base.en"), model);
-      let uvVersion = null;
-      if (!hasPython) {
-        const uv = await uvResolver(); uvVersion = (await command(uv, ["--version"])).trim();
-        await command(uv, ["venv", "--no-config", "--no-cache", "--managed-python", "--relocatable", "--python", "3.12.14", join(stage, "venv")], { timeout: 600000 });
-        await command(uv, ["pip", "sync", "--no-config", "--no-cache", "--require-hashes", "--only-binary", ":all:", "--index-url", "https://pypi.org/simple", "--python", runtimePython(stage), lock], { timeout: 600000 });
-        await probe(runtimePython(stage));
-      }
-      if (!hasModel) await downloader(join(stage, "base.en"), model);
-      for (const [component, present] of [["venv", hasPython], ["base.en", hasModel]]) if (!present) { lease.assert(); if (await exists(join(root, component))) throw new Error("Another runtime component appeared during setup. Existing content was preserved."); await rename(join(stage, component), join(root, component)); promoted.push(component); }
-      const result = await inspect(); lease.assert();
-      const receipt = { ...result, schema: "switchyard-runtime-install/v1", at: new Date().toISOString(), platform: process.platform, uvVersion, reusedExisting: hasPython && hasModel, requirementSha256: createHash("sha256").update(await readFile(lock)).digest("hex"), modelRevision: model.revision };
-      await privateDirectory(join(root, ".maintenance")); await privateWrite(join(root, ".maintenance", "verified.json"), JSON.stringify(receipt));
-      return { status: "verified", reusedExisting: receipt.reusedExisting, installedComponents: promoted, ...result, modelRevision: model.revision };
-    } catch (error) {
-      // Only this attempt's new components are removed. Pre-existing data is
-      // never replaced or deleted, even when verification fails.
-      for (const component of promoted.reverse()) await rename(join(root, component), join(stage, component));
-      throw error;
-    } finally { await rm(stage, { recursive: true, force: true }); }
-  });
+/** Compatibility entry; the same versioned lifecycle serves source and installed callers. */
+export async function setupRuntime({ root = runtimeRoot(), install = false, command = runtimeCommand, uvResolver = trustedUv, downloader = downloadRuntimeModel, model, lock = join(sourceRoot, "runtime.requirements.lock"), coordinate } = {}) {
+  const [{ createRuntimeLifecycle }, { requiredRuntimeSpec }] = await Promise.all([import("./runtime-lifecycle.mjs"), import("./runtime-storage.mjs")]);
+  const spec = await requiredRuntimeSpec({ lock, model });
+  if (!coordinate && root === runtimeRoot()) { const { runtimeMaintenanceCoordinator } = await import("../../deployment/suite/runtime-maintenance.mjs"); coordinate = runtimeMaintenanceCoordinator({ runtimeRoot: root }); }
+  return createRuntimeLifecycle({ root, spec, command, uvResolver, downloader, ...(coordinate ? { coordinate } : {}) })[install ? "install" : "check"]();
 }

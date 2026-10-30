@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runRuntimeCommand } from "./runtime-command.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 
 const windowsHelper = process.env.SWITCHYARD_TEST_RUNTIME_HELPER;
@@ -16,9 +16,10 @@ async function gone(pid) { try { process.kill(pid, 0); if (process.platform === 
 
 test("runtime guardian commits readiness before execution and returns only bounded stdout", { skip }, () => fixture(async (root) => {
   const marker = join(root, "ran"), secret = "synthetic-private-installer-url";
-  let ready = false;
-  const output = await runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write(${JSON.stringify(secret)});process.stdout.write('verified')`], { ...options, onGuardianReady: async (frame) => { assert.ok(frame.guardianPid > 0); await assert.rejects(readFile(marker), { code: "ENOENT" }); ready = true; await new Promise(r => setTimeout(r, 50)); } });
+  let ready = false, scope;
+  const output = await runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write(${JSON.stringify(secret)});process.stdout.write('verified')`], { ...options, onGuardianReady: async (frame) => { scope = frame; assert.ok(frame.guardianPid > 0); assert.equal(await runtimeGuardianStopped(frame, options), false); await assert.rejects(readFile(marker), { code: "ENOENT" }); ready = true; await new Promise(r => setTimeout(r, 50)); } });
   assert.equal(ready, true); assert.equal(output, "verified"); assert.equal(await readFile(marker, "utf8"), "yes"); assert.ok(!output.includes(secret));
+  assert.equal(await runtimeGuardianStopped(scope, options), true);
 }));
 test("runtime guardian cannot execute when the durable start acknowledgement fails", { skip }, () => fixture(async (root) => {
   const marker = join(root, "ran");

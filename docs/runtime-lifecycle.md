@@ -34,8 +34,37 @@ acceptance.
 
 ## Implementation status
 
-The supervisor is implemented and tested on Linux. Versioned component storage,
-normal installed runtime commands, crash recovery and coordinated uninstall are
-still being connected. The existing one-shot runtime setup has not yet been
-replaced by that lifecycle. A working existing runtime is never rebuilt merely
-to demonstrate an installer.
+The supervisor, versioned storage and closed installed commands are implemented:
+`switchyard runtime check|install|update|rollback|recover|uninstall`.
+The source setup entry delegates to the same lifecycle.
+
+An existing matching legacy environment/model is adopted in place. New immutable
+components live under `versions/<uuid>`; unchanged environments/models are
+shared. Atomic selection retains the current and previous records. Each app
+resolves the retained runtime matching its own exact specification. Roll back an
+application before selecting a runtime requiring that older application.
+
+Stored inventories bind regular file content, modes and known uv interpreter
+links using exact 64-bit file identities while reading. Destructive cleanup
+checks every candidate first, preserves unrelated/changed content, and journals
+the inventory before deleting generated software. Recovery accepts already
+removed entries only within that recorded cleanup. Old unreferenced specs are
+pruned too. Legacy empty uv/Hugging Face advisory locks have a narrow permission
+exception inside the private runtime; executable and package content do not.
+
+The installed coordinator acquires installation/start ownership, verifies the
+exact application, blocks other registered instances, stops the owned app and
+holds its ownership boundary while software changes. A private resume journal
+restores the previous running state through the ordinary launcher. Interrupted
+commands retain their native guardian scope; recovery refuses active or
+unconfirmed workers. Protected workspaces, credentials, audio and device
+baselines are outside the cleanup tree. Shared uv-managed Python installations
+are not removed.
+
+Synthetic/fault tests cover reuse, legacy adoption, rollback, pruning,
+verification failure, uncertain worker exit, interrupted promotion/cleanup,
+uninstall and exact application quiescence/restart. Voice/HID/example consumers
+resolve selected versions and disable bytecode writes. Actual pilot adoption and
+native Windows lifecycle acceptance are tracked separately in the
+[implementation evidence](switchyard-status.md). A working runtime is never
+rebuilt merely to demonstrate an installer.

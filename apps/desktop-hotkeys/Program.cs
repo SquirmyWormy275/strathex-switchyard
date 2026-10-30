@@ -108,6 +108,7 @@ internal static class Program
     public static int Main(string[] args)
     {
         if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();
+        if (args.SequenceEqual(new[] { "--runtime-command-status" })) return RuntimeCommandRunner.ReadStatus();
         if (args.Length != 0) return 2;
         if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("Windows hotkeys require an interactive Windows user session."); return 2; }
         var first = Console.ReadLine(); if (first is null || first.Length > 8192) return 2;

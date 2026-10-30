@@ -8,6 +8,8 @@ import { additionalDeviceChanges, validateAdditionalRestore, restoredLayoutOptio
 import { withStateLock } from "./state-lock.mjs";
 import { compileDeviceKey, baseTypingCode } from "./vial-keycodes.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
+import { resolveRuntimePaths } from "./runtime-storage.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
 import { readQmkSettings, writeQmkSetting, settingsReadback } from "./vial-settings.mjs";
 import { readVialDynamic, writeDynamicEntry, dynamicReadback, dynamicCandidate } from "./vial-dynamic.mjs";
 import { readVialEncoders, writeEncoder, encodersReadback } from "./vial-encoders.mjs";
@@ -17,9 +19,12 @@ const integer = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
 const packet = (...bytes) => { const b = Buffer.alloc(32); Buffer.from(bytes).copy(b); return [...b]; };
 
 export class NativeHidTransport {
-  constructor({ executable = join(homedir(), ".local/share/strathex-switchyard/voice", process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python"), spawnProcess = spawn } = {}) {
+  constructor({ executable, spawnProcess = spawn, runtimeResolver = resolveRuntimePaths } = {}) {
     this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
-    this.child = spawnProcess(executable, ["-I", fileURLToPath(new URL("./hid-bridge.py", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: runtimeEnvironment() });
+    this.ready = (async () => {
+    executable ??= (await runtimeResolver()).python;
+    if (this.closed) throw new Error("Device transport startup was cancelled.");
+    this.child = spawnProcess(executable, ["-I", "-B", fileURLToPath(new URL("./hid-bridge.py", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: runtimeEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
       this.buffer += chunk; if (this.buffer.length > 1048576) { this.close(); return; }
@@ -27,14 +32,17 @@ export class NativeHidTransport {
       while ((end = this.buffer.indexOf("\n")) >= 0) { const line = this.buffer.slice(0, end); this.buffer = this.buffer.slice(end + 1); let m; try { m = JSON.parse(line); } catch { this.close(); return; } const p = this.pending.get(m.id); if (!p) continue; this.pending.delete(m.id); clearTimeout(p.timer); m.error ? p.reject(new Error(m.error)) : p.resolve(m.result); }
     });
     this.child.on("error", () => this.close()); this.child.on("close", () => this.close()); this.child.stdin.on("error", () => this.close());
+    })().catch(error => { this.close(); throw error; });
+    this.ready.catch(() => {});
   }
-  request(method, body = {}) {
+  async request(method, body = {}) {
+    await this.ready;
     if (this.closed) return Promise.reject(new Error("Device transport is closed. Reconnect and read the exact device again."));
     return new Promise((resolve, reject) => { const id = ++this.sequence; const timer = setTimeout(() => { this.pending.delete(id); reject(new Error("Device request timed out.")); }, 5000); this.pending.set(id, { resolve, reject, timer }); this.child.stdin.write(`${JSON.stringify({ id, method, ...body })}\n`); });
   }
   async exchange(bytes, read = true) { return Buffer.from(await this.request("exchange", { packet: bytes, read })); }
   async read() { return Buffer.from(await this.request("read")); }
-  close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error("Device transport disconnected. Restoration may be pending until the same device returns.")); } this.pending.clear(); }
+  close() { if (this.closed) return this.stopping; this.closed = true; for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error("Device transport disconnected. Restoration may be pending until the same device returns.")); } this.pending.clear(); return this.stopping = stopOwnedChild(this.child); }
 }
 
 export class VialDevice {
@@ -164,7 +172,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
         const protocol = matches[0].candidateProtocol;
         if (!["vial", "original-xwhatsit-0.9"].includes(protocol)) throw new Error("The discovered interface protocol is unsupported.");
         return await fn(protocol === "vial" ? new VialDevice(checked, deviceId) : new OriginalXwhatsitDevice(checked, deviceId));
-      } finally { t.close(); }
+      } finally { await t.close(); }
     }); } finally { busy.delete(deviceId); }
   }
   async function restore(compartment, id) {
@@ -197,7 +205,7 @@ export function createDeviceService({ store, transportFactory = () => new Native
     }).catch(async (error) => { await store.update(compartment, "device-recovery-pending", (s) => { s.deviceTransactions.find((t) => t.id === id).status = "recovery-pending"; }); throw error; });
   }
   return {
-    async list() { const t = transportFactory(); try { return (await t.request("list")).map(({ path, serial_number, ...d }) => d); } finally { t.close(); } },
+    async list() { const t = transportFactory(); try { return (await t.request("list")).map(({ path, serial_number, ...d }) => d); } finally { await t.close(); } },
     async read(compartment, deviceId) { return using(deviceId, async (d) => { const snapshot = await d.snapshot(); await store.update(compartment, "device-read", (s) => { s.deviceSnapshots ??= []; s.deviceSnapshots = [...s.deviceSnapshots.filter((v) => v.identity.deviceId !== deviceId), snapshot].slice(-16); }); return snapshot; }); },
     async review(compartment, deviceId, value) {
       const input = Array.isArray(value) ? { changes: value } : value;

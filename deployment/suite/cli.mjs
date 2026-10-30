@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { launchApplication, stopApplication, applicationStatus } from "./application.mjs";
 import { dispatchPhysicalIntent } from "../../tools/layout-studio/physical-intent.mjs";
 export async function runApplicationCli(args = process.argv.slice(2), bundleRoot = fileURLToPath(new URL("../../", import.meta.url)).replace(/[\\/]$/, ""), options = {}) {
+  if (args[0] === "runtime") { const { runRuntimeCli } = await import("./runtime.mjs"); await runRuntimeCli(args.slice(1), { installationRoot: options.installationRoot }); return; }
   if (args[0] === "intent") { if (args.length === 2) await dispatchPhysicalIntent({ implementation: args[1] }); else if (args.length === 4) await dispatchPhysicalIntent({ implementation: args[1], roleId: args[2], intent: args[3] }); else throw new Error("Only closed physical intents are accepted."); return; }
   if (["update", "rollback", "uninstall", "recover"].includes(args[0])) { const { runInstallationCli } = await import("./manage.mjs"); await runInstallationCli(args, options.installationRoot ? { root: options.installationRoot } : {}); return; }
   const operation = args.find((a) => ["launch", "status", "stop"].includes(a)) ?? "launch", noOpen = args.includes("--no-open");

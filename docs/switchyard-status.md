@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **102/102 groups passed; 708 tests, 699 passed and 9
+- Integrated native Linux run: **106/106 groups passed; 737 tests, 728 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-432a7bd3-6205-40d0-a7de-7ddab2c0c26e.json`.
+  `.sxsy-verification/isolated-test-fd1917bc-155d-4a7f-a4a1-a036756f3975.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -532,3 +532,28 @@ runtime verification passed Python 3.12.14, all 48 package pins, no extra
 distributions and offline model load with the exact-ID reader. Private receipt:
 `runtime-verification/runtime-files-1793362554804.json`. It reused the existing
 runtime/model; no software copy, device or microphone was created/opened.
+
+## Runtime lifecycle checkpoint
+
+Source `a650f39` added native acknowledged runtime guardians. The integrated
+Linux receipt `10e64199-c29f-4497-9540-25b5371a71d2` passed **103 groups, 716 tests:
+707 pass and 9 expected skips**. The complete Windows release at `4cab102` also
+finished successfully: **212 groups, zero failures**, run
+[41052752221](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41052752221),
+receipt `d282b001-6ab9-424c-b6da-290e157320a5`. This includes native task/controller
+software checks; interactive hardware/account acceptance remains open.
+
+Versioned optional-runtime storage, shared components, exact specification
+selection, current/previous retention, normal CLI maintenance, durable
+promotion/cleanup recovery and exact installed-owner stop/restart coordination
+are now implemented. Voice, HID and the Python example resolve selected runtime
+paths and disable bytecode writes. Focused software/fault checks cover these
+paths; the actual pilot adoption and new Windows guardian execution are pending
+separate acceptance. Existing pilot environment/model inventories were read
+successfully without creating another runtime or downloading a model.
+
+The integrated runtime-lifecycle source check now passes **106/106 Linux groups,
+737 tests: 728 passed and 9 expected platform skips**, receipt
+`fd1917bc-155d-4a7f-a4a1-a036756f3975`. TypeScript typecheck passed. The C# runtime
+guardian and read-only recovery status mode build with zero warnings/errors.
+Compiler bin/obj staging was removed; no additional environment/model was built.

@@ -36,8 +36,8 @@ async function fixture(fn) {
     if (args[0] === "--version") return "uv synthetic";
     if (args[0] === "pip") return "";
     await readFile(exe);
-    if (args.length > 3 && failFinal) throw new Error("Synthetic final load failure");
-    return JSON.stringify({ schema: "switchyard-runtime-probe/v1", python: "3.12.14", packages: { synthetic: "1.0" }, extraDistributions: [], imports: ["av", "hid", "faster_whisper", "langchain_core"], modelLoaded: args.length > 3 });
+    if (args.length > 4 && failFinal) throw new Error("Synthetic final load failure");
+    return JSON.stringify({ schema: "switchyard-runtime-probe/v1", python: "3.12.14", packages: { synthetic: "1.0" }, extraDistributions: [], imports: ["av", "hid", "faster_whisper", "langchain_core"], modelLoaded: args.length > 4, hidOpened: false, providerContacted: false });
   };
   const python = async (base = root) => { const path = runtimePython(base); await mkdir(dirname(path), { recursive: true, mode: 0o700 }); await writeFile(path, "synthetic-python", { mode: 0o600 }); };
   const run = async (exe, args) => { if (args[0] === "venv") { commands.push({ exe, args }); await python(dirname(args.at(-1))); return ""; } return command(exe, args); };
@@ -48,24 +48,24 @@ async function fixture(fn) {
 
 test("optional runtime setup installs only verified components with exact hashes and binary wheels, then reuses them without downloads", () => fixture(async ({ root, options, commands }) => {
   const installed = await setupRuntime({ ...options, install: true });
-  assert.deepEqual(installed.installedComponents, ["venv", "base.en"]);
+  assert.deepEqual(installed.installedComponents, ["python", "model"]);
   const pip = commands.find((c) => c.args[0] === "pip"); assert.ok(pip.args.includes("--require-hashes")); assert.ok(pip.args.includes("--only-binary")); assert.ok(pip.args.includes("--no-cache"));
-  assert.equal(JSON.parse(await readFile(join(root, ".maintenance/verified.json"))).schema, "switchyard-runtime-install/v1");
+  assert.equal(JSON.parse(await readFile(join(root, ".maintenance/current.json"))).schema, "switchyard-runtime-selection/v1");
   const reused = await setupRuntime({ ...options, install: true, downloader: () => { throw new Error("Unexpected duplicate download"); }, uvResolver: () => { throw new Error("Unexpected dependency rebuild"); } });
-  assert.equal(reused.reusedExisting, true); assert.deepEqual(reused.installedComponents, []);
+  assert.equal(reused.unchanged, true);
   assert.ok(!(await readdir(root)).some((n) => n.startsWith(".install-")));
 }));
 
 test("a corrupt model download cannot promote a new interpreter or leave staging artifacts", () => fixture(async ({ root, options, corrupt }) => {
   corrupt(); await assert.rejects(setupRuntime({ ...options, install: true }), /SHA-256/);
-  assert.deepEqual((await readdir(root)).filter((n) => n !== ".maintenance"), []);
+  assert.deepEqual((await readdir(root)).filter((n) => ![".maintenance", "versions"].includes(n)), []); assert.deepEqual(await readdir(join(root, "versions")), []);
 }));
 
 test("existing model content survives a final runtime load failure and only the new interpreter is rolled back", () => fixture(async ({ root, model, options, downloader, failFinal }) => {
   await mkdir(root, { mode: 0o700 }); await downloader(join(root, "base.en"), model); failFinal();
   await assert.rejects(setupRuntime({ ...options, install: true }), /final load failure/);
   await verifyRuntimeModel(join(root, "base.en"), model);
-  assert.deepEqual((await readdir(root)).filter((n) => n !== ".maintenance"), ["base.en"]);
+  assert.deepEqual((await readdir(root)).filter((n) => ![".maintenance", "versions"].includes(n)), ["base.en"]); assert.deepEqual(await readdir(join(root, "versions")), []);
 }));
 
 test("a mismatched existing runtime is preserved, with no dependency sync or model replacement", () => fixture(async ({ root, options, python }) => {
