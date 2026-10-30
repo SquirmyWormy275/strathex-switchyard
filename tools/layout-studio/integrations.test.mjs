@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { stopOwnedChild } from "./owned-process.mjs";
 import { createCustomAgents } from "./custom-agents.mjs";
 import { createCopilot } from "./copilot.mjs";
 import { createStudioServer } from "./serve.mjs";
@@ -126,6 +129,36 @@ test("the Node SDK rejects unsigned, replayed and wrong-session responses before
   fault = "wrong-session"; await assert.rejects(sdk.publish("exact", "ready"), /scope/);
   fault = "valid"; assert.equal((await sdk.publish("exact", "ready")).accepted, true);
   await assert.rejects(sdk.poll(), /command.*contract/);
+});
+
+test("a real bundled Node example exits after abrupt loss of its owning parent", { timeout: 12000 }, async (t) => {
+  const store = memoryStore(), bridge = createCustomAgents({ store });
+  const enrollment = await bridge.enroll("personal", { id: "test", name: "Synthetic", capabilities: ["review"] });
+  const server = createStudioServer({ bridge: { close() {} }, suite: { agentMessage: (...a) => bridge.message(...a), close() {} } });
+  const baseUrl = await listening(server, t), file = fileURLToPath(new URL("../../examples/custom-agent/agent.mjs", import.meta.url));
+  const parent = spawn(process.execPath, ["--input-type=module", "-e", `
+    import {spawn} from 'node:child_process';
+    let text=''; for await (const chunk of process.stdin) text+=chunk;
+    const {file,enrollment}=JSON.parse(text);
+    const child=spawn(process.execPath,[file],{stdio:['pipe',1,2]});
+    child.stdin.on('error',()=>{});
+    child.stdin.write(JSON.stringify({...enrollment,supervised:true})+'\\n');
+    console.log(JSON.stringify({pid:child.pid}));
+  `], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+  let childPid, output = "", errors = "";
+  parent.stdout.on("data", (c) => { output += c; if (output.includes("\n")) childPid = JSON.parse(output.trim()).pid; });
+  parent.stderr.on("data", (c) => { errors += c; });
+  let closed = false; const close = new Promise((resolve) => parent.once("close", () => { closed = true; resolve(); }));
+  t.after(async () => { await stopOwnedChild(parent); if (!closed && childPid) { try { process.kill(childPid, "SIGKILL"); } catch {} } });
+  parent.stdin.end(JSON.stringify({ file, enrollment: { ...enrollment, baseUrl } }));
+  const deadline = Date.now() + 5000;
+  while (!store.states.personal.agents[0].sessionId && Date.now() < deadline && !closed) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(store.states.personal.agents[0].reportedStatus, "ready", errors);
+  assert.equal(Number.isInteger(childPid), true);
+  parent.kill("SIGKILL");
+  let timer;
+  try { await Promise.race([close, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("The example retained its inherited output pipe after its parent died.")), 3000); })]); }
+  finally { clearTimeout(timer); }
 });
 
 test("Copilot-only enrollment uses fixed Microsoft endpoints, opaque credentials and an exact owned Graph conversation", async () => {

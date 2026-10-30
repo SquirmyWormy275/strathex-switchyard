@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **90/90 groups passed; 616 tests, 607 passed and 9
+- Integrated native Linux run: **90/90 groups passed; 619 tests, 610 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-d60cfcef-a760-4381-b79a-8d17355847e3.json`.
+  `.sxsy-verification/isolated-test-7f16d6e7-1336-47a6-a66d-b42d658619d8.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -103,6 +103,13 @@ Tests use synthetic/fault transports unless identified below. The older B122
   Tests reject route substitution, replay and unauthenticated/mis-scoped responses.
   [The SDK contract](../integrations/README.md) documents upgrades and uncertain
   claims; v1 receives HTTP 426. No model prompt or keyboard interface was used.
+- A second actual HTTP check started each example with simultaneous requests,
+  observed one process/session per example and completed both review exchanges.
+  It exposed an atomic-replacement read race, which now retries only newly named
+  safe private files with a strict bound. The same demonstration passed after
+  the fix. Both real Node and Python/LangChain children also exited after abrupt
+  parent loss through their private stdin lifeline. These are owned synthetic
+  examples; no external coding process or task-cancellation claim is made.
 - Local CPU faster-whisper transcribed synthetic speech without an external API.
   Recognition was imperfect; transcript correction remains part of the flow.
   A live microphone conversation has not yet been accepted.

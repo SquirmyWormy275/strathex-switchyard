@@ -33,13 +33,22 @@ export async function privateDirectory(path) {
   const s = await directoryIdentity(path);
   if (process.platform !== "win32" && (s.uid !== uid || (s.mode & 0o077))) throw new Error("Private storage ownership or permissions are invalid.");
 }
-export async function privateRead(path) {
-  const f = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const s = await f.stat(), named = await lstat(path);
-    if (!s.isFile() || named.isSymbolicLink() || s.ino !== named.ino || s.dev !== named.dev || s.size > maxBytes || (process.platform !== "win32" && (s.uid !== uid || (s.mode & 0o077)))) throw new Error("Private storage file is unsafe or oversized.");
-    return await f.readFile("utf8");
-  } finally { await f.close(); }
+export async function privateRead(path, { openFile = open, statName = lstat } = {}) {
+  const safe = (s) => s.isFile() && !s.isSymbolicLink() && s.size <= maxBytes && (process.platform === "win32" || s.uid === uid && !(s.mode & 0o077));
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const f = await openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const s = await f.stat(), named = await statName(path);
+      if (!safe(s) || !safe(named)) throw new Error("Private storage file is unsafe or oversized.");
+      // An atomic writer can replace the name between open() and lstat(). Reopen
+      // the new safe file, never accept an unverified descriptor or a link.
+      if (s.ino !== named.ino || s.dev !== named.dev) continue;
+      const value = await f.readFile("utf8");
+      if (Buffer.byteLength(value) > maxBytes) throw new Error("Private storage file is unsafe or oversized.");
+      return value;
+    } finally { await f.close(); }
+  }
+  throw new Error("Private storage changed repeatedly during read. Retry the local operation.");
 }
 export async function privateWrite(path, text) {
   if (Buffer.byteLength(text) > maxBytes) throw new Error("Private storage limit reached. Review or delete older sessions.");

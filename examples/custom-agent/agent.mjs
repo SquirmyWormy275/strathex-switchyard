@@ -1,8 +1,8 @@
 /** Executable synthetic application. Credentials arrive on stdin, never in profiles or argv. */
 import { switchyardAgent } from "../../integrations/agent-sdk.mjs";
 import { randomUUID } from "node:crypto";
-let input = ""; for await (const chunk of process.stdin) { input += chunk; if (input.length > 8192) throw new Error("Enrollment exceeds its bound."); }
-const enrollment = JSON.parse(input), sdk = switchyardAgent(enrollment), sessionId = randomUUID();
+import { readEnrollment } from "../../integrations/supervised-enrollment.mjs";
+const enrollment = await readEnrollment(), sdk = switchyardAgent(enrollment), sessionId = randomUUID();
 let stopped = false;
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { stopped = true; });
 await sdk.publish(sessionId, "ready");

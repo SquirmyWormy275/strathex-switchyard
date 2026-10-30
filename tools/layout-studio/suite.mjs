@@ -18,13 +18,13 @@ import { createCodingSessions } from "./coding-sessions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, spawnExample = spawn } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
   coding ??= createCodingSessions({ store });
   const custom = createCustomAgents({ store });
-  const examples = new Map(), exampleGenerations = new Map();
+  const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
   let selectionLoaded = false;
@@ -33,6 +33,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   async function stopExample(compartment, example) {
     const key = `${compartment}:${example}`, child = examples.get(key);
     exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1);
+    await exampleStarts.get(key)?.catch(() => {});
     const result = await stopOwnedChild(child);
     if (child && result.stopped && examples.get(key) === child) examples.delete(key);
     await store.update(compartment, "example-stopped", (s) => {
@@ -134,23 +135,34 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       }
       if (path === "/api/suite/agents/example") {
         if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose the bundled custom or LangChain example.");
-        const key = `${compartment}:${body.example}`, existing = examples.get(key);
-        const generation = exampleGenerations.get(key) ?? 0;
+        const key = `${compartment}:${body.example}`, fence = exampleGenerations.get(key) ?? 0;
         await store.authorize(compartment, { provider: "custom-agent" });
-        if (existing && existing.exitCode === null) return { status: "already-running", duplicatePrevented: true };
+        if (closed || fence !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example request was invalidated before startup.");
+        if (exampleStarts.has(key)) { await exampleStarts.get(key); return { status: "already-starting", duplicatePrevented: true }; }
+        const existing = examples.get(key);
+        if (existing && existing.exitCode === null && existing.signalCode == null) return { status: "already-running", duplicatePrevented: true };
+        const generation = fence;
+        const starting = (async () => {
         const id = `${body.example}-example`, state = await store.snapshot(compartment);
         let enrollment;
         if (state.agents.some((a) => a.id === id)) enrollment = { compartment, agentId: id, token: await store.credential(compartment, `agent-${id}`, undefined, { provider: "custom-agent" }), initialSequence: state.agents.find((a) => a.id === id).sequence };
         else enrollment = await custom.enroll(compartment, { id, name: body.example === "custom" ? "Synthetic custom agent" : "Synthetic LangChain Runnable", capabilities: agentIntents });
         const base = new URL(body.workspaceBaseUrl);
-        if (base.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(base.hostname) || base.pathname !== "/" || base.username || base.password) throw new Error("The example requires this workspace's loopback origin.");
+        if (base.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(base.hostname) || base.pathname !== "/" || base.username || base.password || base.search || base.hash) throw new Error("The example requires this workspace's loopback origin.");
         const file = fileURLToPath(new URL(body.example === "custom" ? "../../examples/custom-agent/agent.mjs" : "../../examples/langchain-agent/agent.py", import.meta.url));
         const executable = body.example === "custom" ? process.execPath : join(homedir(), ".local/share/strathex-switchyard/voice", process.platform === "win32" ? "venv/Scripts/python.exe" : "venv/bin/python");
         await store.authorize(compartment, { provider: "custom-agent" });
         if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped before startup.");
-        const child = spawn(executable, [...(body.example === "langchain" ? ["-I"] : []), file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: runtimeEnvironment() });
-        examples.set(key, child); child.stdin.on("error", () => {}); child.on("error", () => { examples.delete(key); }); child.stdin.end(JSON.stringify({ ...enrollment, baseUrl: base.href }));
+        const child = spawnExample(executable, [...(body.example === "langchain" ? ["-I"] : []), file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: runtimeEnvironment() });
+        examples.set(key, child); child.stdin.on("error", () => {});
+        child.on("close", () => { if (examples.get(key) === child) examples.delete(key); });
+        await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+        if (closed || generation !== (exampleGenerations.get(key) ?? 0)) { await stopOwnedChild(child); throw new Error("This example launch was stopped during startup."); }
+        child.stdin.write(JSON.stringify({ ...enrollment, baseUrl: base.href, supervised: true }) + "\n");
         return { status: "starting", agentId: id, provenance: "Wait for authenticated ready event before claiming availability" };
+        })();
+        exampleStarts.set(key, starting);
+        try { return await starting; } finally { if (exampleStarts.get(key) === starting) exampleStarts.delete(key); }
       }
       if (path === "/api/suite/roles/bind") {
         if (!agentIntents.includes(body.intent)) throw new Error("Choose a stable supported intent.");
@@ -258,6 +270,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of examples.keys()) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.all([agents.close(), voice.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voice.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }

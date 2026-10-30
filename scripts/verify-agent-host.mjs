@@ -21,7 +21,9 @@ try {
   await api("/api/suite/mode", { mode: "personal-companion" });
   for (const example of ["custom", "langchain"]) {
     const at = Date.now();
-    assert.equal((await api("/api/suite/agents/example", { example })).status, "starting");
+    const simultaneous = await Promise.all([api("/api/suite/agents/example", { example }), api("/api/suite/agents/example", { example })]);
+    assert.equal(simultaneous.filter((r) => r.status === "starting").length, 1);
+    assert.equal(simultaneous.filter((r) => r.duplicatePrevented).length, 1);
     const agent = await until(async () => (await api("/api/suite/snapshot")).agents.find((a) => a.id === `${example}-example` && a.protocolVersion === 2 && a.reportedStatus === "ready" && a.lastSeen >= at));
     assert.equal((await api("/api/suite/agents/example", { example })).duplicatePrevented, true);
     const queued = await api("/api/suite/agents/dispatch", { agentId: agent.id, sessionId: agent.sessionId, intent: "review" });

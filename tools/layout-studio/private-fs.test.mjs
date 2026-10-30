@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, open, lstat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { directoryIdentity, privateWrite, privateRead } from "./private-fs.mjs";
@@ -25,4 +25,17 @@ test("native temporary storage writes atomically and reads back without assuming
   const root = await mkdtemp(join(tmpdir(), "switchyard-private-native-"));
   try { const path = join(root, "record.json"); await privateWrite(path, '{"value":1}'); await privateWrite(path, '{"value":2}'); assert.equal(await privateRead(path), '{"value":2}'); }
   finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("a private read retries a real atomic replacement without treating the old descriptor as current", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-private-replace-")); let calls = 0;
+  try {
+    const path = join(root, "record.json"); await privateWrite(path, '{"value":"before"}');
+    const value = await privateRead(path, { openFile: async (...args) => { const f = await open(...args); if (++calls === 1) await privateWrite(path, '{"value":"after"}'); return f; } });
+    assert.equal(value, '{"value":"after"}'); assert.equal(calls, 2);
+    let attempts = 0;
+    await assert.rejects(privateRead(path, { statName: async (p) => { attempts++; const s = await lstat(p); s.ino += 1; return s; } }), /changed repeatedly/);
+    assert.equal(attempts, 4);
+    await assert.rejects(privateRead(path, { statName: async (p) => { const s = await lstat(p); s.isSymbolicLink = () => true; return s; } }), /unsafe/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

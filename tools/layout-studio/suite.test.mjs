@@ -85,6 +85,33 @@ test("keyboard-only selection pauses backend sources and stops only this compart
   } finally { await suite.close(); }
 }));
 
+test("concurrent bundled-example starts share one launch and mode changes invalidate a pending startup", () => fixture(async ({ store }) => {
+  let launches = 0, release, block = false, waiting;
+  const snapshot = store.snapshot.bind(store);
+  store.snapshot = async (...args) => { if (block) { block = false; waiting?.(); await new Promise((r) => { release = r; }); } return snapshot(...args); };
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, spawnExample: () => {
+    launches++; const child = new EventEmitter(); child.exitCode = null; child.stdin = new EventEmitter(); child.stdin.write = () => {}; child.stdin.end = () => {};
+    child.kill = () => { child.exitCode = 0; queueMicrotask(() => child.emit("close", 0)); return true; };
+    queueMicrotask(() => child.emit("spawn")); return child;
+  } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    const request = { example: "custom", workspaceBaseUrl: "http://127.0.0.1:43177/" };
+    const starts = await Promise.all([suite.handle("/api/suite/agents/example", request), suite.handle("/api/suite/agents/example", request)]);
+    assert.equal(launches, 1); assert.equal(starts.filter((s) => s.duplicatePrevented).length, 1);
+    await suite.handle("/api/suite/agents/example/stop", { example: "custom" });
+    const blocked = new Promise((r) => { waiting = r; }); block = true;
+    const pending = suite.handle("/api/suite/agents/example", request); const rejection = assert.rejects(pending, /stopped before startup/);
+    await blocked;
+    const mode = suite.handle("/api/suite/mode", { mode: "keyboard-only" });
+    // Wait until the durable mode is selected; then release the older request.
+    while ((await snapshot("personal")).mode !== "keyboard-only") await new Promise((r) => setTimeout(r, 10));
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    release(); await mode; await rejection;
+    assert.equal(launches, 1);
+  } finally { release?.(); await suite.close(); }
+}));
+
 test("missing keys never replace existing data; saved profiles survive restart and omit local environment data", () => fixture(async ({ root, store, keys, secrets }) => {
   await store.initialize("personal"); const p = portableProfile(samplePlan()); p.credentials = "never-portable";
   await store.saveProfile("personal", p);

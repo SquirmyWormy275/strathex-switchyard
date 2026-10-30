@@ -66,3 +66,12 @@ commands uncertain. An exact late acknowledgement can resolve that old claim
 without refreshing the replacement session. It cannot poll the new session's
 commands. An unacknowledged claim remains uncertain after a lost response; the
 system does not infer success, retry the work, or invent an external cancellation.
+
+## Bundled process ownership
+
+The suite serializes concurrent starts of each bundled example and invalidates a
+pending start when its workspace is stopped. Enrollment arrives as a bounded JSON
+line on private stdin with `supervised: true`; that pipe stays open for the owner's
+lifetime. Both bundled examples exit on EOF, including abrupt parent loss while
+an HTTP request is pending. This is a lifecycle protocol for these fixed examples,
+not an OS containment claim or a way to kill an arbitrary external agent.
