@@ -81,7 +81,7 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if (platform === "win32") {
     if (!windowsHotkeys) throw new Error("The Windows suite bundle requires the built native hotkey helper.");
     inputs.set("runtime/hotkeys/Switchyard.Hotkeys.exe", await bytes(await realpath(windowsHotkeys)));
-    for (const name of ["apps/desktop-hotkeys/Program.cs", "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"]) await add(name);
+    for (const name of ["apps/desktop-hotkeys/Program.cs", "apps/desktop-hotkeys/RuntimeCommandRunner.cs", "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"]) await add(name);
     for (const name of await walk(join(sourceRoot, "deployment/windows/licenses"))) await add(`deployment/windows/licenses/${name}`);
   }
   const files = [...inputs].map(([path, b]) => ({ path, size: b.length, sha256: hash(b) }));

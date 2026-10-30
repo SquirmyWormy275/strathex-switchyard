@@ -5,7 +5,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-// Current-user hotkeys only. No shell, arbitrary executable or input injection.
+// Default mode: current-user closed hotkey intents, with no shell or input injection.
+// The separate private runtime guardian mode is used only by the native installer.
 internal static class Program
 {
     private const uint WmHotkey = 0x0312, WmControl = 0x8001, WmQuit = 0x0012;
@@ -104,8 +105,10 @@ internal static class Program
         }
         catch { Write(new { @event = "intent-result", bindingId = binding.Id, acknowledged = false, taskCompletionVerified = false }); }
     }
-    public static int Main()
+    public static int Main(string[] args)
     {
+        if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();
+        if (args.Length != 0) return 2;
         if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("Windows hotkeys require an interactive Windows user session."); return 2; }
         var first = Console.ReadLine(); if (first is null || first.Length > 8192) return 2;
         using var initialization = JsonDocument.Parse(first);

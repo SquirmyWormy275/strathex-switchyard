@@ -117,6 +117,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/windows-host.test.mjs" },
   { file: "tools/layout-studio/state-lock.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/runtime-command.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 8 } : {}) },
   { file: "tools/layout-studio/private-fs.test.mjs" },
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
