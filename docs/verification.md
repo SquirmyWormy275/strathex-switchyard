@@ -7,7 +7,8 @@ for coverage, and the [continuation record](switchyard-status.md) for details.
 
 | Path | Accepted evidence | Practical limit |
 | --- | --- | --- |
-| Integrated Linux source | 120/120 groups; 864 tests, 855 passed and nine platform skips at `468b9ac`. Receipt `a118038d-3ce9-4fa8-af43-ee3dc6f07b6e`. | Synthetic boundary checks plus native Linux subprocesses; Windows cases are separate. |
+| Integrated Linux source | 120/120 groups; 869 tests, 860 passed and nine platform skips at `9781e6c`. Receipt `dfd60a04-a929-4351-ad96-e24ad2a96765`. | Synthetic boundary checks plus native Linux subprocesses; Windows cases are separate. |
+| Installed configuration designer | Seven checks: two validated native replies in the same conversation, distinct independently stopped guardians, protected account/ownership records, authentication, keyboard-only cleanup and preserved definitions. | Synthetic supplied context only; tools/hooks/MCP disabled, untrusted proposals independently checked. No keyboard mutation or coding-task completion claim. |
 | Installed host lock indicators | Four checks: authenticated route, independent Linux kernel readback, rejection without credentials and preserved workspace state. | No physical keyboard association or LED change; Windows reports only its calling-thread toggle snapshot. |
 | Consented matrix backend | Ten fault tests plus six installed rejection checks: explicit one-use consent, policy, physical unlock, scope, capture bounds, stop, late responses and relock. | No HID opened by the installed demonstration. Physical typing/unlock/relock acceptance and frontend controls remain open. |
 | Normal installed Codex task | Seven checks rerun after the shared recovery changes: one reviewed native reply, exact turn acknowledgement, durable duplicates, replay rejection and keyboard-only cleanup. | Read-only/restricted text task; provider completion is not verified coding-task completion. |

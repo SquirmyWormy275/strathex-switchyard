@@ -1512,5 +1512,12 @@ Four additional tests cover pre-start durable scope, full-board continuation,
 cancelled late output, restart/retention and oversized context. All 42 affected
 designer/text/suite/binding checks and typecheck pass. The installed API journey
 now checks two synthetic replies, distinct exited guardians, protected ownership,
-authentication, keyboard-only cleanup and preserved definitions. Its actual run
-is next; no Windows native agent/account acceptance is inferred.
+authentication, keyboard-only cleanup and preserved definitions. That normal
+installed journey passed all seven checks with two tiny synthetic prompts;
+receipt installed-claude-design-1793386347178.json. Both model guardians were
+independently verified exited; only the verified test conversation was removed.
+No keyboard write, external-session stop or personal definition change occurred.
+Complete Linux acceptance at `9781e6c`: 120/120 groups, 869 tests, 860 passed and
+nine platform skips; receipt dfd60a04-a929-4351-ad96-e24ad2a96765. The normal update
+preserved the frozen frontend and removed its disposable bundle. No Windows
+native agent/account acceptance is inferred.
