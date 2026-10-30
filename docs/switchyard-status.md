@@ -795,3 +795,16 @@ Dvorak/opaque retention and paired matrix identity. Typecheck and canonical
 catalog checks pass. New integrated verification and normal installed update
 follow. The frozen frontend is unchanged; its source/adoption controls and
 physical keyboard/pairing acceptance remain pending.
+
+The integrated adoption checkpoint **92022c5** passes **111 Linux groups, 783
+tests: 774 passed and 9 expected platform skips**, receipt
+`d99b9e9d-81c4-486d-bdb2-f8b4327a03a7`. It is now the normal installed backend,
+release `271ab5fc0f7b42e42408dded3653c9f1424afe7f3918c5cbd6e762fd2c84cf45`.
+Six normal update/HTTP checks passed in private receipt
+`assignment-legends-1793371935262.json`: saved definitions/package/modes/private
+link and exact frozen Home were preserved, all export formats matched source,
+and unauthenticated export was rejected. The disposable bundle was removed.
+The installed current/rollback program pair is about **8.3 MiB**. No runtime/model
+copy or new dependency was added. The corrected Windows `51a8996` native backend,
+source-checkout, real helper/guardian and packaging steps have passed; complete
+release verification is still running. Newer adoption checks await their turn.
