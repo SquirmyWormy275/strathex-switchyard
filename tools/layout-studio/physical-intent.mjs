@@ -10,7 +10,11 @@ export function closedIntent(value) {
 }
 export function intentArguments(value) { const v = closedIntent(value); return ["intent", v.implementation, ...(v.roleId ? [v.roleId, v.intent] : [])]; }
 export const intentKey = (value) => createHash("sha256").update(JSON.stringify(closedIntent(value))).digest("hex");
-export function runtimeDirectory() { if (!process.env.XDG_RUNTIME_DIR) throw new Error("The private session runtime directory is unavailable. Start Switchyard in the desktop session."); return join(process.env.XDG_RUNTIME_DIR, "switchyard-studio"); }
+export function runtimeDirectory() {
+  if (process.platform === "win32" && process.env.LOCALAPPDATA) return join(process.env.LOCALAPPDATA, "strathex-switchyard/runtime");
+  if (!process.env.XDG_RUNTIME_DIR) throw new Error("The private session runtime directory is unavailable. Start Switchyard in the desktop session.");
+  return join(process.env.XDG_RUNTIME_DIR, "switchyard-studio");
+}
 /** Preserve an open review tab's access across backend restarts in this login. */
 export async function reviewAccessToken({ root = runtimeDirectory(), port, review, processExists = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { if (e.code === "ESRCH") return false; throw e; } } }) {
   if (!Number.isSafeInteger(port) || port < 1024 || port > 65535 || !/^[a-f0-9]{64}$/.test(review)) throw new Error("The review identity or port is invalid.");

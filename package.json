@@ -23,6 +23,7 @@
     "catalog:export": "node scripts/export-model-f-presets.mjs",
     "review:prepare": "node scripts/prepare-switchyard-review.mjs",
     "review:serve": "node scripts/serve-switchyard-review.mjs",
+    "suite:package": "node scripts/build-switchyard-suite.mjs",
     "runtime:check": "node scripts/setup-switchyard-runtime.mjs --check",
     "runtime:install": "node scripts/setup-switchyard-runtime.mjs --install",
     "runtime:verify-fresh": "node scripts/verify-switchyard-runtime.mjs",

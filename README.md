@@ -31,6 +31,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   proposal, review an exact local connection, and restore a change.
 - [Optional local runtime](docs/optional-runtime.md): install or verify the shared
   CPU voice, configuration HID and LangChain environment from pinned hashes.
+- [Application packaging](docs/suite-installation.md): build the private suite
+  directory, verify its contents and run it independently of the checkout.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
   bindings](docs/claude-task-bindings.md): exact native identities, actual host
   evidence and the controls still being implemented.

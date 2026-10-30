@@ -95,6 +95,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "deployment/suite/release.test.mjs" },
   { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
@@ -189,7 +190,7 @@ function testCounts(output, isTestRun) {
 
 const manifestRoots = [
   "packages/control-plane/test", "packages/protocol/test", "apps/windows-companion/test",
-  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "tools/layout-studio", "scripts", "firmware"
+  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "tools/layout-studio", "scripts", "firmware", "deployment/suite"
 ];
 const portable = (value) => value.replaceAll("\\", "/");
 export function discoverRequiredTestFiles(cwd = root) {

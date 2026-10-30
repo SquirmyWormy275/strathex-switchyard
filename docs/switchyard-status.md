@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **93/93 groups passed; 645 tests, 636 passed and 9
+- Integrated native Linux run: **94/94 groups passed; 648 tests, 639 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-37c6cc17-5e35-448e-8609-0fd10d24a24f.json`.
+  `.sxsy-verification/isolated-test-a75213ca-2fe8-4728-8e54-b32287baaee4.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -249,6 +249,18 @@ session control beyond configuration conversations; expanded layer/macro editing
 editing; Windows interactive acceptance and packaging; install/update/rollback/uninstall and
 a normal launcher; child supervision; profile-library visual acceptance; runtime update/recovery lifecycle; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.
+
+The integrated suite now has a small, manifest-verified bundle builder and a
+standalone runner independent of VS Code or the source checkout. Frozen frontend
+bytes are reproducible from commit `e052a88` with the original review digest;
+backend modules remain separate. The actual bundled server runs in tests, and
+changed/missing/extra files and platform/content mismatches are rejected. Only
+selected tracked source enters the bundle. Accounts, protected state, models,
+Python environments and npm dependencies are excluded. Both CI lanes now build
+private platform packages; the Windows package requires its built native hotkey
+helper and includes its source/runtime licenses. This is unsigned development
+packaging; normal launch, installation and version lifecycle remain unfinished.
+See [build/run details](suite-installation.md).
 
 ## Branch and handover
 

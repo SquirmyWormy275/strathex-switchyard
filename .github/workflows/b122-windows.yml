@@ -55,6 +55,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $tests = @(Get-ChildItem -LiteralPath '.\tools\layout-studio' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
+          $tests += @(Get-ChildItem -LiteralPath '.\deployment\suite' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
           if ($tests.Count -lt 10) { throw 'The expected Switchyard backend tests are missing.' }
           & node --test --test-concurrency=2 @tests
           if ($LASTEXITCODE -ne 0) { throw 'The native Windows Switchyard backend tests failed.' }
@@ -106,6 +107,22 @@ jobs:
         with:
           name: switchyard-windows-hotkeys-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-windows-hotkeys
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Package the integrated suite with its native helper and unchanged frontend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node .\scripts\build-switchyard-suite.mjs "--windows-hotkeys=$exe"
+          if ($LASTEXITCODE -ne 0) { throw 'The integrated suite package did not verify.' }
+
+      - name: Retain the private Windows suite bundle for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-suite-windows-${{ github.sha }}
+          path: artifacts/switchyard-suite
           if-no-files-found: error
           retention-days: 7
 
