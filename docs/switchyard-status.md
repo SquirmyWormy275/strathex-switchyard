@@ -471,3 +471,26 @@ created no thread and submitted no model prompt. Private receipt:
 Windows CI for this source, actual Windows installed-CLI/account acceptance,
 window focus and broader task execution controls remain separate open checks.
 See [exact task bindings](coding-task-bindings.md).
+
+
+## Complete Windows release and current installed pilot
+
+The **complete Windows release passed** at `29b8e47` on run `41047167365`:
+208 passing test/build groups, zero failed groups. Receipt ID:
+`530d5d62-e31f-47c6-8a7e-b0d7f1be9333`. This includes the formerly failing
+installed-runtime alias, Windows PowerShell 5.1/pwsh bootstrap and installed
+Compound Refresh effect checks. The native read-only helper also verified a real
+foreground category (`other`), rejected registration and exited with zero owned
+bindings. This is software/native-runner evidence, not interactive Windows device,
+account, microphone or user-window acceptance. The newer profile and Codex
+transport checkpoints require their own native rerun; the next run is queued.
+
+At `2026-10-30T11:44:02.867495+00:00`, the normal pilot command updated to source `036c70e`,
+release `4fdac2c7d43449404662488a1e65cecf58b11f45ceb808bc053dd670370ade40`. Mutual instance proof, v2 package preservation,
+keyboard-only validation mode, unchanged Personal definitions and the exact
+frozen Home hash all passed. The existing private review URL was retained.
+Live configuration-interface inventory returned **zero**; no HID write was
+attempted. Private receipt:
+`runtime-verification/installed-update-1793360642868.json`.
+The verified disposable bundle was removed. Only the current program and one
+rollback copy remain; optional runtime and protected data were reused.
