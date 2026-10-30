@@ -71,3 +71,21 @@ resolve selected versions and disable bytecode writes. Actual pilot adoption and
 native Windows lifecycle acceptance are tracked separately in the
 [implementation evidence](switchyard-status.md). A working runtime is never
 rebuilt merely to demonstrate an installer.
+
+## Private text input for native providers
+
+The guardian protocol now supports an optional maximum 12,000-byte UTF-8 stdin
+payload and explicitly requested diagnostics capped at 16 KiB. Text travels in
+private pipes, never a process argument or log. Readiness must advertise these
+capabilities before the parent may acknowledge start; older helpers cannot
+silently ignore the input contract. Default installer calls still return bounded
+stdout and discard stderr. Detailed callers receive verified exit/status and
+bounded output in memory, including unsuccessful native exits.
+
+Abort signals close the owner lifeline. Linux session cleanup and the Windows Job
+Object contain owned descendants; this is not a general OS sandbox or proof that
+a deliberately detached Linux process could not escape. Linux tests cover exact
+multibyte input, a nonzero exit with opt-in diagnostics, cancellation, output
+overflow and owner loss. The updated helper builds without warnings; actual
+Windows stdin/diagnostic tests await its next native CI run. Wiring the provider
+text path and durable recovery scope into this transport is the next step.

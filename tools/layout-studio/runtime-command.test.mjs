@@ -37,6 +37,31 @@ test("Windows runtime guardian accepts standard x86 program-directory coordinate
 test("runtime guardian reports a verified nonzero exit without returning sensitive stderr", { skip }, async () => {
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stderr.write('synthetic-secret');process.exit(17)"], options), (error) => { assert.match(error.message, /failed/); assert.ok(!error.message.includes("synthetic-secret")); assert.notEqual(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true; });
 });
+test("reviewed native text crosses only a bounded UTF-8 pipe after guardian readiness, with diagnostics explicitly private", { skip }, () => fixture(async (root) => {
+  const marker = join(root, "ran"), inputText = "Synthetic private text: café\n" + "界".repeat(3000); let scope;
+  const code = `let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',b=>input+=b);process.stdin.on('end',()=>{require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write('synthetic-diagnostic');process.stdout.write(JSON.stringify({input,argv:process.argv.slice(1)}));process.exitCode=7})`;
+  const result = await runRuntimeCommand(process.execPath, ["-e", code], { ...options, inputText, captureStderrBytes: 128, detailed: true, onGuardianReady: async (frame) => { scope = frame; assert.ok(frame.capabilities.includes("bounded-stdin")); assert.equal(JSON.stringify(frame).includes(inputText), false); await assert.rejects(readFile(marker), { code: "ENOENT" }); } });
+  assert.equal(result.exitCode, 7); assert.equal(result.status, "failed"); assert.equal(result.treeExitVerified, true); assert.equal(result.inputDelivered, true); assert.equal(result.stderr, "synthetic-diagnostic"); assert.deepEqual(JSON.parse(result.stdout), { input: inputText, argv: [] }); assert.equal(await runtimeGuardianStopped(scope, options), true);
+}));
+test("a pre-cancelled or oversized native input cannot start an owned guardian", { skip }, async () => {
+  const controller = new AbortController(); controller.abort(); let started = false;
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, signal: controller.signal, onGuardianChild: () => { started = true; } }), /cancelled before startup/);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(4001), onGuardianChild: () => { started = true; } }), /bounded private input/);
+  assert.equal(started, false);
+});
+test("cancelling a private input turn stops its native command and descendant under the same guardian", { skip }, () => fixture(async (root) => {
+  const marker = join(root, "pids"), controller = new AbortController(); let scope;
+  const code = `process.stdin.resume();process.stdin.on('end',()=>{const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify([process.pid,c.pid]));setInterval(()=>{},1000)})`;
+  const pending = runRuntimeCommand(process.execPath, ["-e", code], { ...options, inputText: "Synthetic", signal: controller.signal, onGuardianReady: frame => { scope = frame; } });
+  const outcome = pending.catch(e => e), pids = await waitFor(async () => JSON.parse(await readFile(marker, "utf8"))); controller.abort();
+  assert.match((await outcome).message, /Cancellation/);
+  for (const pid of pids) await waitFor(() => gone(pid));
+  await waitFor(() => runtimeGuardianStopped(scope, options));
+}));
+test("explicit native diagnostics remain bounded and overflow contains the owned command", { skip }, async () => {
+  const r = await runRuntimeCommand(process.execPath, ["-e", "process.stderr.write('x'.repeat(100000));setInterval(()=>{},1000)"], { ...options, captureStderrBytes: 64, detailed: true });
+  assert.equal(r.status, "output-limit"); assert.equal(r.treeExitVerified, true); assert.ok(Buffer.byteLength(r.stderr) <= 64);
+});
 test("runtime timeout contains an ignoring child and its descendant before rejecting", { skip }, () => fixture(async (root) => {
   const pidFile = join(root, "pids");
   const code = `const c=require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify("process.on('SIGTERM',()=>{});setInterval(()=>{},1000)")}],{stdio:'inherit'});require('node:fs').writeFileSync(${JSON.stringify(pidFile)},JSON.stringify([process.pid,c.pid]));process.on('SIGTERM',()=>{});setInterval(()=>{},1000)`;
@@ -52,7 +77,7 @@ test("successful runtime command contains a leftover descendant before claiming 
 test("loss of the installer owner stops its guardian, command and descendant", { skip }, () => fixture(async (root) => {
   const pids = join(root, "pids"), guardian = join(root, "guardian");
   const code = `const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});require('node:fs').writeFileSync(${JSON.stringify(pids)},JSON.stringify([process.pid,c.pid]));setInterval(()=>{},1000)`;
-  const wrapper = `import {runRuntimeCommand} from ${JSON.stringify(new URL("./runtime-command.mjs", import.meta.url).href)};import {runtimeEnvironment} from ${JSON.stringify(new URL("./runtime-setup.mjs", import.meta.url).href)};import {writeFile} from 'node:fs/promises';await runRuntimeCommand(process.execPath,['-e',${JSON.stringify(code)}],{...${JSON.stringify(windowsHelper ? { windowsHelper } : {})},env:runtimeEnvironment(),onGuardianReady:f=>writeFile(${JSON.stringify(guardian)},String(f.guardianPid))});`;
+  const wrapper = `import {runRuntimeCommand} from ${JSON.stringify(new URL("./runtime-command.mjs", import.meta.url).href)};import {runtimeEnvironment} from ${JSON.stringify(new URL("./runtime-setup.mjs", import.meta.url).href)};import {writeFile} from 'node:fs/promises';await runRuntimeCommand(process.execPath,['-e',${JSON.stringify(code)}],{...${JSON.stringify(windowsHelper ? { windowsHelper } : {})},inputText:'Synthetic owner-loss pipe',env:runtimeEnvironment(),onGuardianReady:f=>writeFile(${JSON.stringify(guardian)},String(f.guardianPid))});`;
   const owner = spawn(process.execPath, ["--input-type=module", "-e", wrapper], { env: runtimeEnvironment(), stdio: "ignore" });
   try {
     const owned = await waitFor(async () => JSON.parse(await readFile(pids, "utf8"))); const guardianPid = Number(await readFile(guardian, "utf8"));

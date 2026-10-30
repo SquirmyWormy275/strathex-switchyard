@@ -1,4 +1,4 @@
-/** Internal Linux installer guardian. Its own session anchors exact descendant ownership. */
+/** Internal Linux native-command guardian. Its session anchors descendant ownership. */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -39,12 +39,13 @@ async function stopMembers() {
 }
 async function run() {
   if (parentGone || started) return; started = true;
-  const chunks = []; let bytes = 0, status = "completed", timeout;
-  child = spawn("/usr/bin/setpriv", ["--no-new-privs", "--pdeathsig", "KILL", "--", process.execPath, fileURLToPath(new URL("./runtime-command-exec.mjs", import.meta.url)), String(process.pid), request.executable, JSON.stringify(request.args)], { cwd: request.cwd, env: request.environment, shell: false, detached: false, stdio: ["ignore", "pipe", "pipe"] });
+  const chunks = [], errors = []; let bytes = 0, stderrBytes = 0, status = "completed", timeout;
+  child = spawn("/usr/bin/setpriv", ["--no-new-privs", "--pdeathsig", "KILL", "--", process.execPath, fileURLToPath(new URL("./runtime-command-exec.mjs", import.meta.url)), String(process.pid), request.executable, JSON.stringify(request.args)], { cwd: request.cwd, env: request.environment, shell: false, detached: false, stdio: [request.inputBase64 !== undefined ? "pipe" : "ignore", "pipe", "pipe"] });
   let stopping;
   const stop = () => stopping ??= stopMembers().catch(() => loseParent());
   child.stdout.on("data", (b) => { bytes += b.length; if (bytes > request.maxOutputBytes) { if (status === "completed") { status = "output-limit"; void stop(); } } else chunks.push(b); });
-  child.stderr.on("data", () => {});
+  child.stderr.on("data", (b) => { if (!request.maxStderrBytes) return; stderrBytes += b.length; if (stderrBytes > request.maxStderrBytes) { if (status === "completed") { status = "output-limit"; void stop(); } } else errors.push(b); });
+  const supplied = request.inputBase64 === undefined ? Promise.resolve(true) : new Promise((resolve) => { child.stdin.on("error", () => resolve(false)); child.stdin.end(Buffer.from(request.inputBase64, "base64"), (error) => resolve(!error)); });
   const exited = new Promise((resolve) => { child.once("error", () => resolve(null)); child.once("exit", (code) => resolve(code)); });
   const drained = new Promise((resolve) => { child.once("error", resolve); child.once("close", resolve); });
   timeout = setTimeout(() => { if (status === "completed") status = "timed-out"; void stop(); }, request.timeoutMs);
@@ -54,7 +55,7 @@ async function run() {
   try { await Promise.race([drained, new Promise((_, reject) => { drainTimer = setTimeout(() => reject(new Error("Owned output pipe exit unconfirmed")), 3000); })]); } finally { clearTimeout(drainTimer); }
   if (status === "completed" && exitCode !== 0) status = "failed";
   finished = true;
-  await write({ schema: request.schema, id: request.id, event: "result", status, exitCode, stdout: Buffer.concat(chunks).toString("base64"), treeExitVerified, containment: "owned-linux-session" });
+  await write({ schema: request.schema, id: request.id, event: "result", status, exitCode, stdout: Buffer.concat(chunks).toString("base64"), stderr: Buffer.concat(errors).toString("base64"), inputDelivered: await supplied, treeExitVerified, containment: "owned-linux-session" });
   if (!treeExitVerified) process.kill(-process.pid, "SIGKILL");
   lines.removeAllListeners("close"); lines.close(); process.stdin.destroy();
   process.exit(treeExitVerified ? 0 : 3);
@@ -63,6 +64,7 @@ lines.on("line", (line) => { void (async () => {
   if (!request) {
     request = JSON.parse(line);
     const r = request;
+    if (r.inputBase64 !== undefined && (typeof r.inputBase64 !== "string" || Buffer.from(r.inputBase64, "base64").toString("base64") !== r.inputBase64 || Buffer.from(r.inputBase64, "base64").length > 12000) || r.maxStderrBytes !== undefined && (!Number.isSafeInteger(r.maxStderrBytes) || r.maxStderrBytes < 0 || r.maxStderrBytes > 16384)) throw new Error("Invalid bounded private command input");
     if (r.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(r.id) || !isAbsolute(r.executable) || !isAbsolute(r.cwd) || !/^[a-f0-9]{64}$/.test(r.executableSha256) || !Array.isArray(r.args) || r.args.length > 32 || r.args.some((a) => typeof a !== "string" || a.length > 8192 || /[\0\r\n]/.test(a)) || !Number.isSafeInteger(r.timeoutMs) || r.timeoutMs < 1 || r.timeoutMs > 600000 || !Number.isSafeInteger(r.maxOutputBytes) || r.maxOutputBytes < 1 || r.maxOutputBytes > 524288 || !r.environment || typeof r.environment !== "object" || Object.keys(r.environment).length > 64 || Object.entries(r.environment).some(([k,v]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) || typeof v !== "string" || v.length > 8192 || v.includes("\0"))) throw new Error("Invalid runtime command scope");
     const self = await readFile(`/proc/${process.pid}/stat`, "utf8"), fields = self.slice(self.lastIndexOf(") ") + 2).split(" ");
     if (+fields[2] !== process.pid || +fields[3] !== process.pid) throw new Error("The guardian has no private native session");
@@ -72,7 +74,7 @@ lines.on("line", (line) => { void (async () => {
     if (hash.digest("hex") !== r.executableSha256) throw new Error("Runtime executable identity changed");
     if (parentGone) return;
     ready = true;
-    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session" });
+    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session", capabilities: ["bounded-stdin", "bounded-stderr"] });
   } else {
     const ack = JSON.parse(line);
     if (!ready || started || ack.schema !== request.schema || ack.id !== request.id || ack.start !== true) throw new Error("Invalid runtime start acknowledgement");

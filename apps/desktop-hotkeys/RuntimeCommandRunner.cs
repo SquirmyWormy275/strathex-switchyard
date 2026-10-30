@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
 
-// Private stdio installer protocol, separate from all keyboard/window APIs.
+// Private stdio native-command protocol, separate from keyboard/window APIs.
 // Creation-time Job Object assignment prevents even a suspended orphan escaping
 // when the owner or this guardian disappears during CreateProcess.
 internal static class RuntimeCommandRunner
@@ -63,6 +63,15 @@ internal static class RuntimeCommandRunner
         if (args.ValueKind != JsonValueKind.Array || args.GetArrayLength() > 32) throw NativeError();
         string[] arguments = args.EnumerateArray().Select(a => a.GetString() ?? throw NativeError()).ToArray();
         if (arguments.Any(a => a.Length > 8192 || a.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)) throw NativeError();
+        byte[] inputBytes = Array.Empty<byte>();
+        if (request.TryGetProperty("inputBase64", out var inputValue))
+        {
+            string encoded = inputValue.GetString() ?? throw NativeError();
+            inputBytes = Convert.FromBase64String(encoded);
+            if (inputBytes.Length > 12000 || Convert.ToBase64String(inputBytes) != encoded) throw NativeError();
+        }
+        int stderrLimit = request.TryGetProperty("maxStderrBytes", out var stderrValue) ? stderrValue.GetInt32() : 0;
+        if (stderrLimit < 0 || stderrLimit > 16384) throw NativeError();
         var env = request.GetProperty("environment");
         if (env.ValueKind != JsonValueKind.Object || env.EnumerateObject().Count() > 64) throw NativeError();
         var environment = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -77,7 +86,7 @@ internal static class RuntimeCommandRunner
         using var executableLock = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (Convert.ToHexString(SHA256.HashData(executableLock)).ToLowerInvariant() != digest) throw NativeError();
         using var job = CreateJob(id);
-        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job" });
+        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stderr" } });
         using var ack = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         if (ack.RootElement.GetProperty("schema").GetString() != Schema || ack.RootElement.GetProperty("id").GetString() != id || !ack.RootElement.GetProperty("start").GetBoolean()) throw NativeError();
         _ = Task.Run(async () =>
@@ -98,7 +107,8 @@ internal static class RuntimeCommandRunner
             void Stop(string reason) { lock (Lifecycle) { if (status == "completed") status = reason; _ = TerminateJobObject(job, 124); } }
             using var timer = new Timer(_ => Stop("timed-out"), null, timeout, Timeout.Infinite);
             Task<byte[]> output = Drain(child.Output, limit, () => Stop("output-limit"));
-            Task<byte[]> errors = Drain(child.Error, 0, null);
+            Task<byte[]> errors = Drain(child.Error, stderrLimit, stderrLimit > 0 ? () => Stop("output-limit") : null);
+            Task<bool> supplied = SupplyInput(child.Input, inputBytes);
             uint exitCode = await Task.Run(() =>
             {
                 if (WaitForSingleObject(child.Process, uint.MaxValue) != 0 || !GetExitCodeProcess(child.Process, out uint code)) throw NativeError();
@@ -111,9 +121,15 @@ internal static class RuntimeCommandRunner
             if (ActiveProcesses(job) != 0) throw NativeError();
             await Task.WhenAll(output, errors).WaitAsync(TimeSpan.FromSeconds(3));
             lock (Lifecycle) { if (ParentGone) throw NativeError(); if (status == "completed" && exitCode != 0) status = "failed"; }
-            Write(new { schema = Schema, id, @event = "result", status, exitCode, stdout = Convert.ToBase64String(await output), treeExitVerified = true, containment = "windows-job" });
+            Write(new { schema = Schema, id, @event = "result", status, exitCode, stdout = Convert.ToBase64String(await output), stderr = Convert.ToBase64String(await errors), inputDelivered = await supplied, treeExitVerified = true, containment = "windows-job" });
             return 0;
         }
+    }
+    private static async Task<bool> SupplyInput(Stream input, byte[] bytes)
+    {
+        try { await input.WriteAsync(bytes.AsMemory()); return true; }
+        catch (IOException) { return false; }
+        finally { input.Dispose(); }
     }
     private static async Task<byte[]> Drain(Stream stream, int limit, Action? overflow)
     {
@@ -135,32 +151,30 @@ internal static class RuntimeCommandRunner
     }
     private static Started Start(string executable, string[] args, string cwd, SortedDictionary<string, string> environment, SafeJobHandle job)
     {
-        IntPtr outputRead = IntPtr.Zero, outputWrite = IntPtr.Zero, errorRead = IntPtr.Zero, errorWrite = IntPtr.Zero;
+        IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, outputRead = IntPtr.Zero, outputWrite = IntPtr.Zero, errorRead = IntPtr.Zero, errorWrite = IntPtr.Zero;
         IntPtr attributes = IntPtr.Zero, handles = IntPtr.Zero, jobs = IntPtr.Zero, env = IntPtr.Zero;
         bool initialized = false, transferred = false;
         try
         {
             var security = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Inherit = true };
-            if (!CreatePipe(out outputRead, out outputWrite, ref security, 0) || !CreatePipe(out errorRead, out errorWrite, ref security, 0) || !SetHandleInformation(outputRead, 1, 0) || !SetHandleInformation(errorRead, 1, 0)) throw NativeError();
-            using SafeFileHandle input = CreateFileW("NUL", 0x80000000, 3, IntPtr.Zero, 3, 0x80, IntPtr.Zero);
-            if (input.IsInvalid || !SetHandleInformation(input.DangerousGetHandle(), 1, 1)) throw NativeError();
+            if (!CreatePipe(out inputRead, out inputWrite, ref security, 0) || !CreatePipe(out outputRead, out outputWrite, ref security, 0) || !CreatePipe(out errorRead, out errorWrite, ref security, 0) || !SetHandleInformation(inputWrite, 1, 0) || !SetHandleInformation(outputRead, 1, 0) || !SetHandleInformation(errorRead, 1, 0)) throw NativeError();
             var size = IntPtr.Zero; _ = InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref size);
             attributes = Marshal.AllocHGlobal(size);
             if (!InitializeProcThreadAttributeList(attributes, 2, 0, ref size)) throw NativeError();
             initialized = true;
             handles = Marshal.AllocHGlobal(IntPtr.Size * 3); jobs = Marshal.AllocHGlobal(IntPtr.Size);
-            Marshal.WriteIntPtr(handles, 0, input.DangerousGetHandle()); Marshal.WriteIntPtr(handles, IntPtr.Size, outputWrite); Marshal.WriteIntPtr(handles, IntPtr.Size * 2, errorWrite); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
+            Marshal.WriteIntPtr(handles, 0, inputRead); Marshal.WriteIntPtr(handles, IntPtr.Size, outputWrite); Marshal.WriteIntPtr(handles, IntPtr.Size * 2, errorWrite); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
             if (!UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x20002), handles, new IntPtr(IntPtr.Size * 3), IntPtr.Zero, IntPtr.Zero) || !UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000D), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero)) throw NativeError();
-            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Flags = 0x100, Input = input.DangerousGetHandle(), Output = outputWrite, Error = errorWrite }, Attributes = attributes };
+            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Flags = 0x100, Input = inputRead, Output = outputWrite, Error = errorWrite }, Attributes = attributes };
             env = Marshal.StringToHGlobalUni(string.Join('\0', environment.Select(e => e.Key + "=" + e.Value)) + "\0\0");
             if (!CreateProcessW(executable, new StringBuilder(string.Join(' ', new[] { executable }.Concat(args).Select(Quote))), IntPtr.Zero, IntPtr.Zero, true, 0x4 | 0x8000000 | 0x400 | 0x80000, env, cwd, ref startup, out var process)) throw NativeError();
             transferred = true;
-            return new Started(new SafeFileHandle(process.Process, true), new SafeFileHandle(process.Thread, true), new FileStream(new SafeFileHandle(outputRead, true), FileAccess.Read, 4096, false), new FileStream(new SafeFileHandle(errorRead, true), FileAccess.Read, 4096, false));
+            return new Started(new SafeFileHandle(process.Process, true), new SafeFileHandle(process.Thread, true), new FileStream(new SafeFileHandle(inputWrite, true), FileAccess.Write, 4096, false), new FileStream(new SafeFileHandle(outputRead, true), FileAccess.Read, 4096, false), new FileStream(new SafeFileHandle(errorRead, true), FileAccess.Read, 4096, false));
         }
         finally
         {
-            if (outputWrite != IntPtr.Zero) CloseHandle(outputWrite); if (errorWrite != IntPtr.Zero) CloseHandle(errorWrite);
-            if (!transferred) { if (outputRead != IntPtr.Zero) CloseHandle(outputRead); if (errorRead != IntPtr.Zero) CloseHandle(errorRead); }
+            if (inputRead != IntPtr.Zero) CloseHandle(inputRead); if (outputWrite != IntPtr.Zero) CloseHandle(outputWrite); if (errorWrite != IntPtr.Zero) CloseHandle(errorWrite);
+            if (!transferred) { if (inputWrite != IntPtr.Zero) CloseHandle(inputWrite); if (outputRead != IntPtr.Zero) CloseHandle(outputRead); if (errorRead != IntPtr.Zero) CloseHandle(errorRead); }
             if (initialized) DeleteProcThreadAttributeList(attributes);
             if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (handles != IntPtr.Zero) Marshal.FreeHGlobal(handles); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); if (env != IntPtr.Zero) Marshal.FreeHGlobal(env);
         }
@@ -181,7 +195,7 @@ internal static class RuntimeCommandRunner
         try { if (!QueryInformationJobObject(job, 1, pointer, (uint)Marshal.SizeOf<Accounting>(), IntPtr.Zero)) throw NativeError(); return Marshal.PtrToStructure<Accounting>(pointer).Active; }
         finally { Marshal.FreeHGlobal(pointer); }
     }
-    private sealed record Started(SafeFileHandle Process, SafeFileHandle Thread, FileStream Output, FileStream Error) : IDisposable { public void Dispose() { Output.Dispose(); Error.Dispose(); Thread.Dispose(); Process.Dispose(); } }
+    private sealed record Started(SafeFileHandle Process, SafeFileHandle Thread, FileStream Input, FileStream Output, FileStream Error) : IDisposable { public void Dispose() { Input.Dispose(); Output.Dispose(); Error.Dispose(); Thread.Dispose(); Process.Dispose(); } }
     private sealed class SafeJobHandle : SafeHandleZeroOrMinusOneIsInvalid { private SafeJobHandle() : base(true) {} protected override bool ReleaseHandle() => CloseHandle(handle); }
     [StructLayout(LayoutKind.Sequential)] private struct SecurityAttributes { public int Length; public IntPtr Descriptor; [MarshalAs(UnmanagedType.Bool)] public bool Inherit; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct StartupInfo { public int Size; public string? Reserved, Desktop, Title; public uint X, Y, XSize, YSize, XCount, YCount, Fill, Flags; public ushort Show, ReservedSize; public IntPtr ReservedPointer, Input, Output, Error; }

@@ -1230,3 +1230,22 @@ implement supported exact native client attachment and authority mediation;
 complete the remaining verified controller controls and expose the accumulated
 backend controls after the frozen frontend review. Native Windows fresh-runtime
 acceptance is being monitored separately.
+
+## Native Windows runtime accepted; private provider transport checkpoint
+
+The corrected fresh Windows runtime check at 222dfca passed in run 41097396455.
+The retained native receipt independently confirms Python 3.12.14, 49 exact
+distributions, no extras, CPU model load, same-release independent recheck and
+removal of the disposable runtime. Artifact 12998575101 is a 760-byte ZIP; its
+verified SHA-256 is
+921808014e9dcc5e19f637cf4e0bfb88531c4f7313213d69304eeef302060f24.
+A small receipt copy is retained privately as windows-fresh-runtime-222dfca.json.
+The full release check is still running; microphone/device/account acceptance
+is not inferred. No new runtime/model copy was placed on the pilot.
+
+The native guardian now has a private bounded text-input/diagnostic contract for
+provider turns, capability-gated before start acknowledgement, with AbortSignal
+cleanup. Fifteen applicable runtime/guardian checks pass on Linux; one Windows
+environment-block case awaits native CI. The helper builds with zero warnings
+and errors. This is the transport foundation; Claude reviewed-task integration
+and durable guardian recovery are still being implemented.

@@ -1,4 +1,4 @@
-/** Private command supervision. Callers construct only fixed runtime installer/probe commands. */
+/** Private native command supervision. Callers construct fixed installer/provider commands. */
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -33,16 +33,19 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   if (code !== 0 || error) { await stopOwnedChild(child); return false; }
   try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.activeProcesses === 0; } catch { return false; }
 }
-export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
+export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, captureStderrBytes = 0, detailed = false, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
   if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288) throw new Error("Choose a supported, bounded runtime operation.");
+  if (inputText !== undefined && (typeof inputText !== "string" || Buffer.byteLength(inputText) > 12000 || inputText.includes("\0")) || !Number.isSafeInteger(captureStderrBytes) || captureStderrBytes < 0 || captureStderrBytes > 16384 || typeof detailed !== "boolean") throw new Error("Choose a bounded private input and diagnostic contract.");
+  const checkAbort = () => { if (signal?.aborted) throw Object.assign(new Error("The owned native command was cancelled before startup."), { code: "CANCELLED" }); }; checkAbort();
   const resolved = await realpath(executable), digest = createHash("sha256");
   for await (const chunk of createReadStream(resolved)) digest.update(chunk);
   // Hash the native target but preserve the invocation path: Python locates
   // pyvenv.cfg beside its venv alias, and argv[0] is meaningful to native tools.
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes };
-  if (Buffer.byteLength(JSON.stringify(request)) > 65536) throw new Error("The fixed runtime request exceeds its protocol bound.");
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(inputText !== undefined ? { inputBase64: Buffer.from(inputText).toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
+  if (Buffer.byteLength(JSON.stringify(request)) > 60000) throw new Error("The fixed runtime request exceeds its protocol bound.");
+  checkAbort();
   const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
-  let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting;
+  let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting, guardianFrame;
   let resolveAbort; const aborted = new Promise((r) => { resolveAbort = r; });
   const fail = (message) => {
     failure ??= new Error(message); child.stdin.end();
@@ -71,6 +74,8 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
       if (frame.event === "ready" && !ready) {
         ready = true; clearTimeout(readiness);
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
+        if ((inputText !== undefined && !frame.capabilities?.includes("bounded-stdin")) || (captureStderrBytes && !frame.capabilities?.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
+        guardianFrame = frame;
         guardianBirth = frame.birth;
         pendingReady = Promise.resolve().then(() => onGuardianReady(frame)).then(() => { readyCommitted = true; if (!failure && child.exitCode === null && child.signalCode === null) { acknowledged = true; child.stdin.write(JSON.stringify({ schema: request.schema, id: request.id, start: true }) + "\n"); } }).catch(() => { readyCommitted = true; fail("The runtime start acknowledgement was not committed."); });
       } else if (frame.event === "result" && acknowledged && !result && ["completed", "failed", "timed-out", "output-limit"].includes(frame.status) && (frame.exitCode === null || Number.isSafeInteger(frame.exitCode) && frame.exitCode >= 0 && frame.exitCode <= 0xffffffff) && typeof frame.stdout === "string") result = frame;
@@ -78,12 +83,19 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
     }
   });
   const closed = new Promise((resolve) => { child.once("error", () => { failure ??= new Error("The native runtime guardian is unavailable."); resolve({ code: null }); }); child.once("close", (code, signal) => resolve({ code, signal })); });
-  child.stdin.write(JSON.stringify(request) + "\n");
+  const cancelled = () => { fail("Cancellation requested for this exact owned native command."); failure.code ??= "CANCELLED"; };
+  signal?.addEventListener("abort", cancelled, { once: true });
+  try { onGuardianChild(child); if (signal?.aborted) cancelled(); if (!failure) child.stdin.write(JSON.stringify(request) + "\n"); } catch { fail("The owned native guardian could not be registered before startup."); }
   const exit = await Promise.race([closed, aborted]); clearTimeout(deadline); clearTimeout(readiness);
+  signal?.removeEventListener("abort", cancelled);
   if (failure) { if (exit.stopUnconfirmed || pendingReady && !readyCommitted || acknowledged && !result?.treeExitVerified) failure.code = "RUNTIME_STOP_UNCONFIRMED"; throw failure; }
   if (exit.code !== 0 || !result?.treeExitVerified) throw Object.assign(new Error("Runtime worker exit could not be fully verified. Preserve its staging/recovery state."), { code: "RUNTIME_STOP_UNCONFIRMED" });
-  if (result.status !== "completed" || result.exitCode !== 0) throw new Error(`The optional runtime operation ${result.status === "timed-out" ? "timed out" : result.status === "output-limit" ? "exceeded its output bound" : "failed"}. Existing components were preserved.`);
+  if (!detailed && (result.status !== "completed" || result.exitCode !== 0)) throw new Error(`The optional runtime operation ${result.status === "timed-out" ? "timed out" : result.status === "output-limit" ? "exceeded its output bound" : "failed"}. Existing components were preserved.`);
   const bytes = Buffer.from(result.stdout, "base64");
   if (bytes.toString("base64") !== result.stdout || bytes.length > maxOutputBytes) throw new Error("Invalid bounded runtime output.");
-  return bytes.toString("utf8");
+  if (inputText !== undefined && result.inputDelivered !== true) throw new Error("The exact native input was not fully delivered. Its outcome remains unconfirmed.");
+  if (!detailed) return bytes.toString("utf8");
+  const errors = Buffer.from(result.stderr ?? "", "base64");
+  if (errors.toString("base64") !== (result.stderr ?? "") || errors.length > captureStderrBytes) throw new Error("Invalid bounded private diagnostic output.");
+  return { status: result.status, exitCode: result.exitCode, stdout: bytes.toString("utf8"), stderr: errors.toString("utf8"), inputDelivered: result.inputDelivered === true, treeExitVerified: true, guardian: guardianFrame };
 }

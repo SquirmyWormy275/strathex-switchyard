@@ -106,5 +106,11 @@ or provider account is opened.
 software/model stage after verified exit and preserves recovery data if the
 native guardian is uncertain. CI retains only that receipt for seven days; it does
 not upload the environment or model. The orchestration/recovery tests pass; the
-fresh native Windows result is pending its CI run. This work does not download a
+fresh native Windows check passed at 222dfca in run 41097396455: Python
+3.12.14, 49 exact distributions, no extras, CPU model loaded, a second check of
+the same release, and removal of the disposable runtime. The bounded receipt
+artifact is 12998575101 (760-byte ZIP), SHA-256
+`921808014e9dcc5e19f637cf4e0bfb88531c4f7313213d69304eeef302060f24`.
+This accepts native installation/import/model behavior; microphone, device and
+interactive desktop acceptance remain separate. This work does not download a
 second runtime onto the pilot workstation.
