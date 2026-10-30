@@ -1,4 +1,5 @@
 /** Offline planning model. It never emits firmware, OS shortcuts, or host actions. */
+import { outlinePoints } from "./geometry.mjs";
 export const profileSchema = "sxsy-board-profile/v1";
 export const planSchema = "sxsy-agentic-layout-plan/v1";
 export const modifiers = Object.freeze([
@@ -65,9 +66,22 @@ export function parseBoardProfile(input) {
     const y = finite(item.y, `Key ${id} y`, 0, 256);
     const w = finite(item.w ?? 1, `Key ${id} width`, 0.25, 16);
     const h = finite(item.h ?? 1, `Key ${id} height`, 0.25, 16);
-    return Object.freeze({ id, label, matrix: Object.freeze([row, column]), x, y, w, h, baseKeycode: keycode(item.baseKeycode) });
+    const geometry = {};
+    if (item.rotation !== undefined) geometry.rotation = finite(item.rotation, `Key ${id} rotation`, -180, 180);
+    if (item.shape !== undefined) {
+      if (!Array.isArray(item.shape) || item.shape.length < 1 || item.shape.length > 2) throw new Error("A key shape needs one or two connected rectangles.");
+      geometry.shape = Object.freeze(item.shape.map((r) => {
+        const x = finite(r.x, "Shape x", 0, w), y = finite(r.y, "Shape y", 0, h), rw = finite(r.w, "Shape width", .25, w), rh = finite(r.h, "Shape height", .25, h);
+        if (x + rw > w + 1e-6 || y + rh > h + 1e-6) throw new Error("A key shape exceeds its bounding box.");
+        return Object.freeze({ x, y, w: rw, h: rh });
+      }));
+      outlinePoints({ w, h, shape: geometry.shape });
+    }
+    return Object.freeze({ id, label, matrix: Object.freeze([row, column]), x, y, w, h, ...geometry, baseKeycode: keycode(item.baseKeycode) });
   });
-  return Object.freeze({ schema: profileSchema, name, layout, qmkKeyboard, controller, source: source.source === "qmk-info" ? "qmk-info" : "manual", keys: Object.freeze(keys) });
+  const evidence = {};
+  if (source.evidence !== undefined) { if (!["source-reference", "saved-snapshot", "device-read"].includes(source.evidence)) throw new Error("Unknown typing-layer evidence."); evidence.evidence = source.evidence; }
+  return Object.freeze({ schema: profileSchema, name, layout, qmkKeyboard, controller, source: source.source === "qmk-info" ? "qmk-info" : "manual", ...evidence, keys: Object.freeze(keys) });
 }
 
 /** QMK info.json provides geometry and matrix identity, not the user's typing layer. */

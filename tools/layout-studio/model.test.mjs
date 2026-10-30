@@ -110,7 +110,7 @@ test("studio serves only fixed local assets over loopback", async () => {
     const page = await fetch(base);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
-    assert.match(await page.text(), /Turn agent workflows into a keyboard you can trust/);
+    assert.match(await page.text(), /Switchyard · Keyboard workspace/);
     const example = await fetch(`${base}/sample-study-report.json`);
     assert.equal(example.status, 200);
     assert.equal(parseStudyReport(await example.json()).events, 5);

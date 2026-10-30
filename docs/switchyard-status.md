@@ -1,34 +1,107 @@
-# Switchyard continuation — October 29, 2026
+# Switchyard implementation and evidence
 
-Branch: `feat/switchyard-configuration-loop`. Base: `25824cc` (Omarchy foundation),
-with Studio commits `1b79c12`, `3700081`, `ccf220e`, `96b0ea4` cherry-picked and
-their additive conflicts reconciled. Original worktrees were clean and retained.
+This branch is a **partial full-suite implementation**. The revised handover is
+being implemented across independent requirements; the F77 is the pilot, not a
+scope limit. [The ledger](switchyard-requirements.md) separates implementation
+from validation. Missing hardware or accounts do not excuse missing code.
 
-Direction: [product brief](switchyard-product.md). Decisions and all deferred
-requirements: [ADR](decisions/001-switchyard-configuration.md) and
-[build plan](switchyard-build-plan.md).
+## Run and explore
 
-Initial host inspection: Omarchy, Hyprland 0.56.2, Node 24.14.0 available.
-US QWERTY host layout. F77 absent from USB/sysfs and compositor input inventory;
-no HID device was opened and no keyboard configuration changed. Native ChatGPT
-main window uses the repaired user-local executable. No Switchyard user service
-was running. Private historical F77 Vial snapshots exist outside Git; they are
-not live reads. Do not commit local serials or recovery paths.
+```sh
+mise exec node@24.14.0 -- npm run layout:studio
+```
 
-Baseline installation: `mise exec node@24.14.0 -- npm ci --ignore-scripts` passed.
-Focused Studio/recorder/shortcut checks and typecheck are being established.
-Historical Studio cross-host result was 158/178 groups; this is not the new
-integrated result. Windows, F77, Copilot, managed compartments, native voice and
-physical B122 remain unaccepted.
+Open the private loopback link printed by the server. Home explains the product
+and offers **Keep my place**, a four-control setup with an editable workflow.
+The Model F Labs selector includes 19 manufacturer-listed model/case/round combinations and
+104 named source references. Three proposed designs have development geometry;
+five proposed designs lack verified final geometry and cannot be selected as
+hardware presets. Customize contains the detailed editor. Existing Typing and
+firmware remain unchanged by selecting or exporting a preset.
 
-Startup: `mise exec node@24.14.0 -- npm run layout:studio`.
-Checks: `mise exec node@24.14.0 -- npm test` and `npm run typecheck` under that
-same runtime. Updated receipts and demonstration results follow implementation.
+[Catalog guide and sources](model-f-standard-configurations.md). The 126-profile
+bundle was generated at `artifacts/model-f-standard-configurations/`; each file
+and checksum is listed in its manifest. It includes the 104 named source
+references and 22 recommended Dvorak references. Reference profiles explicitly
+fail host connection until actual typing evidence is read/imported.
 
-Next three executable tasks:
+The F77 saved-snapshot importer preserves recorded Dvorak keycodes. It now renders
+ISO Enter shapes, rotated split thumb keys and displaced alternatives in their
+physical positions. Importing an actual typing layer can carry planned intents
+through unique matching keycodes; absent or ambiguous positions become unassigned.
 
-1. Implement and test versioned profile/proposal import against the existing plan.
-2. Connect authenticated review/apply/readback/restore for a bounded host shortcut.
-3. Exercise real UI tasks and host rollback; update this record with exact receipts.
+## Software evidence
 
-Revision 2 received during implementation: full suite required. See the [authoritative ledger](switchyard-requirements.md). The current source is partial; the host focus loop is only an intermediate test. Updated handover SHA-256 is `8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`. Focused model/transaction/API tests: 24/24 passed. Integrated baseline Studio/recorder/shortcut tests: 18/18; baseline typecheck passed. Native UI and live host application have not yet been exercised.
+- Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
+- Integrated native Linux run: **83/83 groups passed; 564 tests, 555 passed and 9
+  expected platform skips**. Receipt:
+  `.sxsy-verification/isolated-test-df02ac4a-a3fe-4b8f-aaa0-560f3c8edf8e.json`.
+- Current focused Studio run after typing-layer rebasing and microphone-release
+  changes: **42/42 tests passed**, no skips. This includes all 104 named catalog
+  configurations, physical option variations, encrypted compartment boundaries,
+  device fault/restore paths and SDK/OAuth contract tests.
+- `npm run catalog:check` verifies local source SHA-256 values and deterministic
+  generated catalog data. `npm run catalog:export` built 126 portable profiles.
+- TypeScript typecheck passed. The Windows native hotkey helper cross-builds as a
+  self-contained win-x64 executable under .NET 8.0.424. This is build evidence,
+  not proof of Windows runtime behavior.
+
+Tests use synthetic/fault transports unless identified below. The older B122
+27-gate acceptance record is unchanged; every gate remains NOT ACCEPTED.
+
+## Actual local host checks
+
+- Installed Codex 0.165.0 completed a real schema-constrained configuration design
+  request using its existing account. The installed app-server rejected one
+  newer documented sandbox field; the adapter uses its supported read-only
+  contract. Proposals never apply themselves.
+- Installed Claude Code 2.1.308 completed a real configuration design request
+  with tools/hooks/MCP disabled for that session and its existing account.
+- Real custom Node and Python LangChain Runnable examples registered distinct
+  sessions, received an authenticated review intent and acknowledged completion.
+  An example's acknowledgement is self-report, not verified coding-task evidence.
+- Local CPU faster-whisper transcribed synthetic speech without an external API.
+  Recognition was imperfect; transcript correction remains part of the flow.
+  A live microphone conversation has not yet been accepted.
+- Linux Secret Service protected the local smoke-test compartment and credentials.
+  No work tenant was contacted. The repaired native ChatGPT main window was
+  discovered without altering its launcher, voice repair or overlay guard.
+
+## Checks still awaiting a real surface
+
+The tab available to automation still showed Brave’s blocked-page error after the user reported a manual refresh. Brave
+blocked automated navigation/reloads with ERR_BLOCKED_BY_CLIENT; the user was
+asked to refresh the new Home page manually and leave it open. No internal
+browser setting or protection was changed. New catalog/Home visual and click
+acceptance remains pending until the refreshed page is visible. The morning
+review front end is frozen at digest
+`24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`
+and served at `http://127.0.0.1:43177/` with the current local backend.
+`npm run review:serve -- --port 43177` verifies every frozen asset. Backend work
+can continue without changing this review screen.
+
+F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
+identity, physical option agreement, key read/write/restore, unplug/replug and
+ordinary typing must be checked when it is reconnected. Historical snapshots are
+not live evidence. B122 hardware has not arrived. Actual Windows device/shortcut/
+DPAPI/lifecycle checks need a Windows host. Actual Microsoft 365 Graph account,
+license and permissions acceptance needs an approved tenant/account.
+
+## Unfinished implementation
+
+These are code/product work, not hardware/account blockers: physical role
+shortcut wiring and active-compartment CLI enforcement; general coding-task
+session control beyond configuration conversations; full layer/macro/settings
+editing; Windows suite bridge integration; install/update/rollback/uninstall and
+a normal launcher; interprocess coordination and child supervision; profile-library visual acceptance; reproducible optional dependency installation; assignment legend export.
+The Home example is explicitly sample work, never presented as a live agent result.
+
+## Branch and handover
+
+`feat/switchyard-configuration-loop` starts from Omarchy foundation `25824cc` and
+cherry-picks the four existing Studio commits while retaining both original
+worktrees. Integrated checkpoints precede the current continuation. Revision 2
+handover SHA-256:
+`8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`.
+No upstream merge, public release, firmware flash, reset, bootloader action,
+solenoid adjustment or persistent desktop modification has been performed here.

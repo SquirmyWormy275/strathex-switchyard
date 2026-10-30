@@ -1,42 +1,74 @@
-# STRATHEX SWITCHYARD — SXSY-B122
+# Switchyard
 
-> Route attention. Direct agents. Keep the operator in command.
+**Give your keyboard a familiar place to return to work.**
 
-SXSY-B122 is a software-only safety control plane for a proposed 22-control
-operator keyboard for agentic software development. Its primary agent host is
-Omarchy/systemd desktop Linux; Windows is an ordinary keyboard host with optional
-agent controls. Its physical target is a Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
-physical keyboard and its integration are not validated by this repository.
+Switchyard is a local keyboard workspace for people who move between coding
+agents, editors and conversations. It starts with a ready-made arrangement:
+return to your task, check progress, review work, and leave a handoff. Choose your
+Model F Labs keyboard, use the recommended setup, then connect your tools.
+The configurator stays behind **Customize**.
 
-**Try the software before the B122 arrives:** [Start with the Omarchy workflow
-recorder or the VS Code Codex thread command](docs/try-switchyard.md). The guide
-gives a repeatable install, the exact keys and commands, and the current limits.
-The private GitHub preview provides a downloadable Linux bundle and VSIX from
-an exact commit. GitHub Actions also builds an artifact when its budget permits.
-Repository access is currently limited to invited collaborators;
-no public release or license has been approved.
-**Design your own bindings:** [Switchyard Layout Studio](tools/layout-studio/README.md)
-is an offline planner for importing an exact QMK physical layout, inventorying
-agent actions, reviewing optional aggregate workflow observations, testing
-chord assignments, and exporting a reviewable plan. It
-is a software-only design tool; the accepted B122 65-chord map is unchanged.
+## Try the starting experience
 
-**Current status:** the repository contains the hardware-independent B122
-implementation: the canonical protocol and firmware/Raw-HID host source; the
-mutually authenticated Windows and Linux companions; the VS Code
-operator and provisioning surfaces; durable mediation, receipts, recovery,
-containment, and Council; host-attested repository recipes; DPAPI or Linux
-Secret Service credential references; exact-route HTTPS; configured
-provider, GitHub/Git/CI and scanner adapters; Windows Sandbox and Linux
-Bubblewrap isolation boundaries; an exhaustive
-hardware-independent 176-chord Raw-HID product simulator; and content-verified,
-transactional per-user release tooling. Source availability is **not** production, hardware, provider,
-or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
+```sh
+mise exec node@24.14.0 -- npm ci --ignore-scripts
+mise exec node@24.14.0 -- npm run layout:studio
+```
 
-The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
-keys, 65 settled chord behaviors, and 111 intentionally unassigned chord slots.
-The complete behavior contract and adversarial review live in
-[docs/SXSY-B122-complete-key-specification-and-audit.md](docs/SXSY-B122-complete-key-specification-and-audit.md).
+Open the private local link printed by the app. **Home → your keyboard → Use this
+setup** loads four planned controls and the *Keep my place* workflow. Browse the
+catalog without an assistant account. Read/import your actual keyboard
+configuration before connecting a host shortcut; a reference preset cannot
+establish your current firmware or typing layout.
+
+- [Model F Labs configurations](docs/model-f-standard-configurations.md): 19 listed
+  model/case/round combinations, 104 named references, physical options, Dvorak
+  references, split boards and explicitly identified proposed designs.
+- [Configuration walkthrough](docs/switchyard-configuration.md): understand a
+  proposal, review an exact local connection, and restore a change.
+- [Current implementation and evidence](docs/switchyard-status.md): what runs,
+  what has been checked, and what still needs implementation.
+- [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
+  requirement, including checks that require hardware or approved accounts.
+- [Earlier Omarchy tools](docs/try-switchyard.md): workflow recorder and existing
+  Codex thread controls, with their own repeatable walkthrough.
+
+## What works, and what remains
+
+This is a **partial development suite**, built and exercised on Omarchy Linux.
+The current branch combines the existing B122 control plane and Layout Studio
+with a new local product shell, model catalog, configuration conversations,
+protected compartments, local transcription, device transactions, custom-agent
+SDK and separate Microsoft 365 Copilot adapter. Real installed-account design
+requests have been exercised with Codex and Claude Code, and real custom and
+LangChain example processes have exchanged authenticated intents.
+
+These checks do not prove a finished keyboard/agent appliance. General coding-task
+controls, physical role shortcut wiring, desktop packaging, profile-library visual acceptance,
+complete device settings/macro editing and final UI acceptance remain unfinished.
+Windows hotkey helper source cross-builds; its suite integration and Windows host
+acceptance are incomplete. F77 physical acceptance awaits reconnection; B122
+physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
+acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
+
+## Engineering and contribution
+
+The repository develops an explicit intent boundary: a key asks for an operation;
+a reviewed local connection decides whether that exact operation is available.
+Portable layouts exclude credentials and local account/session bindings. Design
+proposals stay editable, and host/device changes require separate baseline,
+review, readback and restoration steps. Failures preserve a recoverable record.
+
+Start with [the product brief](docs/switchyard-product.md), then the
+[configuration decision record](docs/decisions/001-switchyard-configuration.md),
+[build plan](docs/switchyard-build-plan.md) and [contribution guide](CONTRIBUTING.md).
+[Attribution](ATTRIBUTION.md) preserves the keyboard/controller community's work.
+No repository-wide license or public release has been approved.
+
+The original SXSY-B122 target retains its 22-control, 65-behavior contract:
+[complete specification and audit](docs/SXSY-B122-complete-key-specification-and-audit.md).
+It is one hardware target within the broader Switchyard suite; the F77 is the
+current pilot.
 
 ## What this project is
 
@@ -56,10 +88,10 @@ safe and available in the current context.
 - `firmware/qmk/` — QMK-compatible reference firmware that emits bounded,
   versioned Raw HID signals only. It does not run Git, a terminal, a browser,
   or desktop automation.
-- `tools/layout-studio/` — a local browser planner for importing a board's
-  physical layout and ordinary key layer, ranking agent actions, checking
-  binding conflicts, and exporting a review sheet. It makes no firmware or
-  host changes.
+- `tools/layout-studio/` — the developing local product shell, offline Model F
+  catalog, workflow/agent configuration, protected compartment storage and
+  separately reviewed host/device configuration. See the requirement ledger for
+  implementation and validation limits.
 - `packages/protocol/` — the canonical 22-control / 65-behavior manifest,
   packet validation, and a closed command map. Unknown, forged, and
   intentionally unassigned chords have no fallback action.

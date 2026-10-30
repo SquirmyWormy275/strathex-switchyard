@@ -65,13 +65,15 @@ test("saved Vial configuration requires explicit geometry choices and preserves 
   assert.equal(JSON.stringify(p).includes("private-device"), false);
   assert.throws(() => snapshotChoices(snapshot.definition), /definition alone/);
   assert.throws(() => importVialSnapshot({ ...snapshot, keymap_raw: [[[52]]] }, [1]), /dimensions/);
-  assert.throws(() => importVialSnapshot({ ...snapshot, definition: { ...snapshot.definition, layouts: { ...snapshot.definition.layouts, keymap: [[{ r: 15 }, "0,0"]] } } }, [1]), /dedicated importer/);
+  const rotated = importVialSnapshot({ ...snapshot, definition: { ...snapshot.definition, layouts: { ...snapshot.definition.layouts, keymap: [[{ r: 15 }, "0,0"]] } } }, [1]);
+  assert.equal(rotated.keys[0].rotation, 15);
+  assert.throws(() => importVialSnapshot({ ...snapshot, definition: { ...snapshot.definition, layouts: { ...snapshot.definition.layouts, keymap: [[{ r: 181 }, "0,0"]] } } }, [1]), /coordinate/);
 });
 
 test("bridge API rejects missing auth, foreign origins, DNS rebinding, unsafe routes and oversized requests", async () => {
   let effects = 0;
   const bridge = { review: async () => ({ reviewId: "single-use" }), apply: async () => { effects++; return { status: "applied" }; }, transactions: async () => [] };
-  const server = createStudioServer({ token: "test-only", bridge, discover: async () => ({ platform: "synthetic" }) });
+  const server = createStudioServer({ token: "test-only", bridge, discover: async () => ({ platform: "synthetic" }), suite: { authorizeConnection: async () => {}, close: async () => {} } });
   server.listen(0, "127.0.0.1"); await once(server, "listening");
   const base = `http://127.0.0.1:${server.address().port}`;
   const headers = { Authorization: "Bearer test-only", Origin: base, "Content-Type": "application/json" };

@@ -1,7 +1,12 @@
 import { analyzePlan, attachQmkBaseLayer, consequences, families, modifiers, newPlan, parseBoardProfile, parsePlan, parseQmkInfo, parseStudyReport, planMarkdown, studySuggestions } from "/model.mjs";
-import { importProfile, portableProfile, proposalContext, reviewProposal } from "/workspace.mjs";
+import { importProfile, portableProfile, proposalContext, reviewProposal, rebaseTypingLayer } from "/workspace.mjs";
 import { connectWorkspace } from "/connection.mjs";
 import { importVialSnapshot, snapshotChoices } from "/vial-snapshot.mjs";
+import { mountSuite } from "/suite-ui.mjs";
+import { mountDevices } from "/device-ui.mjs";
+import { showWorkspace, showInspector } from "/shell.mjs";
+import { drawKeyboard } from "/keyboard-view.mjs";
+import { mountHome } from "/home.mjs";
 
 const $ = (id) => document.getElementById(id);
 let plan = null;
@@ -16,6 +21,9 @@ let connection;
 let pendingProposal = null;
 let profileIdentity = { id: "my-workflow", name: null };
 let pendingSnapshot = null;
+let profileWorkflow = null;
+let exportAllowed = true;
+let selectedKeyId = null;
 
 function option(value, label = value) { const item = document.createElement("option"); item.value = value; item.textContent = label; return item; }
 function notify(message, undo) {
@@ -29,7 +37,7 @@ function notify(message, undo) {
   clearTimeout(noticeTimer); noticeTimer = setTimeout(() => surface.classList.remove("visible"), 6000);
 }
 function shortNumber(value) { return Number.isFinite(value) ? value.toFixed(1) : "0.0"; }
-function markDirty() { dirty = true; pendingProposal = null; $("adopt-proposal").disabled = true; connection?.invalidate(); $("save-status").textContent = "Changes in this tab are unsaved. Download the editable plan to keep them."; }
+function markDirty() { dirty = true; pendingProposal = null; $("adopt-proposal").disabled = true; connection?.invalidate(); document.dispatchEvent(new CustomEvent("switchyard-plan-change")); $("save-status").textContent = "Saving privately on this computer… Export a portable copy when you want one."; }
 function mayReplacePlan() { return !dirty || window.confirm("Replace the current unsaved layout? Download its editable plan first if you want to keep it."); }
 function updateConsequenceHelp() {
   const help = {
@@ -43,8 +51,9 @@ function updateConsequenceHelp() {
 function resetEditor() {
   editingActionId = null;
   $("action-form").reset();
-  $("action-frequency").value = "5";
-  $("action-savings").value = "10";
+  $("action-frequency").value = "0";
+  $("action-savings").value = "0";
+  $("editor-modifier").value = "gui_alt";
   $("form-title").textContent = "Add an action";
   $("action-submit").textContent = "Add action";
   $("action-cancel").hidden = true;
@@ -67,7 +76,7 @@ function loadInfo(info, layout) {
   plan = newPlan(profile);
   profileIdentity = { id: "my-workflow", name: null };
   nextAction = 1;
-  selectedActionId = null;
+  selectedActionId = null; selectedKeyId = null; profileWorkflow = null;
   resetEditor(); dirty = false;
   render();
 }
@@ -90,15 +99,16 @@ function importKeymap(keymap) {
   markDirty();
   render(); notify("Recorded the exact base layer so ordinary-key impact can be checked.");
 }
-function importSaved(value) {
-  if (!mayReplacePlan()) return;
+function importSaved(value, force = false) {
+  if (!force && !mayReplacePlan()) return;
   let imported;
   if (["sxsy-agentic-layout-plan/v1", "switchyard-profile/v1"].includes(value?.schema)) {
     const portable = importProfile(value); imported = portable.plan; profileIdentity = { id: portable.id, name: portable.name };
+    profileWorkflow = portable.workflow ?? null;
   }
-  else imported = newPlan(parseBoardProfile(value));
+  else { imported = newPlan(parseBoardProfile(value)); profileWorkflow = null; }
   plan = imported;
-  pendingInfo = null; pendingKeymap = null; selectedActionId = null;
+  pendingInfo = null; pendingKeymap = null; selectedActionId = null; selectedKeyId = null;
   nextAction = plan.actions.length + 1;
   resetEditor(); dirty = false;
   $("layout-picker-wrap").hidden = true;
@@ -113,36 +123,17 @@ function importStudy(value) {
 
 function keyboardPreview() {
   const surface = $("keyboard"); surface.replaceChildren();
-  if (!plan) { surface.style.height = "120px"; const empty = document.createElement("div"); empty.className = "board-empty"; empty.textContent = "Your keyboard will appear here."; surface.append(empty); $("pick-help").classList.remove("active"); return; }
-  const width = Math.max(...plan.profile.keys.map((key) => key.x + key.w));
-  const height = Math.max(...plan.profile.keys.map((key) => key.y + key.h));
-  const unit = Math.max(30, Math.min(55, 900 / width));
-  const inner = document.createElement("div");
-  inner.style.position = "relative";
-  inner.style.width = `${Math.ceil(width * unit + 8)}px`;
-  inner.style.height = `${Math.ceil(height * unit + 8)}px`;
-  for (const key of plan.profile.keys) {
-    const assigned = plan.actions.filter((action) => action.binding?.keyId === key.id);
-    const button = document.createElement("button"); button.type = "button";
-    button.className = `key${assigned.length ? " has-action" : ""}${selectedActionId ? " pick-target" : ""}`;
-    button.style.left = `${key.x * unit}px`; button.style.top = `${key.y * unit}px`;
-    button.style.width = `${key.w * unit - 3}px`; button.style.height = `${key.h * unit - 3}px`;
-    const title = document.createElement("span"); title.textContent = key.label;
-    const hint = document.createElement("small"); hint.textContent = key.baseKeycode ?? "base ?";
-    button.append(title, hint);
-    button.title = `${key.label} · matrix ${key.matrix.join(",")} · ${key.baseKeycode ?? "base layer unknown"}${assigned.length ? ` · ${assigned.map((action) => action.label).join(", ")}` : ""}`;
-    button.setAttribute("aria-label", button.title);
-    button.addEventListener("click", () => {
-      if (!selectedActionId) { notify("Choose Pick on board in an action card, then select a physical key."); return; }
-      const action = plan.actions.find((item) => item.id === selectedActionId);
-      if (!action) return;
-      action.binding = { keyId: key.id, modifier: action.binding?.modifier ?? "none" };
-      selectedActionId = null; markDirty(); render();
-    });
-    inner.append(button);
-  }
-  surface.append(inner);
-  surface.style.height = `${Math.ceil(height * unit + 32)}px`;
+  if (!plan) { surface.style.height = "210px"; const empty = document.createElement("div"); empty.className = "board-empty"; const title = document.createElement("strong"); title.textContent = "Start with your keyboard."; const hint = document.createElement("span"); hint.textContent = "Connect a supported keyboard or open a saved configuration."; empty.append(title, hint); surface.append(empty); $("pick-help").classList.remove("active"); return; }
+  drawKeyboard(surface, plan.profile, plan.actions, { selectedKeyId, picking: Boolean(selectedActionId), onKey: (key, assigned) => {
+    selectedKeyId = key.id;
+    $("selected-key-name").textContent = key.label;
+    $("selected-key-base").textContent = `${key.baseKeycode ?? "Typing layer not recorded"} · ${assigned.length ? assigned.map((a) => a.label).join(", ") : "No action assigned"}`;
+    if (!selectedActionId) { keyboardPreview(); showInspector("action"); $("action-label").focus(); return; }
+    const action = plan.actions.find((item) => item.id === selectedActionId);
+    if (!action) return;
+    action.binding = { keyId: key.id, modifier: action.binding?.modifier ?? "gui_ctrl" };
+    selectedActionId = null; markDirty(); render();
+  } });
   $("pick-help").textContent = selectedActionId ? `Pick a key for ${plan.actions.find((action) => action.id === selectedActionId)?.label ?? "the selected action"}. Press Escape to cancel.` : "Choose “Pick on board” in an action card, then select a key here. You can also use the dropdown in its card.";
   $("pick-help").classList.toggle("active", Boolean(selectedActionId));
 }
@@ -150,7 +141,7 @@ function keyboardPreview() {
 function actionRows() {
   const body = $("actions-body"); body.replaceChildren();
   if (!plan) return;
-  for (const action of [...plan.actions].sort((a, b) => b.frequencyPerDay * b.secondsSaved - a.frequencyPerDay * a.secondsSaved)) {
+  for (const action of plan.actions) {
     const card = document.createElement("article"); card.className = `action-card${selectedActionId === action.id ? " selected" : ""}`;
     const head = document.createElement("div"); head.className = "action-card-head";
     const identity = document.createElement("div");
@@ -159,7 +150,7 @@ function actionRows() {
     identity.append(label, meta);
     const priority = document.createElement("span"); priority.className = "priority";
     priority.textContent = `${shortNumber(action.frequencyPerDay * action.secondsSaved / 60)} min/day est.`;
-    head.append(identity, priority);
+    head.append(identity);
     const binding = document.createElement("div"); binding.className = "binding-grid";
     const physical = document.createElement("label"); physical.textContent = "Physical key";
     const keySelect = document.createElement("select"); keySelect.id = `physical-${action.id}`; keySelect.setAttribute("aria-label", `Physical key for ${action.label}`);
@@ -177,7 +168,7 @@ function actionRows() {
     const pick = document.createElement("button"); pick.type = "button"; pick.className = "secondary"; pick.textContent = selectedActionId === action.id ? "Cancel pick" : "Pick on board";
     pick.setAttribute("aria-label", `Pick a key on the board for ${action.label}`);
     pick.setAttribute("aria-pressed", String(selectedActionId === action.id));
-    pick.addEventListener("click", () => { selectedActionId = selectedActionId === action.id ? null : action.id; render(); if (selectedActionId) { $("board").scrollIntoView({ block: "start" }); $("keyboard").querySelector("button")?.focus(); notify(`Select a physical key for ${action.label}. Press Escape to cancel.`); } });
+    pick.addEventListener("click", () => { showWorkspace("keyboard"); selectedActionId = selectedActionId === action.id ? null : action.id; render(); if (selectedActionId) { $("keyboard").querySelector("button")?.focus(); notify(`Select a key for ${action.label}. Escape cancels.`); } });
     binding.append(physical, modifier, pick);
     const actions = document.createElement("div"); actions.className = "card-actions";
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "text-button"; edit.textContent = "Edit action";
@@ -191,10 +182,12 @@ function actionRows() {
       $("action-frequency").value = String(action.frequencyPerDay);
       $("action-savings").value = String(action.secondsSaved);
       $("action-confirmation").checked = action.confirmation;
+      selectedKeyId = action.binding?.keyId ?? null;
+      $("editor-modifier").value = action.binding?.modifier ?? "gui_alt";
       $("form-title").textContent = "Edit action";
       $("action-submit").textContent = "Save changes";
       $("action-cancel").hidden = false;
-      $("mapping").scrollIntoView({ block: "start" });
+      showWorkspace("keyboard"); showInspector("action");
       $("action-label").focus();
     });
     const remove = document.createElement("button"); remove.type = "button"; remove.className = "remove"; remove.textContent = "Remove";
@@ -251,15 +244,16 @@ function studyCards() {
 
 function render() {
   connection?.invalidate();
-  $("copy-assistant-context").disabled = !plan;
+  $("copy-assistant-context").disabled = !plan || !exportAllowed;
   $("preview-proposal").disabled = !plan;
   $("proposal-file").disabled = !plan;
   const board = $("board-summary");
   if (!plan) board.textContent = "Load a board to begin.";
   else board.textContent = `${plan.profile.name} · ${plan.profile.layout} · ${plan.profile.keys.length} keys · ${plan.profile.controller} controller`;
+  if (plan) { board.textContent = plan.profile.name; $("profile-dialog").close(); }
   const baseKnown = Boolean(plan?.profile.keys.every((key) => key.baseKeycode !== null));
-  $("board-base-badge").textContent = !plan ? "Awaiting keyboard" : baseKnown ? "Typing layer recorded" : "Typing layer needed";
-  $("board-base-badge").className = `status-pill${plan ? baseKnown ? " good" : " warn" : ""}`;
+  $("board-base-badge").textContent = !plan ? "Awaiting keyboard" : plan.profile.evidence === "source-reference" ? "Reference · verify your typing layer" : baseKnown ? "Typing layer recorded" : "Typing layer needed";
+  $("board-base-badge").className = `status-label${plan ? baseKnown ? " good" : " warn" : ""}`;
   $("keymap-file").disabled = !plan || plan.profile.source !== "qmk-info";
   $("action-submit").disabled = !plan;
   $("action-count").textContent = `${plan?.actions.length ?? 0} ${plan?.actions.length === 1 ? "action" : "actions"}`;
@@ -274,14 +268,14 @@ function render() {
   else {
     const review = analyzePlan(plan);
     $("progress-review").className = review.readyForReview ? "done" : "";
-    $("review-summary").textContent = `${review.readyForReview ? "Ready for human review" : "Needs more work"} · ${plan.actions.length} ${plan.actions.length === 1 ? "action" : "actions"} · ${shortNumber(review.estimatedMinutesPerDay)} estimated min/day`;
+    $("review-summary").textContent = review.readyForReview ? "Ready for review" : "Needs review";
     for (const issue of review.issues) { const item = document.createElement("li"); item.className = issue.severity; item.textContent = `${issue.severity.toUpperCase()}: ${issue.message}`; list.append(item); }
     if (!review.issues.length) { const item = document.createElement("li"); item.textContent = "No structural issues found. Ergonomics and physical behavior still need review."; list.append(item); }
   }
   if (!plan) $("progress-review").className = "";
-  $("export-json").disabled = !plan;
-  $("export-markdown").disabled = !plan;
-  $("copy-json").disabled = !plan;
+  $("export-json").disabled = !plan || !exportAllowed;
+  $("export-markdown").disabled = !plan || !exportAllowed;
+  $("copy-json").disabled = !plan || !exportAllowed;
   if (!dirty) $("save-status").textContent = plan?.actions.length ? "Current plan is loaded. Download a fresh copy after any changes." : "Your work stays in this tab until you download the plan.";
 }
 
@@ -292,6 +286,8 @@ function download(name, content, type) {
 }
 
 for (const family of families) $("action-family").append(option(family, family.replaceAll("_", " ")));
+for (const modifier of modifiers) $("editor-modifier").append(option(modifier, modifier === "none" ? "None" : modifier.split("_").map((m) => ({ gui: "Super", ctrl: "Ctrl", alt: "Alt", shift: "Shift" })[m]).join(" + ")));
+$("editor-modifier").value = "gui_alt";
 for (const consequence of consequences) $("action-consequence").append(option(consequence, consequence.replaceAll("_", " ")));
 $("action-consequence").addEventListener("change", updateConsequenceHelp);
 fileInput("info-file", importInfo);
@@ -310,7 +306,6 @@ async function loadSample() {
   } catch (error) { notify(error.message); }
 }
 $("sample-button").addEventListener("click", loadSample);
-$("hero-sample-button").addEventListener("click", loadSample);
 $("sample-study-button").addEventListener("click", async () => {
   try { importStudy(await (await fetch("/sample-study-report.json")).json()); }
   catch (error) { notify(error.message); }
@@ -327,7 +322,7 @@ $("action-form").addEventListener("submit", (event) => {
     if (editingActionId && !oldAction) throw new Error("That action is no longer available to edit.");
     const action = { id: oldAction?.id ?? `action-${nextAction++}`, label, family: $("action-family").value,
       consequence: $("action-consequence").value, confirmation: $("action-confirmation").checked,
-      frequencyPerDay, secondsSaved, binding: oldAction?.binding ?? null };
+      frequencyPerDay, secondsSaved, binding: selectedKeyId ? { keyId: selectedKeyId, modifier: $("editor-modifier").value } : oldAction?.binding ?? null };
     const candidate = parsePlan({ ...plan, actions: oldAction ? plan.actions.map((item) => item.id === oldAction.id ? action : item) : [...plan.actions, action] });
     plan = candidate; resetEditor(); markDirty(); render();
     notify(oldAction ? "Action updated." : "Action added. Choose a physical key and modifier in its card.");
@@ -336,7 +331,7 @@ $("action-form").addEventListener("submit", (event) => {
 $("action-cancel").addEventListener("click", resetEditor);
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && selectedActionId) { selectedActionId = null; render(); notify("Key selection cancelled."); } });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
-const portable = () => portableProfile(plan, profileIdentity.id, profileIdentity.name ?? plan.profile.name);
+const portable = () => portableProfile(plan, profileIdentity.id, profileIdentity.name ?? plan.profile.name, profileWorkflow);
 $("export-json").addEventListener("click", () => { if (plan) { download("switchyard-profile.json", `${JSON.stringify(portable(), null, 2)}\n`, "application/json"); $("save-status").textContent = "Download requested. Confirm the file exists before closing this tab."; } });
 $("export-markdown").addEventListener("click", () => { if (plan) download("agentic-layout-review.md", planMarkdown(plan), "text/markdown"); });
 $("copy-json").addEventListener("click", async () => {
@@ -356,7 +351,7 @@ function previewProposal(value) {
   $("proposal-changes").replaceChildren(...result.changes.map((text) => { const li = document.createElement("li"); li.textContent = text; return li; }));
   $("adopt-proposal").disabled = false;
 }
-fileInput("snapshot-file", (value) => {
+function prepareSnapshot(value) {
   const choices = snapshotChoices(value);
   pendingSnapshot = value;
   $("snapshot-choices").replaceChildren(...choices.map((choice, i) => {
@@ -366,8 +361,11 @@ fileInput("snapshot-file", (value) => {
     label.append(select); return label;
   }));
   $("snapshot-options").hidden = false;
+  $("snapshot-file").closest("details").open = true;
+  if (!$("profile-dialog").open) $("profile-dialog").showModal();
   notify("Review the physical arrangement. Saved keycodes are historical evidence, not a live device read.");
-});
+}
+fileInput("snapshot-file", prepareSnapshot);
 $("load-snapshot").addEventListener("click", () => {
   if (!pendingSnapshot) return;
   try {
@@ -375,8 +373,10 @@ $("load-snapshot").addEventListener("click", () => {
     if (selects.some((s) => s.value === "")) throw new Error("Review every physical layout choice first.");
     const profile = importVialSnapshot(pendingSnapshot, selects.map((s) => Number(s.value)));
     if (!mayReplacePlan()) return;
-    plan = newPlan(profile); profileIdentity = { id: "saved-keyboard", name: profile.name };
-    pendingInfo = null; pendingKeymap = null; selectedActionId = null; pendingProposal = null;
+    const carried = plan?.profile.evidence === "source-reference";
+    plan = carried ? rebaseTypingLayer(plan, profile) : newPlan(profile); profileIdentity = { id: "saved-keyboard", name: profile.name };
+    if (!carried) profileWorkflow = null;
+    pendingInfo = null; pendingKeymap = null; selectedActionId = null; selectedKeyId = null; pendingProposal = null;
     resetEditor(); dirty = false; render();
     notify("Saved geometry and layer zero loaded. Device firmware, controller, current layout and physical arrangement remain unverified.");
   } catch (error) { notify(error.message); }
@@ -412,5 +412,14 @@ $("chatgpt-preset").addEventListener("click", () => {
     notify("Choose its physical key, then select Super + Alt in its action card. Normal typing stays available.");
   } catch (error) { notify(error.message); }
 });
+mountHome({ getProfile: () => plan ? portable() : null, usePreset: (value) => {
+  if (!mayReplacePlan()) return false;
+  importSaved(value, true); markDirty(); render();
+  document.dispatchEvent(new CustomEvent("switchyard-profile-loaded")); return true;
+}, notify });
 connection = connectWorkspace({ getPlan: () => plan, notify });
+mountSuite({ getProfile: () => plan ? portable() : null, loadProfile: (value) => { if (value) importSaved(value, true); else { plan = null; dirty = false; render(); } }, previewProposal, notify, onPolicy: (allowed) => { exportAllowed = allowed; }, onWorkflow: (workflow) => { profileWorkflow = workflow; }, saved: () => { dirty = false; $("save-status").textContent = "Saved privately on this computer. Your layout will reopen after restart."; } });
+mountDevices({ getProfile: () => plan ? portable() : null, onSnapshot: prepareSnapshot, notify });
 render();
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(keyboardPreview, 100); });
