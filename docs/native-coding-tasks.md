@@ -121,8 +121,14 @@ native turn ID. A changed post-turn account or wrong-session reply is not retain
 The two providers share the protected approval/idempotency/retention/recovery
 code but retain distinct native adapters and action scopes. They cannot consume
 or delete each other's text records. Keyboard-only shutdown stops an owned print
-before reconciling its original background inventory. This is direct-child stop
-evidence; broader provider-tree containment remains separate implementation work.
+before reconciling its original background inventory. Claude print turns now
+use the production native guardian: their exact owned scope is saved before
+start acknowledgement and verified exit is saved before ownership is released.
+Unverified exit survives retention and outcome review and blocks new provider
+requests until native readback verifies it. Linux session/parent-death and Windows
+Job Object boundaries apply to this owned command; deliberately detached Linux
+processes, metadata probes and shared native background services remain separate
+lifecycle limits. The updated installed journey also verifies saved guardian exit.
 
 Run the installed journey in a Git directory already trusted by the native CLI:
 

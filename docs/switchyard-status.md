@@ -1249,3 +1249,25 @@ cleanup. Fifteen applicable runtime/guardian checks pass on Linux; one Windows
 environment-block case awaits native CI. The helper builds with zero warnings
 and errors. This is the transport foundation; Claude reviewed-task integration
 and durable guardian recovery are still being implemented.
+
+## Claude owned-command lifecycle integration
+
+Claude text turns now use the production native guardian rather than a direct
+print child. The encrypted request saves the exact guardian scope before start
+acknowledgement, and records verified exit before accepting a bounded native
+reply. Text travels over stdin, with optional diagnostics kept in memory and
+only structural failure categories retained. Shared text cleanup retains the
+complete owned resource when exit is uncertain. Recovery checks the saved scope
+before any replacement; keyboard-only cleanup and shutdown also check it.
+Unverified guardian records cannot be deleted or pruned after outcome review.
+
+Fifty applicable focused tests passed with one native Windows environment case
+skipped on Linux (51 total), including actual Linux private input, cancellation,
+resource readiness/exit and owner-loss boundaries. The helper builds with zero
+warnings/errors and TypeScript checks pass. The normal installed Claude journey
+now asserts distinct recorded/stopped guardians for its exact first and continued
+turn; that updated installed check is pending. Windows native private-pipe checks
+are queued separately. This is owned-session/Job containment, not a general OS
+sandbox or proof of containment for deliberately detached Linux processes.
+Metadata probes, native shared background services, broader terminal attachment
+and execution-authority integration remain distinct unfinished work.

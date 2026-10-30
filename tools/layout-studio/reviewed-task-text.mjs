@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
+import { guardianScope } from "./owned-native-command.mjs";
 
 const uuid = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const unresolved = new Set(["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"]);
@@ -22,23 +23,23 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
     if (!t.repositoryIdentity) throw new Error("Explicitly bind this exact task again to review its current repository directory identity before submitting text.");
     adapter.validateTask(t); return t;
   }
-  const running = new Map(), generations = new Map(), unconfirmed = new Map(); let closed = false;
+  const running = new Map(), generations = new Map(), unconfirmed = new Map(), seen = new Set(); let closed = false;
   const generation = (c) => generations.get(c) ?? 0;
-  const stop = async (child) => { try { return (await stopChild(child)).stopped === true; } catch { return false; } };
+  const stop = async (client) => { try { return typeof client.stop === "function" ? await client.stop() === true : (await stopChild(client.child)).stopped === true; } catch { return false; } };
   async function settle(c) {
-    const remaining = new Set(); for (const child of unconfirmed.get(c) ?? []) if (!(await stop(child))) remaining.add(child);
+    const remaining = new Set(); for (const client of unconfirmed.get(c) ?? []) if (!(await stop(client))) remaining.add(client);
     if (remaining.size) { unconfirmed.set(c, remaining); throw new Error("A previous owned text-task process has not verified exit. No replacement was launched."); }
     unconfirmed.delete(c);
   }
   async function dispose(c, resource) {
     for (const client of resource.clients) if (!client.closed) client.close();
     let stopped = true;
-    for (const client of resource.clients) if (!(await stop(client.child))) { stopped = false; const pending = unconfirmed.get(c) ?? new Set(); pending.add(client.child); unconfirmed.set(c, pending); } else unconfirmed.get(c)?.delete(client.child);
+    for (const client of resource.clients) if (!(await stop(client))) { stopped = false; const pending = unconfirmed.get(c) ?? new Set(); pending.add(client); unconfirmed.set(c, pending); } else unconfirmed.get(c)?.delete(client);
     if (!unconfirmed.get(c)?.size) unconfirmed.delete(c);
     return stopped;
   }
   async function use(c, taskId, operation, requestId = null) {
-    const fence = generation(c); await store.authorize(c, { provider }); await settle(c);
+    const fence = generation(c); await store.authorize(c, { provider }); seen.add(c); await settle(c);
     const key = `${c}:${taskId}`;
     if (running.has(key)) throw new Error("A review or text turn is already running for this exact task. Wait or cancel it before sending again.");
     const resource = { clients: new Set(), controller: new AbortController(), cancelled: false, requestId };
@@ -67,7 +68,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
   async function stopCompartment(c) {
     generations.set(c, generation(c) + 1); const resources = [...running.entries()].filter(([key]) => key.startsWith(`${c}:`)).map(([, r]) => r);
     const stopped = await Promise.all(resources.map(async (r) => { r.cancelled = true; r.controller.abort(); return dispose(c, r); }));
-    await settle(c); return { stopped: stopped.every(Boolean), taskCompletionVerified: false };
+    await settle(c); const savedStopped = adapter.verifySavedStop ? await adapter.verifySavedStop(c) : true; return { stopped: stopped.every(Boolean) && savedStopped === true, taskCompletionVerified: false };
   }
   return {
     async list(c) { await store.authorize(c, { provider }); return ((await store.snapshot(c)).codingTurns ?? []).filter(belongs).map(view); },
@@ -111,7 +112,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           if (duplicate) { if (!belongs(duplicate) || duplicate.taskId !== taskId || duplicate.promptSha256 !== scopeHash(text)) throw new Error("This request UUID already names different reviewed text or another task."); return false; }
           if (s.codingTurns.some((t) => t.taskId === taskId && unresolved.has(t.status))) throw new Error("This task has an unresolved previous submission. Review its outcome before starting another.");
           const cutoff = now() - (s.policy === "work" ? 7 : 30) * 86400000;
-          s.codingTurns = s.codingTurns.filter((t) => unresolved.has(t.status) || t.updatedAt >= cutoff);
+          s.codingTurns = s.codingTurns.filter((t) => unresolved.has(t.status) || t.ownedRuntime && t.ownedRuntimeStoppedVerified !== true || t.updatedAt >= cutoff);
           if (s.codingTurns.length >= 32 || Buffer.byteLength(JSON.stringify(s)) > 3 * 1024 * 1024) throw new Error("Review or delete older completed text turns before sending more. Saved context was preserved.");
           s.codingTurns.push({ schema: "switchyard-coding-text-turn/v1", id: requestId, provider, taskId, sessionId: task.sessionId, taskDigest: taskDigest(task), accountFingerprint: task.accountFingerprint, prompt: text, promptSha256: scopeHash(text), status: "reserved", turnId: null, reply: null, createdAt: now(), updatedAt: now(), taskCompletionVerified: false }); return true;
         }, { provider });
@@ -121,6 +122,8 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           await native.prepareTurn(); await authorize();
           await store.update(c, "coding-text-submitting", (s) => { current(); const t = s.codingTurns.find((t) => t.id === requestId); t.status = "submitting"; t.updatedAt = now(); }, { provider }); attempted = true;
           const result = await native.runTurn({ text, signal: resource.controller.signal, checkCurrent: current,
+            onContainment: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian", (s) => { current(); const t = s.codingTurns.find((t) => t.id === requestId); if (t.ownedRuntime && scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The saved owned guardian identity changed before start."); t.ownedRuntime = scope; t.ownedRuntimeStoppedVerified = false; }, { provider }); },
+            onContainmentStopped: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian-exit", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); if (!t || scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The exact saved guardian exit could not be recorded."); t.ownedRuntimeStoppedVerified = true; }); },
             onStarted: async (turnId) => { await store.update(c, "coding-text-identity", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); t.turnId = turnId; t.status = "submitted"; t.updatedAt = now(); }); } });
           if (typeof result.text !== "string" || Buffer.byteLength(result.text) > 32768 || result.nativeStatus !== "completed" || result.nativeSessionVerified !== true || result.nativeTurnIdSupported === true && !/^[A-Za-z0-9_-]{1,128}$/.test(result.turnId ?? "")) throw new Error("The native reply did not verify its bounded session contract. Saved request identity was retained.");
           await authorize(); await verifyRepositoryIdentity(task);
@@ -139,9 +142,9 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
       return { status: stopped ? "owned-connection-stopped" : "stop-unconfirmed", taskCompletionVerified: false, originalEffectsReversed: false };
     },
     async remove(c, id) {
-      return store.update(c, "coding-text-delete", (s) => { const t = s.codingTurns?.find((t) => t.id === id); if (!belongs(t) || unresolved.has(t.status)) throw new Error("Only completed, failed-before-turn or deliberately resolved text records can be deleted."); s.codingTurns = s.codingTurns.filter((t) => t.id !== id); return { deleted: true }; });
+      return store.update(c, "coding-text-delete", (s) => { const t = s.codingTurns?.find((t) => t.id === id); if (!belongs(t) || unresolved.has(t.status) || t.ownedRuntime && t.ownedRuntimeStoppedVerified !== true) throw new Error("Only completed, failed-before-turn or deliberately resolved text records with verified owned process exit can be deleted."); s.codingTurns = s.codingTurns.filter((t) => t.id !== id); return { deleted: true }; });
     },
     stopCompartment,
-    async close() { closed = true; return Promise.all([...new Set([...running.keys()].map((key) => key.split(":")[0]).concat([...unconfirmed.keys()]))].map((c) => stopCompartment(c))); }
+    async close() { closed = true; return Promise.all([...new Set([...seen, ...[...running.keys()].map((key) => key.split(":")[0]), ...unconfirmed.keys()])].map((c) => stopCompartment(c))); }
   };
 }

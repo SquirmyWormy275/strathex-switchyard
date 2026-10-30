@@ -119,7 +119,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     state.audit = state.audit.filter((e) => e.at >= cutoff).slice(-1000);
     state.observations = state.observations.filter((e) => e.updatedAt >= cutoff).slice(-100);
     state.conversations = state.conversations.filter((e) => e.updatedAt >= cutoff).slice(-100);
-    if (state.codingTurns) state.codingTurns = state.codingTurns.filter((e) => ["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"].includes(e.status) || e.updatedAt >= cutoff);
+    if (state.codingTurns) state.codingTurns = state.codingTurns.filter((e) => ["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"].includes(e.status) || e.ownedRuntime && e.ownedRuntimeStoppedVerified !== true || e.updatedAt >= cutoff);
     state.voice = state.voice.filter((e) => e.updatedAt >= cutoff).slice(-100);
   }
   function putProfile(s, p) {

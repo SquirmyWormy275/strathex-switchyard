@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
+import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 
 const windowsHelper = process.env.SWITCHYARD_TEST_RUNTIME_HELPER;
 const options = { env: runtimeEnvironment(), ...(windowsHelper ? { windowsHelper } : {}) };
@@ -49,6 +50,12 @@ test("a pre-cancelled or oversized native input cannot start an owned guardian",
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(4001), onGuardianChild: () => { started = true; } }), /bounded private input/);
   assert.equal(started, false);
 });
+test("owned text resources commit exact guardian scope before execution and durable exit before releasing ownership", { skip }, () => fixture(async (root) => {
+  const resource = { clients: new Set() }, marker = join(root, "ran"); let saved, stopped = false;
+  const result = await runOwnedNativeCommand({ executable: process.execPath, args: ["-e", `process.stdin.resume();process.stdin.on('end',()=>{require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stdout.write('Ready')})`], cwd: root, env: runtimeEnvironment(), text: "Synthetic", resource, command: (exe, args, o) => runRuntimeCommand(exe, args, { ...o, ...(windowsHelper ? { windowsHelper } : {}) }), guardianStopped: frame => runtimeGuardianStopped(frame, options),
+    onReady: async frame => { saved = frame; await assert.rejects(readFile(marker), { code: "ENOENT" }); }, onStopped: async frame => { assert.deepEqual(frame, saved); assert.equal(await runtimeGuardianStopped(frame, options), true); stopped = true; } });
+  assert.equal(result.stdout, "Ready"); assert.equal(stopped, true); assert.equal(resource.clients.size, 1); for (const client of resource.clients) { assert.equal(client.closed, true); assert.equal(await client.stop(), true); }
+}));
 test("cancelling a private input turn stops its native command and descendant under the same guardian", { skip }, () => fixture(async (root) => {
   const marker = join(root, "pids"), controller = new AbortController(); let scope;
   const code = `process.stdin.resume();process.stdin.on('end',()=>{const c=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'inherit'});require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify([process.pid,c.pid]));setInterval(()=>{},1000)})`;

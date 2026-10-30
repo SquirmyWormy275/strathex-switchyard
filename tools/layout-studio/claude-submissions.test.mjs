@@ -20,14 +20,24 @@ async function fixture(fn) {
   const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", status: "registered", label: "Synthetic stopped task", sessionId: randomUUID(), backgroundId: "1234abcd", startedAt: Date.now(), launchPolicy: "tools-disabled/plan", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot), accountFingerprint: claudeAccount(login) };
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });
   await store.initialize("personal"); await store.initialize("company", "work"); await store.update("personal", "synthetic-task", (s) => { s.mode = "personal-companion"; s.codingSessions = [task]; });
-  const settings = { login, version: "2.1.308 (Claude Code)", row: { id: task.backgroundId, cwd: repositoryRoot, kind: "background", state: "stopped", startedAt: task.startedAt, sessionId: task.sessionId }, wrongSession: false, denied: false, delay: false, stderr: "", emptyOutput: false, exitCode: 0, afterPrint: () => {}, beforePrint: () => {} };
+  const settings = { login, version: "2.1.308 (Claude Code)", row: { id: task.backgroundId, cwd: repositoryRoot, kind: "background", state: "stopped", startedAt: task.startedAt, sessionId: task.sessionId }, wrongSession: false, denied: false, delay: false, stderr: "", emptyOutput: false, exitCode: 0, guardianVerified: true, afterPrint: () => {}, beforePrint: () => {} };
   const spawnProcess = (_, args, options) => {
     calls.push({ args, options }); const print = args.includes("-p");
     const value = args[0] === "--version" ? settings.version : args[0] === "auth" ? JSON.stringify(settings.login) : args[0] === "agents" ? JSON.stringify([settings.row]) : JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: settings.wrongSession ? randomUUID() : task.sessionId, result: "Ready", permission_denials: settings.denied ? [{ synthetic: "denied" }] : [] });
     const child = spawn(process.execPath, ["-e", `const s=JSON.parse(process.argv[1]);if(s.print){process.stdin.resume();process.stdin.on('end',()=>{if(s.stderr)process.stderr.write(s.stderr);process.exitCode=s.exitCode;if(s.delay)setTimeout(()=>process.stdout.write(s.value),30000);else process.stdout.write(s.value)})}else process.stdout.write(s.value)`, JSON.stringify({ value: print && settings.emptyOutput ? "" : value, print, delay: settings.delay, stderr: print ? settings.stderr : "", exitCode: print ? settings.exitCode : 0 })], options);
     children.push(child); if (print) { settings.beforePrint(); settings.afterPrint(); } return child;
   };
-  const options = { store, resolveCli: async () => "/synthetic/claude", spawnProcess }, service = createClaudeSubmissions(options), input = { taskId: task.id, text: "Synthetic reviewed native text" };
+  const command = async (executable, args, options) => {
+    const child = spawnProcess(executable, args, { cwd: options.cwd, env: options.env, shell: false, stdio: ["pipe", "pipe", "pipe"] }); options.onGuardianChild(child);
+    const scope = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: child.pid, birth: "1", containment: process.platform === "win32" ? "windows-job" : "owned-linux-session" };
+    const aborted = () => child.kill(); options.signal.addEventListener("abort", aborted, { once: true });
+    let stdout = "", stderr = ""; child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8"); child.stdout.on("data", b => { stdout += b; }); child.stderr.on("data", b => { stderr += b; });
+    const closed = new Promise(resolve => child.once("close", code => resolve(code))); child.stdin.on("error", () => {});
+    try { await options.onGuardianReady(scope); if (options.signal.aborted) { child.kill(); throw new Error("Cancellation requested for the synthetic owned command"); } child.stdin.end(options.inputText); const exitCode = await closed; return { stdout, stderr, exitCode, status: exitCode === 0 ? "completed" : "failed", treeExitVerified: true, inputDelivered: true }; }
+    finally { options.signal.removeEventListener("abort", aborted); }
+  };
+  const guardianStopped = async () => settings.guardianVerified;
+  const options = { store, resolveCli: async () => "/synthetic/claude", spawnProcess, command, guardianStopped }, service = createClaudeSubmissions(options), input = { taskId: task.id, text: "Synthetic reviewed native text" };
   const review = () => service.review("personal", input), submit = (review, extra = {}) => service.submit("personal", { ...input, requestId: randomUUID(), token: review.confirmation.token, ...extra });
   try { await fn({ root, store, service, options, task, settings, calls, children, input, review, submit }); }
   finally { await service.close(); for (const child of children) await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
@@ -35,6 +45,7 @@ async function fixture(fn) {
 test("stopped owned Claude text uses the exact native UUID and account without inventing turn acknowledgements", () => fixture(async ({ root, store, service, options, calls, input, review, submit }) => {
   const approval = await review(); assert.equal(approval.modelPromptSubmitted, false); assert.equal(calls.some((c) => c.args.includes("-p")), false);
   const requestId = randomUUID(), result = await submit(approval, { requestId }); assert.equal(result.reply, "Ready"); assert.equal(result.provider, "claude-code"); assert.equal(result.turnId, null); assert.equal(result.nativeTurnIdSupported, false); assert.equal(result.nativeSessionVerified, true); assert.equal(result.taskCompletionVerified, false);
+  assert.equal(result.ownedRuntime.schema, "switchyard-runtime-command/v1"); assert.equal(result.ownedRuntimeStoppedVerified, true); assert.notEqual(result.ownedRuntime.id, result.sessionId);
   const restarted = createClaudeSubmissions(options); try { assert.equal((await restarted.submit("personal", { ...input, requestId, token: approval.confirmation.token })).duplicatePrevented, true); } finally { await restarted.close(); }
   assert.equal(calls.filter((c) => c.args.includes("-p")).length, 1);
   const print = calls.find((c) => c.args.includes("-p")); assert.equal(print.options.shell, false); assert.equal(print.options.env.ANTHROPIC_API_KEY, undefined); assert.equal(print.options.env.ANTHROPIC_BASE_URL, undefined); assert.ok(print.args.includes("--safe-mode") && print.args.includes("--strict-mcp-config")); assert.equal(print.args[print.args.indexOf("--permission-mode") + 1], "plan"); assert.equal(print.args[print.args.indexOf("--tools") + 1], "");
@@ -107,4 +118,15 @@ test("restart preserves an interrupted first-creation UUID even after the saved 
   const id = randomUUID(); await store.update("personal", "synthetic-interrupted-creation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false }); s.codingTurns = [{ id, taskId: task.id, provider: "claude-code", sessionId: task.sessionId, status: "submitting", updatedAt: Date.now() }]; });
   const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) } });
   try { await suite.handle("/api/suite/snapshot", { compartment: "personal" }); const state = await store.snapshot("personal"); assert.equal(state.codingSessions[0].status, "creation-uncertain"); assert.equal(state.codingTurns[0].status, "outcome-unconfirmed"); const outcome = await service.reviewOutcome("personal", id); await service.resolveOutcome("personal", { id, token: outcome.confirmation.token }); await assert.rejects(review(), /uncertain tasks/); assert.equal(calls.some((c) => c.args.includes("-p")), false); } finally { await suite.close(); }
+}));
+
+test("saved guardian uncertainty survives outcome review, retention and restart and blocks provider replacement until exact exit", () => fixture(async ({ store, service, settings, options, task, calls, review }) => {
+  const id = randomUUID(), scope = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: process.platform === "win32" ? "windows-job" : "owned-linux-session" };
+  await store.update("personal", "synthetic-saved-guardian", (s) => { s.codingTurns = [{ id, provider: "claude-code", taskId: task.id, sessionId: task.sessionId, status: "reviewed-unconfirmed", updatedAt: Date.now()-40*86400000, ownedRuntime: scope, ownedRuntimeStoppedVerified: false }]; });
+  await store.update("personal", "synthetic-retention-pass", () => {}); assert.equal((await store.snapshot("personal")).codingTurns.length, 1);
+  settings.guardianVerified = false; calls.length = 0;
+  const restarted = createClaudeSubmissions(options);
+  try { await assert.rejects(restarted.review("personal", { taskId: task.id, text: "Synthetic" }), /guardian has not verified exit/); await assert.rejects(service.remove("personal", id), /verified owned process exit/); await assert.rejects(restarted.stopCompartment("personal"), /guardian has not verified exit/); assert.equal(calls.length, 0); }
+  finally { settings.guardianVerified = true; await restarted.close(); }
+  await review(); assert.equal(calls.some(c => c.args.includes("-p")), false);
 }));
