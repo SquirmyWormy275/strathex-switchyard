@@ -8,7 +8,7 @@ import { dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileConnection } from "./workspace.mjs";
-import { dispatchPhysicalIntent, intentArguments, waitIntentReceipt } from "./physical-intent.mjs";
+import { closedIntent, dispatchPhysicalIntent, intentArguments, waitIntentReceipt } from "./physical-intent.mjs";
 import { withStateLock } from "./state-lock.mjs";
 
 const exec = promisify(execFile);
@@ -110,7 +110,7 @@ export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devic
 export function createHostBridge({
   configPath = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "hypr/bindings.lua"),
   stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/configuration-transactions"),
-  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now(), intentEntry
+  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now(), intentEntry, afterRestoreWrite = async () => {}
 } = {}) {
   const reviews = new Map();
   const script = fileURLToPath(import.meta.url);
@@ -132,7 +132,7 @@ export function createHostBridge({
   }
   async function lock(fn) {
     await root();
-    return withStateLock(stateRoot, "host", fn);
+    return withStateLock(stateRoot, "host", async lease => { const recovered = await recoverRestoration(lease); return fn(lease, recovered); });
   }
   const save = async (tx) => atomicFile(join(stateRoot, tx.id, "receipt.json"), `${JSON.stringify(tx, null, 2)}\n`);
   async function load(id) {
@@ -151,18 +151,51 @@ export function createHostBridge({
     if (present ? count.length !== 1 || !ours(count[0], c) : count.some((b) => ours(b, c))) throw new Error("Live shortcut readback does not match the reviewed change.");
     if (present && c.callbackName && (await hypr("repl", `type(${callbackName(c)})`)).trim() !== "function") throw new Error("The owned Lua shortcut callback was not loaded.");
   }
-  async function restoreTx(tx) {
-    const current = await config();
+  async function restoredText(tx, text) {
     const baseline = (await ownedFile(join(stateRoot, tx.id, "bindings.lua.before"), true)).text;
-    if (hash(baseline) !== tx.beforeHash) throw new Error("The saved baseline failed verification. No restoration was attempted.");
+    if (hash(baseline) !== tx.beforeHash || typeof tx.block !== "string" || hash(baseline + tx.block) !== tx.afterHash) throw new Error("The saved baseline failed verification. No restoration was attempted.");
+    closedIntent(tx.connection);
+    if (tx.connection.callbackName) callbackName(tx.connection);
     let restored;
-    if (hash(current.text) === tx.beforeHash) restored = current.text;
-    else if (hash(current.text) === tx.afterHash) restored = baseline;
+    if (hash(text) === tx.beforeHash) restored = text;
+    else if (hash(text) === tx.afterHash) restored = baseline;
     else {
-      const first = current.text.indexOf(tx.block);
-      if (first < 0 || current.text.indexOf(tx.block, first + 1) >= 0) throw new Error("The owned shortcut was edited or removed. Review the saved baseline before restoring; unrelated changes are preserved.");
-      restored = current.text.slice(0, first) + current.text.slice(first + tx.block.length);
+      const first = text.indexOf(tx.block);
+      if (first < 0 || text.indexOf(tx.block, first + 1) >= 0) throw new Error("The owned shortcut was edited or removed. Review the saved baseline before restoring; unrelated changes are preserved.");
+      restored = text.slice(0, first) + text.slice(first + tx.block.length);
     }
+    return restored;
+  }
+  const restorationIdentity = tx => hash(JSON.stringify({ id: tx.id, connection: tx.connection, beforeHash: tx.beforeHash, afterHash: tx.afterHash, block: tx.block }));
+  async function verifyRemoved(connections) {
+    if ((await hypr("reload")).trim() !== "ok" || (await hypr("configerrors")).trim()) throw new Error("The compositor could not validate the restored configuration.");
+    const bindings = await live();
+    for (const connection of connections) if (bindings.some(binding => ours(binding, connection))) throw new Error("An owned shortcut remains in live compositor readback; restoration is unconfirmed.");
+    for (const connection of connections) if (connection.callbackName) {
+      const name = callbackName(connection);
+      if ((await hypr("eval", `${name} = nil`)).trim() !== "ok" || (await hypr("repl", `type(${name})`)).trim() !== "nil") throw new Error("The owned shortcut callback removal was not read back.");
+    }
+  }
+  async function recoverRestoration(lease) {
+    const marker = join(stateRoot, "restore-pending.json"); let pending;
+    try { pending = JSON.parse((await ownedFile(marker, true)).text); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+    if (pending.schema !== "switchyard-host-batch-restoration/v1" || !txPattern.test(pending.id) || !/^[a-f0-9]{64}$/.test(pending.beforeHash) || !/^[a-f0-9]{64}$/.test(pending.afterHash) || !Array.isArray(pending.transactions) || !pending.transactions.length || pending.transactions.length > 4096 || pending.transactions.some(tx => !txPattern.test(tx.id) || !/^[a-f0-9]{64}$/.test(tx.identity)) || new Set(pending.transactions.map(tx => tx.id)).size !== pending.transactions.length) throw new Error("The interrupted host restoration record is invalid. Configuration and program files were preserved.");
+    const directory = join(stateRoot, "restorations", pending.id); await ownedDirectory(directory, true);
+    const before = (await ownedFile(join(directory, "bindings.lua.before"), true)).text, after = (await ownedFile(join(directory, "bindings.lua.after"), true)).text;
+    if (hash(before) !== pending.beforeHash || hash(after) !== pending.afterHash) throw new Error("The batch restoration baseline changed; configuration and program files were preserved.");
+    const transactions = [];
+    for (const descriptor of pending.transactions) { const tx = await load(descriptor.id); if (restorationIdentity(tx) !== descriptor.identity || !activeStates.has(tx.status) && tx.status !== "restored") throw new Error("A recorded host transaction changed during batch recovery. Its files were preserved."); closedIntent(tx.connection); if (tx.connection.callbackName) callbackName(tx.connection); transactions.push(tx); }
+    const current = await config(), currentHash = hash(current.text);
+    if (currentHash !== pending.beforeHash && currentHash !== pending.afterHash) throw new Error("Host configuration changed outside both recorded restoration states. Review the dated backup; unrelated changes were preserved.");
+    if (currentHash !== pending.afterHash) { lease.assert(); await atomicFile(configPath, after, current.mode); await afterRestoreWrite(); }
+    await verifyRemoved(transactions.map(tx => tx.connection));
+    if ((await config()).text !== after) throw new Error("The final restored file differs from the exact batch plan.");
+    for (const tx of transactions) { lease.assert(); tx.status = "restored"; tx.detail = "Owned shortcut and callback removed with live readback; unrelated current bindings and dated recovery copies preserved."; await save(tx); }
+    lease.assert(); await atomicFile(join(directory, "result.json"), JSON.stringify({ schema: "switchyard-host-batch-restoration-result/v1", at: new Date().toISOString(), restored: transactions.map(tx => tx.id), afterHash: pending.afterHash })); await rm(marker);
+    return { restored: transactions.map(publicReceipt), backup: directory, readbackVerified: true };
+  }
+  async function restoreTx(tx) {
+    const current = await config(), restored = await restoredText(tx, current.text);
     if ((await config()).text !== current.text) throw new Error("The configuration changed during restoration. Retry after reviewing it.");
     if (restored !== current.text) {
       const directory = join(stateRoot, "restorations", `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID()}`);
@@ -172,14 +205,34 @@ export function createHostBridge({
       if ((await ownedFile(join(directory, "bindings.lua.before"), true)).text !== current.text || (await config()).text !== current.text) throw new Error("The restoration backup or current configuration changed; its bytes were preserved.");
       await atomicFile(configPath, restored, current.mode);
     }
-    await verify(tx.connection, false);
-    if (tx.connection.callbackName && (await hypr("eval", `${callbackName(tx.connection)} = nil`)).trim() !== "ok") throw new Error("The owned shortcut callback could not be cleared.");
+    await verifyRemoved([tx.connection]);
     if ((await config()).text !== restored) throw new Error("Restored file readback failed.");
     tx.status = "restored"; tx.detail = "Owned shortcut removed; previous configuration verified. Later unrelated edits are preserved.";
     await save(tx);
     return publicReceipt(tx);
   }
   return {
+    /** Keep the host lease through the caller's application-removal commit. */
+    async restoreAll(continueRemoval = async result => result) {
+      return lock(async (lease, recovered) => {
+        const ids = (await readdir(stateRoot)).filter(id => txPattern.test(id)).sort().reverse();
+        if (ids.length > 4096) throw new Error("Host transaction history exceeds its bounded restoration inventory. Program files were preserved.");
+        const transactions = [];
+        for (const id of ids) { const tx = await load(id); if (activeStates.has(tx.status)) transactions.push(tx); }
+        if (!transactions.length) return continueRemoval(recovered ?? { restored: [], readbackVerified: true });
+        const current = await config(); let after = current.text;
+        // Preflight every baseline/block against the simulated final file before
+        // the first configuration write or application-file removal.
+        for (const tx of transactions) after = await restoredText(tx, after);
+        const id = `${new Date().toISOString().replaceAll(/[:.]/g, "-")}-${randomUUID()}`, directory = join(stateRoot, "restorations", id);
+        await mkdir(directory, { recursive: true, mode: 0o700 }); await ownedDirectory(directory, true);
+        await writeFile(join(directory, "bindings.lua.before"), current.text, { flag: "wx", mode: 0o600 }); await writeFile(join(directory, "bindings.lua.after"), after, { flag: "wx", mode: 0o600 });
+        await writeFile(join(directory, "reason.txt"), "Restore every exact active Switchyard host shortcut before application removal. Preserve later unrelated bindings and private transaction baselines.\n", { flag: "wx", mode: 0o600 });
+        if ((await config()).text !== current.text) throw new Error("Host bindings changed during batch review. Program files were preserved.");
+        lease.assert(); await atomicFile(join(stateRoot, "restore-pending.json"), JSON.stringify({ schema: "switchyard-host-batch-restoration/v1", id, beforeHash: hash(current.text), afterHash: hash(after), transactions: transactions.map(tx => ({ id: tx.id, identity: restorationIdentity(tx) })) }));
+        const result = await recoverRestoration(lease); lease.assert(); return continueRemoval({ ...result, restored: [...(recovered?.restored ?? []), ...result.restored], ...(recovered?.backup ? { recoveredBackup: recovered.backup } : {}) });
+      });
+    },
     async review(plan, actionId, implementation, target = null) {
       if (process.platform !== "linux") throw new Error("Host application is currently implemented only for Omarchy Linux. Portable design remains available.");
       const connection = compileConnection(plan, actionId, implementation, target);

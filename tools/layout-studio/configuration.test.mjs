@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { once } from "node:events";
+import { spawn } from "node:child_process";
 import { request } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, symlink, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -104,12 +105,12 @@ test("Linux host transaction faults and durable restoration", { skip: process.pl
     const configPath = join(directory, "bindings.lua"), stateRoot = join(directory, "transactions");
     const before = "-- Original bindings; synthetic test only\n";
     await writeFile(configPath, before, { mode: 0o600 });
-    let extra = [], failReload = false, wrongReadback = false, clock = Date.now();
+    let extra = [], failReload = false, wrongReadback = false, clock = Date.now(); const removedCallbacks = new Set();
     const hypr = async (...args) => {
       if (args[0] === "configerrors") return "";
       if (args[0] === "reload") { if (failReload) { failReload = false; throw new Error("Synthetic reload failure"); } return "ok\n"; }
-      if (args[0] === "repl") return "function\n";
-      if (args[0] === "eval" && /^__strathex_switchyard_[a-f0-9]{32} = nil$/.test(args[1])) return "ok\n";
+      if (args[0] === "repl") return removedCallbacks.has(args[1].slice(5, -1)) ? "nil\n" : "function\n";
+      if (args[0] === "eval" && /^__strathex_switchyard_[a-f0-9]{32} = nil$/.test(args[1])) { removedCallbacks.add(args[1].split(" ")[0]); return "ok\n"; }
       if (args[0] === "binds") {
         const text = await readFile(configPath, "utf8");
         const matches = [...text.matchAll(/^o.bind\((.*)\)$/gm)].map((m) => {
@@ -204,6 +205,31 @@ test("Linux host transaction faults and durable restoration", { skip: process.pl
     assert.equal((await restarted.transactions())[0].status, "applying");
     await restarted.restore(tx.id);
     assert.equal(await readFile(configPath, "utf8"), before);
+  }));
+  const applyTwo = async bridge => {
+    const first = await bridge.apply((await review(bridge)).reviewId), secondPlan = plan(); secondPlan.actions[0] = { ...secondPlan.actions[0], id: "other", label: "Second exact shortcut", binding: { keyId: "two", modifier: "gui_alt" } };
+    const second = await bridge.apply((await bridge.review(secondPlan, "other", "native-chatgpt.focus/v1")).reviewId); return [first, second];
+  };
+  await t.test("batch uninstall restoration preserves later edits and verifies every shortcut before continuation", () => fixture(async ({ bridge, configPath, before }) => {
+    await applyTwo(bridge); await writeFile(configPath, (await readFile(configPath, "utf8")) + "-- user addition\n"); let committed = false;
+    const result = await bridge.restoreAll(async restored => { assert.equal(await readFile(configPath, "utf8"), before + "-- user addition\n"); assert.equal(restored.restored.length, 2); assert.ok((await bridge.transactions()).every(tx => tx.status === "restored")); committed = true; return restored; });
+    assert.equal(committed, true); assert.equal(result.readbackVerified, true);
+  }));
+  await t.test("batch restoration preflights all owned blocks before the first mutation", () => fixture(async ({ bridge, configPath }) => {
+    await applyTwo(bridge); const edited = (await readFile(configPath, "utf8")).replace("Show ChatGPT", "User replacement"); await writeFile(configPath, edited); let committed = false;
+    await assert.rejects(bridge.restoreAll(() => { committed = true; }), /edited or removed/); assert.equal(committed, false); assert.equal(await readFile(configPath, "utf8"), edited); assert.equal((await bridge.transactions()).filter(tx => tx.status === "applied").length, 2);
+  }));
+  await t.test("forced owner loss after batch write recovers its exact journal through a fresh kernel lease", () => fixture(async ({ bridge, options, configPath, before, stateRoot }) => {
+    await applyTwo(bridge);
+    const program = `import{createHostBridge}from ${JSON.stringify(new URL("./host.mjs", import.meta.url).href)};await createHostBridge({...${JSON.stringify({ configPath: options.configPath, stateRoot: options.stateRoot })},afterRestoreWrite:()=>process.kill(process.pid,'SIGKILL')}).restoreAll();`;
+    const signal = await new Promise((resolve, reject) => { const child = spawn(process.execPath, ["--input-type=module", "-e", program], { shell: false, stdio: "ignore" }); child.once("error", reject); child.once("close", (code, signal) => resolve(signal)); });
+    assert.equal(signal, "SIGKILL"); assert.equal(await readFile(configPath, "utf8"), before); assert.ok(await readFile(join(stateRoot, "restore-pending.json")));
+    const recovered = await createHostBridge(options).restoreAll(); assert.equal(recovered.restored.length, 2); assert.equal(recovered.readbackVerified, true); await assert.rejects(readFile(join(stateRoot, "restore-pending.json")), { code: "ENOENT" });
+  }));
+  await t.test("interrupted batch recovery preserves an unrelated edit outside its exact recorded states", () => fixture(async ({ bridge, options, configPath, before, stateRoot }) => {
+    await applyTwo(bridge); const interrupted = createHostBridge({ ...options, afterRestoreWrite: () => { throw new Error("Synthetic batch interruption"); } });
+    await assert.rejects(interrupted.restoreAll(), /batch interruption/); const edited = before + "-- user edit during recovery\n"; await writeFile(configPath, edited); let committed = false;
+    await assert.rejects(createHostBridge(options).restoreAll(() => { committed = true; }), /outside both recorded/); assert.equal(committed, false); assert.equal(await readFile(configPath, "utf8"), edited); assert.ok(await readFile(join(stateRoot, "restore-pending.json")));
   }));
   await t.test("discovery can report disconnected hardware without opening any HID device", () => fixture(async ({ directory }) => {
     const evidence = await discoverHost(async () => { throw new Error("Synthetic absent compositor"); }, directory);
