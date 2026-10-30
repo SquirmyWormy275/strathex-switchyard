@@ -71,6 +71,11 @@ test("import reviews show concrete typing differences, reject stale definitions/
   assert.equal(refreshed.localConnections.disconnectedRoleBindings, 1);
   await store.saveWorkflow("personal", { name: "Changed meanwhile", roles: [], steps: [] });
   await assert.rejects(store.importProfilePackage("personal", document, refreshed.reviewId), /Review this exact/);
+  await store.initialize("blank"); const first = await store.reviewProfilePackage("blank", document);
+  assert.equal(first.workflow.changed, true);
+  await store.saveWorkflow("blank", { name: "Edited before the first layout", roles: [], steps: [] });
+  await assert.rejects(store.importProfilePackage("blank", document, first.reviewId), /Review this exact/);
+  assert.equal((await store.snapshot("blank")).profile, null);
 }));
 test("second-host imports preserve keyboard-only policy, clear colliding role authority and round-trip metadata after restart", () => fixture(async ({ root, secrets, store }) => {
   await store.saveProfile("personal", sample());

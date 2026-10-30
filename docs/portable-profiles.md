@@ -4,6 +4,12 @@ A portable profile describes your keyboard and workflow. Each computer supplies
 its own authorized app connections. Moving a profile never enrolls an account,
 chooses a task session or turns on companion mode.
 
+Import reviews also bind the current standalone workflow, even before the first
+keyboard layout is saved. Editing that workflow invalidates an older review and
+the review shows its concrete replacement. A readout-derived workflow adds an
+exact source-digest check under the same state lease as adoption; changing the
+captured keyboard data cannot silently cross that review.
+
 The existing Studio v1 file remains supported. The backend now provides a v2
 package with:
 

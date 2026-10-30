@@ -69,7 +69,7 @@ export function packageDefinition(value) {
   const p = parsePortablePackage(value);
   return definition({ schema: portableSchema, id: p.id, name: p.name, plan: p.plan, workflow: p.workflow });
 }
-export function preparePortableImport(value, { currentProfile = null, localBindings = [] } = {}) {
+export function preparePortableImport(value, { currentProfile = null, currentWorkflow = null, localBindings = [] } = {}) {
   bounded(value);
   if (![packageSchema, portableSchema, "sxsy-agentic-layout-plan/v1"].includes(value.schema)) return { status: "unsupported", preserved: true, sourceDigest: hash(value), reason: "Keep the original document. This version cannot replace saved definitions." };
   const document = value.schema === packageSchema ? parsePortablePackage(value)
@@ -80,10 +80,12 @@ export function preparePortableImport(value, { currentProfile = null, localBindi
     if (!target || canonical(target[field]) !== canonical(document.compatibility[field])) differences.push({ field, current: target?.[field] ?? null, imported: document.compatibility[field] });
   }
   const currentDigest = portableDefinitionDigest(current), localBindingsDigest = hash(localBindings);
-  const review = { schema: "switchyard-profile-import-review/v1", revision: document.revision, currentDigest, localBindingsDigest };
+  const workflow = currentWorkflow === null ? current?.workflow ?? null : parseWorkflow(currentWorkflow);
+  const review = { schema: "switchyard-profile-import-review/v1", revision: document.revision, currentDigest, currentWorkflowDigest: hash(workflow), localBindingsDigest };
   return {
     status: "review-required", reviewId: hash(review), document, migrationRequired: value.schema !== packageSchema,
     compatibility: { comparison: "saved definitions only; no device read", differences, liveDeviceVerified: false },
+    workflow: { current: workflow, imported: document.workflow, changed: canonical(workflow) !== canonical(document.workflow) },
     localConnections: { disconnectedRoleBindings: localBindings.length, imported: 0, requiresLocalReview: true },
     requiredCapabilities: document.requiredCapabilities.map((id) => ({ id, status: "requires-local-verification" })),
     activation: "definitions only; local mode, accounts and policy are preserved",

@@ -22,6 +22,7 @@ import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
 import { exportAssignmentLegends } from "./legend-export.mjs";
 import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
 import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
+import { createReadoutProfiles } from "./readout-profiles.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
@@ -32,6 +33,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
   const voiceQueue = createVoiceQueue({ store, voice });
+  const readoutProfiles = createReadoutProfiles({ store, catalog: sourceCatalog });
   foreground ??= process.platform === "linux" ? { implemented: true, read: async (c, beforeStart) => { await beforeStart(); return { available: true, category: surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), provenance: "Hyprland application class; no task identity" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} } : { implemented: false };
   const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
@@ -230,6 +232,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         return { ...result, snapshotStatus: Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 120000 ? "recent-readout" : "historical-readout", applied: false, note: "This compares the protected readout to source references. It performs no HID operation, changes no profile and grants no host/device authority." };
       }
       if (path === "/api/suite/devices/read") return devices.read(compartment, body.deviceId);
+      if (path === "/api/suite/devices/profile/review") return readoutProfiles.review(compartment, body);
+      if (path === "/api/suite/devices/profile/adopt") return readoutProfiles.adopt(compartment, body);
       if (path === "/api/suite/devices/review") return devices.review(compartment, body.deviceId, body.configuration ?? body.changes);
       if (path === "/api/suite/devices/apply") return devices.apply(compartment, body.reviewId);
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
@@ -304,6 +308,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }

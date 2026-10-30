@@ -197,12 +197,15 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     async exportProfile(id) { const s = await read(id); permit(s, { operation: "export" }); if (!s.profile) throw new Error("Save a profile first."); return importProfile(s.profile); },
     async reviewProfilePackage(id, value) {
       const s = await read(id); permit(s);
-      return preparePortableImport(value, { currentProfile: s.profile, localBindings: s.roleBindings ?? [] });
+      return preparePortableImport(value, { currentProfile: s.profile, currentWorkflow: s.workflow, localBindings: s.roleBindings ?? [] });
     },
-    async importProfilePackage(id, value, reviewId) {
+    async importProfilePackage(id, value, reviewId, { verifySource = () => {} } = {}) {
       return mutate(id, (s) => {
         permit(s);
-        const review = preparePortableImport(value, { currentProfile: s.profile, localBindings: s.roleBindings ?? [] });
+        // A host-owned source check runs under the same state lease as adoption.
+        // HTTP input cannot supply this callback or a source assertion.
+        verifySource(s);
+        const review = preparePortableImport(value, { currentProfile: s.profile, currentWorkflow: s.workflow, localBindings: s.roleBindings ?? [] });
         if (review.status !== "review-required" || typeof reviewId !== "string" || reviewId !== review.reviewId) throw new Error("Review this exact profile and current local connections before importing. Saved definitions are unchanged.");
         const p = packageDefinition(review.document);
         putProfile(s, p);

@@ -115,6 +115,36 @@ the physical case or attest the controller hardware. Original xwhatsit requires
 its separate protocol/lineage path and is not guessed from the Vial catalog.
 Frontend reconciliation controls and actual F77 acceptance remain pending.
 
+## Start from your captured typing layer
+
+The backend can prepare *Keep my place* from a recent protected readout rather
+than replacing it with factory typing. `POST /api/suite/devices/profile/review`
+accepts `deviceId` (one board), or `deviceIds` (two declared split halves in
+left/right source order), and an optional friendly `name`. It requires an exact
+source UID/definition pair and decoded layout choices. Both split definitions
+must form one declared source pair; one half or a reversed/unrelated pair cannot
+be treated as a whole board.
+
+The candidate retains the captured ordinary layer and opaque keycodes. Four
+modified controls prefer unique number-row, keypad, function or letter positions;
+duplicates stay unassigned. It includes stable Builder/Reviewer roles and intents.
+The review shows typing/geometry/workflow differences and the local connections
+that adoption would disconnect. A physical case is not guessed from firmware.
+
+`POST /api/suite/devices/profile/adopt` consumes that review's opaque `reviewId`
+once. Reviews expire with the readout after two minutes. The source digest is
+checked under the same state lease as import; changed snapshots, definitions,
+standalone workflows or local role connections require another review. Adoption
+changes saved definitions and clears the reviewed role bindings. It preserves
+local mode, policy, accounts and keys, writes nothing to a keyboard and applies
+no desktop connection. Connect local tools separately. All of these routes use
+the normal authenticated exact-origin session and selected compartment.
+
+This is implemented for single interfaces and declared split pairs, with fault
+and authenticated HTTP tests. The frontend controls and physical pairing/typing
+acceptance remain pending. Logical right-half matrix rows use the same portable
+offset as the source catalog; this is not a combined physical controller matrix.
+
 The manufacturer's [new-design request page](https://modelfkeyboards.com/product/ultra-compact-new-model-f-designs-split-ortho-planck-preonic-6x12-f20-kinesis-advantage-unsaver-etc/)
 distinguishes possible future designs from made boards. Development references
 exist for 4×12, 5×12 and F20; these do not establish shipped hardware. No final

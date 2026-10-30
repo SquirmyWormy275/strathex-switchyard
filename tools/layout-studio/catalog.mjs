@@ -9,6 +9,15 @@ export const taskControls = Object.freeze([
   { id: "review", label: "Review the work", family: "review", consequence: "read_only", detail: "Bring the work and its evidence into review." },
   { id: "handoff", label: "Leave a handoff", family: "context", consequence: "navigation", detail: "Prepare context for the next person or agent." }
 ]);
+export function recommendedWorkflow() {
+  return parseWorkflow({ name: "Keep my place", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [
+    { id: "define", label: "Define the task and its acceptance evidence", roleId: "builder", after: [] },
+    { id: "resume", label: "Return to the same task after an interruption", roleId: "builder", after: ["define"] },
+    { id: "status", label: "Check progress and identify what needs attention", roleId: "builder", after: ["resume"] },
+    { id: "review", label: "Review the result and its evidence", roleId: "reviewer", after: ["status"] },
+    { id: "handoff", label: "Leave the next step and reviewed context", roleId: "builder", after: ["review"] }
+  ] });
+}
 const alias = { ESCAPE: "Esc", BSPACE: "Backspace", BSPC: "Backspace", ENTER: "Enter", SPACE: "Space", LSHIFT: "Shift", LCTRL: "Ctrl", SCOLON: ";", QUOTE: "'", LBRACKET: "[", RBRACKET: "]", MINUS: "−", EQUAL: "=", COMMA: ",", DOT: ".", SLASH: "/", BSLASH: "\\", GRAVE: "`", CAPSLOCK: "Caps", LALT: "Alt", RALT: "Alt", LGUI: "Super", RGUI: "Super", LSFT: "Shift", RSFT: "Shift", RSHIFT: "Shift", LCTL: "Ctrl", RCTL: "Ctrl", RCTRL: "Ctrl", MINS: "−", EQL: "=", SCLN: ";", QUOT: "'", LBRC: "[", RBRC: "]", BSLS: "\\", GRV: "`", CAPS: "Caps" };
 export function keyLabel(code, matrix) { if (!code || code === "KC_NO") return `Key ${matrix.join(",")}`; const short = code.replace(/^KC_/, ""); return (alias[short] ?? short).slice(0, 32); }
 const dvorak = Object.fromEntries(Object.entries({ Q: "QUOTE", W: "COMMA", E: "DOT", R: "P", T: "Y", Y: "F", U: "G", I: "C", O: "R", P: "L", LBRACKET: "SLASH", LBRC: "SLASH", RBRACKET: "EQUAL", RBRC: "EQUAL", A: "A", S: "O", D: "E", F: "U", G: "I", H: "D", J: "H", K: "T", L: "N", SCOLON: "S", SCLN: "S", QUOTE: "MINUS", QUOT: "MINUS", Z: "SCOLON", X: "Q", C: "J", V: "K", B: "X", N: "B", M: "M", COMMA: "W", DOT: "V", SLASH: "Z", SLSH: "Z", MINUS: "LBRACKET", MINS: "LBRACKET", EQUAL: "RBRACKET", EQL: "RBRACKET" }).map(([a, b]) => [`KC_${a}`, `KC_${b}`]));
@@ -48,13 +57,7 @@ export function standardPreset(catalog, modelId, { variantId, choices, typing = 
   });
   const plan = parsePlan({ ...newPlan(profile), actions });
   if (analyzePlan(plan).issues.some((i) => i.severity === "error")) throw new Error("The selected physical options conflict. Review their arrangement.");
-  const workflow = parseWorkflow({ name: "Keep my place", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [
-    { id: "define", label: "Define the task and its acceptance evidence", roleId: "builder", after: [] },
-    { id: "resume", label: "Return to the same task after an interruption", roleId: "builder", after: ["define"] },
-    { id: "status", label: "Check progress and identify what needs attention", roleId: "builder", after: ["resume"] },
-    { id: "review", label: "Review the result and its evidence", roleId: "reviewer", after: ["status"] },
-    { id: "handoff", label: "Leave the next step and reviewed context", roleId: "builder", after: ["review"] }
-  ] });
+  const workflow = recommendedWorkflow();
   return { portable: portableProfile(plan, `model-f-${model.id}`, `${model.name} · Keep my place`, workflow), model, variant, choices: variant.parts.map((p, i) => choices?.[i] ?? p.choices), typing,
     evidence: "Factory/development source reference. Import your own readout before host shortcuts can be connected. No firmware or ordinary typing changes.", sources: [...new Set(variant.parts.flatMap((p) => [p.source, catalog.definitions[p.definitionId].source, ...(p.geometrySource ? [p.geometrySource] : [])]))] };
 }

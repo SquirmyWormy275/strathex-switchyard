@@ -770,3 +770,28 @@ conversion, while the generated catalog pins LF for canonical regeneration.
 The regression verifies both original CRLF instructions and LF vectors/headers
 through an actual Windows-style checkout. Source hashes are unchanged and no
 integrity check is relaxed. Updated native Windows verification remains pending.
+
+## Readout-derived recommended workflows
+
+The backend now prepares and adopts the recommended four-control workflow from
+the captured typing layer, retaining Dvorak and opaque codes instead of copying
+factory typing. Unique ordinary positions receive modified intents; duplicates
+remain unassigned. Single boards and two distinct declared split halves are
+supported; reversed/unrelated halves and missing known split parts are rejected.
+Portable right-half matrix offsets remain logical, not a combined controller.
+
+Reviews expire with the two-minute source window and are consumed once. The
+exact readout digest is rechecked under the protected import lease. Adoption
+preserves mode/policy/accounts/keys and changes no hardware or desktop shortcut.
+The existing import machinery clears only the reviewed local role enrollment.
+Review identity now also includes the standalone workflow when no profile exists,
+closing a stale-review gap found by the new source-adoption tests. The normal
+authenticated API accepts interface IDs and a friendly name; callers cannot
+replace the protected snapshot or assert its verification.
+
+The readout/catalog/portable suites pass **17 focused tests**, including actual
+HTTP review/adopt, duplicate consumption, changed-source/workflow rejection,
+Dvorak/opaque retention and paired matrix identity. Typecheck and canonical
+catalog checks pass. New integrated verification and normal installed update
+follow. The frozen frontend is unchanged; its source/adoption controls and
+physical keyboard/pairing acceptance remain pending.
