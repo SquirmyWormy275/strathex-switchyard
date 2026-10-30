@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, readlink, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { compileConnection } from "./workspace.mjs";
@@ -102,12 +102,14 @@ export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devic
 export function createHostBridge({
   configPath = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "hypr/bindings.lua"),
   stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/configuration-transactions"),
-  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now()
+  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now(), intentEntry
 } = {}) {
   const reviews = new Map();
   const script = fileURLToPath(import.meta.url);
   if ([script, process.execPath].some((s) => /[\0\r\n]/.test(s))) throw new Error("The application path is unsupported.");
-  const command = (connection) => [process.execPath, script, ...intentArguments(connection)].map(quote).join(" ");
+  const entry = intentEntry ?? [process.execPath, script];
+  if (!Array.isArray(entry) || entry.length !== 2 || entry[0] !== process.execPath || entry.some((s) => typeof s !== "string" || !isAbsolute(s) || /[\0\r\n]/.test(s))) throw new Error("The stable intent entry did not verify.");
+  const command = (connection) => [...entry, ...intentArguments(connection)].map(quote).join(" ");
   const live = async () => {
     const list = JSON.parse(await hypr("binds", "-j"));
     if (!Array.isArray(list)) throw new Error("The compositor shortcut list is unavailable.");

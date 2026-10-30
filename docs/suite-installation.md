@@ -76,10 +76,55 @@ also build the platform bundle and retain it as a private Actions artifact for
 seven days. Those builds do not establish interactive Windows device, shortcut,
 DPAPI, focus or microphone acceptance.
 
-## Implementation still in progress
+## Install, update, restore and remove
 
-The persistent desktop launcher, installed version switching, rollback,
-uninstall and runtime maintenance are the next lifecycle work.
-Use the existing review server while that work continues. No existing desktop
-launcher, autostart setting, ordinary keyboard mapping or protected data is
-changed by building a package.
+After reviewing the bundle identity printed by the builder:
+
+```sh
+/absolute/path/to/node /absolute/bundle/deployment/suite/manage.mjs install /absolute/bundle EXPECTED_SHA256
+switchyard launch
+switchyard status
+switchyard update /absolute/new-bundle EXPECTED_SHA256
+switchyard rollback
+switchyard recover
+switchyard uninstall
+```
+
+Linux installs to `~/.local/share/strathex-switchyard/application`, adds
+`~/.local/bin/switchyard` and a **Switchyard** desktop entry. Windows installs
+under `%LOCALAPPDATA%\Programs\Switchyard`, creates a Start Menu shortcut and
+provides `switchyard.cmd` in that directory. Native shortcut creation reads back
+the exact target and arguments. Neither path installs a login autostart service.
+Add `--no-start` to installation/update for deliberate headless setup.
+
+Only the current program version and one rollback version are retained. A stable
+loader verifies the pinned Node executable and expected release before loading
+the application. Installed Linux host shortcuts use that stable entry, so
+retiring a previous program version cannot break their command path.
+
+Every persistent entry change has a dated exact-byte backup and reason under
+the private application state directory's `installation-backups/`. A durable
+journal precedes replacement. Failed writes restore the previous entry bytes;
+`recover` handles interrupted transactions and refuses unrelated edits before
+writing anything. A committed update whose final cleanup was interrupted is
+kept. Unowned or subsequently edited launchers are preserved. Unknown/modified
+program contents are retained and reported as pending cleanup.
+
+Uninstall removes only matching owned launchers and verified program versions.
+Protected workspace data, OS credential entries and the shared optional runtime
+are retained. Active host connections must be restored in the app first; their
+program and recovery baseline remain available until that succeeds. This guard
+does not stop an application when it refuses removal. Automatic connection
+restoration as part of uninstall is still unfinished.
+
+## Implementation and acceptance still in progress
+
+Linux installer tests exercise real installed application processes through
+update and rollback, seven failure/recovery scenarios, a forced installer exit
+and preserved protected/runtime files. Actual pilot desktop-entry/launch
+acceptance is tracked separately. Native Windows managed startup currently fails
+in CI and is being diagnosed; a Windows host is not the cause of that software
+failure. Native Windows shortcut/install execution must pass CI before acceptance
+is claimed. Complete optional-runtime maintenance, pre-promotion crash cleanup
+and broader owned-provider containment remain implementation work. Building a
+package changes no launcher or keyboard mapping by itself.

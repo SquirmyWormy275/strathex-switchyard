@@ -34,9 +34,9 @@ export const studioAssets = new Map([
   ["/sample-study-report.json", ["sample-study-report.json", "application/json; charset=utf-8"]]
 ]);
 
-export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge, discover = discoverHost, suite = createSuite(), assetRoot = directory, platform = process.platform, windowsDriverFactory, instance, onApplicationStop } = {}) {
+export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge, discover = discoverHost, suite = createSuite(), assetRoot = directory, platform = process.platform, windowsDriverFactory, instance, onApplicationStop, intentEntry } = {}) {
   const instanceGateway = instance ? createInstanceGateway({ token, identity: instance, onStop: onApplicationStop }) : null;
-  bridge ??= platform === "win32" ? createWindowsHostBridge({ store: suite.store, verifyTarget: (c) => suite.authorizeConnection(undefined, c), dispatch: (c) => suite.handle("/api/suite/intent", c), driverFactory: windowsDriverFactory ?? (() => new WindowsNativeHotkeys({ origin: `http://127.0.0.1:${server.address().port}/`, token })) }) : createHostBridge({ verifyTarget: (c) => suite.authorizeConnection(undefined, c) });
+  bridge ??= platform === "win32" ? createWindowsHostBridge({ store: suite.store, verifyTarget: (c) => suite.authorizeConnection(undefined, c), dispatch: (c) => suite.handle("/api/suite/intent", c), driverFactory: windowsDriverFactory ?? (() => new WindowsNativeHotkeys({ origin: `http://127.0.0.1:${server.address().port}/`, token })) }) : createHostBridge({ verifyTarget: (c) => suite.authorizeConnection(undefined, c), intentEntry });
   const server = createServer(async (request, response) => {
     response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
     response.setHeader("X-Content-Type-Options", "nosniff");

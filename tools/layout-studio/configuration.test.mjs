@@ -153,6 +153,11 @@ test("Linux host transaction faults and durable restoration", { skip: process.pl
     collision(); await assert.rejects(review(bridge), /already assigned/);
     assert.equal(await readFile(configPath, "utf8"), before + "-- changed after review\n");
   }));
+  await t.test("installed shortcuts use a stable verified entry instead of a retired version path", () => fixture(async ({ options, configPath, directory }) => {
+    const loader = join(directory, "application launch.mjs"), stable = createHostBridge({ ...options, intentEntry: [process.execPath, loader] });
+    const tx = await stable.apply((await review(stable)).reviewId), written = await readFile(configPath, "utf8");
+    assert.ok(written.includes("application launch.mjs")); assert.equal(written.includes("versions/"), false); await stable.restore(tx.id);
+  }));
   await t.test("failed reload restores and verifies the complete previous file", () => fixture(async ({ bridge, configPath, before, failReload }) => {
     const r = await review(bridge); failReload();
     await assert.rejects(bridge.apply(r.reviewId), /prior host configuration was restored/);

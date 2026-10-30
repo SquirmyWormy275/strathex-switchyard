@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **96/96 groups passed; 656 tests, 647 passed and 9
+- Integrated native Linux run: **97/97 groups passed; 664 tests, 655 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-4dcb6634-2796-43c8-83fc-d047caca510a.json`.
+  `.sxsy-verification/isolated-test-989e853f-fe91-452e-838c-5210e570d2ad.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -246,8 +246,9 @@ inventory still returned zero candidates, without opening an interface.
 
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; expanded layer/macro editing UI and device settings
-editing; Windows interactive acceptance and packaging; install/update/rollback/uninstall and
-a normal launcher; child supervision; profile-library visual acceptance; runtime update/recovery lifecycle; assignment legend export.
+editing; Windows managed-startup correction and interactive acceptance;
+automatic connection restoration during uninstall; broader child supervision;
+profile-library visual acceptance; runtime update/recovery lifecycle; assignment legend export.
 The Home example is explicitly sample work, never presented as a live agent result.
 
 The integrated suite now has a small, manifest-verified bundle builder and a
@@ -259,7 +260,7 @@ selected tracked source enters the bundle. Accounts, protected state, models,
 Python environments and npm dependencies are excluded. Both CI lanes now build
 private platform packages; the Windows package requires its built native hotkey
 helper and includes its source/runtime licenses. This is unsigned development
-packaging; normal launch, installation and version lifecycle remain unfinished.
+packaging; the installed path and remaining lifecycle work are described below.
 See [build/run details](suite-installation.md).
 
 Managed CLI startup now holds a short startup lock and a separate lifetime lease,
@@ -269,8 +270,8 @@ readback. Request/response proofs bind fresh nonce, route, origin and generation
 the browser access token is never disclosed during instance discovery. Actual
 Linux subprocess tests cover three parallel launches, abrupt-owner recovery,
 different-build preservation and occupied ports. The persistent installer,
-desktop entry, installed updates/rollback/uninstall and broader child containment
-are still required. These are not marked blocked by absent hardware.
+desktop entry and installed updates/rollback/uninstall are implemented in the next
+checkpoint below; broader child containment remains required. These are not marked blocked by absent hardware.
 
 The clean bundle from `6a17a24` also ran outside the checkout with the pilot's
 actual protected store: frozen Home hash matched, an unauthenticated API call was
@@ -278,6 +279,25 @@ rejected, the dedicated validation workspace remained keyboard-only and the owne
 process exited. Its 339 program/source/license files total 2,080,079 bytes.
 Private receipt: `runtime-verification/suite-package-1793354686608.json`.
 The earlier prototype bundle was removed after verification.
+
+Persistent installation/update/rollback/removal now has code for Linux and
+Windows, dated exact-entry backups, complete copy/readback before activation,
+current-plus-one-rollback retention and a durable installation journal. Seven
+Linux scenarios pass, including actual installed processes across update and
+rollback, failed writes, forced owner exit and all-file recovery preflight.
+Installed host commands use a verified stable loader rather than a retired
+version path. Uninstall retains protected data/runtime and refuses active host
+connections until they are restored, so automatic connection restoration remains
+unfinished. Pre-promotion crash cleanup and broader provider containment remain
+implementation work. The next step is actual installation/entry verification on
+the pilot workstation; no pilot installation is claimed by these fixture tests.
+
+Windows CI at `880d1f2` failed the three managed-application startup cases before
+the complete release step. Existing backend cases continued to pass. Startup now
+emits only bounded allowlisted stage labels over a separate private pipe, and
+temporary fixture cleanup tolerates a bounded delay for released Windows handles.
+The next native run must identify and fix the actual startup failure. It is a
+software defect, separate from unavailable interactive Windows hardware/accounts.
 
 ## Branch and handover
 
@@ -298,9 +318,9 @@ solenoid adjustment or persistent desktop modification has been performed here.
 2. Complete remaining controller capabilities: tap-dance/combo/encoder/settings
    transactions, exact source/model reconciliation and their failure/recovery
    tests. Keep all physical F77/B122 checks separately pending.
-3. Package the integrated suite's normal launch, single-instance startup,
-   install/update/rollback/uninstall and owned-process recovery on Linux/Windows.
-   Then complete profile compatibility metadata and dynamic
+3. Exercise the installed pilot entry, fix native Windows managed startup and
+   finish automatic connection restoration, pre-promotion cleanup and runtime
+   maintenance. Then complete profile compatibility metadata and dynamic
    assignment legends. The frontend remains frozen for the user's morning review;
    task/device/role UI work is still required in the next frontend iteration.
 

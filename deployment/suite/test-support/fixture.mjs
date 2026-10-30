@@ -16,5 +16,5 @@ export async function fixture(fn, platform = "linux") {
   const digest = hash(JSON.stringify(files)); await writeFile(join(frontendRoot, "manifest.json"), JSON.stringify({ schema: "switchyard-front-end-review/v1", digest, files }), { mode: 0o600 });
   const options = { sourceRoot, sourceFiles, frontendRoot, outputRoot: join(root, "bundles"), sourceCommit: "a".repeat(40), development: true, platform, windowsHotkeys: join(root, "fault-helper.exe") };
   try { await fn({ root, frontendRoot, options, bundle: await buildSuiteRelease(options) }); }
-  finally { await rm(root, { recursive: true, force: true }); }
+  finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
 }

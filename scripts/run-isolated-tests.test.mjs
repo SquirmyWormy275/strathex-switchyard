@@ -85,6 +85,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
+      ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],

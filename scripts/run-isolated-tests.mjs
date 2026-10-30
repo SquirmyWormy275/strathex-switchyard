@@ -97,6 +97,7 @@ export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/application.test.mjs" },
+  { file: "deployment/suite/installation.test.mjs", timeoutMs: 120_000 },
   { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },

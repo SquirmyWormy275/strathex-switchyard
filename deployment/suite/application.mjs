@@ -9,6 +9,7 @@ import { privateDirectory, privateRead, privateWrite } from "../../tools/layout-
 import { runtimeDirectory, publishEndpoint, reviewAccessToken } from "../../tools/layout-studio/physical-intent.mjs";
 import { newInstanceIdentity, requestInstance, endpointIdentity } from "../../tools/layout-studio/instance.mjs";
 import { stopOwnedChild } from "../../tools/layout-studio/owned-process.mjs";
+import { readOwnedFile } from "./owned-files.mjs";
 
 export const applicationStateRoot = () => join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA || join(homedir(), "AppData/Local") : join(homedir(), ".local/state")), "strathex-switchyard/application");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -27,16 +28,25 @@ export async function applicationStatus({ stateRoot = applicationStateRoot() } =
   try { return { status: "running", ...(await requestInstance(endpoint)) }; }
   catch (e) { if (e.code === "ECONNREFUSED") return { status: "not-listening", verification: "No process answered; the saved endpoint is retained for recovery." }; throw e; }
 }
-export async function serveApplication({ bundleRoot, port = 43177, stateRoot = applicationStateRoot(), runtimeRoot = runtimeDirectory(), onReady = () => {} } = {}) {
+export async function serveApplication({ bundleRoot, port = 43177, stateRoot = applicationStateRoot(), runtimeRoot = runtimeDirectory(), onReady = () => {}, onStage = () => {} } = {}) {
+  onStage("verifying-release");
   const manifest = await verifySuiteRelease(bundleRoot, { platform: process.platform, checkRuntime: true });
+  onStage("release-verified");
   if (!Number.isSafeInteger(port) || port !== 0 && (port < 1024 || port > 65535)) throw new Error("Choose a valid local application port.");
   return withStateLock(stateRoot, "application-owner", async (lease) => {
+    onStage("ownership-held");
     lease.assert(); const instance = newInstanceIdentity(manifest.id);
     const token = port ? await reviewAccessToken({ root: runtimeRoot, port, review: manifest.frontend.digest }) : undefined;
     const { createStudioServer } = await import("../../tools/layout-studio/serve.mjs");
+    let intentEntry;
+    if (process.env.SWITCHYARD_INSTALLATION_ROOT) {
+      const root = process.env.SWITCHYARD_INSTALLATION_ROOT, installed = JSON.parse((await readOwnedFile(join(root, "installed.json"))).bytes.toString("utf8")), loader = join(root, "launch.mjs");
+      if (installed.schema !== "switchyard-installation/v1" || installed.current !== manifest.id || join(root, "versions", manifest.id) !== bundleRoot || installed.runtime.path !== process.execPath || installed.managedFiles.find((f) => f.role === "loader")?.sha256 !== (await readOwnedFile(loader))?.sha256) throw new Error("The stable installed intent entry did not verify.");
+      intentEntry = [process.execPath, loader];
+    }
     let resolveLife, rejectLife, stopping;
     const life = new Promise((resolve, reject) => { resolveLife = resolve; rejectLife = reject; });
-    const server = createStudioServer({ assetRoot: join(bundleRoot, "frontend"), token, instance, onApplicationStop: () => shutdown() });
+    const server = createStudioServer({ assetRoot: join(bundleRoot, "frontend"), token, instance, onApplicationStop: () => shutdown(), intentEntry });
     function shutdown() {
       if (stopping) return stopping;
       stopping = (async () => { server.closeAllConnections(); if (server.listening) await new Promise((r) => server.close(r)); await server.cleanup(); resolveLife(); })();
@@ -48,12 +58,15 @@ export async function serveApplication({ bundleRoot, port = 43177, stateRoot = a
     server.once("error", failed);
     try {
       server.listen(port, "127.0.0.1", () => {
+        onStage("server-listening");
         void (async () => {
           lease.assert(); const url = await publishEndpoint(server, { root: runtimeRoot, review: manifest.frontend.digest });
           const endpoint = JSON.parse(await privateRead(join(runtimeRoot, `${server.address().port}.json`)));
           if (endpoint.pid !== process.pid || endpoint.instance.id !== instance.id) throw new Error("Application startup endpoint readback failed.");
           lease.assert(); await privateWrite(join(stateRoot, "endpoint.json"), JSON.stringify(endpoint) + "\n");
+          onStage("endpoint-published");
           await requestInstance(endpoint); await onReady({ url, instance, manifest });
+          onStage("ready");
         })().catch(failed);
       });
       await life; return { status: "stopped", instanceId: instance.id };
@@ -64,7 +77,7 @@ export async function serveApplication({ bundleRoot, port = 43177, stateRoot = a
     }
   });
 }
-export async function launchApplication({ bundleRoot, port = 43177, stateRoot = applicationStateRoot(), environment = applicationEnvironment(), spawnProcess = spawn } = {}) {
+export async function launchApplication({ bundleRoot, port = 43177, stateRoot = applicationStateRoot(), environment = applicationEnvironment(), spawnProcess = spawn, installationRoot } = {}) {
   if (!Number.isSafeInteger(port) || port !== 0 && (port < 1024 || port > 65535)) throw new Error("Choose a valid local application port.");
   const manifest = await verifySuiteRelease(bundleRoot, { platform: process.platform, checkRuntime: true });
   return withStateLock(stateRoot, "application-start", async () => {
@@ -77,7 +90,9 @@ export async function launchApplication({ bundleRoot, port = 43177, stateRoot = 
         return { status: "ready", reused: true, url: endpoint.url, pid: proof.pid, instanceId: proof.instanceId, build: proof.build };
       } catch (e) { if (e.code !== "ECONNREFUSED") throw e; }
     }
-    const child = spawnProcess(process.execPath, [join(bundleRoot, "deployment/suite/run.mjs"), "--port", String(port)], { cwd: bundleRoot, shell: false, windowsHide: true, detached: true, stdio: "ignore", env: environment });
+    const child = spawnProcess(process.execPath, [join(bundleRoot, "deployment/suite/run.mjs"), "--port", String(port)], { cwd: bundleRoot, shell: false, windowsHide: true, detached: true, stdio: ["ignore", "ignore", "ignore", "pipe"], env: { ...environment, SWITCHYARD_STARTUP_TRACE: "1", ...(installationRoot ? { SWITCHYARD_INSTALLATION_ROOT: installationRoot } : {}) } });
+    let diagnostic = "";
+    child.stdio[3]?.on("data", (b) => { diagnostic = (diagnostic + b.toString()).slice(-4096); });
     let ended = false, error;
     child.once("error", (e) => { error = e; }); child.once("exit", () => { ended = true; });
     try {
@@ -87,9 +102,10 @@ export async function launchApplication({ bundleRoot, port = 43177, stateRoot = 
         if (endpoint?.pid !== child.pid) continue;
         const proof = await requestInstance(endpoint);
         if (proof.status !== "ready" || proof.build !== manifest.id) throw new Error("The new application did not verify its exact ready build.");
-        child.unref(); return { status: "ready", reused: false, url: endpoint.url, pid: proof.pid, instanceId: proof.instanceId, build: proof.build };
+        child.stdio[3]?.destroy(); child.unref(); return { status: "ready", reused: false, url: endpoint.url, pid: proof.pid, instanceId: proof.instanceId, build: proof.build };
       }
-      throw new Error(error ? "The private application process could not start." : "Application startup did not verify. An existing review, occupied port or ownership lease may still be active; no process was displaced.");
+      const allowed = new Set(["verifying-release", "release-verified", "ownership-held", "server-listening", "endpoint-published", "ready"]), stages = [...diagnostic.matchAll(/SWITCHYARD_STARTUP_STAGE=([a-z-]{1,32})/g)].map((m) => m[1]).filter((s) => allowed.has(s)).slice(-8);
+      throw new Error(error ? "The private application process could not start." : `Application startup did not verify (${stages.join(", ") || "no startup stage"}). An existing review, occupied port or ownership lease may still be active; no process was displaced.`);
     } catch (e) {
       if (!ended && child.pid && !(await stopOwnedChild(child)).stopped) throw new Error("The failed owned application launch could not be confirmed stopped. Its recovery state was preserved.");
       throw e;

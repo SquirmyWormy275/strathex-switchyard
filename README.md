@@ -58,10 +58,10 @@ exact identity checks and durable duplicate prevention. These host checks sent
 no model prompts and do not establish completion of coding work.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
-controls, physical role shortcut selection in the frontend, desktop packaging, profile-library visual acceptance,
+controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
 Windows hotkey helper source cross-builds; its suite bridge is wired and software-tested, while Windows host
-acceptance and packaging remain incomplete. F77 physical acceptance awaits reconnection; B122
+acceptance remain incomplete, with a managed-startup failure under diagnosis. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
