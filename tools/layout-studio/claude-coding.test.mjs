@@ -158,3 +158,41 @@ test("Claude interactive summon revalidates native session identity and cannot t
     assert.equal((await service.status("personal", task.id)).capabilities.focusable, false);
   } finally { await suite.close(); }
 }));
+
+function supervised(options, settings = {}) {
+  const frames = [], calls = [];
+  const command = async (executable, args, control) => {
+    calls.push({ args, control });
+    const frame = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 1234, birth: "6789", containment: "owned-linux-session" }; frames.push(frame);
+    control.onGuardianChild({ pid: 1234 }); await settings.beforeReady?.(args);
+    await control.onGuardianReady(frame);
+    const stdout = await options.run(executable, args, { cwd: control.cwd });
+    return { status: "completed", exitCode: 0, stdout, stderr: "", inputDelivered: true, treeExitVerified: settings.treeExitVerified !== false };
+  };
+  const service = createClaudeCoding({ ...options, run: undefined, command, guardianStopped: async () => settings.guardianStopped !== false, stopChild: async () => ({ stopped: true }) });
+  return { service, calls, frames };
+}
+test("native Claude metadata and control commands use bounded owned guardians with policy checked before target start", () => fixture(async ({ options, store, input }) => {
+  const { service, calls, frames } = supervised(options);
+  try {
+    assert.equal((await service.discovery("personal")).available, true);
+    const request = input(), task = await service.create("personal", request); assert.equal(task.status, "registered");
+    const cleanup = await service.stopCompartment("personal"); assert.equal(cleanup.stopped, true);
+    assert.ok(calls.some((c) => c.args[0] === "--background")); assert.ok(calls.some((c) => c.args[0] === "stop")); assert.equal(new Set(frames.map((f) => f.id)).size, calls.length);
+    for (const { control } of calls) { assert.equal(control.detailed, true); assert.equal(control.timeout, 20000); assert.equal(control.maxOutputBytes, 262144); assert.equal(control.captureStderrBytes, 16384); assert.equal(control.inputText, undefined); assert.equal(control.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "1"); }
+    const count = calls.length; await store.update("personal", "mode-select", (s) => { s.mode = "keyboard-only"; }); assert.equal((await service.discovery("personal")).permitted, false); assert.equal(calls.length, count);
+  } finally { await service.close(); }
+}));
+test("an unverified native command guardian blocks replacement and shutdown until that exact ownership is reconciled", () => fixture(async ({ options }) => {
+  const settings = { treeExitVerified: false, guardianStopped: false }, { service, calls } = supervised(options, settings);
+  try {
+    assert.equal((await service.discovery("personal")).available, false); assert.equal(calls.length, 1);
+    const blocked = await service.discovery("personal"); assert.match(blocked.reason, /has not verified exit/); assert.equal(calls.length, 1);
+    await assert.rejects(service.close(), /has not verified exit/); assert.equal(calls.length, 1);
+  } finally { settings.guardianStopped = true; await service.close(); }
+}));
+test("revoked policy at native guardian readiness prevents the Claude target from executing", () => fixture(async ({ options, store, calls: nativeCalls }) => {
+  const settings = { beforeReady: async () => { await store.update("personal", "mode-select", (s) => { s.mode = "keyboard-only"; }); } }, { service, calls } = supervised(options, settings);
+  try { const result = await service.discovery("personal"); assert.equal(result.available, false); assert.match(result.reason, /Keyboard-only/); assert.equal(calls.length, 1); assert.equal(nativeCalls.length, 0); }
+  finally { await service.close(); }
+}));

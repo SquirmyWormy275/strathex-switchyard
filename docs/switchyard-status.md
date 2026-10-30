@@ -1392,5 +1392,26 @@ row packing and strict reply bounds. A separate exact-target relock command
 checks locked readback, including refusal by insecure firmware. Ten focused
 matrix tests cover these paths with synthetic transports; the existing 60 device
 and suite checks also pass. The normal installed rejection-path demonstration
-and complete integrated run are next. Frontend controls remain unfinished;
+passed six checks without HID or key capture (receipt
+installed-matrix-boundaries-1793384678511.json). The update retained the exact
+frontend and removed its disposable bundle. Complete Linux acceptance at
+`30168d3`: 119/119 groups, 855 tests, 846 passed and nine platform skips; receipt
+934ec9a0-77f8-4be6-93be-98636e093a7f. Frontend controls remain unfinished;
 actual physical switch, unlock/relock and typing acceptance need the device.
+
+## Supervised native Claude command lifecycle
+
+Claude coding-task version/account/inventory, background creation and exact stop
+commands now run through the shared owned native guardian instead of direct
+child-only management. Policy and generation are rechecked before target start.
+Each command has a 20-second deadline, bounded stdout/private stderr, no input
+and verified guardian exit. An unconfirmed command stays quarantined, blocks
+replacement in its workspace and causes shutdown to report incomplete exit.
+Concurrent cleanup calls share one operation. The provider's separate native
+background service is still governed by exact inventory/stop readback; guardian
+ownership of a CLI command is not general sandbox or shared-daemon ownership.
+
+Three additional lifecycle tests pass alongside the existing native coding,
+reviewed text, suite and guardian checks (58 focused tests total); typecheck
+passes. A real metadata-only CLI demonstration is prepared. Designer subprocess
+and metadata paths outside this coding-task service still require lifecycle work.

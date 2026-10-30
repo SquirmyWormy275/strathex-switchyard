@@ -2,7 +2,6 @@
 import { randomUUID } from "node:crypto";
 import { claudeAccount } from "./claude-account.mjs";
 export { claudeAccount } from "./claude-account.mjs";
-import { spawn } from "node:child_process";
 import { lstat, realpath } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { trustedCli } from "./agents.mjs";
@@ -12,6 +11,8 @@ import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createTaskWindow } from "./task-window.mjs";
 import { repositoryIdentity, verifyRepositoryIdentity } from "./coding-task-identity.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
+import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const shortId = /^[a-f0-9]{8}$/;
@@ -42,27 +43,39 @@ async function repository(value) {
   if (git.isSymbolicLink() || !git.isDirectory() && !git.isFile()) throw new Error("The selected directory has unsupported Git metadata.");
   return root;
 }
-export function createClaudeCoding({ store, resolveCli = trustedCli, run, platform = process.platform, now = () => Date.now(), windows = createTaskWindow({ platform }) } = {}) {
-  const children = new Set(), generations = new Map(), seen = new Set(); let closed = false;
+export function createClaudeCoding({ store, resolveCli = trustedCli, run, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, stopChild = stopOwnedChild, platform = process.platform, now = () => Date.now(), windows = createTaskWindow({ platform }) } = {}) {
+  const children = new Set(), unconfirmed = new Set(), cleanups = new Map(), generations = new Map(), seen = new Set(); let closed = false;
   const fence = (c) => generations.get(c) ?? 0;
   function current(c, generation) { if (closed || fence(c) !== generation) throw new Error("This Claude operation was stopped before its next effect."); }
   async function access(c) { await store.authorize(c, { provider: "claude-code" }); if (!adapter.platforms.includes(platform)) throw new Error("Claude coding-task control is not implemented on this platform."); seen.add(c); return resolveCli("claude-code"); }
+  async function dispose(owned) {
+    for (const client of owned.clients) client.close();
+    let stopped = true;
+    for (const client of owned.clients) { try { if (!await client.stop()) stopped = false; } catch { stopped = false; } }
+    if (stopped) { children.delete(owned); unconfirmed.delete(owned); } else unconfirmed.add(owned);
+    return stopped;
+  }
+  async function settle(c) {
+    for (const owned of [...unconfirmed].filter((r) => r.compartment === c)) if (!await dispose(owned)) throw new Error("A previous exact Claude command guardian has not verified exit. No replacement was launched.");
+  }
   async function execute(c, args, cwd, generation = fence(c), cleanup = false) {
     const executable = cleanup ? await resolveCli("claude-code") : await access(c);
-    if (!cleanup) current(c, generation);
-    if (run) return run(executable, args, { cwd });
-    return new Promise((resolve, reject) => {
-      const child = spawn(executable, args, { cwd, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...runtimeEnvironment(), DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" } });
-      child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
-      const owned = { child, compartment: c }; children.add(owned);
-      let stdout = "", stderr = "", failed = false;
-      const fail = () => { if (!failed) { failed = true; reject(new Error("The native Claude command did not complete within its bounded contract. Its outcome is uncertain; no fallback or automatic retry was selected.")); void stopOwnedChild(child); } };
-      const timer = setTimeout(fail, 20000);
-      child.stdout.on("data", (b) => { stdout += b; if (Buffer.byteLength(stdout) > 256 * 1024) fail(); });
-      child.stderr.on("data", (b) => { stderr += b; if (Buffer.byteLength(stderr) > 65536) fail(); });
-      child.on("error", fail);
-      child.on("close", (code) => { clearTimeout(timer); children.delete(owned); if (failed) return; if (code !== 0) { const trustRejected = args[0] === "--background" && !stdout.trim() && /Workspace not trusted/.test(stderr); reject(Object.assign(new Error(trustRejected ? "Open Claude in this exact directory once and review its native workspace trust dialog before starting a background task." : "The native Claude command was rejected. Check the installed CLI and its local account; no provider fallback was selected."), trustRejected ? { code: "CLAUDE_WORKSPACE_TRUST_REQUIRED", noEffectVerified: true } : {})); } else resolve(stdout); });
-    });
+    if (!cleanup) { current(c, generation); if (cleanups.has(c)) throw new Error("Claude command cleanup is still running in this workspace."); }
+    await settle(c);
+    if (run) { const result = await run(executable, args, { cwd }); if (!cleanup) current(c, generation); return result; }
+    const owned = { clients: new Set(), compartment: c }; children.add(owned);
+    try {
+      const result = await runOwnedNativeCommand({ executable, args, cwd, resource: owned, command, guardianStopped, stopChild, timeout: 20000, maxOutputBytes: 262144, captureStderrBytes: 16384,
+        env: { ...runtimeEnvironment(), DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
+        onReady: async () => { if (!cleanup) { current(c, generation); await store.authorize(c, { provider: "claude-code" }); current(c, generation); } }
+      });
+      if (!cleanup) current(c, generation);
+      if (result.status !== "completed" || result.exitCode !== 0) {
+        const trustRejected = args[0] === "--background" && !result.stdout.trim() && result.status === "failed" && /Workspace not trusted/.test(result.stderr);
+        throw Object.assign(new Error(trustRejected ? "Open Claude in this exact directory once and review its native workspace trust dialog before starting a background task." : "The native Claude command was rejected or exceeded its bounded contract. Its outcome may be uncertain; no fallback or automatic retry was selected."), trustRejected ? { code: "CLAUDE_WORKSPACE_TRUST_REQUIRED", noEffectVerified: true } : {});
+      }
+      return result.stdout;
+    } finally { if (!await dispose(owned)) throw new Error("The exact owned Claude command guardian has not verified exit. No replacement was launched."); }
   }
   async function account(c, generation = fence(c)) { supportedVersion(await execute(c, ["--version"], undefined, generation)); const result = claudeAccount(JSON.parse(await execute(c, ["auth", "status", "--json"], undefined, generation))); current(c, generation); return result; }
   async function inventory(c, root, generation = fence(c), cleanup = false) { return claudeInventory(JSON.parse(await execute(c, ["agents", "--json", "--all", "--cwd", root], root, generation, cleanup)), root); }
@@ -89,9 +102,9 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     current(c, generation); return { task, row };
   }
   const reviewed = (c, t, r) => ({ action: "stop_managed_run", sessionId: t.sessionId, targetSnapshotId: scopeHash(["claude-owned-background-stop/v1", c, t.id, t.sessionId, t.backgroundId, t.repositoryRoot, t.accountFingerprint, t.startedAt, r.pid]), scopeDigest: scopeHash([t.launchPolicy, r]) });
-  async function cleanupCompartment(c) {
+  async function performCleanup(c) {
     generations.set(c, fence(c) + 1);
-    const stopped = await Promise.all([...children].filter((r) => r.compartment === c).map((r) => stopOwnedChild(r.child)));
+    const stopped = await Promise.all([...children].filter((r) => r.compartment === c).map(dispose));
     let backgroundTasksStopped = true, backgroundTasks = 0;
     const tasks = ((await store.snapshot(c)).codingSessions ?? []).filter((t) => t.provider === "claude-code" && t.launchPolicy === "tools-disabled/plan" && t.nativeTransport !== "owned-print");
     for (const t of tasks) {
@@ -107,7 +120,12 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
         await store.update(c, "claude-owned-cleanup", (s) => { taskIn(s, t.id).observation = observation(after); });
       } catch { backgroundTasksStopped = false; }
     }
-    return { stopped: stopped.every((r) => r.stopped) && backgroundTasksStopped, ownedCommandChildren: stopped.length, backgroundTasks, backgroundTasksStopped, externalTaskCompletionVerified: false };
+    return { stopped: stopped.every(Boolean) && backgroundTasksStopped, ownedCommandChildren: stopped.length, backgroundTasks, backgroundTasksStopped, externalTaskCompletionVerified: false };
+  }
+  function cleanupCompartment(c) {
+    if (cleanups.has(c)) return cleanups.get(c);
+    const pending = performCleanup(c).finally(() => { if (cleanups.get(c) === pending) cleanups.delete(c); });
+    cleanups.set(c, pending); return pending;
   }
   return {
     async discovery(c) {
@@ -214,6 +232,6 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
       } catch (e) { await store.update(c, "claude-stop-uncertain", (s) => { taskIn(s, id).lastStop = { at: now(), status: "uncertain" }; }).catch(() => {}); throw e; }
     },
     stopCompartment: cleanupCompartment,
-    async close() { closed = true; return Promise.all([...seen].map(cleanupCompartment)); }
+    async close() { closed = true; const results = await Promise.all([...seen].map(cleanupCompartment)); if (children.size) throw new Error("An exact owned Claude command guardian has not verified exit during shutdown."); return results; }
   };
 }
