@@ -96,6 +96,25 @@ F104 and developmental alternate-controller definitions remain in the catalog's
 source/build register for inspection, not automatic selection. All-pads diagnostic
 maps are retained in source, excluded from normal setup choices.
 
+The backend now compares an encrypted device readout with **all 40 complete
+source definitions and their exact eight-byte firmware UIDs**. Forty retained
+headers provide the literal source values. Decimal UIDs in upstream `.vil`
+presets are parsed losslessly and cross-checked against those headers. The
+[pinned Vial GUI protocol](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/keyboard_comm.py)
+defines the ID as a little-endian 64-bit integer; ordinary JavaScript numeric
+parsing would lose low bits.
+
+`POST /api/suite/devices/identify` accepts an exact previously read `deviceId` in
+the selected compartment. It reads that protected snapshot, performs no HID
+operation and changes no profile. Results distinguish a complete source match,
+an ID/definition conflict, a definition with an unknown ID, and an unrecognized
+readout. Missing layout options remain undecoded; stale readouts remain labelled
+historical. Additional source builds and split halves remain distinct. A matching
+F77 firmware definition suggests both Classic and Compact; it does not identify
+the physical case or attest the controller hardware. Original xwhatsit requires
+its separate protocol/lineage path and is not guessed from the Vial catalog.
+Frontend reconciliation controls and actual F77 acceptance remain pending.
+
 The manufacturer's [new-design request page](https://modelfkeyboards.com/product/ultra-compact-new-model-f-designs-split-ortho-planck-preonic-6x12-f20-kinesis-advantage-unsaver-etc/)
 distinguishes possible future designs from made boards. Development references
 exist for 4×12, 5×12 and F20; these do not establish shipped hardware. No final

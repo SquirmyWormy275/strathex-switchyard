@@ -3,6 +3,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { layoutChoices, unpackChoices } from "../tools/layout-studio/geometry.mjs";
+import { firmwareKeyboardId, presetKeyboardId } from "../tools/layout-studio/catalog-identity.mjs";
 const root = new URL("../third_party/model-f-catalog/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("SOURCES.json", root), "utf8"));
 const bytes = new Map();
@@ -14,13 +15,18 @@ for (const entry of manifest.files) {
 const json = (p) => JSON.parse(bytes.get(p));
 const wc = "ploxiln/keyboards/xwhatsit/brand_new_model_f/", lj = "mymakercorner/keyboards/leyden_jar/";
 const definitions = {}, builds = {};
+function identity(path) {
+  const source = path.replace(/vial\.json$/, "config.h");
+  return { keyboardId: firmwareKeyboardId(bytes.get(source)), source, evidence: "literal pinned firmware source; not device authentication" };
+}
 const title = (s) => s.replaceAll("_", " ").replaceAll("-", " · ").replace(/\bansi\b/gi, "ANSI").replace(/\biso\b/gi, "ISO").replace(/\bhhkb\b/gi, "HHKB").replace(/\bhhshift\b/gi, "HHKB Shift + Ctrl/Caps").replace(/\bfn\b/g, "split Shift").replace(/\bnlock\b/g, "Num Lock layer").replace(/\bsimulock\b/g, "simulated Num Lock").replace(/\bopt(\d)\b/g, "right block $1");
 for (const [p] of bytes) if (p.startsWith(wc) && p.endsWith("/wcass/vial.json")) {
   const name = p.slice(wc.length).split("/")[0], id = `wcass:${name}`;
-  definitions[id] = { definition: json(p), source: p };
+  definitions[id] = { definition: json(p), source: p, firmwareIdentity: identity(p) };
   const prefix = `${wc}${name}/wcass/keymaps/`;
   const variants = [...bytes.keys()].filter((p) => p.startsWith(prefix) && p.endsWith(".vil") && !p.includes("allpads")).map((file) => {
     const v = json(file), stem = file.slice(prefix.length, -4), base = v.layout?.[0], def = definitions[id].definition;
+    if (presetKeyboardId(bytes.get(file)) !== definitions[id].firmwareIdentity.keyboardId) throw new Error(`Preset UID differs from its pinned firmware source: ${file}`);
     if (!Array.isArray(base) || base.length !== def.matrix.rows || base.some((r) => r.length !== def.matrix.cols)) throw new Error(`Invalid reference matrix: ${file}`);
     return { id: stem, label: title(stem.replace(/^[^-]+-/, "")), parts: [{ definitionId: id, base: base.map((r) => r.map((c) => c === -1 ? null : c)), choices: unpackChoices(def, layoutChoices(def).length ? v.layout_options ?? 0 : 0), source: file }] };
   });
@@ -38,7 +44,7 @@ for (const model of ["f122", "b104", "b122", "f20", "f4x12", "f5x12", "f50", "f5
   const keyboardPath = `${lj}${model}/keyboard.json`, keyboard = json(keyboardPath), variants = [];
   for (const p of bytes.keys()) if (p.startsWith(`${lj}${model}/keymaps/`) && p.endsWith("/vial.json")) {
     const name = p.split("/").at(-2), def = json(p), id = `leyden:${model}:${name}`;
-    definitions[id] = { definition: def, source: p };
+    definitions[id] = { definition: def, source: p, firmwareIdentity: identity(p) };
     const cfile = p.replace("vial.json", "keymap.c"), jfile = p.replace("vial.json", "keymap.json");
     let codes = null, layoutName = "LAYOUT", source = p;
     if (bytes.has(cfile)) { codes = cArguments(bytes.get(cfile)); source = cfile; }

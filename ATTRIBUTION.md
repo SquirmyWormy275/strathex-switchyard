@@ -17,7 +17,8 @@ This is distinct from the Leyden Jar hardware repository's license.
 Every copied file, immutable upstream URL and SHA-256 is listed in
 `third_party/model-f-catalog/SOURCES.json`. Each upstream copy of `LICENSE` and all
 copied source notices are retained. `NOTICE.md` explains the generated catalog.
-Only definitions and reference configuration source are imported: no firmware
+Only definitions and reference configuration source are imported, including 40
+literal UID headers added on 2026-10-30 from the same pinned commits: no firmware
 binary, flashing tool, product photography, or manufacturer marketing prose.
 The generated catalog remains subject to these upstream terms; the root licensing
 decision does not relicense it. Catalog research also uses the manufacturer's

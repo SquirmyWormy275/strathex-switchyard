@@ -20,6 +20,8 @@ import { stopOwnedChild } from "./owned-process.mjs";
 import { createClaudeCoding } from "./claude-coding.mjs";
 import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
 import { exportAssignmentLegends } from "./legend-export.mjs";
+import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
+import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
@@ -220,6 +222,13 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
       if (path === "/api/suite/profile/select") return store.selectProfile(compartment, body.profileId, body.revision ?? null);
       if (path === "/api/suite/devices/list") return devices.list();
+      if (path === "/api/suite/devices/identify") {
+        if (typeof body.deviceId !== "string" || !/^[a-f0-9]{64}$/.test(body.deviceId)) throw new Error("Choose an exact previously read configuration interface.");
+        const snapshots = ((await store.snapshot(compartment)).deviceSnapshots ?? []).filter((s) => s.identity.deviceId === body.deviceId);
+        if (snapshots.length !== 1) throw new Error("Read this exact device in this workspace before reconciling source identity.");
+        const result = identifyCatalogSnapshot(sourceCatalog, snapshots[0]), observed = Date.parse(result.capturedAt), ageMs = Date.now() - observed;
+        return { ...result, snapshotStatus: Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= 120000 ? "recent-readout" : "historical-readout", applied: false, note: "This compares the protected readout to source references. It performs no HID operation, changes no profile and grants no host/device authority." };
+      }
       if (path === "/api/suite/devices/read") return devices.read(compartment, body.deviceId);
       if (path === "/api/suite/devices/review") return devices.review(compartment, body.deviceId, body.configuration ?? body.changes);
       if (path === "/api/suite/devices/apply") return devices.apply(compartment, body.reviewId);

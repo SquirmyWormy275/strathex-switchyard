@@ -740,3 +740,23 @@ The repository-restriction checkpoint also passes **109 Linux groups, 773 tests:
 764 passed and 9 expected platform skips**, receipt
 `13dd0367-2656-44b1-8900-053b7b181bd9`. The corrected runner contract passes
 its **16 focused tests** locally; native Windows follow-up is pending.
+
+## Exact source keyboard identities
+
+All 40 catalog definitions now carry an eight-byte UID extracted from literal
+headers at the existing pinned firmware commits. Forty small source headers
+(about 197 kB total) and their hashes/licenses are retained; no firmware is built
+or executed. Every upstream saved-preset UID is parsed losslessly from its source
+decimal literal and checked against its firmware header. Normal JavaScript
+number parsing would round these 64-bit IDs.
+
+The protected readout identification API compares both the complete definition
+and exact UID, reports unknown/conflicting identities and undecoded layout
+options, preserves stale-readout provenance, and returns case/build/split-part
+suggestions without changing profiles or hardware. The F77's Classic and Compact
+cases remain ambiguous; source UID matching is not hardware authentication.
+The source/catalog/package checks pass **13 focused tests**, including all 40
+definitions and lossless literal vectors. Typecheck, source canonicality and
+updated integrated Linux verification are running. Frontend reconciliation,
+readout-derived profile adoption and actual device acceptance remain separate
+unfinished/external work.

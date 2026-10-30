@@ -109,6 +109,7 @@ export const requiredGroups = [
   { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/model.test.mjs" },
   { file: "tools/layout-studio/catalog.test.mjs" },
+  { file: "tools/layout-studio/catalog-identity.test.mjs" },
   { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/suite.test.mjs" },
   { file: "tools/layout-studio/devices.test.mjs" },
