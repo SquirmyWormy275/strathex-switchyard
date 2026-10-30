@@ -1054,3 +1054,24 @@ device/inode identity. Replacing a directory cannot inherit its saved task or
 stop/focus review. Forty-five focused native creator/submission/stdio/Claude checks
 pass. TypeScript typecheck passes; fresh integrated and installed text acceptance
 are running for the ownership correction.
+
+
+The ownership correction passed **115 Linux groups, 817 tests: 808 passed and 9
+expected platform skips**, receipt `0ef29e04-faa9-4842-b94a-24b9e3843175`.
+The normal installed application is now source **201a942**, release
+`9ce3a9d4b81ee3aca618987eb346ea26b87701ac589abc0cebc0399e91229808`.
+Six normal update/export checks passed, preserving the exact frozen Home,
+definitions, modes and private link. The disposable bundle was removed; private
+receipt `assignment-legends-1793377247683.json`.
+
+**Installed reviewed text acceptance passed seven checks** with the actual native
+Codex login: one exact empty task, separate text review, one prompt returning
+`Ready`, exact native acknowledgement retention, duplicate-result reuse, consumed
+approval/unauthenticated-review rejection, unchanged synthetic repository and
+keyboard-only cleanup. Private receipt:
+`installed-reviewed-codex-text-1793377263795.json`. Personal/validation definitions,
+active selection and private link were preserved. The synthetic local task/turn
+records and private directory were removed. The native CLI retains its small
+synthetic history entry. No original daemon session was displaced, file/command
+authority granted or external coding-task completion inferred. Newer native
+Windows/account acceptance and corresponding frontend controls remain separate.

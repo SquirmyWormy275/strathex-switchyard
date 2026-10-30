@@ -63,7 +63,9 @@ thread and created/stopped a tools-disabled Claude background session, with
 exact identity checks and durable duplicate prevention. Those metadata/lifecycle host checks sent
 no model prompts and do not establish completion of coding work. Reviewed Codex
 text submission, exact cancellation and uncertain-outcome review are now
-software-tested; their normal installed acceptance is running.
+software-tested. The installed Codex API has also completed one actual reviewed
+text turn, retained its exact acknowledgement and rejected duplicate/replayed
+submission without claiming coding-task completion.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
