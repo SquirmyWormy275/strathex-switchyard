@@ -36,7 +36,9 @@ function Write-Manifest([string]$Bundle,[string[]]$RelativePaths){
   Write-Utf8NoBom (Join-Path $Bundle 'SHA256SUMS.json') ($manifest|Microsoft.PowerShell.Utility\ConvertTo-Json -Depth 4)
 }
 
-$testRoot=Join-Path ([IO.Path]::GetTempPath()) ('sxsy-b122-trusted-bootstrap-'+[guid]::NewGuid().ToString('N'))
+# This exercises Windows PowerShell 5.1 and native single-file extraction too.
+# Keep the owned fixture leaf short when the isolated parent is a deep export.
+$testRoot=Join-Path ([IO.Path]::GetTempPath()) ('tb-'+[guid]::NewGuid().ToString('N'))
 $bundle=Join-Path $testRoot 'candidate bundle'
 $scripts=Join-Path $bundle 'scripts'
 $stagingBase=Join-Path $testRoot 'private staging'

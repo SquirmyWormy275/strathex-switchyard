@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import hashlib
 import re
 import subprocess
@@ -16,6 +17,88 @@ PDF_BUILDER = REPOSITORY_ROOT / "scripts" / "build_b122_manual_pdf.py"
 CANONICAL_MANIFEST = (
     REPOSITORY_ROOT / "packages" / "protocol" / "generated" / "b122-control-map.json"
 )
+
+
+def test_png_compression_variants_preserve_canonical_bytes_only_when_every_pixel_matches(monkeypatch) -> None:
+    from PIL import Image
+    monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
+    from generate_b122_documentation import preserve_demo_png_encoding
+
+    image = Image.new("RGB", (1600, 900), "white")
+    fast, dense = io.BytesIO(), io.BytesIO()
+    image.save(fast, format="PNG", compress_level=1)
+    image.save(dense, format="PNG", compress_level=9)
+    assert fast.getvalue() != dense.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), fast.getvalue()) == fast.getvalue()
+    image.putpixel((1599, 899), (0, 0, 0))
+    changed = io.BytesIO()
+    image.save(changed, format="PNG")
+    assert preserve_demo_png_encoding(changed.getvalue(), fast.getvalue()) == changed.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), None) == dense.getvalue()
+    assert preserve_demo_png_encoding(dense.getvalue(), b"invalid PNG") == dense.getvalue()
+
+
+def test_legend_ink_respects_literal_faces_and_all_sixty_flap_clip_boundaries(monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
+    from b122_legend_geometry import geometry, inset, inside
+
+    source = geometry()
+    assert len(source["compact"]) == 18
+    assert len(source["full"]) == 15
+    assert len(source["sourcePaths"]) == 16
+    assert source["full"][4]["face"]["x"] == 501.945312
+    assert source["full"][0]["face"]["w"] == 30.644531
+    for shape in source["full"]:
+        assert len(shape["panels"]) == 4
+        for modifier, panel in shape["panels"].items():
+            assert all(inside(p, panel["polygon"]) for p in inset(panel["polygon"]))
+            x, y, w, h = panel.get("inkBox", panel.get("actionBox"))
+            assert all(inside(p, panel["polygon"]) for p in ((x, y), (x+w, y), (x, y+h), (x+w, y+h)))
+            if modifier == "alt":
+                assert max(p[0] for p in panel["clipPoints"]) <= x-1+1e-6
+            elif modifier == "shift_alt":
+                assert min(p[0] for p in panel["clipPoints"]) >= x+w+1-1e-6
+
+
+def test_standalone_legends_keep_source_scale_credit_and_readable_unsqueezed_text(monkeypatch) -> None:
+    import xml.etree.ElementTree as ET
+    monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
+    from generate_b122_legends import load_manifest, records, PALETTES, SHORT_ACTIONS
+    from b122_legend_render import individual_svg, fit_lines, MIN_LEGEND_FONT
+    from b122_legend_geometry import SVG_SHA256
+
+    for item in records(load_manifest()):
+        svg = individual_svg(item, PALETTES["ibm-blue"], SHORT_ACTIONS)
+        root = ET.fromstring(svg)
+        assert root.attrib["width"].endswith("pt") and root.attrib["height"].endswith("pt")
+        assert SVG_SHA256 in svg and "@Mates_ENGINEER" in svg
+        text = list(root.iter("{http://www.w3.org/2000/svg}text"))
+        assert text and all(float(t.attrib["font-size"]) >= MIN_LEGEND_FONT for t in text)
+        assert all("textLength" not in t.attrib and "lengthAdjust" not in t.attrib for t in text)
+        assert sum(e.attrib.get("fill") == "none" and "stroke" in e.attrib for e in root) == 6
+    with pytest.raises(ValueError, match="readable minimum"):
+        fit_lines("IMPOSSIBLYLONGWORD", 8, 8, "Helvetica-Bold", 6.5)
+
+
+def test_canonical_legend_outputs_are_reproducible_and_reject_changed_source(tmp_path, monkeypatch) -> None:
+    monkeypatch.syspath_prepend(str(REPOSITORY_ROOT / "scripts"))
+    from generate_b122_legends import build_all, make_legend_pdf, records, load_manifest, PALETTES
+
+    native_write = Path.write_text
+    def windows_default_write(path, content, *args, **kwargs):
+        if kwargs.get("newline") is None:
+            content = content.replace("\n", "\r\n")
+        return native_write(path, content, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", windows_default_write)
+
+    output = build_all(tmp_path, REPOSITORY_ROOT / "third-party/cyber_engineer/pure-template.pdf")
+    for path in output:
+        assert path.read_bytes() == (REPOSITORY_ROOT / path.relative_to(tmp_path)).read_bytes()
+    changed = tmp_path / "changed-source.pdf"
+    changed.write_bytes((REPOSITORY_ROOT / "third-party/cyber_engineer/pure-template.pdf").read_bytes()+b"\n% altered source\n")
+    with pytest.raises(ValueError, match="source template changed"):
+        make_legend_pdf(changed, tmp_path / "rejected.pdf", records(load_manifest()), PALETTES["ibm-blue"])
+    assert not (tmp_path / "rejected.pdf").exists()
 
 
 def run_generator(output_root: Path, *extra: str) -> subprocess.CompletedProcess[str]:

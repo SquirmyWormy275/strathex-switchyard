@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRequiredTestManifest, createStrictTestEnvironment, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
@@ -39,6 +39,13 @@ test("platform groups accept only their exact declared skip count", async () => 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Linux source lane keeps shared and native groups without claiming Windows runtime coverage", () => {
+  assert.ok(linuxGroups.some((group) => group.file === "packages/control-plane/test/runtime.test.ts"));
+  assert.ok(linuxGroups.some((group) => group.file === "apps/linux-companion/test/linux-secret.test.ts"));
+  assert.equal(linuxGroups.some((group) => group.file.startsWith("apps/windows-companion/")), false);
+  assert.equal(linuxGroups.find((group) => group.file === "apps/linux-companion/test/linux-isolation.test.ts")?.expectedSkipped, process.platform === "linux" ? undefined : 1);
 });
 
 test("the required manifest exactly represents every repository test file", () => {
@@ -78,6 +85,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
+      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => [`tools/layout-studio/${name}.test.mjs`, 120_000]) : []),
+      ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
@@ -92,6 +101,11 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];
     assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
+    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"]) {
+      assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "win32"), { timeoutMs: 120_000 });
+      assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "linux"), {});
+    }
+    assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });
     assert.equal(overridden.receipt.success, true);
@@ -189,7 +203,7 @@ test("strict child environments allowlist operating-system inputs and isolate te
     const code = "if(process.env.SXSY_AMBIENT_SECRET||process.env.DATABASE_URL||process.env.GH_TOKEN||process.env.NODE_OPTIONS||process.env.SXSY_TEST_MODE!=='1'||process.env.SXSY_NETWORK!=='deny'||!process.env.SXSY_TEST_ROOT||!process.env.SXSY_TEST_DATABASE)process.exit(19)";
     const result = await runVerification({ groups: [{ file: "strict-environment", args: ["-e", code] }], outputDirectory: directory, executable });
     assert.equal(result.receipt.success, true);
-    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v2");
+    assert.equal(result.receipt.children[0].environmentPolicy, "strict-test-v3");
   } finally {
     delete process.env.SXSY_AMBIENT_SECRET;
     await rm(directory, { recursive: true, force: true });

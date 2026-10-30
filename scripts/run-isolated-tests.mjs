@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -59,9 +59,10 @@ const mediatedGitTests = [
   "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target",
   "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
-const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
+const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
+    ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));
 const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "workflow-context"]
@@ -92,8 +93,67 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     file: `apps/linux-companion/test/${name}.test.ts`,
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
+export function nativeTestOverrides(file, platform = process.platform) {
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
+}
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/verify-runtime-platform.test.mjs" },
+  { file: "deployment/suite/release.test.mjs" },
+  { file: "deployment/suite/application.test.mjs" },
+  { file: "deployment/suite/runtime-maintenance.test.mjs" },
+  { file: "deployment/suite/connection-restoration.test.mjs" },
+  { file: "deployment/suite/installation.test.mjs", timeoutMs: 120_000 },
+  { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
+  { file: "scripts/workflow-capture.test.mjs" },
+  { file: "scripts/codex-thread-status.test.mjs" },
+  { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
+  { file: "tools/layout-studio/model.test.mjs" },
+  { file: "tools/layout-studio/catalog.test.mjs" },
+  { file: "tools/layout-studio/catalog-identity.test.mjs" },
+  { file: "tools/layout-studio/readout-profiles.test.mjs" },
+  { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/suite.test.mjs" },
+  { file: "tools/layout-studio/devices.test.mjs" },
+  { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },
+  { file: "tools/layout-studio/vial-dynamic.test.mjs" },
+  { file: "tools/layout-studio/vial-encoders.test.mjs" },
+  { file: "tools/layout-studio/vial-rules.test.mjs" },
+  { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/physical-intent.test.mjs" },
+  { file: "tools/layout-studio/instance.test.mjs" },
+  { file: "tools/layout-studio/foreground.test.mjs" },
+  { file: "tools/layout-studio/keyboard-indicators.test.mjs" },
+  { file: "tools/layout-studio/matrix-diagnostics.test.mjs" },
+  { file: "tools/layout-studio/portable-package.test.mjs" },
+  { file: "tools/layout-studio/legend-export.test.mjs" },
+  { file: "tools/layout-studio/windows-host.test.mjs" },
+  { file: "tools/layout-studio/state-lock.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
+  // The separate native CI helper step executes all fourteen boundary cases.
+  // Source-only Windows groups have no built helper and must skip exactly these.
+  { file: "tools/layout-studio/runtime-command.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 15 } : {}) },
+  { file: "tools/layout-studio/runtime-lifecycle.test.mjs" },
+  { file: "tools/layout-studio/runtime-consumers.test.mjs" },
+  { file: "tools/layout-studio/private-fs.test.mjs" },
+  { file: "tools/layout-studio/coding-sessions.test.mjs" },
+  { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
+  { file: "tools/layout-studio/codex-turn.test.mjs" },
+  // Protected Windows fault matrices each start many short native lock helpers.
+  // Keep their cold-process allowance bounded without relaxing assertions/skips.
+  { file: "tools/layout-studio/agents-claude.test.mjs", ...nativeTestOverrides("tools/layout-studio/agents-claude.test.mjs") },
+  { file: "tools/layout-studio/claude-account.test.mjs" },
+  { file: "tools/layout-studio/conversation-bindings.test.mjs", ...nativeTestOverrides("tools/layout-studio/conversation-bindings.test.mjs") },
+  { file: "tools/layout-studio/codex-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/codex-submissions.test.mjs") },
+  { file: "tools/layout-studio/claude-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-submissions.test.mjs") },
+  // Native Windows kernel leases start the system PowerShell helper per state
+  // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
+  // allow bounded process/pipe cleanup without relaxing any assertion or skip.
+  { file: "tools/layout-studio/claude-coding.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs") },
+  { file: "tools/layout-studio/task-window.test.mjs" },
+  { file: "tools/layout-studio/voice-queue.test.mjs" },
+  { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
@@ -140,6 +200,9 @@ export const requiredGroups = [
   ...providerHostTests,
   ...providerTlsNetworkTests
 ];
+/** The native Linux source lane omits Windows-only runtime contracts. */
+export const linuxGroups = requiredGroups
+  .filter((group) => !group.file.startsWith("apps/windows-companion/") && !group.file.startsWith("deployment/windows/"));
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {
@@ -165,7 +228,7 @@ function testCounts(output, isTestRun) {
 
 const manifestRoots = [
   "packages/control-plane/test", "packages/protocol/test", "apps/windows-companion/test",
-  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "scripts", "firmware"
+  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "tools/layout-studio", "scripts", "firmware", "deployment/suite"
 ];
 const portable = (value) => value.replaceAll("\\", "/");
 export function discoverRequiredTestFiles(cwd = root) {
@@ -253,8 +316,12 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const startedAt = new Date().toISOString(); const started = Date.now();
   const configuredTestParent = inheritedValue(sourceEnvironment, "SXSY_B122_TEST_TEMP_ROOT");
   if (configuredTestParent !== undefined && (!isAbsolute(configuredTestParent) || /[\0\r\n"]/u.test(configuredTestParent))) throw new Error("The isolated test parent is invalid.");
-  const testParent = configuredTestParent ?? tmpdir();
-  await mkdir(testParent, { recursive: true });
+  const requestedParent = configuredTestParent ?? tmpdir();
+  await mkdir(requestedParent, { recursive: true });
+  // Release builds use a short SUBST drive on Windows. Keep private test state
+  // on the actual local drive; private storage deliberately rejects drive
+  // redirection rather than treating that temporary build alias as authority.
+  const testParent = await realpath(requestedParent);
   const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
@@ -296,9 +363,9 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
         const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed + counts.skipped === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === expectedSkipped && counts.todo === 0;
         const success = !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess;
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v3", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
       } catch {
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v3", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
         try {
           await cleanupIsolatedRoot(cleanup, testRoot, testParent);

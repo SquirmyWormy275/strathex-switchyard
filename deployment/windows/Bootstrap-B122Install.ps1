@@ -392,7 +392,16 @@ function New-B122BootstrapEnvironmentBlock([System.Collections.IDictionary]$Envi
 
 function Read-B122BootstrapOutput([string]$Path,[int]$MaximumBytes){
   $item=Get-B122BootstrapItem $Path $false;if($item.Length-lt0-or$item.Length-gt$MaximumBytes){throw 'The trusted installer exceeded its bootstrap output bound.'}
-  $bytes=[IO.File]::ReadAllBytes($item.FullName);try{return [Text.Encoding]::UTF8.GetString($bytes)}finally{if($bytes.Length){[Array]::Clear($bytes,0,$bytes.Length)}}
+  # Diagnostics may be read while the owned supervisor still holds its output
+  # handle. Permit that writer without surrendering the byte bound.
+  $stream=[IO.File]::Open($item.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite-bor[IO.FileShare]::Delete))
+  $bytes=New-Object byte[] ($MaximumBytes+1)
+  try{
+    $length=0
+    do{$count=$stream.Read($bytes,$length,$bytes.Length-$length);$length+=$count}while($count-gt0-and$length-lt$bytes.Length)
+    if($length-gt$MaximumBytes){throw 'The trusted installer exceeded its bootstrap output bound.'}
+    return [Text.Encoding]::UTF8.GetString($bytes,0,$length)
+  }finally{$stream.Dispose();[Array]::Clear($bytes,0,$bytes.Length)}
 }
 
 function Invoke-B122BootstrapSupervisor([string]$HelperPath,[string]$RequestPath,[string]$StatePath,[string]$BindingAckPath,[System.Collections.IDictionary]$Environment,[int]$TimeoutSeconds,[string]$JobName,[string]$StdoutPath,[string]$StderrPath,[string]$RunningMarker){

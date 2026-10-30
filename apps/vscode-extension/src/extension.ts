@@ -1,11 +1,23 @@
 import * as vscode from "vscode";
-import { isAbsolute, relative } from "node:path";
+import { existsSync } from "node:fs";
+import { isAbsolute, join, relative } from "node:path";
+import { homedir } from "node:os";
 import { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge } from "./companion-bridge.ts";
 import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, type GitRootRegistration } from "./controller.ts";
 import { ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader } from "./named-pipe-transport.ts";
 import { LinuxLibsecretCurrentUserProtector } from "../../linux-companion/src/linux-secret.ts";
 import type { ExtensionSecretReader } from "./named-pipe-transport.ts";
 import type { ExtensionContextLike, VscodeLike } from "./vscode-like.ts";
+import type { CodexLocalThreadBinding, CodexLocalThreadObservation } from "./operator-status.ts";
+
+const { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads } = require("./codex-daemon-status.cjs") as {
+  readCodexDaemonThreads(socketPath: string): Promise<readonly CodexLocalThreadObservation[]>;
+  readExactCodexDaemonThread(socketPath: string, threadId: string): Promise<CodexLocalThreadObservation>;
+  startCodexDaemonThread(socketPath: string, repositoryRoot: string, taskId: string): Promise<Readonly<{ threadId: string }>>;
+  persistBoundCodexThread(binding: CodexLocalThreadBinding): Promise<CodexLocalThreadBinding>;
+  readBoundCodexThreads(): Promise<readonly CodexLocalThreadBinding[]>;
+};
+const codexSocket = join(homedir(), ".codex", "app-server-control", "app-server-control.sock");
 
 export { JsonLineCompanionBridge, UnavailableExtensionCompanionBridge, type ExtensionCompanionBridge, type JsonLineTransport, type RawHidDeviceIdentity, type RawHidInstallationPin, type RawHidRuntimeStatus, type HardwareSignalClaim } from "./companion-bridge.ts";
 export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, WindowsDpapiSecretReader, type ExtensionSecretReader, type StoredCompanionPipeConfiguration } from "./named-pipe-transport.ts";
@@ -24,6 +36,18 @@ export function activate(context: vscode.ExtensionContext): void {
     configuredCompanionBridge(secretProtector),
     {
       resolveGitRoots: createVscodeGitRootResolver(vscode),
+      observeCodexThreads: async (boundThreadIds) => {
+        if (process.platform !== "linux") return [];
+        const recent = await readCodexDaemonThreads(codexSocket).catch(() => []);
+        const exact = await Promise.allSettled([...new Set(boundThreadIds)].map((id) => readExactCodexDaemonThread(codexSocket, id)));
+        const joined = new Map(recent.map((thread) => [thread.id, thread]));
+        for (const result of exact) if (result.status === "fulfilled") joined.set(result.value.id, result.value);
+        return [...joined.values()];
+      },
+      startCodexThread: (repositoryRoot, taskId) => startCodexDaemonThread(codexSocket, repositoryRoot, taskId),
+      persistCodexBinding: (binding) => persistBoundCodexThread(binding),
+      readCodexBindings: () => readBoundCodexThreads(),
+      codexExecutable: installedCodexExecutable(),
       openExternal: async (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
       executeCommand: async (command) => { await vscode.commands.executeCommand(command); },
       sealSecret: (cleartext) => secretProtector.seal(cleartext),
@@ -33,6 +57,16 @@ export function activate(context: vscode.ExtensionContext): void {
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
   });
+}
+
+/** Fixed current-user/system locations; workspace settings never select an executable. */
+function installedCodexExecutable(): string | undefined {
+  return [
+    join(homedir(), ".local", "share", "mise", "installs", "codex", "latest", "bin", "codex"),
+    join(homedir(), ".local", "bin", "codex"),
+    "/usr/local/bin/codex",
+    "/usr/bin/codex"
+  ].find((candidate) => existsSync(candidate));
 }
 
 /**

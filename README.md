@@ -1,29 +1,107 @@
-# STRATHEX SWITCHYARD — SXSY-B122
+# Switchyard
 
-> Route attention. Direct agents. Keep the operator in command.
+**Give your keyboard a familiar place to return to work.**
 
-SXSY-B122 is a software-only safety control plane for a proposed 22-control
-operator keyboard for agentic software development. Its host platforms are
-Windows and systemd-based desktop Linux. Its physical target is a
-Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
-physical keyboard and its integration are not validated by this repository.
+Switchyard is a local keyboard workspace for people who move between coding
+agents, editors and conversations. It starts with a ready-made arrangement:
+return to your task, check progress, review work, and leave a handoff. Choose your
+Model F Labs keyboard, use the recommended setup, then connect your tools.
+The configurator stays behind **Customize**.
 
-**Current status:** the repository contains the hardware-independent B122
-implementation: the canonical protocol and firmware/Raw-HID host source; the
-mutually authenticated Windows and Linux companions; the VS Code
-operator and provisioning surfaces; durable mediation, receipts, recovery,
-containment, and Council; host-attested repository recipes; DPAPI or Linux
-Secret Service credential references; exact-route HTTPS; configured
-provider, GitHub/Git/CI and scanner adapters; Windows Sandbox and Linux
-Bubblewrap isolation boundaries; an exhaustive
-hardware-independent 176-chord Raw-HID product simulator; and content-verified,
-transactional per-user release tooling. Source availability is **not** production, hardware, provider,
-or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
+## Try the starting experience
 
-The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
-keys, 65 settled chord behaviors, and 111 intentionally unassigned chord slots.
-The complete behavior contract and adversarial review live in
-[docs/SXSY-B122-complete-key-specification-and-audit.md](docs/SXSY-B122-complete-key-specification-and-audit.md).
+```sh
+mise exec node@24.14.0 -- npm ci --ignore-scripts
+mise exec node@24.14.0 -- npm run layout:studio
+```
+
+Open the private local link printed by the app. **Home → your keyboard → Use this
+setup** loads four planned controls and the *Keep my place* workflow. Browse the
+catalog without an assistant account. Read/import your actual keyboard
+configuration before connecting a host shortcut; a reference preset cannot
+establish your current firmware or typing layout.
+First use stays in keyboard-only mode. Select Personal companion in Settings
+when you are ready to connect personal tools; a Work workspace uses its managed,
+Copilot-only policy. Imported layouts never enable providers or recording.
+
+- [Model F Labs configurations](docs/model-f-standard-configurations.md): 19 listed
+  model/case/round combinations, 104 named references, physical options, Dvorak
+  references, split boards and explicitly identified proposed designs.
+- [Configuration walkthrough](docs/switchyard-configuration.md): understand a
+  proposal, review an exact local connection, and restore a change.
+- [Optional local runtime](docs/optional-runtime.md): install or verify the shared
+  CPU voice, configuration HID and LangChain environment from pinned hashes.
+- [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
+  stable intents and migration before connecting a second computer.
+- [Assignment references and legends](docs/assignment-legends.md): export saved
+  controls and source-sized relegendable-cap sheets; the frontend control is pending.
+- [Application packaging](docs/suite-installation.md): build the private suite
+  directory, verify its contents and run it independently of the checkout.
+- [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
+  bindings](docs/claude-task-bindings.md): exact native identities, actual host
+  evidence and the controls still being implemented.
+- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
+  approve bounded text and recover an uncertain turn without automatic retry.
+- [Current implementation and evidence](docs/switchyard-status.md): what runs,
+  what has been checked, and what still needs implementation.
+- [Verification at a glance](docs/verification.md): accepted checkpoints,
+  native demonstrations, reproducible checks and their practical limits.
+- [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
+  requirement, including checks that require hardware or approved accounts.
+- [Earlier Omarchy tools](docs/try-switchyard.md): workflow recorder and existing
+  Codex thread controls, with their own repeatable walkthrough.
+
+## What works, and what remains
+
+This is a **partial development suite**, built and exercised on Omarchy Linux.
+The current branch combines the existing B122 control plane and Layout Studio
+with a new local product shell, model catalog, configuration conversations,
+protected compartments, local transcription, device transactions, custom-agent
+SDK and separate Microsoft 365 Copilot adapter. Real installed-account design
+requests have been exercised with Codex and Claude Code, and real custom and
+LangChain example processes have exchanged authenticated intents.
+The separate task backend has also created/resumed an empty read-only Codex
+thread and created/stopped a tools-disabled Claude background session, with
+exact identity checks and durable duplicate prevention. Those metadata/lifecycle host checks sent
+no model prompts and do not establish completion of coding work. Reviewed Codex
+text submission, exact cancellation and uncertain-outcome review are now
+software-tested. Both installed native task APIs now pass reviewed text journeys.
+Codex retains its exact turn acknowledgement; Claude supports exact creation,
+continuation and separately approved resume-only recovery after an uncertain
+first turn. Owned guardian exit, duplicate/replay handling and keyboard-only
+cleanup are verified. Provider replies do not establish coding-task completion.
+
+These checks do not prove a finished keyboard/agent appliance. General coding-task
+controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
+expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
+The complete Windows release passed 225 test/build groups for `7aeb1e6`, including
+managed startup, installer, bootstrap, portable profiles and automation checks.
+Fresh native Windows installation/import/model/recheck and cleanup also passed
+with 49 exact distributions. Newer private-pipe and recovery checkpoints await
+their corrected complete Windows run. The latest accepted Linux run has 121 groups
+and 876 tests. [Verification details](docs/verification.md) distinguish each result
+and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
+physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
+acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
+
+## Engineering and contribution
+
+The repository develops an explicit intent boundary: a key asks for an operation;
+a reviewed local connection decides whether that exact operation is available.
+Portable layouts exclude credentials and local account/session bindings. Design
+proposals stay editable, and host/device changes require separate baseline,
+review, readback and restoration steps. Failures preserve a recoverable record.
+
+Start with [the product brief](docs/switchyard-product.md), then the
+[configuration decision record](docs/decisions/001-switchyard-configuration.md),
+[build plan](docs/switchyard-build-plan.md) and [contribution guide](CONTRIBUTING.md).
+[Attribution](ATTRIBUTION.md) preserves the keyboard/controller community's work.
+No repository-wide license or public release has been approved.
+
+The original SXSY-B122 target retains its 22-control, 65-behavior contract:
+[complete specification and audit](docs/SXSY-B122-complete-key-specification-and-audit.md).
+It is one hardware target within the broader Switchyard suite; the F77 is the
+current pilot.
 
 ## What this project is
 
@@ -43,6 +121,10 @@ safe and available in the current context.
 - `firmware/qmk/` — QMK-compatible reference firmware that emits bounded,
   versioned Raw HID signals only. It does not run Git, a terminal, a browser,
   or desktop automation.
+- `tools/layout-studio/` — the developing local product shell, offline Model F
+  catalog, workflow/agent configuration, protected compartment storage and
+  separately reviewed host/device configuration. See the requirement ledger for
+  implementation and validation limits.
 - `packages/protocol/` — the canonical 22-control / 65-behavior manifest,
   packet validation, and a closed command map. Unknown, forged, and
   intentionally unassigned chords have no fallback action.
@@ -118,8 +200,13 @@ pushes, merges, force-pushes, approves a permission, or submits a prompt.
 
 ## Local development
 
-Use a current Node.js runtime that supports TypeScript transformation (the test
-scripts use `node --experimental-transform-types`). Tests use temporary files,
+Use the reviewed Node.js **24.14.0** runtime recorded in `.node-version` (for
+example, `mise exec node@24.14.0 -- npm test`). Node 26 removed the
+transformation flag used by these source tests. `npm test` runs the supported
+host lane: shared and native Linux groups on Linux, and the full Windows lane
+on Windows. `npm run test:all` retains the cross-host diagnostic suite and can
+expose Windows-only failures on Linux. Test receipts record every group and
+host skip. Tests use temporary files,
 fakes, and in-memory brokers; they must never use a production database,
 credentials, data, or endpoint.
 
@@ -132,6 +219,18 @@ npm run build:companion
 npm run build:linux-companion
 npm run build:provider-host
 ```
+
+The read-only **SXSY-B122: Show Managed Sessions** command in VS Code refreshes the authenticated companion registry and displays exact task, plan, repository, target, capability, and reported status. On Linux it also includes local Codex daemon threads as **task-bound** or **unbound** runtime rows, without changing a managed session's capability or status. It performs no host or agent action. Native ChatGPT and Claude sessions remain unknown until an authorized adapter proves their identity and observation capability.
+
+`npm run codex:threads` gives a separate read-only [Codex thread inventory](docs/codex-thread-inventory.md) through the local App Server. It discards titles and previews and labels stored threads `not-observed`; it does not register them as verified Switchyard sessions.
+
+`npm run codex:live` reads runtime status from an already-running current-user Codex daemon on Linux. It shows local thread IDs and status without promoting unbound threads into managed sessions.
+
+On Linux, **SXSY-B122: Start Task-Bound Codex Thread** in VS Code creates a Codex thread for the chosen exact Git root, records Codex's returned thread ID with a short task ID, and opens that thread in a terminal. **Show Managed Sessions** displays its live local status beside the task binding; an unavailable companion target stays `unverified`. See [Codex thread inventory and binding](docs/codex-thread-inventory.md).
+
+Before the B122 arrives, **Super+Alt+R** can toggle an opt-in local workflow study on an Omarchy workstation after installing the portable shortcut. A temporary user service counts only broad foreground app categories and time while active; it does not infer agent status. `npm run workflow -- help` lists deliberate event fields, `npm run workflow -- report` summarizes the study, and `npm run workflow -- path` shows the private log and its size. The 10 MiB log cap prevents unbounded growth. This recorder captures no prompts, code, clipboard, or window titles. See [workflow capture](docs/workflow-capture.md).
+
+The commissioned keyboard must retain a complete standard USB typing map. On a Windows computer without Switchyard installed, ordinary keys must work immediately and the advanced controls must have no agent effect. The owner expects the B122 in **January 2027**; the current 22-control QMK overlay is not a complete typing keymap, and plug-and-type validation is scheduled after the device arrives. See the [host capability matrix](docs/platform-capability-matrix.md).
 
 `npm run start:companion` starts the reviewed per-user companion, not a Windows
 service or service-account boundary. The standalone entry point supplies the
@@ -170,6 +269,7 @@ particular:
 
 ## Documentation, attribution, and governance
 
+- [Layout Studio quick start, profile format, and limitations](tools/layout-studio/README.md)
 - [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
 - [Software-only completion audit](docs/software-only-completion-audit.md)
 - [Local companion and VS Code guide](docs/local-companion.md)
@@ -180,6 +280,7 @@ particular:
 - [Project charter](docs/01-project-charter.md)
 - [Hardware and software architecture](docs/02-system-architecture.md)
 - [Workflow study protocol](docs/03-workflow-study.md)
+- [August workflow reassessment](docs/workflow-reassessment-2026-10.md) and [Linux/Windows capability matrix](docs/platform-capability-matrix.md)
 - [Control taxonomy requirements](docs/04-control-taxonomy.md)
 - [Publication roadmap](docs/05-roadmap.md) and [publication gate](docs/06-publication-gate.md)
 - [Documentation provenance](docs/README.md)

@@ -596,6 +596,15 @@ foreach($workspaceJunction in @(
   @{link=(Join-Path $buildRoot 'node_modules\@strathex\switchyard-provider-adapter-host');target=(Join-Path $buildRoot 'apps\provider-adapter-host')},
   @{link=(Join-Path $buildRoot 'node_modules\@strathex\switchyard-vscode');target=(Join-Path $buildRoot 'apps\vscode-extension')}
 )){Remove-B122VerifiedWorkspaceJunction -Link $workspaceJunction.link -ExpectedTarget $workspaceJunction.target}
+$verificationReceiptSource=Join-Path $buildRoot '.sxsy-verification'
+if(Test-Path -LiteralPath $verificationReceiptSource -PathType Container){
+  $verificationReceiptDestination=Join-Path $output 'build-provenance\verification'
+  New-Item -ItemType Directory -Path $verificationReceiptDestination -Force|Out-Null
+  foreach($verificationReceiptFile in @(Get-ChildItem -LiteralPath $verificationReceiptSource -Filter 'isolated-test-*.json' -File -Force)){
+    if($verificationReceiptFile.Name-notmatch'^isolated-test-[a-f0-9-]{36}\.json$'-or$verificationReceiptFile.Length-gt4MB-or$verificationReceiptFile.Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'A verification receipt is unsafe or oversized.'}
+    Copy-Item -LiteralPath $verificationReceiptFile.FullName -Destination (Join-Path $verificationReceiptDestination $verificationReceiptFile.Name)
+  }
+}
 foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$testTempRoot,$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
 
 $portableSmokeResult=Invoke-B122WithIsolatedBuildEnvironment { $captured=@(& (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output);[pscustomobject]@{exitCode=$LASTEXITCODE;output=($captured-join[Environment]::NewLine)} }

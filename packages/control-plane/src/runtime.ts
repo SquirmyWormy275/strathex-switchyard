@@ -335,7 +335,7 @@ export class DurableMediatedExecutor {
   readonly recovery: NoReplayOperationRecovery;
   private readonly options: DurableMediatedExecutorOptions;
   private readonly now: () => Date;
-  private readonly executionControls = new ExecutionControlRegistry();
+  private readonly executionControls: ExecutionControlRegistry;
   private readonly deadlineSchedules = new Map<string, DeadlineSchedule>();
   private recoveryPoll?: DeadlineSchedule;
   private recoveryPollRunning = false;
@@ -344,13 +344,14 @@ export class DurableMediatedExecutor {
   constructor(options: DurableMediatedExecutorOptions) {
     this.options = options;
     this.now = options.now ?? (() => new Date());
+    this.executionControls = new ExecutionControlRegistry(() => this.now().getTime());
     this.sessions = options.sessions ?? new SessionRegistry(options.store);
     this.authorities = options.authorities ?? new AuthorityLedger(options.store, { clock: () => this.now().toISOString() });
     this.gateEvidence = options.gateEvidence ?? new GateEvidenceLedger(options.store);
     this.snapshots = options.snapshots ?? new TargetSnapshotLedger(options.store);
     this.checkpoints = options.checkpoints ?? new CheckpointLedger(options.store);
     this.confirmations = options.confirmations ?? new DurableConfirmationLedger(options.store, { clock: () => this.now().toISOString() });
-    this.budgets = options.budgets ?? new DurableBudgetManager(options.store);
+    this.budgets = options.budgets ?? new DurableBudgetManager(options.store, { clock: () => this.now().toISOString() });
     this.operations = new OperationSagaStore(options.store);
     this.receipts = new ReceiptLedger(options.store);
     this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts);

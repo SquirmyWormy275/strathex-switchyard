@@ -10,7 +10,8 @@ permissions:
 
 concurrency:
   group: b122-windows-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Finish one full Windows verification while newer source checkpoints queue.
+  cancel-in-progress: false
 
 jobs:
   verify-windows-release:
@@ -49,6 +50,19 @@ jobs:
         shell: pwsh
         run: npm.cmd ci --ignore-scripts
 
+      - name: Verify the native Switchyard backend before the complete release build
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & node --test scripts/run-isolated-tests.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'The native Windows isolated-runner contract failed.' }
+          $tests = @(Get-ChildItem -LiteralPath '.\tools\layout-studio' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
+          $tests += @(Get-ChildItem -LiteralPath '.\deployment\suite' -Filter '*.test.mjs' | Sort-Object Name | ForEach-Object { $_.FullName })
+          if ($tests.Count -lt 10) { throw 'The expected Switchyard backend tests are missing.' }
+          & node --test --test-concurrency=2 @tests
+          if ($LASTEXITCODE -ne 0) { throw 'The native Windows Switchyard backend tests failed.' }
+
       - name: Install pinned documentation dependencies
         shell: pwsh
         run: python -m pip install --disable-pip-version-check -r scripts/b122-docs-requirements.txt
@@ -56,9 +70,13 @@ jobs:
       - name: Verify generated documentation and the complete manual PDF
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           python .\scripts\generate_b122_documentation.py --check
+          if ($LASTEXITCODE -ne 0) { throw 'The canonical documentation sources are stale or invalid.' }
           python .\scripts\generate_b122_legends.py --check
+          if ($LASTEXITCODE -ne 0) { throw 'The canonical PDF/SVG legend sources are stale or invalid.' }
           python -m pytest .\docs\tests\test_b122_documentation.py -q
+          if ($LASTEXITCODE -ne 0) { throw 'The documentation and rendered-PDF verification tests failed.' }
 
       - name: Fetch and verify the official portable Node runtime
         shell: pwsh
@@ -75,6 +93,97 @@ jobs:
       - name: Provision the reviewed repository-local .NET toolchain
         shell: pwsh
         run: .\deployment\windows\Provision-B122DotnetToolchain.ps1
+
+      - name: Build the Switchyard Windows hotkey helper from verified offline packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\apps\desktop-hotkeys\Switchyard.Hotkeys.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\.tools\dotnet\dotnet.exe restore $project -r win-x64 --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Switchyard helper offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe publish $project --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:RuntimeFrameworkVersion=8.0.30 -o $output
+          if ($LASTEXITCODE -ne 0) { throw 'Switchyard helper build failed.' }
+          $exe = Join-Path $output 'Switchyard.Hotkeys.exe'
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Switchyard.Hotkeys.exe" | Out-File (Join-Path $output 'SHA256SUMS') -Encoding ascii
+          @{ commit=$env:GITHUB_SHA; sdk='8.0.424'; runtime='8.0.30'; validation='Build only; interactive Windows acceptance remains open.' } | ConvertTo-Json | Out-File (Join-Path $output 'build-evidence.json') -Encoding utf8
+
+      - name: Verify native read-only category observation without registering hotkeys
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node .\scripts\verify-windows-observer.mjs --helper $exe
+          if ($LASTEXITCODE -ne 0) { throw 'The native read-only observation contract failed.' }
+
+      - name: Verify runtime Job Object supervision and owner-loss containment
+        shell: pwsh
+        run: |
+          $env:SWITCHYARD_TEST_RUNTIME_HELPER = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node --test .\tools\layout-studio\runtime-command.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'The native runtime guardian contract failed.' }
+
+      - name: Retain the exact Windows helper checkpoint for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-windows-hotkeys-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-hotkeys
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify a fresh optional runtime with native imports and offline CPU model
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uvStage = Join-Path $env:RUNNER_TEMP 'switchyard-uv-0.12.7'
+          $uvArchive = Join-Path $env:RUNNER_TEMP 'switchyard-uv-0.12.7.zip'
+          $receipt = Join-Path $env:RUNNER_TEMP 'switchyard-native-runtime-verification.json'
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          # Pinned upstream archive checksum: releases.astral.sh/github/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip.sha256
+          try {
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://releases.astral.sh/github/uv/releases/download/0.12.7/uv-x86_64-pc-windows-msvc.zip' -OutFile $uvArchive
+            $actual = (Get-FileHash -LiteralPath $uvArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -cne 'bf1518af459a3915511a11fdc6e2f43ef9a2afa138b9d498eeb9642fe9d85218') { throw 'The pinned uv Windows archive digest did not verify.' }
+            Expand-Archive -LiteralPath $uvArchive -DestinationPath $uvStage
+            $candidates = @(Get-ChildItem -LiteralPath $uvStage -Filter 'uv.exe' -File -Recurse)
+            if ($candidates.Count -ne 1) { throw 'The verified uv archive did not contain one native executable.' }
+            $uv = $candidates[0].FullName
+            $version = & $uv --version
+            if ($LASTEXITCODE -ne 0 -or $version -notmatch '^uv 0\.12\.7(?:\s|$)') { throw 'The pinned native uv version did not verify.' }
+            & node .\scripts\verify-runtime-platform.mjs --uv $uv --helper $exe --receipt $receipt
+            if ($LASTEXITCODE -ne 0) { throw 'Fresh native Windows dependency/import/offline CPU model verification failed; inspect the bounded receipt.' }
+          } finally {
+            if (Test-Path -LiteralPath $uvArchive) { Remove-Item -LiteralPath $uvArchive -Force }
+            if ((Test-Path -LiteralPath $receipt) -and (Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json).temporaryRuntimeRemoved -eq $true) {
+              Remove-Item -LiteralPath $uvStage -Recurse -Force
+            }
+          }
+
+      - name: Retain the bounded native runtime acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-native-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-native-runtime-verification.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Package the integrated suite with its native helper and unchanged frontend
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node .\scripts\build-switchyard-suite.mjs "--windows-hotkeys=$exe"
+          if ($LASTEXITCODE -ne 0) { throw 'The integrated suite package did not verify.' }
+
+      - name: Retain the private Windows suite bundle for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-suite-windows-${{ github.sha }}
+          path: artifacts/switchyard-suite
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build and verify the complete Windows bundle
         shell: pwsh
@@ -95,6 +204,18 @@ jobs:
             subst $buildDrive /d
             if ($LASTEXITCODE -ne 0) { throw 'The short release-build drive could not be removed.' }
           }
+
+      - name: Retain bounded verification receipts after success or failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-windows-verification-${{ github.sha }}
+          path: |
+            artifacts/b122-windows/build-provenance/verification/isolated-test-*.json
+            artifacts/b122-windows/.source-tree/.sxsy-verification/isolated-test-*.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Prove generated source remains canonical
         shell: pwsh

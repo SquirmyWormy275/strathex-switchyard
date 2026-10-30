@@ -2,8 +2,16 @@
   "schema": "sxsy-b122-legend-manifest/v1",
   "sourceSchema": "sxsy-b122-control-map/v1",
   "sourceProtocolVersion": 1,
-  "sourceManifestSha256": "e1418a21b9e189c5cca19c3339c313e16e107032420e31fc90de304c9b0c31f5",
+  "sourceManifestSha256": "9a6c7fe24b1c4d0be68a926c16b9b10d0addc3ae0f4d5cd9e36887d127abb534",
   "physicalPositionStatus": "unassigned-within-bank",
+  "template": {
+    "sourcePdfSha256": "a16192b9c8cc7f1031527a9b5e60b25fe1aa8eaf1592b9be4d6abc97be4b6040",
+    "sourceSvgSha256": "06bb168f1cf6b7cf4d2a84041626d032a62d41b41e1dff2377fcaa32355ec2b3",
+    "units": "points",
+    "inkInsetPoints": 0.5,
+    "minimumFontPoints": 4.75,
+    "capFitVerified": false
+  },
   "controls": [
     {
       "logicalId": "A01",

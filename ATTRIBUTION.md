@@ -4,6 +4,27 @@ This register is a project control, not a ceremonial acknowledgements page. Add 
 
 Last reviewed: 2026-09-02.
 
+## Model F Labs configuration catalog (2026-10-29)
+
+The offline catalog uses Vial definitions, reference keymaps and physical geometry from
+[ploxiln/vial-qmk](https://github.com/ploxiln/vial-qmk/tree/c832c9b0edfa554c6e8344cb732f14620e63b210)
+and [mymakercorner/vial-qmk](https://github.com/mymakercorner/vial-qmk/tree/761cb1c1b71ed91c48185f3e03465702b21e49f4).
+Credit remains with Model F Labs / Ellipse, wcass, xwhatsit, Pandrew, NathanA,
+ploxiln, Eric Becourt (Rico), and QMK/Vial contributors. The firmware repositories
+ship GPL version 2; file-level GPL-2.0-or-later notices are preserved where present.
+This is distinct from the Leyden Jar hardware repository's license.
+
+Every copied file, immutable upstream URL and SHA-256 is listed in
+`third_party/model-f-catalog/SOURCES.json`. Each upstream copy of `LICENSE` and all
+copied source notices are retained. `NOTICE.md` explains the generated catalog.
+Only definitions and reference configuration source are imported, including 40
+literal UID headers added on 2026-10-30 from the same pinned commits: no firmware
+binary, flashing tool, product photography, or manufacturer marketing prose.
+The generated catalog remains subject to these upstream terms; the root licensing
+decision does not relicense it. Catalog research also uses the manufacturer's
+[models](https://modelfkeyboards.com/) and [manual](https://modelfkeyboards.com/manual/),
+linked as evidence without copying their prose. No affiliation is claimed.
+
 ## Contributor lineage
 
 ### Model F Labs / Ellipse (Joe)
@@ -36,7 +57,7 @@ See the Leyden Jar repository's “How the project started,” “Comparison wit
 - **Contribution:** Real-time keyboard configuration GUI and Vial-specific QMK fork.
 - **Canonical sources:** [vial-kb/vial-gui](https://github.com/vial-kb/vial-gui), [vial-kb/vial-qmk](https://github.com/vial-kb/vial-qmk)
 - **License reported upstream:** GPL-2.0 for Vial GUI; Vial-QMK contains GPL-2.0 and component-specific notices that must be preserved file by file.
-- **Use here:** Planned configuration and possible firmware integration.
+- **Use here:** Source-verified protocol interoperability for local configuration read/review/write/restore. Bounded codecs are implemented independently; firmware integration remains separate.
 - **Files copied:** None.
 
 ### QMK community

@@ -1,0 +1,83 @@
+{
+  "schema": "switchyard-front-end-review/v1",
+  "sourceCommit": "e052a88a6689d252dc537f5d03f05588a14f23ab",
+  "digest": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "files": [
+    {
+      "file": "index.html",
+      "sha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130"
+    },
+    {
+      "file": "app.mjs",
+      "sha256": "214d2bb111bd71bea949bd0e3b0be7c0f79ce84280ead92290735d63bece4863"
+    },
+    {
+      "file": "model.mjs",
+      "sha256": "82b1d84d83fb94b454f374bc79acd0ae268286c26e2f0504a8d486dd1faa01cf"
+    },
+    {
+      "file": "workspace.mjs",
+      "sha256": "afaa2f1d0fe5240e4d1ca5af89452d68629e543e05e3c1677f62f234c3a37ab1"
+    },
+    {
+      "file": "connection.mjs",
+      "sha256": "e4e581f4321e229ae4e1fa65c129236159935bb14dd3768d9430bb6946a90cf7"
+    },
+    {
+      "file": "vial-snapshot.mjs",
+      "sha256": "9ae120fb23bb5786e64d7188d3e14970a537827604903a88549f19f56aecc7ee"
+    },
+    {
+      "file": "suite-ui.mjs",
+      "sha256": "cf5ac13ec5cc2d084524a09b015d7b74e6cf1c24a1ba797d9906eb2058cd9107"
+    },
+    {
+      "file": "workflow.mjs",
+      "sha256": "bfc2518f6927d2f087fca2290fca13f6d4b89ae02c44dbd7743855efed7e5542"
+    },
+    {
+      "file": "device-ui.mjs",
+      "sha256": "30aff8c584a451306b27ab0a550b212c19e862212c0a8aac850005e96d9cdaa2"
+    },
+    {
+      "file": "shell.mjs",
+      "sha256": "e27cac1e8f9aa559596f58e4aa40ff43a8c00153fc02a1690a0f374b4983480f"
+    },
+    {
+      "file": "home.mjs",
+      "sha256": "56d05dde881bada56d31beb8a5905851baea571812eb5e228bdf106634ce7f26"
+    },
+    {
+      "file": "catalog.mjs",
+      "sha256": "47c7863ca718ad57e6bed29b43d4fa48c2448b145f904ee11e24c8978b3ff82f"
+    },
+    {
+      "file": "geometry.mjs",
+      "sha256": "84d2689f3e046402defa125feb721a61856a46d3b9b9443d242b4742f0d73a89"
+    },
+    {
+      "file": "keyboard-view.mjs",
+      "sha256": "bafb38a4a38d1202c286f6a740c1c6055dca25400f7f394da55baea8b0c08598"
+    },
+    {
+      "file": "model-f-catalog.json",
+      "sha256": "9f3b9838e63c603a6c9279a4cdabe32b3777f47b9c92930d07816a6213777065"
+    },
+    {
+      "file": "style.css",
+      "sha256": "823406ff73a76766c9780067a99d306c19130d299ccdd572d869affac76a79ef"
+    },
+    {
+      "file": "sample-info.json",
+      "sha256": "5bedbd514820db420b105ab0cc4f05d8292ec9df2785dbd32280edd320c57a33"
+    },
+    {
+      "file": "sample-keymap.json",
+      "sha256": "e33cb872996f605f64f77178f7b6af2af1fe2e68082ea76900d171137b2abebf"
+    },
+    {
+      "file": "sample-study-report.json",
+      "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
+    }
+  ]
+}

@@ -21,6 +21,14 @@ output panel for missing trace data. A second Normal VS Code press inside the bo
 to the next open VS Code window; the first press only focuses the last-used
 window.
 
+On Linux, **Start Task-Bound Codex Thread** starts a Codex App Server thread for
+an exact Git root, records Codex's returned thread ID with a short task ID in
+private local state, and opens that thread in the integrated terminal. **Show
+Managed Sessions** labels local daemon status as task-bound or unbound without
+promoting it to companion-verified lifecycle capability. A target is shown only
+when the same exact authenticated session and TargetSnapshot persist across
+thread creation.
+
 Durable workflow provider results are validated against the exact prepared
 artifact ID, digest, and result kind before the extension renders bounded
 read-only Proof, decision, plan, Handoff, focus, authority, or voice

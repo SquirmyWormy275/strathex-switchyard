@@ -1,2 +1,7 @@
+* text=auto eol=lf
 *.pdf binary
 *.png binary
+# Retained source/template checksums cover original bytes, including line endings.
+third-party/cyber_engineer/** -text
+third_party/model-f-catalog/** -text
+tools/layout-studio/model-f-catalog.json text eol=lf

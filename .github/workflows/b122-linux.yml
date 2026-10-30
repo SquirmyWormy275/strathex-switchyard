@@ -2,6 +2,7 @@ name: B122 Linux release verification
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -50,12 +51,16 @@ jobs:
       - name: Verify shared and native Linux control planes
         run: |
           npm run typecheck
+          npm run catalog:check
+          npm run catalog:export -- --dir "$RUNNER_TEMP/switchyard-standard-configurations"
           for test_file in \
             packages/protocol/test/*.test.ts \
             packages/control-plane/test/*.test.ts \
             apps/provider-adapter-host/test/*.test.ts \
             apps/vscode-extension/test/*.test.ts \
             apps/linux-companion/test/*.test.ts \
+            tools/layout-studio/*.test.mjs \
+            deployment/suite/*.test.mjs \
             scripts/*.test.mjs \
             firmware/*.test.mjs; do
             timeout --signal=KILL 300s node --experimental-transform-types --test "$test_file"
@@ -66,6 +71,25 @@ jobs:
           npm run build:provider-host
           npm run package:linux-companion:dry-run
           npm run package:vscode:dry-run
+
+      - name: Retain standard keyboard profiles for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-standard-configurations-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-standard-configurations
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Package the integrated suite with the unchanged frozen frontend
+        run: npm run suite:package
+
+      - name: Retain the private Linux suite bundle for seven days
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: switchyard-suite-linux-${{ github.sha }}
+          path: artifacts/switchyard-suite
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Lint Linux lifecycle scripts
         run: |
@@ -115,3 +139,23 @@ jobs:
 
       - name: Prove generated source remains canonical
         run: git diff --exit-code
+
+      - name: Package the verified preview for download
+        run: |
+          tar -C "$RUNNER_TEMP" -cJf "$RUNNER_TEMP/sxsy-b122-linux-x64.tar.xz" sxsy-b122-linux-x64
+          (cd "$RUNNER_TEMP" && sha256sum sxsy-b122-linux-x64.tar.xz > sxsy-b122-linux-x64.tar.xz.sha256)
+          cp "$RUNNER_TEMP/sxsy-b122-linux-x64/extension/sxsy-b122-switchyard.vsix" "$RUNNER_TEMP/sxsy-b122-switchyard.vsix"
+          (cd "$RUNNER_TEMP" && sha256sum sxsy-b122-linux-x64.tar.xz sxsy-b122-switchyard.vsix > SHA256SUMS)
+
+      - name: Upload the verified Linux preview
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sxsy-b122-linux-preview-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz
+            ${{ runner.temp }}/sxsy-b122-linux-x64.tar.xz.sha256
+            ${{ runner.temp }}/sxsy-b122-switchyard.vsix
+            ${{ runner.temp }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
