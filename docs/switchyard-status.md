@@ -1204,3 +1204,29 @@ one added Windows environment test correctly pending native Windows execution.
 The latest integrated Linux run passed all 117 groups: **832 tests, 823 pass and
 nine platform skips**, receipt 70559d96-91a8-421e-9760-7c194fa07f4d.
 The frozen frontend and installed private link are preserved.
+
+## Canonical B122 print geometry accepted in software
+
+The older approximate overlay positions are removed. Canonical sheets now match
+all 33 literal faces to the pinned source SVG and derive all sixty full-insert
+flaps plus clip cuts from that same source. Ink stays inside cut boundaries; the
+side labels leave one point clear of the clip ends. PDF and SVG share text layout
+with a 4.75 pt minimum, word/hyphen wrapping and no glyph stretching. The compact
+RE-ANCHOR label wraps at its hyphen. The short Run/Alt label is STOP OWNED RUN,
+retaining the existing managed-only action. No protocol assignment changed.
+
+All three two-page palette PDFs and all 22 actual-scale standalone SVGs were
+rendered and visually inspected. All 26 documentation tests and deterministic
+regeneration pass with the pinned Node 24 environment. The generator also uses
+the pinned pypdf compression API and attaches source pages to its writer before
+merging. The original creator notices and 15 mm calibration box are preserved.
+Private receipt: canonical-legend-geometry-1793381215131.json. Printer scaling,
+physical cap fit, final branded artwork and hardware commissioning remain open;
+the source geometry is not a hardware measurement. Temporary review tooling and
+PNGs are disposable; the canonical PDFs/SVGs remain in Git.
+
+Next independently executable work: finish owned-provider crash containment;
+implement supported exact native client attachment and authority mediation;
+complete the remaining verified controller controls and expose the accumulated
+backend controls after the frozen frontend review. Native Windows fresh-runtime
+acceptance is being monitored separately.

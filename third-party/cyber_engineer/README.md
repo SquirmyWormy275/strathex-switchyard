@@ -29,3 +29,9 @@ directly from the retained SVG's axis-aligned rectangle paths, in SVG points.
 The application insets its ink by 0.5 points on every edge, preserving source
 outlines and clip cuts. These are template coordinates, not keyboard pitch or
 a measurement of the user's caps.
+
+The canonical B122 generator also matches all 33 faces back to the literal SVG
+and derives its sixty full-insert flaps and side clip cuts from that same pinned
+source. Its colored ink stays inside those boundaries; each standalone insert
+retains the sixteen original face/flap/clip paths at their actual point scale.
+No new physical-fit or third-party artwork-license claim is added.

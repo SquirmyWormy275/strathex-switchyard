@@ -65,7 +65,10 @@ legibility bounds and preservation of the input definitions. An actual F77 Dvora
 catalog reference was rendered through librsvg/Cairo to one A4 PDF and inspected
 as a PNG; labels and source cut lines remained clear. That is software/rendering
 evidence. Printer scaling, physical cap fit and frontend click acceptance remain
-unverified. The older canonical B122 PDF overlays use separate layout code and
-still require reconciliation with the exact source face and panel geometry.
+unverified. The separate [canonical B122 kit](../legends/printable/README.md)
+now uses the same literal faces plus source-derived flaps and clip clearances.
+Its six PDF pages and 22 standalone SVGs were rendered and inspected; source
+scale, readable font bounds and reproducible outputs are tested. It describes
+the settled B122 control reference, independently of a saved general profile.
 
 Source and reuse instructions: [cyber_engineer package](../third-party/cyber_engineer/README.md).
