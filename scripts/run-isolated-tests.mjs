@@ -117,6 +117,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/private-fs.test.mjs" },
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
+  { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/claude-coding.test.mjs" },
   { file: "tools/layout-studio/task-window.test.mjs" },
   { file: "tools/layout-studio/voice-queue.test.mjs" },

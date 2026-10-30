@@ -1,8 +1,8 @@
 # Exact coding-task bindings
 
 Coding tasks are separate from the keyboard configuration designer. The backend
-now binds real Codex daemon threads to a local task, working directory, compartment
-and current-login fingerprint. It can inventory recent daemon threads, bind an
+binds real Codex app-server threads to a local task, working directory, compartment
+and current-login fingerprint. It can inventory recent threads, bind an
 existing exact thread, create one empty read-only thread per durable request, and
 refresh its runtime status. The frozen frontend does not expose this task panel
 yet. General coding-task integration is still in progress.
@@ -100,6 +100,50 @@ without a model prompt. It does not imply equivalence with this Codex adapter.
 Native task-window focus, exact interactive client resumption, supervised terminal
 lifecycle, approved review/handoff submission, cancellation and integration with
 the existing exact-scope authority broker remain unfinished. Further Claude task
-controls and the Windows Codex general coding-task transport are also
-implementation work. Existing configuration conversations, SDK integrations and
+controls remain implementation work. The Windows stdio task transport is now
+implemented; its native installed-CLI/account acceptance is still open. Existing configuration conversations, SDK integrations and
 native Windows hotkeys are separate capabilities and do not imply those are done.
+
+## Windows task transport
+
+Windows uses `switchyard.codex-stdio/v1` instead of a Unix socket. On the first
+permitted request it starts one owned native app-server per compartment through
+private stdin/stdout pipes. Shell/plugins/apps/memories/multi-agent/web search and
+enabled MCP servers are disabled with effective configuration readback. Provider
+API keys and runtime injection variables do not enter the child environment.
+The existing native CLI login supplies identity; no new token store is introduced.
+
+The closed transport supports metadata inventory/read, local-login fingerprinting,
+empty read-only/on-request creation and exact owned read-only runtime resume.
+Create verifies returned identity, working directory and sandbox/approval policy
+before persisting the bounded local assistant marker. It submits no user/model
+turn. Resume excludes transcript history and reads permissions back. An identity
+returned before a later failure, including mode-off, remains available for exact
+recovery and does not authorize automatic replacement creation.
+
+Mode-off stops only the owned compartment's app-server. Pending initialization is
+fenced against late startup. Unconfirmed exit blocks replacement until exact exit
+is verified. The Linux default still uses the existing shared daemon and leaves
+that shared service running.
+
+Eight tests exercise actual JSON-lines child-process pipes and Windows service
+composition, permission/directory/account boundaries, creation idempotency,
+retained partial identities, mode-off and unconfirmed-stop isolation. The built
+Windows runner still needs to execute this checkpoint's tests. Native Windows
+installed-CLI/account and interactive-window acceptance remain separate.
+
+A real Linux CLI check against Codex **0.166.0** identified the existing login,
+read metadata inventory and verified the exact owned native app-server exited
+**31 ms** after its wrapper was killed. No new thread or model prompt was created.
+Private receipts are `runtime-verification/codex-stdio-1793360185995.json` and
+`runtime-verification/codex-stdio-parent-loss-1793360373712.json`.
+This does not claim actual Windows account acceptance or new-transport create/
+resume acceptance. Run the repeatable read-only parent-loss check with:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-codex-stdio-host.mjs --read-only
+```
+
+The transport follows the [official app-server documentation](https://learn.chatgpt.com/docs/app-server)
+for JSON-lines initialization and metadata-only read/resume. Installed response
+fields are independently checked; API evolution cannot silently broaden permissions.

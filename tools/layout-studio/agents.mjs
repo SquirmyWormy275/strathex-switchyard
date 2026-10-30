@@ -9,6 +9,7 @@ import { modifiers, families, consequences, parsePlan, analyzePlan } from "./mod
 import { proposalSchema } from "./workspace.mjs";
 import { privateDirectory } from "./suite-store.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
+import { desktopEnvironment } from "./process-environment.mjs";
 
 const text = { type: "string" };
 export const designResponseSchema = {
@@ -66,11 +67,12 @@ export async function readCodexMcpNames(executable, cwd) {
   } finally { probe.close(); }
 }
 export class CodexClient extends EventEmitter {
-  constructor(executable, cwd, serverNames = []) {
+  constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
+    this.clientInfo = clientInfo;
     codexDesignConfig(serverNames); this.serverNames = [...serverNames];
     const restrictions = ["features.shell_tool=false", "features.plugins=false", "features.apps=false", "features.memories=false", "features.multi_agent=false", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
-    this.child = spawn(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
+    this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
       this.buffer += chunk;
@@ -95,7 +97,7 @@ export class CodexClient extends EventEmitter {
       try { this.send({ id, method, params }); } catch (e) { this.pending.delete(id); clearTimeout(timer); reject(e); }
     });
   }
-  async handshake() { await this.request("initialize", { clientInfo: { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } }); this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
+  async handshake() { await this.request("initialize", { clientInfo: this.clientInfo }); this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
   async initialize() { assertCodexDesignConfig(await this.handshake()); }
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }

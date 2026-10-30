@@ -132,7 +132,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           pauseMonitor(compartment);
-          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -292,6 +292,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }

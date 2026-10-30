@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **99/99 groups passed; 680 tests, 671 passed and 9
+- Integrated native Linux run: **100/100 groups passed; 688 tests, 679 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-aca502bb-ade8-406c-a826-eaf75e0a0761.json`.
+  `.sxsy-verification/isolated-test-13812547-147e-46cb-99d6-fa1db2fb7ebd.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -449,3 +449,25 @@ bundle was removed; current plus rollback installed copies total about 6 MiB.
 The installer now distinguishes an omitted start preference (preserve the prior
 running state) from explicit `--no-start` (leave a changed installation stopped).
 A native fixture checks this transition without altering the live pilot.
+
+
+## Owned Windows Codex task transport
+
+The Windows task backend now uses a restricted native app-server over stdio,
+with private per-compartment children, metadata-only inventory/read, current-login
+fingerprints and exact read-only create/resume checks. It never submits a model
+turn or grants tool approval. Effective restrictions and returned permissions are
+checked before accepting capability. Mode-off fences pending startup and stops
+only that compartment's child; unconfirmed exit blocks a replacement. A thread
+ID returned before mode-off or later failure is retained for exact recovery.
+The existing Linux shared daemon is preserved.
+
+Eight focused tests pass, including actual JSON-lines subprocess framing,
+Windows service composition, durable duplicate prevention and stop isolation.
+A real installed Linux Codex 0.166.0 check identified login/read inventory and
+verified the native owned app-server exited 31 ms after abrupt owner loss. It
+created no thread and submitted no model prompt. Private receipt:
+`runtime-verification/codex-stdio-parent-loss-1793360373712.json`.
+Windows CI for this source, actual Windows installed-CLI/account acceptance,
+window focus and broader task execution controls remain separate open checks.
+See [exact task bindings](coding-task-bindings.md).
