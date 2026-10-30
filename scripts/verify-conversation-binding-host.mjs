@@ -36,7 +36,7 @@ try {
     const bound = await api("conversation/binding/bind", input); assert.equal(bound.modelPromptSubmitted, false); assert.equal(bound.originalAccountVerified, false);
     const saved = (await api("snapshot", { compartment })).conversations.find((c) => c.id === fixture.id);
     assert.equal(saved.accountFingerprint, review.scope.currentAccountFingerprint); assert.equal(saved.sessionId, fixture.sessionId); assert.deepEqual(saved.messages, fixture.messages);
-    await api("conversation/binding/bind", input, 400); checks.push(`${provider}: reviewed exact destination, retained context/identity and rejected replay without a model request`);
+    await api("conversation/binding/bind", input, 409); checks.push(`${provider}: reviewed exact destination, retained context/identity and rejected replay without a model request`);
   }
   await api("conversation/binding/review", { compartment, conversationId: fixtures[0].id }, 401, false); checks.push("unauthenticated review rejected");
 } catch (error) { failure = error; evidence.failure = error.message; }
