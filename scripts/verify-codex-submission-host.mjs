@@ -16,7 +16,8 @@ assert.ok(token && url.protocol === "http:" && url.hostname === "127.0.0.1");
 const hash = (v) => createHash("sha256").update(v).digest("hex"), digest = (v) => hash(JSON.stringify(v));
 async function api(path, body, expected = 200, authenticated = true) {
   const r = await fetch(new URL(`/api/suite/${path}`, url.origin), { method: "POST", redirect: "error", headers: { "Content-Type": "application/json", Origin: url.origin, ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(150000) });
-  assert.equal(r.status, expected, "The installed reviewed-text check returned an unexpected HTTP status."); return r.json();
+  const value = await r.json();
+  assert.equal(r.status, expected, `The installed ${path} check did not verify: ${typeof value.error === "string" ? value.error.slice(0, 600) : "unexpected HTTP status"}`); return value;
 }
 const definitions = (s) => digest([s.profile, s.workflow, s.roleBindings ?? [], s.mode]), personal = definitions(await api("snapshot", { compartment: "personal" })), selection = await store.selection();
 await privateDirectory(repositoryRoot); await mkdir(join(repositoryRoot, ".git"), { mode: 0o700 });

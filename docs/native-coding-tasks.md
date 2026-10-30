@@ -20,7 +20,9 @@ unfinished. Claude configuration-design continuation is a separate working path.
 
 1. Create an empty task with `coding/codex/create`, using a stable request UUID,
    a short local label and the exact Git working directory. Creation does not
-   send a model prompt. Existing external bindings remain observation-only.
+   send a model prompt. A dedicated creator must verify exit before registration,
+   releasing the native writer for a later reviewed turn. Existing daemon/terminal
+   bindings remain with their original runtimes and cannot receive text here.
 2. Review text with `coding/codex/turns/review`. Read its exact session, account
    fingerprint, directory identity and text. An older task without directory
    identity needs explicit binding again before this review.
@@ -31,6 +33,11 @@ unfinished. Claude configuration-design continuation is a separate working path.
 4. Inspect `coding/codex/turns/list`. `provider-turn-completed` reports the native
    turn's response; `taskCompletionVerified` remains false. Repeating a retained
    request UUID returns the saved result without another submission.
+
+Dedicated tasks are labelled ready for text review rather than resumable in an
+attached client. A status check or a private runtime acknowledgement is not a
+terminal/window attachment. Older daemon-bound tasks keep their separate legacy
+read-only resume route; the app does not displace an existing native writer.
 
 All paths are POST routes beneath `/api/suite/` on the authenticated private
 loopback origin. Supply the selected `compartment` explicitly. Work policy rejects

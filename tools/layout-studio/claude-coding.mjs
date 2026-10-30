@@ -11,6 +11,7 @@ import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createTaskWindow } from "./task-window.mjs";
+import { repositoryIdentity, verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const shortId = /^[a-f0-9]{8}$/;
@@ -77,11 +78,13 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
   async function exact(c, id, generation = fence(c)) {
     const login = await account(c, generation), task = taskIn(await store.snapshot(c), id);
     if (task.accountFingerprint !== login) throw new Error("The local Claude login changed. This task was not redirected to another account.");
+    await verifyRepositoryIdentity(task);
     if (!task.sessionId && !task.backgroundId) throw new Error("No exact Claude session identity was returned. Review native inventory and deliberately bind an identified session; this request will not guess or relaunch.");
     const rows = await inventory(c, task.repositoryRoot, generation), row = rows.find((r) => task.backgroundId ? r.backgroundId === task.backgroundId : r.sessionId === task.sessionId);
     if (row && task.sessionId && row.sessionId !== task.sessionId) throw new Error("The exact Claude session identity changed; review this binding deliberately.");
     if (row?.sessionId) await store.claimSession(c, { provider: "claude-code", sessionId: row.sessionId });
     if (await account(c, generation) !== login) throw new Error("The local Claude login changed during observation.");
+    await verifyRepositoryIdentity(task);
     current(c, generation); return { task, row };
   }
   const reviewed = (c, t, r) => ({ action: "stop_managed_run", sessionId: t.sessionId, targetSnapshotId: scopeHash(["claude-owned-background-stop/v1", c, t.id, t.sessionId, t.backgroundId, t.repositoryRoot, t.accountFingerprint, t.startedAt, r.pid]), scopeDigest: scopeHash([t.launchPolicy, r]) });
@@ -115,28 +118,29 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
     async inventory(c, { repositoryRoot }) { const root = await repository(repositoryRoot); await account(c); return inventory(c, root); },
     async list(c) { await access(c); return ((await store.snapshot(c)).codingSessions ?? []).filter((t) => t.provider === "claude-code").map(view); },
     async bind(c, { sessionId, repositoryRoot, label }) {
-      const generation = fence(c), login = await account(c, generation), root = await repository(repositoryRoot);
+      const generation = fence(c), login = await account(c, generation), root = await repository(repositoryRoot), identity = await repositoryIdentity(root);
       if (!uuid.test(sessionId ?? "") || !bounded(label, 100)) throw new Error("Choose a full Claude session UUID and a short local task label.");
       const row = (await inventory(c, root, generation)).find((r) => r.sessionId === sessionId);
       if (!row) throw new Error("Claude did not report that exact session in the selected directory. No title or most-recent session was guessed.");
       if (await account(c, generation) !== login) throw new Error("The local Claude login changed while binding.");
+      await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
       await store.claimSession(c, { provider: "claude-code", sessionId }); current(c, generation);
       return store.update(c, "claude-coding-bind", (s) => {
         s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.provider === "claude-code" && t.sessionId === sessionId);
-        if (found) { if (found.repositoryRoot !== root || found.accountFingerprint !== login || found.backgroundId !== row.backgroundId) throw new Error("This saved Claude task changed its exact local context."); found.observation = observation(row); return { ...view(found), duplicatePrevented: true }; }
+        if (found) { if (found.repositoryRoot !== root || found.accountFingerprint !== login || found.backgroundId !== row.backgroundId || found.repositoryIdentity && (found.repositoryIdentity.device !== identity.device || found.repositoryIdentity.inode !== identity.inode)) throw new Error("This saved Claude task changed its exact local context."); found.repositoryIdentity ??= identity; found.observation = observation(row); return { ...view(found), duplicatePrevented: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
-        const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", label: label.trim(), repositoryRoot: root, accountFingerprint: login, sessionId, backgroundId: row.backgroundId, startedAt: row.startedAt, status: "registered", createdAt: now(), observation: observation(row) };
+        const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId, backgroundId: row.backgroundId, startedAt: row.startedAt, status: "registered", createdAt: now(), observation: observation(row) };
         s.codingSessions.push(task); return view(task);
       }, { provider: "claude-code" });
     },
     async create(c, { requestId, repositoryRoot, label }) {
-      const generation = fence(c), login = await account(c, generation), root = await repository(repositoryRoot);
+      const generation = fence(c), login = await account(c, generation), root = await repository(repositoryRoot), identity = await repositoryIdentity(root);
       if (!uuid.test(requestId ?? "") || !bounded(label, 100)) throw new Error("An empty Claude task needs a stable request UUID and a short local label.");
       const reserved = await store.update(c, "claude-create-reserve", (s) => {
         s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.id === requestId);
         if (found) { if (found.provider !== "claude-code" || found.repositoryRoot !== root || found.accountFingerprint !== login) throw new Error("This request identity already names another task or local account."); return view(found); }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
-        s.codingSessions.push({ schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, accountFingerprint: login, sessionId: null, backgroundId: null, launchPolicy: "tools-disabled/plan", status: "creating", createdAt: now(), observation: null }); return null;
+        s.codingSessions.push({ schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId: null, backgroundId: null, launchPolicy: "tools-disabled/plan", status: "creating", createdAt: now(), observation: null }); return null;
       }, { provider: "claude-code" });
       if (reserved) return { ...reserved, duplicatePrevented: true };
       try {
@@ -150,6 +154,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, platfo
         if (!row?.sessionId) throw new Error("The new Claude background session has no verified full session UUID yet.");
         await store.update(c, "claude-create-full-identity", (s) => { const t = taskIn(s, requestId); t.sessionId = row.sessionId; t.startedAt = row.startedAt; });
         if (await account(c, generation) !== login) throw new Error("The local Claude login changed during creation.");
+        await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
         await store.claimSession(c, { provider: "claude-code", sessionId: row.sessionId }); current(c, generation);
         return store.update(c, "claude-create-bind", (s) => { const t = taskIn(s, requestId); t.status = "registered"; t.observation = observation(row); return { ...view(t), modelPromptSubmitted: false }; }, { provider: "claude-code" });
       } catch (e) { await store.update(c, "claude-create-uncertain", (s) => { taskIn(s, requestId).status = "creation-uncertain"; }).catch(() => {}); throw new Error(`${e.message} Creation is uncertain; this request will not create another background session automatically.`); }

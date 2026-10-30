@@ -9,7 +9,7 @@ import { directoryIdentity } from "./private-fs.mjs";
 import { createCodexStdioTasks } from "./codex-stdio-tasks.mjs";
 import { repositoryIdentity, verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 
-const { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, resumeExactCodexDaemonThread, startCodexDaemonThread } = createRequire(import.meta.url)("../../apps/vscode-extension/src/codex-daemon-status.cjs");
+const { readCodexDaemonAccount, resumeExactCodexDaemonThread } = createRequire(import.meta.url)("../../apps/vscode-extension/src/codex-daemon-status.cjs");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const thread = /^[A-Za-z0-9_-]{1,128}$/;
 const fingerprint = /^[a-f0-9]{64}$/;
@@ -20,11 +20,34 @@ async function repository(value) {
   if (git.isSymbolicLink() || (!git.isDirectory() && !git.isFile())) throw new Error("The selected directory has unsupported Git metadata.");
   return root;
 }
-export function createCodingSessions({ store, resolveCli = trustedCli, platform = process.platform, now = () => Date.now(), daemon, socketPath = join(homedir(), ".codex/app-server-control/app-server-control.sock") } = {}) {
-  const adapter = { id: platform === "win32" ? "switchyard.codex-stdio" : "switchyard.codex-daemon", version: 1, platform, testedApplicationVersion: platform === "linux" ? "0.165.0" : null, detection: platform === "win32" ? "installed native CLI; owned private stdio app-server with restricted configuration" : "installed native CLI and private current-user daemon socket", accountScope: "local login fingerprint; organization unverified" };
-  daemon ??= platform === "win32" ? createCodexStdioTasks({ store, resolveCli }) : { list: () => readCodexDaemonThreads(socketPath), account: () => readCodexDaemonAccount(socketPath), read: (sessionId, root) => readExactCodexDaemonThread(socketPath, sessionId, { expectedRepositoryRoot: root }), resume: (sessionId, root) => resumeExactCodexDaemonThread(socketPath, sessionId, root), start: (root, taskId) => startCodexDaemonThread(socketPath, root, taskId, { readOnly: true }) };
+export function createCodingSessions({ store, resolveCli = trustedCli, platform = process.platform, now = () => Date.now(), daemon, taskDriverFactory, socketPath = join(homedir(), ".codex/app-server-control/app-server-control.sock") } = {}) {
+  const adapter = { id: "switchyard.codex-stdio", version: 2, platform, testedApplicationVersion: "0.166.0", detection: "installed native CLI; owned restricted metadata connection and separately exited task creators", accountScope: "local login fingerprint; organization unverified" };
+  const injected = daemon != null;
+  const legacy = daemon ?? (platform === "linux" ? { account: () => readCodexDaemonAccount(socketPath), resume: (sessionId, root) => resumeExactCodexDaemonThread(socketPath, sessionId, root) } : null);
+  daemon ??= createCodexStdioTasks({ store, resolveCli });
+  taskDriverFactory ??= injected ? null : () => createCodexStdioTasks({ store, resolveCli });
+  const taskDrivers = new Map(), generations = new Map(); let closed = false;
+  const assertGeneration = (c, g) => { if (closed || g !== (generations.get(c) ?? 0)) throw new Error("This task operation was stopped before its next effect."); };
+  async function ownedTask(compartment, operation, generation = generations.get(compartment) ?? 0) {
+    if (closed) throw new Error("This task service is closed.");
+    for (const [key, r] of taskDrivers) if (r.compartment === compartment && r.uncertain) { const exits = await r.driver.close().catch(() => []); if (!exits.length || exits.some((e) => e?.stopped !== true)) throw new Error("A previous owned task creator has not verified exit. No replacement was launched."); taskDrivers.delete(key); }
+    if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("Owned task startup was stopped.");
+    const driver = taskDriverFactory(), key = Symbol("owned-task-creator"), record = { compartment, driver, uncertain: false }; taskDrivers.set(key, record);
+    let result, failure;
+    try { if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("Owned task startup was stopped."); result = await operation(driver); }
+    catch (error) { failure = error; }
+    finally {
+      const exits = await driver.close().catch(() => [{ stopped: false }]);
+      if (!Array.isArray(exits) || exits.some((r) => r?.stopped !== true)) { record.uncertain = true; failure = Object.assign(new Error("The exact owned task creator did not verify exit. Its returned identity was preserved; no replacement was launched."), { createdThreadId: result?.threadId ?? failure?.createdThreadId }); }
+      else taskDrivers.delete(key);
+    }
+    if (failure) throw failure;
+    if (closed || generation !== (generations.get(compartment) ?? 0)) throw Object.assign(new Error("The owned task operation was stopped after its native acknowledgement."), { createdThreadId: result?.threadId });
+    return result;
+  }
   const resuming = new Map();
   async function access(compartment) {
+    if (closed) throw new Error("This task service is closed.");
     await store.authorize(compartment, { provider: "codex" });
     if (!["linux", "win32"].includes(platform)) throw new Error("The general Codex task adapter supports Linux and Windows. This platform implementation is unavailable.");
     await resolveCli("codex");
@@ -41,7 +64,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
   }
   function view(task) {
     const fresh = Boolean(task.observation && now() - task.observation.observedAt >= 0 && now() - task.observation.observedAt <= 30000);
-    return { ...task, observation: fresh ? task.observation : { status: "stale", observedAt: task.observation?.observedAt ?? null, provenance: "Refresh this exact binding; no runtime state inferred", completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(task.sessionId), observable: Boolean(task.sessionId), focusable: false, launchable: false, resumable: task.status === "registered" && task.launchPolicy === "read-only/on-request", controllable: false, cancellable: false, mediated: false }, accountScope: { type: "local ChatGPT login fingerprint", organizationVerified: false } };
+    return { ...task, observation: fresh ? task.observation : { status: "stale", observedAt: task.observation?.observedAt ?? null, provenance: "Refresh this exact binding; no runtime state inferred", completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(task.sessionId), observable: Boolean(task.sessionId), focusable: false, launchable: false, resumable: task.status === "registered" && task.launchPolicy === "read-only/on-request" && task.nativeTransport !== "owned-stdio", textReviewAvailable: task.status === "registered" && task.nativeTransport === "owned-stdio", controllable: false, cancellable: false, mediated: false }, accountScope: { type: "local ChatGPT login fingerprint", organizationVerified: false } };
   }
   return {
     async discovery(compartment) {
@@ -49,7 +72,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       try { await store.authorize(compartment, { provider: "codex" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
       if (!["linux", "win32"].includes(platform)) return { ...result, permitted: true, reason: "The general Codex task adapter supports Linux and Windows. This platform implementation is unavailable." };
       try { await resolveCli("codex"); } catch (e) { return { ...result, permitted: true, installed: false, running: false, reason: e.message }; }
-      try { const rows = await daemon.list(compartment); return { ...result, permitted: true, installed: true, running: true, available: true, recentThreads: rows.length, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-thread", "resume-owned-read-only-runtime"], provenance: "Supported local app-server inventory; no thread content, model prompt or outcome inferred" }; }
+      try { const rows = await daemon.list(compartment); return { ...result, permitted: true, installed: true, running: true, available: true, recentThreads: rows.length, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-thread", "review-owned-task-text"], provenance: "Owned native app-server metadata; no thread content, model prompt or outcome inferred" }; }
       catch (e) { return { ...result, permitted: true, installed: true, running: false, reason: e.message }; }
     },
     async list(compartment) { await access(compartment); return ((await store.snapshot(compartment)).codingSessions ?? []).filter((t) => t.provider === "codex").map(view); },
@@ -69,20 +92,23 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       }, { provider: "codex" });
     },
     async create(compartment, { requestId, repositoryRoot, label }) {
+      const generation = generations.get(compartment) ?? 0;
       const login = await account(compartment);
       if (!uuid.test(requestId ?? "") || typeof label !== "string" || !label.trim() || label.length > 100 || /[\0\r\n]/.test(label)) throw new Error("An empty task needs a stable request UUID and a short local label.");
       const root = await repository(repositoryRoot), identity = await repositoryIdentity(root);
       const reserved = await store.update(compartment, "coding-create-reserve", (s) => {
+        assertGeneration(compartment, generation);
         s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.id === requestId);
         if (found) { if (found.provider !== "codex" || found.repositoryRoot !== root || found.accountFingerprint !== login.fingerprint) throw new Error("This request identity already names a different task or login."); return { task: view(found), duplicate: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
-        const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, sessionId: null, accountFingerprint: login.fingerprint, launchPolicy: "read-only/on-request", status: "creating", createdAt: now(), observation: null };
+        const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, ...(taskDriverFactory ? { nativeTransport: "owned-stdio" } : {}), sessionId: null, accountFingerprint: login.fingerprint, launchPolicy: "read-only/on-request", status: "creating", createdAt: now(), observation: null };
         s.codingSessions.push(task); return { duplicate: false };
       }, { provider: "codex" });
       if (reserved.duplicate) return { ...reserved.task, duplicatePrevented: true };
       let createdThreadId;
       try {
-        const result = await daemon.start(root, `switchyard-${requestId}`, compartment), sessionId = result.threadId;
+        assertGeneration(compartment, generation);
+        const result = taskDriverFactory ? await ownedTask(compartment, (driver) => driver.start(root, `switchyard-${requestId}`, compartment), generation) : await daemon.start(root, `switchyard-${requestId}`, compartment), sessionId = result.threadId;
         if (typeof sessionId !== "string" || !thread.test(sessionId)) throw new Error("The new thread identity is invalid.");
         createdThreadId = sessionId;
         // Save the returned identity before a later read/account/claim can fail.
@@ -91,7 +117,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (current.fingerprint !== login.fingerprint) throw new Error("The local login changed while creating the task.");
         await store.claimSession(compartment, { provider: "codex", sessionId });
         await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
-        return store.update(compartment, "coding-create-bind", (s) => { const task = s.codingSessions.find((t) => t.id === requestId); task.status = "registered"; task.observation = observation; return { ...view(task), modelPromptSubmitted: false }; }, { provider: "codex" });
+        return store.update(compartment, "coding-create-bind", (s) => { assertGeneration(compartment, generation); const task = s.codingSessions.find((t) => t.id === requestId); task.status = "registered"; task.observation = observation; return { ...view(task), modelPromptSubmitted: false }; }, { provider: "codex" });
       } catch (error) {
         await store.update(compartment, "coding-create-uncertain", (s) => { const task = s.codingSessions.find((t) => t.id === requestId), knownId = createdThreadId ?? error.createdThreadId; if (!task.sessionId && typeof knownId === "string" && thread.test(knownId)) task.sessionId = knownId; task.status = "creation-uncertain"; }).catch(() => {});
         throw new Error(`${error.message} Creation is uncertain; this request will not launch another thread automatically.`);
@@ -117,11 +143,13 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex" || task.status !== "registered" || task.launchPolicy !== "read-only/on-request") throw new Error("Runtime resume is implemented only for exact read-only tasks created by Switchyard. Existing task permissions are not changed.");
         if (task.accountFingerprint !== login.fingerprint) throw new Error("The local Codex login changed. This task was not resumed in another account.");
         await verifyRepositoryIdentity(task);
+        if (task.nativeTransport === "owned-stdio") throw new Error("This task is ready for reviewed text continuation. No attached native client is verified; use its exact text review instead of claiming a window or task was resumed.");
         await store.claimSession(compartment, { provider: "codex", sessionId: task.sessionId });
         const before = await exact(task.sessionId, task.repositoryRoot, compartment);
         if (["active", "waiting-on-approval"].includes(before.status)) throw new Error("This exact task is already active or awaiting approval. Its running permissions were preserved.");
         try {
-          const result = await daemon.resume(task.sessionId, task.repositoryRoot, compartment);
+          if (legacy?.account && (await legacy.account(compartment)).fingerprint !== login.fingerprint) throw new Error("The original native runtime account changed. No saved context was resumed in it.");
+          const result = await (legacy ?? daemon).resume(task.sessionId, task.repositoryRoot, compartment);
           if (result.id !== task.sessionId || result.repositoryRoot !== task.repositoryRoot || result.permissions !== task.launchPolicy || result.modelPromptSubmitted !== false || !states.includes(result.observation)) throw new Error("Codex did not verify the exact resumed runtime and permissions.");
           if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during resume.");
           await verifyRepositoryIdentity(task);
@@ -140,7 +168,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       resuming.set(key, pending);
       try { return await pending; } finally { if (resuming.get(key) === pending) resuming.delete(key); }
     },
-    async stopCompartment(c) { return daemon.stopCompartment?.(c) ?? { stopped: true, sharedRuntimePreserved: true }; },
-    async close() { return daemon.close?.(); }
+    async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); const results = await Promise.all([daemon.stopCompartment?.(c) ?? { stopped: true }, ...[...taskDrivers.values()].filter((r) => r.compartment === c).map(async (r) => { const exits = await r.driver.close(); return { stopped: Array.isArray(exits) && exits.every((e) => e.stopped) }; })]); return { stopped: results.every((r) => r.stopped === true), sharedRuntimePreserved: true }; },
+    async close() { closed = true; const results = await Promise.all([...new Set([...taskDrivers.values()].map((r) => r.compartment))].map((c) => this.stopCompartment(c))); await daemon.close?.(); return results; }
   };
 }

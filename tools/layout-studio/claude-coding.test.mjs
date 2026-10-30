@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, rm, realpath, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, realpath, readFile, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
@@ -39,6 +39,15 @@ test("Claude's actual versioned inventory distinguishes process state from task 
   assert.throws(() => claudeInventory([{ ...row, state: "imagined-complete" }], "/one"), /unsupported/);
   assert.throws(() => claudeAccount({ loggedIn: true, authMethod: "api_key", apiProvider: "firstParty", email: "a", orgId: "b" }), /supported first-party/);
 });
+
+test("a replacement repository cannot inherit an exact Claude task, stop review or interactive focus", () => fixture(async ({ root, repositoryRoot, service, calls, input }) => {
+  const task = await service.create("personal", input()); assert.match(task.repositoryIdentity.inode, /^[1-9]\d*$/);
+  await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); calls.length = 0;
+  await assert.rejects(service.status("personal", task.id), /directory was replaced/);
+  await assert.rejects(service.reviewStop("personal", task.id), /directory was replaced/);
+  await assert.rejects(service.focus("personal", task.id), /directory was replaced/);
+  assert.equal(calls.some((args) => args[0] === "agents" || args[0] === "stop"), false);
+}));
 
 test("Claude creates one empty background session per durable request, preserves native identities and requires explicit current-account binding", () => fixture(async ({ service, options, store, calls, input, stateRoot, changeAccount }) => {
   assert.equal((await service.discovery("personal")).available, true);

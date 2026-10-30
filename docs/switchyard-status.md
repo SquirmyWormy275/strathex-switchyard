@@ -1021,3 +1021,36 @@ checked; Linux budgets/assertions/skips are unchanged. Full integrated and norma
 installed acceptance are running. The frontend stays frozen. Claude task text,
 interactive attachment and execution-authority mediation remain implementation
 work rather than hardware/account-blocked checks.
+
+The initial submission checkpoint passed **115 Linux groups, 813 tests: 804
+passed and 9 expected platform skips**, receipt
+`5a9b64e8-51bd-44a6-9609-bdfef1dafd58`. Normal installed update/export also passed
+six checks for source **7aeb1e6**, release
+`74099a7a50be5cf92bd74b44ee8f92a4af70471b4cf33bdb989a1965bc95330f`,
+preserving the frozen frontend, definitions, modes and private link. Its disposable
+bundle was removed; receipt `assignment-legends-1793376459558.json`.
+
+Actual installed text acceptance then exposed a native writer-ownership conflict:
+an empty task created in the shared Linux daemon remains held by that runtime.
+Private continuation was refused before a model turn; both failed proof fixtures
+were removed and their modes/definitions restored. Private receipts are
+`installed-reviewed-codex-text-1793376494515.json` and
+`installed-reviewed-codex-text-1793376606244.json`. This is a software integration
+failure, not unavailable hardware/account acceptance. A controlled two-runtime
+native check confirmed that `thread/unsubscribe` does not release the writer.
+
+New app tasks now use a dedicated restricted creator on both Linux and Windows.
+Its direct child must verify exit before registration; only these explicitly
+marked tasks can enter private text review. An uncertain creator exit retains its
+returned identity, blocks another creator and never relaunches the request.
+Delayed acknowledgements after shutdown are retained as uncertain. Existing
+daemon/terminal sessions remain attached to their original runtimes, and dedicated
+tasks do not advertise unverified native-client resumption. Legacy daemon resume
+checks its own account separately. Default metadata reads use an owned restricted
+CLI connection and need no pre-existing daemon.
+
+Claude coding-task create/bind/status/focus also now verifies native repository
+device/inode identity. Replacing a directory cannot inherit its saved task or
+stop/focus review. Forty-five focused native creator/submission/stdio/Claude checks
+pass. TypeScript typecheck passes; fresh integrated and installed text acceptance
+are running for the ownership correction.

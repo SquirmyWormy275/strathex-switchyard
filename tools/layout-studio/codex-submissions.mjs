@@ -9,11 +9,12 @@ import { stopOwnedChild } from "./owned-process.mjs";
 
 const uuid = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const unresolved = new Set(["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"]);
-const taskDigest = (t) => scopeHash([t.id, t.provider, t.sessionId, t.accountFingerprint, t.repositoryRoot, t.repositoryIdentity, t.launchPolicy, t.status]);
+const taskDigest = (t) => scopeHash([t.id, t.provider, t.sessionId, t.accountFingerprint, t.repositoryRoot, t.repositoryIdentity, t.launchPolicy, t.nativeTransport, t.status]);
 function taskIn(state, id) {
   const t = state.codingSessions?.find((t) => t.id === id);
   if (!t || t.schema !== "switchyard-coding-session/v1" || t.provider !== "codex" || t.status !== "registered" || t.launchPolicy !== "read-only/on-request" || !/^[A-Za-z0-9_-]{1,128}$/.test(t.sessionId ?? "") || !/^[a-f0-9]{64}$/.test(t.accountFingerprint ?? "")) throw new Error("Choose an exact registered read-only task created by Switchyard. External or uncertain tasks cannot receive text here.");
   if (!t.repositoryIdentity) throw new Error("Explicitly bind this exact task again to review its current repository directory identity before submitting text.");
+  if (t.nativeTransport !== "owned-stdio") throw new Error("This task belongs to its original runtime. Create a dedicated owned task for reviewed text; no existing writer or client was displaced.");
   return t;
 }
 function prompt(value) {

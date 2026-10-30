@@ -22,6 +22,36 @@ async function fixture(fn) {
 }
 const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
 
+test("dedicated native task creators release the writer before registration and never resume an attached client implicitly", () => fixture(async ({ service, options, repositoryRoot, calls }) => {
+  let writer = false, closed = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ start: async () => { writer = true; return { threadId: "synthetic-created-thread" }; }, close: async () => { writer = false; closed++; return [{ stopped: true }]; } }) });
+  try {
+    const task = await owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Dedicated task" });
+    assert.equal(task.nativeTransport, "owned-stdio"); assert.equal(writer, false); assert.equal(closed, 1); assert.equal(task.capabilities.resumable, false); assert.equal(task.capabilities.textReviewAvailable, true);
+    calls.length = 0; await assert.rejects(owned.resume("personal", task.id), /reviewed text continuation/); assert.equal(calls.includes("resume"), false);
+  } finally { await owned.close(); }
+}));
+
+test("an unconfirmed creator exit preserves its returned identity and blocks another native creator", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let stopped = false, starts = 0, factories = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => { factories++; return { start: async () => { starts++; return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped }] }; } });
+  try {
+    await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Uncertain owner" }), /creator did not verify exit/);
+    const task = (await store.snapshot("personal")).codingSessions[0]; assert.equal(task.sessionId, "synthetic-created-thread"); assert.equal(task.status, "creation-uncertain");
+    await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "No replacement" }), /previous owned task creator/); assert.equal(factories, 1); assert.equal(starts, 1);
+  } finally { stopped = true; await owned.close(); }
+}));
+
+test("stopping a pending dedicated creator retains a late native identity without registering or relaunching it", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let entered, release, starts = 0; const ready = new Promise((r) => { entered = r; });
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ start: async () => { starts++; entered(); await new Promise((r) => { release = r; }); return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped: true }] }) });
+  try {
+    const input = { requestId: randomUUID(), repositoryRoot, label: "Pending creator" }, pending = owned.create("personal", input), rejected = assert.rejects(pending, /stopped after.*acknowledgement/); await ready;
+    await owned.stopCompartment("personal"); release(); await rejected;
+    const saved = (await store.snapshot("personal")).codingSessions[0]; assert.equal(saved.sessionId, "synthetic-created-thread"); assert.equal(saved.status, "creation-uncertain"); assert.equal((await owned.create("personal", input)).duplicatePrevented, true); assert.equal(starts, 1);
+  } finally { release?.(); await owned.close(); }
+}));
+
 test("replacing a directory at the same path cannot redirect a saved native task", () => fixture(async ({ root, repositoryRoot, service, calls, idle }) => {
   const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic owned task" });
   assert.match(task.repositoryIdentity.inode, /^[1-9]\d*$/); assert.match(task.repositoryIdentity.device, /^\d+$/);

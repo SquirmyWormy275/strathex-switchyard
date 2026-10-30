@@ -16,7 +16,7 @@ async function fixture(fn) {
   await mkdir(join(repositoryRoot, ".git"), { recursive: true });
   let clock = Date.now();
   const store = createSuiteStore({ root: join(root, "state"), clock: () => clock, secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });
-  const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", status: "registered", label: "Synthetic task", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot), accountFingerprint: "a".repeat(64), sessionId: randomUUID(), launchPolicy: "read-only/on-request" };
+  const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", status: "registered", nativeTransport: "owned-stdio", label: "Synthetic task", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot), accountFingerprint: "a".repeat(64), sessionId: randomUUID(), launchPolicy: "read-only/on-request" };
   for (const c of ["personal", "other"]) { await store.initialize(c); await store.update(c, "synthetic-task", (s) => { s.mode = "personal-companion"; s.codingSessions = [{ ...task, sessionId: c === "personal" ? task.sessionId : randomUUID() }]; }); }
   await store.initialize("company", "work");
   const settings = { fingerprint: task.accountFingerprint, stopped: true, config: codexDesignConfig(), nativeState: "idle", wrongPermissions: false, onTurn: null, afterReply: () => {} };
