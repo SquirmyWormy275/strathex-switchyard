@@ -1298,3 +1298,21 @@ built-helper step; its source-only lane records the exact helper-absence skips.
 Malformed native lifecycle objects/capability fields now fail the owned command
 rather than escaping the response parser. The last normal installed backend is
 f2d11f3, with frozen frontend and private endpoint preserved.
+
+## Explicit recovery of uncertain Claude first creation
+
+A task whose first native acceptance was lost now has separate recovery
+review/submit routes. The previous uncertain outcome must be deliberately
+reviewed first; fresh approval binds the original UUID, account, repository,
+text and recovery operation. Recovery uses native `--resume` only and cannot
+fall back to `--session-id` or fork. A successful exact reply atomically verifies
+the original task and restores normal continuation. Missing native history
+retains uncertainty. Request identities cannot cross ordinary/recovery scopes;
+repeated recovery requests reuse the durable saved result.
+
+All 51 focused native-task/suite checks and TypeScript checks pass, including
+missing-history preservation and rejected recovery before outcome review. The
+normal installed journey now includes a synthetic lost-local-acceptance fault
+against an actual existing native conversation, then separate recovery approval;
+that expanded native acceptance is pending. This is not an automatic retry or
+proof of external task completion.

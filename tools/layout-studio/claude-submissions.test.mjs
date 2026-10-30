@@ -130,3 +130,29 @@ test("saved guardian uncertainty survives outcome review, retention and restart 
   finally { settings.guardianVerified = true; await restarted.close(); }
   await review(); assert.equal(calls.some(c => c.args.includes("-p")), false);
 }));
+
+test("deliberate first-creation recovery resumes only the original UUID after outcome review and cannot reuse ordinary request identities", () => fixture(async ({ store, service, settings, task, calls, input, review, submit }) => {
+  await store.update("personal", "synthetic-local-reservation", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false }); }); settings.row.sessionId = randomUUID(); settings.wrongSession = true;
+  await assert.rejects(submit(await review()), /native session/);
+  await assert.rejects(service.reviewRecovery("personal", input), /previous uncertain outcome/);
+  const previous = (await store.snapshot("personal")).codingTurns[0], outcome = await service.reviewOutcome("personal", previous.id); await service.resolveOutcome("personal", { id: previous.id, token: outcome.confirmation.token });
+  await assert.rejects(review(), /uncertain tasks/);
+  const approval = await service.reviewRecovery("personal", input); assert.equal(approval.scope.operation, "recover-exact-native-session"); assert.equal(approval.scope.nativeIdentityVerified, false); assert.equal(approval.modelPromptSubmitted, false);
+  const request = { ...input, requestId: randomUUID(), token: approval.confirmation.token }; await assert.rejects(service.submit("personal", request), /uncertain tasks/);
+  settings.wrongSession = false; const result = await service.submitRecovery("personal", request); assert.equal(result.sessionId, task.sessionId); assert.equal(result.operation, "recover-exact-native-session"); assert.equal(result.reply, "Ready"); assert.equal(result.ownedRuntimeStoppedVerified, true);
+  assert.equal((await service.submitRecovery("personal", request)).duplicatePrevented, true); await assert.rejects(service.submit("personal", request), /different reviewed text/);
+  const saved = (await store.snapshot("personal")).codingSessions[0]; assert.equal(saved.nativeIdentityVerified, true); assert.equal(saved.status, "registered"); assert.equal(saved.sessionId, task.sessionId);
+  const prints = calls.filter(c => c.args.includes("-p")); assert.equal(prints.length, 2); assert.equal(prints[0].args.at(-2), "--session-id"); assert.equal(prints[1].args.at(-2), "--resume"); assert.equal(prints[1].args.at(-1), task.sessionId);
+  await assert.rejects(service.reviewRecovery("personal", input), /does not have an uncertain first creation/);
+}));
+
+test("missing native history during explicit recovery preserves uncertainty without ever selecting a new conversation", () => fixture(async ({ store, service, settings, task, calls, input }) => {
+  await store.update("personal", "synthetic-reviewed-unknown", (s) => { Object.assign(s.codingSessions[0], { nativeTransport: "owned-print", backgroundId: null, nativeIdentityVerified: false, status: "creation-uncertain", creationOutcomeReviewedAt: Date.now() }); }); settings.row.sessionId = randomUUID(); settings.emptyOutput = true; settings.exitCode = 1; settings.stderr = "No conversation found with this session ID";
+  const suite = createSuite({ store, claudeSubmissions: service, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    const approval = await suite.handle("/api/suite/coding/claude/turns/recovery/review", { compartment: "personal", ...input });
+    await assert.rejects(suite.handle("/api/suite/coding/claude/turns/recovery/submit", { compartment: "personal", ...input, requestId: randomUUID(), token: approval.confirmation.token }), /native session/);
+    const state = await store.snapshot("personal"); assert.equal(state.codingSessions[0].status, "creation-uncertain"); assert.equal(state.codingSessions[0].sessionId, task.sessionId); assert.equal(state.codingSessions[0].nativeIdentityVerified, false); assert.equal(state.codingTurns[0].status, "outcome-unconfirmed"); assert.equal(state.codingTurns[0].reply, null); assert.ok(state.codingTurns[0].nativeResultSummary.stderrCategories.includes("session-unavailable"));
+    const prints = calls.filter(c => c.args.includes("-p")); assert.equal(prints.length, 1); assert.equal(prints[0].args.at(-2), "--resume"); assert.equal(prints[0].args.includes("--session-id"), false); await assert.rejects(service.reviewRecovery("personal", input), /previous uncertain outcome/);
+  } finally { await suite.close(); }
+}));

@@ -103,6 +103,16 @@ interrupted or rejected first creation retains its requested identity and blocks
 another creation, including after restart or local outcome review. It never
 falls back from resume to creation or forks the conversation.
 
+To recover that exact requested native conversation, deliberately resolve its
+uncertain outcome first. Then use `coding/claude/turns/recovery/review` and
+`coding/claude/turns/recovery/submit` with fresh reviewed text, a new stable request
+UUID and the returned approval. This is explicitly **resume only**: if native
+history is unavailable, the original identity and uncertainty are retained. It
+never uses `--session-id` or `--fork-session`. A successful exact native reply
+verifies the task and restores ordinary continuation. Account/root/guardian
+checks still apply; unresolved intervening attempts require another outcome review.
+Recovery request IDs and approvals cannot be used through the ordinary route.
+
 The older `coding/claude/create` still creates an empty native background job.
 A background job stopped before its first turn has no saved conversation to
 resume. Its identity is preserved; it is not converted into a new print task.
@@ -136,8 +146,10 @@ Run the installed journey in a Git directory already trusted by the native CLI:
 mise exec node@24.14.0 -- node scripts/verify-claude-submission-host.mjs --synthetic
 ```
 
-It reserves one local task, separately reviews two tiny prompts, checks native
-creation and exact continuation plus duplicate/replay behavior, then restores
+It reserves one local task, separately reviews three tiny prompts, checks native
+creation and exact continuation, injects a synthetic loss of local first-turn
+acceptance, then verifies explicit resume-only recovery and request-scope checks.
+It restores
 keyboard-only mode and removes
 its synthetic local records. It never changes native workspace-trust settings,
 deletes native user history or grants file/command authority. Its native result

@@ -178,6 +178,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/claude/turns/list") return claudeSubmissions.list(compartment);
       if (path === "/api/suite/coding/claude/turns/review") return claudeSubmissions.review(compartment, body);
       if (path === "/api/suite/coding/claude/turns/submit") return claudeSubmissions.submit(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/recovery/review") return claudeSubmissions.reviewRecovery(compartment, body);
+      if (path === "/api/suite/coding/claude/turns/recovery/submit") return claudeSubmissions.submitRecovery(compartment, body);
       if (path === "/api/suite/coding/claude/turns/cancel") return claudeSubmissions.cancel(compartment, body.requestId);
       if (path === "/api/suite/coding/claude/turns/outcome/review") return claudeSubmissions.reviewOutcome(compartment, body.id);
       if (path === "/api/suite/coding/claude/turns/outcome/resolve") return claudeSubmissions.resolveOutcome(compartment, body);
