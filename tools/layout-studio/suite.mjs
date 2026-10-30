@@ -146,7 +146,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
       if (path === "/api/suite/profile/export") return store.exportProfile(compartment);
-      if (path === "/api/suite/workflow/save") { const workflow = parseWorkflow(body.workflow); return store.update(compartment, "workflow-save", (s) => { s.workflow = workflow; return workflow; }); }
+      if (path === "/api/suite/workflow/save") return store.saveWorkflow(compartment, body.workflow);
       if (path === "/api/suite/copilot/discovery") return copilot.discovery(compartment);
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);
       if (path === "/api/suite/copilot/poll") return copilot.pollLogin(compartment, body.loginId);

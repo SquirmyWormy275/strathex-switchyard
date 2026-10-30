@@ -67,13 +67,11 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **86/86 groups passed; 575 tests, 566 passed and 9
+- Integrated native Linux run: **86/86 groups passed; 579 tests, 570 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-1482e6d6-8f89-4e9f-a909-9036f042e8e8.json`.
-- Current focused Studio run after typing-layer rebasing and microphone-release
-  changes: **51/51 tests passed**, no skips. This includes all 104 named catalog
-  configurations, physical option variations, encrypted compartment boundaries,
-  device fault/restore paths and SDK/OAuth contract tests.
+  `.sxsy-verification/isolated-test-0844b4df-2c01-4caf-b1ce-b9146c9e2174.json`.
+  Coverage includes all 104 named catalog configurations, physical options,
+  protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
   generated catalog data. `npm run catalog:export` built 126 portable profiles.
 - TypeScript typecheck passed. The Windows native hotkey helper cross-builds as a
@@ -89,6 +87,10 @@ Tests use synthetic/fault transports unless identified below. The older B122
   request using its existing account. The installed app-server rejected one
   newer documented sandbox field; the adapter uses its supported read-only
   contract. Proposals never apply themselves.
+- Its effective MCP configuration is now inspected without creating a thread,
+  then every enabled server is disabled and the resulting restrictions read
+  back before design. The installed CLI passed this startup check with zero
+  enabled MCP servers. Concurrent requests share one initialized runtime.
 - Installed Claude Code 2.1.308 completed a real configuration design request
   with tools/hooks/MCP disabled for that session and its existing account.
 - Real custom Node and Python LangChain Runnable examples registered distinct
@@ -122,6 +124,10 @@ DPAPI/lifecycle checks need a Windows host. Actual Microsoft 365 Graph account,
 license and permissions acceptance needs an approved tenant/account.
 
 ## Unfinished implementation
+
+Workflow text edits now retain role/step identities through reordering. A renamed
+role gets a new identity rather than inheriting its old session authority. Saving
+a workflow updates its active profile, saved library entry and history atomically.
 
 These are code/product work, not hardware/account blockers: physical role shortcut controls in the next frontend iteration; general coding-task
 session control beyond configuration conversations; full layer/macro/settings

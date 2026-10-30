@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { importProfile } from "./workspace.mjs";
+import { reconcileWorkflow } from "./workflow.mjs";
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
 const templates = {
@@ -117,6 +118,18 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     state.conversations = state.conversations.filter((e) => e.updatedAt >= cutoff).slice(-100);
     state.voice = state.voice.filter((e) => e.updatedAt >= cutoff).slice(-100);
   }
+  function putProfile(s, p) {
+    s.profiles ??= []; s.profileHistory ??= [];
+    const index = s.profiles.findIndex((entry) => entry.profile.id === p.id);
+    if (index < 0 && s.profiles.length >= 32) throw new Error("The workspace already has 32 saved profiles. Export and manage them before adding another.");
+    const next = { ...p, workflow: p.workflow ?? s.workflow }, previous = index >= 0 ? s.profiles[index].profile : s.profile?.id === p.id ? s.profile : null;
+    if (previous && JSON.stringify(previous) !== JSON.stringify(next)) { s.profileHistory.push({ revision: randomUUID(), at: clock(), profile: previous }); s.profileHistory = s.profileHistory.slice(-20); }
+    const entry = { profile: next, updatedAt: clock() };
+    if (index >= 0) s.profiles[index] = entry; else s.profiles.push(entry);
+    s.profile = next; s.workflow = next.workflow;
+    if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Saved profile storage limit reached. Existing state is preserved.");
+    return s.profile;
+  }
   return {
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
     async initialize(id = "personal", policy) {
@@ -141,22 +154,9 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     async authorize(id, request) { const s = await read(id); return permit(s, request); },
     async saveProfile(id, value) {
       const p = importProfile(value);
-      return mutate(id, (s) => {
-        s.profiles ??= []; s.profileHistory ??= [];
-        const index = s.profiles.findIndex((entry) => entry.profile.id === p.id);
-        if (index < 0 && s.profiles.length >= 32) throw new Error("The workspace already has 32 saved profiles. Export and manage them before adding another.");
-        const next = { ...p, workflow: p.workflow ?? s.workflow }, previous = index >= 0 ? s.profiles[index].profile : s.profile?.id === p.id ? s.profile : null;
-        if (previous && JSON.stringify(previous) !== JSON.stringify(next)) {
-          s.profileHistory.push({ revision: randomUUID(), at: clock(), profile: previous });
-          s.profileHistory = s.profileHistory.slice(-20);
-        }
-        const entry = { profile: next, updatedAt: clock() };
-        if (index >= 0) s.profiles[index] = entry; else s.profiles.push(entry);
-        s.profile = next; s.workflow = next.workflow;
-        if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Saved profile storage limit reached. Existing state is preserved.");
-        return s.profile;
-      });
+      return mutate(id, (s) => putProfile(s, p));
     },
+    async saveWorkflow(id, value) { return mutate(id, (s) => { const workflow = reconcileWorkflow(value, s.workflow); if (s.profile) putProfile(s, { ...s.profile, workflow }); else s.workflow = workflow; return workflow; }); },
     async selectProfile(id, profileId, revision = null) {
       return mutate(id, (s) => {
         const target = revision ? s.profileHistory?.find((p) => p.revision === revision && p.profile.id === profileId)?.profile : s.profiles?.find((p) => p.profile.id === profileId)?.profile;

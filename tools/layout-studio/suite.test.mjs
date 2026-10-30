@@ -6,10 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
-import { createAgentService } from "./agents.mjs";
+import { createAgentService, codexDesignConfig, assertCodexDesignConfig } from "./agents.mjs";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile } from "./workspace.mjs";
-import { parseWorkflow } from "./workflow.mjs";
+import { parseWorkflow, reconcileWorkflow } from "./workflow.mjs";
 
 function samplePlan() { return newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] })); }
 async function fixture(fn) {
@@ -68,7 +68,27 @@ test("workflow edits validate role bindings, step relationships and cycles", () 
   assert.equal(workflow.steps[2].after[0], workflow.steps[1].id);
   assert.throws(() => parseWorkflow({ ...workflow, steps: workflow.steps.map((s, i) => ({ ...s, after: i ? [workflow.steps[i - 1].id] : [workflow.steps[2].id] })) }), /cycle/);
   assert.throws(() => parseWorkflow({ ...workflow, steps: [{ ...workflow.steps[0], roleId: "missing-role" }] }), /relationship/);
+  assert.throws(() => parseWorkflow({ ...workflow, schema: "switchyard-workflow/v99" }), /version is unsupported/);
 });
+
+test("workflow reordering preserves role meaning, while renaming cannot silently inherit a bound role", () => {
+  const previous = parseWorkflow({ name: "Loop", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", roleId: "reviewer", after: ["build"] }] });
+  const reordered = reconcileWorkflow({ name: "Loop", roles: ["Reviewer", "Builder"], steps: ["Review", "Build"] }, previous);
+  assert.deepEqual(reordered.roles.map((r) => r.id), ["reviewer", "builder"]);
+  assert.deepEqual(reordered.steps.map((s) => s.id), ["review", "build"]);
+  assert.equal(reordered.steps[1].roleId, "builder"); assert.deepEqual(reordered.steps[1].after, ["review"]);
+  const renamed = reconcileWorkflow({ name: "Loop", roles: ["Implementer", "Reviewer"], steps: ["Build", "Review"] }, previous);
+  assert.notEqual(renamed.roles[0].id, "builder"); assert.equal(renamed.steps[0].roleId, null);
+  assert.throws(() => reconcileWorkflow({ name: "Loop", roles: ["Builder", "Builder"], steps: [] }, previous), /duplicated/);
+});
+
+test("workflow saves update active profile, library and history atomically", () => fixture(async ({ store }) => {
+  await store.initialize("personal"); const old = parseWorkflow({ name: "First", roles: [{ id: "builder", label: "Builder" }], steps: ["Build"] });
+  await store.saveProfile("personal", portableProfile(samplePlan(), "desk", "Desk", old));
+  const saved = await store.saveWorkflow("personal", { name: "Reviewed", roles: ["Builder", "Reviewer"], steps: ["Build", "Review"] });
+  assert.equal(saved.roles[0].id, "builder"); assert.deepEqual((await store.exportProfile("personal")).workflow, saved);
+  const snapshot = await store.snapshot("personal"); assert.deepEqual(snapshot.profiles[0].profile.workflow, saved); assert.deepEqual(snapshot.profileHistory[0].profile.workflow, old);
+}));
 
 test("named profiles retain their workflow, isolate revisions by compartment, and preserve the current saved version after opening history", () => fixture(async ({ root, store, secrets }) => {
   await store.initialize("personal"); await store.initialize("work", "work");
@@ -138,14 +158,40 @@ test("Codex design binds an exact returned session, rejects unsafe outputs and n
       }); return { turn: { id: "synthetic-turn" } };
     }
   };
-  const agents = createAgentService({ store, runtimeRoot: join(root, "runtime"), codexFactory: () => fake, resolveCli: async () => "/synthetic-native-cli" });
+  const agents = createAgentService({ store, runtimeRoot: join(root, "runtime"), codexFactory: () => fake, resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => ["configured-one", "configured-two"] });
   try {
     await assert.rejects(agents.design({ compartment: "work", provider: "codex", message: "denied", plan: samplePlan() }), /prohibited/);
     assert.equal(calls.length, 0);
     const response = await agents.design({ compartment: "personal", provider: "codex", message: "Improve the review routine", plan: samplePlan() });
     assert.equal(response.sessionId, "synthetic-thread");
     assert.equal(calls.find((c) => c.method === "thread/start").params.config.features.shell_tool, false);
+    assert.deepEqual(calls.find((c) => c.method === "thread/start").params.config.mcp_servers, { "configured-one": { enabled: false }, "configured-two": { enabled: false } });
     assert.equal(calls.find((c) => c.method === "turn/start").params.sandboxPolicy.type, "readOnly");
     assert.equal((await store.snapshot("personal")).conversations[0].sessionId, "synthetic-thread");
   } finally { agents.close(); }
+}));
+
+test("Codex design reads back complete tool restrictions and fails closed for enabled or unspecified MCP servers", () => {
+  const config = codexDesignConfig(); assert.deepEqual(config.mcp_servers, {});
+  assert.doesNotThrow(() => assertCodexDesignConfig(config));
+  assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, mcp_servers: { codex_app: { enabled: false } } }));
+  for (const server of [{ enabled: true }, {}]) assert.throws(() => assertCodexDesignConfig({ ...config, mcp_servers: { unexpected: server } }), /No design turn/);
+  assert.throws(() => assertCodexDesignConfig({ ...config, features: { ...config.features, shell_tool: true } }), /No design turn/);
+  assert.throws(() => codexDesignConfig(["escape.features.shell_tool"]), /identities are unsupported/);
+});
+
+test("concurrent exact-session reads share initialization, and a failed connection can be retried without leaking a second runtime", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  await store.update("personal", "synthetic-bound-conversation", (s) => { s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", updatedAt: Date.now(), messages: [] }]; });
+  let created = 0, closed = 0, fail = true;
+  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [], codexFactory: () => {
+    created++; return { closed: false, initialize: async () => { await new Promise((r) => setTimeout(r, 15)); if (fail) throw new Error("Synthetic unavailable connection"); }, close() { this.closed = true; closed++; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) };
+  } });
+  try {
+    const first = await Promise.allSettled([service.status("personal", "owned"), service.status("personal", "owned")]);
+    assert.ok(first.every((r) => r.status === "rejected")); assert.equal(created, 1); assert.equal(closed, 1);
+    fail = false; const retried = await Promise.all([service.status("personal", "owned"), service.status("personal", "owned")]);
+    assert.equal(created, 2); assert.ok(retried.every((r) => r.sessionId === "exact-thread"));
+  } finally { service.close(); }
+  assert.equal(closed, 2);
 }));

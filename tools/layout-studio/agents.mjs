@@ -43,10 +43,32 @@ export function validateDesignResponse(value, basePlan) {
   return { reply: value.reply, workflow: { name: "Designed workflow", steps: value.steps, roles: value.roles }, proposal: operations.length ? { schema: proposalSchema, basePlan, summary: value.summary || "Review the proposed arrangement", operations } : null };
 }
 
-class CodexClient extends EventEmitter {
-  constructor(executable, cwd) {
+export function codexDesignConfig(serverNames = []) {
+  if (!Array.isArray(serverNames) || serverNames.length > 128 || serverNames.some((n) => typeof n !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(n))) throw new Error("Configured Codex MCP identities are unsupported. No design turn was submitted.");
+  return { features: { shell_tool: false, plugins: false, apps: false, memories: false, multi_agent: false }, web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
+}
+export function assertCodexDesignConfig(config) {
+  const expected = codexDesignConfig();
+  if (!config || config.web_search !== "disabled" || Object.entries(expected.features).some(([name, value]) => config.features?.[name] !== value) || !config.mcp_servers || Object.values(config.mcp_servers).some((server) => server?.enabled !== false)) throw new Error("Codex did not enforce the restricted design configuration. No design turn was submitted.");
+}
+export async function readCodexMcpNames(executable, cwd) {
+  // Inspect the app-server's actual effective configuration, without creating a
+  // thread. `codex mcp list` also returns generated entries which cannot safely
+  // be overridden as ordinary TOML transports. An empty table alone merges with
+  // the user's configuration and therefore does not disable configured tools.
+  const probe = new CodexClient(executable, cwd);
+  try {
+    const config = await probe.handshake();
+    if (!config?.mcp_servers || typeof config.mcp_servers !== "object") throw new Error("Codex tool configuration is unavailable.");
+    const names = Object.entries(config.mcp_servers).filter(([, s]) => s.enabled !== false).map(([name]) => name).sort();
+    codexDesignConfig(names); return names;
+  } finally { probe.close(); }
+}
+export class CodexClient extends EventEmitter {
+  constructor(executable, cwd, serverNames = []) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
-    const restrictions = ["features.shell_tool=false", "features.plugins=false", "features.apps=false", "features.memories=false", "features.multi_agent=false", "web_search=\"disabled\"", "mcp_servers.node_repl.enabled=false"];
+    codexDesignConfig(serverNames); this.serverNames = [...serverNames];
+    const restrictions = ["features.shell_tool=false", "features.plugins=false", "features.apps=false", "features.memories=false", "features.multi_agent=false", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
     this.child = spawn(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
@@ -72,17 +94,28 @@ class CodexClient extends EventEmitter {
       try { this.send({ id, method, params }); } catch (e) { this.pending.delete(id); clearTimeout(timer); reject(e); }
     });
   }
-  async initialize() { await this.request("initialize", { clientInfo: { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } }); this.send({ method: "initialized", params: {} }); }
+  async handshake() { await this.request("initialize", { clientInfo: { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } }); this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
+  async initialize() { assertCodexDesignConfig(await this.handshake()); }
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }
 
-export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd) => new CodexClient(exe, cwd), spawnProcess = spawn, resolveCli = trustedCli } = {}) {
-  const busy = new Set(), clients = new Map(), running = new Map();
+export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames } = {}) {
+  const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map();
+  let closed = false;
   async function codex(compartment) {
+    if (closed) throw new Error("The design service is closed.");
+    if (connecting.has(compartment)) return connecting.get(compartment);
     if (clients.get(compartment)?.closed === false) return clients.get(compartment);
-    const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
-    const client = codexFactory(await resolveCli("codex"), cwd); clients.set(compartment, client);
-    await client.initialize(); return client;
+    const pending = (async () => {
+      const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
+      const executable = await resolveCli("codex"), names = await resolveMcp(executable, cwd); codexDesignConfig(names);
+      if (closed) throw new Error("The design service is closed.");
+      const client = codexFactory(executable, cwd, names); client.serverNames = [...names]; clients.set(compartment, client);
+      try { await client.initialize(); if (closed) throw new Error("The design service is closed."); return client; }
+      catch (error) { client.close(); if (clients.get(compartment) === client) clients.delete(compartment); throw error; }
+    })();
+    connecting.set(compartment, pending);
+    try { return await pending; } finally { connecting.delete(compartment); }
   }
   return {
     async discovery() {
@@ -97,14 +130,14 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       const id = conversation?.id ?? randomUUID(), key = `${compartment}:${id}`;
       if (busy.has(key)) throw new Error("This exact conversation is already running. Wait or cancel before sending again.");
       busy.add(key);
-      await store.update(compartment, "design-draft", (s) => { s.conversations = [...s.conversations.filter((c) => c.id !== id), { id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; }, { provider });
       const context = { instruction: "You are Switchyard's configuration designer. Improve the process before mapping it. Return only the response schema. Never run tools, read files, contact services, or apply a change. Use actual supplied key IDs. Preserve ordinary typing; use modified chords. Do not invent device, completion, time-saving or capability evidence. Estimates default to zero. Explain questions in reply. Return the full desired action list, editable process steps and agent role labels. Keep stable action IDs when revising. The output is an untrusted proposal requiring independent review.", currentPlan: plan, currentWorkflow: state.workflow, conversation: (conversation?.messages ?? []).slice(-12), request: message };
       let sessionId = conversation?.sessionId ?? null;
       try {
+        await store.update(compartment, "design-draft", (s) => { s.conversations = [...s.conversations.filter((c) => c.id !== id), { id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; }, { provider });
         let response;
         if (provider === "codex") {
           const client = await codex(compartment);
-          const restricted = { sandbox: "read-only", approvalPolicy: "never", config: { features: { shell_tool: false, plugins: false, apps: false, memories: false, multi_agent: false }, web_search: "disabled", mcp_servers: { node_repl: { enabled: false } } }, baseInstructions: "Only design a keyboard configuration from supplied text. Never call a tool. Return the required JSON schema." };
+          const restricted = { sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames), baseInstructions: "Only design a keyboard configuration from supplied text. Never call a tool. Return the required JSON schema." };
           if (sessionId) { const r = await client.request("thread/resume", { ...restricted, threadId: sessionId }); if (r.thread?.id !== sessionId) throw new Error("Codex resumed a different thread."); }
           else { const r = await client.request("thread/start", { ...restricted, cwd: join(runtimeRoot, compartment), serviceName: "switchyard-design" }); sessionId = r.thread?.id; }
           if (typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("Codex returned an invalid thread identity.");
@@ -162,9 +195,9 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id);
       if (!c?.sessionId) throw new Error("Choose an exact owned conversation before resuming.");
       await store.authorize(compartment, { provider: c.provider });
-      if (c.provider === "codex") { const r = await (await codex(compartment)).request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: { features: { shell_tool: false, plugins: false, apps: false, multi_agent: false }, web_search: "disabled", mcp_servers: { node_repl: { enabled: false } } } }); if (r.thread?.id !== c.sessionId) throw new Error("The resumed thread identity did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
+      if (c.provider === "codex") { const client = await codex(compartment); const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) }); if (r.thread?.id !== c.sessionId) throw new Error("The resumed thread identity did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
       return { sessionId: c.sessionId, status: "selected-for-continuation", provenance: "Exact Claude configuration conversation selected. Its next message uses --resume; external runtime state is not observed." };
     },
-    close() { for (const c of clients.values()) c.close(); for (const r of running.values()) r.child?.kill(); }
+    close() { closed = true; for (const c of clients.values()) c.close(); for (const r of running.values()) r.child?.kill(); }
   };
 }
