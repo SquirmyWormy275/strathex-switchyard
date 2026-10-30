@@ -13,17 +13,17 @@ import { stopOwnedChild } from "./owned-process.mjs";
 
 const childSource = `
 const readline=require('node:readline'), settings=JSON.parse(process.argv[1]);
-const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');
+const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');let started=false;
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);if(!m.method||m.id===undefined)return;
  let result={};
  switch(m.method){
   case 'initialize':break;
-  case 'config/read':if(Object.hasOwn(settings,'badFrame')){send(settings.badFrame);return;}for(const [id,method] of [[999,'item/commandExecution/requestApproval'],[1000,'item/fileChange/requestApproval'],[1001,'item/permissions/requestApproval'],[1002,'mcpServer/elicitation/request'],[1003,'item/tool/requestUserInput'],[1004,'item/tool/call'],[1005,'unknown/requestApproval']])send({id,method,params:{command:'never-executed'}});result={config:settings.config};break;
+  case 'config/read':if(Object.hasOwn(settings,'badFrame')){send(settings.badFrame);return;}for(const [id,method] of [[999,'item/commandExecution/requestApproval'],[1000,'item/fileChange/requestApproval'],[1001,'item/permissions/requestApproval'],[1002,'mcpServer/elicitation/request'],[1003,'item/tool/requestUserInput'],[1004,'item/tool/call'],[1005,'unknown/requestApproval']])send({id,method,params:{command:'never-executed'}});result={config:m.params.cwd?(started&&settings.projectConfigAfterStart||settings.projectConfig||settings.config):settings.config};break;
   case 'account/read':result={account:{type:'chatgpt',email:'synthetic@example.invalid'}};break;
   case 'thread/list':result={data:[{id:'synthetic-existing',preview:'never-return-preview',status:{type:'idle'}}]};break;
   case 'thread/read':result={thread:{id:settings.badId?77:m.params.threadId,cwd:settings.wrongRoot||settings.repositoryRoot,status:{type:'idle'},turns:settings.history?[{private:'never-return-history'}]:[]}};break;
-  case 'thread/start':case 'thread/resume':result={thread:{id:m.params.threadId||'synthetic-created',cwd:settings.repositoryRoot,status:{type:'idle'},turns:[]},cwd:settings.repositoryRoot,sandbox:{type:settings.badPermissions?'workspaceWrite':'readOnly'},approvalPolicy:'on-request'};break;
+  case 'thread/start':case 'thread/resume':started=true;result={thread:{id:m.params.threadId||'synthetic-created',cwd:settings.repositoryRoot,status:{type:'idle'},turns:[]},cwd:settings.repositoryRoot,sandbox:{type:settings.badPermissions?'workspaceWrite':'readOnly'},approvalPolicy:'on-request'};break;
   case 'thread/inject_items':if(settings.failInject){send({id:m.id,error:{message:'Synthetic marker failure'}});return;}break;
   default:send({id:m.id,error:{message:'Unexpected method'}});return;
  }
@@ -75,8 +75,23 @@ test("owned task creation persists only a local marker; resume reads back exact 
   const resumed = await driver.resume(result.threadId, repositoryRoot, "personal"); assert.equal(resumed.permissions, "read-only/on-request"); assert.equal(resumed.modelPromptSubmitted, false);
   const marker = frames.find((m) => m.method === "thread/inject_items"); assert.equal(marker.params.items[0].role, "assistant");
   assert.ok(frames.some((m) => m.method === "thread/resume" && m.params.excludeTurns === true && m.params.cwd === repositoryRoot));
+  for (const method of ["thread/start", "thread/resume"]) assert.deepEqual(frames.find((m) => m.method === method).params.config, codexDesignConfig());
+  assert.equal(frames.filter((m) => m.method === "config/read" && m.params.cwd === repositoryRoot).length, 4);
   assert.equal(frames.some((m) => /turn\//.test(m.method)), false);
 }));
+test("repository-specific tools and feature changes cannot cross an owned task creation or resume boundary", async () => {
+  for (const projectConfig of [{ ...codexDesignConfig(), mcp_servers: { project_local: { enabled: true } } }, { ...codexDesignConfig(), features: { ...codexDesignConfig().features, hooks: true } }, { ...codexDesignConfig(), features: { ...codexDesignConfig().features, computer_use: true } }]) await fixture(async ({ repositoryRoot, driver, frames }) => {
+    await assert.rejects(driver.start(repositoryRoot, "switchyard-restricted", "personal"), /restricted design configuration/);
+    await assert.rejects(driver.resume("synthetic-created", repositoryRoot, "personal"), /restricted design configuration/);
+    assert.equal(frames.some((m) => m.method === "thread/start" || m.method === "thread/resume" || m.method === "turn/start"), false);
+    assert.ok(frames.some((m) => m.method === "config/read" && m.params.cwd === repositoryRoot));
+  }, { projectConfig });
+});
+test("a changed project configuration after native creation preserves its returned identity without injecting or submitting content", () => fixture(async ({ repositoryRoot, driver, frames }) => {
+  await assert.rejects(driver.start(repositoryRoot, "switchyard-restricted", "personal"), (e) => e.createdThreadId === "synthetic-created" && /restricted/.test(e.message));
+  assert.equal(frames.filter((m) => m.method === "thread/start").length, 1);
+  assert.equal(frames.some((m) => m.method === "thread/inject_items" || m.method === "turn/start"), false);
+}, { projectConfigAfterStart: { ...codexDesignConfig(), mcp_servers: { late_project_tool: { enabled: true } } } }));
 test("wrong root, non-string identity, unexpected history and unrestricted configuration are rejected", async () => {
   await fixture(async ({ repositoryRoot, driver, settings }) => { settings.wrongRoot = dirname(repositoryRoot); await assert.rejects(driver.read("synthetic-existing", repositoryRoot, "personal"), /another working directory/); });
   await fixture(async ({ repositoryRoot, driver }) => { await assert.rejects(driver.read("synthetic-existing", repositoryRoot, "personal"), /different thread/); }, { badId: true });

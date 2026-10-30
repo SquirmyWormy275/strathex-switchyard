@@ -48,7 +48,7 @@ export function validateDesignResponse(value, basePlan) {
 
 export function codexDesignConfig(serverNames = []) {
   if (!Array.isArray(serverNames) || serverNames.length > 128 || serverNames.some((n) => typeof n !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(n))) throw new Error("Configured Codex MCP identities are unsupported. No design turn was submitted.");
-  return { features: { shell_tool: false, plugins: false, apps: false, memories: false, multi_agent: false }, web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
+  return { features: { shell_tool: false, unified_exec: false, computer_use: false, code_mode: false, code_mode_host: false, hooks: false, plugins: false, apps: false, memories: false, multi_agent: false, multi_agent_v2: false }, web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
 }
 export function assertCodexDesignConfig(config) {
   const expected = codexDesignConfig();
@@ -65,14 +65,14 @@ export async function readCodexMcpNames(executable, cwd) {
     if (!config?.mcp_servers || typeof config.mcp_servers !== "object") throw new Error("Codex tool configuration is unavailable.");
     const names = Object.entries(config.mcp_servers).filter(([, s]) => s.enabled !== false).map(([name]) => name).sort();
     codexDesignConfig(names); return names;
-  } finally { probe.close(); }
+  } finally { probe.close(); if (!(await stopOwnedChild(probe.child)).stopped) throw new Error("The native configuration probe did not verify exit. No replacement was launched."); }
 }
 export class CodexClient extends EventEmitter {
   constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
     this.clientInfo = clientInfo;
     codexDesignConfig(serverNames); this.serverNames = [...serverNames];
-    const restrictions = ["features.shell_tool=false", "features.plugins=false", "features.apps=false", "features.memories=false", "features.multi_agent=false", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
+    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
     this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {

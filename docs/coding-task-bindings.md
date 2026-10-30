@@ -108,8 +108,10 @@ native Windows hotkeys are separate capabilities and do not imply those are done
 
 Windows uses `switchyard.codex-stdio/v1` instead of a Unix socket. On the first
 permitted request it starts one owned native app-server per compartment through
-private stdin/stdout pipes. Shell/plugins/apps/memories/multi-agent/web search and
-enabled MCP servers are disabled with effective configuration readback. Provider
+private stdin/stdout pipes. Shell/unified execution, computer use, code-mode
+hosting, hooks, plugins/apps/memories, both multi-agent flags and web search are
+explicitly disabled, together with the discovered enabled MCP servers, with
+effective configuration readback. Provider
 API keys and runtime injection variables do not enter the child environment.
 The existing native CLI login supplies identity; no new token store is introduced.
 
@@ -121,15 +123,24 @@ turn. Resume excludes transcript history and reads permissions back. An identity
 returned before a later failure, including mode-off, remains available for exact
 recovery and does not authorize automatic replacement creation.
 
+Creation/resume also reads the effective configuration for the exact repository
+before and after the native acknowledgement. An additional project-local MCP
+server or changed required feature prevents continuation; the private startup
+directory's configuration alone is insufficient. The same restrictions accompany
+the exact thread request. If the post-creation check fails, the returned identity
+is retained and no marker/model content is submitted. This is a restricted
+metadata transport, not the general execution-authority broker.
+
 Mode-off stops only the owned compartment's app-server. Pending initialization is
 fenced against late startup. Unconfirmed exit blocks replacement until exact exit
 is verified. The Linux default still uses the existing shared daemon and leaves
 that shared service running.
 
-Eight tests exercise actual JSON-lines child-process pipes and Windows service
+Eleven tests exercise actual JSON-lines child-process pipes and Windows service
 composition, permission/directory/account boundaries, creation idempotency,
 retained partial identities, mode-off and unconfirmed-stop isolation. The built
-Windows runner still needs to execute this checkpoint's tests. Native Windows
+Windows backend checks passed through `e5e8ab0`; these newer project/feature checks
+are awaiting that runner. Native Windows
 installed-CLI/account and interactive-window acceptance remain separate.
 
 A real Linux CLI check against Codex **0.166.0** identified the existing login,

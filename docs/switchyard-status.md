@@ -691,3 +691,37 @@ The older canonical B122 overlays are a separate generator and still need their
 face/panel coordinates reconciled. See [assignment legends](assignment-legends.md).
 The export and packaged release checks pass **11 focused tests**; TypeScript
 typecheck passes. Integrated Linux verification is running.
+
+Integrated export source passed **109 groups, 771 tests: 762 passed and 9 expected
+platform skips**, receipt `2b29d669-60f9-471a-969c-cbba3b0ef3f8`. The normal installed
+app was updated to source **70a27d3**, release
+`9dfcca96d7198dca422bbc233f352a9a6f2b3bb39583c08bdd0558a87c63e73e`.
+Private receipt `assignment-legends-1793369996490.json` passed six update/HTTP
+checks: all three actual installed formats matched exact source output,
+unauthenticated export was rejected, and Personal definitions, the validation
+package/modes, private link and frozen Home bytes were preserved. The disposable
+bundle was removed; the current/rollback installation occupies about **7.1 MiB**.
+Render receipt `assignment-render-1793370138729.json` retains only hashes and
+inspection results; all eight temporary render files were removed.
+
+## Repository-specific native restrictions
+
+The owned Codex stdio path now explicitly disables unified execution, computer
+use, code-mode hosting and hooks as well as its previous restrictions. Effective
+configuration is checked for the target repository before and after empty-thread
+creation/resume, and the same restrictions accompany that request. Additional
+project tools fail closed; a late failure preserves the returned identity and
+submits no marker/model content. Configuration probes must verify owned exit
+before returning. This does not change the user's shared daemon configuration.
+
+The installed native CLI **0.166.0** verified these restrictions against the
+actual repository without creating a thread or model turn, and verified its
+owned process exit. The native pipe/task/service checks pass **34 tests**;
+typecheck passes. Updated integrated verification is running. General approved
+submissions, native interactive attachment and authority-broker integration
+remain unfinished implementation, distinct from account/hardware acceptance.
+
+The Windows `e5e8ab0` run has passed its native backend, real read-only helper,
+eight actual Job Object/owner-loss tests and integrated suite packaging. Its
+complete release verification is still running; the earlier full-run Claude
+deadline correction is not accepted until that complete result arrives.

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { realpath } from "node:fs/promises";
-import { CodexClient, readCodexMcpNames, trustedCli } from "./agents.mjs";
+import { CodexClient, readCodexMcpNames, trustedCli, assertCodexDesignConfig, codexDesignConfig } from "./agents.mjs";
 import { directoryIdentity, privateDirectory } from "./private-fs.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 const threadId = /^[A-Za-z0-9_-]{1,128}$/;
@@ -56,6 +56,15 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
     const fence = generation(c), { client, authorize } = await connected(c, fence);
     await authorize(); const result = await operation(client, authorize); await authorize(); return result;
   }
+  async function restrictedRoot(client, expectedRoot, authorize) {
+    // A different repository may contribute tools/configuration which were not
+    // visible in the private startup directory. Metadata reads do not load it.
+    // Refuse an unverified effective configuration before creating/resuming a
+    // runtime, and repeat the check after the native acknowledgement.
+    await authorize();
+    const { config } = await client.request("config/read", { cwd: expectedRoot, includeLayers: false });
+    assertCodexDesignConfig(config); await authorize();
+  }
   async function stopCompartment(c) {
     generations.set(c, generation(c) + 1);
     const client = clients.get(c); if (client) await dispose(c, client);
@@ -83,10 +92,11 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
       let createdThreadId;
       try {
         return await use(c, async (client, authorize) => {
-          const value = await client.request("thread/start", { cwd: expectedRoot, serviceName: "strathex-switchyard", sandbox: "read-only", approvalPolicy: "on-request" });
+          await restrictedRoot(client, expectedRoot, authorize);
+          const value = await client.request("thread/start", { cwd: expectedRoot, serviceName: "strathex-switchyard", sandbox: "read-only", approvalPolicy: "on-request", config: codexDesignConfig(client.serverNames) });
           if (validId(value.thread?.id)) createdThreadId = value.thread.id;
           if (!createdThreadId || value.cwd !== expectedRoot || value.thread.cwd !== expectedRoot || value.sandbox?.type !== "readOnly" || value.approvalPolicy !== "on-request") throw new Error("The empty Codex thread did not verify its exact identity and read-only permissions.");
-          await authorize();
+          await restrictedRoot(client, expectedRoot, authorize);
           // Persist a local assistant marker without sending a model/user turn.
           await client.request("thread/inject_items", { threadId: createdThreadId, items: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: `Switchyard task binding: ${taskId}. No user request has been submitted. Await the operator's instructions.` }] }] });
           return { threadId: createdThreadId };
@@ -95,10 +105,12 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
     },
     async resume(id, expectedRoot, c) {
       if (!validId(id)) throw new Error("Choose an exact thread identity."); await directoryIdentity(expectedRoot);
-      return use(c, async (client) => {
-        const value = await client.request("thread/resume", { threadId: id, excludeTurns: true, cwd: expectedRoot, sandbox: "read-only", approvalPolicy: "on-request" });
+      return use(c, async (client, authorize) => {
+        await restrictedRoot(client, expectedRoot, authorize);
+        const value = await client.request("thread/resume", { threadId: id, excludeTurns: true, cwd: expectedRoot, sandbox: "read-only", approvalPolicy: "on-request", config: codexDesignConfig(client.serverNames) });
         if (value.thread?.id !== id || value.cwd !== expectedRoot || value.sandbox?.type !== "readOnly" || value.approvalPolicy !== "on-request") throw new Error("Codex did not verify the resumed thread and permissions.");
         await exactRoot(value.thread.cwd, expectedRoot);
+        await restrictedRoot(client, expectedRoot, authorize);
         return { ...observed(value.thread), repositoryRoot: expectedRoot, permissions: "read-only/on-request", modelPromptSubmitted: false };
       });
     },
