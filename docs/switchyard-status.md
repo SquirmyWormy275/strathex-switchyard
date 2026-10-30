@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **87/87 groups passed; 593 tests, 584 passed and 9
+- Integrated native Linux run: **88/88 groups passed; 598 tests, 589 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-66f8afc8-a70d-4070-b102-90453f7ace4f.json`.
+  `.sxsy-verification/isolated-test-76e68cc3-ca64-4ca9-8a62-c918519a87cc.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -104,6 +104,10 @@ Tests use synthetic/fault transports unless identified below. The older B122
   Linux environment installed from the lock and loaded the CPU model; it was
   removed after verification. Windows binary-wheel resolution passed a dry run.
   See [setup, evidence and remaining lifecycle work](optional-runtime.md).
+- The restarted backend served the exact frozen Home HTML and both real bundled
+  examples completed authenticated synthetic review exchanges with duplicate
+  prevention under the isolated runtime environment. This is example acknowledgement,
+  not verified external coding-task completion. No HID interface was opened.
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -119,7 +123,15 @@ review front end is frozen at digest
 `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`
 and served at `http://127.0.0.1:43177/` with the current local backend.
 `npm run review:serve -- --port 43177` verifies every frozen asset. Backend work
-can continue without changing this review screen.
+can continue without changing this review screen. A same-review restart now keeps
+the private access code within the login session, preserving an already-open tab's
+connection; live endpoint owners and invalid saved endpoints are rejected.
+
+Early native Windows CI exposed overly strict string comparison of real paths
+against DOS/case aliases. The corrected storage boundary checks every ancestor
+for links and verifies filesystem identity while accepting those native aliases.
+Network/device paths and traversal remain rejected, as do Unix path aliases.
+Linux regression checks pass; the native Windows rerun is still pending.
 
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and

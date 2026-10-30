@@ -11,6 +11,16 @@ export function closedIntent(value) {
 export function intentArguments(value) { const v = closedIntent(value); return ["intent", v.implementation, ...(v.roleId ? [v.roleId, v.intent] : [])]; }
 export const intentKey = (value) => createHash("sha256").update(JSON.stringify(closedIntent(value))).digest("hex");
 export function runtimeDirectory() { if (!process.env.XDG_RUNTIME_DIR) throw new Error("The private session runtime directory is unavailable. Start Switchyard in the desktop session."); return join(process.env.XDG_RUNTIME_DIR, "switchyard-studio"); }
+/** Preserve an open review tab's access across backend restarts in this login. */
+export async function reviewAccessToken({ root = runtimeDirectory(), port, review, processExists = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { if (e.code === "ESRCH") return false; throw e; } } }) {
+  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535 || !/^[a-f0-9]{64}$/.test(review)) throw new Error("The review identity or port is invalid.");
+  await privateDirectory(root);
+  let endpoint; try { endpoint = JSON.parse(await privateRead(join(root, `${port}.json`))); } catch (e) { if (e.code === "ENOENT") return undefined; throw e; }
+  const url = new URL(endpoint.url), match = /^#access=([A-Za-z0-9_-]{43})$/.exec(url.hash);
+  if (endpoint.schema !== "switchyard-active-endpoint/v1" || !Number.isSafeInteger(endpoint.pid) || endpoint.pid < 1 || url.origin !== `http://127.0.0.1:${port}` || url.pathname !== "/" || url.search || url.username || url.password || !match) throw new Error("The saved review endpoint is invalid; it was preserved for inspection.");
+  if (processExists(endpoint.pid)) throw new Error("An existing process still owns this review endpoint. Reuse the running review or stop its verified owner before restarting.");
+  return endpoint.review === review ? match[1] : undefined;
+}
 export async function publishEndpoint(server, { root = runtimeDirectory(), review = null } = {}) {
   await privateDirectory(root);
   const url = `http://127.0.0.1:${server.address().port}/#access=${server.accessToken}`, value = JSON.stringify({ schema: "switchyard-active-endpoint/v1", url, pid: process.pid, ...(review ? { review } : {}) });

@@ -6,7 +6,7 @@ import { lstat, mkdir, open, readFile, realpath, rename, rm } from "node:fs/prom
 import { homedir, userInfo } from "node:os";
 import { join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { privateDirectory, privateWrite } from "./private-fs.mjs";
+import { privateDirectory, privateWrite, directoryIdentity } from "./private-fs.mjs";
 import { withStateLock } from "./state-lock.mjs";
 
 export const runtimeRoot = () => join(homedir(), ".local/share/strathex-switchyard/voice");
@@ -16,8 +16,8 @@ const exists = async (p) => { try { await lstat(p); return true; } catch (e) { i
 async function ownedDirectory(path, create = false) {
   if (!isAbsolute(path) || /[\0\r\n]/.test(path)) throw new Error("The runtime needs an absolute local directory.");
   if (create) await mkdir(path, { recursive: true, mode: 0o700 });
-  const s = await lstat(path);
-  if (!s.isDirectory() || s.isSymbolicLink() || await realpath(path) !== path || (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022))) throw new Error("The runtime directory has unsafe ownership, links or write permissions.");
+  const s = await directoryIdentity(path);
+  if (process.platform !== "win32" && (s.uid !== userInfo().uid || s.mode & 0o022)) throw new Error("The runtime directory has unsafe ownership, links or write permissions.");
 }
 export async function hashRuntimeFile(path, expectedSize) {
   const f = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));

@@ -5,9 +5,23 @@ import { once } from "node:events";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { closedIntent, publishEndpoint, dispatchPhysicalIntent, waitIntentReceipt, intentKey } from "./physical-intent.mjs";
+import { closedIntent, publishEndpoint, dispatchPhysicalIntent, waitIntentReceipt, intentKey, reviewAccessToken } from "./physical-intent.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
+
+test("backend review restarts retain access only for the same private frozen review and a stopped endpoint owner", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-review-access-")), review = "b".repeat(64), token = "a".repeat(43), endpoint = { schema: "switchyard-active-endpoint/v1", pid: 12345, url: `http://127.0.0.1:43177/#access=${token}`, review };
+  const options = { root, port: 43177, review, processExists: () => false };
+  try {
+    assert.equal(await reviewAccessToken(options), undefined);
+    await writeFile(join(root, "43177.json"), JSON.stringify(endpoint), { mode: 0o600 });
+    assert.equal(await reviewAccessToken(options), token);
+    assert.equal(await reviewAccessToken({ ...options, review: "c".repeat(64) }), undefined);
+    await assert.rejects(reviewAccessToken({ ...options, processExists: () => true }), /still owns/);
+    await writeFile(join(root, "43177.json"), JSON.stringify({ ...endpoint, url: `https://external.invalid/#access=${token}` }));
+    await assert.rejects(reviewAccessToken(options), /endpoint is invalid/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test("physical gateway uses only its private active endpoint and closed intent; acceptance is not task completion", async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-physical-")), seen = [];
