@@ -1376,3 +1376,21 @@ manifest because Windows checkout converted text to CRLF. The repository default
 now requires LF for detected text, with retained vendor source trees still
 explicitly exempt and PDFs/images treated as binary. This addresses source
 checkout determinism; it does not establish a complete Windows release pass.
+
+## Consented Vial matrix diagnostic and verified relock
+
+The backend now has a one-use explicit consent review, physical-unlock preflight
+and ephemeral switch-state sampling for the active permitted workspace. Samples
+are never persisted or routed to a provider. Capture is bounded to 60 seconds,
+240 samples and a 100 ms minimum interval, with no background polling. Exact
+protected scope, live UID/protocol and complete definition checks fence every
+request. Unlock is checked on both sides of each matrix query. Stop, mode,
+workspace, expiry and shutdown revoke capture and reject late responses.
+
+The source-specific codec enforces the actual firmware compile guard, big-endian
+row packing and strict reply bounds. A separate exact-target relock command
+checks locked readback, including refusal by insecure firmware. Ten focused
+matrix tests cover these paths with synthetic transports; the existing 60 device
+and suite checks also pass. The normal installed rejection-path demonstration
+and complete integrated run are next. Frontend controls remain unfinished;
+actual physical switch, unlock/relock and typing acceptance need the device.

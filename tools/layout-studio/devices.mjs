@@ -13,6 +13,7 @@ import { stopOwnedChild } from "./owned-process.mjs";
 import { readQmkSettings, writeQmkSetting, settingsReadback } from "./vial-settings.mjs";
 import { readVialDynamic, writeDynamicEntry, dynamicReadback, dynamicCandidate } from "./vial-dynamic.mjs";
 import { readVialEncoders, writeEncoder, encodersReadback } from "./vial-encoders.mjs";
+import { matrixDimensions, decodeMatrixState } from "./vial-matrix.mjs";
 
 const digest = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const integer = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
@@ -57,12 +58,29 @@ export class VialDevice {
     if (version < 1 || version > 6 || /^0+$/.test(keyboardId)) throw new Error("This Vial identity/version is unsupported.");
     return { deviceId: this.deviceId, keyboardId, viaProtocol: 9, vialProtocol: version, controller: "unverified", interface: "configuration Raw HID", capabilities: ["dynamic-keymap", "macro-buffer", "layout-options"], firmwareRecovery: "Configuration readout only; no firmware image readback or flashing is provided." };
   }
-  async unlocked() { const r = await this.transport.exchange(packet(0xFE, 5)); return r[0] === 1; }
-  async unlockStatus() { const r = await this.transport.exchange(packet(0xFE, 5)); return { unlocked: r[0] === 1, inProgress: r[1] === 1, physicalKeys: [...r.subarray(2)].reduce((a, v, i, all) => { if (i % 2 === 0 && v !== 255 && all[i + 1] !== 255) a.push([v, all[i + 1]]); return a; }, []) }; }
+  async unlocked() { const s = await this.unlockStatus(); return s.unlocked && !s.inProgress; }
+  async unlockStatus() {
+    const r = await this.transport.exchange(packet(0xFE, 5));
+    if (r.length !== 32 || ![0, 1].includes(r[0]) || ![0, 1].includes(r[1])) throw new Error("The Vial lock-state response is malformed.");
+    const physicalKeys = [];
+    for (let i = 2; i < 32; i += 2) {
+      if (r[i] === 255 && r[i + 1] === 255) continue;
+      if (r[i] > 31 || r[i + 1] > 31) throw new Error("The Vial physical unlock positions are malformed.");
+      physicalKeys.push([r[i], r[i + 1]]);
+    }
+    return { unlocked: r[0] === 1, inProgress: r[1] === 1, physicalKeys };
+  }
   async beginUnlock() { await this.transport.exchange(packet(0xFE, 6)); return this.unlockStatus(); }
   async pollUnlock() { await this.transport.exchange(packet(0xFE, 7)); return this.unlockStatus(); }
-  async snapshot() {
-    const identity = await this.identity();
+  async lock() { await this.transport.exchange(packet(0xFE, 8)); const status = await this.unlockStatus(); if (status.unlocked || status.inProgress) throw new Error("Physical Vial relock was not verified."); return { ...status, lockedVerified: true }; }
+  async matrixState(rows, cols) {
+    matrixDimensions(rows, cols);
+    if (!await this.unlocked()) throw new Error("Physically unlock this exact keyboard before the consented key test.");
+    const r = await this.transport.exchange(packet(2, 3));
+    try { if (!await this.unlocked()) throw new Error("The keyboard relocked during the key test. The sample was discarded."); return decodeMatrixState(r, rows, cols); }
+    finally { r.fill(0); }
+  }
+  async definition() {
     const size = (await this.transport.exchange(packet(0xFE, 1))).readUInt32LE(0);
     if (size < 1 || size > 65536) throw new Error("The device definition size is unsupported.");
     const parts = [];
@@ -70,6 +88,12 @@ export class VialDevice {
     const definition = await this.transport.request("decode-definition", { data: Buffer.concat(parts).subarray(0, size).toString("base64") });
     const rows = definition?.matrix?.rows, cols = definition?.matrix?.cols;
     if (!integer(rows, 32) || !integer(cols, 32) || !rows || !cols || rows * cols > 512) throw new Error("The verified definition has unsupported matrix dimensions.");
+    return definition;
+  }
+  async snapshot() {
+    const identity = await this.identity();
+    const definition = await this.definition();
+    const rows = definition.matrix.rows, cols = definition.matrix.cols;
     const lc = await this.transport.exchange(packet(0x11)), layers = lc[1];
     if (lc[0] !== 0x11 || layers < 1 || layers > 32) throw new Error("The device layer count is unsupported.");
     const bytes = layers * rows * cols * 2; if (bytes > 32768) throw new Error("The device keymap exceeds the supported bound.");
@@ -161,18 +185,21 @@ export function validateDeviceChanges(snapshot, changes, meaningSnapshot = snaps
 
 export function createDeviceService({ store, transportFactory = () => new NativeHidTransport(), now = () => Date.now(), withDeviceLock = (id, fn) => withStateLock(join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA : null) || join(homedir(), ".local/state"), "strathex-switchyard", "device-access", id), "hid", fn) } = {}) {
   const reviews = new Map(), busy = new Set();
-  async function using(deviceId, fn) {
+  async function using(deviceId, fn, { beforeIo = async () => {}, signal } = {}) {
     if (typeof deviceId !== "string" || !/^[a-f0-9]{64}$/.test(deviceId)) throw new Error("Select an exact discovered configuration interface.");
     if (busy.has(deviceId)) throw new Error("A configuration transaction already owns this device."); busy.add(deviceId);
     try { return await withDeviceLock(deviceId, async (lease) => {
-      const t = transportFactory(), checked = Object.fromEntries(["request", "exchange", "read"].map((method) => [method, (...args) => { lease.assert(); return t[method](...args); }]));
+      const guard = async () => { lease.assert(); if (signal?.aborted) throw new Error("The device diagnostic was stopped."); await beforeIo(); lease.assert(); if (signal?.aborted) throw new Error("The device diagnostic was stopped."); };
+      await guard();
+      const t = transportFactory(), abort = () => { Promise.resolve(t.close()).catch(() => {}); }, checked = Object.fromEntries(["request", "exchange", "read"].map((method) => [method, async (...args) => { await guard(); return t[method](...args); }]));
+      signal?.addEventListener("abort", abort, { once: true });
       try {
         const list = await checked.request("list"), matches = list.filter((d) => d.id === deviceId);
         if (matches.length !== 1) throw new Error("The selected keyboard is disconnected or its identity is ambiguous.");
         const protocol = matches[0].candidateProtocol;
         if (!["vial", "original-xwhatsit-0.9"].includes(protocol)) throw new Error("The discovered interface protocol is unsupported.");
         return await fn(protocol === "vial" ? new VialDevice(checked, deviceId) : new OriginalXwhatsitDevice(checked, deviceId));
-      } finally { await t.close(); }
+      } finally { signal?.removeEventListener("abort", abort); await t.close(); }
     }); } finally { busy.delete(deviceId); }
   }
   async function restore(compartment, id) {
@@ -207,6 +234,28 @@ export function createDeviceService({ store, transportFactory = () => new Native
   return {
     async list() { const t = transportFactory(); try { return (await t.request("list")).map(({ path, serial_number, ...d }) => d); } finally { await t.close(); } },
     async read(compartment, deviceId) { return using(deviceId, async (d) => { const snapshot = await d.snapshot(); await store.update(compartment, "device-read", (s) => { s.deviceSnapshots ??= []; s.deviceSnapshots = [...s.deviceSnapshots.filter((v) => v.identity.deviceId !== deviceId), snapshot].slice(-16); }); return snapshot; }); },
+    async matrixProbe(baseline, { sample = false, beforeIo, signal } = {}) {
+      matrixDimensions(baseline.rows, baseline.cols);
+      return using(baseline.identity.deviceId, async (d) => {
+        if (!(d instanceof VialDevice)) throw new Error("Switch-state diagnostics are implemented only for verified Vial interfaces.");
+        const identity = await d.identity(), definition = await d.definition();
+        if (["deviceId", "keyboardId", "viaProtocol", "vialProtocol"].some((k) => identity[k] !== baseline.identity[k]) || digest(definition) !== digest(baseline.definition)) throw new Error("The keyboard identity or definition changed. No key state was requested.");
+        if (sample) return { pressed: await d.matrixState(baseline.rows, baseline.cols) };
+        const status = await d.unlockStatus();
+        if (!status.unlocked || status.inProgress) throw new Error("Physically unlock this exact keyboard before the consented key test.");
+        return { unlocked: true };
+      }, { beforeIo, signal });
+    },
+    async relock(compartment, deviceId) {
+      const saved = ((await store.snapshot(compartment)).deviceSnapshots ?? []).filter((s) => s.identity.deviceId === deviceId);
+      if (saved.length !== 1) throw new Error("Read this exact keyboard in this workspace before relocking it.");
+      return using(deviceId, async (d) => {
+        if (!(d instanceof VialDevice)) throw new Error("Physical Vial relock does not apply to this protocol.");
+        const identity = await d.identity();
+        if (["keyboardId", "viaProtocol", "vialProtocol"].some((k) => identity[k] !== saved[0].identity[k])) throw new Error("The keyboard identity changed. No lock command was sent.");
+        return d.lock();
+      });
+    },
     async review(compartment, deviceId, value) {
       const input = Array.isArray(value) ? { changes: value } : value;
       if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((k) => !["changes", "macros", "layoutOptions", "qmkSettings", "tapDances", "combos", "keyOverrides", "alternateRepeatKeys", "encoders"].includes(k))) throw new Error("Review a supported bounded configuration proposal.");

@@ -68,6 +68,53 @@ depend on their current OS path. Real reconnection and operator checks remain
 part of hardware acceptance. No F77 hardware transaction is accepted while the
 pilot device is absent.
 
+## Consented physical-key diagnostic
+
+The backend provides a separate Vial switch-matrix test. Review requires the
+currently selected Personal workspace, companion mode, recording permission and
+a protected device readout no older than two minutes. It performs no HID I/O.
+The notice explains that switch positions can reveal typing and asks the user to
+close sensitive applications. Starting requires `consent: true` and the exact
+one-use review token. Start rechecks live identity, the complete definition and
+physical unlock; it does not read any pressed keys.
+
+The caller can then request individual samples for at most 60 seconds and 240
+samples, at least 100 ms apart. There is no background polling. Each sample
+rechecks the protected scope, live identity and definition, with unlock checks
+before and after the matrix query. Samples contain matrix coordinates only;
+they are never written to compartment state, logs or a provider. A workspace
+switch, keyboard-only mode, explicit stop, expiry, service restart or shutdown
+revokes capture. Policy/identity failures discard late responses and require a
+new explicit review. Stopping an in-flight request aborts its exact owned HID
+transport and waits for it to settle.
+
+Authenticated POST routes, in order:
+
+1. `/api/suite/devices/matrix/review`: `{ compartment, deviceId }` returns
+   `reviewId`, `consentToken`, notice and limits.
+2. `/api/suite/devices/matrix/start`: `{ compartment, reviewId, consentToken,
+   consent: true }` returns the ephemeral test `id` and deadline.
+3. `/api/suite/devices/matrix/sample`: `{ compartment, id }` returns one sample.
+4. `/api/suite/devices/matrix/stop`: `{ compartment, id }` revokes that test.
+
+Stop does not silently relock firmware. The separate
+`/api/suite/devices/lock` route accepts `{ compartment, deviceId }`, stops that
+workspace's diagnostic, verifies the previously read exact identity, sends only
+Vial's volatile lock command and verifies locked readback. Insecure firmware
+that ignores relock is reported as unverified. No keymap, flash or electrical
+setting is written. The frontend controls remain unfinished while frozen.
+
+The codec follows the pinned firmware's
+[matrix query](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/via.c#L228)
+and [lock contract](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/vial.c#L139).
+The firmware's compile guard is `(floor(cols / 8) + 1) * rows <= 28`; a matrix
+outside that guard is rejected before any switch query, even when a different
+packing calculation appears to fit. Rows use big-endian bytes with column zero
+in the low bit. Malformed headers, lengths, padding, columns and lock replies
+are rejected. Original xwhatsit does not inherit this Vial capability. Passing
+fault transports does not establish actual typing, host layout, rollover or
+physical LED behavior.
+
 ## Backend request example
 
 This is a developer contract example, not a command to run on the owner's device.
