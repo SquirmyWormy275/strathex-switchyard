@@ -125,7 +125,10 @@ export const requiredGroups = [
   { file: "tools/layout-studio/private-fs.test.mjs" },
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
-  { file: "tools/layout-studio/claude-coding.test.mjs" },
+  // Native Windows kernel leases start the system PowerShell helper per state
+  // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
+  // allow bounded process/pipe cleanup without relaxing any assertion or skip.
+  { file: "tools/layout-studio/claude-coding.test.mjs", ...(process.platform === "win32" ? { timeoutMs: 120_000 } : {}) },
   { file: "tools/layout-studio/task-window.test.mjs" },
   { file: "tools/layout-studio/voice-queue.test.mjs" },
   { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },

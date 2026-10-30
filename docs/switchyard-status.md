@@ -631,3 +631,14 @@ configuration interfaces, preserved definitions/package/modes/private URL and
 exact frozen Home hash. Its disposable bundle was removed. Automatic uninstall
 remains accepted through isolated software/process tests; the user's live
 review installation was not removed.
+
+The Windows `7efce3a` full-release run failed only its isolated Claude group,
+although all nine assertions passed in 44.99 seconds. That sits against the
+45-second whole-process budget, consistent with a lifecycle deadline overrun.
+The bounded Windows allowance is now 120 seconds; Linux remains unchanged. CI
+failure output now includes timeout, duration, exit/signal and cleanup fields
+so future failures expose that distinction directly. No assertions/skips were
+removed. The earlier native backend, read-only helper and eight runtime guardian
+checks passed. The complete release remains failed until the next run verifies
+the correction; this is a software verification issue, not absent hardware or
+an account blocker.

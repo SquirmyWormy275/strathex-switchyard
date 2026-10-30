@@ -163,9 +163,11 @@ the installed current/rollback pair occupies about 6.2 MiB.
 The complete Windows release passed **212 groups** at `4cab102`, including the
 previously failing alias/bootstrap/automation cases and native task/controller
 checks. At `7efce3a`, native backend tests, read-only category observation and
-runtime Job Object owner-loss checks also passed; that full release is still
-running. New removal code must pass the next native Windows run before its
-execution is accepted. Browser visual/click, interactive Windows device/account,
+runtime Job Object owner-loss checks also passed. Its full run later reported
+the Claude group failed despite nine passing assertions in 44.99 seconds, against
+a 45-second lifecycle budget. A bounded Windows allowance and clearer failure
+timing are queued for verification. New removal code must also pass its next
+native run before execution is accepted. Browser visual/click, interactive Windows device/account,
 voice capture and exact provider-task attachment remain separate acceptance or
 implementation items. See the [live requirement ledger](switchyard-requirements.md)
 and [evidence](switchyard-status.md). Building a package changes no launcher or
