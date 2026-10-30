@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, open, lstat } from "node:fs/promises";
+import { mkdtemp, rm, open, lstat, rename, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { directoryIdentity, privateWrite, privateRead } from "./private-fs.mjs";
@@ -27,15 +27,34 @@ test("native temporary storage writes atomically and reads back without assuming
   finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("a private read retries a real atomic replacement without treating the old descriptor as current", async () => {
+test("a private read retries a changed safe name without treating an old descriptor as current", async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-private-replace-")); let calls = 0;
   try {
     const path = join(root, "record.json"); await privateWrite(path, '{"value":"before"}');
-    const value = await privateRead(path, { openFile: async (...args) => { const f = await open(...args); if (++calls === 1) await privateWrite(path, '{"value":"after"}'); return f; } });
-    assert.equal(value, '{"value":"after"}'); assert.equal(calls, 2);
+    const value = await privateRead(path, {
+      openFile: async (...args) => { const f = await open(...args); if (++calls === 1 && process.platform !== "win32") await privateWrite(path, '{"value":"after"}'); return f; },
+      // Windows prevents replacing an open destination. Exercise the changed-
+      // name check directly there; the next test covers its real sharing errors.
+      statName: async (p) => { const s = await lstat(p); if (process.platform === "win32" && calls === 1) s.ino += 1; return s; }
+    });
+    assert.equal(value, process.platform === "win32" ? '{"value":"before"}' : '{"value":"after"}'); assert.equal(calls, 2);
     let attempts = 0;
     await assert.rejects(privateRead(path, { statName: async (p) => { attempts++; const s = await lstat(p); s.ino += 1; return s; } }), /changed repeatedly/);
     assert.equal(attempts, 4);
     await assert.rejects(privateRead(path, { statName: async (p) => { const s = await lstat(p); s.isSymbolicLink = () => true; return s; } }), /unsafe/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Windows sharing failures retry atomic promotion with the old state intact, then stop at a strict bound", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-private-sharing-"));
+  try {
+    const path = join(root, "state.json"); await privateWrite(path, "before"); let attempts = 0;
+    await privateWrite(path, "after", { platform: "win32", renameFile: async (...args) => { if (++attempts === 1) { assert.equal(await privateRead(path), "before"); throw Object.assign(new Error("Synthetic Windows sharing violation"), { code: "EPERM" }); } return rename(...args); } });
+    assert.equal(attempts, 2); assert.equal(await privateRead(path), "after"); attempts = 0;
+    await assert.rejects(privateWrite(path, "must-not-replace", { platform: "win32", renameFile: async () => { attempts++; throw Object.assign(new Error("Persistent sharing violation"), { code: "EPERM" }); } }), /Persistent sharing/);
+    assert.equal(attempts, 6); assert.equal(await privateRead(path), "after"); assert.deepEqual(await readdir(root), ["state.json"]);
+    attempts = 0;
+    await assert.rejects(privateWrite(path, "must-not-replace", { platform: "linux", renameFile: async () => { attempts++; throw Object.assign(new Error("Other platform failure"), { code: "EPERM" }); } }), /Other platform/);
+    assert.equal(attempts, 1); assert.equal(await privateRead(path), "after");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

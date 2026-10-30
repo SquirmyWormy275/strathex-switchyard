@@ -50,13 +50,21 @@ export async function privateRead(path, { openFile = open, statName = lstat } = 
   }
   throw new Error("Private storage changed repeatedly during read. Retry the local operation.");
 }
-export async function privateWrite(path, text) {
+export async function privateWrite(path, text, { renameFile = rename, platform = process.platform } = {}) {
   if (Buffer.byteLength(text) > maxBytes) throw new Error("Private storage limit reached. Review or delete older sessions.");
   await privateDirectory(dirname(path));
   const temporary = join(dirname(path), `.pending-${randomUUID()}`);
   try {
     const f = await open(temporary, "wx", 0o600);
     try { await f.writeFile(text); await f.sync(); } finally { await f.close(); }
-    await rename(temporary, path);
+    for (let attempt = 0; ; attempt++) {
+      try { await renameFile(temporary, path); break; }
+      catch (error) {
+        // Windows can deny replacement while a legitimate reader holds the old
+        // file. Retry only its sharing/lock errors; never unlink the old state.
+        if (platform !== "win32" || !["EPERM", "EBUSY", "EACCES"].includes(error.code) || attempt >= 5) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 10 * 2 ** attempt));
+      }
+    }
   } finally { await rm(temporary, { force: true }); }
 }
