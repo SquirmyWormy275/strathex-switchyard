@@ -14,7 +14,9 @@ import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages
 import type { AutomationOperationProposal } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
 
-const now = "2026-08-26T12:00:00.000Z";
+// Real effect boundaries use wall-clock deadlines. Keep this fixture's stable
+// governance clock current instead of issuing permanently expired permits.
+const now = new Date().toISOString();
 const hash = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
 const environment = { toolVersions: { node: process.version, git: "installed-test" } } as const;
 const authenticator: JournalAuthenticator = {
@@ -106,7 +108,7 @@ test("packaged default composition executes one reviewed Refresh through host-lo
     planRevision: session.planRevision,
     allowedActions: ["compound_refresh"],
     prohibitedActions: [],
-    expiresAt: "2026-08-26T12:20:00.000Z",
+    expiresAt: new Date(Date.parse(now) + 20 * 60_000).toISOString(),
     issuedBy: "TEST\\operator"
   });
   const durableSession = await companion.sessions.get(session.id);

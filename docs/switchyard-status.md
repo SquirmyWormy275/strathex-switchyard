@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **92/92 groups passed; 639 tests, 630 passed and 9
+- Integrated native Linux run: **93/93 groups passed; 645 tests, 636 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-42f8ad4d-32fd-4f48-b7b9-5ada1e19fe54.json`.
+  `.sxsy-verification/isolated-test-37c6cc17-5e35-448e-8609-0fd10d24a24f.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -113,6 +113,13 @@ Tests use synthetic/fault transports unless identified below. The older B122
 - Local CPU faster-whisper transcribed synthetic speech without an external API.
   Recognition was imperfect; transcript correction remains part of the flow.
   A live microphone conversation has not yet been accepted.
+- The real CPU/HTTP voice recovery demonstration also passed at
+  `2026-10-30T09:53:20Z`: concurrent duplicates shared a result, later text kept
+  the corrected prefix and required review, and saved audio was removed.
+  The actual Python worker released its inherited pipe 17 ms after abrupt
+  owner exit. Temporary synthetic audio and the test session were deleted;
+  the validation workspace returned to keyboard-only. No microphone was opened.
+  [Repeatable demonstration and recovery behavior](voice-recovery.md).
 - The optional runtime now has a hash-locked installer and verifier. The existing
   48-package runtime matched all pins without extra packages. A fresh disposable
   Linux environment installed from the lock and loaded the CPU model; it was
@@ -192,6 +199,15 @@ remains open. The newer Linux focus logic also passed the native Windows softwar
 step at `cbfd69c` on run `41031976085`; it still rejects actual Windows window
 focus as unimplemented.
 
+The complete Windows release run at `f8f6965` failed after its separate native
+backend step passed. Its isolated test harness inherited the temporary SUBST
+build drive, which protected storage correctly refused. The harness now resolves
+the actual local temporary directory before creating private state. Platform
+skip declarations were corrected, and an older integration fixture now issues
+current wall-clock permits rather than expired August ones. Its actual local
+effect check passed after the change. The next complete Windows CI run must
+verify those fixes; unresolved failures remain implementation work.
+
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and
 ordinary typing must be checked when it is reconnected. Historical snapshots are
@@ -255,7 +271,7 @@ solenoid adjustment or persistent desktop modification has been performed here.
    tests. Keep all physical F77/B122 checks separately pending.
 3. Package the integrated suite's normal launch, single-instance startup,
    install/update/rollback/uninstall and owned-process recovery on Linux/Windows.
-   Then complete profile compatibility metadata, voice queue recovery and dynamic
+   Then complete profile compatibility metadata and dynamic
    assignment legends. The frontend remains frozen for the user's morning review;
    task/device/role UI work is still required in the next frontend iteration.
 

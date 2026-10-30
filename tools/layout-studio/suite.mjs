@@ -17,6 +17,7 @@ import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createClaudeCoding } from "./claude-coding.mjs";
+import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn } = {}) {
@@ -26,6 +27,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   coding ??= createCodingSessions({ store });
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
+  const voiceQueue = createVoiceQueue({ store, voice });
   const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
@@ -117,7 +119,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           clearInterval(monitors.get(compartment)); monitors.delete(compartment);
-          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voice.stopCompartment?.(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -236,18 +238,11 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         const v = { id: randomUUID(), status: "recording", destination: "local-transcription", chunks: [], transcript: "", reviewedTranscript: "", updatedAt: Date.now() };
         return store.update(compartment, "voice-start", (s) => { if (s.voice.some((v) => v.status === "recording")) throw new Error("Pause the current voice session first."); s.voice.push(v); return v; }, { operation: "record", provider: "local-transcription" });
       }
-      if (path === "/api/suite/voice/segment") {
-        if (typeof body.audio !== "string" || body.audio.length > 240000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(body.audio) || !/^[a-zA-Z0-9_-]{1,64}$/.test(body.chunkId)) throw new Error("Audio segments must be bounded and have a unique identity.");
-        let chunk;
-        await store.update(compartment, "voice-segment", (s) => { const v = voiceSession(s, body.id); const existing = v.chunks.find((c) => c.id === body.chunkId); if (existing) { chunk = existing; return; } if (!["recording", "paused"].includes(v.status)) throw new Error("This voice session cannot accept new audio."); if (v.chunks.length >= 1000) throw new Error("Voice session limit reached. Review this transcript and start a new session."); chunk = { id: body.chunkId, audio: body.audio, text: null, status: "pending" }; v.chunks.push(chunk); v.updatedAt = Date.now(); }, { operation: "record", provider: "local-transcription" });
-        if (chunk.status === "transcribed") return { text: chunk.text, duplicate: true };
-        const transcription = await voice.transcribe(chunk.audio, { compartment, beforeStart: () => store.authorize(compartment, { operation: "record", provider: "local-transcription" }) });
-        return store.update(compartment, "voice-transcribe", (s) => { const v = voiceSession(s, body.id), c = v.chunks.find((c) => c.id === body.chunkId); if (!c) throw new Error("Audio was deleted while transcription was running."); c.text = transcription.text; c.audio = null; c.status = "transcribed"; v.transcript = v.chunks.map((c) => c.text ?? "").join(" ").trim().slice(0, 160000); v.updatedAt = Date.now(); return { transcript: v.transcript, text: c.text, destination: "Local CPU; audio removed after successful transcription" }; }, { provider: "local-transcription" });
-      }
+      if (path === "/api/suite/voice/segment") return voiceQueue.segment(compartment, body);
       if (path === "/api/suite/voice/retry") { const s = await store.snapshot(compartment), v = voiceSession(s, body.id); for (const chunk of v.chunks.filter((c) => c.audio && c.status === "pending")) await this.handle("/api/suite/voice/segment", { compartment, id: v.id, audio: chunk.audio, chunkId: chunk.id }); return { retried: true }; }
       if (path === "/api/suite/voice/state") return store.update(compartment, "voice-state", (s) => { const v = voiceSession(s, body.id); if (!["recording", "paused", "stopped"].includes(body.status) || v.status === "stopped") throw new Error("That voice transition is unavailable."); v.status = body.status; v.updatedAt = Date.now(); return { id: v.id, status: v.status }; }, body.status === "recording" ? { operation: "record", provider: "local-transcription" } : {});
-      if (path === "/api/suite/voice/review") return store.update(compartment, "voice-review", (s) => { const v = voiceSession(s, body.id); if (typeof body.transcript !== "string" || body.transcript.length > 160000) throw new Error("The reviewed transcript exceeds the session limit."); v.reviewedTranscript = body.transcript; v.updatedAt = Date.now(); return { reviewed: true }; });
-      if (path === "/api/suite/voice/delete") return store.update(compartment, "voice-delete", (s) => { const v = voiceSession(s, body.id); if (v.status === "recording") throw new Error("Pause or stop voice before deleting its data."); s.voice = s.voice.filter((v) => v.id !== body.id); return { deleted: true }; });
+      if (path === "/api/suite/voice/review") return store.update(compartment, "voice-review", (s) => reviewTranscript(voiceSession(s, body.id), body.transcript));
+      if (path === "/api/suite/voice/delete") { const result = await store.update(compartment, "voice-delete", (s) => { const v = voiceSession(s, body.id); if (v.status === "recording") throw new Error("Pause or stop voice before deleting its data."); s.voice = s.voice.filter((v) => v.id !== body.id); return { deleted: true }; }); const stopped = await voiceQueue.stopSession(compartment, body.id); if (stopped.stopped === false) throw new Error("Voice data was deleted, but its owned local worker stop is unconfirmed."); return result; }
       if (path === "/api/suite/route/check") { await store.route(compartment, body.destination, "synthetic-boundary-check", body.provider); return { allowed: true }; }
       throw new Error("That suite operation is unavailable. No alternate action was executed.");
     },
@@ -281,6 +276,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voice.close?.(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voiceQueue.close(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }

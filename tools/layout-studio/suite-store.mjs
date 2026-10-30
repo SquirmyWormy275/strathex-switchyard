@@ -133,6 +133,10 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     return s.profile;
   }
   return {
+    async withResourceLock(kind, identity, fn) {
+      if (kind !== "voice-cpu" || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
+      return withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, fn);
+    },
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
     async initialize(id = "personal", policy) {
       validate(id); if (policy !== undefined && (typeof policy !== "string" || !Object.hasOwn(templates, policy))) throw new Error("Choose Personal or Copilot-only Work policy.");

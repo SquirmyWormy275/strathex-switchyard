@@ -45,7 +45,7 @@ test("Linux source lane keeps shared and native groups without claiming Windows 
   assert.ok(linuxGroups.some((group) => group.file === "packages/control-plane/test/runtime.test.ts"));
   assert.ok(linuxGroups.some((group) => group.file === "apps/linux-companion/test/linux-secret.test.ts"));
   assert.equal(linuxGroups.some((group) => group.file.startsWith("apps/windows-companion/")), false);
-  assert.equal(linuxGroups.find((group) => group.file === "apps/linux-companion/test/linux-isolation.test.ts")?.expectedSkipped, undefined);
+  assert.equal(linuxGroups.find((group) => group.file === "apps/linux-companion/test/linux-isolation.test.ts")?.expectedSkipped, process.platform === "linux" ? undefined : 1);
 });
 
 test("the required manifest exactly represents every repository test file", () => {

@@ -58,6 +58,9 @@ run. That is dependency-resolution evidence, not Windows runtime acceptance.
 Local CPU transcription of synthetic speech works, but misheard “review” as
 “remove.” Correcting and reviewing transcripts remains essential. A real
 microphone/browser session is still an open acceptance check.
+The [voice recovery demonstration](voice-recovery.md) also passed through the
+real CPU/HTTP path: concurrent duplicate handling, correction continuity,
+audio erasure after saving text and Python exit after abrupt owner loss.
 
 Suite packaging, runtime update/rollback/uninstall, recovery after a forced
 installer termination and managed installation policy remain unfinished lifecycle

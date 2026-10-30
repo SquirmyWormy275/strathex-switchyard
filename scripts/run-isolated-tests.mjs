@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -62,6 +62,7 @@ const mediatedGitTests = [
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
+    ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));
 const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "workflow-context"]
@@ -112,6 +113,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/claude-coding.test.mjs" },
   { file: "tools/layout-studio/task-window.test.mjs" },
+  { file: "tools/layout-studio/voice-queue.test.mjs" },
   { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
@@ -275,8 +277,12 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const startedAt = new Date().toISOString(); const started = Date.now();
   const configuredTestParent = inheritedValue(sourceEnvironment, "SXSY_B122_TEST_TEMP_ROOT");
   if (configuredTestParent !== undefined && (!isAbsolute(configuredTestParent) || /[\0\r\n"]/u.test(configuredTestParent))) throw new Error("The isolated test parent is invalid.");
-  const testParent = configuredTestParent ?? tmpdir();
-  await mkdir(testParent, { recursive: true });
+  const requestedParent = configuredTestParent ?? tmpdir();
+  await mkdir(requestedParent, { recursive: true });
+  // Release builds use a short SUBST drive on Windows. Keep private test state
+  // on the actual local drive; private storage deliberately rejects drive
+  // redirection rather than treating that temporary build alias as authority.
+  const testParent = await realpath(requestedParent);
   const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
