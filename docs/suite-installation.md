@@ -38,6 +38,24 @@ retains the same frozen review's private access only after its previous owner
 has exited. A live owner is never displaced. The packaged frontend uses a separate
 directory so frozen browser modules cannot replace newer backend modules.
 
+The managed CLI starts or reuses exactly one application owner:
+
+```sh
+/absolute/path/to/node /absolute/bundle/deployment/suite/cli.mjs launch --no-open
+/absolute/path/to/node /absolute/bundle/deployment/suite/cli.mjs status
+/absolute/path/to/node /absolute/bundle/deployment/suite/cli.mjs stop
+```
+
+Omit `--no-open` to use the normal OS URL opener. Startup is serialized by a
+kernel lock; a separate lifetime lease belongs to the application process.
+Concurrent launches reuse the exact authenticated build. Discovery signs both
+directions with fresh, route-bound HMAC, so an unverified replacement listener
+never receives the browser access token. Stop addresses the same instance and
+requires process-exit readback. It does not infer completion of a coding task.
+An occupied port or another live build is preserved for deliberate resolution.
+Abrupt owner loss releases the kernel lease; the saved endpoint remains for
+recovery, and a later launch creates a new generation without replaying actions.
+
 For an explicitly labeled uncommitted development build, add `--allow-dirty`.
 Untracked files are still excluded. Commit tested checkpoints before regular
 packaging. Generated bundles live under `artifacts/switchyard-suite/` and stay
@@ -60,9 +78,8 @@ DPAPI, focus or microphone acceptance.
 
 ## Implementation still in progress
 
-The normal desktop launcher, coordinated single-instance startup, installed
-version switching, rollback, uninstall and runtime maintenance are the next
-lifecycle work. The standalone bundle runner is not yet their substitute.
+The persistent desktop launcher, installed version switching, rollback,
+uninstall and runtime maintenance are the next lifecycle work.
 Use the existing review server while that work continues. No existing desktop
 launcher, autostart setting, ordinary keyboard mapping or protected data is
 changed by building a package.

@@ -27,7 +27,7 @@ export async function reviewAccessToken({ root = runtimeDirectory(), port, revie
 }
 export async function publishEndpoint(server, { root = runtimeDirectory(), review = null } = {}) {
   await privateDirectory(root);
-  const url = `http://127.0.0.1:${server.address().port}/#access=${server.accessToken}`, value = JSON.stringify({ schema: "switchyard-active-endpoint/v1", url, pid: process.pid, ...(review ? { review } : {}) });
+  const url = `http://127.0.0.1:${server.address().port}/#access=${server.accessToken}`, value = JSON.stringify({ schema: "switchyard-active-endpoint/v1", url, pid: process.pid, ...(review ? { review } : {}), ...(server.instanceIdentity ? { instance: server.instanceIdentity } : {}) });
   await privateWrite(join(root, `${server.address().port}.json`), value);
   await privateWrite(join(root, "active.json"), value);
   return url;

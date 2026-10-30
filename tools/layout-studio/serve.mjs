@@ -9,6 +9,7 @@ import { createHostBridge, discoverHost } from "./host.mjs";
 import { createSuite } from "./suite.mjs";
 import { createWindowsHostBridge, WindowsNativeHotkeys } from "./windows-host.mjs";
 import { publishEndpoint } from "./physical-intent.mjs";
+import { createInstanceGateway } from "./instance.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 export const studioAssets = new Map([
@@ -33,7 +34,8 @@ export const studioAssets = new Map([
   ["/sample-study-report.json", ["sample-study-report.json", "application/json; charset=utf-8"]]
 ]);
 
-export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge, discover = discoverHost, suite = createSuite(), assetRoot = directory, platform = process.platform, windowsDriverFactory } = {}) {
+export function createStudioServer({ token = randomBytes(32).toString("base64url"), bridge, discover = discoverHost, suite = createSuite(), assetRoot = directory, platform = process.platform, windowsDriverFactory, instance, onApplicationStop } = {}) {
+  const instanceGateway = instance ? createInstanceGateway({ token, identity: instance, onStop: onApplicationStop }) : null;
   bridge ??= platform === "win32" ? createWindowsHostBridge({ store: suite.store, verifyTarget: (c) => suite.authorizeConnection(undefined, c), dispatch: (c) => suite.handle("/api/suite/intent", c), driverFactory: windowsDriverFactory ?? (() => new WindowsNativeHotkeys({ origin: `http://127.0.0.1:${server.address().port}/`, token })) }) : createHostBridge({ verifyTarget: (c) => suite.authorizeConnection(undefined, c) });
   const server = createServer(async (request, response) => {
     response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
@@ -45,6 +47,7 @@ export function createStudioServer({ token = randomBytes(32).toString("base64url
     const allowedAuthorities = new Set([`127.0.0.1:${server.address()?.port}`, `localhost:${server.address()?.port}`]);
     const json = (status, value) => { response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" }); response.end(JSON.stringify(value)); };
     if (!allowedAuthorities.has(authority) || (request.headers.origin && request.headers.origin !== `http://${authority}`) || ["cross-site", "same-site"].includes(request.headers["sec-fetch-site"])) { json(403, { error: "This request is outside the local workspace origin." }); return; }
+    if (request.url?.startsWith("/instance/")) { if (instanceGateway) await instanceGateway(request, response, `http://${authority}`); else json(404, { error: "This development server has no managed application identity." }); return; }
     if (request.url?.startsWith("/agent/")) {
       if (request.method !== "POST" || request.headers["content-type"] !== "application/json" || request.headers.origin) { json(403, { error: "The scoped agent bridge accepts only authenticated non-browser JSON clients." }); return; }
       if (!request.url.startsWith("/agent/v2/")) { json(426, { error: "This agent contract is unsupported. Use the current v2 SDK; no alternate action was executed." }); return; }
@@ -85,7 +88,10 @@ export function createStudioServer({ token = randomBytes(32).toString("base64url
   server.requestTimeout = 10000;
   server.headersTimeout = 10000;
   server.accessToken = token;
-  server.on("close", () => { bridge.close?.(); void suite.close(); });
+  server.instanceIdentity = instance;
+  let cleanup;
+  server.cleanup = () => cleanup ??= Promise.all([Promise.resolve().then(() => bridge.close?.()), Promise.resolve().then(() => suite.close())]);
+  server.on("close", () => { void server.cleanup().catch(() => {}); });
   return server;
 }
 

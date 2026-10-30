@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **94/94 groups passed; 648 tests, 639 passed and 9
+- Integrated native Linux run: **96/96 groups passed; 656 tests, 647 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-a75213ca-2fe8-4728-8e54-b32287baaee4.json`.
+  `.sxsy-verification/isolated-test-4dcb6634-2796-43c8-83fc-d047caca510a.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -261,6 +261,23 @@ private platform packages; the Windows package requires its built native hotkey
 helper and includes its source/runtime licenses. This is unsigned development
 packaging; normal launch, installation and version lifecycle remain unfinished.
 See [build/run details](suite-installation.md).
+
+Managed CLI startup now holds a short startup lock and a separate lifetime lease,
+reuses one authenticated instance for concurrent launches, verifies exact build
+and process identity, and stops through a signed instance request with exit
+readback. Request/response proofs bind fresh nonce, route, origin and generation;
+the browser access token is never disclosed during instance discovery. Actual
+Linux subprocess tests cover three parallel launches, abrupt-owner recovery,
+different-build preservation and occupied ports. The persistent installer,
+desktop entry, installed updates/rollback/uninstall and broader child containment
+are still required. These are not marked blocked by absent hardware.
+
+The clean bundle from `6a17a24` also ran outside the checkout with the pilot's
+actual protected store: frozen Home hash matched, an unauthenticated API call was
+rejected, the dedicated validation workspace remained keyboard-only and the owned
+process exited. Its 339 program/source/license files total 2,080,079 bytes.
+Private receipt: `runtime-verification/suite-package-1793354686608.json`.
+The earlier prototype bundle was removed after verification.
 
 ## Branch and handover
 

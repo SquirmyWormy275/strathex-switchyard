@@ -96,6 +96,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
+  { file: "deployment/suite/application.test.mjs" },
   { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
@@ -107,6 +108,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/integrations.test.mjs" },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
+  { file: "tools/layout-studio/instance.test.mjs" },
   { file: "tools/layout-studio/windows-host.test.mjs" },
   { file: "tools/layout-studio/state-lock.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
