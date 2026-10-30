@@ -961,3 +961,25 @@ The coding/stdio groups pass **21 focused tests**, including moving the original
 directory aside, creating a different Git directory at the same path and
 verifying that status, resume and rebinding cannot redirect its saved task.
 General approved text submission remains the next implementation step.
+
+The current native configuration exposed a generated `node_repl` MCP entry.
+A table containing only `enabled=false` failed native parsing before a prompt.
+The owned client now replaces each discovered MCP entry with a complete,
+explicitly disabled transport referencing the already trusted CLI and a fixed
+`--version` argument. That command is never launched as an MCP server. Effective
+configuration still must report every entry disabled; newly appearing enabled
+entries fail closed. The user's global configuration is unchanged.
+
+Automatic project instruction discovery is also explicitly set to zero and read
+back. The current [official configuration schema](https://developers.openai.com/codex/config-schema.json)
+documents additional tool configuration fields that this installed version does
+not return. Those fields are not treated as enforced controls. The adapter uses
+its verified 0.166.0 contract and read-only sandbox; an instruction or an ignored
+configuration field is not a grant or proof of isolation.
+
+An actual restricted ephemeral turn passed with the generated entry disabled,
+project-document bytes zero, account stable and exact owned exit verified:
+`codex-restricted-turn-1793375838303.json`. The 36 focused conversation/stdio/turn
+tests pass, including complete disabled-transport arguments and rejection of
+enabled automatic project instructions. General text submission is being built
+separately and is not included in this compatibility checkpoint.

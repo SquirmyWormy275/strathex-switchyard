@@ -246,6 +246,7 @@ test("Codex design reads back complete tool restrictions and fails closed for en
   assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, mcp_servers: { codex_app: { enabled: false } } }));
   for (const server of [{ enabled: true }, {}]) assert.throws(() => assertCodexDesignConfig({ ...config, mcp_servers: { unexpected: server } }), /No design turn/);
   assert.throws(() => assertCodexDesignConfig({ ...config, features: { ...config.features, shell_tool: true } }), /No design turn/);
+  assert.throws(() => assertCodexDesignConfig({ ...config, project_doc_max_bytes: 32768 }), /No design turn/);
   for (const unsupported of [{ model_provider: "alternate" }, { chatgpt_base_url: "https://example.invalid/backend-api" }, { openai_base_url: "https://example.invalid" }, { model_providers: { openai: { base_url: "https://example.invalid" } } }]) assert.throws(() => assertCodexDesignConfig({ ...config, ...unsupported }), /first-party route/);
   assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, chatgpt_base_url: "https://chatgpt.com/backend-api/" }));
   assert.throws(() => codexDesignConfig(["escape.features.shell_tool"]), /identities are unsupported/);

@@ -30,22 +30,31 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  send({id:m.id,result});
 });`;
 async function fixture(fn, overrides = {}) {
-  const temporary = await mkdtemp(join(tmpdir(), "cs-")), root = await realpath(temporary), repositoryRoot = join(root, "repo"), keys = new Map(), frames = [], children = [];
+  const temporary = await mkdtemp(join(tmpdir(), "cs-")), root = await realpath(temporary), repositoryRoot = join(root, "repo"), keys = new Map(), frames = [], children = [], launches = [];
   await mkdir(join(repositoryRoot, ".git"), { recursive: true });
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); } } });
   await store.initialize("personal"); await store.initialize("company", "work");
   await store.update("personal", "synthetic-mode", (s) => { s.mode = "personal-companion"; });
   const settings = { repositoryRoot, config: codexDesignConfig(), ...overrides };
   const clientFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names, { spawnProcess: (_, args, options) => {
+    launches.push(args);
     assert.equal(options.shell, false); assert.equal(options.env.OPENAI_API_KEY, undefined); assert.ok(args.includes("features.shell_tool=false"));
     const child = spawn(process.execPath, ["-e", childSource, JSON.stringify(settings)], options), write = child.stdin.write.bind(child.stdin);
     child.stdin.write = (value, ...rest) => { frames.push(JSON.parse(String(value))); return write(value, ...rest); };
     children.push(child); return child;
   } });
   const options = { store, root: join(root, "runtime"), resolveCli: async () => process.execPath, resolveMcp: async () => [], clientFactory }, driver = createCodexStdioTasks(options);
-  try { await fn({ root, repositoryRoot, store, driver, frames, children, options, settings }); }
+  try { await fn({ root, repositoryRoot, store, driver, frames, children, options, settings, launches }); }
   finally { await driver.close(); for (const c of children) if (c.exitCode === null && c.signalCode === null) c.kill("SIGKILL"); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 40 }); }
 }
+test("configured and generated MCP entries receive complete disabled transports without inheriting native commands", () => fixture(async ({ options, launches }) => {
+  const driver = createCodexStdioTasks({ ...options, resolveMcp: async () => ["configured", "generated"] });
+  try {
+    await driver.account("personal");
+    for (const name of ["configured", "generated"]) assert.ok(launches[0].includes(`mcp_servers.${name}={command=${JSON.stringify(process.execPath)},args=["--version"],enabled=false}`));
+    assert.ok(launches[0].includes("project_doc_max_bytes=0")); assert.equal(launches[0].some((arg) => /^mcp_servers\..*\.enabled=false$/.test(arg)), false);
+  } finally { await driver.close(); }
+}));
 test("real stdio framing verifies restricted initialization/account and returns only exact thread metadata", () => fixture(async ({ repositoryRoot, driver, frames, children }) => {
   const login = await driver.account("personal"); assert.equal(login.type, "chatgpt"); assert.match(login.fingerprint, /^[a-f0-9]{64}$/); assert.equal(JSON.stringify(login).includes("@"), false);
   assert.deepEqual(await driver.list("personal"), [{ id: "synthetic-existing", observation: "idle" }]);

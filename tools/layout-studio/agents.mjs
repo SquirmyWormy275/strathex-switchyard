@@ -52,13 +52,13 @@ export function validateDesignResponse(value, basePlan) {
 export function codexDesignConfig(serverNames = []) {
   if (!Array.isArray(serverNames) || serverNames.length > 128 || serverNames.some((n) => typeof n !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(n))) throw new Error("Configured Codex MCP identities are unsupported. No design turn was submitted.");
   const disabled = ["shell_tool", "unified_exec", "shell_snapshot", "computer_use", "browser_use", "browser_use_external", "browser_use_full_cdp_access", "browser_annotation_api", "in_app_browser", "in_app_local_automation", "in_app_voice", "in_app_dictation", "code_mode", "code_mode_host", "hooks", "plugins", "plugin_discovery_prefetch", "remote_plugin", "apps", "memories", "multi_agent", "multi_agent_v2", "view_image", "image_generation", "sleep_tool", "tool_suggest", "workspace_dependencies", "skill_search", "skill_mcp_dependency_install", "auth_elicitation", "guardian_approval", "daemon_auto_start", "goals", "unbounded_connection_retries"];
-  return { features: Object.fromEntries(disabled.map((name) => [name, false])), approvals_reviewer: "user", web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
+  return { features: Object.fromEntries(disabled.map((name) => [name, false])), project_doc_max_bytes: 0, approvals_reviewer: "user", web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
 }
 export function assertCodexDesignConfig(config) {
   const expected = codexDesignConfig();
   let officialBackend = config?.chatgpt_base_url == null;
   if (!officialBackend) try { const u = new URL(config.chatgpt_base_url); officialBackend = u.origin === "https://chatgpt.com" && /^\/backend-api\/?$/.test(u.pathname) && !u.search && !u.hash && !u.username && !u.password; } catch { /* unknown endpoints are refused */ }
-  if (!config || !officialBackend || config.openai_base_url != null || config.model_providers?.openai != null || config.model_provider != null && config.model_provider !== "openai" || config.approvals_reviewer !== "user" || config.web_search !== "disabled" || Object.entries(expected.features).some(([name, value]) => config.features?.[name] !== value) || !config.mcp_servers || Object.values(config.mcp_servers).some((server) => server?.enabled !== false)) throw new Error("Codex did not enforce the restricted design configuration and first-party route. No design turn was submitted.");
+  if (!config || !officialBackend || config.openai_base_url != null || config.model_providers?.openai != null || config.model_provider != null && config.model_provider !== "openai" || config.approvals_reviewer !== "user" || config.web_search !== "disabled" || config.project_doc_max_bytes !== 0 || Object.entries(expected.features).some(([name, value]) => config.features?.[name] !== value) || !config.mcp_servers || Object.values(config.mcp_servers).some((server) => server?.enabled !== false)) throw new Error("Codex did not enforce the restricted design configuration and first-party route. No design turn was submitted.");
 }
 export function codexAccountFingerprint(account) {
   if (account?.type !== "chatgpt" || typeof account.email !== "string" || !account.email.trim() || account.email.length > 320 || /[\0\r\n]/.test(account.email)) throw new Error("The native Codex login has no verified first-party account identity. No API-key or alternate-provider fallback was selected.");
@@ -90,7 +90,10 @@ export class CodexClient extends EventEmitter {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
     this.clientInfo = clientInfo;
     codexDesignConfig(serverNames); this.serverNames = [...serverNames];
-    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "approvals_reviewer=\"user\"", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
+    // Generated native MCP entries need a complete parseable transport override;
+    // adding only `.enabled=false` can create a table with no transport. Replace
+    // it with an explicitly disabled fixed native command; it is never launched.
+    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "project_doc_max_bytes=0", "approvals_reviewer=\"user\"", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}={command=${JSON.stringify(executable)},args=[\"--version\"],enabled=false}`)];
     this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
