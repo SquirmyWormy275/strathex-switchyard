@@ -19,7 +19,7 @@ async function exactRoot(value, expected) {
   if (canonical !== expected) throw new Error("Codex returned another working directory. No task was redirected.");
 }
 export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/codex-tasks"), resolveCli = trustedCli, resolveMcp = readCodexMcpNames, clientFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names, { clientInfo: { name: "switchyard_tasks", title: "Switchyard exact tasks", version: "0.1.0" } }), stopChild = stopOwnedChild } = {}) {
-  const clients = new Map(), connecting = new Map(), generations = new Map(), unconfirmed = new Map(); let closed = false;
+  const clients = new Map(), connecting = new Map(), generations = new Map(), unconfirmed = new Map(), probes = new Map(); let closed = false;
   const generation = (c) => generations.get(c) ?? 0;
   async function dispose(c, client) {
     client.close(); const result = await stopChild(client.child);
@@ -41,7 +41,10 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
         const pending = (async () => {
           const cwd = join(root, c); await privateDirectory(cwd); await authorize();
           const executable = await resolveCli("codex"); await authorize();
-          const names = await resolveMcp(executable, cwd); await authorize();
+          let names;
+          try { names = await resolveMcp(executable, cwd, { onProbe: (probe) => { probes.set(c, probe); } }); }
+          finally { const probe = probes.get(c); if (probe) { const result = await dispose(c, probe); if (result.stopped && probes.get(c) === probe) probes.delete(c); if (!result.stopped) throw new Error("The owned Codex configuration probe has not verified exit. No replacement was launched."); } }
+          await authorize();
           const owned = clientFactory(executable, cwd, names);
           try { await owned.initialize(); await authorize(); clients.set(c, owned); return owned; }
           catch (e) { await dispose(c, owned); throw e; }
@@ -67,6 +70,7 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
   }
   async function stopCompartment(c) {
     generations.set(c, generation(c) + 1);
+    const probe = probes.get(c); if (probe) { if ((await dispose(c, probe)).stopped && probes.get(c) === probe) probes.delete(c); }
     const client = clients.get(c); if (client) await dispose(c, client);
     await connecting.get(c)?.catch(() => {});
     const pending = clients.get(c) ?? unconfirmed.get(c);
@@ -115,6 +119,6 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
       });
     },
     stopCompartment,
-    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...unconfirmed.keys()])].map(stopCompartment)); }
+    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...unconfirmed.keys(), ...probes.keys()])].map(stopCompartment)); }
   };
 }

@@ -18,7 +18,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);if(!m.method||m.id===undefined)return;
  let result={};
  switch(m.method){
-  case 'initialize':break;
+  case 'initialize':result={userAgent:settings.peerUserAgent??(m.params.clientInfo.name+'/0.166.0 (synthetic fixture)')};break;
   case 'config/read':if(Object.hasOwn(settings,'badFrame')){send(settings.badFrame);return;}for(const [id,method] of [[999,'item/commandExecution/requestApproval'],[1000,'item/fileChange/requestApproval'],[1001,'item/permissions/requestApproval'],[1002,'mcpServer/elicitation/request'],[1003,'item/tool/requestUserInput'],[1004,'item/tool/call'],[1005,'unknown/requestApproval']])send({id,method,params:{command:'never-executed'}});result={config:m.params.cwd?(started&&settings.projectConfigAfterStart||settings.projectConfig||settings.config):settings.config};break;
   case 'account/read':result={account:{type:'chatgpt',email:'synthetic@example.invalid'}};break;
   case 'thread/list':result={data:[{id:'synthetic-existing',preview:'never-return-preview',status:{type:'idle'}}]};break;
@@ -80,12 +80,18 @@ test("owned task creation persists only a local marker; resume reads back exact 
   assert.equal(frames.some((m) => /turn\//.test(m.method)), false);
 }));
 test("repository-specific tools and feature changes cannot cross an owned task creation or resume boundary", async () => {
-  for (const projectConfig of [{ ...codexDesignConfig(), mcp_servers: { project_local: { enabled: true } } }, { ...codexDesignConfig(), features: { ...codexDesignConfig().features, hooks: true } }, { ...codexDesignConfig(), features: { ...codexDesignConfig().features, computer_use: true } }]) await fixture(async ({ repositoryRoot, driver, frames }) => {
+  for (const projectConfig of [{ ...codexDesignConfig(), mcp_servers: { project_local: { enabled: true } } }, ...["hooks", "computer_use", "browser_use", "view_image", "image_generation", "workspace_dependencies"].map((name) => ({ ...codexDesignConfig(), features: { ...codexDesignConfig().features, [name]: true } })), { ...codexDesignConfig(), approvals_reviewer: "auto_review" }]) await fixture(async ({ repositoryRoot, driver, frames }) => {
     await assert.rejects(driver.start(repositoryRoot, "switchyard-restricted", "personal"), /restricted design configuration/);
     await assert.rejects(driver.resume("synthetic-created", repositoryRoot, "personal"), /restricted design configuration/);
     assert.equal(frames.some((m) => m.method === "thread/start" || m.method === "thread/resume" || m.method === "turn/start"), false);
     assert.ok(frames.some((m) => m.method === "config/read" && m.params.cwd === repositoryRoot));
   }, { projectConfig });
+});
+test("unreviewed native versions or another peer identity cannot initialize tools, read accounts or create a task", async () => {
+  for (const peerUserAgent of ["switchyard_design/0.167.0 (synthetic fixture)", "another_peer/0.166.0 (synthetic fixture)", "", "switchyard_design/0.166.0\n(synthetic fixture)"]) await fixture(async ({ driver, frames }) => {
+    await assert.rejects(driver.account("personal"), /verified.*version|version.*verified/);
+    assert.equal(frames.some((m) => m.method !== "initialize"), false);
+  }, { peerUserAgent });
 });
 test("a changed project configuration after native creation preserves its returned identity without injecting or submitting content", () => fixture(async ({ repositoryRoot, driver, frames }) => {
   await assert.rejects(driver.start(repositoryRoot, "switchyard-restricted", "personal"), (e) => e.createdThreadId === "synthetic-created" && /restricted/.test(e.message));

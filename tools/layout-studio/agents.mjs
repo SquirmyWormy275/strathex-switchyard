@@ -2,10 +2,11 @@
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { deniedCodexServerRequest } from "./codex-requests.mjs";
+import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { modifiers, families, consequences, parsePlan, analyzePlan } from "./model.mjs";
 import { proposalSchema } from "./workspace.mjs";
 import { privateDirectory } from "./suite-store.mjs";
@@ -48,31 +49,46 @@ export function validateDesignResponse(value, basePlan) {
 
 export function codexDesignConfig(serverNames = []) {
   if (!Array.isArray(serverNames) || serverNames.length > 128 || serverNames.some((n) => typeof n !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(n))) throw new Error("Configured Codex MCP identities are unsupported. No design turn was submitted.");
-  return { features: { shell_tool: false, unified_exec: false, computer_use: false, code_mode: false, code_mode_host: false, hooks: false, plugins: false, apps: false, memories: false, multi_agent: false, multi_agent_v2: false }, web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
+  const disabled = ["shell_tool", "unified_exec", "shell_snapshot", "computer_use", "browser_use", "browser_use_external", "browser_use_full_cdp_access", "browser_annotation_api", "in_app_browser", "in_app_local_automation", "in_app_voice", "in_app_dictation", "code_mode", "code_mode_host", "hooks", "plugins", "plugin_discovery_prefetch", "remote_plugin", "apps", "memories", "multi_agent", "multi_agent_v2", "view_image", "image_generation", "sleep_tool", "tool_suggest", "workspace_dependencies", "skill_search", "skill_mcp_dependency_install", "auth_elicitation", "guardian_approval", "daemon_auto_start", "goals", "unbounded_connection_retries"];
+  return { features: Object.fromEntries(disabled.map((name) => [name, false])), approvals_reviewer: "user", web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
 }
 export function assertCodexDesignConfig(config) {
   const expected = codexDesignConfig();
-  if (!config || config.web_search !== "disabled" || Object.entries(expected.features).some(([name, value]) => config.features?.[name] !== value) || !config.mcp_servers || Object.values(config.mcp_servers).some((server) => server?.enabled !== false)) throw new Error("Codex did not enforce the restricted design configuration. No design turn was submitted.");
+  let officialBackend = config?.chatgpt_base_url == null;
+  if (!officialBackend) try { const u = new URL(config.chatgpt_base_url); officialBackend = u.origin === "https://chatgpt.com" && /^\/backend-api\/?$/.test(u.pathname) && !u.search && !u.hash && !u.username && !u.password; } catch { /* unknown endpoints are refused */ }
+  if (!config || !officialBackend || config.openai_base_url != null || config.model_providers?.openai != null || config.model_provider != null && config.model_provider !== "openai" || config.approvals_reviewer !== "user" || config.web_search !== "disabled" || Object.entries(expected.features).some(([name, value]) => config.features?.[name] !== value) || !config.mcp_servers || Object.values(config.mcp_servers).some((server) => server?.enabled !== false)) throw new Error("Codex did not enforce the restricted design configuration and first-party route. No design turn was submitted.");
 }
-export async function readCodexMcpNames(executable, cwd) {
+export function codexAccountFingerprint(account) {
+  if (account?.type !== "chatgpt" || typeof account.email !== "string" || !account.email.trim() || account.email.length > 320 || /[\0\r\n]/.test(account.email)) throw new Error("The native Codex login has no verified first-party account identity. No API-key or alternate-provider fallback was selected.");
+  return createHash("sha256").update(JSON.stringify([account.type, account.email.trim().toLowerCase()])).digest("hex");
+}
+export async function readCodexMcpNames(executable, cwd, { onProbe = () => {} } = {}) {
   // Inspect the app-server's actual effective configuration, without creating a
   // thread. `codex mcp list` also returns generated entries which cannot safely
   // be overridden as ordinary TOML transports. An empty table alone merges with
   // the user's configuration and therefore does not disable configured tools.
   const probe = new CodexClient(executable, cwd);
   try {
+    onProbe(probe);
     const config = await probe.handshake();
     if (!config?.mcp_servers || typeof config.mcp_servers !== "object") throw new Error("Codex tool configuration is unavailable.");
     const names = Object.entries(config.mcp_servers).filter(([, s]) => s.enabled !== false).map(([name]) => name).sort();
     codexDesignConfig(names); return names;
   } finally { probe.close(); if (!(await stopOwnedChild(probe.child)).stopped) throw new Error("The native configuration probe did not verify exit. No replacement was launched."); }
 }
+function reviewedCodexVersion(hello, name) {
+  const agent = hello?.userAgent, prefix = `${name}/`;
+  if (typeof agent !== "string" || agent.length > 512 || /[\0\r\n]/.test(agent) || !agent.startsWith(prefix)) throw new Error("Codex did not identify a verified native adapter version. Saved work was preserved.");
+  const version = /^(\d+\.\d+\.\d+) \(/.exec(agent.slice(prefix.length))?.[1];
+  if (version !== "0.166.0") throw new Error("This Codex version is not verified by the restricted adapter (0.166.0). Saved work was preserved.");
+  return version;
+}
 export class CodexClient extends EventEmitter {
   constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
     this.clientInfo = clientInfo;
     codexDesignConfig(serverNames); this.serverNames = [...serverNames];
-    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
+    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "approvals_reviewer=\"user\"", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}.enabled=false`)];
     this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
@@ -100,14 +116,22 @@ export class CodexClient extends EventEmitter {
       try { this.send({ id, method, params }); } catch (e) { this.pending.delete(id); clearTimeout(timer); reject(e); }
     });
   }
-  async handshake() { await this.request("initialize", { clientInfo: this.clientInfo }); this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
-  async initialize() { assertCodexDesignConfig(await this.handshake()); }
+  async handshake() { const hello = await this.request("initialize", { clientInfo: this.clientInfo }); try { this.nativeVersion = reviewedCodexVersion(hello, this.clientInfo.name); } catch (error) { this.close(); throw error; } this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
+  async initialize() { assertCodexDesignConfig(await this.handshake()); this.accountFingerprint = codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account); this.restrictionsVerified = true; }
+  async recheckAccount() { if (codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account) !== this.accountFingerprint) { this.close(); throw new Error("The native Codex login changed. Saved context was not rerouted."); } return this.accountFingerprint; }
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }
 
-export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames } = {}) {
-  const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map();
+export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild } = {}) {
+  const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map();
   let closed = false;
+  const confirmStop = async (child) => { try { return (await stopChild(child)).stopped === true; } catch { return false; } };
+  function retainUnconfirmed(compartment, child) { if (!child) return; const pending = unconfirmed.get(compartment) ?? new Set(); pending.add(child); unconfirmed.set(compartment, pending); }
+  async function settleUnconfirmed(compartment) {
+    const remaining = new Set(); for (const child of unconfirmed.get(compartment) ?? []) if (!(await confirmStop(child))) remaining.add(child);
+    if (remaining.size) { unconfirmed.set(compartment, remaining); throw new Error("A previous owned provider process has not verified exit. No replacement was launched."); }
+    unconfirmed.delete(compartment);
+  }
   function currentGeneration(compartment, generation) { if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("This compartment's design request was stopped. Your draft is preserved."); }
   async function codex(compartment) {
     if (closed) throw new Error("The design service is closed.");
@@ -115,23 +139,38 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     if (clients.get(compartment)?.closed === false) return clients.get(compartment);
     const generation = generations.get(compartment) ?? 0;
     const pending = (async () => {
+      await settleUnconfirmed(compartment);
+      for (const [map, previous] of [[clients, clients.get(compartment)], [probes, probes.get(compartment)]]) if (previous) {
+        if (!previous.closed) previous.close();
+        if (!(await confirmStop(previous.child))) { retainUnconfirmed(compartment, previous.child); throw new Error("The previous owned Codex process has not verified exit. No replacement was launched."); }
+        if (map.get(compartment) === previous) map.delete(compartment);
+      }
+      currentGeneration(compartment, generation);
       const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
-      const executable = await resolveCli("codex"), names = await resolveMcp(executable, cwd); codexDesignConfig(names);
+      const executable = await resolveCli("codex"); currentGeneration(compartment, generation);
+      let names;
+      try { names = await resolveMcp(executable, cwd, { onProbe: (probe) => { probes.set(compartment, probe); } }); }
+      finally { const probe = probes.get(compartment); if (probe) { if (!probe.closed) probe.close(); if (await confirmStop(probe.child)) { if (probes.get(compartment) === probe) probes.delete(compartment); } else { retainUnconfirmed(compartment, probe.child); throw new Error("The owned Codex configuration probe has not verified exit. No replacement was launched."); } } }
+      codexDesignConfig(names);
       if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("This compartment's design connection was stopped.");
       const client = codexFactory(executable, cwd, names); client.serverNames = [...names]; clients.set(compartment, client);
       try { await client.initialize(); if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("This compartment's design connection was stopped."); return client; }
-      catch (error) { client.close(); if (clients.get(compartment) === client) clients.delete(compartment); throw error; }
+      catch (error) { if (!client.closed) client.close(); if (await confirmStop(client.child)) { if (clients.get(compartment) === client) clients.delete(compartment); } else retainUnconfirmed(compartment, client.child); throw error; }
     })();
     connecting.set(compartment, pending);
     try { return await pending; } finally { if (connecting.get(compartment) === pending) connecting.delete(compartment); }
   }
   async function stopCompartment(compartment) {
     generations.set(compartment, (generations.get(compartment) ?? 0) + 1);
-    const client = clients.get(compartment), children = new Set();
+    const client = clients.get(compartment), probe = probes.get(compartment), children = new Set();
     if (client?.child) children.add(client.child);
-    client?.close(); clients.delete(compartment); connecting.delete(compartment);
+    if (probe?.child) children.add(probe.child);
+    for (const child of unconfirmed.get(compartment) ?? []) children.add(child);
+    if (client && !client.closed) client.close(); if (probe && !probe.closed) probe.close();
     for (const [key, r] of running) if (key.startsWith(`${compartment}:`) && r.child) children.add(r.child);
-    const results = await Promise.all([...children].map((child) => stopOwnedChild(child)));
+    const ordered = [...children], results = await Promise.all(ordered.map(async (child) => ({ stopped: await confirmStop(child) })));
+    const remaining = new Set(ordered.filter((_, i) => !results[i].stopped)); if (remaining.size) unconfirmed.set(compartment, remaining); else unconfirmed.delete(compartment);
+    for (const [map, owned] of [[clients, client], [probes, probe]]) if (owned && (!owned.child || results[ordered.indexOf(owned.child)]?.stopped) && map.get(compartment) === owned) map.delete(compartment);
     return { stopped: results.every((r) => r.stopped), ownedProcesses: results.length, taskCompletionVerified: false };
   }
   return {
@@ -142,48 +181,47 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     async design({ compartment, provider, message, plan: input, conversationId }) {
       const generation = generations.get(compartment) ?? 0; currentGeneration(compartment, generation);
       await store.authorize(compartment, { provider });
+      await settleUnconfirmed(compartment);
+      currentGeneration(compartment, generation);
       if (typeof message !== "string" || !message.trim() || message.length > 12000) throw new Error("Describe the workflow in 1–12000 characters.");
       const plan = parsePlan(input), state = await store.snapshot(compartment);
+      currentGeneration(compartment, generation);
       const conversation = conversationId ? state.conversations.find((c) => c.id === conversationId && c.provider === provider) : null;
       if (conversationId && !conversation) throw new Error("That conversation is not bound to this compartment and provider.");
       const id = conversation?.id ?? randomUUID(), key = `${compartment}:${id}`;
-      if (busy.has(key)) throw new Error("This exact conversation is already running. Wait or cancel before sending again.");
+      if ([...busy].some((k) => k.startsWith(`${compartment}:`))) throw new Error("A design turn is already running in this workspace. Wait or cancel before sending again.");
       busy.add(key);
       const context = { instruction: "You are Switchyard's configuration designer. Improve the process before mapping it. Return only the response schema. Never run tools, read files, contact services, or apply a change. Use actual supplied key IDs. Preserve ordinary typing; use modified chords. Do not invent device, completion, time-saving or capability evidence. Estimates default to zero. Explain questions in reply. Return the full desired action list, editable process steps and agent role labels. Keep stable action IDs when revising. The output is an untrusted proposal requiring independent review.", currentPlan: plan, currentWorkflow: state.workflow, conversation: (conversation?.messages ?? []).slice(-12), request: message };
-      let sessionId = conversation?.sessionId ?? null;
+      let sessionId = conversation?.sessionId ?? null, accountFingerprint = conversation?.accountFingerprint ?? null;
       try {
-        await store.update(compartment, "design-draft", (s) => { s.conversations = [...s.conversations.filter((c) => c.id !== id), { id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; }, { provider });
+        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; }, { provider });
         currentGeneration(compartment, generation);
         let response;
         if (provider === "codex") {
           const client = await codex(compartment);
           currentGeneration(compartment, generation);
+          await client.recheckAccount(); currentGeneration(compartment, generation);
+          if (conversation && conversation.accountFingerprint !== client.accountFingerprint) throw new Error("This conversation has no verified binding to the current native login. Its context was preserved; review the legacy binding or choose a new conversation.");
+          accountFingerprint = client.accountFingerprint;
           const restricted = { sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames), baseInstructions: "Only design a keyboard configuration from supplied text. Never call a tool. Return the required JSON schema." };
-          if (sessionId) { const r = await client.request("thread/resume", { ...restricted, threadId: sessionId }); if (r.thread?.id !== sessionId) throw new Error("Codex resumed a different thread."); }
-          else { const r = await client.request("thread/start", { ...restricted, cwd: join(runtimeRoot, compartment), serviceName: "switchyard-design" }); sessionId = r.thread?.id; }
+          let native;
+          if (sessionId) { native = await client.request("thread/resume", { ...restricted, threadId: sessionId }); if (native.thread?.id !== sessionId) throw new Error("Codex resumed a different thread."); }
+          else { native = await client.request("thread/start", { ...restricted, cwd: join(runtimeRoot, compartment), serviceName: "switchyard-design" }); sessionId = native.thread?.id; }
           if (typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("Codex returned an invalid thread identity.");
-          await store.update(compartment, "design-session-bind", (s) => { const c = s.conversations.find((c) => c.id === id); if (c) c.sessionId = sessionId; }, { provider });
+          await store.update(compartment, "design-session-bind", (s) => { const c = s.conversations.find((c) => c.id === id); if (c) { c.sessionId = sessionId; c.accountFingerprint = accountFingerprint; } });
+          if (native.sandbox?.type !== "readOnly" || native.approvalPolicy !== "never" || native.modelProvider !== "openai") throw new Error("The native thread did not verify read-only permissions and the first-party provider. Its returned identity was retained; no model prompt was submitted.");
+          await store.claimSession(compartment, { provider, sessionId });
           currentGeneration(compartment, generation);
-          response = await new Promise((resolve, reject) => {
-            const messages = [];
-            const timer = setTimeout(() => { cleanup(); void this.cancel(compartment, id).catch(() => {}); reject(new Error("The design turn timed out. Your current layout and conversation draft are saved.")); }, 120000);
-            const cleanup = () => { clearTimeout(timer); client.off("notification", listener); client.off("disconnected", disconnected); };
-            const disconnected = () => { cleanup(); reject(new Error("Codex disconnected during design. Retry with your saved draft.")); };
-            const listener = (m) => {
-              if (m.params?.threadId !== sessionId) return;
-              if (m.method === "item/completed" && m.params.item?.type === "agentMessage") messages.push(m.params.item.text);
-              if (m.method === "turn/completed") { cleanup(); if (m.params.turn?.status !== "completed") { reject(new Error("Codex did not complete this proposal; the current layout is preserved.")); return; } try { resolve(JSON.parse(messages.at(-1))); } catch { reject(new Error("Codex did not return a valid structured proposal.")); } }
-            };
-            client.on("notification", listener); client.on("disconnected", disconnected);
-            client.request("turn/start", { threadId: sessionId, input: [{ type: "text", text: JSON.stringify(context) }], approvalPolicy: "never", sandboxPolicy: { type: "readOnly" }, outputSchema: designResponseSchema }).then((r) => { running.set(key, { provider, sessionId, turnId: r.turn.id }); }, (e) => { cleanup(); reject(e); });
-          });
+          const controller = new AbortController(); running.set(key, { provider, sessionId, controller, turnId: null });
+          const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: JSON.stringify(context), outputSchema: designResponseSchema, signal: controller.signal, stopChild, checkCurrent: () => currentGeneration(compartment, generation), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
+          try { response = JSON.parse(turn.text); } catch { throw new Error("Codex did not return a valid structured proposal."); }
         } else if (provider === "claude-code") {
           const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
           const executable = await resolveCli("claude-code");
           await store.authorize(compartment, { provider }); currentGeneration(compartment, generation);
           const args = ["--safe-mode", "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}', "--setting-sources", "", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--json-schema", JSON.stringify(designResponseSchema), ...(sessionId ? ["--resume", sessionId] : ["--session-id", randomUUID()])];
           const value = await new Promise((resolve, reject) => {
-            const child = spawnProcess(executable, args, { cwd, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
+            const child = spawnProcess(executable, args, { cwd, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
             running.set(key, { provider, child }); let output = "", settled = false;
             const timer = setTimeout(() => { child.kill(); finish(new Error("Claude Code timed out; your current draft is preserved.")); }, 120000);
             const finish = (error, result) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(result); };
@@ -196,21 +234,23 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           response = value.structured_output; sessionId = value.session_id;
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
         const reviewed = validateDesignResponse(response, plan);
-        const saved = { id, provider, sessionId, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
-        await store.update(compartment, "design-conversation", (s) => { s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; }, { provider });
+        const saved = { id, provider, sessionId, accountFingerprint, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
+        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; }, { provider });
         return { ...reviewed, conversationId: id, sessionId, provider, provenance: "provider-returned exact session; design output independently validated" };
       } catch (error) {
+        const uncertain = provider === "codex" && error.stopVerified === false ? clients.get(compartment)?.child : null;
+        retainUnconfirmed(compartment, uncertain);
         await store.update(compartment, "design-failure", (s) => { const c = s.conversations.find((c) => c.id === id); if (c) { c.status = "failed"; c.updatedAt = Date.now(); } }).catch(() => {});
         throw error;
-      } finally { busy.delete(key); running.delete(key); }
+      } finally { const owned = running.get(key)?.child; if (owned && !(await confirmStop(owned))) retainUnconfirmed(compartment, owned); busy.delete(key); running.delete(key); }
     },
     async cancel(compartment, id) {
       const matching = [...running.entries()].filter(([key]) => key.startsWith(`${compartment}:`));
       const current = id ? running.get(`${compartment}:${id}`) : matching.length === 1 ? matching[0][1] : null;
-      if (!current) throw new Error("No exact active turn is owned by this conversation.");
-      await store.authorize(compartment, { provider: current.provider });
-      if (current.provider === "codex") { const client = clients.get(compartment); if (!client || client.closed) throw new Error("The original Codex runtime is unavailable; cancellation is unconfirmed. No replacement was launched."); await client.request("turn/interrupt", { threadId: current.sessionId, turnId: current.turnId }); }
-      else await stopOwnedChild(current.child);
+      if (!current) { const pending = [...busy].filter((key) => key.startsWith(`${compartment}:`) && (!id || key === `${compartment}:${id}`)); if (pending.length !== 1) throw new Error("No exact active turn is owned by this conversation."); await store.snapshot(compartment); const result = await stopCompartment(compartment); return { status: result.stopped ? "owned-startup-stopped" : "stop-unconfirmed", completionVerified: false }; }
+      await store.snapshot(compartment);
+      if (current.provider === "codex") { const client = clients.get(compartment); if (!client || client.closed || !current.controller) throw new Error("The original Codex runtime is unavailable; cancellation is unconfirmed. No replacement was launched."); current.controller.abort(); }
+      else { const result = await stopChild(current.child); if (!result.stopped) throw new Error("The owned Claude process has not verified exit. Cancellation is unconfirmed."); }
       return { status: "cancellation-requested", completionVerified: false };
     },
     async status(compartment, id) { const generation = generations.get(compartment) ?? 0; const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id); if (!c) throw new Error("That exact conversation is unavailable."); await store.authorize(compartment, { provider: c.provider }); currentGeneration(compartment, generation); if (c.provider === "codex") { const client = await codex(compartment); currentGeneration(compartment, generation); const r = await client.request("thread/read", { threadId: c.sessionId, includeTurns: false }); if (r.thread?.id !== c.sessionId) throw new Error("The exact thread changed."); return { sessionId: c.sessionId, status: r.thread.status, provenance: "Codex local runtime; not verified task completion" }; } return { sessionId: c.sessionId, status: running.has(`${compartment}:${id}`) ? "running-owned-process" : "not-observed", provenance: "Claude process lifecycle; not task completion" }; },
@@ -220,9 +260,9 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       if (!c?.sessionId) throw new Error("Choose an exact owned conversation before resuming.");
       await store.authorize(compartment, { provider: c.provider });
       currentGeneration(compartment, generation);
-      if (c.provider === "codex") { const client = await codex(compartment); currentGeneration(compartment, generation); const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) }); if (r.thread?.id !== c.sessionId) throw new Error("The resumed thread identity did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
+      if (c.provider === "codex") { if (!/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before resuming. Its saved context is preserved."); const client = await codex(compartment); await client.recheckAccount(); currentGeneration(compartment, generation); if (c.accountFingerprint !== client.accountFingerprint) throw new Error("The native account changed. No saved context was resumed or rerouted."); await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId }); const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) }); if (r.thread?.id !== c.sessionId || r.sandbox?.type !== "readOnly" || r.approvalPolicy !== "never" || r.modelProvider !== "openai") throw new Error("The resumed thread identity, first-party provider or permissions did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact account-bound Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
       return { sessionId: c.sessionId, status: "selected-for-continuation", provenance: "Exact Claude configuration conversation selected. Its next message uses --resume; external runtime state is not observed." };
     },
-    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...running.keys()].map((key) => key.split(":")[0]))].map(stopCompartment)); }
+    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...probes.keys(), ...unconfirmed.keys(), ...connecting.keys(), ...running.keys()].map((key) => key.split(":")[0]))].map(stopCompartment)); }
   };
 }

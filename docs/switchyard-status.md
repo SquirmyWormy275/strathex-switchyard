@@ -819,3 +819,43 @@ gap: successful release cleanup removes the exported source tree before the
 workflow upload. The builder now copies bounded regular receipt files into
 verified build provenance first; the workflow collects that success path and
 the original failure path. This follow-up awaits Windows verification.
+
+## Account-bound restricted native turns
+
+The owned Codex adapter now verifies the native handshake against its reviewed
+CLI version, **0.166.0**, disables 34 explicit feature paths, checks effective
+configuration and requires the existing first-party login. Browser control,
+image access/generation, automatic approval review, dependency/tool discovery,
+shells, hooks and MCP tools are disabled. Unsupported versions and alternate
+provider routes fail before creating a thread or sending context. The adapter
+does not change the user's global CLI configuration or configure an API key.
+
+Configuration conversations retain the original login fingerprint and exact
+returned session. Continuing under a different login is refused before context
+submission; a failed attempt preserves the previous proposal and workflow.
+Older conversations without a fingerprint are preserved but require an explicit
+legacy-binding review (still unfinished) or a new conversation before continuing.
+
+One owned connection runs one design turn per workspace. The bounded response
+reader matches both thread and turn IDs, retains the acknowledgement before
+accepting early notifications, rejects tool events and checks the account again
+before saving a reply. Cancellation before acknowledgement closes only the owned
+connection without guessing a turn ID or retrying. Unconfirmed probe/client exit
+blocks replacement by either provider. Direct-child exit is evidence about that
+child, not proof of general process-tree containment or external task completion.
+
+`scripts/verify-codex-turn-host.mjs --synthetic` passed an actual tiny,
+schema-constrained ephemeral turn through installed Codex 0.166.0. The reply
+matched, exact identities were retained, the account stayed consistent, and the
+owned child exited before its temporary directory was removed. Private receipt:
+`codex-restricted-turn-1793374686385.json` (source hashes retained). A fresh
+metadata-only owner-loss check also passed: **31 ms** native exit after SIGKILL,
+receipt `codex-stdio-parent-loss-1793374784483.json`; no thread or prompt was
+created by that check. No account email, session ID or credential is in Git.
+
+The three focused conversation/stdio/turn groups pass **35 tests**, including
+changed-login preservation, early replies, exact cancellation and uncertain-exit
+quarantine. TypeScript typecheck passes. Updated full Linux verification is
+running. General approved coding submissions, legacy account-binding review,
+Claude configuration-conversation account binding and broader native attachment/
+containment remain implementation work; unavailable hardware does not block them.

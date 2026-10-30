@@ -208,15 +208,15 @@ test("Codex design binds an exact returned session, rejects unsafe outputs and n
   await store.initialize("personal"); await store.initialize("work", "work");
   await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
   const calls = [];
-  const fake = new EventEmitter(); fake.closed = false; fake.initialize = async () => {}; fake.close = () => { fake.closed = true; };
+  const fake = new EventEmitter(); fake.closed = false; fake.nativeVersion = "0.166.0"; fake.accountFingerprint = "a".repeat(64); fake.recheckAccount = async () => fake.accountFingerprint; fake.restrictionsVerified = true; fake.initialize = async () => {}; fake.close = () => { fake.closed = true; };
   fake.request = async (method, params) => {
     calls.push({ method, params });
-    if (method === "thread/start") return { thread: { id: "synthetic-thread" } };
-    if (method === "thread/resume") return { thread: { id: params.threadId } };
+    if (method === "thread/start") return { thread: { id: "synthetic-thread" }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
+    if (method === "thread/resume") return { thread: { id: params.threadId }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
     if (method === "turn/start") {
       setImmediate(() => {
-        fake.emit("notification", { method: "item/completed", params: { threadId: "synthetic-thread", item: { type: "agentMessage", text: JSON.stringify({ reply: "A synthetic response", summary: "Review the process", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] }) } } });
-        fake.emit("notification", { method: "turn/completed", params: { threadId: "synthetic-thread", turn: { status: "completed" } } });
+        fake.emit("notification", { method: "item/completed", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", item: { type: "agentMessage", text: JSON.stringify({ reply: "A synthetic response", summary: "Review the process", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] }) } } });
+        fake.emit("notification", { method: "turn/completed", params: { threadId: "synthetic-thread", turn: { id: "synthetic-turn", status: "completed" } } });
       }); return { turn: { id: "synthetic-turn" } };
     }
   };
@@ -230,6 +230,13 @@ test("Codex design binds an exact returned session, rejects unsafe outputs and n
     assert.deepEqual(calls.find((c) => c.method === "thread/start").params.config.mcp_servers, { "configured-one": { enabled: false }, "configured-two": { enabled: false } });
     assert.equal(calls.find((c) => c.method === "turn/start").params.sandboxPolicy.type, "readOnly");
     assert.equal((await store.snapshot("personal")).conversations[0].sessionId, "synthetic-thread");
+    assert.equal((await store.snapshot("personal")).conversations[0].accountFingerprint, "a".repeat(64));
+    const count = calls.length, previousProposal = (await store.snapshot("personal")).conversations[0].proposal;
+    fake.accountFingerprint = "b".repeat(64);
+    await assert.rejects(agents.design({ compartment: "personal", provider: "codex", message: "Do not route previous context to this changed login", plan: samplePlan(), conversationId: response.conversationId }), /verified binding/);
+    assert.equal(calls.length, count); assert.deepEqual((await store.snapshot("personal")).conversations[0].proposal, previousProposal);
+    await store.update("personal", "synthetic-legacy", (s) => { delete s.conversations[0].accountFingerprint; });
+    await assert.rejects(agents.resume("personal", response.conversationId), /legacy conversation/); assert.equal(calls.length, count);
   } finally { agents.close(); }
 }));
 
@@ -239,6 +246,8 @@ test("Codex design reads back complete tool restrictions and fails closed for en
   assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, mcp_servers: { codex_app: { enabled: false } } }));
   for (const server of [{ enabled: true }, {}]) assert.throws(() => assertCodexDesignConfig({ ...config, mcp_servers: { unexpected: server } }), /No design turn/);
   assert.throws(() => assertCodexDesignConfig({ ...config, features: { ...config.features, shell_tool: true } }), /No design turn/);
+  for (const unsupported of [{ model_provider: "alternate" }, { chatgpt_base_url: "https://example.invalid/backend-api" }, { openai_base_url: "https://example.invalid" }, { model_providers: { openai: { base_url: "https://example.invalid" } } }]) assert.throws(() => assertCodexDesignConfig({ ...config, ...unsupported }), /first-party route/);
+  assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, chatgpt_base_url: "https://chatgpt.com/backend-api/" }));
   assert.throws(() => codexDesignConfig(["escape.features.shell_tool"]), /identities are unsupported/);
 });
 
@@ -268,4 +277,22 @@ test("stopping a compartment invalidates pending native connection work without 
     await service.stopCompartment("personal"); release(); await rejected; assert.equal(spawned, 0);
     assert.equal((await service.status("personal", "owned")).sessionId, "exact-thread"); assert.equal(spawned, 1);
   } finally { release(); await service.close(); }
+}));
+
+test("an unconfirmed native probe or initialization exit blocks every provider replacement in its workspace", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); await store.update("personal", "synthetic-mode", (s) => { s.mode = "personal-companion"; });
+  for (const failure of ["probe", "initialize"]) {
+    let stopped = false, resolved = 0, spawned = 0;
+    const child = {}, owned = { child, closed: false, close() { this.closed = true; }, initialize: async () => { throw Error("Synthetic initialization failure"); } };
+    const service = createAgentService({ store, runtimeRoot: join(root, failure), resolveCli: async () => { resolved++; return "/synthetic-native-cli"; }, resolveMcp: async (_, __, { onProbe }) => { if (failure === "probe") { onProbe(owned); throw Error("Synthetic probe failure"); } return []; }, codexFactory: () => { spawned++; return owned; }, stopChild: async () => ({ stopped }) });
+    try {
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "Synthetic request", plan: samplePlan() }), /probe.*exit|initialization failure/);
+      const priorResolved = resolved, priorSpawned = spawned;
+      await assert.rejects(service.design({ compartment: "personal", provider: "claude-code", message: "No replacement", plan: samplePlan() }), /previous owned provider.*exit/);
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "No retry", plan: samplePlan() }), /previous owned provider.*exit/);
+      assert.equal(resolved, priorResolved); assert.equal(spawned, priorSpawned);
+      assert.equal((await service.stopCompartment("personal")).stopped, false);
+      stopped = true; assert.equal((await service.stopCompartment("personal")).stopped, true);
+    } finally { stopped = true; await service.close(); }
+  }
 }));
