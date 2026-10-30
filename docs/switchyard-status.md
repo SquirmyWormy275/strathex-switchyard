@@ -1354,7 +1354,12 @@ Fifty focused indicator/suite/runner/native guardian tests and TypeScript checks
 pass; the native helper builds with zero warnings/errors. Windows observer CI
 now exercises the new contract after the helper is built. Actual Windows
 interactive state and device LED acceptance remain open. The normal installed
-Linux route/retention-preservation demonstration is being prepared.
+Linux route/retention-preservation demonstration passed all four checks, including
+independent stable kernel readback, unauthorized-request rejection and unchanged
+workspace definitions, mode, selection and private access URL. Receipt:
+installed-keyboard-indicators-1793384062783.json. Complete Linux source acceptance
+at `3a01549` is 118/118 groups, 845 tests: 836 passed and nine platform skips;
+receipt 54a0a8ef-d251-4c32-9735-e8f8e2cb2131.
 
 The latest Codex regression also passed all seven installed checks after the
 shared recovery refactor (one tiny native prompt, exact acknowledgement,
@@ -1362,3 +1367,12 @@ duplicates/replay, unchanged repository and keyboard-only cleanup). Receipt:
 installed-reviewed-codex-text-1793382924738.json. Browser automation currently
 exposes no Switchyard tab; no browser navigation or frozen-frontend reload was
 performed.
+
+## Reproducible Windows documentation checkout
+
+The native Windows backend test step at `3a01549` passed. The now-strict
+documentation step then correctly rejected generated text and its byte-digest
+manifest because Windows checkout converted text to CRLF. The repository default
+now requires LF for detected text, with retained vendor source trees still
+explicitly exempt and PDFs/images treated as binary. This addresses source
+checkout determinism; it does not establish a complete Windows release pass.

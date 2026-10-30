@@ -7,7 +7,8 @@ for coverage, and the [continuation record](switchyard-status.md) for details.
 
 | Path | Accepted evidence | Practical limit |
 | --- | --- | --- |
-| Integrated Linux source | 117/117 groups; 841 tests, 832 passed and nine platform skips at `4eea520`. Receipt `6f8e3e9c-0c9e-4e84-8e06-832c1d334dbd`. | Synthetic boundary checks plus native Linux subprocesses; Windows cases are separate. |
+| Integrated Linux source | 118/118 groups; 845 tests, 836 passed and nine platform skips at `3a01549`. Receipt `54a0a8ef-d251-4c32-9735-e8f8e2cb2131`. | Synthetic boundary checks plus native Linux subprocesses; Windows cases are separate. |
+| Installed host lock indicators | Four checks: authenticated route, independent Linux kernel readback, rejection without credentials and preserved workspace state. | No physical keyboard association or LED change; Windows reports only its calling-thread toggle snapshot. |
 | Normal installed Codex task | Seven checks rerun after the shared recovery changes: one reviewed native reply, exact turn acknowledgement, durable duplicates, replay rejection and keyboard-only cleanup. | Read-only/restricted text task; provider completion is not verified coding-task completion. |
 | Normal installed Claude task | Thirteen checks: exact creation/continuation, three separately reviewed prompts, distinct recorded/stopped guardians and explicit resume-only recovery after a synthetic lost-acceptance fault. | Original account and UUID retained; no tools or invented native turn IDs. This fault injection is not a claimed physical crash. |
 | Native Windows release tests | [225 complete test/build groups at `7aeb1e6`](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41086724429), including real native observer and guardian/owner-loss checks. Receipt `a3672c96-9eca-49bd-a92b-e973ea7d8e94`. | Applies to that checkpoint. New private-pipe/recovery changes await a corrected complete run. |
@@ -21,7 +22,10 @@ helper tests against an obsolete allowance of eight. Every test body passed.
 The skip inventory is corrected, Linux now exercises its platform environment
 boundary, and each Windows documentation generator must propagate its own exit
 code. [The corrected run](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41102281542)
-must finish before newer complete Windows acceptance is claimed. Earlier
+must finish before newer complete Windows acceptance is claimed. At `3a01549`,
+the native backend tests passed but documentation verification exposed Windows
+checkout line-ending conversion. Text checkouts now explicitly use LF; retained
+vendor source bytes remain exempt. A corrected full run is still required. Earlier
 step-level success does not retroactively validate a masked generator failure.
 
 ## Follow a result into the code
