@@ -31,6 +31,9 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   proposal, review an exact local connection, and restore a change.
 - [Optional local runtime](docs/optional-runtime.md): install or verify the shared
   CPU voice, configuration HID and LangChain environment from pinned hashes.
+- [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
+  bindings](docs/claude-task-bindings.md): exact native identities, actual host
+  evidence and the controls still being implemented.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
@@ -47,6 +50,10 @@ protected compartments, local transcription, device transactions, custom-agent
 SDK and separate Microsoft 365 Copilot adapter. Real installed-account design
 requests have been exercised with Codex and Claude Code, and real custom and
 LangChain example processes have exchanged authenticated intents.
+The separate task backend has also created/resumed an empty read-only Codex
+thread and created/stopped a tools-disabled Claude background session, with
+exact identity checks and durable duplicate prevention. These host checks sent
+no model prompts and do not establish completion of coding work.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, desktop packaging, profile-library visual acceptance,

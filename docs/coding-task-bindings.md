@@ -92,9 +92,14 @@ Tests cover directory/account mismatch, Work prohibition before provider access,
 staleness, cross-compartment ownership, tampering, concurrent/restarted duplicate
 requests, partial creation and exact role routing.
 
+Claude Code has a separate [native task adapter](claude-task-bindings.md) for
+inventory, exact account/directory/session bindings, durable empty background
+creation and reviewed owned-session stops. Its actual Linux HTTP exchange passed
+without a model prompt. It does not imply equivalence with this Codex adapter.
+
 Native task-window focus, exact interactive client resumption, supervised terminal
 lifecycle, approved review/handoff submission, cancellation and integration with
-the existing exact-scope authority broker remain unfinished. Claude Code task
-inventory/control and the Windows general coding-task transport are also
+the existing exact-scope authority broker remain unfinished. Further Claude task
+controls and the Windows Codex general coding-task transport are also
 implementation work. Existing configuration conversations, SDK integrations and
 native Windows hotkeys are separate capabilities and do not imply those are done.

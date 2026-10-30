@@ -119,13 +119,13 @@ export class DurableConfirmationError extends Error {
  * reauthentication assertion.
  */
 export class DurableConfirmationLedger {
-  private readonly store: ProtectedJsonStore;
+  private readonly store: Pick<ProtectedJsonStore, "transaction" | "readEntries">;
   private readonly clock: () => string;
   private readonly tokenFactory: () => string;
   private readonly idFactory: () => string;
   private readonly ttlMs: number;
 
-  constructor(store: ProtectedJsonStore, options: {
+  constructor(store: Pick<ProtectedJsonStore, "transaction" | "readEntries">, options: {
     readonly clock?: () => string;
     readonly tokenFactory?: () => string;
     readonly idFactory?: () => string;

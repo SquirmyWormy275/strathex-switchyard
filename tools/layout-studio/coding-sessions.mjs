@@ -50,7 +50,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       try { const rows = await daemon.list(); return { ...result, permitted: true, installed: true, running: true, available: true, recentThreads: rows.length, capabilities: ["exact-coding-task-bind", "runtime-status", "create-empty-thread", "resume-owned-read-only-runtime"], provenance: "Supported local daemon inventory; no thread content, model prompt or outcome inferred" }; }
       catch (e) { return { ...result, permitted: true, installed: true, running: false, reason: e.message }; }
     },
-    async list(compartment) { await access(compartment); return ((await store.snapshot(compartment)).codingSessions ?? []).map(view); },
+    async list(compartment) { await access(compartment); return ((await store.snapshot(compartment)).codingSessions ?? []).filter((t) => t.provider === "codex").map(view); },
     async bind(compartment, { sessionId, repositoryRoot, label }) {
       const login = await account(compartment);
       if (typeof sessionId !== "string" || !thread.test(sessionId) || typeof label !== "string" || !label.trim() || label.length > 100 || /[\0\r\n]/.test(label)) throw new Error("Choose an exact Codex session and a short local task label.");

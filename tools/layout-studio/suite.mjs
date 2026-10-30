@@ -16,13 +16,15 @@ import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
+import { createClaudeCoding } from "./claude-coding.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, spawnExample = spawn } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, claudeCoding, spawnExample = spawn } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
   coding ??= createCodingSessions({ store });
+  claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
   const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
   const started = new Set(), initializing = new Map(), monitors = new Map();
@@ -65,7 +67,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
     if (binding.targetKind === "coding-task") {
       const task = state.codingSessions?.find((t) => t.id === binding.targetId && t.provider === binding.provider && t.sessionId === binding.sessionId && t.schema === "switchyard-coding-session/v1");
-      if (binding.provider !== "codex" || !task || (intent !== "status" && !(intent === "resume" && task.launchPolicy === "read-only/on-request" && task.status === "registered"))) throw new Error("This exact coding-task binding supports runtime status only, plus daemon resume for owned read-only tasks. No alternate session action was selected.");
+      if (!task || !(intent === "status" && ["codex", "claude-code"].includes(binding.provider) || binding.provider === "codex" && intent === "resume" && task.launchPolicy === "read-only/on-request" && task.status === "registered")) throw new Error("This exact coding-task binding supports runtime status only, plus Codex daemon resume for owned read-only tasks. No alternate session action was selected.");
     } else if (binding.provider === "custom-agent") {
       const a = state.agents.find((a) => a.id === binding.targetId && a.sessionId === binding.sessionId);
       if (!a || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
@@ -115,7 +117,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           clearInterval(monitors.get(compartment)); monitors.delete(compartment);
-          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voice.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([agents.stopCompartment?.(compartment), voice.stopCompartment?.(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -127,6 +129,14 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/codex/create") return coding.create(compartment, body);
       if (path === "/api/suite/coding/codex/status") return coding.status(compartment, body.id);
       if (path === "/api/suite/coding/codex/resume") return coding.resume(compartment, body.id);
+      if (path === "/api/suite/coding/claude/discovery") return claudeCoding.discovery(compartment);
+      if (path === "/api/suite/coding/claude/inventory") return claudeCoding.inventory(compartment, body);
+      if (path === "/api/suite/coding/claude/list") return claudeCoding.list(compartment);
+      if (path === "/api/suite/coding/claude/bind") return claudeCoding.bind(compartment, body);
+      if (path === "/api/suite/coding/claude/create") return claudeCoding.create(compartment, body);
+      if (path === "/api/suite/coding/claude/status") return claudeCoding.status(compartment, body.id);
+      if (path === "/api/suite/coding/claude/stop/review") return claudeCoding.reviewStop(compartment, body.id);
+      if (path === "/api/suite/coding/claude/stop") return claudeCoding.stop(compartment, body);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
       if (path === "/api/suite/agents/example/stop") {
@@ -244,7 +254,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       await store.authorize(compartment, { provider: b.provider });
       let result;
-      if (b.targetKind === "coding-task") result = await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
+      if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await claudeCoding.status(compartment, b.targetId) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
       else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
@@ -270,6 +280,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voice.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
+    async close() { closed = true; for (const timer of monitors.values()) clearInterval(timer); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); await Promise.all([agents.close(), voice.close?.(), claudeCoding.close?.(), ...[...examples.values()].map((child) => stopOwnedChild(child))]); }
   };
 }

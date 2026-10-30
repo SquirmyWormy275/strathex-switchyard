@@ -67,9 +67,9 @@ the compositor. Restoration removes its owned function too.
 ## Software evidence
 
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
-- Integrated native Linux run: **90/90 groups passed; 619 tests, 610 passed and 9
+- Integrated native Linux run: **91/91 groups passed; 628 tests, 619 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-7f16d6e7-1336-47a6-a66d-b42d658619d8.json`.
+  `.sxsy-verification/isolated-test-fd2cbd8b-29e3-4656-a2dc-dc16d409bd70.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -131,6 +131,13 @@ Tests use synthetic/fault transports unless identified below. The older B122
   check. Exact directory/login/permissions were verified, history excluded from
   the response and no model prompt submitted. Window focus, interactive client
   resumption and verified task completion remain separate unaccepted capabilities.
+- Claude Code 2.1.308 has a separate native task API. Actual authenticated HTTP
+  acceptance created an empty tools-disabled/plan background task, retained its
+  native identities, prevented a duplicate, read exact status, consumed a reviewed
+  stop and rejected confirmation replay. No model prompt was submitted. The live
+  trial caught the CLI's changing `startedAt` field; the returned UUID/job ID and
+  exact directory/account bind the task instead. See [scope and remaining
+  controls](claude-task-bindings.md).
 - Linux Secret Service protected the local smoke-test compartment and credentials.
   No work tenant was contacted. The repaired native ChatGPT main window was
   discovered without altering its launcher, voice repair or overlay guard.
@@ -160,6 +167,17 @@ Linux regression checks pass. The native Windows backend step passed on CI run
 its larger release build is still in progress.
 the general Codex Unix transport is Linux-only and Windows task transport remains
 unfinished implementation.
+
+Native Windows run `41028247696` later exposed open-file sharing behavior in the
+new atomic-read test. Windows can deny replacement while a reader holds the
+destination. Promotion now retries only bounded Windows sharing/lock failures,
+without unlinking old state; tests retain the prior file on persistent failure
+and exercise a real held reader on Windows. The read-race case distinguishes
+Windows's prevention of that rename from Unix's allowed atomic replacement.
+Checkpoints `6dcb776` and `d1c5d43` carry this fix. The native backend step
+passed at `d1c5d43` on run `41030056076`, including the actual reader-held
+Windows promotion case. Its full release build remains separate; the newer
+Claude adapter still needs its own native Windows rerun.
 
 F77 is absent from USB/input inventory; no unrelated HID device was opened. Live
 identity, physical option agreement, key read/write/restore, unplug/replug and
@@ -207,6 +225,21 @@ handover SHA-256:
 `8c3bee6c378548dedab7fed7e959b426d2d9bb7609835d88d354c37cb9e80adb`.
 No upstream merge, public release, firmware flash, reset, bootloader action,
 solenoid adjustment or persistent desktop modification has been performed here.
+
+## Next three executable tasks
+
+1. Implement verified task-window focus and native terminal attachment/resume;
+   retain exact Codex/Claude identities, process ownership and explicit missing
+   capabilities. Connect approved task submissions to the existing authority
+   machinery without foreground typing or accidental background copies.
+2. Complete remaining controller capabilities: tap-dance/combo/encoder/settings
+   transactions, exact source/model reconciliation and their failure/recovery
+   tests. Keep all physical F77/B122 checks separately pending.
+3. Package the integrated suite's normal launch, single-instance startup,
+   install/update/rollback/uninstall and owned-process recovery on Linux/Windows.
+   Then complete profile compatibility metadata, voice queue recovery and dynamic
+   assignment legends. The frontend remains frozen for the user's morning review;
+   task/device/role UI work is still required in the next frontend iteration.
 
 ## GitHub and local footprint
 

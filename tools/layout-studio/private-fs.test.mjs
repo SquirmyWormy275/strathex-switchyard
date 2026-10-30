@@ -56,10 +56,10 @@ test("Windows sharing failures retry atomic promotion with the old state intact,
     attempts = 0;
     await assert.rejects(privateWrite(path, "must-not-replace", { platform: "linux", renameFile: async () => { attempts++; throw Object.assign(new Error("Other platform failure"), { code: "EPERM" }); } }), /Other platform/);
     assert.equal(attempts, 1); assert.equal(await privateRead(path), "after");
-    const held = await open(path, "r"); attempts = 0;
-    const release = new Promise((resolve, reject) => setTimeout(() => { held.close().then(resolve, reject); }, 25));
-    await privateWrite(path, "native reader released", { renameFile: async (...args) => { attempts++; return rename(...args); } });
-    await release;
+    const held = await open(path, "r"); attempts = 0; let released = false;
+    try {
+      await privateWrite(path, "native reader released", { renameFile: async (...args) => { attempts++; try { return await rename(...args); } catch (e) { if (!released && process.platform === "win32" && ["EPERM", "EBUSY", "EACCES"].includes(e.code)) { await held.close(); released = true; } throw e; } } });
+    } finally { if (!released) await held.close(); }
     if (process.platform === "win32") assert.ok(attempts > 1, "native Windows must exercise retry while the destination is open");
     assert.equal(await privateRead(path), "native reader released");
   } finally { await rm(root, { recursive: true, force: true }); }
