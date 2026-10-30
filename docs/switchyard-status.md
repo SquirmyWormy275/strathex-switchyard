@@ -859,3 +859,39 @@ quarantine. TypeScript typecheck passes. Updated full Linux verification is
 running. General approved coding submissions, legacy account-binding review,
 Claude configuration-conversation account binding and broader native attachment/
 containment remain implementation work; unavailable hardware does not block them.
+
+
+The restricted-turn checkpoint passed **112 Linux groups, 792 tests: 783 passed
+and 9 expected platform skips**, receipt
+`886d33a0-70e9-4e60-8db8-51c443369686`. The final additional tool-completion refusal
+also passed its seven focused stream checks.
+
+## First-party Claude configuration conversations
+
+Claude configuration design now uses a bounded native version/auth-status check
+before sending context and after receiving a reply. The reviewed design CLI is
+**2.1.308**. Its first-party account/org fingerprint is retained with the original
+conversation; alternate authentication, changed login/org and unbound legacy
+context fail before continuation. Email and org values are not copied into state.
+The separate coding-inventory adapter reuses the same fingerprint function.
+
+A new conversation retains its exact requested UUID before launch, claims its
+workspace ownership, and requires the returned native UUID to match. A failed or
+changed-account reply preserves saved context and the previous proposal. Auth
+probes participate in workspace shutdown and uncertain-exit quarantine. Subprocess
+environments exclude provider keys, endpoint overrides and runtime injection;
+the restricted design launch keeps tools, hooks and MCP disabled.
+
+The conversation/Claude groups pass **30 focused tests**; TypeScript typecheck
+passes. An actual installed-account check created and continued one synthetic
+configuration conversation with two validated structured replies and the same
+session UUID. All owned direct children exited; the isolated protected validation
+store and runtime staging were removed. Personal definitions were unchanged.
+Private receipt: `claude-account-bound-design-1793375021836.json`. The installed
+Claude CLI retains its two tiny native history entries; no history or account
+material enters Git. This verifies configuration continuation, not an external
+coding task, general process-tree containment or Windows runtime acceptance.
+
+Legacy conversation account-binding review remains unfinished. New conversations
+work; older unbound context is preserved until deliberate review. The frozen
+frontend and currently installed source remain unchanged during this checkpoint.

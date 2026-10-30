@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { deniedCodexServerRequest } from "./codex-requests.mjs";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
+import { readClaudeDesignLogin } from "./claude-account.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -122,8 +123,8 @@ export class CodexClient extends EventEmitter {
   close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
 }
 
-export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild } = {}) {
-  const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map();
+export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), spawnProcess = spawn, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin } = {}) {
+  const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map(), auxiliaryChildren = new Map();
   let closed = false;
   const confirmStop = async (child) => { try { return (await stopChild(child)).stopped === true; } catch { return false; } };
   function retainUnconfirmed(compartment, child) { if (!child) return; const pending = unconfirmed.get(compartment) ?? new Set(); pending.add(child); unconfirmed.set(compartment, pending); }
@@ -131,6 +132,12 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     const remaining = new Set(); for (const child of unconfirmed.get(compartment) ?? []) if (!(await confirmStop(child))) remaining.add(child);
     if (remaining.size) { unconfirmed.set(compartment, remaining); throw new Error("A previous owned provider process has not verified exit. No replacement was launched."); }
     unconfirmed.delete(compartment);
+  }
+  async function claudeLogin(compartment, executable, cwd, generation) {
+    try { return await readClaudeLogin(executable, cwd, { spawnProcess, stopChild, checkCurrent: () => currentGeneration(compartment, generation),
+      onChild: (child) => { const owned = auxiliaryChildren.get(compartment) ?? new Set(); owned.add(child); auxiliaryChildren.set(compartment, owned); },
+      onStopped: (child) => { const owned = auxiliaryChildren.get(compartment); owned?.delete(child); if (!owned?.size) auxiliaryChildren.delete(compartment); }
+    }); } catch (error) { retainUnconfirmed(compartment, error.ownedChild); throw error; }
   }
   function currentGeneration(compartment, generation) { if (closed || generation !== (generations.get(compartment) ?? 0)) throw new Error("This compartment's design request was stopped. Your draft is preserved."); }
   async function codex(compartment) {
@@ -166,11 +173,14 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     if (client?.child) children.add(client.child);
     if (probe?.child) children.add(probe.child);
     for (const child of unconfirmed.get(compartment) ?? []) children.add(child);
+    for (const child of auxiliaryChildren.get(compartment) ?? []) children.add(child);
     if (client && !client.closed) client.close(); if (probe && !probe.closed) probe.close();
     for (const [key, r] of running) if (key.startsWith(`${compartment}:`) && r.child) children.add(r.child);
     const ordered = [...children], results = await Promise.all(ordered.map(async (child) => ({ stopped: await confirmStop(child) })));
     const remaining = new Set(ordered.filter((_, i) => !results[i].stopped)); if (remaining.size) unconfirmed.set(compartment, remaining); else unconfirmed.delete(compartment);
     for (const [map, owned] of [[clients, client], [probes, probe]]) if (owned && (!owned.child || results[ordered.indexOf(owned.child)]?.stopped) && map.get(compartment) === owned) map.delete(compartment);
+    for (const child of auxiliaryChildren.get(compartment) ?? []) if (results[ordered.indexOf(child)]?.stopped) auxiliaryChildren.get(compartment).delete(child);
+    if (!auxiliaryChildren.get(compartment)?.size) auxiliaryChildren.delete(compartment);
     return { stopped: results.every((r) => r.stopped), ownedProcesses: results.length, taskCompletionVerified: false };
   }
   return {
@@ -219,19 +229,28 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
           const executable = await resolveCli("claude-code");
           await store.authorize(compartment, { provider }); currentGeneration(compartment, generation);
-          const args = ["--safe-mode", "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}', "--setting-sources", "", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--json-schema", JSON.stringify(designResponseSchema), ...(sessionId ? ["--resume", sessionId] : ["--session-id", randomUUID()])];
+          const login = await claudeLogin(compartment, executable, cwd, generation);
+          if (conversation && conversation.accountFingerprint !== login.fingerprint) throw new Error("This conversation has no verified binding to the current native Claude login. Its context was preserved; review the legacy binding or choose a new conversation.");
+          accountFingerprint = login.fingerprint;
+          const continuing = Boolean(sessionId); sessionId ??= randomUUID();
+          if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(sessionId)) throw new Error("Choose an exact supported native Claude conversation.");
+          await store.update(compartment, "design-session-bind", (s) => { currentGeneration(compartment, generation); const c = s.conversations.find((c) => c.id === id); if (c) { c.sessionId = sessionId; c.accountFingerprint = accountFingerprint; } }, { provider });
+          await store.claimSession(compartment, { provider, sessionId }); currentGeneration(compartment, generation);
+          const args = ["--safe-mode", "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}', "--setting-sources", "", "--permission-mode", "dontAsk", "--permission-prompts", "none", "--json-schema", JSON.stringify(designResponseSchema), ...(continuing ? ["--resume", sessionId] : ["--session-id", sessionId])];
           const value = await new Promise((resolve, reject) => {
             const child = spawnProcess(executable, args, { cwd, shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
             running.set(key, { provider, child }); let output = "", settled = false;
             const timer = setTimeout(() => { child.kill(); finish(new Error("Claude Code timed out; your current draft is preserved.")); }, 120000);
             const finish = (error, result) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(result); };
             child.on("error", () => finish(new Error("Claude Code could not start.")));
-            child.stdout.on("data", (chunk) => { output += chunk; if (output.length > 2 * 1024 * 1024) { child.kill(); finish(new Error("Claude Code exceeded the response bound.")); } });
+            child.stdout.on("data", (chunk) => { output += chunk; if (Buffer.byteLength(output) > 2 * 1024 * 1024) { child.kill(); finish(new Error("Claude Code exceeded the response bound.")); } });
             child.stdin.on("error", () => {});
             child.on("close", (code) => { try { const r = JSON.parse(output); if (code || r.is_error || !r.structured_output) throw new Error(); finish(null, r); } catch { finish(new Error("Claude Code could not produce a proposal. Check its sign-in and account limits; the current layout is preserved.")); } });
             child.stdin.end(JSON.stringify(context));
           });
-          response = value.structured_output; sessionId = value.session_id;
+          if (value.session_id !== sessionId) throw new Error("Claude returned a different native session. Saved context was preserved; no replacement was submitted.");
+          if ((await claudeLogin(compartment, executable, cwd, generation)).fingerprint !== accountFingerprint) throw new Error("The native Claude login changed before retaining the reply. Saved context was preserved.");
+          response = value.structured_output;
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
         const reviewed = validateDesignResponse(response, plan);
         const saved = { id, provider, sessionId, accountFingerprint, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
@@ -253,16 +272,37 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       else { const result = await stopChild(current.child); if (!result.stopped) throw new Error("The owned Claude process has not verified exit. Cancellation is unconfirmed."); }
       return { status: "cancellation-requested", completionVerified: false };
     },
-    async status(compartment, id) { const generation = generations.get(compartment) ?? 0; const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id); if (!c) throw new Error("That exact conversation is unavailable."); await store.authorize(compartment, { provider: c.provider }); currentGeneration(compartment, generation); if (c.provider === "codex") { const client = await codex(compartment); currentGeneration(compartment, generation); const r = await client.request("thread/read", { threadId: c.sessionId, includeTurns: false }); if (r.thread?.id !== c.sessionId) throw new Error("The exact thread changed."); return { sessionId: c.sessionId, status: r.thread.status, provenance: "Codex local runtime; not verified task completion" }; } return { sessionId: c.sessionId, status: running.has(`${compartment}:${id}`) ? "running-owned-process" : "not-observed", provenance: "Claude process lifecycle; not task completion" }; },
+    async status(compartment, id) {
+      const generation = generations.get(compartment) ?? 0;
+      const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id);
+      if (!c?.sessionId) throw new Error("That exact conversation is unavailable.");
+      await store.authorize(compartment, { provider: c.provider }); currentGeneration(compartment, generation);
+      if (c.provider === "codex") {
+        if (!/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before querying its runtime. Saved context is preserved.");
+        const client = await codex(compartment); await client.recheckAccount(); currentGeneration(compartment, generation);
+        if (c.accountFingerprint !== client.accountFingerprint) throw new Error("The native account changed. No saved conversation was redirected.");
+        const r = await client.request("thread/read", { threadId: c.sessionId, includeTurns: false });
+        if (r.thread?.id !== c.sessionId) throw new Error("The exact thread changed.");
+        return { sessionId: c.sessionId, status: r.thread.status, provenance: "Codex local runtime; not verified task completion" };
+      }
+      return { sessionId: c.sessionId, status: running.has(`${compartment}:${id}`) ? "running-owned-process" : "not-observed", provenance: "Claude process lifecycle; not task completion" };
+    },
     async resume(compartment, id) {
       const generation = generations.get(compartment) ?? 0;
       const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id);
       if (!c?.sessionId) throw new Error("Choose an exact owned conversation before resuming.");
+      if ([...busy].some((key) => key.startsWith(`${compartment}:`))) throw new Error("A design turn is already running in this workspace. Wait or cancel before resuming.");
       await store.authorize(compartment, { provider: c.provider });
       currentGeneration(compartment, generation);
       if (c.provider === "codex") { if (!/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before resuming. Its saved context is preserved."); const client = await codex(compartment); await client.recheckAccount(); currentGeneration(compartment, generation); if (c.accountFingerprint !== client.accountFingerprint) throw new Error("The native account changed. No saved context was resumed or rerouted."); await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId }); const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) }); if (r.thread?.id !== c.sessionId || r.sandbox?.type !== "readOnly" || r.approvalPolicy !== "never" || r.modelProvider !== "openai") throw new Error("The resumed thread identity, first-party provider or permissions did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact account-bound Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
-      return { sessionId: c.sessionId, status: "selected-for-continuation", provenance: "Exact Claude configuration conversation selected. Its next message uses --resume; external runtime state is not observed." };
+      if (c.provider !== "claude-code" || !/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before continuing. Saved context is preserved.");
+      const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
+      const executable = await resolveCli("claude-code"), login = await claudeLogin(compartment, executable, cwd, generation);
+      currentGeneration(compartment, generation);
+      if (c.accountFingerprint !== login.fingerprint) throw new Error("The native Claude account changed. No saved context was resumed or rerouted.");
+      await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId });
+      return { sessionId: c.sessionId, status: "selected-for-continuation", provenance: "Exact account-bound Claude configuration conversation selected. Its next message uses --resume; external runtime state is not observed." };
     },
-    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...probes.keys(), ...unconfirmed.keys(), ...connecting.keys(), ...running.keys()].map((key) => key.split(":")[0]))].map(stopCompartment)); }
+    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...probes.keys(), ...unconfirmed.keys(), ...connecting.keys(), ...auxiliaryChildren.keys(), ...running.keys()].map((key) => key.split(":")[0]))].map(stopCompartment)); }
   };
 }

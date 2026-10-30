@@ -254,10 +254,10 @@ test("Codex design reads back complete tool restrictions and fails closed for en
 test("concurrent exact-session reads share initialization, and a failed connection can be retried without leaking a second runtime", () => fixture(async ({ store, root }) => {
   await store.initialize("personal");
   await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
-  await store.update("personal", "synthetic-bound-conversation", (s) => { s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", updatedAt: Date.now(), messages: [] }]; });
+  await store.update("personal", "synthetic-bound-conversation", (s) => { s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", accountFingerprint: "a".repeat(64), updatedAt: Date.now(), messages: [] }]; });
   let created = 0, closed = 0, fail = true;
   const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [], codexFactory: () => {
-    created++; return { closed: false, initialize: async () => { await new Promise((r) => setTimeout(r, 15)); if (fail) throw new Error("Synthetic unavailable connection"); }, close() { this.closed = true; closed++; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) };
+    created++; return { closed: false, accountFingerprint: "a".repeat(64), recheckAccount: async () => {}, initialize: async () => { await new Promise((r) => setTimeout(r, 15)); if (fail) throw new Error("Synthetic unavailable connection"); }, close() { this.closed = true; closed++; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) };
   } });
   try {
     const first = await Promise.allSettled([service.status("personal", "owned"), service.status("personal", "owned")]);
@@ -269,9 +269,9 @@ test("concurrent exact-session reads share initialization, and a failed connecti
 }));
 
 test("stopping a compartment invalidates pending native connection work without closing future permitted connections", () => fixture(async ({ store, root }) => {
-  await store.initialize("personal"); await store.update("personal", "synthetic-connected-session", (s) => { s.mode = "personal-companion"; s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", updatedAt: Date.now(), messages: [] }]; });
+  await store.initialize("personal"); await store.update("personal", "synthetic-connected-session", (s) => { s.mode = "personal-companion"; s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", accountFingerprint: "a".repeat(64), updatedAt: Date.now(), messages: [] }]; });
   let release, entered; const gate = new Promise((r) => { release = r; }), reached = new Promise((r) => { entered = r; }); let resolved = 0, spawned = 0;
-  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => { if (++resolved === 1) { entered(); await gate; } return "/synthetic/codex"; }, resolveMcp: async () => [], codexFactory: () => { spawned++; return { closed: false, initialize: async () => {}, close() { this.closed = true; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) }; } });
+  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => { if (++resolved === 1) { entered(); await gate; } return "/synthetic/codex"; }, resolveMcp: async () => [], codexFactory: () => { spawned++; return { closed: false, accountFingerprint: "a".repeat(64), recheckAccount: async () => {}, initialize: async () => {}, close() { this.closed = true; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) }; } });
   try {
     const pending = service.status("personal", "owned"); const rejected = assert.rejects(pending, /stopped/); await reached;
     await service.stopCompartment("personal"); release(); await rejected; assert.equal(spawned, 0);

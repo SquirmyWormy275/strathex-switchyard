@@ -133,6 +133,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/codex-turn.test.mjs" },
+  { file: "tools/layout-studio/agents-claude.test.mjs" },
   // Native Windows kernel leases start the system PowerShell helper per state
   // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
   // allow bounded process/pipe cleanup without relaxing any assertion or skip.
