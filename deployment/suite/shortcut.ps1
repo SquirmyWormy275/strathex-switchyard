@@ -1,4 +1,7 @@
 $ErrorActionPreference = 'Stop'
+$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
+$PSModuleAutoLoadingPreference = 'None'
+Import-Module -Name ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Utility.psd1')) -ErrorAction Stop
 $utf8 = [Text.UTF8Encoding]::new($false)
 $inputPipe = [IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8)
 $outputPipe = [IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8)

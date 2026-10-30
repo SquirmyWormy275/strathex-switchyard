@@ -14,7 +14,7 @@ import { readOwnedFile } from "./owned-files.mjs";
 export const applicationStateRoot = () => join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA || join(homedir(), "AppData/Local") : join(homedir(), ".local/state")), "strathex-switchyard/application");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export function applicationEnvironment(source = process.env) {
-  const allowed = new Set(["PATH", "HOME", "USER", "LOGNAME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "SYSTEMROOT", "SYSTEMDRIVE", "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_CURRENT_DESKTOP", "DBUS_SESSION_BUS_ADDRESS", "HYPRLAND_INSTANCE_SIGNATURE"]);
+  const allowed = new Set(["PATH", "HOME", "USER", "LOGNAME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "OS", "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)", "COMMONPROGRAMW6432", "ALLUSERSPROFILE", "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "PROCESSOR_IDENTIFIER", "USERNAME", "USERDOMAIN", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_CURRENT_DESKTOP", "DBUS_SESSION_BUS_ADDRESS", "HYPRLAND_INSTANCE_SIGNATURE"]);
   return Object.fromEntries(Object.entries(source).filter(([key]) => allowed.has(key.toUpperCase())));
 }
 async function savedEndpoint(stateRoot) {
@@ -75,7 +75,7 @@ export async function serveApplication({ bundleRoot, port = 43177, stateRoot = a
       clearInterval(ownerCheck);
       server.removeListener("error", failed); await shutdown();
     }
-  });
+  }, { onProgress: onStage });
 }
 export async function launchApplication({ bundleRoot, port = 43177, stateRoot = applicationStateRoot(), environment = applicationEnvironment(), spawnProcess = spawn, installationRoot } = {}) {
   if (!Number.isSafeInteger(port) || port !== 0 && (port < 1024 || port > 65535)) throw new Error("Choose a valid local application port.");
@@ -104,7 +104,7 @@ export async function launchApplication({ bundleRoot, port = 43177, stateRoot = 
         if (proof.status !== "ready" || proof.build !== manifest.id) throw new Error("The new application did not verify its exact ready build.");
         child.stdio[3]?.destroy(); child.unref(); return { status: "ready", reused: false, url: endpoint.url, pid: proof.pid, instanceId: proof.instanceId, build: proof.build };
       }
-      const allowed = new Set(["verifying-release", "release-verified", "ownership-held", "server-listening", "endpoint-published", "ready"]), stages = [...diagnostic.matchAll(/SWITCHYARD_STARTUP_STAGE=([a-z-]{1,32})/g)].map((m) => m[1]).filter((s) => allowed.has(s)).slice(-8);
+      const allowed = new Set(["verifying-release", "release-verified", "ownership-held", "server-listening", "endpoint-published", "ready", "lease-directory", "lease-file", "lease-spawned", "lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found", "lease-held", "lease-ready"]), stages = [...diagnostic.matchAll(/SWITCHYARD_STARTUP_STAGE=([a-z0-9-]{1,32})/g)].map((m) => m[1]).filter((s) => allowed.has(s) || /^lease-error-[0-9]{1,5}$/.test(s)).slice(-12);
       throw new Error(error ? "The private application process could not start." : `Application startup did not verify (${stages.join(", ") || "no startup stage"}). An existing review, occupied port or ownership lease may still be active; no process was displaced.`);
     } catch (e) {
       if (!ended && child.pid && !(await stopOwnedChild(child)).stopped) throw new Error("The failed owned application launch could not be confirmed stopped. Its recovery state was preserved.");

@@ -69,7 +69,7 @@ the compositor. Restoration removes its owned function too.
 - Node 24.14.0; clean dependency installation with `npm ci --ignore-scripts`.
 - Integrated native Linux run: **97/97 groups passed; 667 tests, 658 passed and 9
   expected platform skips**. Receipt:
-  `.sxsy-verification/isolated-test-c1579860-23fc-4385-b51b-22a68c0ca50f.json`.
+  `.sxsy-verification/isolated-test-e7b22711-8cae-4797-8b88-f9c01355f2cc.json`.
   Coverage includes all 104 named catalog configurations, physical options,
   protected state locks, device recovery and SDK/OAuth contracts.
 - `npm run catalog:check` verifies local source SHA-256 values and deterministic
@@ -318,6 +318,22 @@ and exposed permission-field recovery and lossy numeric file-ID checks. Helpers
 now use explicit UTF-8 raw pipes, exact 64-bit file identities and platform-aware
 permission metadata. A detached/no-console kernel-lock test was added. Those
 Windows fixes still require the next native run; no pass is inferred.
+
+The next native run at `b732ebb` passed exact file-ID handling, permission-field
+recovery and detached pipe-only locking. Four application-startup cases still
+failed before ownership acknowledgement. The restricted application environment
+now retains standard Windows system coordinates while excluding provider keys
+and runtime/module injection. Helpers explicitly import only the built-in
+PowerShell utility by its absolute system path, avoiding discovery of user or
+third-party modules. Allowlisted progress stages now distinguish file setup,
+helper input, native sharing errors and lock readiness. Native rerun is required.
+
+The actual installed updater also passed upgrade, rollback and restoration to
+`b732ebb`, creating a new verified process generation each time. Saved workflow,
+profile/library definitions and the original review URL matched before/after.
+Private receipt: `runtime-verification/installed-update-1793356842041.json`.
+Only current and one rollback program version remain locally; source bundles
+were removed after readback.
 
 ## Branch and handover
 

@@ -48,7 +48,8 @@ test("a running different build is preserved and an occupied port is never displ
   } finally { listener.closeAllConnections(); await new Promise((r) => listener.close(r)); }
 }));
 test("application subprocesses receive desktop/credential-store coordinates without provider secrets or runtime injection", () => {
-  const env = applicationEnvironment({ HOME: "/safe", PATH: "/bin", XDG_RUNTIME_DIR: "/private/runtime", DBUS_SESSION_BUS_ADDRESS: "unix:path=/private/bus", WAYLAND_DISPLAY: "wayland-1", HYPRLAND_INSTANCE_SIGNATURE: "synthetic", NODE_OPTIONS: "--inspect", NODE_PATH: "/injected", PYTHONPATH: "/injected", OPENAI_API_KEY: "secret", ANTHROPIC_API_KEY: "secret", GH_TOKEN: "secret" });
+  const env = applicationEnvironment({ HOME: "/safe", PATH: "/bin", XDG_RUNTIME_DIR: "/private/runtime", DBUS_SESSION_BUS_ADDRESS: "unix:path=/private/bus", WAYLAND_DISPLAY: "wayland-1", HYPRLAND_INSTANCE_SIGNATURE: "synthetic", windir: "C:\\Windows", ProgramFiles: "C:\\Program Files", PROCESSOR_ARCHITECTURE: "AMD64", NODE_OPTIONS: "--inspect", NODE_PATH: "/injected", PYTHONPATH: "/injected", PSModulePath: "/injected", OPENAI_API_KEY: "secret", ANTHROPIC_API_KEY: "secret", GH_TOKEN: "secret" });
   assert.equal(env.HOME, "/safe"); assert.equal(env.WAYLAND_DISPLAY, "wayland-1"); assert.equal(env.DBUS_SESSION_BUS_ADDRESS, "unix:path=/private/bus");
-  for (const k of ["NODE_OPTIONS", "NODE_PATH", "PYTHONPATH", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GH_TOKEN"]) assert.equal(env[k], undefined);
+  assert.equal(env.windir, "C:\\Windows"); assert.equal(env.ProgramFiles, "C:\\Program Files"); assert.equal(env.PROCESSOR_ARCHITECTURE, "AMD64");
+  for (const k of ["NODE_OPTIONS", "NODE_PATH", "PYTHONPATH", "PSModulePath", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GH_TOKEN"]) assert.equal(env[k], undefined);
 });

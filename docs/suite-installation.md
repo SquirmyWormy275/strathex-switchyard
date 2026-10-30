@@ -143,3 +143,9 @@ use explicit UTF-8 raw standard streams, following the
 with a dedicated detached/no-console lock test. File identity comparisons use
 exact 64-bit integers, and Windows recovery does not interpret synthesized Unix
 permission bits as native ACL evidence. The next native run must verify the fixes.
+The native rerun passed those filesystem/recovery and detached-pipe cases; managed
+startup still failed. Its restricted environment now preserves required Windows
+system coordinates. Helpers import the built-in utility by its explicit system
+path instead of discovering user/third-party modules. This also avoids dependence
+on a pre-existing [PowerShell module analysis cache](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_windows_powershell_5.1).
+The next run must establish application startup before Windows acceptance.
