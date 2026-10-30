@@ -150,7 +150,8 @@ from outside the checkout after the primary loader was removed. Linux shortcut
 batch tests use a synthetic compositor with actual subprocess/kernel-lease loss;
 they do not establish physical key or live-desktop removal acceptance.
 
-The pilot normal installation is source **7fe13c0**. Verified app update,
+The pilot normal installation is source **7dec739**; runtime adoption originally
+passed at **7fe13c0**, and the newer backend update/reuse checks also passed. Verified app update,
 in-place adoption of the existing shared runtime, 48 exact dependencies and
 offline CPU model load, exact app restart and unchanged runtime reuse passed
 on October 30, 2026. Saved definitions/package/modes, private review URL and

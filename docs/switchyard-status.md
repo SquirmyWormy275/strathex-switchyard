@@ -622,3 +622,12 @@ and 9 expected platform skips**, receipt
 include a real forced installer exit and invocation of the dated verified
 recovery entry from an unrelated working directory after primary-loader removal.
 The pilot app remains installed; no live user installation was removed.
+
+The normal installed backend was then updated to source **7dec739**, release
+`c58c2ea5d8068cca5ed08dfd0a1989371fed6cb9aa50ddd9ad2a199be97ffe0f`.
+Private receipt `runtime-lifecycle-1793367143958.json` passed five reuse/update
+checks: no runtime rebuild/download/restart for matching maintenance, zero
+configuration interfaces, preserved definitions/package/modes/private URL and
+exact frozen Home hash. Its disposable bundle was removed. Automatic uninstall
+remains accepted through isolated software/process tests; the user's live
+review installation was not removed.
