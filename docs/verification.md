@@ -12,35 +12,20 @@ for coverage, and the [continuation record](switchyard-status.md) for details.
 | Installed host lock indicators | Four checks: authenticated route, independent Linux kernel readback, rejection without credentials and preserved workspace state. | No physical keyboard association or LED change; Windows reports only its calling-thread toggle snapshot. |
 | Consented matrix backend | Ten fault tests plus six installed rejection checks: explicit one-use consent, policy, physical unlock, scope, capture bounds, stop, late responses and relock. | No HID opened by the installed demonstration. Physical typing/unlock/relock acceptance and frontend controls remain open. |
 | Original 0.9 controller | Seven direct protocol tests and 82 focused device/configuration checks: expansion readout, rotating keymap, strict framing, persistent key setter, recovery and protection of calibration/expansion keycodes. | Fault transports backed by the pinned vendor source; no physical legacy controller or solenoid acceptance. Expansion control remains unavailable. |
+| Task authority boundary | Seven real-repository scenarios plus core ledger/inspector and packaged lifecycle checks. Exact-scope issuance, fresh targets, revocation, cancellation and retained process ownership are implemented. | Native task identity is synthetic in these scenarios; installed acceptance is pending. The suite commit-effect route is unfinished; native provider permissions stay unchanged. |
 | Normal installed Codex task | Seven checks rerun after the shared recovery changes: one reviewed native reply, exact turn acknowledgement, durable duplicates, replay rejection and keyboard-only cleanup. | Read-only/restricted text task; provider completion is not verified coding-task completion. |
 | Normal installed Claude task | Thirteen checks: exact creation/continuation, three separately reviewed prompts, distinct recorded/stopped guardians and explicit resume-only recovery after a synthetic lost-acceptance fault. | Original account and UUID retained; no tools or invented native turn IDs. This fault injection is not a claimed physical crash. |
 | Native Claude command supervision | Eight real metadata checks verified nine distinct guardians exited, including shared designer/task probes. Installed empty-task creation stayed observable, then passed separately reviewed exact stop and replay rejection under the new supervision. The 13-check installed text journey passed again after the shared-probe change. | Metadata/empty-task checks send no model prompt; text regression sends three tiny approved prompts. No account fallback or external-session stop; native background-service ownership remains distinct from the CLI guardian. |
-| Native Windows release tests | [225 complete test/build groups at `7aeb1e6`](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41086724429), including real native observer and guardian/owner-loss checks. Receipt `a3672c96-9eca-49bd-a92b-e973ea7d8e94`. | Applies to that checkpoint. New private-pipe/recovery changes await a corrected complete run. |
+| Native Windows release tests | [231 complete test/build groups at `2e64ff6`](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41113037341): 1,615 tests, 1,576 passed and 39 reviewed skips. Receipt `b622fe62-7892-4e00-999e-4aa637f3e2a9`; bounded artifact `13008565118` downloaded and SHA-256 verified. | Includes native helper observer/guardian, 512 KiB private input, both documentation generators and full packaged release verification. Interactive agent accounts, microphone and HID remain separate. |
 | Fresh native Windows optional runtime | [Acceptance at `222dfca`](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41097396455): Python 3.12.14, 49 exact distributions, no extras, offline CPU model load, independent same-release recheck and disposable-runtime removal. Bounded artifact `12998575101` was downloaded and its digest verified. | No Windows microphone, configuration HID or signed-in native agent was exercised by this job. |
 | Canonical B122 print kit | All six PDF pages and 22 actual-scale SVG inserts rendered and inspected; 27 documentation tests pass. Literal source faces/flaps and clip cuts, reproducible output, 4.75 pt minimum text. | Printer calibration, cap fit, final branded artwork and physical commissioning remain open. |
 | Other installed pilot paths | Actual local CPU speech, authenticated Node/Python SDK exchanges, scoped Omarchy callback/restoration, profile migration and managed application/runtime lifecycle checks. | Each path has its own scope in the ledger; an SDK acknowledgement is self-reported. |
 
-The later Windows receipt `60da4861-4e5e-4cf1-a148-5c0a8dc60ac0` is **not an
-accepted release**: 226/227 groups passed, but the runner rejected nine skipped
-helper tests against an obsolete allowance of eight. Every test body passed.
-The skip inventory is corrected, Linux now exercises its platform environment
-boundary, and each Windows documentation generator must propagate its own exit
-code. [The corrected run](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41102281542)
-must finish before newer complete Windows acceptance is claimed. At `3a01549`,
-the native backend tests passed but documentation verification exposed Windows
-checkout line-ending conversion. Text checkouts now explicitly use LF; retained
-vendor source bytes remain exempt. At `30168d3` the backend tests passed again,
-then the remaining stale source-digest manifest was rejected. Its fingerprints
-are regenerated from current canonical sources. The demo PNG is preserved only
-when every rendered pixel matches, avoiding platform zlib encoding churn while
-still hashing exact output bytes. Both generators and all 27 documentation tests
-pass locally with CI's pinned Python 3.13.3. Windows at `9781e6c` then passed the
-backend and documentation-manifest checks but rejected CRLF generated by the
-legend text writers. Those now explicitly write LF; the 27-test documentation
-suite also passes with simulated Windows defaults and on system Python 3.14.8.
-A corrected full Windows run is still
-required. Earlier
-step-level success does not retroactively validate a masked generator failure.
+Earlier Windows runs exposed skip-inventory, checkout line-ending and generated
+text/manifest failures. Those were software failures and were corrected before
+the complete `2e64ff6` run passed. A masked or partial earlier step is not
+retroactively accepted. The latest task-authority work has its own pending full
+source/native acceptance; the Windows checkpoint above predates it.
 
 ## Follow a result into the code
 

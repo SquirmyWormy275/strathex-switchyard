@@ -225,3 +225,17 @@ test("content modified during descriptor hashing is rejected and the descriptor 
   await assert.rejects(new NodeFileDigestReader({ openFile }).digest(root, "task.txt"), /file changed during hashing/i);
   assert.equal(changed, true); assert.equal(acquired?.fd, -1);
 });
+
+
+test("NUL Git filenames with literal backslashes cannot alias another tracked path", async () => {
+  const runner = new ScriptedRunner({
+    "rev-parse --show-toplevel": result("C:/work/example\n"),
+    "ls-files -z": result("src\\secret.txt\0src/safe.txt\0"),
+    "ls-files --deleted -z": result(""),
+    "ls-files --others --exclude-standard -z": result(""),
+    "ls-files --others --ignored --exclude-standard -z": result("")
+  });
+  const actual = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect("C:/work/example");
+  assert.deepEqual(actual.trackedFiles, [{ path: "src/safe.txt", digest: "sha256:src/safe.txt" }]);
+  assert.match(actual.issues?.join(" ") ?? "", /ambiguous backslash filename/i);
+});

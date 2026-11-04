@@ -170,7 +170,7 @@ function cleanOutput(value: string): string | undefined {
 }
 
 function nulPaths(value: string): readonly string[] {
-  return value.split("\0").filter(Boolean).map((path) => path.replaceAll("\\", "/").replace(/^\.\//, ""));
+  return value.split("\0").filter(Boolean);
 }
 
 function parseSubmodules(value: string): Readonly<Record<string, string>> {
@@ -266,7 +266,11 @@ export class GitCliInspector implements GitInspector {
       issues.push(shortFailure(label, result));
       return [];
     }
-    return nulPaths(result.stdout);
+    const paths = nulPaths(result.stdout);
+    // Git's NUL format already uses '/' on Windows. A literal Linux backslash
+    // must never be reinterpreted as a different directory during hashing.
+    if (paths.some((path) => path.includes("\\"))) issues.push(`Git ${label} contains an ambiguous backslash filename; snapshot is incomplete.`);
+    return paths.filter((path) => !path.includes("\\"));
   }
 
   private async hashFiles(

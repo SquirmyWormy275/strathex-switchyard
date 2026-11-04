@@ -1,0 +1,127 @@
+/** Reviewed host authority for exact task-owned paths; native model permissions stay unchanged. */
+import { randomUUID } from "node:crypto";
+import { AuthorityLedger } from "../../packages/control-plane/src/authority.ts";
+import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
+import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
+import { createRepositoryInspection } from "./repository-inspection.mjs";
+const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
+const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
+const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
+const prohibited = ["pr_upsert", "pr_merge", "direct_main", "run_target", "debug_target", "plan_approval"];
+function path(value) {
+  if (typeof value !== "string" || value.length > 512 || /[\\\0\r\n:*?\[\]]/.test(value) || value.startsWith("/") || value.split("/").some(p => !p || /[\x00-\x1f\x7f]/.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p) || p === "." || p === ".." || p.toLowerCase() === ".git")) throw new Error("Choose literal repository-relative file paths without traversal or platform aliases.");
+  return value;
+}
+function paths(value, field, max = 256) {
+  if (!Array.isArray(value) || value.length > max) throw new Error(`Choose a bounded ${field} list.`);
+  const output = value.map(path); if (new Set(output.map(p => process.platform === "win32" ? p.toLowerCase() : p)).size !== output.length) throw new Error(`The ${field} list repeats a path.`); return output.sort();
+}
+function proposal(input) {
+  if (!uuid(input.taskId) || typeof input.planRevision !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/.test(input.planRevision)) throw new Error("Select one exact task UUID and a bounded plan revision.");
+  const ownedPaths = paths(input.paths, "owned paths"); if (!ownedPaths.length) throw new Error("Review at least one exact task-owned file.");
+  const lifetimeMinutes = input.lifetimeMinutes ?? 15;
+  if (!Number.isSafeInteger(lifetimeMinutes) || lifetimeMinutes < 1 || lifetimeMinutes > 60) throw new Error("Choose an authority lifetime of 1–60 minutes.");
+  if (input.actions !== undefined && (JSON.stringify(input.actions) !== JSON.stringify(["local_commit"]))) throw new Error("Only host-mediated local commit authority is implemented in this route.");
+  const classifications = input.classifications ?? {};
+  const includedUntracked = paths(classifications.includedUntracked ?? [], "included untracked files"), excludedUntracked = paths(classifications.excludedUntracked ?? [], "excluded untracked files"), excludedIgnored = paths(classifications.excludedIgnored ?? [], "excluded ignored files");
+  if (includedUntracked.some(p => excludedUntracked.includes(p)) || [...includedUntracked, ...excludedUntracked].some(p => excludedIgnored.includes(p))) throw new Error("Every untracked or ignored path needs exactly one classification.");
+  return { taskId: input.taskId, planRevision: input.planRevision, paths: ownedPaths, lifetimeMinutes, classifications: { includedUntracked, excludedUntracked, excludedIgnored } };
+}
+function taskIn(s, id) {
+  const t = s.codingSessions?.find(t => t.id === id);
+  if (!t || t.schema !== "switchyard-coding-session/v1" || !["codex", "claude-code"].includes(t.provider) || t.status !== "registered" || !t.sessionId || !t.repositoryIdentity || !/^[a-f0-9]{64}$/.test(t.accountFingerprint ?? "") || !["owned-stdio", "owned-print"].includes(t.nativeTransport) || t.provider === "claude-code" && t.nativeIdentityVerified !== true) throw new Error("Bind a verified native coding task before reviewing host authority.");
+  if (s.codingTurns?.some(turn => turn.taskId === id && (["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"].includes(turn.status) || turn.ownedRuntime && turn.ownedRuntimeStoppedVerified !== true))) throw new Error("Settle this task's uncertain turn and owned process before reviewing host authority.");
+  return t;
+}
+function ledger(state, now) {
+  state.taskAuthorityJournal ??= [];
+  return new AuthorityLedger({
+    readEntries: async () => structuredClone(state.taskAuthorityJournal),
+    transaction: async fn => fn({ readEntries: async () => structuredClone(state.taskAuthorityJournal), append: async (kind, payload) => {
+      if (state.taskAuthorityJournal.length >= 512) throw new Error("The authority journal is full. Existing grants were preserved.");
+      const entry = { schemaVersion: 1, sequence: (state.taskAuthorityJournal.at(-1)?.sequence ?? 0) + 1, id: randomUUID(), kind, at: new Date(now()).toISOString(), payload: structuredClone(payload) };
+      entry.hash = scopeHash(entry); state.taskAuthorityJournal.push(entry); return structuredClone(entry);
+    } })
+  }, { clock: () => new Date(now()).toISOString() });
+}
+export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store }), now = () => Date.now() } = {}) {
+  const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
+  const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
+  async function access(c, id, generation) {
+    current(c, generation); if (!await isActive(c)) throw new Error("Select this workspace before reviewing task authority.");
+    const state = await store.snapshot(c), task = taskIn(state, id);
+    await store.authorize(c, { provider: task.provider }); current(c, generation);
+    if (state.policy !== "personal" || state.mode !== "personal-companion") throw new Error("Local task authority requires the permitted Personal companion workspace.");
+    await verifyRepositoryIdentity(task); return { state, task };
+  }
+  async function capture(c, proposed, generation) {
+    const { state, task } = await access(c, proposed.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
+    if (typeof checkNative !== "function") throw new Error("The native task identity verifier is unavailable.");
+    await checkNative(c, task);
+    const authorize = async () => { const fresh = await access(c, task.id, generation); if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw new Error("The exact task, account or workspace policy changed. Review again."); };
+    await authorize(); const result = await inspection.capture(c, task, proposed.classifications, authorize); await authorize(); await checkNative(c, task); await authorize();
+    const { snapshot, files } = result;
+    if (snapshot.completeness !== "complete") throw new Error("The repository snapshot is incomplete. Classify every untracked/ignored input and keep files within supported inspection bounds before reviewing authority.");
+    if (!snapshot.defaultBranch || !snapshot.branch || snapshot.branch === snapshot.defaultBranch || snapshot.detached) throw new Error("Select a verified non-default feature branch before reviewing local commit authority.");
+    if (Object.keys(snapshot.submodules).length) throw new Error("Task authority for repositories with submodules is not implemented yet.");
+    const tracked = new Set(files.tracked.map(f => f.path)), included = new Set(files.untracked.filter(f => f.classification === "included").map(f => f.path));
+    if (proposed.paths.some(p => !tracked.has(p) && !included.has(p))) throw new Error("Each task-owned file must be tracked or explicitly included in this exact snapshot.");
+    const actualUntracked = new Set(files.untracked.map(f => f.path)), actualIgnored = new Set(files.ignored.map(f => f.path));
+    if ([...proposed.classifications.includedUntracked, ...proposed.classifications.excludedUntracked].some(p => !actualUntracked.has(p)) || proposed.classifications.excludedIgnored.some(p => !actualIgnored.has(p))) throw new Error("A reviewed input classification no longer matches the actual repository.");
+    return { task, binding, workspace, snapshot, proposed };
+  }
+  async function exclusive(c, fn) {
+    if (pending.has(c)) throw new Error("Wait for the current task authority inspection to settle.");
+    pending.add(c); seen.add(c); try { return await fn(generations.get(c) ?? 0); } finally { pending.delete(c); }
+  }
+  const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
+  const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: false });
+  return {
+    async review(c, input) { return exclusive(c, async generation => {
+      const result = await capture(c, proposal(input), generation); current(c, generation);
+      const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
+        reason: "Authorize only the host local-commit broker for these literal files, plan revision, native task/account and repository snapshot. Provider tools and native permissions stay unchanged. Every commit still needs a separate exact effect review; the suite commit route is not yet connected.", reauthenticated: false });
+      current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: ["local_commit"] }, nativePermissionsChanged: false };
+    }); },
+    async issue(c, input) { return exclusive(c, async generation => {
+      if (!uuid(input.token)) throw new Error("Use the exact one-use approval from this task authority review.");
+      const result = await capture(c, proposal(input), generation);
+      const decision = await suiteConfirmations(store, c, result.task.provider, now).consume({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result), token: input.token });
+      if (!decision.allowed) throw new Error(decision.reason);
+      return store.update(c, "task-authority-issue", async s => {
+        current(c, generation); if (taskDigest(taskIn(s, result.task.id)) !== result.binding || workspaceDigest(s) !== result.workspace) throw new Error("The reviewed task authority changed before issuance.");
+        const all = s.taskAuthorities ?? [], live = all.filter(r => !r.grant.revokedAt && Date.parse(r.grant.expiresAt) > now());
+        const history = all.filter(r => !live.includes(r)).slice(-16);
+        s.taskAuthorities = [...live, ...history];
+        const retained = new Set(s.taskAuthorities.map(r => r.id));
+        s.taskAuthorityJournal = (s.taskAuthorityJournal ?? []).filter(e => retained.has(e.payload.grant?.id ?? e.payload.authorityId));
+        if (s.taskAuthorities.length >= 64) throw new Error("The protected task authority inventory is full; existing records were preserved.");
+        const grant = await ledger(s, now).issue({ repositoryRoot: result.task.repositoryRoot, sessionId: result.task.sessionId, taskId: result.task.id, planRevision: result.proposed.planRevision, allowedActions: ["local_commit"], prohibitedActions: prohibited, issuedBy: "authenticated-local-review", expiresAt: new Date(now() + result.proposed.lifetimeMinutes * 60000).toISOString() });
+        current(c, generation); const record = { schema: "switchyard-task-authority/v1", id: grant.id, taskId: result.task.id, taskDigest: result.binding, workspaceDigest: result.workspace, grant, targetSnapshot: result.snapshot, proposal: result.proposed }; s.taskAuthorities.push(record); return view(record);
+      }, { provider: result.task.provider });
+    }); },
+    async list(c) { return ((await store.snapshot(c)).taskAuthorities ?? []).map(view); },
+    async revoke(c, id) {
+      if (!uuid(id)) throw new Error("Choose the exact local authority UUID.");
+      return store.update(c, "task-authority-revoke", async s => { const record = s.taskAuthorities?.find(r => r.id === id); if (!record) throw new Error("That authority is unavailable in this workspace."); record.grant = await ledger(s, now).revoke(id, "Explicit local operator revocation"); return view(record); });
+    },
+    async revalidate(c, id) { return exclusive(c, async generation => {
+      const s = await store.snapshot(c), record = s.taskAuthorities?.find(r => r.id === id);
+      if (!record) throw new Error("That authority is unavailable in this workspace.");
+      const decision = await ledger(s, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
+      if (!decision.allowed) return { allowed: false, reason: decision.reason, nativePermissionsChanged: false };
+      const actual = await capture(c, record.proposal, generation);
+      const fresh = await store.snapshot(c), latest = await ledger(fresh, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
+      current(c, generation);
+      const allowed = latest.allowed && actual.binding === record.taskDigest && actual.workspace === record.workspaceDigest && actual.snapshot.id === record.targetSnapshot.id;
+      return { allowed, reason: !latest.allowed ? latest.reason : allowed ? "The exact scoped authority and repository snapshot remain current; a separately reviewed commit effect is still required." : "The task, policy or repository changed. Issue a newly reviewed authority; this grant was not redirected.", targetSnapshotId: actual.snapshot.id, nativePermissionsChanged: false, localCommitExecutionImplemented: false };
+    }); },
+    async stopCompartment(c) {
+      generations.set(c, (generations.get(c) ?? 0) + 1);
+      const stopped = await inspection.stopCompartment(c);
+      await store.update(c, "task-authority-suspend", async s => { s.taskAuthorityEpoch = (s.taskAuthorityEpoch ?? 0) + 1; for (const record of s.taskAuthorities ?? []) if (!record.grant.revokedAt) record.grant = await ledger(s, now).revoke(record.id, "Workspace authority was suspended"); });
+      return stopped;
+    },
+    async close() { closed = true; await inspection.close(); for (const c of seen) { await store.update(c, "task-authority-shutdown", async s => { s.taskAuthorityEpoch = (s.taskAuthorityEpoch ?? 0) + 1; for (const r of s.taskAuthorities ?? []) if (!r.grant.revokedAt) r.grant = await ledger(s, now).revoke(r.id, "Owning suite closed"); }); } }
+  };
+}

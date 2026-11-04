@@ -27,9 +27,10 @@ import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
 import { createReadoutProfiles } from "./readout-profiles.mjs";
 import { createKeyboardIndicators } from "./keyboard-indicators.mjs";
 import { createMatrixDiagnostics } from "./matrix-diagnostics.mjs";
+import { createTaskAuthority } from "./task-authority.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -48,6 +49,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   let selectionLoading;
   let closed = false;
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
+  taskAuthority ??= createTaskAuthority({ store, isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
   async function stopExample(compartment, example) {
     const key = `${compartment}:${example}`, child = examples.get(key);
     exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1);
@@ -134,6 +136,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         await loadSelection();
         if (activeCompartment !== compartment) {
           await matrixDiagnostics.stopCompartment(activeCompartment);
+          await taskAuthority.stopCompartment(activeCompartment);
           pauseMonitor(activeCompartment); await foreground.stopCompartment?.(activeCompartment);
           await store.update(activeCompartment, "compartment-suspend-sources", (s) => { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; });
         }
@@ -148,6 +151,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           await matrixDiagnostics.stopCompartment(compartment);
+          await taskAuthority.stopCompartment(compartment);
           pauseMonitor(compartment);
           // Stop the exact print continuation before reconciling the original
           // background inventory, which can briefly report the same session.
@@ -158,6 +162,11 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         }
         return result;
       }
+      if (path === "/api/suite/coding/authority/review") return taskAuthority.review(compartment, body);
+      if (path === "/api/suite/coding/authority/issue") return taskAuthority.issue(compartment, body);
+      if (path === "/api/suite/coding/authority/list") return taskAuthority.list(compartment);
+      if (path === "/api/suite/coding/authority/revalidate") return taskAuthority.revalidate(compartment, body.id);
+      if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
       if (path === "/api/suite/coding/codex/discovery") return coding.discovery(compartment);
       if (path === "/api/suite/coding/codex/list") return coding.list(compartment);
       if (path === "/api/suite/coding/codex/bind") return coding.bind(compartment, body);
@@ -270,7 +279,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/devices/apply") return devices.apply(compartment, body.reviewId);
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
-      if (path === "/api/suite/devices/lock") { await matrixDiagnostics.stopCompartment(compartment); return devices.relock(compartment, body.deviceId); }
+      if (path === "/api/suite/devices/lock") { await matrixDiagnostics.stopCompartment(compartment);
+          await taskAuthority.stopCompartment(compartment); return devices.relock(compartment, body.deviceId); }
       if (path === "/api/suite/devices/matrix/review") return matrixDiagnostics.review(compartment, body);
       if (path === "/api/suite/devices/matrix/start") return matrixDiagnostics.start(compartment, body);
       if (path === "/api/suite/devices/matrix/sample") return matrixDiagnostics.sample(compartment, body);
@@ -347,6 +357,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; await matrixDiagnostics.close(); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
+    async close() { closed = true; await matrixDiagnostics.close(); await taskAuthority.close(); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
   };
 }

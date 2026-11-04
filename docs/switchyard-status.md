@@ -1579,3 +1579,36 @@ both documentation generators, native observer/guardian tests, fresh optional
 runtime verification and the complete packaged release build. Detailed receipt
 acceptance is being reconciled; interactive accounts and physical devices remain
 separate checks.
+
+## Scoped task authority connected to the suite
+
+The backend now exposes exact task authority review/issue/list/revalidate/revoke
+through its authenticated API. It reuses the existing AuthorityLedger and
+one-use confirmation ledger inside each AEAD compartment. Grants name one
+verified native task/account, native directory identity, plan revision, literal
+file set and complete Git snapshot. Current native account checks bracket
+inspection. Work policy, keyboard-only mode, uncertain native turns, stale scopes,
+replayed approvals and unsupported broader actions are rejected. Suspension and
+orderly shutdown revoke grants; providers retain their original permissions.
+
+Read-only Git inspection now uses fixed queries under native guardians with
+protected pre-start ownership and verified exit. It disables fsmonitor commands,
+external protocols and global/system Git config, and bounds output, time and
+file hashing. Unsettled guardians survive restart. Excluded inputs remain hashed;
+credential-bearing origins and ambiguous backslash names cannot become accepted
+targets. Seven scenarios use real disposable Git repositories, including
+cancellation and no-HEAD-change checks. The packaged server and installed-loader
+tests pass after including the new control-plane dependencies. See
+task-authority.md for route scope and explicit limits. The separate commit and
+execution-effect bridge remains unfinished; these grants cannot execute one.
+
+Full Windows acceptance at `2e64ff6` is now reconciled: 231/231 groups, 1,615
+tests, 1,576 passed and 39 reviewed skips. Receipt
+b622fe62-7892-4e00-999e-4aa637f3e2a9 was downloaded from bounded artifact
+13008565118; ZIP SHA-256
+f6c78f6edfdccaf9576642e10ce80599355576fbfe45ab7508a4b2bd39b34368.
+No archive or runtime copy was retained. New authority changes need their own
+complete acceptance. The terminal's previous GitHub token became invalid; the
+connected GitHub app published the exact tested file tree as `f519b83` using a
+leased fast-forward. The local object and branch were verified and synchronized
+without changing global credentials or rewriting remote history.

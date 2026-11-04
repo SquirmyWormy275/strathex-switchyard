@@ -15,8 +15,9 @@ The task controls below are backend APIs. The frontend is frozen for review;
 these new controls are not yet exposed there. Claude text tasks use the same protected review lifecycle;
 first-turn creation and continuation have separate native contracts and their
 installed acceptance passed native creation and continuation with two synthetic
-text turns; interactive client attachment remains separate. General interactive attachment and broader execution-authority mediation remain
-unfinished. Claude configuration-design continuation is a separate working path.
+text turns; interactive client attachment remains separate. Reviewed [task authority](task-authority.md) is now connected to fresh repository
+snapshots. Interactive attachment and the separate commit/execution-effect
+connection remain unfinished. Claude configuration-design continuation is a separate working path.
 
 ## Follow one task
 
