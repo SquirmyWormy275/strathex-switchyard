@@ -8,6 +8,15 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The metadata-only Windows broker bootstrap now has exact SCM installation and
+removal, a System service, first-instance local pipe with kernel caller SID
+verification, signed challenge replies and a protected CLR extraction inventory.
+Both helper/proof compile with zero warnings/errors; all sixteen crypto checks,
+four package checks and the new Linux refusal guards pass. Scratch was removed.
+Actual service lifecycle and twelve restricted-client/cache/pipe checks await the
+new disposable Windows lane. Normal-user setup, bounded volume effects and
+application wiring remain unfinished; readiness still says brokerImplemented=false.
+
 Linux hosted run `41924141682` exposed a stop-readiness race: a durable running
 owner could become visible before its exact in-memory stop controller. The
 controller now registers before that write; acknowledgement still follows the

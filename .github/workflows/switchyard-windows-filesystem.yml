@@ -95,6 +95,17 @@ jobs:
           $proof | Add-Member -NotePropertyName assemblySha256 -NotePropertyValue ((Get-FileHash $assembly -Algorithm SHA256).Hash.ToLowerInvariant())
           $proof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
 
+      - name: Verify the exact metadata broker service lifecycle
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $dotnet = Join-Path $env:GITHUB_WORKSPACE '.tools\dotnet\dotnet.exe'
+          $proof = Join-Path $env:GITHUB_WORKSPACE 'deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          & node scripts/verify-windows-storage-broker.mjs --synthetic "--helper=$helper" "--dotnet=$dotnet" "--proof=$proof"
+          if ($LASTEXITCODE -ne 0) { throw 'The exact protected metadata service did not complete; preserve its ownership evidence.' }
+
       - name: Verify storage and mapping ownership fault boundaries
         shell: pwsh
         timeout-minutes: 6
@@ -138,5 +149,14 @@ jobs:
         with:
           name: switchyard-windows-standalone-helper-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-standalone-helper-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the scoped broker lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-broker-bootstrap-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-broker-bootstrap-verification.json
           if-no-files-found: error
           retention-days: 7

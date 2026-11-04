@@ -21,6 +21,33 @@ verifies independent exit and removes only that proof's copy/cache. This new
 native standalone acceptance is pending CI; local runtime/package checks pass.
 It does not establish privileged service or VM acceptance.
 
+The metadata-only broker bootstrap is now implemented behind explicit native
+CLI modes. An already elevated installer creates a new fixed per-user service,
+protected code/key/configuration and a separate System/Administrators-only CLR
+extraction cache. SCM configuration, exact image digest and the per-service
+environment are read back. The System process seals native file identities,
+sizes and hashes before accepting clients. Restarts verify that inventory;
+removal first verifies the original SCM configuration, captures its exact native
+process handle, observes service and process exit, then deletes only the verified
+inventory. Existing or unfamiliar installation state is preserved.
+
+The pipe holds one first instance, refuses remote clients and authenticates the
+kernel caller SID before parsing its closed metadata request. Its ACL omits
+instance-creation rights for the ordinary client. Every reply is signed against
+the installed key and a fresh request nonce. The installer does not elevate the
+application, assign privileges to a user or expose any volume/shell verb. Its
+metadata continues to say `brokerImplemented: false` because bounded privileged
+storage effects and the normal-user setup path remain unfinished.
+
+Helper and linked proof compile without warnings; the sixteen actual crypto
+checks and four package checks pass locally, and build scratch was removed.
+The new disposable Windows lane installs this exact metadata service, verifies
+twelve restricted-client/cache/malformed-pipe boundaries, then observes exact
+exit and removal. That native lifecycle proof is pending CI. The per-service
+runtime environment and extraction behavior require this actual native check;
+managed compilation cannot establish them. No broker service was installed on
+the Linux pilot.
+
 The broker metadata wire contract is now implemented separately from the future
 privileged service. It accepts only a closed metadata request and binds a fresh
 256-bit nonce, installation UUID, owner-scope digest, service-image digest and
@@ -30,12 +57,10 @@ in a pipe reply. Duplicate/unknown fields, other curves, changed scopes/images,
 wrong keys, replayed nonces and changed privilege claims are refused. Its
 readiness statement still explicitly reports `brokerImplemented: false`.
 
-Sixteen actual compiled parser/cryptography checks pass locally, with a
-zero-warning helper build, six Linux native-only guards and four package checks.
-The native Windows filesystem lane now runs the same proof and retains only its
-small result, source digest and assembly digest. Privileged service installation,
-authenticated pipe transport and bounded volume effects are still unfinished;
-the wire proof opens no service, volume, account or guest.
+Sixteen actual compiled parser/cryptography checks pass locally and on native
+Windows. The filesystem lane retains only its small result, source digest and
+assembly digest. The wire proof itself opens no service, volume, account or
+guest. The separate bootstrap lane above tests the new service transport.
 
 The protected-file primitive is implemented and compiles without warnings. New
 broker files use an Administrators/System owner and protected exact ACLs; the

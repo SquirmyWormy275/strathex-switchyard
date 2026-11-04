@@ -45,20 +45,20 @@ internal static class WindowsStorageBrokerFiles
             parent=Path.GetDirectoryName(parent);
         }
     }
-    private static void Verify(SafeFileHandle handle,string sid,bool directory,bool clientRead,bool executable)
+    private static void Verify(SafeFileHandle handle,string sid,bool directory,bool clientRead,bool executable,bool inheritedPrivate=false)
     {
         if(handle.IsInvalid||!GetFileInformationByHandle(handle,out var info)||(info.Attributes&0x400)!=0||((info.Attributes&0x10)!=0)!=directory)throw Invalid();
         uint error=GetSecurityInfo(handle,1,5,out _,out _,out _,out _,out var descriptor);if(error!=0)throw new Win32Exception(checked((int)error));
         try
         {
             uint size=GetSecurityDescriptorLength(descriptor);if(size is <20 or >65536)throw Invalid();byte[] bytes=new byte[size];Marshal.Copy(descriptor,bytes,0,checked((int)size));var security=new RawSecurityDescriptor(bytes,0);
-            if(security.Owner?.Value is not ("S-1-5-18" or "S-1-5-32-544")||!security.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected)||security.DiscretionaryAcl==null)throw Invalid();
+            if(security.Owner?.Value is not ("S-1-5-18" or "S-1-5-32-544")||!inheritedPrivate&&!security.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected)||security.DiscretionaryAcl==null||inheritedPrivate&&clientRead)throw Invalid();
             var expected=new Dictionary<string,int>{{"S-1-5-18",Full},{"S-1-5-32-544",Full}};if(clientRead)expected.Add(sid,directory||executable?ReadExecute:Read);
             var seen=new HashSet<string>(StringComparer.Ordinal);
             foreach(GenericAce entry in security.DiscretionaryAcl)
             {
                 if(entry is not CommonAce ace||ace.AceQualifier!=AceQualifier.AccessAllowed||!expected.TryGetValue(ace.SecurityIdentifier.Value,out int mask)||ace.AccessMask!=mask||!seen.Add(ace.SecurityIdentifier.Value)
-                    ||ace.AceFlags!=(directory?AceFlags.ContainerInherit|AceFlags.ObjectInherit:AceFlags.None))throw Invalid();
+                    ||(ace.AceFlags&~(inheritedPrivate?AceFlags.Inherited:AceFlags.None))!=(directory?AceFlags.ContainerInherit|AceFlags.ObjectInherit:AceFlags.None))throw Invalid();
             }
             if(seen.Count!=expected.Count)throw Invalid();
         }
@@ -71,16 +71,33 @@ internal static class WindowsStorageBrokerFiles
         if(!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl,1,out var memory,out _))throw new Win32Exception(Marshal.GetLastWin32Error());
         return new SecurityAttributes{Length=checked((uint)Marshal.SizeOf<SecurityAttributes>()),Descriptor=memory,Inherit=false};
     }
-    internal static SafeFileHandle PinDirectory(string path,string sid)
+    internal static SafeFileHandle PinDirectory(string path,string sid,bool clientRead=true)
     {
         NoRedirectedParents(path);var handle=CreateFileW(path,ReadControl|0x80,3,IntPtr.Zero,OpenExisting,BackupSemantics|OpenReparsePoint,IntPtr.Zero);
-        try{Verify(handle,sid,true,true,false);return handle;}catch{handle.Dispose();throw;}
+        try{Verify(handle,sid,true,clientRead,false);return handle;}catch{handle.Dispose();throw;}
     }
-    internal static SafeFileHandle CreateDirectory(string path,string sid)
+    internal static string OwnerForRoot(string path)
     {
-        NoRedirectedParents(path);var security=Security(sid,true,true,false);
+        NoRedirectedParents(path);using var handle=CreateFileW(path,ReadControl|0x80,3,IntPtr.Zero,OpenExisting,BackupSemantics|OpenReparsePoint,IntPtr.Zero);
+        if(handle.IsInvalid||!GetFileInformationByHandle(handle,out var info)||(info.Attributes&0x410)!=0x10)throw Invalid();
+        uint error=GetSecurityInfo(handle,1,5,out _,out _,out _,out _,out var descriptor);if(error!=0)throw new Win32Exception(checked((int)error));
+        string sid;
+        try
+        {
+            uint size=GetSecurityDescriptorLength(descriptor);if(size is <20 or >65536)throw Invalid();byte[] bytes=new byte[size];Marshal.Copy(descriptor,bytes,0,checked((int)size));var security=new RawSecurityDescriptor(bytes,0);
+            var clients=security.DiscretionaryAcl?.OfType<CommonAce>().Where(ace=>ace.SecurityIdentifier.Value.StartsWith("S-1-5-21-",StringComparison.Ordinal)).Select(ace=>ace.SecurityIdentifier.Value).Distinct().ToArray();
+            if(clients?.Length!=1)throw Invalid();sid=clients[0];
+        }
+        finally{LocalFree(descriptor);}
+        Verify(handle,sid,true,true,false);
+        if(!Path.GetFullPath(path).TrimEnd('\\').Equals(Root(sid).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw Invalid();
+        return sid;
+    }
+    internal static SafeFileHandle CreateDirectory(string path,string sid,bool clientRead=true)
+    {
+        NoRedirectedParents(path);var security=Security(sid,true,clientRead,false);
         try{if(!CreateDirectoryW(path,ref security))throw new Win32Exception(Marshal.GetLastWin32Error());}finally{LocalFree(security.Descriptor);}
-        return PinDirectory(path,sid);
+        return PinDirectory(path,sid,clientRead);
     }
     internal static byte[] ReadFile(string path,string sid,int maximum,bool clientRead=true,bool executable=false)
     {
@@ -105,5 +122,17 @@ internal static class WindowsStorageBrokerFiles
         if(file.IsInvalid||!GetFileInformationByHandle(file,out var info)||(info.Attributes&0x410)!=0)throw Invalid();
         using var stream=new FileStream(file,FileAccess.Read);if(stream.Length is <1 or >134217728)throw Invalid();byte[] bytes=new byte[checked((int)stream.Length)];stream.ReadExactly(bytes);
         if(stream.ReadByte()!=-1||Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()!=expectedSha256)throw Invalid();return bytes;
+    }
+    internal sealed record PrivateIdentity(string NativeId,bool Directory,long Size,string? Sha256);
+    internal static PrivateIdentity InspectPrivate(string path,string sid,bool directory)
+    {
+        NoRedirectedParents(path);using var handle=CreateFileW(path,ReadControl|0x80|(directory?0:GenericRead),1,IntPtr.Zero,OpenExisting,OpenReparsePoint|(directory?BackupSemantics:0),IntPtr.Zero);
+        Verify(handle,sid,directory,false,false,inheritedPrivate:true);
+        if(!GetFileInformationByHandle(handle,out var info)||!directory&&info.Links!=1)throw Invalid();
+        long size=((long)info.SizeHigh<<32)|info.SizeLow;if(!directory&&(size<1||size>134217728))throw Invalid();
+        string nativeId=$"{info.Volume:x8}:{info.IndexHigh:x8}{info.IndexLow:x8}";
+        if(directory)return new(nativeId,true,0,null);
+        using var stream=new FileStream(handle,FileAccess.Read);if(stream.Length!=size)throw Invalid();
+        return new(nativeId,false,size,Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant());
     }
 }
