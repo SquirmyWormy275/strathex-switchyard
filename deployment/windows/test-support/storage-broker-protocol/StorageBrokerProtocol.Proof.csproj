@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs" Link="WindowsStorageBrokerProtocol.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs" Link="WindowsStorageBrokerFiles.cs" />
   </ItemGroup>
 </Project>

@@ -43,4 +43,10 @@ using var changed=JsonDocument.Parse(storage.RootElement.GetRawText().Replace("\
 Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,changed.RootElement,key));
 using var wrongCurve=ECDsa.Create(ECCurve.NamedCurves.nistP384);
 Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,storage.RootElement,wrongCurve));
-Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceInstalled=false,volumeOpened=false,guestLaunched=false}));
+int protectedFilesChecks=0;
+if(args.Length>0)
+{
+    if(!OperatingSystem.IsWindows()||!args.SequenceEqual(new[]{"--native-files"}))throw new InvalidOperationException("Choose only the explicit disposable Windows protected-file proof.");
+    protectedFilesChecks=NativeFilesProof.Run();
+}
+Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,protectedFilesChecks,serviceInstalled=false,volumeOpened=false,guestLaunched=false}));

@@ -8,6 +8,15 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Windows broker protected-file creation/readback is now implemented with an
+Administrators/System owner, exact protected ACLs, client read-only code/metadata,
+private signing-key storage, no reparse traversal and bounded handle reads.
+The expanded proof compiles with zero warnings; all sixteen crypto/parser cases
+still pass and scratch was removed. Sixteen actual Windows file/low-privilege
+checks are pending CI. They use a restricted version of the existing worker token,
+create no account or service, and remove their new nonce directory. Privileged
+service/pipe/setup/volume integration remains unfinished.
+
 Complete Linux `5fd0186` passes 163/163 groups: 1,060 tests, 1,050 passed and ten
 declared skips. Receipt `b145a682-ed06-4a35-9f23-0218999afab9` retained, every child
 cleanup verified and the disposable worktree removed. The installed Run

@@ -26,6 +26,17 @@ small result, source digest and assembly digest. Privileged service installation
 authenticated pipe transport and bounded volume effects are still unfinished;
 the wire proof opens no service, volume, account or guest.
 
+The protected-file primitive is implemented and compiles without warnings. New
+broker files use an Administrators/System owner and protected exact ACLs; the
+ordinary client receives only read/execute access to code and public metadata.
+The signing-key file excludes the client. Handles reject reparse points, bound
+reads and verify the ACL/owner; creation uses the protected descriptor atomically
+and reads written bytes back. Its Windows-only CI proof disables privileges and
+makes Administrators deny-only using [CreateRestrictedToken](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken),
+then checks public reads and denied code/config/key/permission writes. That native
+proof is pending; Linux cannot establish Windows ACL acceptance. No service is
+installed by this check, and its new nonce directory is removed after verification.
+
 ```mermaid
 flowchart LR
   Task[Task authority and selected bytes] --> Review[One-use review]

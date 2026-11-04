@@ -10,6 +10,7 @@ const sourceFiles = ["packages/protocol/src/b122.ts", "apps/windows-companion/sr
 sourceFiles.push("apps/windows-companion/src/repository-runtime.ts", "apps/windows-companion/src/repository-runtime-broker.ts", "apps/windows-companion/src/repository-inputs.ts", "apps/linux-companion/src/linux-repository-runtime.ts", "apps/linux-companion/src/linux-repository-inputs.ts");
 sourceFiles.push("apps/windows-companion/src/receipt-evidence.ts", "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs");
 sourceFiles.push("apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs");
+sourceFiles.push("apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs");
 sourceFiles.push("apps/desktop-hotkeys/ReviewedInputStager.cs", "apps/desktop-hotkeys/BoundedExchangeImage.cs", "apps/desktop-hotkeys/BoundedExchangeVolume.cs", "apps/desktop-hotkeys/WindowsSandboxCli.cs", "apps/windows-companion/sandbox-helper/Program.cs", "apps/windows-companion/src/windows-sandbox.ts", "apps/windows-companion/src/execution-cancellation.ts");
 for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) sourceFiles.push(`third-party/cyber_engineer/${name}`);
 for (const prefix of ["packages/control-plane/src", "tools/layout-studio", "integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await readdir(join(sourceRoot, prefix), { recursive: true })) if ((await lstat(join(sourceRoot, prefix, name))).isFile()) sourceFiles.push(`${prefix}/${name.replaceAll("\\", "/")}`);
