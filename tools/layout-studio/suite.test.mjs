@@ -75,6 +75,7 @@ test("HTTP workspace origin metadata is removed from exact commit, recovery and 
   const calls = [], repositoryCommits = { review: async (c, input) => { calls.push({ c, input }); if (input.force !== undefined) throw new Error("Broader operation fields are rejected"); return { status: "requires-confirmation" }; }, execute: async (c, input) => { calls.push({ c, input }); return { status: "completed" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
   const repositoryRecovery = { review: repositoryCommits.review, apply: repositoryCommits.execute, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
   const executionCalls=[],repositoryExecution={review:async(c,input)=>{executionCalls.push({c,input});if(input.command!==undefined)throw Error("Untrusted execution command field");return {status:"requires-confirmation"};},apply:async(c,input)=>{executionCalls.push({c,input});return {status:"running"};},status:async(c,id)=>({requestId:id}),stopCompartment:async()=>({stopped:true}),close:async()=>{}};
+  repositoryExecution.reviewStop=repositoryExecution.review;repositoryExecution.applyStop=repositoryExecution.apply;
   const suite = createSuite({ store, repositoryCommits, repositoryRecovery, repositoryExecution, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
   const token = "t".repeat(43), server = createStudioServer({ suite, bridge: { close() {} }, token }); server.listen(0, "127.0.0.1"); await once(server, "listening");
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -97,7 +98,9 @@ test("HTTP workspace origin metadata is removed from exact commit, recovery and 
     assert.equal((await execution("review",{compartment:"personal",requestId,command:"untrusted"})).status,409);assert.equal(executionCalls[1].input.command,"untrusted");
     assert.equal((await execution("apply",{compartment:"personal",requestId,token:requestId})).status,200);assert.equal(executionCalls[2].input.token,requestId);
     assert.equal((await execution("status",{compartment:"personal",requestId,pid:12345})).status,409);
-    for(const field of ["repositoryExecutions","repositoryExecutionJournal","repositoryExecutionReviews","repositoryExecutionStaging"])await store.update("personal","synthetic-private-execution",s=>{s[field]=[{private:"synthetic-owned-execution-private"}];});
+    assert.equal((await execution("stop/review",{compartment:"personal",requestId,stopId:requestId})).status,200);assert.equal(Object.hasOwn(executionCalls[3].input,"workspaceBaseUrl"),false);
+    assert.equal((await execution("stop/apply",{compartment:"personal",stopId:requestId,token:requestId})).status,200);assert.equal(executionCalls[4].input.token,requestId);
+    for(const field of ["repositoryExecutions","repositoryExecutionJournal","repositoryExecutionReviews","repositoryExecutionStaging","repositoryExecutionStops","repositoryExecutionStopJournal"])await store.update("personal","synthetic-private-execution",s=>{s[field]=[{private:"synthetic-owned-execution-private"}];});
     assert.equal(JSON.stringify(await suite.handle("/api/suite/snapshot",{compartment:"personal"})).includes("synthetic-owned-execution-private"),false);
     const clients = async (path, body, authenticated = true) => { const r = await fetch(origin + "/api/suite/integrations/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
     assert.equal((await clients("catalog", { compartment: "personal" }, false)).status, 401);

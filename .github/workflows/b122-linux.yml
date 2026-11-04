@@ -39,7 +39,7 @@ jobs:
       - name: Install Linux host prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends bubblewrap dbus-x11 espeak-ng gnome-keyring libsecret-tools pipewire-bin policykit-1 shellcheck unzip util-linux xz-utils zip
+          sudo apt-get install --yes --no-install-recommends apparmor-profiles apparmor-utils bubblewrap dbus-x11 espeak-ng gnome-keyring libsecret-tools pipewire-bin policykit-1 shellcheck unzip util-linux xz-utils zip
           test "$(realpath "$(command -v bwrap)")" = /usr/bin/bwrap
           test "$(realpath "$(command -v secret-tool)")" = /usr/bin/secret-tool
           test "$(realpath "$(command -v flock)")" = /usr/bin/flock
@@ -50,6 +50,13 @@ jobs:
 
       - name: Verify the runner permits the actual namespace boundary
         run: |
+          # Load the distribution's scoped bwrap policy on this disposable runner.
+          # Keep system-wide user-namespace restrictions and guardian no-new-privs.
+          # Upstream: https://gitlab.com/apparmor/apparmor/-/blob/apparmor-4.0/profiles/apparmor/profiles/extras/bwrap-userns-restrict
+          if test -r /sys/module/apparmor/parameters/enabled && test "$(cat /sys/module/apparmor/parameters/enabled)" = Y; then
+            test -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+            sudo apparmor_parser --replace /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          fi
           /usr/bin/bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent --new-session --clearenv --proc /proc --dev /dev --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind-try /lib64 /lib64 --chdir / /usr/bin/true
 
       - name: Verify shared and native Linux control planes

@@ -30,16 +30,29 @@ Linux runtime cases pass. The updated native input proof passes three checks
 The full `ab7ceed` Linux run passed 149/150 groups; the final native recovery
 fault case exceeded its old 45-second group limit. That case then passed alone
 in 51 seconds. The corrected 120-second group plus ownership/manifest checks
-pass 30/30 cases (receipt `9b67cf81-8701-4344-ac05-293405d860cc`). Full acceptance
-of the corrected revision is still pending. The additional workspace-stop
+pass 30/30 cases (receipt `9b67cf81-8701-4344-ac05-293405d860cc`). The corrected full `24f3a77` run passes 150/150 groups: 962 tests,
+952 passed and ten declared platform skips. Receipt:
+`9a8c1b0e-4f45-4bbd-9954-3416b30a4774`. The disposable verification checkout was
+removed after its complete receipt and exited children were verified. The additional workspace-stop
 regression verifies durable cancellation before abort and released budgets while
 preserving the original admission and unconfirmed program outcome.
 
 Ubuntu CI at `ab7ceed` rejected the actual namespace tool-replacement test;
 native diagnostics and an explicit runner namespace preflight are now retained.
-That CI failure remains open; the same actual native check passes on this host.
-Windows guest execution, writable build outputs, reviewed per-run stop and the
-remaining action integrations are unfinished implementation, not hardware blocks.
+The preflight reports `bwrap: loopback: Failed RTM_NEWADDR: Operation not
+permitted`. CI now installs and loads Ubuntu's packaged, scoped bwrap AppArmor
+profile on its disposable runner; production namespace restrictions and guardian
+no-new-privs remain enforced. Native CI acceptance of that setup is pending.
+The same actual check passes on this host. Windows backend CI at `ab7ceed`
+exposed a frozen test clock: a permit appeared expired before the fake broker
+ran. The fixture now uses wall time for native-bound lifetimes; production's
+60-second policy permits are unchanged.
+Reviewed per-run stop now has a separate approval, budget, operation and receipt,
+with exact-handle ownership, duplicate rejection and receipt-only recovery. Five
+service cases, four stop fault cases, HTTP and packaged imports pass. Its normal
+installed acceptance is pending. Windows guest execution, writable build outputs
+and remaining action integrations are unfinished implementation, not hardware
+blocks.
 
 At published `c6e8a50`, GitHub Linux release verification and the short native
 Windows client-platform lane pass. The complete Windows run 41846396332 passed

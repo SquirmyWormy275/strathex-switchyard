@@ -11,8 +11,8 @@ function verified(entries) {
   return structuredClone(entries);
 }
 export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects" } = {}) {
-  if (!["effects", "recovery", "execution"].includes(domain)) throw new Error("Unsupported protected repository journal domain.");
-  const field = domain === "effects" ? "repositoryEffectJournal" : domain === "recovery" ? "repositoryRecoveryJournal" : "repositoryExecutionJournal";
+  if (!["effects", "recovery", "execution", "execution-stop"].includes(domain)) throw new Error("Unsupported protected repository journal domain.");
+  const field = domain === "effects" ? "repositoryEffectJournal" : domain === "recovery" ? "repositoryRecoveryJournal" : domain === "execution" ? "repositoryExecutionJournal" : "repositoryExecutionStopJournal";
   const journal = {
     filePath: `suite-aead:${compartment}:repository-${domain}`, hasAuthenticatedProtection: true,
     async readEntries() { return verified((await store.snapshot(compartment))[field] ?? []); },

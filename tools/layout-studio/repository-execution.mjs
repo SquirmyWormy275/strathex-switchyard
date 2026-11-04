@@ -12,6 +12,7 @@ import { LinuxBubblewrapRepositoryProcessSupervisor } from "../../apps/linux-com
 import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
 import { createRepositoryExecutionSupervisors } from "./repository-execution-supervisor.mjs";
 import { createRepositoryExecutionStaging } from "./repository-execution-staging.mjs";
+import { createRepositoryExecutionStops } from "./repository-execution-stop.mjs";
 import { scopeHash } from "./confirmations.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
@@ -76,9 +77,11 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       recoveryHosts.set(c,recovery);
     }
     await recovery.recoverAfterRestart();
-    return staging.cleanupCompartment(c);
+    const cleanup=await staging.cleanupCompartment(c);await stops.recover(c);return cleanup;
   }
+  const stops=createRepositoryExecutionStops({store,supervisors,isActive,now,reconcile:recoverCompartment});
   return {
+    reviewStop:stops.review,applyStop:stops.apply,listStops:stops.list,
     recoverCompartment,
     async review(c,input){return exclusive(c,async g=>{
       const proposal=proposed(input);current(c,g);if(platform!=="linux")throw Error("Connected guest execution on this platform is unfinished implementation; no uncontained host substitute was selected.");
@@ -111,9 +114,9 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
     });},
     async list(c){return ((await store.snapshot(c)).repositoryExecutionReviews??[]).map(view);},
     async status(c,id){await recoverCompartment(c);await runtimes.get(`${c}:${id}`)?.runtime.reconcileBudgetedOperations();if(!uuid(id))throw Error("Choose an exact execution request UUID.");const s=await store.snapshot(c),r=s.repositoryExecutionReviews?.find(r=>r.requestId===id);if(!r)throw Error("That execution is unavailable in this workspace.");const native=s.repositoryExecutions?.find(n=>n.operationId===r.operationId);if(r.status==="running"&&native?.stoppedVerified===true&&(native.status==="settled"||native.stopRequestedAt)){const observedStatus=native.status==="settled"?(native.result?.status==="completed"&&native.result.exitCode===0?"completed":native.result?.status==="timed-out"?"timed_out":"failed"):"cancelled";await update(c,id,"repository-execution-terminal-observed",row=>{if(row.status==="running"){row.status="settled";row.observedStatus=observedStatus;row.terminalObservedAt=now();}});r.status="settled";r.observedStatus=observedStatus;}return {...view(r),nativeStatus:native?.status??"not-observed",nativeExitVerified:native?.stoppedVerified===true,output:native?.result?redactText(native.result.stdout):null,diagnostic:native?.result?redactText(native.result.stderr):native?.failure?redactText(native.failure.message):null,programExitCode:native?.result?.exitCode??null,stagingCleanupPending:s.repositoryExecutionStaging?.find(n=>n.operationId===r.operationId)?.cleanupPending??false};},
-    async stopCompartment(c){generations.set(c,(generations.get(c)??0)+1);const result=await supervisors.stopCompartment(c);await Promise.allSettled([pending.get(c)].filter(Boolean));const cleanup=await staging.cleanupCompartment(c);await recoveryHosts.get(c)?.reconcileBudgetedOperations();return {...result,...cleanup};},
+    async stopCompartment(c){generations.set(c,(generations.get(c)??0)+1);await stops.stopCompartment(c);const result=await supervisors.stopCompartment(c);await Promise.allSettled([pending.get(c)].filter(Boolean));const cleanup=await staging.cleanupCompartment(c);await recoveryHosts.get(c)?.reconcileBudgetedOperations();return {...result,...cleanup};},
     async close(){closed=true;for(const c of seen)generations.set(c,(generations.get(c)??0)+1);let failure;
-      try{await supervisors.close();}catch(error){failure=error;}
+      try{await stops.close();await supervisors.close();}catch(error){failure=error;}
       await Promise.allSettled(pending.values());
       try{for(const c of seen)await staging.cleanupCompartment(c);for(const host of runtimes.values())await host.runtime.reconcileBudgetedOperations();for(const host of recoveryHosts.values())await host.reconcileBudgetedOperations();}catch(error){failure??=error;}
       finally{for(const host of runtimes.values())host.runtime.stopObservation();for(const host of recoveryHosts.values())host.stopObservation();runtimes.clear();recoveryHosts.clear();}

@@ -8,7 +8,7 @@ bounded result. A successful program exit does not mark the coding task done.
 This backend path is API-only while the frontend is frozen. The current policy
 provides a read-only reviewed workspace, denied network and ambient credentials,
 and a 64 MiB temporary filesystem. It never mounts the live repository. Writable
-build outputs, Windows guest execution, reviewed per-run stop controls, debug,
+build outputs, Windows guest execution, debug,
 web, environment and pipeline connections remain implementation work. Workspace
 shutdown, keyboard-only mode and application shutdown stop owned executions.
 
@@ -73,6 +73,28 @@ executable identity and selected workspace are checked again before the effect.
 The existing policy, checkpoint, budget, operation and receipt ledgers mediate
 admission. Native readiness is persisted before the guardian receives its start
 acknowledgement. Cancellation monitoring remains attached through managed exit.
+
+## Stop one owned run
+
+POST `/api/suite/coding/execution/stop/review` with `compartment`, the original
+Run `requestId`, and a new `stopId` UUID. Inspect that exact managed-run binding,
+then POST `/api/suite/coding/execution/stop/apply` with compartment, stop ID and
+its separate one-use token. Stop requests cannot supply commands or process IDs.
+The original coding authority need not be extended to stop an already owned
+process; the selected Personal workspace and exact native handle are required.
+
+A separate 15-second budget, operation and receipt cover the stop postcondition.
+They never overwrite the original Run admission or claim that its program
+completed. Unknown native exit keeps the stop unresolved and its budget occupied.
+A later independent exit can release interrupted bookkeeping with an incomplete
+result; it cannot manufacture a passing receipt. A lost final result can be
+recovered from its exact protected receipt and verified native binding without
+another stop. Native handles lost across restart are observed rather than
+replaced with guessed PIDs.
+
+Five service cases, four focused stop faults, authenticated HTTP transport and
+package-import checks pass. Normal installed per-run stop acceptance is pending;
+the earlier eight-check installed journey covered Run and workspace shutdown.
 
 ## Retained evidence and recovery
 

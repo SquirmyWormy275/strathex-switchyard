@@ -196,6 +196,11 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         return path.endsWith("/review") ? repositoryExecution.review(compartment, proposal) : repositoryExecution.apply(compartment, proposal);
       }
       if (path === "/api/suite/coding/execution/list") return repositoryExecution.list(compartment);
+      if (path === "/api/suite/coding/execution/stop/review" || path === "/api/suite/coding/execution/stop/apply") {
+        const { workspaceBaseUrl, ...proposal } = body;
+        return path.endsWith("/review") ? repositoryExecution.reviewStop(compartment, proposal) : repositoryExecution.applyStop(compartment, proposal);
+      }
+      if (path === "/api/suite/coding/execution/stop/list") return repositoryExecution.listStops(compartment);
       if (path === "/api/suite/coding/execution/status") {
         if (Object.keys(body).some(k => !["compartment", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Inspect only one exact execution request identity.");
         return repositoryExecution.status(compartment, body.requestId);
@@ -316,7 +321,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, ...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, ...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);

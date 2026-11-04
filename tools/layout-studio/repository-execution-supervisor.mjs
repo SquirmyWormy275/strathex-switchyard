@@ -122,6 +122,7 @@ export function createRepositoryExecutionSupervisors({ store, command = runRunti
       };
     },
     async list(c) { return ((await store.snapshot(c)).repositoryExecutions ?? []).map(r=>({operationId:r.operationId,action:r.action,supervisorId:r.supervisorId,status:r.status,stoppedVerified:r.stoppedVerified,taskCompletionVerified:false})); },
+    async canStop(c,id) { const process=resources.get(keyFor(c,id))?.process;return Boolean(process && await process.isAlive()); },
     stopCompartment,stopOperation,reconcile,
     async close() { closed=true; const results=await Promise.all([...seen].map(stopCompartment)); if(results.some(r=>!r.stopped)) throw new Error("Retained execution ownership still needs independent exit verification."); }
   };
