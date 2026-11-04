@@ -208,7 +208,7 @@ test("a parent replaced after descriptor acquisition is rejected before reading 
   if (process.platform === "win32") {
     const outcome = await captured.then(value => ({ value }), error => ({ error }));
     if (renamePrevented) {
-      assert.ok("value" in outcome); assert.equal(outcome.value, createHash("sha256").update("original").digest("hex"));
+      assert.ok("value" in outcome); assert.equal(outcome.value, "sha256:" + createHash("sha256").update("original").digest("hex"));
       assert.equal(await readFile(join(parent, "task.txt"), "utf8"), "original");
       await assert.rejects(lstat(join(root, "moved")), { code: "ENOENT" }); assert.ok(reads > 0);
     } else { assert.ok("error" in outcome); assert.match(String(outcome.error), /parent changed/i); assert.equal(reads, 0); }

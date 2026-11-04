@@ -93,6 +93,7 @@ export class OwnedGitIndexLease {
   private readonly original: BigIntStats;
   private readonly initialLock: BigIntStats;
   private originalDigest?: string;
+  private indexClosed = false;
   private closed = false;
   private constructor(indexPath: string, index: FileHandle, lock: FileHandle, original: BigIntStats, lockStat: BigIntStats) {
     this.indexPath = indexPath; this.lockPath = `${indexPath}.lock`; this.index = index; this.lock = lock; this.original = original; this.initialLock = lockStat;
@@ -147,7 +148,7 @@ export class OwnedGitIndexLease {
     if (!this.originalDigest) throw new Error("Copy and verify the original index before recording preservation.");
     return { indexPath: this.indexPath, lockPath: this.lockPath, indexIdentity: this.indexIdentity, lockIdentity: this.lockIdentity, originalIndexSha256: this.originalDigest, lockStamp: gitFileStamp(this.initialLock) };
   }
-  async replaceWith(privateIndex: string): Promise<void> {
+  async replaceWith(privateIndex: string, { closeOriginalBeforeRename = process.platform === "win32" } = {}): Promise<void> {
     if (this.closed) throw new Error("This owned Git index lease is closed.");
     const root = dirname(privateIndex), captured = await new NodeFileDigestReader().read(root, relative(root, privateIndex));
     try {
@@ -160,8 +161,22 @@ export class OwnedGitIndexLease {
       const writtenStamp = await assertOwnedGitFile(this.lockPath, this.lock, this.lockIdentity);
       const verified = await readIndex(this.lockPath, this.lock, this.lockIdentity, writtenStamp);
       try { if (!verified.equals(captured.bytes)) throw new Error("The exact owned Git index bytes did not verify before replacement."); } finally { verified.fill(0); }
-      await assertOwnedGitFile(this.indexPath, this.index, this.indexIdentity);
-      await rename(this.lockPath, this.indexPath); await this.abandon();
+      const assertOriginal = (current: BigIntStats) => {
+        if (!current.isFile() || current.isSymbolicLink() || !sameIdentity(current, this.indexIdentity) || current.size !== this.original.size || current.mtimeNs !== this.original.mtimeNs || current.ctimeNs !== this.original.ctimeNs) throw new Error("The exact original Git index changed before atomic replacement. Preserve the different index.");
+      };
+      assertOriginal(await assertOwnedGitFile(this.indexPath, this.index, this.indexIdentity));
+      // MoveFileEx replacement on Windows can reject an open destination.
+      // Keep the verified source descriptor and conventional Git lock; release
+      // only our destination handle, then recheck its named native identity.
+      if (closeOriginalBeforeRename) { await this.index.close(); this.indexClosed = true; }
+      for (let attempt = 0; ; attempt++) {
+        assertOriginal(await lstat(this.indexPath, { bigint: true }));
+        const currentLock = await assertOwnedGitFile(this.lockPath, this.lock, this.lockIdentity);
+        if (currentLock.size !== writtenStamp.size || currentLock.mtimeNs !== writtenStamp.mtimeNs || currentLock.ctimeNs !== writtenStamp.ctimeNs) throw new Error("The verified replacement Git index changed before rename.");
+        try { await rename(this.lockPath, this.indexPath); break; }
+        catch (error) { if (!closeOriginalBeforeRename || !["EPERM", "EBUSY", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "") || attempt >= 5) throw error; await new Promise(r => setTimeout(r, 10 * 2 ** attempt)); }
+      }
+      await assertOwnedGitFile(this.indexPath, this.lock, this.lockIdentity); await this.abandon();
     } finally { captured.bytes.fill(0); }
   }
   async release(): Promise<void> {
@@ -169,5 +184,5 @@ export class OwnedGitIndexLease {
     try { const current = await assertOwnedGitFile(this.lockPath, this.lock, this.lockIdentity); if (current.size !== this.initialLock.size || current.mtimeNs !== this.initialLock.mtimeNs || current.ctimeNs !== this.initialLock.ctimeNs) throw new Error("The owned shared-index lock changed; preserve it for recovery."); await unlink(this.lockPath); }
     finally { await this.abandon(); }
   }
-  async abandon(): Promise<void> { if (this.closed) return; this.closed = true; await Promise.allSettled([this.index.close(), this.lock.close()]); }
+  async abandon(): Promise<void> { if (this.closed) return; this.closed = true; await Promise.allSettled([this.indexClosed ? undefined : this.index.close(), this.lock.close()]); }
 }

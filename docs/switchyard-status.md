@@ -1836,3 +1836,47 @@ Complete Linux acceptance passed 142/142 groups: 917 tests, 908 passed and
 nine declared platform skips; receipt c45acffa-ad97-461a-9983-861db0d6de03.
 The 51 focused checks and TypeScript checks also pass. The observer's write
 flag remains false and recovery application remains explicitly unimplemented.
+
+
+## Separate exact local commit admission connected to suite authority
+
+Authenticated commit review/execute/list now uses the existing task grant and
+its fresh native account/directory/task/target capture. A separately approved
+effect names the exact paths/content digests, message and explicit author.
+Arbitrary command/path overrides, force, push and merge fields are rejected
+before native inspection. The existing durable runtime supplies the policy,
+checkpoint, confirmation, budget, operation/child-saga and receipt path; the
+authority port can read existing protected grants but cannot mint a replacement.
+Provider tool permissions and coding-task completion claims remain unchanged.
+
+Three service cases pass, including a native Linux commit and tracked deletion
+through this full service. Duplicate requests return the same operation and
+receipt without another native command or commit. Changed targets, revoked
+grants, substituted approval/message and unsafe authors are rejected. The
+installed acceptance script creates one actual empty native task, submits no
+model prompt, commits only a disposable repository and restores selection and
+keyboard-only mode. Its installed result is recorded separately. Operator
+recovery application and general execution effects remain unfinished.
+
+Complete Linux acceptance before the subsequent Windows replacement correction
+passed 143/143 groups, 920 tests, 911 passed and nine platform skips; receipt
+2784a738-3235-4fa8-b048-0050a422cd31. Nineteen focused commit/runner checks,
+29 suite/authority/packaging checks and TypeScript checks pass.
+
+Windows run 41798074080 at `ae9af02` passed backend, documentation, native
+observer/guardian, fresh optional runtime and suite packaging. The final lane
+found a real descriptor-related index replacement refusal, consequential
+automation failure, and a Windows-only digest assertion missing its `sha256:`
+prefix. The replacement now closes only the verified destination descriptor
+immediately before rename, rechecks its native identity/stamp and the held
+source on every bounded sharing-error retry, and proves the final renamed
+identity. A native-file close-race fault preserves a competing destination.
+All 32 affected Linux cases pass; native Windows acceptance is pending.
+
+Complete Linux acceptance after the replacement correction passed 144/144
+groups: 921 tests, 912 passed and nine declared platform skips; receipt
+e96cb30f-111e-4d7b-89f3-b963daf9493c. TypeScript checks and all 32 affected
+Git/inspector cases pass. Corrected native Windows acceptance remains pending.
+The prior `39a1534` source passed the normal six-check installed update, receipt
+assignment-legends-1793782119744.json; its 461-file, 4,330,999-byte source bundle
+was removed after verification. The frozen frontend/private link were preserved.

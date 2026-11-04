@@ -44,7 +44,7 @@ function ledger(state, now) {
     } })
   }, { clock: () => new Date(now()).toISOString() });
 }
-export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store }), now = () => Date.now() } = {}) {
+export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store }), localCommitExecutionImplemented = false, now = () => Date.now() } = {}) {
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
   async function access(c, id, generation) {
@@ -68,19 +68,43 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     if (proposed.paths.some(p => !tracked.has(p) && !included.has(p))) throw new Error("Each task-owned file must be tracked or explicitly included in this exact snapshot.");
     const actualUntracked = new Set(files.untracked.map(f => f.path)), actualIgnored = new Set(files.ignored.map(f => f.path));
     if ([...proposed.classifications.includedUntracked, ...proposed.classifications.excludedUntracked].some(p => !actualUntracked.has(p)) || proposed.classifications.excludedIgnored.some(p => !actualIgnored.has(p))) throw new Error("A reviewed input classification no longer matches the actual repository.");
-    return { task, binding, workspace, snapshot, proposed };
+    return { task, binding, workspace, snapshot, proposed, files };
   }
   async function exclusive(c, fn) {
     if (pending.has(c)) throw new Error("Wait for the current task authority inspection to settle.");
     pending.add(c); seen.add(c); try { return await fn(generations.get(c) ?? 0); } finally { pending.delete(c); }
   }
   const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
-  const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: false });
+  const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented) });
   return {
+    /** Host ports only. No public route accepts a grant, snapshot or native identity. */
+    authorityLedger(c) {
+      return new AuthorityLedger({
+        readEntries: async () => (await store.snapshot(c)).taskAuthorityJournal ?? [],
+        transaction: async () => { throw new Error("Issue and revoke task authority only through its separately reviewed host routes."); }
+      }, { clock: () => new Date(now()).toISOString() });
+    },
+    async assertCurrent(c, id) {
+      const generation = generations.get(c) ?? 0, s = await store.snapshot(c), record = s.taskAuthorities?.find(r => r.id === id);
+      if (!record) throw new Error("That scoped task authority is unavailable.");
+      const { state, task } = await access(c, record.taskId, generation), decision = await ledger(state, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
+      if (!decision.allowed || taskDigest(task) !== record.taskDigest || workspaceDigest(state) !== record.workspaceDigest) throw new Error("The exact task authority, native binding, account or workspace policy changed.");
+      current(c, generation); return { task, record: structuredClone(record) };
+    },
+    async resolve(c, id) { return exclusive(c, async generation => {
+      const state = await store.snapshot(c), record = state.taskAuthorities?.find(r => r.id === id);
+      if (!record) throw new Error("That scoped task authority is unavailable.");
+      const decision = await ledger(state, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
+      if (!decision.allowed) throw new Error(decision.reason);
+      const actual = await capture(c, record.proposal, generation), fresh = await store.snapshot(c), latest = await ledger(fresh, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
+      current(c, generation);
+      if (!latest.allowed || actual.binding !== record.taskDigest || actual.workspace !== record.workspaceDigest || actual.snapshot.id !== record.targetSnapshot.id) throw new Error("The exact task authority target changed. Review a new grant; this one was not redirected.");
+      return { ...actual, record: structuredClone(record) };
+    }); },
     async review(c, input) { return exclusive(c, async generation => {
       const result = await capture(c, proposal(input), generation); current(c, generation);
       const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
-        reason: "Authorize only the host local-commit broker for these literal files, plan revision, native task/account and repository snapshot. Provider tools and native permissions stay unchanged. Every commit still needs a separate exact effect review; the suite commit route is not yet connected.", reauthenticated: false });
+        reason: "Authorize only the host local-commit broker for these literal files, plan revision, native task/account and repository snapshot. Provider tools and native permissions stay unchanged. Every commit still needs a separate exact effect review through the host commit broker.", reauthenticated: false });
       current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: ["local_commit"] }, nativePermissionsChanged: false };
     }); },
     async issue(c, input) { return exclusive(c, async generation => {
@@ -114,7 +138,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const fresh = await store.snapshot(c), latest = await ledger(fresh, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action: "local_commit" });
       current(c, generation);
       const allowed = latest.allowed && actual.binding === record.taskDigest && actual.workspace === record.workspaceDigest && actual.snapshot.id === record.targetSnapshot.id;
-      return { allowed, reason: !latest.allowed ? latest.reason : allowed ? "The exact scoped authority and repository snapshot remain current; a separately reviewed commit effect is still required." : "The task, policy or repository changed. Issue a newly reviewed authority; this grant was not redirected.", targetSnapshotId: actual.snapshot.id, nativePermissionsChanged: false, localCommitExecutionImplemented: false };
+      return { allowed, reason: !latest.allowed ? latest.reason : allowed ? "The exact scoped authority and repository snapshot remain current; a separately reviewed commit effect is still required." : "The task, policy or repository changed. Issue a newly reviewed authority; this grant was not redirected.", targetSnapshotId: actual.snapshot.id, nativePermissionsChanged: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented) };
     }); },
     async stopCompartment(c) {
       generations.set(c, (generations.get(c) ?? 0) + 1);

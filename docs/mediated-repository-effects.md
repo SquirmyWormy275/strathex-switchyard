@@ -2,9 +2,10 @@
 
 The companion's local-commit component now stages verified bytes without running
 repository filters and creates commits through Git's plumbing interfaces. The
-suite authority API is already connected; its separate commit-effect admission
-and recovery connection is still unfinished. A suite authority grant currently
-does not execute this component or change native provider permissions.
+suite authority API and its separate exact commit review/execute routes are
+connected. An authority grant alone does not execute a commit or change native
+provider permissions. Recovery inspection is connected; recovery application
+remains unfinished.
 
 ## From reviewed target to commit
 
@@ -56,8 +57,9 @@ operation ID. Successful cleanup removes owned files and empty staging folders.
 An unconfirmed native command exit retains the exact indices, hooks directory
 and locks for recovery, with an ambiguous result. It does not guess that a
 process stopped or release a lock while an unknown effect may still be running.
-The suite must connect independent native-exit reconciliation and recovery
-before enabling this effect API. The existing companion handler remains behind
+The suite verifies retained native owners and exposes no-replay recovery
+observations. An uncertain effect blocks another review pending explicit
+operator reconciliation; the recovery apply route remains unfinished. The existing companion handler remains behind
 its own broker and final-effect guard; it is not a standalone authority boundary.
 
 Nineteen tests use actual disposable repositories and Git processes. They cover
@@ -110,11 +112,10 @@ retention across an unknown exit/restart and cancellation with late output.
 Native Windows has a declared skip for the Linux guardian journey; its existing
 helper lane separately checks the underlying native command transport.
 
-The suite now exposes read-only recovery listing and inspection through its
-authenticated API. Public commit admission and separately confirmed recovery
-application remain unconnected. This internal demonstration does not enable the
-task authority API to execute a commit. Those effect routes and their normal
-installed acceptance remain implementation work. The transport currently bounds an operation to 128 commands
+The suite exposes read-only recovery listing/inspection and separate commit
+review/execute routes through its authenticated API. Recovery application
+remains unconnected. An authority grant alone cannot execute a commit; every
+effect needs a separate exact one-use approval. The transport currently bounds an operation to 128 commands
 and two minutes, each command to ten seconds, and index checkpoints to 512 KiB.
 Encrypted checkpoint and effect journal inventories each have a 2 MiB bound;
 recovery data is preserved when either fills. The offline suite now includes only
@@ -164,3 +165,57 @@ exit is unconfirmed. Shutdown still closes other owned resources if a recovery
 component reports failure. Ordinary frontend snapshots omit effect journals,
 original-index checkpoint bytes and private operation records; explicit recovery
 routes return bounded observations instead. No frontend asset changed.
+
+
+## Review and execute one local commit
+
+The authenticated `/api/suite/coding/commits/` routes reuse an existing reviewed
+task authority. `review` accepts only `requestId`, `authorityId`, `message` and
+`author: { name, email }`, plus the workspace `compartment`. It accepts no shell
+command, path override, force flag, push or merge request. The returned packet
+shows the exact native task/session, root/branch, owned file digests, complete
+target ID, message and author. No author is guessed from global Git or an account.
+
+`execute` accepts only the same `requestId` and the separate returned one-use
+`token`. The server rechecks native task/account/root identity and recaptures the
+whole target, uses the existing authority ledger, records a host broker context
+without inventing provider capabilities, and admits the operation through the
+core checkpoint, confirmation, policy and budget gates. The budget allows one
+concurrent local commit, one attempt, two minutes and at most 20 claims per hour.
+The existing handler receives only the reviewed paths/message/author.
+
+Completed duplicate requests return the original protected operation and receipt
+with `replayed: true`; they do not create a new commit or launch another native
+command. Uncertain requests return their retained result and block another
+review pending explicit reconciliation. `list` returns review/result metadata.
+Keyboard-only selection, workspace suspension and shutdown invalidate pending
+work and stop only owned native resources. Imported profiles and provider output
+cannot create these grants or reviews.
+
+Three service scenarios pass: unsafe input before native inspection,
+substituted/changed/revoked approvals, and a real native Linux commit including
+a tracked deletion, exact author, shared-index reconciliation, independent
+guardian exit and duplicate request/receipt readback. Their native coding
+identity is explicitly synthetic. The explicit normal installed acceptance
+script is separate and creates one empty actual native task without prompting:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-repository-commit-host.mjs --synthetic
+```
+
+It commits only its new disposable repository, checks binary content and an
+unowned edit, reads the installed recovery API, restores selection/keyboard-only
+mode and removes successful private staging. Failure retains evidence and
+recovery records. Native task history is kept; no model is prompted.
+
+Native Windows run 41798074080 rejected index replacement while the original
+destination descriptor was held, as well as a missing `sha256:` prefix in a
+Windows-only test expectation. The replacement sequence now releases its own
+verified destination handle immediately before rename, rechecks native identity
+and timestamps, and retains the source descriptor plus Git's conventional lock.
+Bounded sharing-error retries recheck both files every time; no busy foreign
+lock or changed destination is overwritten. An actual-file fault case exercises
+the same sequence on Linux and replaces the destination during close; it remains
+untouched. Complete corrected native Windows acceptance remains pending. The
+implementation uses libuv's [MoveFileEx replacement](https://github.com/libuv/libuv/blob/v1.x/src/win/fs.c)
+with the [documented Windows move API](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw).

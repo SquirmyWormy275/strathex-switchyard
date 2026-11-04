@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { access, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -13,7 +13,7 @@ import { GitCliInspector } from "../../../packages/control-plane/src/git-inspect
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
 import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "../src/mediated-git.ts";
-import { OwnedGitIndexLease, reopenOwnedGitFileLock } from "../src/git-index-lease.ts";
+import { OwnedGitIndexLease, reopenOwnedGitFileLock, captureGitFile } from "../src/git-index-lease.ts";
 import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 
 class RecordingChildSaga implements ChildOperationSaga {
@@ -434,6 +434,23 @@ test("reopening a preserved lease refuses in-place lock changes and changed orig
     await rm(path + ".lock"); const second = await OwnedGitIndexLease.acquire(path); await second.copyOriginalTo(join(isolated.state, "copy-2")); const next = second.preservation(); await second.abandon();
     await writeFile(path, "different original bytes");
     await assert.rejects(OwnedGitIndexLease.reopenPreserved(next), /original Git index content changed/); assert.equal(await readFile(path, "utf8"), "different original bytes"); await access(path + ".lock");
+  } finally { await isolated.dispose(); }
+});
+
+test("the Windows replacement sequence closes its destination and preserves a competing replacement after that close", async () => {
+  const isolated = await fixture();
+  try {
+    const path = join(isolated.root, ".git/index"), copy = join(isolated.state, "windows-copy"), lease = await OwnedGitIndexLease.acquire(path); await lease.copyOriginalTo(copy);
+    const expected = await readFile(path), replacementIdentity = lease.lockIdentity; await lease.replaceWith(copy, { closeOriginalBeforeRename: true });
+    const captured = await captureGitFile(path); try { assert.deepEqual(captured.identity, replacementIdentity); assert.deepEqual(captured.bytes, expected); } finally { captured.bytes.fill(0); }
+    const second = await OwnedGitIndexLease.acquire(path), nextCopy = join(isolated.state, "windows-copy-2"); await second.copyOriginalTo(nextCopy);
+    // Fault the actual descriptor close: another writer replaces the pathname
+    // in the Windows-specific gap. The final named identity check must reject it.
+    const held = (second as unknown as { index: FileHandle }).index, close = held.close.bind(held);
+    held.close = async () => { await close(); await rename(path, path + ".prior-owned"); await writeFile(path, "competing index after destination close"); };
+    try { await assert.rejects(second.replaceWith(nextCopy, { closeOriginalBeforeRename: true }), /original Git index changed/); }
+    finally { await second.abandon(); }
+    assert.equal(await readFile(path, "utf8"), "competing index after destination close"); await access(path + ".lock");
   } finally { await isolated.dispose(); }
 });
 

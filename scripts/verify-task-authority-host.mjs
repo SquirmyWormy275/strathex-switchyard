@@ -41,7 +41,7 @@ try {
  const proposed = { compartment, taskId, planRevision: "synthetic-plan-1", paths: ["task.txt"], lifetimeMinutes: 5 };
  const review = await api("coding/authority/review", proposed); assert.equal(review.scope.targetSnapshot.completeness, "complete"); assert.equal(review.scope.repositoryRoot, repositoryRoot); assert.equal(review.scope.sessionId, task.sessionId); assert.deepEqual(review.scope.allowedActions, ["local_commit"]);
  checks.push("installed review captured actual Git contents under protected native guardians");
- const grant = await api("coding/authority/issue", { ...proposed, token: review.confirmation.token }); grantId = grant.id; assert.equal(grant.grant.taskId, taskId); assert.equal(grant.nativePermissionsChanged, false); assert.equal(grant.localCommitExecutionImplemented, false);
+ const grant = await api("coding/authority/issue", { ...proposed, token: review.confirmation.token }); grantId = grant.id; assert.equal(grant.grant.taskId, taskId); assert.equal(grant.nativePermissionsChanged, false); assert.equal(grant.localCommitExecutionImplemented, true);
  assert.equal((await api("coding/authority/revalidate", { compartment, id: grant.id })).allowed, true);
  checks.push("one-use approval issued the exact protected authority and a fresh snapshot revalidated");
  await api("coding/authority/issue", { ...proposed, token: review.confirmation.token }, 409); await api("coding/authority/review", proposed, 401, false);

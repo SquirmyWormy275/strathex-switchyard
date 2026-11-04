@@ -6,13 +6,12 @@ one verified coding task, plan revision, literal file list and complete Git
 snapshot. The grant uses the existing control-plane authority and confirmation
 ledgers inside the workspace's encrypted state.
 
-The suite's commit-effect route is still unfinished. These controls establish
-and revalidate its authority boundary; they do not enable native provider tools,
-change a model's permissions, execute a plan, stage files or create a commit.
-The existing companion commit broker remains a separate implementation until
-its policy, containment, native ownership, final-effect and recovery barriers
-are connected here. The [repository-effect contract](mediated-repository-effects.md)
-describes the implemented companion component and its remaining suite connection.
+Authority and effects use separate approvals. These authority routes do not
+enable native provider tools, change model permissions or execute a plan. The
+[host commit API](mediated-repository-effects.md#review-and-execute-one-local-commit)
+now independently reviews and executes a local commit through the existing
+policy, checkpoint, budget, operation and native ownership barriers. Recovery
+inspection is read-only; operator recovery application remains unfinished.
 
 ## Review an exact scope
 
@@ -29,7 +28,7 @@ conversation, not just a locally reserved UUID.
    the approval. A repeated token cannot mint another grant.
 3. Call `revalidate` with the grant `id` before using it. Expiry, revocation,
    changed snapshots or changed bindings deny authorization. This result is not
-   an execution permit; a future effect must independently check again.
+   an execution permit; the separately reviewed effect independently checks again.
 4. Use `list` to inspect the workspace's protected records, or `revoke` with an
    exact `id`. Revocation works in keyboard-only mode. Workspace suspension,
    keyboard-only selection and orderly shutdown revoke owned grants.
