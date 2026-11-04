@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -21,10 +21,11 @@ async function fixture(context: test.TestContext) {
   const trustPath = join(source, "trust.json");
   await writeFile(trustPath, JSON.stringify({ schema: "sxsy-b122.scanner-fixture-trust", version: 1, authorityId: "security-lab", keyId, publicKeyPem, allowedKinds: ["scanner", "advisory"], expiresAt: "2027-08-24T12:00:00.000Z" }), "utf8");
   const presence = { async verify() { return { verified: true, operator: "TEST\\Security" }; } };
-  const registry = new DurableScannerFixtureRegistry(new ProtectedJsonStore({ filePath: join(state, "protected.jsonl") }), state, () => new Date(observedAt));
+  const store=new ProtectedJsonStore({ filePath: join(state, "protected.jsonl") });
+  const registry = new DurableScannerFixtureRegistry(store, state, () => new Date(observedAt));
   const administration = createScannerFixtureAdministration({ registry, presence, now: () => new Date(observedAt) });
   await administration.installTrust(trustPath);
-  return { root, source, state, keys, keyId, registry, administration };
+  return { root, source, state, keys, keyId, store, registry, administration };
 }
 
 async function signedManifest(setup: Awaited<ReturnType<typeof fixture>>, id: string, kind: "scanner" | "advisory", overrides: Readonly<Record<string, unknown>> = {}): Promise<string> {
@@ -71,6 +72,37 @@ test("fixture IDs, signatures, freshness, kind, and revocation all fail closed",
   await setup.administration.revokeFixture("revoked-feed", "feed withdrawn");
   await assert.rejects(setup.registry.resolve({ scannerFixtureIds: ["revoked-feed"], advisoryFixtureIds: [], observedAt }), /not actively installed/i);
   await assert.rejects(setup.registry.resolve({ scannerFixtureIds: [], advisoryFixtureIds: ["revoked-feed"], observedAt }), /not actively installed/i);
+});
+
+test("independent concurrent fixture installers cannot replace or erase the accepted destination",async context=>{
+  const setup=await fixture(context),manifest=await signedManifest(setup,"concurrent-feed","scanner");
+  const other=new DurableScannerFixtureRegistry(new ProtectedJsonStore({filePath:setup.store.filePath}),setup.state,()=>new Date(observedAt));
+  const results=await Promise.allSettled([setup.registry.installFixture(manifest,"first"),other.installFixture(manifest,"second")]);
+  assert.equal(results.filter(r=>r.status==="fulfilled").length,1);assert.equal(results.filter(r=>r.status==="rejected").length,1);
+  assert.equal((await setup.registry.listFixtures()).length,1);
+  assert.equal((await setup.registry.resolve({scannerFixtureIds:["concurrent-feed"],advisoryFixtureIds:[],observedAt})).length,1);
+  assert.deepEqual((await readdir(join(setup.state,"scanner-fixtures","concurrent-feed"))).sort(),["content.bin","manifest.json"]);
+});
+
+test("a lost final fixture acknowledgement preserves its committed journal and original files without replay",async context=>{
+  const setup=await fixture(context),manifest=await signedManifest(setup,"lost-ack-feed","scanner"),append=setup.store.append.bind(setup.store);
+  setup.store.append=async(kind,payload)=>{const result=await append(kind,payload);if(kind==="b122.scanner-fixture.install.v1")throw Error("Synthetic lost acknowledgement");return result;};
+  await assert.rejects(setup.registry.installFixture(manifest,"operator"),/unconfirmed/);
+  const path=join(setup.state,"scanner-fixtures","lost-ack-feed","content.bin"),before=await readFile(path);
+  assert.equal((await setup.registry.listFixtures()).length,1);assert.equal((await setup.registry.resolve({scannerFixtureIds:["lost-ack-feed"],advisoryFixtureIds:[],observedAt})).length,1);
+  await assert.rejects(setup.registry.installFixture(manifest,"retry"),/already installed/);assert.deepEqual(await readFile(path),before);
+});
+
+test("an unfamiliar empty or populated fixture directory is preserved before any writes",async context=>{
+  const setup=await fixture(context);await mkdir(join(setup.state,"scanner-fixtures"));
+  for(const id of ["foreign-empty","foreign-populated"]){
+    const manifest=await signedManifest(setup,id,"scanner"),root=join(setup.state,"scanner-fixtures",id);await mkdir(root);
+    if(id==="foreign-populated")await writeFile(join(root,"foreign.txt"),"preserve this independent file");
+    await assert.rejects(setup.registry.installFixture(manifest,"operator"),/preserve/);
+    assert.deepEqual(await readdir(root),id==="foreign-empty"?[]:["foreign.txt"]);
+    if(id==="foreign-populated")assert.equal(await readFile(join(root,"foreign.txt"),"utf8"),"preserve this independent file");
+  }
+  assert.equal((await setup.registry.listFixtures()).length,0);
 });
 
 function canonical(value: unknown): string { if (value === null || typeof value !== "object") return JSON.stringify(value); if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`; }

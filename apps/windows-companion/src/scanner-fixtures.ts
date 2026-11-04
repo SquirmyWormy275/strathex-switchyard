@@ -1,6 +1,6 @@
 /** Signed scanner/advisory fixture installation and freshness verification. */
-import { createHash, createPublicKey, randomUUID, verify } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { createHash, createPublicKey, verify } from "node:crypto";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
@@ -100,22 +100,26 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     if (!inside(sourceRoot, contentSource.path)) throw new Error("Scanner fixture content resolves outside its signed package boundary.");
     await this.verifyManifest(manifest, source.bytes, sourceRoot, this.now(), contentSource.bytes);
     const destination = resolve(this.packageRoot, manifest.id);
-    const staging = resolve(this.packageRoot, `.${manifest.id}.${randomUUID()}.tmp`);
-    if (!inside(this.packageRoot, destination) || !inside(this.packageRoot, staging)) throw new Error("Scanner fixture identity escaped host state.");
+    if (!inside(this.packageRoot, destination)) throw new Error("Scanner fixture identity escaped host state.");
     if ((await this.fixtures()).some((item) => item.id === manifest.id)) throw new Error("Scanner fixture identity is already installed and cannot be replaced in place.");
-    await mkdir(this.packageRoot, { recursive: true });
-    await mkdir(staging);
+    await mkdir(this.packageRoot, { recursive: true, mode: 0o700 });
+    // Exclusive creation is the cross-process reservation. A rename could
+    // replace an unfamiliar empty directory; a failed second installer must
+    // never remove the first installer's destination or accepted contents.
+    try { await mkdir(destination, { mode: 0o700 }); }
+    catch { throw new Error("The scanner fixture directory already exists or cannot be reserved; preserve its original files and reconcile before retrying."); }
     try {
-      await writeFile(resolve(staging, "manifest.json"), source.bytes, { flag: "wx" });
-      await writeFile(resolve(staging, "content.bin"), contentSource.bytes, { flag: "wx" });
-      await this.verifyInstalledAt(staging, this.now());
-      await rename(staging, destination);
+      await writeFile(resolve(destination, "manifest.json"), source.bytes, { flag: "wx", mode: 0o600 });
+      await writeFile(resolve(destination, "content.bin"), contentSource.bytes, { flag: "wx", mode: 0o600 });
+      await this.verifyInstalledAt(destination, this.now());
       const manifestSha256 = sha256(source.bytes);
       const entry = await this.store.append(fixtureInstallKind, { id: manifest.id, kind: manifest.kind, packageRoot: destination, manifestSha256, installedBy: bounded(installedBy, "scanner fixture operator", 160) });
       return { id: manifest.id, kind: manifest.kind, packageRoot: destination, manifestSha256, installedAt: entry.at, installedBy, status: "active" };
-    } catch (error) {
-      await Promise.all([rm(staging, { recursive: true, force: true }), rm(destination, { recursive: true, force: true })]);
-      throw error;
+    } catch {
+      // The durable append may have committed before its acknowledgement was
+      // lost. Preserve the exact reservation and files; never replay or erase
+      // a possibly accepted fixture, or recursively delete unfamiliar content.
+      throw new Error("The scanner fixture installation outcome is unconfirmed; preserve its reserved directory and protected journal for reconciliation.");
     }
   }
 
