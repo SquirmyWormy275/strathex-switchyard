@@ -13,9 +13,9 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `15cd19b` is installed as release
-`345605f95d18e54617de469edfb86a34a7376a7ad8c3c48b07c9c0ba7d43259e`: 468 files,
-4,417,965 bytes. Six normal update checks pass (assignment-legends-1793792770918.json).
+Published source `7012333` is installed as release
+`5625f7250f4133a9f1dbcc7b949b2ad0c3042494ef7e610b6e79bda43dd791e8`: 468 files,
+4,417,965 bytes. Six normal update checks pass (assignment-legends-1793793990974.json).
 Current plus one rollback occupy about 11 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
@@ -53,6 +53,16 @@ preserved.
 
 ## Windows client verification
 
+Current source 7012333 passes all 60 checks in six native Windows boundary
+groups, including shared reviewed-input validation, exact role routing and actual
+Windows PowerShell WinRT/AsTask metadata without URI activation. Run
+[41826311362](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41826311362),
+receipt c04c5387-af12-480c-87f3-84015b127275. Tested merge commit 7074fdf has the
+exact same source tree. Artifact 13319542094 (1,573 bytes) was downloaded in memory
+and SHA-256 verified; only client-platform-windows-7012333.json remains privately.
+No archive or runtime copy was retained. Windows guest input staging remains
+unfinished; these checks do not accept an interactive URI/account/window.
+
 The published role source 15cd19b passes all 47 checks in five native Windows
 client groups, including actual Windows PowerShell WinRT/AsTask metadata without
 URI activation. Run [41823579833](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41823579833),
@@ -65,7 +75,11 @@ The earlier WinRT source ea96ffe passed 41 checks after correcting native UTF-8
 startup and the fixed Utility module; the original 40/41 timeout remains in the
 verification history. The 15-second metadata deadline was preserved. These are
 accepted software/native metadata checks, not interactive Windows URI, account,
-window or device acceptance. The complete newer Windows release remains pending.
+window or device acceptance. The complete newer Windows release remains pending. Run 41823818569 at source
+38eb56d has passed backend, native helper build, owner-loss, optional-runtime and
+suite packaging steps; complete bundle verification was still running at the
+last check. The newer 7012333 full run is queued behind it. Track fresh runs after
+subsequent documentation checkpoints; do not relabel queueing as a hardware block.
 
 ## Client roles and physical intent connection
 
@@ -134,8 +148,9 @@ bootloader, solenoid operation, public release, merge or license change occurred
 ## Next executable work
 
 1. Connect host-pinned general execution recipes to the task authority, durable
-   operation/budget and containment paths; local commits alone do not complete
-   the execution integration.
+   operation/budget and owned-guardian paths, reusing the reviewed input provider.
+   Finish Windows guest staging, output quotas and restart staging recovery; the
+   older direct process-group launcher is not the desktop readiness/exit protocol.
 2. Complete exact native desktop/IDE/terminal attachments and the remaining
    source-verified controller controls, without substituting homepage launch for
    session identity or inferring electrical capabilities.

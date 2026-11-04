@@ -138,3 +138,24 @@ Fresh installed device enumeration returned zero configuration interfaces
 keyboard configuration. F77/B122 physical checks remain unavailable, separate
 from unfinished general execution, Windows guest input staging and frontend
 implementation.
+
+Installed source `7012333` passed six normal update checks
+(assignment-legends-1793793990974.json), preserving the exact frozen frontend,
+private link, definitions and modes. The package is 468 files/4,417,965 bytes;
+current plus rollback remain about 11 MiB and bundle staging is empty. The new
+Linux companion input provider was exercised through its explicit source/native
+proof; the Studio general execution route remains unfinished.
+
+Current source `7012333` passes all 60 tests in six native Windows boundary groups,
+run [41826311362](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41826311362),
+job 126561818571, receipt `c04c5387-af12-480c-87f3-84015b127275`. The tested merge
+7074fdf93fd1f26c6c32c9e49973f8fc3630f40e has the exact source tree
+8a1a6cabd02cdaad84ae846a7daa384cc3356008. Artifact 13319542094 (1,573 bytes) was
+downloaded in memory and verified against SHA-256
+`96da326f683a19a586a7f69cd3fd0501461dec175849f5204586cd4978706be5`. Only its
+private JSON receipt remains. This accepts portable reviewed-input parsing and
+client/role/native metadata boundaries; Windows guest staging, interactive
+hotkeys, URI/account/window behavior and the complete newer Windows bundle
+remain separate. The complete release at 38eb56d (run 41823818569) has passed
+backend/native helper/owner-loss/optional-runtime/package steps and remains in
+complete bundle verification; its source predates the reviewed-input change.
