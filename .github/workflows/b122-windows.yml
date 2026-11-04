@@ -117,8 +117,20 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
-          & node scripts/verify-windows-reviewed-inputs.mjs --synthetic "--helper=$exe"
-          if ($LASTEXITCODE -ne 0) { throw 'Native reviewed input, ACL, sharing or ownership verification failed.' }
+          # Reuse the already hash-verified official archive on the helper's
+          # volume. Extract only node.exe; staging itself must use hard links.
+          $nodeRoot = Join-Path $env:RUNNER_TEMP ('switchyard-native-node-' + [guid]::NewGuid().ToString('D'))
+          New-Item -ItemType Directory -Path $nodeRoot | Out-Null
+          $node = Join-Path $nodeRoot 'node.exe'
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($env:NODE_RUNTIME_ARCHIVE)
+          try {
+            $entry = $zip.GetEntry("node-v$env:NODE_RUNTIME_VERSION-win-x64/node.exe")
+            if ($null -eq $entry) { throw 'The verified official Node image is missing.' }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $node, $false)
+          } finally { $zip.Dispose() }
+          & node scripts/verify-windows-reviewed-inputs.mjs --synthetic "--helper=$exe" "--node=$node"
+          if ($LASTEXITCODE -ne 0) { throw 'Native reviewed input, tool links, ACL, sharing or ownership verification failed.' }
+          Remove-Item -LiteralPath $nodeRoot -Recurse -Force
 
       - name: Retain native Windows input verification
         if: always()

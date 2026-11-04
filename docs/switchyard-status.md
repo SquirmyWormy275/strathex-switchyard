@@ -121,7 +121,14 @@ release their in-process slot after independently verified late exit. Six actual
 compiled entry/guard checks pass with zero warnings/errors; source/assembly
 hashes were retained and scratch removed. Native Windows link/renamed-entry
 acceptance is now included in CI, pending. [Tool contract](windows-guest-tools.md).
-The Studio Windows Run adapter, selected recipe runtime staging, bounded writable
+One host-pinned Node runtime now stages beside that worker as a second exact
+hard link. Requests cannot supply tool paths; copied trusted configuration,
+independent source hashes/identities, native write-sharing prevention and
+interrupted two-link cleanup pass 47 focused cases. The updated helper compiles
+without warnings/errors and Linux native-only guards pass; scratch was removed
+after `windows-node-tools-build-20261104.json` retained source/assembly hashes.
+Actual Windows Node version/identity/sharing acceptance is in CI, pending.
+The Studio Windows Run adapter, bounded writable
 exchange, broader build outputs and remaining action connections are unfinished
 implementation, not hardware blocks. The coordinator explicitly reports no
 exchange filesystem quota. Actual VM startup/login/worker/stop/restart acceptance
@@ -292,7 +299,7 @@ bootloader, solenoid operation, public release, merge or license change occurred
 
 1. Connect host-pinned general execution recipes to the task authority, durable
    operation/budget and owned-guardian paths, reusing the reviewed input provider.
-   Finish selected Windows recipe runtime staging, the bounded writable exchange, Studio
+   Finish the bounded Windows writable exchange, Studio
    execution adapter and broader output/restart recovery; the
    older direct process-group launcher is not the desktop readiness/exit protocol.
 2. Complete exact native desktop/IDE/terminal attachments and the remaining

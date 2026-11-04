@@ -197,18 +197,20 @@ internal static class ReviewedInputStager
     }
 
     // Link only this exact running helper image. The same image embeds the
-    // fixed guest worker; no caller supplies a replacement tool or executable.
+    // fixed guest worker. A trusted host may additionally pin one node.exe;
+    // neither mode copies a runtime or accepts arbitrary target tool names.
     public static int RunToolLink()
     {
         const string schema = "switchyard-windows-guest-tools/v1";
-        var handles = new List<SafeFileHandle>(); string phase = "request";
+        var handles = new List<SafeFileHandle>(); var streams = new List<FileStream>(); string phase = "request";
         try
         {
             Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
-            Exact(request, "schema", "operationId", "sourceIdentity", "stagingRoot", "stagingIdentity", "expectedSha256");
+            bool withNode = request.TryGetProperty("nodeRuntime", out var node);
+            Exact(request, withNode ? new[] { "schema", "operationId", "sourceIdentity", "stagingRoot", "stagingIdentity", "expectedSha256", "nodeRuntime" } : new[] { "schema", "operationId", "sourceIdentity", "stagingRoot", "stagingIdentity", "expectedSha256" });
             if (request.GetProperty("schema").GetString() != schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation)) throw Invalid();
             string source = Environment.ProcessPath ?? throw Invalid(), stageRoot = Absolute(request.GetProperty("stagingRoot")), expected = request.GetProperty("expectedSha256").GetString() ?? "";
             if (!Path.GetFileName(source).Equals("Switchyard.Hotkeys.exe", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(stageRoot) != "tools-" + operation.ToString("D") || !Digest.IsMatch(expected)) throw Invalid();
@@ -221,6 +223,18 @@ internal static class ReviewedInputStager
             using var stream = new FileStream(Open(source, false), FileAccess.Read); var sourceIdentity = Information(stream.SafeFileHandle, false);
             long bytes = checked((long)(((ulong)sourceIdentity.SizeHigh << 32) | sourceIdentity.SizeLow));
             if (!Matches(sourceIdentity, request.GetProperty("sourceIdentity")) || bytes is < 1 or > 128L * 1024 * 1024 || Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant() != expected) throw Invalid();
+            string nodePath = "", nodeSha256 = ""; long nodeBytes = 0; FileInformation nodeIdentity = default;
+            if (withNode)
+            {
+                phase = "node-runtime";
+                Exact(node, "path", "identity", "sha256");
+                nodePath = Absolute(node.GetProperty("path")); nodeSha256 = node.GetProperty("sha256").GetString() ?? "";
+                if (!Path.GetFileName(nodePath).Equals("node.exe", StringComparison.OrdinalIgnoreCase) || !Digest.IsMatch(nodeSha256)) throw Invalid();
+                PinDirectories(Path.GetDirectoryName(nodePath)!, handles);
+                var nodeHandle = Open(nodePath, false); handles.Add(nodeHandle); var nodeStream = new FileStream(nodeHandle, FileAccess.Read); streams.Add(nodeStream); nodeIdentity = Information(nodeHandle, false);
+                nodeBytes = checked((long)(((ulong)nodeIdentity.SizeHigh << 32) | nodeIdentity.SizeLow));
+                if (!Matches(nodeIdentity, node.GetProperty("identity")) || nodeBytes is < 1 or > 128L * 1024 * 1024 || Matches(nodeIdentity, request.GetProperty("sourceIdentity")) || Convert.ToHexString(SHA256.HashData(nodeStream)).ToLowerInvariant() != nodeSha256) throw Invalid();
+            }
             string target = Path.Combine(stageRoot, "b122-sandbox-worker.exe");
             phase = "hard-link";
             if (!CreateHardLinkW(NativeName(target), NativeName(source), IntPtr.Zero)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
@@ -229,10 +243,24 @@ internal static class ReviewedInputStager
             if (!Matches(actual, request.GetProperty("sourceIdentity")) || !Matches(Information(stage, true), request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(stageRoot).Count() != 1) throw Invalid();
             bool embedded = typeof(Sxsy.B122.SandboxHelper.Program).Assembly == typeof(ReviewedInputStager).Assembly;
             if (!embedded) throw Invalid();
-            Console.WriteLine(JsonSerializer.Serialize(new { schema, operationId = operation.ToString("D"), sourceIdentity = Identity(actual), stagingIdentity = Identity(stageIdentity), sha256 = expected, linkedBytes = bytes, copiedBytes = 0, toolName = "b122-sandbox-worker.exe", privateAclReadbackVerified = true, workerEmbedded = true, sandboxEnforced = false }));
+            object? runtimeProof = null;
+            if (withNode)
+            {
+                phase = "node-hard-link";
+                string nodeTarget = Path.Combine(stageRoot, "node.exe");
+                if (!CreateHardLinkW(NativeName(nodeTarget), NativeName(nodePath), IntPtr.Zero)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                phase = "node-linked-identity";
+                using var nodeLinked = Open(nodeTarget, false);
+                if (!Matches(Information(nodeLinked, false), node.GetProperty("identity"))) throw Invalid();
+                runtimeProof = new { identity = Identity(nodeIdentity), sha256 = nodeSha256, linkedBytes = nodeBytes, filename = "node.exe" };
+            }
+            if (!Matches(Information(stage, true), request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(stageRoot).Count() != (withNode ? 2 : 1)) throw Invalid();
+            var proof = new Dictionary<string, object?> { ["schema"] = schema, ["operationId"] = operation.ToString("D"), ["sourceIdentity"] = Identity(actual), ["stagingIdentity"] = Identity(stageIdentity), ["sha256"] = expected, ["linkedBytes"] = bytes, ["copiedBytes"] = 0, ["toolName"] = "b122-sandbox-worker.exe", ["privateAclReadbackVerified"] = true, ["workerEmbedded"] = true, ["sandboxEnforced"] = false };
+            if (withNode) proof["nodeRuntime"] = runtimeProof;
+            Console.WriteLine(JsonSerializer.Serialize(proof));
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine($"Native guest-tool staging failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}. No runtime-copy fallback was used."); return 2; }
-        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+        finally { foreach (var stream in streams) stream.Dispose(); foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 }
