@@ -159,3 +159,39 @@ creation/continuation, a synthetic lost-acceptance fault and separately approved
 resume-only recovery, verified owned guardians, duplicate/replay rejection and
 keyboard-only cleanup. Native pipe,
 policy, first-turn lifecycle and crash-recovery tests pass.
+
+## Recover an interrupted host local commit
+
+Task authority and the exact commit review are separate approvals. A lost native
+result keeps its operation, original outcome, private index and owned lease
+proofs. Recovery never retries the reference update or restores working files.
+The backend exposes these authenticated, compartment-scoped POST routes:
+
+| Route under `/api/suite/coding/repository-effects/` | Body and behavior |
+| --- | --- |
+| `list` | `{ compartment }` lists retained outcomes and cleanup status. |
+| `inspect` | `{ compartment, id }` independently verifies native exit and reads exact repository metadata. |
+| `review` | `{ compartment, id, cleanupPrivateStaging }` requires an explicit boolean cleanup choice and returns a five-minute exact-scope approval. |
+| `apply` | `{ compartment, id, reviewId, token }` consumes that approval once. Changed references, files, locks, accounts or workspace scope require a fresh observation and review. |
+
+Only `review-index-reconciliation` and `review-owned-cleanup` can authorize the
+bounded recovery action. `manual-review` preserves the different evidence. The
+new receipt describes metadata reconciliation; it does not turn the original
+uncertain commit into a passing command. Remaining unfamiliar cache files stay
+referenced with `cleanupPending`. A duplicate reserved request returns its
+recorded result or incomplete status and never repeats filesystem writes.
+
+The explicit installed Linux acceptance mode uses a new disposable repository,
+an actual empty Codex task, two separately reviewed commit approvals and a
+trusted source-only post-reference fault. Recovery then runs through the normal
+installed HTTP routes. It sends zero model prompts and provides no public fault
+injection endpoint:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-repository-commit-host.mjs --synthetic --recovery-fault
+```
+
+This validation workspace must be idle and free of older retained effects. On
+failure the script preserves its evidence; on success it verifies guardian exit,
+restores keyboard-only mode and workspace selection, and removes only its own
+disposable staging/local records. Native empty-task history remains intact.

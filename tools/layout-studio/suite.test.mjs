@@ -62,7 +62,7 @@ test("repository recovery routes preserve exact IDs and unknown native exit prev
     await suite.handle("/api/suite/bootstrap");
     assert.equal((await suite.handle("/api/suite/coding/repository-effects/list", { compartment: "personal" }))[0].status, "recovery-required");
     const id = "11111111-1111-1111-1111-111111111111", view = await suite.handle("/api/suite/coding/repository-effects/inspect", { compartment: "personal", id }); assert.equal(view.operationId, id); assert.equal(view.repositoryWritten, false);
-    await store.update("personal", "synthetic-recovery-packet", s => { s.repositoryEffectJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectCheckpoints = [{ original: "synthetic-private-recovery-bytes" }]; s.repositoryEffects = []; });
+    await store.update("personal", "synthetic-recovery-packet", s => { s.repositoryRecoveryJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectCheckpoints = [{ original: "synthetic-private-recovery-bytes" }]; s.repositoryEffects = []; });
     const snapshot = await suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(JSON.stringify(snapshot).includes("synthetic-private-recovery-bytes"), false); assert.equal(Object.hasOwn(snapshot, "repositoryEffectCheckpoints"), false);
     await assert.rejects(suite.handle("/api/suite/mode", { compartment: "personal", mode: "keyboard-only" }), /owned process stop is unconfirmed/); assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
     await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
@@ -71,9 +71,10 @@ test("repository recovery routes preserve exact IDs and unknown native exit prev
   assert.equal(agentClosed, true); assert.equal(recoveryClosed, true);
 }));
 
-test("HTTP workspace origin metadata is removed from exact commit proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
+test("HTTP workspace origin metadata is removed from exact commit and recovery proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
   const calls = [], repositoryCommits = { review: async (c, input) => { calls.push({ c, input }); if (input.force !== undefined) throw new Error("Broader operation fields are rejected"); return { status: "requires-confirmation" }; }, execute: async (c, input) => { calls.push({ c, input }); return { status: "completed" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
-  const suite = createSuite({ store, repositoryCommits, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  const repositoryRecovery = { review: repositoryCommits.review, apply: repositoryCommits.execute, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
+  const suite = createSuite({ store, repositoryCommits, repositoryRecovery, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
   const token = "t".repeat(43), server = createStudioServer({ suite, bridge: { close() {} }, token }); server.listen(0, "127.0.0.1"); await once(server, "listening");
   const origin = `http://127.0.0.1:${server.address().port}`;
   const api = async (path, body) => { const response = await fetch(origin + "/api/suite/coding/commits/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
@@ -84,6 +85,11 @@ test("HTTP workspace origin metadata is removed from exact commit proposals with
     const rejected = await api("review", { ...input, force: true }); assert.equal(rejected.status, 409); assert.match(rejected.body.error, /Broader operation/); assert.equal(calls[1].input.force, true);
     assert.equal((await api("execute", { compartment: "personal", requestId, token: "22222222-2222-2222-2222-222222222222" })).status, 200);
     assert.equal(Object.hasOwn(calls[2].input, "workspaceBaseUrl"), false); assert.equal(calls[2].input.token, "22222222-2222-2222-2222-222222222222");
+    const recover = async (path, body) => { const r = await fetch(origin + "/api/suite/coding/repository-effects/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); return r.status; };
+    assert.equal(await recover("review", { compartment: "personal", id: requestId, cleanupPrivateStaging: true }), 200);
+    assert.equal(Object.hasOwn(calls[3].input, "workspaceBaseUrl"), false); assert.equal(calls[3].input.cleanupPrivateStaging, true);
+    assert.equal(await recover("review", { compartment: "personal", id: requestId, force: true }), 409); assert.equal(calls[4].input.force, true);
+    assert.equal(await recover("apply", { compartment: "personal", id: requestId, reviewId: requestId, token: requestId }), 200); assert.equal(Object.hasOwn(calls[5].input, "workspaceBaseUrl"), false);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
 }));
 

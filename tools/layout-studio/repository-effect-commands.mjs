@@ -62,7 +62,7 @@ export function createRepositoryEffectCommands({ store, stateDirectory, command 
           const scratchRoot = join(stateDirectory, "native-scratch"); await privateDirectory(scratchRoot);
           scratch = await mkdtemp(join(scratchRoot, "git-")); scratchIdentity = identity(await directoryIdentity(scratch));
           await store.update(c, "repository-effect-reserve", s => {
-            s.repositoryEffects = (s.repositoryEffects ?? []).filter(r => r.status !== "settled").concat((s.repositoryEffects ?? []).filter(r => r.status === "settled").slice(-7));
+            s.repositoryEffects = (s.repositoryEffects ?? []).filter(r => r.status !== "settled" || r.cleanupPending).concat((s.repositoryEffects ?? []).filter(r => r.status === "settled" && !r.cleanupPending).slice(-7));
             if (s.repositoryEffects.length >= 32) throw new Error("The repository effect inventory is full. Existing recovery records were preserved.");
             s.repositoryEffects.push({ schema: "switchyard-repository-effect/v1", id: operationId, taskId: task.id, provider: task.provider, bindingDigest, repositoryRoot: task.repositoryRoot, repositoryIdentity: task.repositoryIdentity, gitDirectory, gitIdentity, author: structuredClone(author), scratch, scratchIdentity, commands: [], status: "reserved", at: now() });
           }, { provider: task.provider }); recordStarted = true;
@@ -94,7 +94,10 @@ export function createRepositoryEffectCommands({ store, stateDirectory, command 
               const captured = await captureGitFile(value.privateIndex);
               try { privateIndexProof = { identity: captured.identity, sha256: captured.sha256 }; } finally { captured.bytes.fill(0); }
             }
-            await update(c, operationId, "repository-effect-preservation", r => { r.preservation = { ...structuredClone(value), ...(privateIndexProof ? { privateIndexProof } : {}) }; });
+            if (!inside(join(stateDirectory, "git-operations", operationHash(operationId)), value.privateIndexCopy)) throw new Error("The preserved inspection index belongs to another operation.");
+            const copy = await captureGitFile(value.privateIndexCopy); let privateIndexCopyProof;
+            try { privateIndexCopyProof = { identity: copy.identity, sha256: copy.sha256 }; } finally { copy.bytes.fill(0); }
+            await update(c, operationId, "repository-effect-preservation", r => { r.preservation = { ...structuredClone(value), privateIndexCopyProof, ...(privateIndexProof ? { privateIndexProof } : {}) }; });
           } });
           if (!outcome || !["completed", "failed", "blocked", "unavailable", "incomplete", "cancelled", "running"].includes(outcome.status) || !["not_started", "committed", "ambiguous", "compensated"].includes(outcome.effectDisposition)) throw new Error("The host Git effect did not return one typed effect disposition.");
           lease.assert();

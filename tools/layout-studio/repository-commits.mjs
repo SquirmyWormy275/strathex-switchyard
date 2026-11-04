@@ -91,6 +91,11 @@ export function createRepositoryCommits({ store, authority, stateDirectory, comm
         const owned = (await store.snapshot(c)).repositoryEffects?.find(r => r.bindingDigest === review.scopeDigest);
         outcome = { status: "incomplete", summary: owned ? "The owned commit did not settle. Inspect its retained operation; no automatic replay is permitted." : "Admission stopped before a native repository effect was reserved. A fresh review is required.", effectDisposition: owned ? "ambiguous" : "not_started", ...(owned ? { operationId: owned.id } : {}) };
       }
+      // The core can reject terminal result recording while an exact child
+      // remains unresolved. That generic failure must not hide the host's
+      // durable native effect or incorrectly settle the separate review.
+      const retained = (await store.snapshot(c)).repositoryEffects?.find(r => r.bindingDigest === review.scopeDigest);
+      if (retained?.status === "recovery-required") outcome = { ...outcome, status: "incomplete", summary: "The exact native repository effect requires explicit no-replay reconciliation. Its original result remains uncertain.", effectDisposition: "ambiguous", operationId: retained.id, data: { ...outcome.data, recoveryStatePreserved: true } };
       await update(c, review.requestId, "local-commit-result", r => { r.status = outcome.effectDisposition === "ambiguous" || outcome.data?.recoveryStatePreserved === true || outcome.effectDisposition === "committed" && outcome.status !== "completed" ? "recovery-required" : "settled"; r.outcome = structuredClone(outcome); if (outcome.operationId) r.operationId = outcome.operationId; r.finishedAt = now(); });
       return { ...outcome, replayed: false, nativePermissionsChanged: false, providerTaskCompletionVerified: false };
     }); },

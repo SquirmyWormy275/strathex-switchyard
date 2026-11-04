@@ -1951,3 +1951,36 @@ e6e5bf02-75a5-43e4-b7ca-1e5430172458. The installed release remains 713f439;
 this source checkpoint has not replaced it. Windows run 41807554404 for cda0327
 was still running when checked; complete newer native Windows acceptance is
 pending.
+
+
+## Separately approved repository metadata recovery
+
+The authenticated recovery API now implements review/apply alongside list/inspect.
+Each five-minute one-use approval binds the exact retained operation, branch/HEAD,
+index/lock identities and digests, account/workspace epoch and explicit private
+staging cleanup choice. The operator action uses an independent protected
+operation/budget/receipt journal. It never replays a reference update or restores
+worktree files. Foreign or changed files remain for manual review.
+
+Positive post-recovery readback is durable before critical lease release. A new
+approval can recognize an already-reconciled index after interruption. Cleanup
+removes only matching private files and empty owned staging directories; unknown
+files remain referenced with cleanupPending. Original commit outcomes/receipts
+are retained, while only the exact root's resolved children, leases and budget
+claims can be settled. A native lost-readback fault exposed generic core failure
+reporting that hid an unresolved host effect; the separate commit review now
+remains explicitly incomplete/recovery-required in that case.
+
+The 44 focused checks pass, including seven recovery cases and a native Linux
+post-reference failure with actual Git, independently exited guardians, one
+commit, unchanged original receipts and an unrelated operation left executing.
+The complete run passed 146/146 groups: 931 tests, 922 passed and nine platform skips; receipt 3c33a553-f736-4fda-8f18-eff5a3969cfe. Review then added explicit running-claim/deadline checks before filesystem effects; all eight recovery cases pass, and that final complete rerun is pending. Normal installed recovery acceptance remains pending.
+The frontend is unchanged; recovery controls remain API-only. Physical F77/B122,
+interactive Windows accounts/HID and tenant acceptance remain external checks,
+while general execution effects and distinct integrations remain software work.
+
+
+The final complete Linux rerun passed 146/146 groups: 932 tests, 923 passed,
+nine declared platform skips; receipt 770d2f59-d13b-49eb-a081-6140e5577c15.
+Type checking passes. Normal installed metadata recovery remains pending until
+the new bundle is installed and its explicit fault journey succeeds.

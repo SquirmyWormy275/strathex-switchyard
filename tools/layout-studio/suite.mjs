@@ -182,6 +182,10 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/coding/commits/list") return repositoryCommits.list(compartment);
       if (path === "/api/suite/coding/repository-effects/list") return repositoryRecovery.list(compartment);
       if (path === "/api/suite/coding/repository-effects/inspect") return repositoryRecovery.inspect(compartment, body.id);
+      if (path === "/api/suite/coding/repository-effects/review" || path === "/api/suite/coding/repository-effects/apply") {
+        const { workspaceBaseUrl, ...proposal } = body;
+        return path.endsWith("/review") ? repositoryRecovery.review(compartment, proposal) : repositoryRecovery.apply(compartment, proposal);
+      }
       if (path === "/api/suite/coding/authority/list") return taskAuthority.list(compartment);
       if (path === "/api/suite/coding/authority/revalidate") return taskAuthority.revalidate(compartment, body.id);
       if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
@@ -280,7 +284,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, ...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, ...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);

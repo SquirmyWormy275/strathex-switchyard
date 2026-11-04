@@ -84,8 +84,8 @@ The complete Windows release passed 231 test/build groups for `2e64ff6`, includi
 managed startup, installer, bootstrap, portable profiles and automation checks.
 Fresh native Windows installation/import/model/recheck and cleanup also passed
 with 49 exact distributions. Newer private-pipe and recovery checkpoints await
-their corrected complete Windows run. The latest accepted Linux run has 144 groups
-and 922 tests. [Verification details](docs/verification.md) distinguish each result
+their corrected complete Windows run. The latest accepted Linux run has 146 groups
+and 932 tests. [Verification details](docs/verification.md) distinguish each result
 and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
