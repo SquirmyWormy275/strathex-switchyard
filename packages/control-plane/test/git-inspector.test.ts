@@ -173,7 +173,11 @@ test("repository digest byte limits are enforced on actual files and exact-limit
   await writeFile(join(root, "exact.bin"), Buffer.alloc(64, 7));
   await writeFile(join(root, "large.bin"), Buffer.alloc(65, 7));
   assert.match(await reader.digest(root, "exact.bin"), /^sha256:[a-f0-9]{64}$/);
+  const captured = await reader.read(root, "exact.bin"); assert.deepEqual(captured.bytes, Buffer.alloc(64, 7)); assert.equal(captured.digest, await reader.digest(root, "exact.bin"));
+  await writeFile(join(root, "binary.bin"), Buffer.from([0, 255, 128, 10, 13]));
+  assert.deepEqual((await reader.read(root, "binary.bin")).bytes, Buffer.from([0, 255, 128, 10, 13]));
   await assert.rejects(reader.digest(root, "large.bin"), /bounded digest size/i);
+  await assert.rejects(reader.read(root, "large.bin"), /bounded digest size/i);
   for (const maxFileBytes of [0, -1, NaN, 1.5, 128 * 1024 * 1024 + 1]) {
     assert.throws(() => new NodeFileDigestReader({ maxFileBytes }), /bounded/i);
   }

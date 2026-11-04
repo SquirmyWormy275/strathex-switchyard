@@ -33,15 +33,16 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   if (code !== 0 || error) { await stopOwnedChild(child); return false; }
   try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.activeProcesses === 0; } catch { return false; }
 }
-export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, captureStderrBytes = 0, detailed = false, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
+export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
   if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288) throw new Error("Choose a supported, bounded runtime operation.");
-  if (inputText !== undefined && (typeof inputText !== "string" || Buffer.byteLength(inputText) > 524288 || inputText.includes("\0")) || !Number.isSafeInteger(captureStderrBytes) || captureStderrBytes < 0 || captureStderrBytes > 16384 || typeof detailed !== "boolean") throw new Error("Choose a bounded private input and diagnostic contract.");
+  if (inputText !== undefined && inputBytes !== undefined || inputBytes !== undefined && (!(inputBytes instanceof Uint8Array) || inputBytes.byteLength > 524288) || inputText !== undefined && (typeof inputText !== "string" || Buffer.byteLength(inputText) > 524288 || inputText.includes("\0")) || !Number.isSafeInteger(captureStderrBytes) || captureStderrBytes < 0 || captureStderrBytes > 16384 || typeof detailed !== "boolean") throw new Error("Choose a bounded private input and diagnostic contract.");
+  const input = inputText !== undefined ? Buffer.from(inputText) : inputBytes !== undefined ? Buffer.from(inputBytes) : undefined;
   const checkAbort = () => { if (signal?.aborted) throw Object.assign(new Error("The owned native command was cancelled before startup."), { code: "CANCELLED" }); }; checkAbort();
   const resolved = await realpath(executable), digest = createHash("sha256");
   for await (const chunk of createReadStream(resolved)) digest.update(chunk);
   // Hash the native target but preserve the invocation path: Python locates
   // pyvenv.cfg beside its venv alias, and argv[0] is meaningful to native tools.
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(inputText !== undefined ? { inputBase64: Buffer.from(inputText).toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
   if (Buffer.byteLength(JSON.stringify(request)) > 1048576) throw new Error("The fixed runtime request exceeds its protocol bound.");
   checkAbort();
   const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
@@ -76,7 +77,7 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
         ready = true; clearTimeout(readiness);
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
         const capabilities = Array.isArray(frame.capabilities) ? frame.capabilities : [];
-        if ((inputText !== undefined && !capabilities.includes("bounded-stdin")) || (inputText !== undefined && Buffer.byteLength(inputText) > 12000 && !capabilities.includes("bounded-stdin-512k")) || (captureStderrBytes && !capabilities.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
+        if ((input !== undefined && !capabilities.includes("bounded-stdin")) || (input !== undefined && input.length > 12000 && !capabilities.includes("bounded-stdin-512k")) || (captureStderrBytes && !capabilities.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
         guardianFrame = frame;
         guardianBirth = frame.birth;
         pendingReady = Promise.resolve().then(() => onGuardianReady(frame)).then(() => { readyCommitted = true; if (!failure && child.exitCode === null && child.signalCode === null) { acknowledged = true; child.stdin.write(JSON.stringify({ schema: request.schema, id: request.id, start: true }) + "\n"); } }).catch(() => { readyCommitted = true; fail("The runtime start acknowledgement was not committed."); });
@@ -95,7 +96,7 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
   if (!detailed && (result.status !== "completed" || result.exitCode !== 0)) throw new Error(`The optional runtime operation ${result.status === "timed-out" ? "timed out" : result.status === "output-limit" ? "exceeded its output bound" : "failed"}. Existing components were preserved.`);
   const bytes = Buffer.from(result.stdout, "base64");
   if (bytes.toString("base64") !== result.stdout || bytes.length > maxOutputBytes) throw new Error("Invalid bounded runtime output.");
-  if (inputText !== undefined && result.inputDelivered !== true) throw new Error("The exact native input was not fully delivered. Its outcome remains unconfirmed.");
+  if (input !== undefined && result.inputDelivered !== true) throw new Error("The exact native input was not fully delivered. Its outcome remains unconfirmed.");
   if (!detailed) return bytes.toString("utf8");
   const errors = Buffer.from(result.stderr ?? "", "base64");
   if (errors.toString("base64") !== (result.stderr ?? "") || errors.length > captureStderrBytes) throw new Error("Invalid bounded private diagnostic output.");

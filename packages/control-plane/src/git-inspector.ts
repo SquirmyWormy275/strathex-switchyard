@@ -105,22 +105,37 @@ export class NodeFileDigestReader implements FileDigestReader {
   }
 
   async digest(repositoryRoot: string, relativePath: string): Promise<string> {
-    const file = await this.openVerified(repositoryRoot, relativePath);
+    return (await this.consume(repositoryRoot, relativePath, false)).digest;
+  }
+
+  /** A bounded immutable-at-read payload for private broker pipes, never a path for Git to reopen. */
+  async read(repositoryRoot: string, relativePath: string): Promise<{ readonly bytes: Buffer; readonly digest: string }> {
+    const result = await this.consume(repositoryRoot, relativePath, true);
+    return { bytes: result.bytes!, digest: result.digest };
+  }
+
+  private async consume(repositoryRoot: string, relativePath: string, capture: boolean): Promise<{ readonly digest: string; readonly bytes?: Buffer }> {
+    const file = await this.openVerified(repositoryRoot, relativePath); let contents: Buffer | undefined;
     try {
       if (file.metadata.size > BigInt(this.maxFileBytes)) throw new Error("Repository file exceeds the bounded digest size.");
+      if (capture) contents = Buffer.alloc(Number(file.metadata.size));
       const hash = createHash("sha256"), buffer = Buffer.alloc(65536); let position = 0;
       while (true) {
         const { bytesRead } = await file.handle.read(buffer, 0, buffer.length, position);
         if (!bytesRead) break;
-        position += bytesRead;
-        if (position > this.maxFileBytes) throw new Error("Repository file exceeds the bounded digest size.");
-        hash.update(buffer.subarray(0, bytesRead));
+        if (position + bytesRead > this.maxFileBytes) throw new Error("Repository file exceeds the bounded digest size.");
+        if (contents) {
+          if (position + bytesRead > contents.length) throw new Error("Repository file changed during hashing.");
+          contents.set(buffer.subarray(0, bytesRead), position);
+        }
+        position += bytesRead; hash.update(buffer.subarray(0, bytesRead));
       }
       const after = await file.handle.stat({ bigint: true });
       if (!sameFile(file.metadata, after) || after.size !== BigInt(position)) throw new Error("Repository file changed during hashing.");
       await this.assertCurrent(file, after);
-      return `sha256:${hash.digest("hex")}`;
-    } finally { await file.handle.close(); }
+      return { digest: `sha256:${hash.digest("hex")}`, ...(contents ? { bytes: contents } : {}) };
+    } catch (error) { contents?.fill(0); throw error; }
+    finally { await file.handle.close(); }
   }
 
   async state(repositoryRoot: string, relativePath: string): Promise<"regular_file" | "missing"> {

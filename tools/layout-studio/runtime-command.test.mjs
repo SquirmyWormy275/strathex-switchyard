@@ -50,6 +50,8 @@ test("a pre-cancelled or oversized native input cannot start an owned guardian",
   const controller = new AbortController(); controller.abort(); let started = false;
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, signal: controller.signal, onGuardianChild: () => { started = true; } }), /cancelled before startup/);
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(174763), onGuardianChild: () => { started = true; } }), /bounded private input/);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputBytes: Buffer.alloc(524289), onGuardianChild: () => { started = true; } }), /bounded private input/);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "text", inputBytes: Buffer.from([0]), onGuardianChild: () => { started = true; } }), /bounded private input/);
   assert.equal(started, false);
 });
 test("a complete bounded designer context crosses the private pipe at the exact UTF-8 byte limit after readiness", { skip }, async () => {
@@ -57,6 +59,15 @@ test("a complete bounded designer context crosses the private pipe at the exact 
   assert.equal(Buffer.byteLength(inputText), 524288);
   const result = await runRuntimeCommand(process.execPath, ["-e", "let bytes=0;const hash=require('node:crypto').createHash('sha256');process.stdin.on('data',b=>{bytes+=b.length;hash.update(b)});process.stdin.on('end',()=>process.stdout.write(JSON.stringify({bytes,digest:hash.digest('hex'),argv:process.argv.slice(1)})))"], { ...options, inputText, detailed: true, maxOutputBytes: 1024, onGuardianReady: frame => { assert.ok(frame.capabilities.includes("bounded-stdin-512k")); scope = frame; } });
   assert.deepEqual(JSON.parse(result.stdout), { bytes: 524288, digest: expected, argv: [] }); assert.equal(result.inputDelivered, true); assert.equal(result.treeExitVerified, true); assert.equal(await runtimeGuardianStopped(scope, options), true);
+  // Repository blobs include NUL and non-UTF-8 bytes. They stay in the private
+  // pipe, with a copied payload that cannot change after readiness admission.
+  const bytes = Buffer.alloc(524288); for (let i = 0; i < bytes.length; i++) bytes[i] = i % 256;
+  const binaryDigest = createHash("sha256").update(bytes).digest("hex"), resource = { clients: new Set() };
+  const binary = await runOwnedNativeCommand({ executable: process.execPath, args: ["-e", "let bytes=0;const hash=require('node:crypto').createHash('sha256');process.stdin.on('data',b=>{bytes+=b.length;hash.update(b)});process.stdin.on('end',()=>process.stdout.write(JSON.stringify({bytes,digest:hash.digest('hex'),argv:process.argv.slice(1)})))"], bytes, env: runtimeEnvironment(), resource, maxOutputBytes: 1024,
+    command: (exe, args, o) => runRuntimeCommand(exe, args, { ...o, ...(windowsHelper ? { windowsHelper } : {}) }), guardianStopped: frame => runtimeGuardianStopped(frame, options),
+    onReady: frame => { scope = frame; bytes.fill(7); }, onStopped: async frame => { assert.equal(await runtimeGuardianStopped(frame, options), true); } });
+  assert.deepEqual(JSON.parse(binary.stdout), { bytes: 524288, digest: binaryDigest, argv: [] }); assert.equal(binary.inputDelivered, true);
+  for (const client of resource.clients) assert.equal(await client.stop(), true);
 });
 test("owned text resources commit exact guardian scope before execution and durable exit before releasing ownership", { skip }, () => fixture(async (root) => {
   const resource = { clients: new Set() }, marker = join(root, "ran"); let saved, stopped = false;

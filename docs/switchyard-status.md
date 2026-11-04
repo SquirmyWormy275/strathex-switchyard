@@ -1667,3 +1667,22 @@ zero configuration interfaces, without opening a device or writing keys; receipt
 device-enumeration-1793776364377.json. Physical F77/B122 acceptance remains open.
 The installed application holds current plus one rollback version (about 9 MiB);
 no application bundle, source archive or copied optional runtime remains staged.
+
+## Bounded binary input for mediated repository effects
+
+The owned-command transport now accepts either reviewed UTF-8 text or copied
+binary bytes through the same 512 KiB private-stdin contract. The payload stays
+out of argv/environment; over-limit or mixed input is rejected before startup.
+The actual Linux guardian carried every byte value at the exact bound with its
+SHA-256 unchanged even when the caller buffer was modified after readiness.
+No native helper protocol or source-only Windows skip count changed; actual
+Windows binary-input acceptance remains pending.
+
+The verified repository reader can now return bounded exact bytes from the same
+descriptor/parent identity checks used for hashing, for a future broker pipe.
+All 15 native command tests, 11 inspector tests, 29 provider regression tests and
+TypeScript checks pass. These prerequisites support replacing Git add/commit
+with filter-free blob staging and plumbing/CAS effects. That replacement and
+the suite effect connection remain unfinished; they are software work, not
+hardware/account blockers. The user withdrew the Seagate steering before any
+move or drive/configuration change; development stays in the current checkout.
