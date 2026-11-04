@@ -51,7 +51,7 @@ internal static class WindowsStorageBrokerService
             WindowsStorageBrokerPipe.Serve(pipe,current,key,Stop.Token).GetAwaiter().GetResult();
             if(!Stop.IsCancellationRequested)error=1;
         }
-        catch{error=1;}
+        catch(Exception failure){error=1;if(settings!=null)WindowsStorageBrokerDiagnostic.RetainFirst(settings,"service-loop",failure,false);}
         finally{if(statusHandle!=IntPtr.Zero)try{Report(1,error);}catch{/* SCM/process exit still needs independent observation. */}}
     }
     internal static int Run()

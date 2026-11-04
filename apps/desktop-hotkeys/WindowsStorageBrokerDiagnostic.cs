@@ -5,7 +5,7 @@ using System.Text.Json;
 internal static class WindowsStorageBrokerDiagnostic
 {
     internal const string FileName="first-request-failure.json";
-    private static readonly string[] Phases={"connection","frame","caller","request","storage","signature","write"};
+    private static readonly string[] Phases={"connection","frame","caller","request","storage","signature","write","service-loop"};
     internal static void RetainFirst(WindowsStorageBrokerInstallation.Settings settings,string phase,Exception error,bool callerMatched)
     {
         try
