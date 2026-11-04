@@ -27,7 +27,7 @@ internal static class WindowsStorageBrokerRuntime
             if(directory)foreach(string child in Directory.EnumerateFileSystemEntries(path).Order(StringComparer.Ordinal))Visit(child,depth+1);
         }
         using var pin=WindowsStorageBrokerFiles.PinDirectory(root,settings.ClientSid,clientRead:false);Visit(root,0);
-        if(entries.Count<3||!entries.Any(e=>!e.Identity.Directory))throw Invalid();
+        if(entries.Count<1)throw Invalid();
         return entries.OrderBy(e=>e.Path,StringComparer.Ordinal).ToArray();
     }
     private static byte[] Bytes(WindowsStorageBrokerInstallation.Settings settings,Entry[] entries)=>JsonSerializer.SerializeToUtf8Bytes(new Inventory("switchyard-windows-broker-runtime/v1",settings.InstallationId,settings.ServiceImageSha256,entries));
@@ -40,6 +40,7 @@ internal static class WindowsStorageBrokerRuntime
     internal static void SealOrVerify(WindowsStorageBrokerInstallation.Settings settings)
     {
         if(WindowsStorageBrokerFiles.CurrentOwnerSid()!="S-1-5-18"||Environment.GetEnvironmentVariable("DOTNET_BUNDLE_EXTRACT_BASE_DIR")!=Root(settings))throw Invalid();
+        RuntimePackageMetadata.AssertPrivateRuntime(Root(settings));
         Entry[] entries=Observe(settings);string inventory=Path.Combine(settings.Root,InventoryName);
         if(File.Exists(inventory))Compare(settings,entries);
         else WindowsStorageBrokerFiles.CreateFile(inventory,settings.ClientSid,Bytes(settings,entries),clientRead:false);

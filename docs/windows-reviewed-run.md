@@ -10,15 +10,18 @@ Actual interactive VM acceptance requires a supported Windows Sandbox host;
 filesystem CI and runner doubles do not establish that acceptance. The frontend
 remains frozen for review.
 
-The Windows helper now embeds its native .NET runtime libraries as well as its
-managed code. [Microsoft's single-file deployment contract](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
-requires `IncludeNativeLibrariesForSelfExtract` for this packaging. Calls to the
+The Windows .NET 8 single-file host statically links its CLR/JIT, as described in
+the [upstream implementation](https://github.com/dotnet/runtime/issues/43071).
+`IncludeNativeLibrariesForSelfExtract` additionally includes native dependencies
+when present; [Microsoft's deployment contract](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
+describes their extraction. Calls to the
 fixed helper receive only validated current-user temporary coordinates in
 addition to their explicit environment; runtime startup overrides are refused.
 The Windows lane copies only the executable to a new empty directory, removes
 installed-runtime discovery paths, runs real metadata through its owned guardian,
-verifies independent exit and removes only that proof's copy/cache. This new
-native standalone acceptance is pending CI; local runtime/package checks pass.
+verifies the exact running image, absence of external CLR/JIT modules and
+independent exit, then removes only that proof's copy/cache. Native standalone
+acceptance is pending the corrected CI rerun; local runtime/package checks pass.
 It does not establish privileged service or VM acceptance.
 
 The metadata-only broker bootstrap is now implemented behind explicit native
@@ -26,7 +29,8 @@ CLI modes. An already elevated installer creates a new fixed per-user service,
 protected code/key/configuration and a separate System/Administrators-only CLR
 extraction cache. SCM configuration, exact image digest and the per-service
 environment are read back. The System process seals native file identities,
-sizes and hashes before accepting clients. Restarts verify that inventory;
+sizes and hashes before accepting clients. A statically linked runtime may leave
+the cache empty; any external runtime DLL must be inside it. Restarts verify that inventory;
 removal first verifies the original SCM configuration, captures its exact native
 process handle, observes service and process exit, then deletes only the verified
 inventory. Existing or unfamiliar installation state is preserved.

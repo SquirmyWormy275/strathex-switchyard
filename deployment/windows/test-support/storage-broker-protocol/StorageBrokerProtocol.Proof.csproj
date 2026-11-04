@@ -12,6 +12,7 @@
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs" Link="WindowsStorageBrokerFiles.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs" Link="WindowsStorageBrokerInstallation.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs" Link="WindowsStorageBrokerRuntime.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/RuntimePackageMetadata.cs" Link="RuntimePackageMetadata.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerPipe.cs" Link="WindowsStorageBrokerPipe.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStoragePrerequisites.cs" Link="WindowsStoragePrerequisites.cs" />
   </ItemGroup>
