@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSuiteRelease } from "../deployment/suite/release.mjs";
 const root = await realpath(fileURLToPath(new URL("../", import.meta.url))), args = process.argv.slice(2);
-if (args.some((arg) => arg !== "--allow-dirty" && !arg.startsWith("--windows-hotkeys="))) throw new Error("Usage: npm run suite:package -- [--allow-dirty] [--windows-hotkeys=/absolute/native/helper.exe]");
+if (args.some((arg) => arg !== "--allow-dirty" && !arg.startsWith("--windows-hotkeys=") && !arg.startsWith("--windows-setup="))) throw new Error("Usage: npm run suite:package -- [--allow-dirty] [--windows-hotkeys=/absolute/native/helper.exe] [--windows-setup=/absolute/native/setup.exe]");
 const dirty = execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { cwd: root, encoding: "utf8" }).trim().length > 0;
 if (dirty && !args.includes("--allow-dirty")) throw new Error("Commit the tested checkpoint before packaging, or explicitly label an uncommitted development build with --allow-dirty.");
 const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
@@ -25,6 +25,6 @@ try {
     await writeFile(join(frontendRoot, f.file), data, { flag: "wx", mode: 0o600 });
   }
   await writeFile(join(frontendRoot, "manifest.json"), JSON.stringify(recipe), { mode: 0o600 });
-  const result = await buildSuiteRelease({ sourceRoot: root, sourceFiles, outputRoot, frontendRoot, sourceCommit, development: dirty, windowsHotkeys: args.find((arg) => arg.startsWith("--windows-hotkeys="))?.slice("--windows-hotkeys=".length) });
+  const result = await buildSuiteRelease({ sourceRoot: root, sourceFiles, outputRoot, frontendRoot, sourceCommit, development: dirty, windowsHotkeys: args.find((arg) => arg.startsWith("--windows-hotkeys="))?.slice("--windows-hotkeys=".length), windowsSetup:args.find(arg=>arg.startsWith("--windows-setup="))?.slice("--windows-setup=".length) });
   console.log(JSON.stringify(result, null, 2));
 } finally { await rm(frontendRoot, { recursive: true, force: true }); }

@@ -33,6 +33,17 @@ test("release verification rejects changed, missing, additional and mis-scoped c
   const extra = join(bundle.directory, "unmanifested.txt"); await writeFile(extra, "unexpected"); await assert.rejects(verifySuiteRelease(bundle.directory), /unmanifested/); await rm(extra);
   await rm(path); await assert.rejects(verifySuiteRelease(bundle.directory), /missing/);
 }));
+test("the Windows bundle includes broker/bootstrap sources and the linked guest worker needed to rebuild its helper",()=>fixture(async({bundle})=>{
+  const manifest=await verifySuiteRelease(bundle.directory,{expectedId:bundle.id,platform:"win32"});
+  for(const name of ["WindowsStorageBroker.cs","WindowsStorageBrokerBootstrap.cs","WindowsStorageBrokerService.cs","WindowsStorageBrokerControl.cs","WindowsStorageBrokerPipe.cs","WindowsStorageBrokerRuntime.cs","WindowsStorageBrokerDiagnostic.cs","RuntimePackageMetadata.cs"]){
+    assert.ok(manifest.files.some(file=>file.path===`apps/desktop-hotkeys/${name}`),`The shipped helper cannot be rebuilt without ${name}.`);
+  }
+  assert.match(await readFile(join(bundle.directory,"apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"),"utf8"),/\.\.\/windows-companion\/sandbox-helper\/Program.cs/);
+  assert.ok(manifest.files.some(file=>file.path==="apps/windows-companion/sandbox-helper/Program.cs"));
+  assert.ok(manifest.files.some(file=>file.path==="runtime/hotkeys/Switchyard.Setup.exe"));
+  assert.ok(manifest.files.some(file=>file.path==="apps/windows-setup/Setup.cpp"));
+  assert.ok(manifest.files.some(file=>file.path==="deployment/windows/Build-SwitchyardSetup.ps1"));
+},"win32"));
 test("release identity binds file names, platform, revision and the complete frozen frontend; builders refuse changed reviews and missing Windows helpers", () => fixture(async ({ bundle, options, frontendRoot }) => {
   const manifestPath = join(bundle.directory, "switchyard-release.json"), original = JSON.parse(await readFile(manifestPath, "utf8"));
   await writeFile(manifestPath, JSON.stringify({ ...original, sourceCommit: "b".repeat(40) })); await assert.rejects(verifySuiteRelease(bundle.directory), /content identity/);

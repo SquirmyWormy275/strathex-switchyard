@@ -5,7 +5,9 @@ import { mkdir, lstat, open, readFile, readdir, realpath, rename, rm, writeFile 
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { userInfo } from "node:os";
 
-const schema = "switchyard-suite-release/v1", maxFiles = 512, maxTotal = 128 * 1024 * 1024;
+// Full keyboard catalog plus the complete Windows helper/setup source closure.
+// The byte ceiling stays fixed; this bounded inventory allows the added files.
+const schema = "switchyard-suite-release/v1", maxFiles = 640, maxTotal = 128 * 1024 * 1024;
 export const nodeVersion = "24.14.0";
 const hash = (data) => createHash("sha256").update(data).digest("hex");
 const required = ["package.json", "tools/layout-studio/serve.mjs", "tools/layout-studio/suite.mjs", "deployment/suite/release.mjs", "deployment/suite/run.mjs", "apps/vscode-extension/src/codex-daemon-status.cjs", "packages/control-plane/src/confirmations.ts", "frontend/index.html"];
@@ -65,7 +67,7 @@ export async function verifySuiteRelease(root, { expectedId, platform, checkRunt
   if (hash(JSON.stringify(front.files)) !== front.digest || front.files.length !== manifest.files.filter((f) => f.path.startsWith("frontend/")).length || front.files.some((f) => !manifest.files.some((entry) => entry.path === `frontend/${f.file}` && entry.sha256 === f.sha256))) throw new Error("The frozen frontend identity did not verify.");
   return manifest;
 }
-export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, frontendRoot, sourceCommit, development = false, platform = process.platform, windowsHotkeys } = {}) {
+export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, frontendRoot, sourceCommit, development = false, platform = process.platform, windowsHotkeys, windowsSetup } = {}) {
   sourceRoot = await realpath(sourceRoot); outputRoot = resolve(outputRoot); frontendRoot = await realpath(frontendRoot);
   if (!["linux", "win32"].includes(platform) || !/^[a-f0-9]{40}$/.test(sourceCommit) || typeof development !== "boolean" || outputRoot === sourceRoot || !relative(sourceRoot, outputRoot).startsWith(`artifacts${sep}`)) throw new Error("Build the private suite bundle under this checkout's artifacts directory with an exact source revision.");
   const front = JSON.parse((await bytes(join(frontendRoot, "manifest.json"))).toString("utf8"));
@@ -85,7 +87,14 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if (platform === "win32") {
     if (!windowsHotkeys) throw new Error("The Windows suite bundle requires the built native hotkey helper.");
     inputs.set("runtime/hotkeys/Switchyard.Hotkeys.exe", await bytes(await realpath(windowsHotkeys)));
-    for (const name of ["apps/desktop-hotkeys/Program.cs", "apps/desktop-hotkeys/RuntimeCommandRunner.cs", "apps/desktop-hotkeys/ReviewedInputStager.cs", "apps/desktop-hotkeys/BoundedExchangeImage.cs", "apps/desktop-hotkeys/BoundedExchangeVolume.cs", "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs", "apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs", "apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs", "apps/desktop-hotkeys/WindowsSandboxCli.cs", "apps/windows-companion/sandbox-helper/Program.cs", "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"]) await add(name);
+    if(windowsSetup){
+      inputs.set("runtime/hotkeys/Switchyard.Setup.exe",await bytes(await realpath(windowsSetup)));
+      await add("apps/windows-setup/Setup.cpp");await add("deployment/windows/Build-SwitchyardSetup.ps1");
+    }
+    // The SDK implicitly compiles every adjacent C# source. Keep that complete
+    // tracked closure, including new partials/services, with the shipped image.
+    for (const name of [...tracked].filter(name=>/^apps\/desktop-hotkeys\/[^/]+\.(?:cs|csproj)$/.test(name))) await add(name);
+    await add("apps/windows-companion/sandbox-helper/Program.cs");
     for (const name of await walk(join(sourceRoot, "deployment/windows/licenses"))) await add(`deployment/windows/licenses/${name}`);
   }
   const files = [...inputs].map(([path, b]) => ({ path, size: b.length, sha256: hash(b) }));

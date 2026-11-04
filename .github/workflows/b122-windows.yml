@@ -206,7 +206,10 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
-          & node .\scripts\build-switchyard-suite.mjs "--windows-hotkeys=$exe"
+          & .\deployment\windows\Build-SwitchyardSetup.ps1 -OutputDirectory (Split-Path -Parent $exe)
+          if ($LASTEXITCODE -ne 0) { throw 'The closed native setup compiler failed.' }
+          $setup = Join-Path (Split-Path -Parent $exe) 'Switchyard.Setup.exe'
+          & node .\scripts\build-switchyard-suite.mjs "--windows-hotkeys=$exe" "--windows-setup=$setup"
           if ($LASTEXITCODE -ne 0) { throw 'The integrated suite package did not verify.' }
 
       - name: Retain the private Windows suite bundle for seven days
