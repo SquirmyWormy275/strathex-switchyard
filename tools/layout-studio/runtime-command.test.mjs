@@ -27,6 +27,8 @@ test("runtime guardian commits readiness, preserves invocation identity and retu
   let invalidScope;
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write(Buffer.from([255]))"], { ...options, onGuardianReady: frame => { invalidScope = frame; } }), /valid UTF-8/);
   assert.equal(await runtimeGuardianStopped(invalidScope, options), true);
+  const many = Array.from({ length:64 },(_,i)=>`literal-${i}`);
+  assert.deepEqual(JSON.parse(await runRuntimeCommand(process.execPath,["-e","process.stdout.write(JSON.stringify(process.argv.slice(1)))","--",...many],options)),many);
 }));
 test("runtime guardian cannot execute when the durable start acknowledgement fails", { skip }, () => fixture(async (root) => {
   const marker = join(root, "ran");
@@ -55,6 +57,8 @@ test("a pre-cancelled or oversized native input cannot start an owned guardian",
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "界".repeat(174763), onGuardianChild: () => { started = true; } }), /bounded private input/);
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputBytes: Buffer.alloc(524289), onGuardianChild: () => { started = true; } }), /bounded private input/);
   await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, inputText: "text", inputBytes: Buffer.from([0]), onGuardianChild: () => { started = true; } }), /bounded private input/);
+  await assert.rejects(runRuntimeCommand(process.execPath, ["--version"], { ...options, expectedExecutableSha256:"0".repeat(64), onGuardianChild:()=>{started=true;} }), /reviewed native executable digest/);
+  await assert.rejects(runRuntimeCommand(process.execPath, Array(257).fill("literal"), { ...options, onGuardianChild:()=>{started=true;} }), /bounded runtime operation/);
   assert.equal(started, false);
 });
 test("a complete bounded designer context crosses the private pipe at the exact UTF-8 byte limit after readiness", { skip }, async () => {

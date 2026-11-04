@@ -93,6 +93,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ...(process.platform === "win32" ? [["tools/layout-studio/task-authority.test.mjs", 240_000]] : []),
+      ...(process.platform === "win32" ? [["tools/layout-studio/repository-recovery.test.mjs", 120_000]] : []),
+      ["tools/layout-studio/repository-execution.test.mjs", 240_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
@@ -111,6 +113,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
     }
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority.test.mjs", "win32"), { timeoutMs: 240_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority.test.mjs", "linux"), {});
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "win32"), { timeoutMs: 120_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "linux"), {});
     assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];
     const overridden = await runVerification({ groups: [{ file: "bounded-override", args: delayed, timeoutMs: 1_000 }], outputDirectory: directory, timeoutMs: 50, executable });

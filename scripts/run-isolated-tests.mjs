@@ -112,6 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
+  if (platform === "win32" && file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
   const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
@@ -134,8 +135,11 @@ export const requiredGroups = [
   { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/suite.test.mjs" },
   { file: "tools/layout-studio/repository-effects.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
-  { file: "tools/layout-studio/repository-recovery.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/repository-commits.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-execution-supervisor.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-execution-staging.test.mjs" },
+  { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },

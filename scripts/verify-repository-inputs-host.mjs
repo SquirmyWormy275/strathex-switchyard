@@ -2,14 +2,13 @@
 /** Explicit actual Linux namespace proof; disposable synthetic inputs only. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { mkdtemp, mkdir, writeFile, readFile, access, rm, readdir } from "node:fs/promises";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
 import { once } from "node:events";
 import { LinuxDisposableExecutionRootProvider, LinuxBubblewrapRepositoryProcessSupervisor } from "../apps/linux-companion/src/linux-repository-runtime.ts";
+import { runRuntimeCommand } from "../tools/layout-studio/runtime-command.mjs";
 import { privateWrite } from "../tools/layout-studio/private-fs.mjs";
 if (process.platform !== "linux" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw Error("Usage: node --experimental-transform-types scripts/verify-repository-inputs-host.mjs --synthetic (bounded actual Bubblewrap proof with synthetic files)");
 const stage = await mkdtemp(join(tmpdir(), "switchyard-inputs-native-")), repository = join(stage, "repository"), state = join(stage, "state"), checks = [];
@@ -27,7 +26,7 @@ process.stdout.write(JSON.stringify({success:true,inputRead:true,unselectedFiles
   lease = await provider.prepare({ action: "pipeline_local_gate", repositoryRoot: repository, isolation: "disposable", inputFiles: [input] });
   assert.deepEqual(await readdir(lease.root), ["probe.mjs"]); checks.push("only the one exact reviewed file was staged; unselected synthetic credentials remained outside");
   let result;
-  const inner = { start: async request => { result = await promisify(execFile)(request.executable, request.args, { cwd: request.cwd, env: request.environment, timeout: 15000, maxBuffer: 16384, encoding: "utf8" }); return {}; } };
+  const inner = { start: async request => { result = await runRuntimeCommand(request.executable, request.args, { cwd: request.cwd, env: request.environment, linuxExecutable: request.linuxExecutable, timeout: 15000, maxOutputBytes: 16384, captureStderrBytes: 16384, detailed: true }); return { wait: async () => ({ code: result.exitCode, signal: null, terminalEvidence: "trusted" }) }; } };
   const supervisor = new LinuxBubblewrapRepositoryProcessSupervisor(inner);
   await supervisor.start({ action: "pipeline_local_gate", operationId: "synthetic-input-namespace", targetSnapshotId: "a".repeat(64), repositoryRoot: repository, executionRoot: lease.root, isolation: "disposable", manifestSha256: "b".repeat(64), executable: process.execPath, executableSha256: createHash("sha256").update(await readFile(process.execPath)).digest("hex"), args: ["probe.mjs"], cwd: lease.root, environment: { LANG: "C" }, lifecycle: "foreground", timeoutMs: 15000, maxOutputBytes: 16384 });
   assert.equal(result.stderr, ""); const observed = JSON.parse(result.stdout); assert.equal(Object.values(observed).every(v => v === true), true);

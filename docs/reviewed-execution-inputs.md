@@ -3,8 +3,9 @@
 A disposable execution workspace must contain only the files the operator
 reviewed. Copying a whole project can carry an ignored `.env`, database or
 credential file into the run. Switchyard's Linux runtime now refuses that
-fallback. This is an execution prerequisite; the Studio's general execution
-connection remains unfinished.
+fallback. The [reviewed task execution API](reviewed-task-execution.md) connects
+this prerequisite to separately approved Linux Run effects. Other execution
+actions and the frontend connection remain unfinished.
 
 The existing v1 host-pinned process recipe accepts an `inputFiles` extension:
 
@@ -47,8 +48,9 @@ The Linux namespace no longer mounts the host's whole `/etc`. It supplies only
 the dynamic loader cache there, alongside the existing read-only system runtime
 mounts, isolated process/network namespaces and cleared environment. This does
 not turn explicitly selected production data into synthetic data, provide a
-disk quota for arbitrary run output, or accept the remaining general execution
-connection. Equivalent Windows guest input staging still needs its own
+disk quota for arbitrary writable build outputs, or accept every execution
+action. The connected Run path mounts reviewed inputs read-only and bounds its
+temporary filesystem. Equivalent Windows guest input staging still needs its own
 implementation and native acceptance; the portable recipe validation is shared.
 
 Run the software boundaries with the pinned Node runtime:

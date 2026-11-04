@@ -6,6 +6,30 @@ separates unfinished implementation from checks needing hardware or accounts;
 [verification](verification.md) identifies the exact source and practical limits
 behind each accepted result.
 
+## Active backend iteration
+
+The Linux reviewed Run service now passes actual task-input → policy/checkpoint/
+budget → Bubblewrap → owned guardian → terminal-result checks. It preserves the
+original admission result, releases terminal budget claims, and removes only
+unchanged, independently stopped input copies. Atomic tool replacement during
+readiness cannot substitute the reviewed executable descriptor. The API,
+shutdown/restart boundaries and evidence exclusions are described in the
+[execution contract](reviewed-task-execution.md). The frontend is unchanged.
+
+Focused evidence: 38 HTTP/runtime/staging/execution cases and 20 shared broker/
+Linux runtime cases pass. The updated native input proof passes three checks
+(`repository-inputs-native-1793804631743.json`) without copying a runtime. These
+are source checks; normal installed execution acceptance is still pending.
+Windows guest execution, writable build outputs, reviewed per-run stop and the
+remaining action integrations are unfinished implementation, not hardware blocks.
+
+At published `c6e8a50`, GitHub Linux release verification and the short native
+Windows client-platform lane pass. The complete Windows run 41846396332 passed
+backend, helper, Job Object, fresh runtime and suite packaging, then exhausted
+the recovery group's 45-second harness allowance after six passing cases. Its
+Windows group budget is now 120 seconds, with no effect deadline or assertions
+removed; complete corrected acceptance remains pending.
+
 ## Current pilot
 
 The normal installed command is `~/.local/bin/switchyard`. Source development uses

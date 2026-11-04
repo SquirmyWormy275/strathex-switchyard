@@ -60,7 +60,7 @@ internal static class RuntimeCommandRunner
         int timeout = request.GetProperty("timeoutMs").GetInt32(), limit = request.GetProperty("maxOutputBytes").GetInt32();
         if (request.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(id, "D", out _) || !Path.IsPathFullyQualified(executable) || !Path.IsPathFullyQualified(cwd) || executable.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 || cwd.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 || !Regex.IsMatch(digest, "^[a-f0-9]{64}$") || timeout < 1 || timeout > 600000 || limit < 1 || limit > 524288) throw NativeError();
         var args = request.GetProperty("args");
-        if (args.ValueKind != JsonValueKind.Array || args.GetArrayLength() > 32) throw NativeError();
+        if (args.ValueKind != JsonValueKind.Array || args.GetArrayLength() > 256) throw NativeError();
         string[] arguments = args.EnumerateArray().Select(a => a.GetString() ?? throw NativeError()).ToArray();
         if (arguments.Any(a => a.Length > 8192 || a.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)) throw NativeError();
         byte[] inputBytes = Array.Empty<byte>();

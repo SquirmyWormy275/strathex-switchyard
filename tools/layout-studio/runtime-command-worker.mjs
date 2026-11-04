@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile, readdir, lstat, realpath } from "node:fs/promises";
+import { readFile, readdir, lstat, realpath, open } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { userInfo } from "node:os";
 import readline from "node:readline";
@@ -40,7 +40,8 @@ async function stopMembers() {
 async function run() {
   if (parentGone || started) return; started = true;
   const chunks = [], errors = []; let bytes = 0, stderrBytes = 0, status = "completed", timeout;
-  child = spawn("/usr/bin/setpriv", ["--no-new-privs", "--pdeathsig", "KILL", "--", process.execPath, fileURLToPath(new URL("./runtime-command-exec.mjs", import.meta.url)), String(process.pid), request.executable, JSON.stringify(request.args)], { cwd: request.cwd, env: request.environment, shell: false, detached: false, stdio: [request.inputBase64 !== undefined ? "pipe" : "ignore", "pipe", "pipe"] });
+  const entry = request.linuxExecutableSha256 ? ["/usr/bin/python3", "-I", "-B", fileURLToPath(new URL("./runtime-command-exec.py", import.meta.url))] : [process.execPath, fileURLToPath(new URL("./runtime-command-exec.mjs", import.meta.url))];
+  child = spawn("/usr/bin/setpriv", ["--no-new-privs", "--pdeathsig", "KILL", "--", ...entry, String(process.pid), request.executable, JSON.stringify(request.args), ...(request.linuxExecutableSha256 ? [request.linuxExecutableSha256] : [])], { cwd: request.cwd, env: request.environment, shell: false, detached: false, stdio: [request.inputBase64 !== undefined ? "pipe" : "ignore", "pipe", "pipe", ...(request.linuxExecutableSha256 ? [3] : [])] });
   let stopping;
   const stop = () => stopping ??= stopMembers().catch(() => loseParent());
   child.stdout.on("data", (b) => { bytes += b.length; if (bytes > request.maxOutputBytes) { if (status === "completed") { status = "output-limit"; void stop(); } } else chunks.push(b); });
@@ -66,16 +67,22 @@ lines.on("line", (line) => { void (async () => {
     request = JSON.parse(line);
     const r = request;
     if (r.inputBase64 !== undefined && (typeof r.inputBase64 !== "string" || Buffer.from(r.inputBase64, "base64").toString("base64") !== r.inputBase64 || Buffer.from(r.inputBase64, "base64").length > 524288) || r.maxStderrBytes !== undefined && (!Number.isSafeInteger(r.maxStderrBytes) || r.maxStderrBytes < 0 || r.maxStderrBytes > 16384)) throw new Error("Invalid bounded private command input");
-    if (r.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(r.id) || !isAbsolute(r.executable) || !isAbsolute(r.cwd) || !/^[a-f0-9]{64}$/.test(r.executableSha256) || !Array.isArray(r.args) || r.args.length > 32 || r.args.some((a) => typeof a !== "string" || a.length > 8192 || /[\0\r\n]/.test(a)) || !Number.isSafeInteger(r.timeoutMs) || r.timeoutMs < 1 || r.timeoutMs > 600000 || !Number.isSafeInteger(r.maxOutputBytes) || r.maxOutputBytes < 1 || r.maxOutputBytes > 524288 || !r.environment || typeof r.environment !== "object" || Object.keys(r.environment).length > 64 || Object.entries(r.environment).some(([k,v]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) || typeof v !== "string" || v.length > 8192 || v.includes("\0"))) throw new Error("Invalid runtime command scope");
+    if (r.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(r.id) || !isAbsolute(r.executable) || !isAbsolute(r.cwd) || !/^[a-f0-9]{64}$/.test(r.executableSha256) || !Array.isArray(r.args) || r.args.length > 256 || r.args.some((a) => typeof a !== "string" || a.length > 8192 || /[\0\r\n]/.test(a)) || !Number.isSafeInteger(r.timeoutMs) || r.timeoutMs < 1 || r.timeoutMs > 600000 || !Number.isSafeInteger(r.maxOutputBytes) || r.maxOutputBytes < 1 || r.maxOutputBytes > 524288 || !r.environment || typeof r.environment !== "object" || Object.keys(r.environment).length > 64 || Object.entries(r.environment).some(([k,v]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) || typeof v !== "string" || v.length > 8192 || v.includes("\0"))) throw new Error("Invalid runtime command scope");
     const self = await readFile(`/proc/${process.pid}/stat`, "utf8"), fields = self.slice(self.lastIndexOf(") ") + 2).split(" ");
     if (+fields[2] !== process.pid || +fields[3] !== process.pid) throw new Error("The guardian has no private native session");
     const executable = await realpath(r.executable), s = await lstat(executable);
     if (!s.isFile() || ![0, userInfo().uid].includes(s.uid) || s.mode & 0o6022) throw new Error("Unsafe native runtime executable");
     const hash = createHash("sha256"); for await (const b of createReadStream(executable)) hash.update(b);
     if (hash.digest("hex") !== r.executableSha256) throw new Error("Runtime executable identity changed");
+    if (r.linuxExecutableSha256 !== undefined) {
+      if (r.executable !== "/usr/bin/bwrap" || !r.args.includes("/proc/self/fd/3") || !/^[a-f0-9]{64}$/.test(r.linuxExecutableSha256)) throw new Error("Invalid pinned Linux executable");
+      const pinned = await open("/proc/self/fd/3", "r");
+      try { const st = await pinned.stat(); if (!st.isFile() || st.size > 512 * 1024 * 1024) throw new Error("Invalid executable descriptor"); const h = createHash("sha256"); for await (const b of pinned.createReadStream({ autoClose:false })) h.update(b); if (h.digest("hex") !== r.linuxExecutableSha256) throw new Error("Pinned executable changed"); }
+      finally { await pinned.close(); }
+    }
     if (parentGone) return;
     ready = true;
-    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session", capabilities: ["bounded-stdin", "bounded-stdin-512k", "bounded-stderr"] });
+    await write({ schema: r.schema, id: r.id, event: "ready", guardianPid: process.pid, birth: fields[19], containment: "owned-linux-session", capabilities: ["bounded-stdin", "bounded-stdin-512k", "bounded-stderr", "pinned-linux-executable"] });
   } else {
     const ack = JSON.parse(line);
     if (!ready || started || ack.schema !== request.schema || ack.id !== request.id || ack.start !== true) throw new Error("Invalid runtime start acknowledgement");

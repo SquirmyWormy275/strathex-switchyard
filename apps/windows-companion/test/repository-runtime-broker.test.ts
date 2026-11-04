@@ -96,6 +96,33 @@ test("repository runtime broker preserves exact post-start effect disposition", 
   assert.equal(outcome.data?.exitCode, 9);
 });
 
+test("managed admission retains cancellation and deadline monitoring until child exit", async () => {
+  for (const reason of ["cancellation", "deadline"] as const) {
+    let options: RepositoryRuntimeExecuteOptions | undefined, cancelled = false, reads = 0;
+    const runtime = {
+      async execute(_action: string, input: RepositoryRuntimeExecuteOptions): Promise<RepositoryRuntimeResult> {
+        options = input;
+        input.managedLifecycle!.started();
+        return { status: "running", summary: "owned managed child", managedProcessId: `managed:${"a".repeat(64)}`, pid: 1234 };
+      }
+    };
+    const broker = new RepositoryRuntimeExecutionBroker({ async resolve() { return runtime as unknown as RepositoryRuntime; } });
+    const outcome = await broker.execute(request({ session: providerSession, executionControl: {
+      operationId: "operation-runtime", deadline: new Date(Date.now() + (reason === "deadline" ? 250 : 5_000)).toISOString(),
+      async isCancellationRequested() { reads++; return cancelled; }
+    } }));
+    assert.equal(outcome.status, "running");
+    assert.equal(options!.signal!.aborted, false, "returning running must not cancel its child");
+    if (reason === "cancellation") cancelled = true;
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("The managed cancellation monitor was lost after admission.")), 1_000);
+      options!.signal!.addEventListener("abort", () => { clearTimeout(timeout); resolve(); }, { once: true });
+    });
+    options!.managedLifecycle!.stopped();
+    assert.ok(reads >= 1);
+  }
+});
+
 test("repository runtime broker refuses recipe/action confusion and pre-cancelled work", async () => {
   let calls = 0;
   const runtime = { async execute(): Promise<RepositoryRuntimeResult> { calls += 1; return { status: "completed", summary: "unexpected" }; } };

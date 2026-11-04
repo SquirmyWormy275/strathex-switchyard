@@ -273,6 +273,8 @@ export interface DurableMediatedExecutorOptions {
   readonly snapshots?: TargetSnapshotLedger;
   readonly checkpoints?: CheckpointLedger;
   readonly checkpointCapture?: CheckpointCaptureAdapter;
+  /** Host configuration can require extra checkpoints, never remove built-in ones. */
+  readonly additionalCheckpointActions?: readonly CommandAction[];
   /**
    * Read-only verification of each captured recovery artifact.  Risky work is
    * unavailable when the host cannot prove the preservation reference still
@@ -439,6 +441,7 @@ export class DurableMediatedExecutor {
       budgets: this.budgets,
       checkpoints: this.checkpoints,
       checkpointCapture: this.options.checkpointCapture,
+      additionalCheckpointActions: this.options.additionalCheckpointActions,
       checkpointVerifier: this.options.checkpointVerifier,
       policyVersion: this.options.policyVersion,
       revalidator: this.finalTargetRevalidator(),
@@ -821,6 +824,17 @@ export class DurableMediatedExecutor {
     const budgets = await this.reconcileBudgetedOperations();
     await this.resumeRecoveredBudgetLifecycle();
     return { operations, budgets };
+  }
+
+  /** Stop this instance's observation timers after its host lifecycle has stopped owned effects.
+   * Durable claims and unknown outcomes remain intact for the next host instance.
+   */
+  stopObservation(): void {
+    this.recoveryPollingEnabled = false;
+    this.recoveryPoll?.cancel();
+    this.recoveryPoll = undefined;
+    for (const timer of this.deadlineSchedules.values()) timer.cancel();
+    this.deadlineSchedules.clear();
   }
 
   /**
@@ -1341,6 +1355,7 @@ interface DurableRuntimeGovernanceOptions {
   readonly budgets: DurableBudgetManager;
   readonly checkpoints: CheckpointLedger;
   readonly checkpointCapture?: CheckpointCaptureAdapter;
+  readonly additionalCheckpointActions?: readonly CommandAction[];
   readonly checkpointVerifier?: RecoveryArtifactVerifier;
   readonly revalidator: TargetSnapshotRevalidator;
   readonly sessions: SessionRegistry;
@@ -1462,7 +1477,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
 
   async admit(input: DispatchGovernanceRequest): Promise<DispatchGovernanceAdmission> {
     let effectGuard: EffectGuard | undefined;
-    const workflow = checkpointWorkflow(input.definition);
+    const workflow = checkpointWorkflow(input.definition) ?? (this.options.additionalCheckpointActions?.includes(input.definition.action) ? "risky_mutation" : undefined);
     if (workflow) {
       if (!input.target) return { allowed: false, status: "unavailable", summary: "This risky workflow needs a durably recorded exact TargetSnapshot before a checkpoint can be captured." };
       if (!this.options.checkpointCapture) return { allowed: false, status: "unavailable", summary: "This risky workflow has no trusted checkpoint-capture adapter; no broker was called." };

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import type { OperationControllerObservation } from "../../../packages/control-plane/src/runtime.ts";
@@ -32,12 +33,20 @@ export { LinuxDisposableExecutionRootProvider } from "./linux-repository-inputs.
 
 /** Wraps security and pipeline recipes in a deny-network Bubblewrap namespace. */
 export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryProcessSupervisor {
-  constructor(private readonly inner: RepositoryProcessSupervisor) {}
+  private readonly inner: RepositoryProcessSupervisor;
+  private readonly actions: ReadonlySet<string>;
+  private readonly readOnlyDisposable: boolean;
+  private readonly temporaryBytes?: number;
+  constructor(inner: RepositoryProcessSupervisor, { additionalActions = [], readOnlyDisposable = false, temporaryBytes }: { additionalActions?: readonly string[]; readOnlyDisposable?: boolean; temporaryBytes?: number } = {}) {
+    this.inner=inner; this.actions=new Set([...isolatedActions,...additionalActions]); this.readOnlyDisposable=readOnlyDisposable;
+    if (temporaryBytes !== undefined && (!Number.isSafeInteger(temporaryBytes) || temporaryBytes < 16 * 1024 * 1024 || temporaryBytes > 256 * 1024 * 1024)) throw new Error("Choose a bounded temporary namespace filesystem.");
+    this.temporaryBytes=temporaryBytes;
+  }
   recover(scope: RepositoryProcessRecoveryScope): Promise<readonly RepositorySupervisedProcess[]> { return this.inner.recover(scope); }
   observeOperation(request: RepositoryProcessObservationRequest): Promise<OperationControllerObservation> { return this.inner.observeOperation(request); }
 
   async start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess> {
-    if (!isolatedActions.has(request.action)) return this.inner.start(request);
+    if (!this.actions.has(request.action)) return this.inner.start(request);
     if (!request.executionRoot || !request.isolation) throw new Error("The Linux sandboxed repository recipe has no exact execution-root binding.");
     const repositoryRoot = await realpath(request.repositoryRoot);
     const executionRoot = await realpath(request.executionRoot);
@@ -45,29 +54,51 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
     if (!inside(executionRoot, cwd)) throw new Error("The Linux sandboxed recipe cwd escaped its execution root.");
     if (request.isolation === "disposable" ? executionRoot === repositoryRoot : executionRoot !== repositoryRoot) throw new Error("The Linux sandboxed recipe received a mismatched isolation root.");
     const executable = await realpath(request.executable);
-    if (createHash("sha256").update(await readFile(executable)).digest("hex") !== request.executableSha256.toLowerCase()) throw new Error("The Linux sandboxed recipe executable changed before namespace launch.");
-    const mappedCwd = mappedPath(executionRoot, cwd);
-    const systemExecutable = ["/usr/", "/bin/", "/lib/", "/lib64/"].some((prefix) => executable.startsWith(prefix));
-    const mappedExecutable = inside(executionRoot, executable) ? mappedPath(executionRoot, executable) : systemExecutable ? executable : "/b122-tool";
-    const executableBind = mappedExecutable === "/b122-tool" ? ["--ro-bind", executable, mappedExecutable] : [];
-    const mount = request.isolation === "disposable" ? "--bind" : "--ro-bind";
-    const environment = Object.entries(request.environment).sort(([left], [right]) => left.localeCompare(right)).flatMap(([name, value]) => ["--setenv", name, value]);
-    const args = [
-      "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
-      "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-      "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
-      mount, executionRoot, "/workspace", ...executableBind, "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
-    ];
-    const bwrap = await realpath(bwrapPath);
-    if (bwrap !== bwrapPath || !(await lstat(bwrap)).isFile()) throw new Error("The fixed Linux Bubblewrap executable is unavailable.");
-    return this.inner.start({
-      ...request,
-      executable: bwrap,
-      executableSha256: createHash("sha256").update(await readFile(bwrap)).digest("hex"),
-      args,
-      cwd: executionRoot,
-      environment: { PATH: "/usr/bin:/bin" }
-    });
+    // Keep the reviewed inode open across the guardian's readiness handshake.
+    // An atomic tool upgrade must not substitute a new pathname after hashing.
+    const executableHandle = await open(executable, constants.O_RDONLY | constants.O_NOFOLLOW);
+    let transferred = false;
+    try {
+      const before = await executableHandle.stat({ bigint: true });
+      if (!before.isFile() || before.size > 512n * 1024n * 1024n) throw new Error("The reviewed Linux executable is not a bounded regular file.");
+      const hash = createHash("sha256"), chunk = Buffer.alloc(64 * 1024);
+      let position = 0;
+      for (;;) {
+        const { bytesRead } = await executableHandle.read(chunk, 0, Math.min(chunk.length, Number(before.size) - position + 1), position);
+        if (!bytesRead) break;
+        position += bytesRead;
+        if (position > Number(before.size)) throw new Error("The Linux executable grew during verification.");
+        hash.update(chunk.subarray(0, bytesRead));
+      }
+      const after = await executableHandle.stat({ bigint: true });
+      if (position !== Number(before.size) || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs || hash.digest("hex") !== request.executableSha256.toLowerCase()) throw new Error("The Linux sandboxed recipe executable changed before namespace launch.");
+      const mappedCwd = mappedPath(executionRoot, cwd);
+      const systemExecutable = ["/usr/", "/bin/", "/lib/", "/lib64/"].some((prefix) => executable.startsWith(prefix));
+      const mappedExecutable = inside(executionRoot, executable) ? mappedPath(executionRoot, executable) : systemExecutable ? executable : "/b122-tool";
+      const executableBind = ["--ro-bind", "/proc/self/fd/3", mappedExecutable];
+      const mount = request.isolation === "disposable" && !this.readOnlyDisposable ? "--bind" : "--ro-bind";
+      const environment = Object.entries(request.environment).sort(([left], [right]) => left.localeCompare(right)).flatMap(([name, value]) => ["--setenv", name, value]);
+      const args = [
+        "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
+        "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", ...(this.temporaryBytes ? ["--size", String(this.temporaryBytes)] : []), "--tmpfs", "/tmp",
+        "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
+        mount, executionRoot, "/workspace", ...executableBind, "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
+      ];
+      const bwrap = await realpath(bwrapPath);
+      if (bwrap !== bwrapPath || !(await lstat(bwrap)).isFile()) throw new Error("The fixed Linux Bubblewrap executable is unavailable.");
+      const child = await this.inner.start({
+        ...request,
+        executable: bwrap,
+        executableSha256: createHash("sha256").update(await readFile(bwrap)).digest("hex"),
+        args,
+        cwd: executionRoot,
+        environment: { PATH: "/usr/bin:/bin" },
+        linuxExecutable: { fd: executableHandle.fd, sha256: request.executableSha256 }
+      });
+      transferred = true;
+      void child.wait().finally(() => executableHandle.close()).catch(() => undefined);
+      return child;
+    } finally { if (!transferred) await executableHandle.close(); }
   }
 }
 
@@ -81,12 +112,16 @@ interface LinuxRecipeReport {
 
 /** Converts only Bubblewrap-executed, pinned-manifest typed reports into authenticated host receipts. */
 export class LinuxHostValidatedRepositoryRecipeRunner implements SandboxRepositoryRecipeRunner {
+  private readonly runtimes: DurableRepositoryRuntimeRegistry;
+  private readonly issuer: HostReceiptEvidenceIssuer;
+  private readonly scannerFixtures: ScannerFixtureResolver;
+  private readonly clock: () => Date;
   constructor(
-    private readonly runtimes: DurableRepositoryRuntimeRegistry,
-    private readonly issuer: HostReceiptEvidenceIssuer,
-    private readonly scannerFixtures: ScannerFixtureResolver,
-    private readonly clock: () => Date = () => new Date()
-  ) {}
+    runtimes: DurableRepositoryRuntimeRegistry,
+    issuer: HostReceiptEvidenceIssuer,
+    scannerFixtures: ScannerFixtureResolver,
+    clock: () => Date = () => new Date()
+  ) { this.runtimes=runtimes; this.issuer=issuer; this.scannerFixtures=scannerFixtures; this.clock=clock; }
 
   async runRecipe(request: IsolationRequest, recipeId: string): Promise<BrokerOutcome> {
     if (!isolatedActions.has(request.action) || recipeId !== request.action || !request.effectGuard) return incomplete("Linux repository validation requires one supported exact recipe and final effect guard.");

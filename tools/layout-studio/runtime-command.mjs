@@ -33,19 +33,22 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   if (code !== 0 || error) { await stopOwnedChild(child); return false; }
   try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.activeProcesses === 0; } catch { return false; }
 }
-export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
-  if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288) throw new Error("Choose a supported, bounded runtime operation.");
+export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, expectedExecutableSha256, linuxExecutable, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
+  if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288 || !Array.isArray(args) || args.length > 256 || args.some(a=>typeof a!=="string" || a.length>8192 || /[\0\r\n]/.test(a))) throw new Error("Choose a supported, bounded runtime operation.");
   if (inputText !== undefined && inputBytes !== undefined || inputBytes !== undefined && (!(inputBytes instanceof Uint8Array) || inputBytes.byteLength > 524288) || inputText !== undefined && (typeof inputText !== "string" || Buffer.byteLength(inputText) > 524288 || inputText.includes("\0")) || !Number.isSafeInteger(captureStderrBytes) || captureStderrBytes < 0 || captureStderrBytes > 16384 || typeof detailed !== "boolean") throw new Error("Choose a bounded private input and diagnostic contract.");
+  if (linuxExecutable !== undefined && (process.platform !== "linux" || executable !== "/usr/bin/bwrap" || !args.includes("/proc/self/fd/3") || !linuxExecutable || Object.keys(linuxExecutable).some(k=>!["fd","sha256"].includes(k)) || !Number.isSafeInteger(linuxExecutable.fd) || linuxExecutable.fd < 3 || !/^[a-f0-9]{64}$/.test(linuxExecutable.sha256 ?? ""))) throw new Error("The pinned Linux executable descriptor contract is invalid.");
   const input = inputText !== undefined ? Buffer.from(inputText) : inputBytes !== undefined ? Buffer.from(inputBytes) : undefined;
   const checkAbort = () => { if (signal?.aborted) throw Object.assign(new Error("The owned native command was cancelled before startup."), { code: "CANCELLED" }); }; checkAbort();
   const resolved = await realpath(executable), digest = createHash("sha256");
   for await (const chunk of createReadStream(resolved)) digest.update(chunk);
+  const executableSha256 = digest.digest("hex");
+  if (expectedExecutableSha256 !== undefined && (typeof expectedExecutableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(expectedExecutableSha256) || executableSha256 !== expectedExecutableSha256)) throw new Error("The exact reviewed native executable digest changed before guardian startup.");
   // Hash the native target but preserve the invocation path: Python locates
   // pyvenv.cfg beside its venv alias, and argv[0] is meaningful to native tools.
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256: digest.digest("hex"), args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256, args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(linuxExecutable ? { linuxExecutableSha256: linuxExecutable.sha256 } : {}), ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
   if (Buffer.byteLength(JSON.stringify(request)) > 1048576) throw new Error("The fixed runtime request exceeds its protocol bound.");
   checkAbort();
-  const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore"], env: desktopEnvironment() });
+  const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore", ...(linuxExecutable ? [linuxExecutable.fd] : [])], env: desktopEnvironment() });
   let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting, guardianFrame;
   let resolveAbort; const aborted = new Promise((r) => { resolveAbort = r; });
   const fail = (message) => {
@@ -77,6 +80,7 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
         ready = true; clearTimeout(readiness);
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
         const capabilities = Array.isArray(frame.capabilities) ? frame.capabilities : [];
+        if (linuxExecutable && !capabilities.includes("pinned-linux-executable")) { fail("The guardian does not support the pinned Linux executable contract."); return; }
         if ((input !== undefined && !capabilities.includes("bounded-stdin")) || (input !== undefined && input.length > 12000 && !capabilities.includes("bounded-stdin-512k")) || (captureStderrBytes && !capabilities.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
         guardianFrame = frame;
         guardianBirth = frame.birth;

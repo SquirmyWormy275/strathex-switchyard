@@ -249,6 +249,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
           ? { status: "cancelled", summary: "The repository runtime observed cancellation before execution.", effectDisposition: "not_started" }
           : { status: "unavailable", summary: "The repository runtime could not verify durable cancellation state before execution.", effectDisposition: "not_started" };
     }
+    let managedLifetime = false;
     try {
       if (!request.effectGuard) return { status: "blocked", summary: "The repository runtime requires an exact dispatch-bound final effect guard." };
       const admissionFence = this.containment ? await this.containment.check(request.target.repositoryRoot, "execution") : undefined;
@@ -292,6 +293,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
         ...(request.session ? { sessionId: request.session.id } : {}),
         ...(request.authority ? { authorityId: request.authority.id } : {}),
         signal: operationControl.signal,
+        managedLifecycle: { started() { managedLifetime = true; }, stopped() { operationControl.dispose(); } },
         effectGuard
       });
       if (action === "debug_target" && result.status === "running" && result.debugConfiguration && this.hostActions) {
@@ -330,7 +332,7 @@ export class RepositoryRuntimeExecutionBroker implements ExecutionBroker {
       return mapped;
     } catch (error) {
       return { status: "failed", summary: `The verified repository runtime failed safely: ${untrustedSummary((error as Error).message)}` };
-    } finally { operationControl.dispose(); }
+    } finally { if (!managedLifetime) operationControl.dispose(); }
   }
 
   private async queueVerifiedPythonEnvironment(request: ExecutionRequest, interpreter: string, result: RepositoryRuntimeResult): Promise<BrokerOutcome> {

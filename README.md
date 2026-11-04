@@ -45,6 +45,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a
   binary file through review, encrypted preservation, the durable policy broker
   and supervised native Git; run its disposable native demonstration.
+- [Reviewed task execution](docs/reviewed-task-execution.md): run exact task-owned
+  inputs through separate approval, Linux containment and durable native evidence.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Verification at a glance](docs/verification.md): accepted checkpoints,
