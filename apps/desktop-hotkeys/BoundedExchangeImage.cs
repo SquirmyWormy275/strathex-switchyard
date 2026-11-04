@@ -113,7 +113,10 @@ internal static class BoundedExchangeImage
             ulong nativeSize = BinaryPrimitives.ReadUInt64LittleEndian(size.AsSpan(8, 8)); uint nativeSector = BinaryPrimitives.ReadUInt32LittleEndian(size.AsSpan(28, 4)), nativeType = BinaryPrimitives.ReadUInt32LittleEndian(subtype.AsSpan(8, 4)), nativeLoaded = BinaryPrimitives.ReadUInt32LittleEndian(loaded.AsSpan(8, 4));
             if (nativeSize != VirtualBytes) throw new InvalidOperationException($"native-vhd-size-{nativeSize}");
             if (nativeSector != 512) throw new InvalidOperationException($"native-vhd-sector-{nativeSector}");
-            if (new Guid(identifier.AsSpan(8, 16)) != operationId) throw new InvalidOperationException(new Guid(identifier.AsSpan(8, 16), bigEndian: true) == operationId ? "native-vhd-identifier-network" : "native-vhd-identifier-other");
+            // The VHD UUID is an opaque network-order byte sequence. The native
+            // GUID output retains those bytes; formatting it as a CLR GUID
+            // would reverse its first three fields and change the comparison.
+            if (!identifier.AsSpan(8, 16).SequenceEqual(operationId.ToByteArray(bigEndian: true))) throw new InvalidOperationException("native-vhd-identifier-other");
             if (nativeType != 2) throw new InvalidOperationException($"native-vhd-type-{nativeType}");
             if (nativeLoaded != 0) throw new InvalidOperationException($"native-vhd-loaded-{nativeLoaded}");
         }

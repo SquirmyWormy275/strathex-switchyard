@@ -174,6 +174,11 @@ updated C# build has no warnings/errors, all five Linux mode guards pass and
 16 staging/package cases pass. Native inspection/header acceptance is pending;
 the immutable Node/worker checks are confirmed individually, not an accepted
 complete image or VM path.
+The diagnostic rerun at `f5dd3be` identifies the VHD UUID byte-order comparison:
+the native reader returns the persisted opaque network-order bytes, while CLR
+GUID formatting reverses its first fields. The comparator now checks the exact
+original bytes instead. No alternative UUID/capacity is accepted; corrected
+native acceptance remains pending.
 
 ## Current pilot
 

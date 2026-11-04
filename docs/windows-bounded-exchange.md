@@ -49,6 +49,12 @@ reader now reports only a closed field code and bounded numeric diagnostics so
 the native layout/identity discrepancy can be corrected from actual evidence.
 The local format test is not Windows acceptance.
 
+The diagnostic rerun at `f5dd3be` identified the precise mismatch:
+`native-vhd-identifier-network`. Windows returned the VHD's original 16 UUID
+bytes, while the comparator formatted them as a CLR GUID, reversing the first
+three fields. It now compares the exact network-order UUID bytes; no alternate
+identity or capacity is accepted. Corrected native acceptance is pending.
+
 `--inspect-bounded-exchange-image` now provides a separate read-only native
 observation of the exact original file ID, full image hash, private directory
 DACL and detached VHD header. It cannot change the directory's ACL or create a
