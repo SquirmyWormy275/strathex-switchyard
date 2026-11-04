@@ -42,6 +42,9 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   evidence and the controls still being implemented.
 - [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
+- [Mediated repository effects](docs/mediated-repository-effects.md): follow a
+  binary file through review, encrypted preservation, the durable policy broker
+  and supervised native Git; run its disposable native demonstration.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Verification at a glance](docs/verification.md): accepted checkpoints,
@@ -74,12 +77,12 @@ cleanup are verified. Provider replies do not establish coding-task completion.
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 225 test/build groups for `7aeb1e6`, including
+The complete Windows release passed 231 test/build groups for `2e64ff6`, including
 managed startup, installer, bootstrap, portable profiles and automation checks.
 Fresh native Windows installation/import/model/recheck and cleanup also passed
 with 49 exact distributions. Newer private-pipe and recovery checkpoints await
-their corrected complete Windows run. The latest accepted Linux run has 121 groups
-and 876 tests. [Verification details](docs/verification.md) distinguish each result
+their corrected complete Windows run. The latest accepted Linux run has 140 groups
+and 913 tests. [Verification details](docs/verification.md) distinguish each result
 and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.

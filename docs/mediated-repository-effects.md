@@ -60,7 +60,7 @@ The suite must connect independent native-exit reconciliation and recovery
 before enabling this effect API. The existing companion handler remains behind
 its own broker and final-effect guard; it is not a standalone authority boundary.
 
-Sixteen tests use actual disposable repositories and Git processes. They cover
+Seventeen tests use actual disposable repositories and Git processes. They cover
 ordinary/private-index commits, branch/detached setup, stale targets, competing
 reference updates, exact binary content, changed witnesses and tripwire filters,
 diff drivers, text conversion, fsmonitor and hooks. Descriptor-bound index and
@@ -72,3 +72,60 @@ index digest before any reference mutation. A simulated unconfirmed native
 exit checks preservation; it is not a claimed physical crash. These tests are
 registered in both the Linux and Windows release lanes. Native Windows acceptance
 for the updated implementation is pending.
+
+
+## Suite transport and durable native demonstration
+
+The host-only repository effect transport now runs the handler's Git commands
+through native guardians. A kernel resource lease serializes the native
+repository identity, and every command rechecks host authorization, workspace
+policy and original repository/Git directory identities. Git receives only
+trusted handler argv, the exact operation's private index, a fixed environment
+and the explicitly reviewed author. Provider, SDK and HTTP payloads have no
+argv entry point. Linked Git common directories are explicitly unsupported.
+
+The host stores each guardian identity in its AEAD compartment before acknowledging
+startup, and independently checks native exit before recording stopped state.
+An expected reference update, including its old/new object IDs, is durably
+recorded before that command may start. Unknown exits, cancellation and restart
+retain the scope and scratch; replacement is blocked pending explicit no-replay
+reconciliation. A readback failure after a successful reference update also
+retains the exact handler indices and leases.
+
+The existing durable runtime uses a hash-chained journal inside the same locked
+AEAD workspace for policy, sessions, authority, confirmation, budgets, checkpoints,
+operations and receipts. The original index and target are copied into encrypted
+checkpoint data, independently hashed on readback, and referenced by the core
+checkpoint ledger before broker admission. No plaintext recovery copy is written.
+The checkpoint's recovery guide authorizes no restore or deletion.
+
+Five integration scenarios pass. One uses the actual native Linux guardian,
+Git and kernel leases: a separately confirmed durable operation commits exact
+binary bytes with the reviewed author, preserves another edited file, reconciles
+the shared index, independently verifies every retained guardian exited, and
+rejects approval replay. The native coding identity in this disposable fixture
+is synthetic; no provider task or model prompt is created. The remaining cases
+check encrypted journal rollback/isolation/corruption, author/lease rejection,
+retention across an unknown exit/restart and cancellation with late output.
+Native Windows has a declared skip for the Linux guardian journey; its existing
+helper lane separately checks the underlying native command transport.
+
+The suite's public commit admission and operator recovery routes are still
+unconnected. This internal demonstration does not enable the task authority
+API to execute a commit. Those routes and normal installed acceptance remain
+implementation work. The transport currently bounds an operation to 128 commands
+and two minutes, each command to ten seconds, and index checkpoints to 512 KiB.
+Encrypted checkpoint and effect journal inventories each have a 2 MiB bound;
+recovery data is preserved when either fills. The offline suite now includes only
+the runtime dependency closure and the three Git helpers, with a 5 MiB Linux
+source-bundle test budget; no Node, .NET, model or Python runtime is copied.
+
+Reproduce the disposable native demonstration and fault cases with Node 24:
+
+```sh
+mise exec node@24.14.0 -- node --test tools/layout-studio/repository-effects.test.mjs
+```
+
+It creates its own private state, synthetic identity and local repository, verifies
+the resulting commit and native exits, then removes that fixture. It neither
+prompts a model nor commits changes in this checkout.

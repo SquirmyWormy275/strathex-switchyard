@@ -391,6 +391,19 @@ test("an unconfirmed native Git exit retains its exact indices and shared lock f
   } finally { await isolated.dispose(); }
 });
 
+test("a readback failure after a verified reference update retains exact transaction recovery files", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let advanced = false;
+    const runner: LocalGitRunner = { async run(args, options) { if (advanced && args[0] === "rev-parse" && args[1] === "HEAD") throw new Error("Synthetic unavailable HEAD readback"); const result = await delegate.run(args, options); if (args.includes("update-ref") && result.exitCode === 0) advanced = true; return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "ambiguous"); assert.equal(outcome.data?.recoveryStatePreserved, true);
+    assert.notEqual(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head); await access(join(isolated.root, ".git/index.lock"));
+    assert.ok((await readdir(join(isolated.state, "git-operations"))).length); assert.ok((await readdir(join(isolated.state, "git-locks"))).length);
+  } finally { await isolated.dispose(); }
+});
+
 
 test("a replacement shared index lock is preserved after the exact reviewed commit advances HEAD", async () => {
   const isolated = await fixture();

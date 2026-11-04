@@ -1752,3 +1752,47 @@ accepts only the exact native EPERM boundary with original bytes intact and no
 replacement directory, or detects an actual parent replacement before reading.
 The descriptor must close in either case. All 28 affected Linux checks pass;
 complete corrected native Windows acceptance is still pending.
+
+
+## Owned Git commands, encrypted checkpoints and a durable native commit
+
+The suite now has a host-only Git effect transport with a native repository
+resource lease and per-command authorization/root/Git-directory checks. It
+persists exact guardians before startup acknowledgement, records expected ref
+updates before native launch and independently verifies exit before marking
+stopped. The original index and target are preserved as bounded encrypted
+checkpoint data; the existing core checkpoint gate verifies those bytes before
+broker admission. The control-plane session/authority/confirmation/budget/
+operation/receipt journal now runs directly inside a locked AEAD compartment,
+with hash-chain verification and atomic rollback. Normal Node 24 imports the
+runtime without a transform flag after removing its sole parameter property.
+
+Five new integration checks pass, including a real native Linux Git commit
+through the existing durable runtime. It commits every reviewed binary byte
+with the explicit author, preserves the unowned worktree edit, reconciles the
+index and verifies every recorded guardian independently stopped. Replayed
+approval is rejected. The fixture's task/authority are explicitly synthetic;
+no model prompt or provider task-completion claim is involved. Other cases
+exercise protected journal corruption/rollback, rejection before startup,
+unknown-exit restart retention and cancellation with late output. Seventeen
+actual Git handler cases pass, including preservation after an ordinary
+readback exception following a successful CAS.
+
+The public suite commit admission and operator recovery routes remain unfinished
+and disabled. The internal transport is a prerequisite, not an enabled generic
+Git API. It caps commands, time, journal/checkpoint size and exact private paths.
+Packaging includes the actual runtime dependency closure and Git helpers; the
+source-only Linux bundle budget increases from 4 to 5 MiB for these dependencies,
+with normal-Node imports verified from the bundle. No native/optional runtime
+copy is added.
+
+The previous published ownership checkpoint `ae9af02` passed the normal installed
+update's six checks with unchanged frontend, definitions, modes and private link;
+receipt assignment-legends-1793780168900.json. Its disposable application bundle
+was removed. Windows run 41798074080 is still pending complete acceptance.
+
+The complete Linux source lane passed 140/140 groups: 913 tests, 904 passed and
+nine declared platform skips. Receipt 184543fb-5986-4c26-935e-ba34e5bec3d7.
+All 25 focused journal/native/packaging/runner cases, 17 actual Git handler
+cases, the 16 suite regressions and TypeScript checks pass. No current source
+Windows acceptance is inferred from this Linux run.

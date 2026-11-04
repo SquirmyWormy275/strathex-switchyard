@@ -35,7 +35,8 @@ export class ExecutionControlRegistry {
   private readonly cancelled = new Map<string, string>();
   private readonly controls = new Map<string, ExecutionControl>();
 
-  constructor(private readonly now: () => number = Date.now) {}
+  private readonly now: () => number;
+  constructor(now: () => number = Date.now) { this.now = now; }
 
   bind(operationId: string, deadline: string, budgetClaimId?: string): ExecutionControl {
     const control: ExecutionControl = {
