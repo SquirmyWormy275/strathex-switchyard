@@ -2,8 +2,8 @@
 
 The Windows connection uses a small host manifest to bind the selected input
 files to the guest's existing catalog format. The live repository is never a
-writable guest mapping. This validator is implemented; the Studio admission
-adapter is still being connected.
+writable guest mapping. The validator and host-only runner are implemented;
+the Studio policy/admission adapter is still being connected.
 
 `run.json` has exactly these fields:
 
@@ -56,3 +56,33 @@ The original blocking state-lock behavior is unchanged. The new probe is tested
 against another actual process, owner death, independent store instances and a
 callback failure whose error code resembles a busy lock. Native Windows probe
 acceptance is included in the short filesystem workflow.
+
+## Host orchestration
+
+`createWindowsReviewedRunner` connects the native input, worker/runtime, image,
+bounded-volume and managed-session services to the backend. Its caller must
+already own policy admission and supply the exact current task guard. Paths to
+replacement helpers, runtimes or host commands are not request fields. Source
+and runtime hashes are rechecked before the durable Run reservation; each native
+service retains its own original readiness and exit records.
+
+The runner holds its kernel lease through preparation, guest output validation
+and cleanup. Recovery in another process must acquire that lease before touching
+the guest or its staging. The native cleanup callbacks additionally probe the
+same lease so they cannot mistake preparation for an absent consumer. Mode
+shutdown cancels the owned boundary and waits for its result.
+
+A backend completion requires fresh independent guest/native exit readback
+before the runner reports completion. The original backend observation, admitted
+result and storage retirement are recorded separately. Unknown exit preserves
+all assets and blocks replacement. Failed cleanup leaves a known program result
+intact while blocking another Run; later reconciliation cannot replay or upgrade
+the original program result. General workspace snapshots omit these records.
+
+The combined runner/manifest/kernel-lock/privacy/release group passes 43 checks;
+type checking passes. Nine orchestration cases use explicit native service/VM
+doubles with actual encrypted records, file reads and kernel leases. They cover
+cross-process recovery during preparation and guest execution, stale scope,
+ambiguous reservation, unsupported prerequisites, cancellation and late cleanup.
+Native Windows acceptance of the new runner/probe cases is pending. Actual
+supported-host VM execution and the Studio admission connection remain separate.

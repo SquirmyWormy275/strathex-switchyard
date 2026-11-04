@@ -8,6 +8,18 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The host-only Windows Run runner now connects selected-file staging, exact
+worker/runtime links, bounded-volume handoff, managed sessions, backend output
+validation and independent cleanup. It holds a kernel lease through preparation
+and execution; another process must acquire the same lease before recovery can
+touch the guest. Completion requires fresh independent native/VM exit. Original
+backend observations, Run results and storage retirement remain separate.
+Nine orchestration cases pass; the combined manifest/lock/privacy/release group
+passes 43/43 and type checking passes. Native Windows runner/probe checks are
+pending. Studio policy/admission wiring and personal-host privileged setup remain
+unfinished software; supported interactive VM acceptance is a separate check.
+[Run contract](windows-reviewed-run.md).
+
 The Windows host now durably hands one original fixed-capacity image into a
 writable-volume lifecycle. Native Windows workflow 41896980735 at `a8690328`
 passes actual host-service creation, mounted readback, non-replay/consumer fences
