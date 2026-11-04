@@ -1984,3 +1984,30 @@ The final complete Linux rerun passed 146/146 groups: 932 tests, 923 passed,
 nine declared platform skips; receipt 770d2f59-d13b-49eb-a081-6140e5577c15.
 Type checking passes. Normal installed metadata recovery remains pending until
 the new bundle is installed and its explicit fault journey succeeds.
+
+
+## Installed metadata recovery accepted
+
+Published 5aa471383b14ef5d16d6158edb96c88cae7dea93 installed through the normal
+command; all six update checks pass. Release
+10a186ca9bb0b43ac7108b4027e6c316ac57ab55facf6d256d0362ac7e776933
+contains 463 files and 4,379,339 bytes. Frozen frontend digest and private link
+are unchanged. Update receipt assignment-legends-1793787772686.json.
+
+The explicit installed recovery journey passed eight checks. An actual empty
+Codex task used the installed exact authority and commit review; a trusted source
+host injected lost readback only after its real native reference update. Normal
+installed authenticated recovery review/apply then reconciled the retained index
+and owned leases. No second commit occurred. Original effect/review outcomes
+remain unchanged, and a duplicate returns the same independent recovery receipt.
+All 36 Git guardians and 13 retained inspection guardians independently verified
+exit; zero model prompts. Receipt installed-repository-recovery-1793787873360.json,
+recovery receipt d770ff92-be8f-439b-8d51-0382190127b3.
+
+The proof restored keyboard-only validation mode and original selection, preserved
+definitions/private link and native empty-task history, and removed only its own
+staging/local records. Bundle staging is empty; current plus rollback remains
+about 11 MiB. Draft PR20 now describes the implemented metadata recovery and
+146-group/932-test Linux evidence. General execution effects, distinct client
+integrations and frontend controls remain implementation work; absent hardware
+and interactive accounts remain separate acceptance checks.

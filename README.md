@@ -75,7 +75,10 @@ first turn. Owned guardian exit, duplicate/replay handling and keyboard-only
 cleanup are verified. Separately approved host commits now pass a normal installed
 journey with an actual empty native task, exact binary bytes, explicit author,
 unowned-edit preservation and durable duplicate/receipt readback. No model prompt
-is sent by that journey. Provider replies do not establish coding-task completion.
+is sent by that journey. Separately approved metadata recovery also passes an
+installed journey after a deliberate native post-reference fault in a disposable
+repository: the exact index is reconciled without another commit, and original
+uncertain outcomes remain unchanged. Provider replies do not establish coding-task completion.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
