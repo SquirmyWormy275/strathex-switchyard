@@ -70,11 +70,18 @@ test("Linux repository security recipes are compiled into a deny-network Bubblew
 test("Linux typed pipeline evidence is converted only after the exact pinned Bubblewrap runtime completes", { skip: process.platform !== "linux" }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-evidence-")); context.after(async () => rm(root, { recursive: true, force: true }));
   const target = { id: "a".repeat(64), repositoryRoot: await realpath(root), branch: "feature", head: "b".repeat(40), indexTree: "c".repeat(40), trackedManifest: "d".repeat(64), untrackedManifest: "e".repeat(64), canonicalRemote: "https://github.com/example/repo.git", submodules: {}, policyVersion: "b122-linux-v1", environmentFingerprint: "f".repeat(64), capturedAt: "2026-08-27T00:00:00.000Z", completeness: "complete" as const, reasons: [] };
-  const output = JSON.stringify({ schema: "sxsy-b122.linux-repository-recipe-result", version: 1, coverage: ["correctness", "isolation", "production_data", "ambient_credentials"].map((dimension) => ({ dimension, status: "covered", fixtureId: `runtime:${dimension}` })), scannerFixtureIds: [], advisoryFixtureIds: [] });
+  let output = JSON.stringify({ schema: "sxsy-b122.linux-repository-recipe-result", version: 1, coverage: ["correctness", "isolation", "production_data", "ambient_credentials"].map((dimension) => ({ dimension, status: "covered", fixtureId: `runtime:${dimension}` })), scannerFixtureIds: [], advisoryFixtureIds: [] });
+  const validOutput = output;
   let issued = false;
   const runtimes = { async resolve() { return { async execute() { return { status: "completed" as const, summary: "passed", effectDisposition: "committed" as const, exitCode: 0, output, outputTruncated: false }; } }; }, async list() { return [{ canonicalRepositoryRoot: target.repositoryRoot, expectedSha256: "c".repeat(64), status: "active" as const }]; } };
   const issuer = { issue() { throw new Error("not scanner"); }, issueRepositoryRecipeEvidence() { issued = true; return {} as never; } };
   const runner = new LinuxHostValidatedRepositoryRecipeRunner(runtimes as never, issuer, { async resolve() { return []; } }, () => new Date());
   const result = await runner.runRecipe({ action: "pipeline_local_gate", operationId: "operation", target, profile: "full_sandbox", effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } }, "pipeline_local_gate");
   assert.equal(result.status, "completed"); assert.equal(issued, true);
+  issued = false; output = "untyped output";
+  const malformed = await runner.runRecipe({ action: "pipeline_local_gate", operationId: "operation", target, profile: "full_sandbox", effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } } }, "pipeline_local_gate");
+  assert.equal(malformed.status,"incomplete"); assert.equal(malformed.effectDisposition,"committed"); assert.equal(issued,false);
+  output = validOutput;
+  const revoked = await runner.runRecipe({ action: "pipeline_local_gate", operationId: "operation", target, profile: "full_sandbox", effectGuard: { async assertCurrent() { return { allowed: false, reason: "revoked after execution" }; } } }, "pipeline_local_gate");
+  assert.equal(revoked.status,"incomplete"); assert.equal(revoked.effectDisposition,"committed"); assert.equal(issued,false);
 });

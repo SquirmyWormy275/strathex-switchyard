@@ -530,4 +530,9 @@ test("pipeline and security recipes always route through the OS sandbox runner",
   assert.equal(shield.status, "completed");
   assert.deepEqual(actions, ["pipeline_local_gate:pipeline_local_gate:full_sandbox", "shield_change_scan:shield_change_scan:full_sandbox"]);
   assert.equal(hostResolutions, 0);
+  for (const outcome of [{status:"completed" as const,summary:"ran",effectDisposition:"committed" as const},{status:"incomplete" as const,summary:"ran without valid evidence",effectDisposition:"committed" as const,data:{receiptEvidenceEnvelope:{}}}]) {
+    const missing = new SandboxedRepositoryExecutionBroker({async resolve(){throw Error("no host fallback");}},{async runRecipe(){return outcome;}});
+    const observed = await missing.execute(request({action:"pipeline_local_gate",recipe:repositoryRuntimeExecutionRecipe("pipeline_local_gate",target)}));
+    assert.equal(observed.status,"incomplete");assert.equal(observed.effectDisposition,"committed","failed evidence must not erase an observed program effect");
+  }
 });

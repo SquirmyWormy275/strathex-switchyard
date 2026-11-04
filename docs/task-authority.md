@@ -1,7 +1,7 @@
 # Task authority in the suite
 
 A saved conversation does not authorize repository changes. Switchyard now lets
-an operator review and issue a short-lived **host local-commit authority** for
+an operator review and issue a short-lived **host task authority** for
 one verified coding task, plan revision, literal file list and complete Git
 snapshot. The grant uses the existing control-plane authority and confirmation
 ledgers inside the workspace's encrypted state.
@@ -11,7 +11,10 @@ enable native provider tools, change model permissions or execute a plan. The
 [host commit API](mediated-repository-effects.md#review-and-execute-one-local-commit)
 now independently reviews and executes a local commit through the existing
 policy, checkpoint, budget, operation and native ownership barriers. Recovery
-inspection is read-only; operator recovery application remains unfinished.
+inspection is read-only; [separately approved recovery](mediated-repository-effects.md)
+reconciles exact owned metadata without replay. Connected execution grants cover
+Run on Linux/Windows and local-gate/clean-reproduction recipes on Linux, each
+with its separate [execution review](reviewed-task-execution.md).
 
 ## Review an exact scope
 

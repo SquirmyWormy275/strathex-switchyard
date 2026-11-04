@@ -31,6 +31,7 @@ import { createTaskAuthority } from "./task-authority.mjs";
 import { createRepositoryEffectRecovery } from "./repository-effect-recovery.mjs";
 import { createRepositoryCommits } from "./repository-commits.mjs";
 import { createRepositoryExecution } from "./repository-execution.mjs";
+import { connectedExecutionActions } from "./repository-execution-actions.mjs";
 import { createClientLaunch } from "./client-launch.mjs";
 import { createClientIntegrations } from "./client-integrations.mjs";
 import { clientRecipe } from "../../integrations/client-recipes.mjs";
@@ -56,7 +57,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   let selectionLoading;
   let closed = false;
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
-  taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: ["linux","win32"].includes(platform) ? ["run_target"] : [], isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
+  taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
   const repositoryDirectory = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects");
   repositoryCommits ??= createRepositoryCommits({ store, authority: taskAuthority, stateDirectory: repositoryDirectory });
   repositoryExecution ??= createRepositoryExecution({ store, authority: taskAuthority, platform, stateDirectory: join(repositoryDirectory, "execution"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });

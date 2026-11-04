@@ -8,6 +8,21 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Linux local-gate and clean-reproduction actions now share the normal reviewed
+execution route. Exact task grants, foreground bounded namespaces, typed reports
+and host-authenticated evidence precede passing receipts. Four actual namespace
+cases pass, including incomplete reports, key/input substitution, cancellation,
+native exit and cleanup; existing authority/Run contracts pass 14/14 and type
+checking passes. The installed pipeline journey is being prepared. Windows
+pipeline/scanner/advisory/writable-build connections remain unfinished.
+
+Complete Linux `8931c7d` passes 162/162 groups: 1,053 tests, 1,043 passed and ten
+declared skips. Receipt `bb82e1f0-7800-465f-b462-b58cf3e3fcda` retained;
+every child cleanup verified and the disposable worktree removed. Actual Windows
+prerequisite query and all 30 native filesystem checks pass at `e7a8e67`, workflow
+`41916832172`; digest-verified `windows-storage-preflight-e7a-native.json` retained.
+Normal Windows factory/client and all four policy jobs also pass at `8931c7d`.
+
 The normal suite now exposes connected Run authority on both Linux and Windows,
 and passes the trusted platform through to the execution factory. The previous
 Windows policy tests exercised the adapter but missed the ordinary factory's

@@ -135,21 +135,22 @@ export class LinuxHostValidatedRepositoryRecipeRunner implements SandboxReposito
       result = await runtime.execute(action, { operationId: request.operationId, targetSnapshotId: request.target.id, ...(request.session ? { sessionId: request.session.id } : {}), ...(request.authority ? { authorityId: request.authority.id } : {}), effectGuard: currentGuard });
     } catch { return { status: "unavailable", summary: "No unchanged host-attested Linux repository runtime is available for the exact target.", effectDisposition: "not_started" }; }
     if (result.status !== "completed") return { status: result.status, summary: result.summary, effectDisposition: result.effectDisposition };
+    const observedEffect = result.effectDisposition ?? "ambiguous";
     let report: LinuxRecipeReport;
     try { report = parseReport(result.output, action); }
-    catch { return incomplete("The Bubblewrap recipe completed without one exact typed Linux evidence report."); }
+    catch { return incomplete("The Bubblewrap recipe completed without one exact typed Linux evidence report.", observedEffect); }
     const observedAt = this.clock();
-    if (!Number.isFinite(observedAt.getTime())) return incomplete("The Linux repository evidence clock is invalid.");
+    if (!Number.isFinite(observedAt.getTime())) return incomplete("The Linux repository evidence clock is invalid.", observedEffect);
     let fixtures: readonly VerifiedScannerFixture[];
     try { fixtures = await this.scannerFixtures.resolve({ scannerFixtureIds: report.scannerFixtureIds, advisoryFixtureIds: report.advisoryFixtureIds, observedAt }); }
-    catch { return incomplete("The Linux repository recipe named a missing, expired, revoked, or invalid signed scanner fixture."); }
+    catch { return incomplete("The Linux repository recipe named a missing, expired, revoked, or invalid signed scanner fixture.", observedEffect); }
     const securityAction = action.startsWith("shield_") || action === "release_shield";
     const fixtureIds = new Set(fixtures.map((fixture) => fixture.id));
-    if (securityAction && report.coverage.some((entry) => entry.status === "covered" && (!entry.fixtureId || !fixtureIds.has(entry.fixtureId)))) return incomplete("Linux Shield coverage was not bound to a verified signed scanner or advisory fixture.");
+    if (securityAction && report.coverage.some((entry) => entry.status === "covered" && (!entry.fixtureId || !fixtureIds.has(entry.fixtureId)))) return incomplete("Linux Shield coverage was not bound to a verified signed scanner or advisory fixture.", observedEffect);
     const pin = (await this.runtimes.list()).filter((candidate) => candidate.status === "active" && samePath(candidate.canonicalRepositoryRoot, request.target.repositoryRoot));
-    if (pin.length !== 1) return incomplete("The Linux repository runtime pin became absent or ambiguous before evidence issuance.");
+    if (pin.length !== 1) return incomplete("The Linux repository runtime pin became absent or ambiguous before evidence issuance.", observedEffect);
     const bwrap = await realpath(bwrapPath).catch(() => "");
-    if (bwrap !== bwrapPath) return incomplete("The fixed Bubblewrap helper identity changed before evidence issuance.");
+    if (bwrap !== bwrapPath) return incomplete("The fixed Bubblewrap helper identity changed before evidence issuance.", observedEffect);
     const helperSha256 = createHash("sha256").update(await readFile(bwrap)).digest("hex");
     const createdAt = observedAt.toISOString();
     const expiresAt = new Date(Math.min(observedAt.getTime() + 5 * 60_000, ...fixtures.map((fixture) => Date.parse(fixture.expiresAt)))).toISOString();
@@ -168,12 +169,12 @@ export class LinuxHostValidatedRepositoryRecipeRunner implements SandboxReposito
       expiresAt
     } as const;
     try {
-      await currentGuard.check();
+      if (!(await currentGuard.check()).allowed) return incomplete("The exact pipeline authority changed before evidence issuance.", observedEffect);
       const typed = createRepositoryRecipeEvidence(executionRequest, result, binding, observedAt.getTime());
       const receiptEvidenceEnvelope = this.issuer.issueRepositoryRecipeEvidence(typed, executionRequest, binding);
       const complete = typed.outcome === "passed" && typed.completeness === "complete";
       return { status: complete ? "completed" : "incomplete", summary: complete ? "The Linux Bubblewrap recipe completed with exact host-authenticated evidence." : "The Linux Bubblewrap recipe ran, but required evidence remains incomplete.", effectDisposition: result.effectDisposition, data: { receiptEvidenceEnvelope } };
-    } catch { return incomplete("The Linux repository result could not be converted into exact authenticated host evidence."); }
+    } catch { return incomplete("The Linux repository result could not be converted into exact authenticated host evidence.", observedEffect); }
   }
 }
 
@@ -198,7 +199,7 @@ function identifiers(value: unknown): readonly string[] {
   return value as string[];
 }
 function fixtureVersions(fixtures: readonly VerifiedScannerFixture[]): Readonly<Record<string, string>> { return Object.fromEntries(fixtures.map((fixture) => [`fixture:${fixture.kind}:${fixture.id}`, `manifest=sha256:${fixture.manifestSha256};content=sha256:${fixture.contentSha256};feed=${fixture.feedVersion};tool=${fixture.toolName}@${fixture.toolVersion}`])); }
-function incomplete(summary: string): BrokerOutcome { return { status: "incomplete", summary, effectDisposition: "not_started" }; }
+function incomplete(summary: string, effectDisposition: BrokerOutcome["effectDisposition"] = "not_started"): BrokerOutcome { return { status: "incomplete", summary, effectDisposition }; }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).length === keys.length && keys.every((key) => key in value); }
 function samePath(left: string, right: string): boolean { return resolve(left) === resolve(right); }

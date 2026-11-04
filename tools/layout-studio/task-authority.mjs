@@ -4,6 +4,7 @@ import { AuthorityLedger } from "../../packages/control-plane/src/authority.ts";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { createRepositoryInspection } from "./repository-inspection.mjs";
+import { connectedExecutionActions } from "./repository-execution-actions.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -46,7 +47,7 @@ function ledger(state, now) {
   }, { clock: () => new Date(now()).toISOString() });
 }
 export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], now = () => Date.now() } = {}) {
-  if (!Array.isArray(executionActions) || executionActions.some(a => a !== "run_target")) throw new Error("Choose only execution actions connected by this host implementation.");
+  if (!Array.isArray(executionActions) || new Set(executionActions).size!==executionActions.length || executionActions.some(a => !connectedExecutionActions("linux").includes(a))) throw new Error("Choose only execution actions connected by this host implementation.");
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
   async function access(c, id, generation) {

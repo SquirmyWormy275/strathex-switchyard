@@ -621,11 +621,11 @@ export class SandboxedRepositoryExecutionBroker implements ExecutionBroker {
       profile: "full_sandbox"
     }, request.action);
     if (outcome.status === "completed" && !boundHostReceipt(outcome.data?.receiptEvidenceEnvelope, request, "passed", "complete")) {
-      return { status: "incomplete", summary: "The OS sandbox recipe ran, but no exact host-authenticated completion evidence was attached.", effectDisposition: "not_started" };
+      return { status: "incomplete", summary: "The OS sandbox recipe ran, but no exact host-authenticated completion evidence was attached.", effectDisposition: outcome.effectDisposition ?? "ambiguous" };
     }
     if (outcome.status === "incomplete" && outcome.data?.receiptEvidenceEnvelope !== undefined
       && !boundHostReceipt(outcome.data.receiptEvidenceEnvelope, request, "incomplete", "incomplete")) {
-      return { status: "incomplete", summary: "The OS sandbox recipe returned malformed or cross-bound incomplete evidence.", effectDisposition: "not_started" };
+      return { status: "incomplete", summary: "The OS sandbox recipe returned malformed or cross-bound incomplete evidence.", effectDisposition: outcome.effectDisposition ?? "ambiguous" };
     }
     return outcome;
   }

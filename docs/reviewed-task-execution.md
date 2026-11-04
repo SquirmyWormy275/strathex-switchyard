@@ -9,7 +9,9 @@ This backend path is API-only while the frontend is frozen. The current policy
 provides a read-only reviewed workspace, denied network and ambient credentials,
 and a 64 MiB temporary filesystem. It never mounts the live repository. The Windows platform now has its own reviewed guest Run and exact-stop adapter;
 its policy tests use a runner double and normal personal-host privileged setup
-remains unfinished. Writable build outputs, debug, web, environment and pipeline
+remains unfinished. Linux local-gate and clean-reproduction recipes use this
+same route with foreground execution and authenticated evidence, as described
+below. Writable build outputs, debug, web, environment and security-scanner
 connections remain implementation work. [Windows contract](windows-reviewed-run.md). Workspace
 shutdown, keyboard-only mode and application shutdown stop owned executions.
 
@@ -35,8 +37,8 @@ mise exec node@24.14.0 -- node scripts/verify-repository-execution-host.mjs --sy
 ```
 
 It requires the normal installed app and the existing permitted Codex login.
-Ten checks passed at `0aeae75`; the private result is
-`installed-repository-execution-1793810385256.json`. These include a separate exact
+Ten checks passed at `45e9eb6`; the private result is
+`installed-repository-execution-1793824944140.json`. These include a separate exact
 stop receipt, duplicate handling, a fresh reviewed Run after that stop and three
 independently exited native guardians. Successful cleanup restores
 selection, definitions, keyboard-only validation state and the private endpoint;
@@ -72,6 +74,69 @@ Run recipe must use managed, disposable execution and explicit
 captured stdout, 4 KiB diagnostic stderr and the existing bounded input manifest.
 Only Run and its owned stop descriptor may appear in this connected manifest.
 The request cannot provide a replacement command, arguments, PID or permission.
+
+## Run a local gate or clean reproduction
+
+On Linux, task authority can explicitly grant `pipeline_local_gate` or
+`pipeline_clean_reproduction`. The normal factory advertises these connected
+actions. Use the same review/apply/status sequence, naming the exact granted
+action in both the authority and execution review. Windows currently advertises
+Run only; its pipeline connection remains unfinished software.
+
+The selected manifest contains only that pipeline action. Its process recipe
+uses `lifecycle: "foreground"`, `isolation: "disposable"` and exact `inputFiles`,
+with the same ten-minute/output/input bounds as Run. `NODE_ENV`, when declared,
+must be `test`. Each operation receives a fresh read-only selected input root
+and a fresh 64 MiB temporary filesystem. Tools must put scratch/output in
+`/tmp`. Complete dependency preparation and writable build artifacts remain
+separate work.
+
+A successful recipe writes one UTF-8 JSON report to stdout:
+
+```json
+{
+  "schema": "sxsy-b122.linux-repository-recipe-result",
+  "version": 1,
+  "coverage": [
+    {"dimension":"correctness","status":"covered","fixtureId":"approved:my-gate"},
+    {"dimension":"isolation","status":"covered","fixtureId":"approved:my-gate"},
+    {"dimension":"production_data","status":"covered","fixtureId":"approved:my-gate"},
+    {"dimension":"ambient_credentials","status":"covered","fixtureId":"approved:my-gate"}
+  ],
+  "scannerFixtureIds": [],
+  "advisoryFixtureIds": []
+}
+```
+
+Clean reproduction also requires one `reproduction` coverage entry. Each
+dimension occurs exactly once and has a bounded literal fixture ID. A dimension
+may explicitly be `unavailable`; that produces incomplete evidence. Scanner and
+advisory fixtures are not connected to this route. A gate's assertions and
+claimed coverage are part of the exact operator-approved program.
+
+Zero exit without a complete valid report stays incomplete. The host binds the
+report to the operation, exact target, approved manifest, namespace helper hash,
+policy version and observation lifetime, then authenticates it with a separate
+per-compartment credential-store key. The shared receipt verifier checks those
+bindings before issuing a passing receipt. Malformed evidence retains the fact
+that the program ran. Revocation before evidence issuance cannot earn a passing
+result, and duplicate requests cannot execute again.
+
+Foreground pipelines honor the durable cancellation/deadline control and
+workspace/application shutdown. The existing separately reviewed managed-Run
+stop API remains specific to admitted managed Run processes.
+
+Four source cases exercise actual native namespaces, both actions, incomplete
+reports, exact grants, key/input substitution, cancellation, native exit and
+cleanup. The normal installed demonstration is:
+
+```sh
+mise exec node@24.14.0 -- node --experimental-transform-types scripts/verify-repository-execution-host.mjs --synthetic --pipeline
+```
+
+It uses a new disposable repository and one empty native Codex task, with zero
+prompts. Installed acceptance for the new pipeline route is pending until that
+journey completes; source namespace checks and installed evidence stay distinct.
 
 The task/account/directory binding, complete repository snapshot, manifest bytes,
 executable identity and selected workspace are checked again before the effect.
