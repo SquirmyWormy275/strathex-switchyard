@@ -1645,3 +1645,25 @@ disposable pilot repository with no upstream. Its snapshot was complete and
 all eight retained guardian identities independently verified exited. Twelve
 affected authority/packaging checks and typecheck pass. This diagnostic is not
 a replacement for the pending corrected normal installed authority journey.
+
+## Corrected installed authority and complete Linux acceptance
+
+At `c49ff56`, complete Linux verification passed 122/122 groups: 890 tests,
+881 passed and nine platform skips; receipt
+2ba09262-890b-425c-9220-d22f88777d9f. The normal installed update passed six
+checks and removed its disposable bundle. Installed authority acceptance then
+passed seven checks with one actual empty Codex task, no model prompts, fresh
+snapshot issuance/revalidation, approval replay and changed-file rejection,
+revocation, preserved definitions/private link, restored selection and
+keyboard-only cleanup. Eight retained native guardian identities independently
+verified exited. Receipt installed-task-authority-1793776270876.json. The two
+earlier failed fixtures were separately preflighted and removed with their
+local records; native empty-task history was preserved. No suite commit or
+native provider permission change occurred. The commit-effect bridge is still
+unfinished.
+
+Fresh normal installed enumeration on 2026-11-04T07:12:44.377Z again returned
+zero configuration interfaces, without opening a device or writing keys; receipt
+device-enumeration-1793776364377.json. Physical F77/B122 acceptance remains open.
+The installed application holds current plus one rollback version (about 9 MiB);
+no application bundle, source archive or copied optional runtime remains staged.

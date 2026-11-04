@@ -78,8 +78,9 @@ aliases are rejected. The inventory retains live grants and a bounded recent
 history; portable profiles cannot carry these local authorities or approvals.
 
 Tests use real disposable Git repositories, independent filesystem checks and
-synthetic native-task identities. Installed native-account acceptance is recorded
-separately on the [verification page](verification.md). Provider completion,
+synthetic native-task identities. Seven normal installed checks passed with an actual empty native Codex task,
+zero model prompts and independent exit verification for eight retained guardians.
+Detailed acceptance is recorded on the [verification page](verification.md). Provider completion,
 execution authority and independently verified coding-task completion remain
 different results.
 
