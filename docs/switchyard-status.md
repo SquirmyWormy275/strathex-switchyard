@@ -8,6 +8,20 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Complete Linux `5fd0186` passes 163/163 groups: 1,060 tests, 1,050 passed and ten
+declared skips. Receipt `b145a682-ed06-4a35-9f23-0218999afab9` retained, every child
+cleanup verified and the disposable worktree removed. The installed Run
+regression also passes all ten checks with zero prompts and cleanup, receipt
+`installed-repository-execution-1793829941630.json`. All six native Windows
+policy/authority/host-stop jobs pass at `a50a205`, workflow `41920825404`.
+
+The closed Windows broker metadata wire contract now binds an installation,
+owner/image scope, request and fresh nonce to P-256/SHA-256 authentication.
+Sixteen compiled crypto/parser checks, zero-warning helper build, six Linux
+guards and four package checks pass; scratch removed. Native wire CI is pending.
+The privileged service/pipe/setup/volume integration remains unfinished software;
+the protocol alone cannot establish a protected installation or perform effects.
+
 Installed `5fd0186` now passes all eight expanded pipeline checks, including a
 separately approved stop before the program response arrives, exact duplicate
 receipts, unchanged admission, three independently exited guardians, removed

@@ -66,6 +66,26 @@ jobs:
           } finally { $zip.Dispose() }
           Remove-Item -LiteralPath $archive -Force
 
+      - name: Verify compiled authenticated broker metadata without installing a service
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\deployment\windows\test-support\storage-broker-protocol\StorageBrokerProtocol.Proof.csproj'
+          & .\.tools\dotnet\dotnet.exe restore $project --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Broker protocol proof offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe build $project --no-restore -c Release -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Broker protocol proof build failed.' }
+          $assembly = '.\deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          $result = & .\.tools\dotnet\dotnet.exe $assembly
+          if ($LASTEXITCODE -ne 0) { throw 'An authenticated broker metadata boundary failed.' }
+          $proof = $result | ConvertFrom-Json
+          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
+          $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
+          $proof | Add-Member -NotePropertyName protocolSourceSha256 -NotePropertyValue ((Get-FileHash '.\apps\desktop-hotkeys\WindowsStorageBrokerProtocol.cs' -Algorithm SHA256).Hash.ToLowerInvariant())
+          $proof | Add-Member -NotePropertyName assemblySha256 -NotePropertyValue ((Get-FileHash $assembly -Algorithm SHA256).Hash.ToLowerInvariant())
+          $proof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
+
       - name: Verify storage and mapping ownership fault boundaries
         shell: pwsh
         timeout-minutes: 6
@@ -91,5 +111,14 @@ jobs:
         with:
           name: switchyard-windows-filesystem-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-windows-inputs-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the broker protocol proof
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-broker-protocol-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-broker-protocol-verification.json
           if-no-files-found: error
           retention-days: 7

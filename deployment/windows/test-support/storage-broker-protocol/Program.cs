@@ -1,0 +1,46 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+// Actual cryptography and parser execution; no service, volume, account or VM.
+using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+using var foreign = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+var binding = new WindowsStorageBrokerProtocol.Binding(Guid.NewGuid().ToString("D"), new string('a',64), new string('b',64));
+string nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+byte[] requestBytes = WindowsStorageBrokerProtocol.Request(binding, nonce);
+var request = WindowsStorageBrokerProtocol.ReadRequest(requestBytes, binding);
+using var storage = JsonDocument.Parse("""
+{"schema":"switchyard-windows-storage-prerequisites/v1","privilegeAssigned":true,"privilegeEnabled":false,"privilegeStateUnchanged":true,"requiresPrivilegedSetup":false,"brokerImplemented":false,"effectStarted":false,"sandboxEnforced":false}
+""");
+byte[] reply = WindowsStorageBrokerProtocol.Reply(binding, request, storage.RootElement, key), publicKey = key.ExportSubjectPublicKeyInfo();
+int checks = 0;
+void Require(bool value) { if (!value) throw new InvalidOperationException("Storage broker protocol proof failed."); checks++; }
+void Refuses(Action action)
+{
+    try { action(); } catch (Exception error) when (error is InvalidOperationException or JsonException or CryptographicException or FormatException or DecoderFallbackException) { checks++; return; }
+    throw new InvalidOperationException("An untrusted broker message was accepted.");
+}
+Require(WindowsStorageBrokerProtocol.Verify(reply,binding,request,publicKey).GetProperty("privilegeStateUnchanged").GetBoolean());
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding,request,foreign.ExportSubjectPublicKeyInfo()));
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding with {InstallationId=Guid.NewGuid().ToString("D")},request,publicKey));
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding with {OwnerScope=new string('c',64)},request,publicKey));
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding with {ServiceImageSha256=new string('d',64)},request,publicKey));
+var nextRequest=WindowsStorageBrokerProtocol.ReadRequest(WindowsStorageBrokerProtocol.Request(binding,new string('e',64)),binding);
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding,nextRequest,publicKey));
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(reply,binding,request,publicKey.Concat(new byte[]{0}).ToArray()));
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(new byte[16385],binding,request,publicKey));
+var envelope=JsonNode.Parse(reply)!.AsObject();envelope["payload"]=envelope["payload"]!.GetValue<string>().Replace("privilegeEnabled\":false","privilegeEnabled\":true",StringComparison.Ordinal);
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(Encoding.UTF8.GetBytes(envelope.ToJsonString()),binding,request,publicKey));
+envelope=JsonNode.Parse(reply)!.AsObject();envelope["command"]="untrusted";
+Refuses(()=>WindowsStorageBrokerProtocol.Verify(Encoding.UTF8.GetBytes(envelope.ToJsonString()),binding,request,publicKey));
+string raw=Encoding.UTF8.GetString(requestBytes);
+Refuses(()=>WindowsStorageBrokerProtocol.ReadRequest(Encoding.UTF8.GetBytes(raw.Replace("\"metadata\"","\"attach\"",StringComparison.Ordinal)),binding));
+Refuses(()=>WindowsStorageBrokerProtocol.ReadRequest(Encoding.UTF8.GetBytes(raw.Replace("\"nonce\":","\"nonce\":\""+nonce+"\",\"nonce\":",StringComparison.Ordinal)),binding));
+Refuses(()=>WindowsStorageBrokerProtocol.ReadRequest(new byte[]{255,255},binding));
+Refuses(()=>WindowsStorageBrokerProtocol.Request(binding,"replayed-or-arbitrary"));
+using var changed=JsonDocument.Parse(storage.RootElement.GetRawText().Replace("\"effectStarted\":false","\"effectStarted\":true",StringComparison.Ordinal));
+Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,changed.RootElement,key));
+using var wrongCurve=ECDsa.Create(ECCurve.NamedCurves.nistP384);
+Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,storage.RootElement,wrongCurve));
+Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceInstalled=false,volumeOpened=false,guestLaunched=false}));

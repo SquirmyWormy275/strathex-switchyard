@@ -10,6 +10,22 @@ Actual interactive VM acceptance requires a supported Windows Sandbox host;
 filesystem CI and runner doubles do not establish that acceptance. The frontend
 remains frozen for review.
 
+The broker metadata wire contract is now implemented separately from the future
+privileged service. It accepts only a closed metadata request and binds a fresh
+256-bit nonce, installation UUID, owner-scope digest, service-image digest and
+request digest to a P-256/SHA-256 signature. The verifier requires the public key
+from a separately verified protected installation; it cannot trust a key supplied
+in a pipe reply. Duplicate/unknown fields, other curves, changed scopes/images,
+wrong keys, replayed nonces and changed privilege claims are refused. Its
+readiness statement still explicitly reports `brokerImplemented: false`.
+
+Sixteen actual compiled parser/cryptography checks pass locally, with a
+zero-warning helper build, six Linux native-only guards and four package checks.
+The native Windows filesystem lane now runs the same proof and retains only its
+small result, source digest and assembly digest. Privileged service installation,
+authenticated pipe transport and bounded volume effects are still unfinished;
+the wire proof opens no service, volume, account or guest.
+
 ```mermaid
 flowchart LR
   Task[Task authority and selected bytes] --> Review[One-use review]
