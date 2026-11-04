@@ -38,7 +38,8 @@ Eight checks passed at `ab7ceed`; the private result is
 `installed-repository-execution-1793805620119.json`. Successful cleanup restores
 selection, definitions, keyboard-only validation state and the private endpoint;
 it retains the native empty-task history. Failed checks retain their synthetic
-staging and evidence.
+staging and evidence. Use `--compartment=execution-validation-suffix` for a new
+explicit validation workspace when retained evidence prevents reusing the default.
 
 ## API sequence
 
@@ -59,7 +60,8 @@ repository or diagnostic log.
 4. POST `/api/suite/coding/execution/status` with compartment/request ID to
    observe the retained native result, independent exit and staging cleanup.
    Duplicate apply requests return the original admission result without
-   starting another program.
+   starting another program. A new separately reviewed request has its own
+   protected operation scope, including after a previous run was cancelled.
 
 The complete v1 runtime manifest must name the selected repository root. Its
 Run recipe must use managed, disposable execution and explicit

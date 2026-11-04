@@ -275,6 +275,8 @@ export interface DurableMediatedExecutorOptions {
   readonly checkpointCapture?: CheckpointCaptureAdapter;
   /** Host configuration can require extra checkpoints, never remove built-in ones. */
   readonly additionalCheckpointActions?: readonly CommandAction[];
+  /** Exact host-reviewed invocation scope; never accepted from a command packet. */
+  readonly operationScopeDigest?: string;
   /**
    * Read-only verification of each captured recovery artifact.  Risky work is
    * unavailable when the host cannot prove the preservation reference still
@@ -356,7 +358,7 @@ export class DurableMediatedExecutor {
     this.budgets = options.budgets ?? new DurableBudgetManager(options.store, { clock: () => this.now().toISOString() });
     this.operations = new OperationSagaStore(options.store);
     this.receipts = new ReceiptLedger(options.store);
-    this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts);
+    this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts, { scopeDigest: options.operationScopeDigest });
     this.recovery = new NoReplayOperationRecovery(this.operations);
     for (const [action, reconciler] of Object.entries(options.operationReconcilers ?? {})) this.recovery.register(action, reconciler);
   }

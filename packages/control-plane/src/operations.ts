@@ -912,21 +912,24 @@ function isFinalCommandStatus(status: CommandStatus): boolean {
 export class DurableOperationCoordinator {
   private readonly operations: OperationSagaStore;
   private readonly receipts: ReceiptLedger;
+  private readonly scopeDigest?: string;
 
-  constructor(operations: OperationSagaStore, receipts: ReceiptLedger) {
+  constructor(operations: OperationSagaStore, receipts: ReceiptLedger, options: { readonly scopeDigest?: string } = {}) {
+    if (options.scopeDigest !== undefined && !/^[a-f0-9]{64}$/.test(options.scopeDigest)) throw new Error("A host operation scope must be one exact reviewed SHA-256 digest.");
     this.operations = operations;
     this.receipts = receipts;
+    this.scopeDigest = options.scopeDigest;
   }
 
   async claim(input: DurableOperationClaim): Promise<DurableCommandOperationLease> {
     const action = nonEmpty(input.action, "dispatch action");
     const targetSnapshotId = input.targetSnapshotId ?? `<no-target:${input.sessionId ?? "host"}>`;
-    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none" });
+    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none", ...(this.scopeDigest ? { hostReviewScopeDigest: this.scopeDigest } : {}) });
     const claimed = await this.operations.claimScope({
       scope,
       action,
       targetSnapshotId,
-      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
+      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), ...(this.scopeDigest ? { hostReviewScopeDigest: this.scopeDigest } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
     });
     return {
       operationId: claimed.operation.id,

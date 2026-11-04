@@ -49,8 +49,16 @@ ran. The fixture now uses wall time for native-bound lifetimes; production's
 60-second policy permits are unchanged.
 Reviewed per-run stop now has a separate approval, budget, operation and receipt,
 with exact-handle ownership, duplicate rejection and receipt-only recovery. Five
-service cases, four stop fault cases, HTTP and packaged imports pass. Its normal
-installed acceptance is pending. Windows guest execution, writable build outputs
+service cases, four stop fault cases, HTTP and packaged imports pass. The expanded installed journey at `0151e69` verified exact stop, its distinct
+receipt, duplicate handling and the unchanged original admission, then exposed a
+separate defect: the next reviewed Run reused the cancelled dispatch scope.
+Receipt `installed-repository-execution-1793806863845.json` records the failure;
+its encrypted workspace and synthetic staging remain preserved. All observed
+native owners exited, and selection/definitions/keyboard-only state were restored.
+The host now binds each Run's durable operation to its protected review digest;
+legacy default scopes and same-request no-replay behavior remain unchanged.
+Fourteen core regression cases pass, including child-saga no-replay. Corrected
+installed acceptance remains pending. Windows guest execution, writable build outputs
 and remaining action integrations are unfinished implementation, not hardware
 blocks.
 

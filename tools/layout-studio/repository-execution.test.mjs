@@ -31,7 +31,7 @@ async function settled(f,id){const deadline=Date.now()+10000;let status;while(Da
 test("reviewed execution uses separate action authority, approval, checkpoint, budget and duplicate receipt boundaries",async t=>{
   const f=await fixture(t),before=await f.run("rev-parse","HEAD"),review=await f.execution.review("personal",f.proposed);
   assert.equal(review.review.executionPolicy.network,"denied");assert.equal(review.review.executionPolicy.hostRepositoryWritten,false);
-  for(const bad of [{...f.proposed,requestId:randomUUID(),command:"untrusted"},{...f.proposed,requestId:randomUUID(),manifestPath:"../outside"}])await assert.rejects(f.execution.review("personal",bad));
+  for(const bad of [{...f.proposed,requestId:randomUUID(),command:"untrusted"},{...f.proposed,requestId:randomUUID(),manifestPath:"../outside"},{...f.proposed,requestId:randomUUID(),operationScopeDigest:"a".repeat(64)}])await assert.rejects(f.execution.review("personal",bad));
   await assert.rejects(f.execution.apply("personal",{requestId:f.proposed.requestId,token:randomUUID()}),/approval/);assert.equal(f.effects(),0);
   const input={requestId:f.proposed.requestId,token:review.confirmation.token},result=await f.execution.apply("personal",input);assert.equal(result.status,"running",JSON.stringify(result));assert.equal(result.providerTaskCompletionVerified,false);
   const status=await settled(f,f.proposed.requestId);assert.equal(status.nativeExitVerified,true);assert.equal(status.output,"synthetic program output");
@@ -56,6 +56,8 @@ test("a separately approved per-run stop reaches only its owned handle and retai
   const stopId=randomUUID(),stop=await f.execution.reviewStop("personal",{requestId:f.proposed.requestId,stopId}),input={stopId,token:stop.confirmation.token};
   const result=await f.execution.applyStop("personal",input);assert.equal(result.status,"completed",JSON.stringify(result));assert.equal(result.originalOperationId,admission.operationId);assert.equal(result.originalOutcomeUnchanged,true);
   assert.equal((await f.execution.applyStop("personal",input)).receiptId,result.receiptId);const status=await f.execution.status("personal",f.proposed.requestId);assert.equal(status.observedStatus,"cancelled");assert.equal(status.outcome.status,"running");assert.equal(status.programExitCode,null);assert.equal(status.nativeExitVerified,true);assert.equal(f.effects(),1);
+  const next={...f.proposed,requestId:randomUUID()},nextReview=await f.execution.review("personal",next),nextRun=await f.execution.apply("personal",{requestId:next.requestId,token:nextReview.confirmation.token});assert.equal(nextRun.status,"running",JSON.stringify(nextRun));assert.notEqual(nextRun.operationId,admission.operationId);assert.equal(f.effects(),2);
+  const original=await f.execution.apply("personal",{requestId:f.proposed.requestId,token:review.confirmation.token});assert.equal(original.replayed,true);assert.equal(original.operationId,admission.operationId);await f.execution.stopCompartment("personal");
 });
 test("actual Linux host broker connects reviewed task inputs, namespace and owned guardian without a live repository write",{skip:process.platform!=="linux"},async t=>{
   const f=await fixture(t,{native:true}),review=await f.execution.review("personal",f.proposed),before=await f.run("rev-parse","HEAD");
