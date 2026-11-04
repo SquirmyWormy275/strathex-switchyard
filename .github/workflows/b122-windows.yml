@@ -109,6 +109,24 @@ jobs:
           "$hash  Switchyard.Hotkeys.exe" | Out-File (Join-Path $output 'SHA256SUMS') -Encoding ascii
           @{ commit=$env:GITHUB_SHA; sdk='8.0.424'; runtime='8.0.30'; validation='Build only; interactive Windows acceptance remains open.' } | ConvertTo-Json | Out-File (Join-Path $output 'build-evidence.json') -Encoding utf8
 
+      - name: Verify native reviewed Windows input staging without opening a guest
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node scripts/verify-windows-reviewed-inputs.mjs --synthetic "--helper=$exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Native reviewed input, ACL, sharing or ownership verification failed.' }
+
+      - name: Retain native Windows input verification
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-reviewed-inputs-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-inputs-verification.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Verify native read-only category observation without registering hotkeys
         shell: pwsh
         run: |

@@ -42,3 +42,12 @@ test("unconfirmed stop exit retains its budget and later exit observation releas
   const journal=repositoryEffectJournal(f.store,"personal",{domain:"execution-stop"}),budgets=new DurableBudgetManager(journal);assert.equal((await budgets.list()).some(c=>c.state==="running"),true);await f.service.recover("personal");assert.equal((await budgets.list()).some(c=>c.state==="running"),true);
   await f.store.update("personal","independent-later-exit",state=>{state.repositoryExecutions[0].stoppedVerified=true;});await f.service.recover("personal");const recovered=await f.service.apply("personal",input);assert.equal(recovered.status,"incomplete");assert.equal(recovered.recoveredWithoutReplay,true);assert.equal((await new ReceiptLedger(journal).list()).length,0);assert.equal((await budgets.list()).some(c=>["claimed","running","cancelling","timed_out"].includes(c.state)),false);assert.equal(f.calls(),1);
 });
+test("a failed atomic admission write cannot deliver a stop or leave a partially started budget",async t=>{
+  const f=await fixture(t),review=await f.service.review("personal",f.proposal),original=f.store.update;
+  let fail=true;
+  f.store.update=async(...args)=>{if(fail&&args[1]==="repository-effect-journal"){fail=false;throw Error("Synthetic lost atomic admission write");}return original(...args);};
+  const input={stopId:f.proposal.stopId,token:review.confirmation.token},result=await f.service.apply("personal",input);
+  assert.equal(result.status,"incomplete");assert.equal(result.effectDisposition,"not_started");assert.equal(result.failurePhase,"admission");assert.equal(f.calls(),0);
+  assert.equal((await new DurableBudgetManager(repositoryEffectJournal(f.store,"personal",{domain:"execution-stop"})).list()).length,0);
+  assert.equal((await f.service.apply("personal",input)).replayed,true);assert.equal(f.calls(),0);
+});

@@ -9,7 +9,7 @@ const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRo
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
 const prohibited = ["pr_upsert", "pr_merge", "direct_main", "run_target", "debug_target", "plan_approval"];
 function path(value) {
-  if (typeof value !== "string" || value.length > 512 || /[\\\0\r\n:*?\[\]]/.test(value) || value.startsWith("/") || value.split("/").some(p => !p || /[\x00-\x1f\x7f]/.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p) || p === "." || p === ".." || p.toLowerCase() === ".git")) throw new Error("Choose literal repository-relative file paths without traversal or platform aliases.");
+  if (typeof value !== "string" || value.length > 512 || /[\\\0\r\n:*?\[\]]/.test(value) || value.startsWith("/") || value.split("/").some(p => !p || /[\x00-\x1f\x7f]/.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(p) || p === "." || p === ".." || p.toLowerCase() === ".git")) throw new Error("Choose literal repository-relative file paths without traversal or platform aliases.");
   return value;
 }
 function paths(value, field, max = 256) {

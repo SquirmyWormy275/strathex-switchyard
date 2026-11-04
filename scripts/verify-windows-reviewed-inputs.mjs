@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+/** Actual NTFS/ACL/sharing checks only; never opens a VM, account or keyboard. */
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, mkdir, writeFile, readFile, access, open, symlink, rename, rm } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, isAbsolute } from "node:path";
+import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
+import { createWindowsReviewedInputs } from "../tools/layout-studio/windows-reviewed-inputs.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
+import { directoryIdentity, privateWrite } from "../tools/layout-studio/private-fs.mjs";
+const flags=process.argv.slice(2),helper=flags.find(flag=>flag.startsWith("--helper="))?.slice(9);
+if(process.platform!=="win32"||flags.length!==2||!flags.includes("--synthetic")||!helper||!isAbsolute(helper))throw Error("Usage on native Windows: node scripts/verify-windows-reviewed-inputs.mjs --synthetic --helper=ABSOLUTE_BUILT_HELPER");
+const root=await mkdtemp(join(process.env.LOCALAPPDATA||homedir(),"switchyard-native-inputs-")),source=join(root,"repository"),stateDirectory=join(root,"inputs"),keys=new Map(),checks=[];
+const sha=bytes=>createHash("sha256").update(bytes).digest("hex"),identity=stat=>({device:stat.dev.toString(),inode:stat.ino.toString()});
+const store=createSuiteStore({root:join(root,"private"),secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>{keys.set(c+p,v);}}});await store.initialize("personal");await store.update("personal","native-input-test",state=>{state.mode="personal-companion";});
+let nativeCalls=0,failure;
+const service=createWindowsReviewedInputs({store,stateDirectory,helper,consumerStopped:async()=>true,command:(exe,args,options)=>{nativeCalls++;assert.equal(exe,helper);assert.deepEqual(args,["--stage-reviewed-inputs"]);return runRuntimeCommand(exe,args,{...options,windowsHelper:helper});}});
+// consumerStopped is true only because this bounded journey never creates or
+// maps a guest VM. Production consumers must supply their own verified fence.
+try {
+  await mkdir(source);await mkdir(join(source,"src"));const bytes=Buffer.from([0,255,128,10]);await writeFile(join(source,"src/task.bin"),bytes);await writeFile(join(source,"unselected.env"),"synthetic unselected credential");
+  const input={repositoryRoot:source,sourceIdentity:identity(await directoryIdentity(source)),inputFiles:[{path:"src/task.bin",sha256:sha(bytes),size:bytes.length,classification:"non-production"}]},context=()=>({operationId:randomUUID(),scopeDigest:"a".repeat(64),provider:"codex"}),authorize=async()=>{};
+  const first=context(),lease=await service.prepare("personal",first,input,authorize);assert.deepEqual(await readFile(join(lease.root,"src/task.bin")),bytes);await assert.rejects(access(join(lease.root,"unselected.env")),{code:"ENOENT"});assert.equal(lease.privateAclReadbackVerified,true);assert.equal(lease.sandboxEnforced,false);assert.equal(Object.hasOwn(lease,"protections"),false);await lease.assertCurrent();checks.push("actual native reader copied only exact reviewed binary bytes and independently read back a protected inheritable current-user/System/Administrators DACL");
+  const calls=nativeCalls;await assert.rejects(service.prepare("personal",first,input,authorize));assert.equal(nativeCalls,calls);checks.push("durable duplicate operation could not launch another native reader");await lease.release();await assert.rejects(access(lease.root),{code:"ENOENT"});
+  const locked=context(),writer=await open(join(source,"src/task.bin"),"r+");try{await assert.rejects(service.prepare("personal",locked,input,authorize),/native Windows reader/);}finally{await writer.close();}assert.equal((await service.cleanup("personal",locked.operationId)).cleaned,true);checks.push("native read-sharing contract rejected an already writable source handle before copying data");
+  const outside=join(root,"outside");await mkdir(outside);await writeFile(join(outside,"secret"),"synthetic outside bytes");await symlink(outside,join(source,"linked"),"junction");const linked=context();await assert.rejects(service.prepare("personal",linked,{...input,inputFiles:[{path:"linked/secret",sha256:sha("synthetic outside bytes"),size:23,classification:"non-production"}]},authorize),/native Windows reader/);assert.equal((await service.cleanup("personal",linked.operationId)).cleaned,true);assert.equal(await readFile(join(outside,"secret"),"utf8"),"synthetic outside bytes");checks.push("actual NTFS junction traversal was rejected without copying or changing its outside file");
+  const replacement=context(),owned=await service.prepare("personal",replacement,input,authorize);await rename(owned.root,owned.root+"-original");await mkdir(owned.root);await writeFile(join(owned.root,"foreign"),"preserve replacement");await assert.rejects(owned.release(),/replaced/);assert.equal(await readFile(join(owned.root,"foreign"),"utf8"),"preserve replacement");await rm(owned.root,{recursive:true});await rename(owned.root+"-original",owned.root);await owned.release();checks.push("native directory identities preserved a replacement until the exact original owned copy was restored");
+  const state=await store.snapshot("personal");for(const row of state.repositoryWindowsInputs){assert.equal(row.stoppedVerified,true);assert.equal(await runtimeGuardianStopped(row.ownedRuntime,{windowsHelper:helper}),true);assert.equal(row.cleanupPending,false);}checks.push("every exact native staging guardian independently exited and every unchanged owned copy was removed; no VM or runtime copy was created");
+} catch(error){failure=error;}
+finally{try{await service.close();if(!failure)await rm(root,{recursive:true});}catch(error){failure??=error;}}
+const receipt=join(process.env.RUNNER_TEMP||homedir(),"switchyard-windows-inputs-verification.json"),result={schema:"switchyard-native-windows-inputs/v1",at:new Date().toISOString(),success:!failure,checks,nativeCalls,helperSha256:sha(await readFile(helper)),windowsSandboxVerified:false,guestLaunched:false,keyboardOpened:false,accountOpened:false,failure:failure?.message??null,...(failure?{retainedSyntheticRoot:root}:{})};await privateWrite(receipt,JSON.stringify(result,null,2)+"\n");console.log(JSON.stringify({receipt,success:!failure,checks:checks.length,nativeCalls,guestLaunched:false}));if(failure)throw failure;

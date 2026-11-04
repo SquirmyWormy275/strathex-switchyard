@@ -73,7 +73,7 @@ async function writeVerifiedManifest(hostRoot: string, value: unknown, repositor
 test("even digest-pinned manifests reject unbounded or ambiguous disposable input authority", async context => {
   const setup = await fixture(context), witness = { path: "task.mjs", sha256: "a".repeat(64), size: 12, classification: "non-production" };
   const recipe = (inputFiles: unknown) => manifest(setup.repositoryRoot, { pipeline_local_gate: processRecipe({ isolation: "disposable", inputFiles }) });
-  for (const inputs of [[], [{ ...witness, command: "untrusted" }], [{ ...witness, path: "../outside" }], [{ ...witness, path: ".git/config" }], [{ ...witness, path: "C:stream" }], [{ ...witness, path: "NUL.txt" }], [witness, { ...witness, path: "TASK.mjs" }], [{ ...witness, classification: "production" }], [{ ...witness, size: 4 * 1024 * 1024 + 1 }], [{ ...witness, sha256: "unverified" }]]) {
+  for (const inputs of [[], [{ ...witness, command: "untrusted" }], [{ ...witness, path: "../outside" }], [{ ...witness, path: ".git/config" }], [{ ...witness, path: "C:stream" }], [{ ...witness, path: "NUL.txt" }], [{ ...witness, path: "COM¹" }], [{ ...witness, path: "CONIN$" }], [{ ...witness, path: Array(33).fill("a").join("/") }], [{...witness,path:"directory"},{...witness,path:"directory/file"}], [witness, { ...witness, path: "TASK.mjs" }], [{ ...witness, classification: "production" }], [{ ...witness, size: 4 * 1024 * 1024 + 1 }], [{ ...witness, sha256: "unverified" }]]) {
     await assert.rejects(writeVerifiedManifest(setup.hostRoot, recipe(inputs), setup.repositoryRoot), /inputFiles/);
   }
   const loaded = await writeVerifiedManifest(setup.hostRoot, recipe([witness]), setup.repositoryRoot);

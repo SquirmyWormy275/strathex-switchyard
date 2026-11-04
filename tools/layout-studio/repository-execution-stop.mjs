@@ -49,10 +49,10 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
     current(compartment, generation);
     return { state, run, native, scopeDigest: scope(compartment, state, run, native) };
   }
-  function ledger(compartment) {
-    const journal = repositoryEffectJournal(store, compartment, { domain: "execution-stop", now });
+  function ledger(compartment, transaction) {
+    const journal = transaction ? { transaction: fn => fn(transaction), readEntries: transaction.readEntries } : repositoryEffectJournal(store, compartment, { domain: "execution-stop", now });
     const clock = () => new Date(now()).toISOString();
-    return { operations: new OperationSagaStore(journal, { clock }), budgets: new DurableBudgetManager(journal, { clock }), receipts: new ReceiptLedger(journal, { clock }) };
+    return { journal, operations: new OperationSagaStore(journal, { clock }), budgets: new DurableBudgetManager(journal, { clock }), receipts: new ReceiptLedger(journal, { clock }) };
   }
   async function recover(compartment) {
     if (pending.has(compartment)) return;
@@ -114,28 +114,38 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
           if (currentRow.status !== "reviewed") throw Error("This stop approval was already reserved.");
           currentRow.status = "executing";
         });
-        const { operations, budgets, receipts } = ledger(compartment);
-        let claimId, effectAttempted = false, stoppedVerified = false, result;
+        const { journal, operations, budgets, receipts } = ledger(compartment);
+        let claimId, effectAttempted = false, stoppedVerified = false, result, failurePhase = "admission";
         try {
-          await budgets.configure(budget);
-          const begun = await operations.begin({ id: row.stopId, idempotencyKey: row.stopId, action: "stop_managed_run", targetSnapshotId: row.scopeDigest, details: { originalOperationId: row.originalOperationId, managedProcessId: row.managedProcessId } });
-          if (begun.reused) throw Error("This protected stop operation already exists; it cannot be replayed.");
-          const claimed = await budgets.claim({ operationId: row.stopId, commandClass: "stop_managed_run", requestedBy: "authenticated-exact-stop-review" });
-          if (!claimed.allowed) throw Error(claimed.reason);
-          claimId = claimed.claim.id;
-          const started = await budgets.start(claimId);
-          if (!started.allowed) throw Error(started.reason);
-          await operations.advance(row.stopId, "executing");
+          // One authenticated commit admits the operation and starts its claim.
+          // Repeated Windows lock-helper launches must not consume the stop's
+          // deadline before any native effect. A failed write admits nothing.
+          claimId = await journal.transaction(async transaction => {
+            const { operations, budgets } = ledger(compartment, transaction);
+            await budgets.configure(budget);
+            const begun = await operations.begin({ id: row.stopId, idempotencyKey: row.stopId, action: "stop_managed_run", targetSnapshotId: row.scopeDigest, details: { originalOperationId: row.originalOperationId, managedProcessId: row.managedProcessId } });
+            if (begun.reused) throw Error("This protected stop operation already exists; it cannot be replayed.");
+            const claimed = await budgets.claim({ operationId: row.stopId, commandClass: "stop_managed_run", requestedBy: "authenticated-exact-stop-review" });
+            if (!claimed.allowed) throw Error(claimed.reason);
+            const started = await budgets.start(claimed.claim.id);
+            if (!started.allowed) throw Error(started.reason);
+            await operations.advance(row.stopId, "executing");
+            return claimed.claim.id;
+          });
+          failurePhase = "pre-effect-validation";
           const before = await check(), claim = await budgets.get(claimId);
           if (claim?.state !== "running" || Date.parse(claim.expiresAt) <= now()) throw Error("The exact stop budget expired before the effect.");
           effectAttempted = true;
+          failurePhase = "native-stop";
           const stopped = await supervisors.stopOperation(compartment, row.originalOperationId);
           stoppedVerified = stopped.accepted === true;
+          failurePhase = "exit-reconciliation";
           await reconcile(compartment);
           const state = await store.snapshot(compartment), original = state.repositoryExecutionReviews?.find(run => run.requestId === row.requestId);
           if (scopeHash(original?.outcome) !== row.originalOutcomeDigest) throw Error("The original admission outcome changed; preserve both stop and program evidence.");
           if (!stoppedVerified || Date.parse(claim.expiresAt) <= now()) throw Error("The exact stop did not verify native exit within its budget; prior outcomes remain preserved.");
           const evidenceDigest = scopeHash([row.scopeDigest, before.native.ownedRuntime, before.native.commandDigest, "independently-verified-native-exit"]);
+          failurePhase = "receipt-recording";
           await operations.advance(row.stopId, "external_committed");
           const receipt = await receipts.issue({ operationId: row.stopId, action: "stop_managed_run", targetSnapshotId: row.scopeDigest, result: "passed", completeness: "complete", evidenceDigest, policyVersion: "suite-reviewed-execution-stop/v1", toolVersions: { nativeGuardian: "switchyard-runtime-command/v1" } });
           await operations.advance(row.stopId, "recorded", { receiptId: receipt.id, commandStatus: "completed" });
@@ -151,7 +161,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
             if (claimId) await budgets.settle(claimId, "failed", "The reviewed stop did not finish its durable result; no replay is permitted.");
           }
           const original = (await store.snapshot(compartment)).repositoryExecutionReviews?.find(run => run.requestId === row.requestId);
-          result = { status: "incomplete", effectDisposition: effectAttempted ? "ambiguous" : "not_started", operationId: row.stopId, originalOperationId: row.originalOperationId, stoppedVerified, originalOutcomeUnchanged: scopeHash(original?.outcome) === row.originalOutcomeDigest, providerTaskCompletionVerified: false, summary: "The exact stop result is unconfirmed. Preserve its ownership and prior program outcome; no automatic replay is permitted." };
+          result = { status: "incomplete", effectDisposition: effectAttempted ? "ambiguous" : "not_started", failurePhase, operationId: row.stopId, originalOperationId: row.originalOperationId, stoppedVerified, originalOutcomeUnchanged: scopeHash(original?.outcome) === row.originalOutcomeDigest, providerTaskCompletionVerified: false, summary: "The exact stop result is unconfirmed. Preserve its ownership and prior program outcome; no automatic replay is permitted." };
         }
         await update(compartment, row.stopId, "repository-execution-stop-result", currentRow => {
           currentRow.status = result.status === "completed" ? "settled" : "outcome-unconfirmed";

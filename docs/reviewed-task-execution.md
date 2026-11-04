@@ -34,8 +34,10 @@ mise exec node@24.14.0 -- node scripts/verify-repository-execution-host.mjs --sy
 ```
 
 It requires the normal installed app and the existing permitted Codex login.
-Eight checks passed at `ab7ceed`; the private result is
-`installed-repository-execution-1793805620119.json`. Successful cleanup restores
+Ten checks passed at `26b78c2`; the private result is
+`installed-repository-execution-1793807525872.json`. These include a separate exact
+stop receipt, duplicate handling, a fresh reviewed Run after that stop and three
+independently exited native guardians. Successful cleanup restores
 selection, definitions, keyboard-only validation state and the private endpoint;
 it retains the native empty-task history. Failed checks retain their synthetic
 staging and evidence. Use `--compartment=execution-validation-suffix` for a new
@@ -86,6 +88,10 @@ The original coding authority need not be extended to stop an already owned
 process; the selected Personal workspace and exact native handle are required.
 
 A separate 15-second budget, operation and receipt cover the stop postcondition.
+Admission is committed in one encrypted journal transaction, so repeated
+Windows lock-helper startup does not spend that deadline on separate admission
+writes. A failed admission commit cannot deliver the stop. Final scope and
+deadline checks still occur before the native effect.
 They never overwrite the original Run admission or claim that its program
 completed. Unknown native exit keeps the stop unresolved and its budget occupied.
 A later independent exit can release interrupted bookkeeping with an incomplete
@@ -94,9 +100,10 @@ recovered from its exact protected receipt and verified native binding without
 another stop. Native handles lost across restart are observed rather than
 replaced with guessed PIDs.
 
-Five service cases, four focused stop faults, authenticated HTTP transport and
-package-import checks pass. Normal installed per-run stop acceptance is pending;
-the earlier eight-check installed journey covered Run and workspace shutdown.
+Five service cases, focused stop faults, authenticated HTTP transport and
+package-import checks pass. Normal installed per-run stop and a fresh approved
+Run afterward pass the ten-check journey above. Native Windows deadline
+acceptance of the atomic admission change remains pending.
 
 ## Retained evidence and recovery
 

@@ -31,7 +31,9 @@ their boundaries, not the truth of an arbitrary label or absence of secrets
 within an explicitly supplied file.
 
 Linux disposable recipes require 1–4,096 literal relative files, at most 4 MiB
-each and 64 MiB total. There is no directory glob, Git metadata, traversal,
+each and 64 MiB total, with at most 32 path components and 4,096
+distinct directories. File/directory collisions and Windows console/serial
+device aliases (including superscript DOS aliases) are refused before staging. There is no directory glob, Git metadata, traversal,
 platform alias, case-colliding path or automatic dependency installation. Omitted
 inputs fail closed. Existing Linux pins that relied on copying the full project
 must be reviewed with exact inputs and pinned again; they are not silently
@@ -50,8 +52,41 @@ mounts, isolated process/network namespaces and cleared environment. This does
 not turn explicitly selected production data into synthetic data, provide a
 disk quota for arbitrary writable build outputs, or accept every execution
 action. The connected Run path mounts reviewed inputs read-only and bounds its
-temporary filesystem. Equivalent Windows guest input staging still needs its own
-implementation and native acceptance; the portable recipe validation is shared.
+temporary filesystem. Windows now has a separate native NTFS staging port with
+the same manifest limits. Its guest mapping and execution connection remain
+unfinished; copying reviewed inputs alone provides no execution containment.
+
+## Native Windows staging
+
+`createWindowsReviewedInputs` is an internal host port, not a command endpoint.
+It reserves one exact operation, source identity, selected-byte manifest and new
+staging-directory identity in the encrypted compartment before acknowledging
+native startup. The fixed `--stage-reviewed-inputs` C# helper pins directory
+handles without delete sharing, refuses reparse points and already writable
+source handles, and copies only bounded, digest-verified regular files. It sets
+and independently reads back a protected inheritable DACL on its newly owned
+directory. No existing project permissions are changed.
+
+The JavaScript host independently checks the complete staged tree and hashes.
+Duplicates cannot stage again; unknown native exit blocks replacement. Cleanup
+requires the original directory, unchanged selected bytes, independently stopped
+stager and a trusted consumer-exit fence. Replacements and unfamiliar files are
+preserved. The workspace retains at most 64 MiB of outstanding input copies.
+The returned lease explicitly reports `sandboxEnforced: false` and has no runtime
+protection grant; it cannot authorize an uncontained host recipe.
+
+Four software boundary cases pass. The changed C# helper compiles with zero
+warnings/errors using the existing .NET 8 SDK. Its Linux invocation rejects the
+Windows-only mode before filesystem effects. Actual NTFS sharing, DACL,
+junction, identity and cleanup acceptance runs separately on Windows CI:
+
+```powershell
+node scripts/verify-windows-reviewed-inputs.mjs --synthetic --helper=C:\absolute\path\Switchyard.Hotkeys.exe
+```
+
+This explicit synthetic check opens no guest, keyboard or provider account and
+copies no runtime. Native acceptance remains pending; it does not establish
+Windows Sandbox execution or interactive device/account acceptance.
 
 Run the software boundaries with the pinned Node runtime:
 

@@ -16,58 +16,55 @@ readiness cannot substitute the reviewed executable descriptor. The API,
 shutdown/restart boundaries and evidence exclusions are described in the
 [execution contract](reviewed-task-execution.md). The frontend is unchanged.
 
-Normal installed Run at `ab7ceed` passed eight checks with one actual empty
+Normal installed source `26b78c2` passed ten checks with one actual empty
 Codex task and zero prompts. Actual output confirmed denied host files,
 credentials and loopback, a read-only workspace and 64 MiB temporary filesystem.
-The terminal receipt and original duplicate admission matched; both native
-guardians independently exited, both input copies were removed, and definitions,
-selection, keyboard-only validation state and the private link were restored.
-Receipt: `installed-repository-execution-1793805620119.json`.
+The terminal receipt, separate exact-stop receipt and duplicate admissions
+matched. A third, freshly reviewed Run started after the stopped Run; all three
+native guardians independently exited and unchanged input copies were removed.
+Definitions, selection, keyboard-only validation state and the private link were
+restored. Receipt: `installed-repository-execution-1793807525872.json`.
 
-Focused evidence: 38 HTTP/runtime/staging/execution cases and 20 shared broker/
-Linux runtime cases pass. The updated native input proof passes three checks
-(`repository-inputs-native-1793804631743.json`) without copying a runtime.
-The full `ab7ceed` Linux run passed 149/150 groups; the final native recovery
-fault case exceeded its old 45-second group limit. That case then passed alone
-in 51 seconds. The corrected 120-second group plus ownership/manifest checks
-pass 30/30 cases (receipt `9b67cf81-8701-4344-ac05-293405d860cc`). The corrected full `24f3a77` run passes 150/150 groups: 962 tests,
-952 passed and ten declared platform skips. Receipt:
-`9a8c1b0e-4f45-4bbd-9954-3416b30a4774`. The disposable verification checkout was
-removed after its complete receipt and exited children were verified. The additional workspace-stop
-regression verifies durable cancellation before abort and released budgets while
-preserving the original admission and unconfirmed program outcome.
+Complete local Linux source at `0151e69` passes 151/151 groups: 967 tests,
+957 passed and ten declared platform skips. Receipt:
+`9a24b1ab-23b8-44d5-9569-a444d2ff1ca0`. The disposable checkout was removed after
+its complete receipt and exited children were verified. Full verification at
+`26b78c2` is running in another small isolated checkout while implementation
+continues. Ubuntu release CI at `0151e69` passes, including the actual namespace
+preflight with Ubuntu's packaged scoped bwrap AppArmor profile. No workstation
+policy, namespace restriction or guardian no-new-privs setting was weakened.
 
-Ubuntu CI at `ab7ceed` rejected the actual namespace tool-replacement test;
-native diagnostics and an explicit runner namespace preflight are now retained.
-The preflight reports `bwrap: loopback: Failed RTM_NEWADDR: Operation not
-permitted`. CI now installs and loads Ubuntu's packaged, scoped bwrap AppArmor
-profile on its disposable runner; production namespace restrictions and guardian
-no-new-privs remain enforced. Native CI acceptance of that setup is pending.
-The same actual check passes on this host. Windows backend CI at `ab7ceed`
-exposed a frozen test clock: a permit appeared expired before the fake broker
-ran. The fixture now uses wall time for native-bound lifetimes; production's
-60-second policy permits are unchanged.
-Reviewed per-run stop now has a separate approval, budget, operation and receipt,
-with exact-handle ownership, duplicate rejection and receipt-only recovery. Five
-service cases, four stop fault cases, HTTP and packaged imports pass. The expanded installed journey at `0151e69` verified exact stop, its distinct
-receipt, duplicate handling and the unchanged original admission, then exposed a
-separate defect: the next reviewed Run reused the cancelled dispatch scope.
-Receipt `installed-repository-execution-1793806863845.json` records the failure;
-its encrypted workspace and synthetic staging remain preserved. All observed
-native owners exited, and selection/definitions/keyboard-only state were restored.
-The host now binds each Run's durable operation to its protected review digest;
-legacy default scopes and same-request no-replay behavior remain unchanged.
-Fourteen core regression cases pass, including child-saga no-replay. Corrected
-installed acceptance remains pending. Windows guest execution, writable build outputs
-and remaining action integrations are unfinished implementation, not hardware
-blocks.
+Reviewed per-run stop has a separate approval, budget, operation and receipt,
+with exact-handle ownership, duplicate rejection and receipt-only recovery.
+Windows CI at `0151e69` exposed its deadline being spent on repeated kernel-lock
+helper startups before the effect. Admission now uses one authenticated journal
+transaction; the same 15-second deadline and final scope check remain. A failed
+admission write cannot deliver a stop or leave a partially started claim. Native
+Windows acceptance of this correction is pending. The short Windows client lane
+at `26b78c2` passed 42 assertions but exceeded the suite group's 45-second harness
+limit before its last case. That group now receives 120 seconds on Windows;
+no assertion or production deadline was removed.
 
-At published `c6e8a50`, GitHub Linux release verification and the short native
-Windows client-platform lane pass. The complete Windows run 41846396332 passed
-backend, helper, Job Object, fresh runtime and suite packaging, then exhausted
-the recovery group's 45-second harness allowance after six passing cases. The
-recovery group budget is now 120 seconds on both platforms, with no effect deadline or assertions
-removed; complete corrected acceptance remains pending.
+Native Windows reviewed-input staging is implemented separately from guest
+execution. The fixed C# reader pins NTFS directory/file handles, refuses reparse
+points and writable source handles, hashes only explicitly selected bytes, and
+sets/readbacks a private inherited DACL on a new owned directory. The host
+records readiness before acknowledgement, verifies the complete copied tree,
+refuses replay and preserves unknown owners/replacement files. Cleanup requires
+independent native and trusted consumer exit. Four software boundary cases and
+four release-closure cases pass; the helper compiles with zero warnings/errors
+and rejects this mode on Linux before filesystem effects. The small build
+scratch directory was removed, with source/assembly hashes retained in
+`windows-reviewed-inputs-build-20261104.json`; no runtime was copied. Actual NTFS,
+ACL, junction and sharing checks are now in Windows CI and remain pending.
+[Input contract](reviewed-execution-inputs.md).
+
+The failed installed `0151e69` proof remains preserved, including its encrypted
+workspace and synthetic inputs; it exposed the subsequently corrected dispatch
+scope reuse. New Run requests bind their own protected review digest, while
+same-request duplicates and legacy operation scopes retain no-replay behavior.
+Windows guest execution, writable build outputs and remaining action
+integrations are unfinished implementation, not hardware blocks.
 
 ## Current pilot
 
@@ -76,9 +73,9 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `ab7ceed` is installed as release
-`0a02afc39dfc8d8dbba18ab317ae38c32167e3255568e2767ea518b521f8ad64`: 477 files,
-4,603,496 bytes. Six normal update checks pass (assignment-legends-1793805407570.json).
+Published source `26b78c2` is installed as release
+`e2294283777e4f6b1afb050f4074c2c7163ce2117483b518f0f7cdd7ada1ac69`: 478 files,
+4,622,833 bytes. Six normal update checks pass (assignment-legends-1793807217916.json).
 Current plus one rollback occupy about 11 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
