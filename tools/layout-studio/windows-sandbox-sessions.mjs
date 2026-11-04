@@ -64,6 +64,12 @@ export function createWindowsSandboxSessions({store,stateDirectory,platform=proc
   }
 
   return {
+    async metadata(c,binding,authorize,signal){
+      binding=structuredClone(binding);
+      if(closed||platform!=="win32"||!binding||Object.keys(binding).sort().join()!=="operationId,provider,scopeDigest"||!uuid(binding.operationId)||!digest(binding.scopeDigest)||!["codex","claude-code"].includes(binding.provider)||typeof authorize!=="function")throw Error("Bind prerequisite observation to one exact reviewed host operation.");
+      seen.add(c);
+      return native.call(c,{...binding,sandboxId:randomUUID()},{action:"metadata"},authorize,{signal});
+    },
     forOperation(c,binding,authorize){
       binding=structuredClone(binding);
       if(!binding||Object.keys(binding).sort().join()!=="operationId,provider,scopeDigest"||!uuid(binding.operationId)||!digest(binding.scopeDigest)||!["codex","claude-code"].includes(binding.provider)||typeof authorize!=="function")throw Error("Bind the managed guest to one exact reviewed host operation.");

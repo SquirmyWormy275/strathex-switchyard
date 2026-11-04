@@ -15,6 +15,14 @@ const statuses={metadata:["available","unavailable"],list:["observed","unavailab
 const once=new Set(["start","connect","execute","stop"]),leaseKey=scopeHash(["switchyard-windows-sandbox-cli","current-user"]);
 const commandField=action=>({start:"nativeStartCommandId",connect:"nativeConnectCommandId",execute:"nativeExecuteCommandId",stop:"nativeStopCommandId"}[action]);
 
+export function validateWindowsStoragePrerequisites(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "brokerImplemented,effectStarted,privilegeAssigned,privilegeEnabled,privilegeStateUnchanged,requiresPrivilegedSetup,sandboxEnforced,schema"
+    || value.schema !== "switchyard-windows-storage-prerequisites/v1" || typeof value.privilegeAssigned !== "boolean" || typeof value.privilegeEnabled !== "boolean"
+    || value.privilegeEnabled && !value.privilegeAssigned || value.requiresPrivilegedSetup !== !value.privilegeAssigned || value.privilegeStateUnchanged !== true
+    || value.brokerImplemented !== false || value.effectStarted !== false || value.sandboxEnforced !== false) throw Error("The read-only Windows storage prerequisites did not verify.");
+  return structuredClone(value);
+}
+
 export function validateWindowsExchangeBinding(value,operationId){
   const keys=["schema","operationId","stagingRoot","stagingIdentity","imageIdentity","mountIdentity","footerSha256","volumeGuid"];
   const identity=value=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).sort().join()==="device,inode"&&[value.device,value.inode].every(part=>typeof part==="string"&&/^(0|[1-9][0-9]{0,19})$/.test(part));
@@ -31,8 +39,9 @@ function request(input,context){
   return {schema,...structuredClone(input)};
 }
 function response(value,input){
-  const allowed=["schema","action","status","reason","effectStarted",...({metadata:["aliasType"],list:["ids"],start:["sandboxId","configurationSha256"],stop:["sandboxId","absentObserved"],connect:["sandboxId"],"probe-login":["sandboxId","guestExitCode"],execute:["sandboxId","guestExitCode"]}[input.action])];
+  const allowed=["schema","action","status","reason","effectStarted",...({metadata:["aliasType","storage"],list:["ids"],start:["sandboxId","configurationSha256"],stop:["sandboxId","absentObserved"],connect:["sandboxId"],"probe-login":["sandboxId","guestExitCode"],execute:["sandboxId","guestExitCode"]}[input.action])];
   if(!value||typeof value!=="object"||Array.isArray(value)||Object.keys(value).some(k=>!allowed.includes(k))||value.schema!==schema||value.action!==input.action||!statuses[input.action].includes(value.status)||typeof value.effectStarted!=="boolean")throw Error("The exact native Sandbox response did not verify.");
+  if(input.action==="metadata") { if(value.effectStarted!==false || value.status==="available" && value.aliasType!=="current-user-AppExecLink") throw Error("The native prerequisite observation cannot start a guest."); if(value.storage!==undefined)validateWindowsStoragePrerequisites(value.storage); }
   if(value.status==="observed"&&(!Array.isArray(value.ids)||value.ids.length>64||value.ids.some(id=>!uuid(id))||new Set(value.ids).size!==value.ids.length))throw Error("The native Sandbox inventory is unknown, not empty.");
   if(value.sandboxId!==undefined&&value.sandboxId!==input.sandboxId||value.configurationSha256!==undefined&&value.configurationSha256!==input.configurationSha256)throw Error("The native Sandbox response crossed its exact identity or configuration.");
   if(value.status==="started"&&(value.sandboxId!==input.sandboxId||value.configurationSha256!==input.configurationSha256)||value.status==="stopped"&&(value.sandboxId!==input.sandboxId||value.absentObserved!==true)||value.status==="executed"&&(!Number.isInteger(value.guestExitCode)||value.guestExitCode<0||value.guestExitCode>0xffffffff))throw Error("The native Sandbox postcondition remains unconfirmed.");

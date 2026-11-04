@@ -8,6 +8,14 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Windows Run now observes the Sandbox command interface and storage privilege
+before staging inputs/tools/images. Native metadata uses query-only token access,
+bounded reads and unchanged privilege readback; missing prerequisites settle the
+consumed operation as unavailable. It neither enables privileges nor performs
+setup. Thirty local contracts, zero-warning helper build, six Linux guards and
+type checking pass; build scratch removed. Actual token query is pending native
+CI, and normal-user privileged setup/broker remains unfinished software.
+
 All four complete Windows policy files pass in workflow `41914612230` at
 `cdd86cb`. The separate Windows client check exposed eager optional-helper
 loading when opening an empty workspace. Recovery now checks encrypted ownership

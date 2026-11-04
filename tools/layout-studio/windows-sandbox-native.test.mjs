@@ -6,9 +6,15 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createSuiteStore } from "./suite-store.mjs";
 import { scopeHash } from "./confirmations.mjs";
-import { createWindowsSandboxNativeCalls,validateWindowsExchangeBinding } from "./windows-sandbox-native.mjs";
+import { createWindowsSandboxNativeCalls,validateWindowsExchangeBinding,validateWindowsStoragePrerequisites } from "./windows-sandbox-native.mjs";
 const schema="switchyard-windows-sandbox-cli/v1",sha=value=>createHash("sha256").update(value).digest("hex");
 const syntheticExchange=operationId=>({schema:"switchyard-windows-bounded-volume/v1",operationId,stagingRoot:`C:\\owned\\disk-${operationId}`,stagingIdentity:{device:"1",inode:"2"},imageIdentity:{device:"1",inode:"3"},mountIdentity:{device:"1",inode:"4"},footerSha256:"b".repeat(64),volumeGuid:`\\\\?\\Volume{${randomUUID()}}\\`});
+const storage={schema:"switchyard-windows-storage-prerequisites/v1",privilegeAssigned:true,privilegeEnabled:false,privilegeStateUnchanged:true,requiresPrivilegedSetup:false,brokerImplemented:false,effectStarted:false,sandboxEnforced:false};
+test("storage readiness is a closed read-only observation, never setup or containment authority",()=>{
+ assert.deepEqual(validateWindowsStoragePrerequisites(storage),storage);
+ assert.equal(validateWindowsStoragePrerequisites({...storage,privilegeAssigned:false,requiresPrivilegedSetup:true}).requiresPrivilegedSetup,true);
+ for(const value of [null,{...storage,privilegeAssigned:false},{...storage,privilegeEnabled:true,privilegeAssigned:false,requiresPrivilegedSetup:true},{...storage,privilegeStateUnchanged:false},{...storage,brokerImplemented:true},{...storage,effectStarted:true},{...storage,sandboxEnforced:true},{...storage,path:"untrusted"}])assert.throws(()=>validateWindowsStoragePrerequisites(value));
+});
 // Explicit native/VM doubles. This suite tests the protected transport, not WSB.
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),"switchyard-sandbox-native-contract-")),keys=new Map(),owners=new Map(),services=[];
@@ -23,7 +29,7 @@ async function fixture(t){
     try{
       await options.onGuardianReady(scope);effects++;
       const record=(await store.snapshot("personal")).repositoryWindowsGuestCommands.at(-1);assert.equal(record.ownedRuntime.id,scope.id);assert.equal(record.status,"running");assert.equal(record.stoppedVerified,false);
-      let value={schema,action:input.action,status:"available",aliasType:"current-user-AppExecLink",effectStarted:false};
+      let value={schema,action:input.action,status:"available",aliasType:"current-user-AppExecLink",storage,effectStarted:false};
       if(input.action==="list")value={schema,action:input.action,status:"observed",ids:badInventory?null:[],effectStarted:false};
       if(input.action==="start")value={schema,action:input.action,status:"started",sandboxId:input.sandboxId,configurationSha256:input.configurationSha256,effectStarted:true};
       if(input.action==="execute")value={schema,action:input.action,status:"executed",sandboxId:input.sandboxId,guestExitCode:7,effectStarted:true};

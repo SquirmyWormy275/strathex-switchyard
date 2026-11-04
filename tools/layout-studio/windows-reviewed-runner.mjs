@@ -10,7 +10,7 @@ import { createWindowsReviewedInputs } from "./windows-reviewed-inputs.mjs";
 import { createWindowsGuestTools } from "./windows-guest-tools.mjs";
 import { createWindowsExchangeImages } from "./windows-exchange-images.mjs";
 import { createWindowsSandboxSessions } from "./windows-sandbox-sessions.mjs";
-import { createWindowsSandboxNativeCalls } from "./windows-sandbox-native.mjs";
+import { createWindowsSandboxNativeCalls, validateWindowsStoragePrerequisites } from "./windows-sandbox-native.mjs";
 
 const schema = "switchyard-windows-reviewed-runner/v1";
 const helperPath = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
@@ -143,6 +143,15 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           if ((await store.snapshot(c)).repositoryWindowsRuns?.some(row => row.cleanupPending)) throw Error("Reconcile the existing Windows Run's native owners and storage before another run.");
           const loaded = await loadWindowsReviewedRun({ ...plan, recipeRuntimeSha256: p.identities.recipeRuntime.sha256 }); await check();
           await store.update(c, "windows-run-reserve", state => { const rows = state.repositoryWindowsRuns ?? []; if (rows.some(row => row.operationId === id || row.cleanupPending)) throw Error("The Windows Run reservation changed."); state.repositoryWindowsRuns = [...rows.slice(-32), { schema, ...context, planDigest, status: "executing", phase: "reserved", cleanupPending: true, createdAt: now() }]; }); reserved = true; resource.reserved = true;
+          const preflight = await p.sessions.metadata(c,context,check,signal); await check();
+          const storage = validateWindowsStoragePrerequisites(preflight.storage);
+          if (!["available","unavailable"].includes(preflight.status) || preflight.effectStarted !== false) throw Error("The native Windows Run preflight did not verify.");
+          await update(c,id,"windows-run-preflight",row=>{row.preflight={status:preflight.status,storage,observedAt:now()};});
+          if (preflight.status !== "available" || storage.requiresPrivilegedSetup) {
+            result = { status:"unavailable", summary:preflight.status !== "available" ? "Windows Run requires the current-user Windows Sandbox command interface." : "Windows Run requires the scoped privileged storage setup, which is not implemented yet. No inputs or exchange storage were staged.", providerTaskCompletionVerified:false };
+            await update(c,id,"windows-run-preflight-unavailable",row=>{row.status="settled";row.phase="preflight";row.result=result;row.nativeExitVerified=true;row.cleanupPending=false;});
+            return result;
+          }
           pollTimer = setInterval(async () => {
             if (polling) return; polling = true;
             try { const row = await get(c, id); if (!row || row.stopRequestedAt !== undefined) resource.controller.abort(); }

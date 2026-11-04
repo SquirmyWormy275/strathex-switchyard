@@ -34,6 +34,7 @@ async function fixture(t) {
   let recoverCalls = 0; let active = true, guestExited = true, unknownExit = false, cleanupAllowed = true, hold = false, stageHold = false, enter, releaseStage, stageEntered, hook = async () => {};
   const entered = new Promise(resolve => { enter = resolve; }), staged = new Promise(resolve => { stageEntered = resolve; }), stagingGate = new Promise(resolve => { releaseStage = resolve; });
   const identities = { helperSha256: "c".repeat(64), recipeRuntime: { path: "C:\\owned\\node.exe", sha256: runtime }, nodeVersion: "24.14.0" };
+  let preflight = {status:"available",effectStarted:false,storage:{schema:"switchyard-windows-storage-prerequisites/v1",privilegeAssigned:true,privilegeEnabled:false,privilegeStateUnchanged:true,requiresPrivilegedSetup:false,brokerImplemented:false,effectStarted:false,sandboxEnforced:false}},preflights=0;
   const servicesFactory = async ({consumerStopped}) => {
     consumers.push(consumerStopped);
     const asset = name => ({ prepare: async (c, binding, input, authorize) => {
@@ -42,7 +43,7 @@ async function fixture(t) {
       if (name === "images") return { createVolume: async () => { calls.push("volume"); return { operationId: binding.operationId, exchangeQuotaEnforced: true }; } };
       return { operationId: binding.operationId, root: join(stage,name), helperFilename:"b122-sandbox-worker.exe", assertCurrent: async () => { await hook(name+"-assert"); } };
     }, cleanup: async (c,id) => { assert.equal(await consumerStopped(c,id),true); calls.push("cleanup-"+name); return {cleaned:cleanupAllowed}; }, stopCompartment:async()=>({stopped:true}), close:async()=>{} });
-    return { inputs:asset("inputs"),tools:asset("tools"),images:asset("images"),sessions:{ recover:async()=>{recoverCalls++;return{stopped:guestExited};},consumerStopped:async()=>guestExited,forOperation:(_c,binding)=>({operationId:binding.operationId}),stopCompartment:async()=>({stopped:guestExited}),close:async()=>{} } };
+    return { inputs:asset("inputs"),tools:asset("tools"),images:asset("images"),sessions:{ metadata:async(_c,binding,authorize)=>{assert.equal((await store.snapshot("personal")).repositoryWindowsRuns.at(-1).operationId,binding.operationId);await authorize();preflights++;return structuredClone(preflight);},recover:async()=>{recoverCalls++;return{stopped:guestExited};},consumerStopped:async()=>guestExited,forOperation:(_c,binding)=>({operationId:binding.operationId}),stopCompartment:async()=>({stopped:guestExited}),close:async()=>{} } };
   };
   const backendFactory = options => ({ execute: async request => {
     calls.push("backend"); assert.equal(options.requireReviewedInputs,true); assert.equal(options.requireBoundedExchange,true); assert.equal(options.runner.operationId,request.operationId); assert.equal(request.reviewedInputs.operationId,request.operationId); assert.equal(request.reviewedExchange.operationId,request.operationId); assert.equal(request.expectedHelperSha256,identities.helperSha256); assert.equal(request.expectedRecipeCatalogSha256,sha(catalog));
@@ -53,8 +54,17 @@ async function fixture(t) {
   const create = (otherStore=store) => { const service=createWindowsReviewedRunner({store:otherStore,stateDirectory,platform:"win32",pins:async()=>identities,servicesFactory,backendFactory,isActive:async()=>active});services.push(service);return service; };
   const runner = create();
   t.after(async()=>{active=true;guestExited=true;cleanupAllowed=true;identities.helperSha256="c".repeat(64);identities.nodeVersion="24.14.0";identities.recipeRuntime.sha256=runtime;releaseStage();for(const service of services){await service.recover("personal");await service.close();}await rm(stage,{recursive:true,force:true});});
-  return {recoverCalls:()=>recoverCalls,store,runner,create,context,plan,calls,consumers,identities,entered,staged,releaseStage,run:(binding=context,proposed=plan)=>runner.run("personal",binding,proposed,async()=>{}),hold:()=>{hold=true;},holdStaging:()=>{stageHold=true;},unknownExit:()=>{unknownExit=true;},observeExit:()=>{guestExited=true;unknownExit=false;},active:value=>{active=value;},cleanup:value=>{cleanupAllowed=value;},hook:fn=>{hook=fn;},otherStore:()=>createSuiteStore({root:join(stage,"private"),secrets})};
+  return {preflight:value=>{preflight=value;},preflightValue:()=>structuredClone(preflight),preflights:()=>preflights,recoverCalls:()=>recoverCalls,store,runner,create,context,plan,calls,consumers,identities,entered,staged,releaseStage,run:(binding=context,proposed=plan)=>runner.run("personal",binding,proposed,async()=>{}),hold:()=>{hold=true;},holdStaging:()=>{stageHold=true;},unknownExit:()=>{unknownExit=true;},observeExit:()=>{guestExited=true;unknownExit=false;},active:value=>{active=value;},cleanup:value=>{cleanupAllowed=value;},hook:fn=>{hook=fn;},otherStore:()=>createSuiteStore({root:join(stage,"private"),secrets})};
 }
+test("missing Sandbox or storage privileges settle as unavailable before staging and cannot replay their consumed operation",async t=>{
+ for(const missing of ["alias","privilege"]){const f=await fixture(t),preflight=f.preflightValue();if(missing==="alias")preflight.status="unavailable";else Object.assign(preflight.storage,{privilegeAssigned:false,requiresPrivilegedSetup:true});f.preflight(preflight);
+  assert.equal((await f.run()).status,"unavailable");assert.deepEqual(f.calls,[]);const row=(await f.store.snapshot("personal")).repositoryWindowsRuns[0];assert.equal(row.phase,"preflight");assert.equal(row.cleanupPending,false);assert.equal(row.nativeExitVerified,true);assert.equal(row.preflight.storage.privilegeEnabled,false);
+  assert.equal((await f.run()).replayed,true);assert.equal(f.preflights(),1);assert.deepEqual(f.calls,[]);
+ }
+});
+test("malformed or privilege-changing preflight cannot stage inputs or start a VM",async t=>{
+ const f=await fixture(t),preflight=f.preflightValue();preflight.storage.privilegeStateUnchanged=false;f.preflight(preflight);await assert.rejects(f.run(),/prerequisites/);assert.equal(f.calls.includes("inputs"),false);assert.equal(f.calls.includes("backend"),false);assert.equal((await f.run()).replayed,true);
+});
 test("one host-only Windows Run connects exact staging, bounded storage, backend admission and separate native-owner cleanup",async t=>{
  const f=await fixture(t),prerequisites=await f.runner.prerequisites();assert.equal(prerequisites.recipeRuntime.sha256,f.identities.recipeRuntime.sha256);prerequisites.recipeRuntime.sha256="f".repeat(64);const result=await f.run();assert.equal(result.status,"completed");assert.equal(result.providerTaskCompletionVerified,false);
  assert.deepEqual(f.calls.slice(0,5),["inputs","tools","images","volume","backend"]);assert.deepEqual(f.calls.slice(5).sort(),["cleanup-images","cleanup-inputs","cleanup-tools"]);

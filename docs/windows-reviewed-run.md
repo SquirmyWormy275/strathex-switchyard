@@ -14,7 +14,8 @@ remains frozen for review.
 flowchart LR
   Task[Task authority and selected bytes] --> Review[One-use review]
   Review --> Ledger[Checkpoint and budget]
-  Ledger --> Inputs[Read-only inputs and pinned tools]
+  Ledger --> Preflight[Read-only host prerequisite check]
+  Preflight --> Inputs[Read-only inputs and pinned tools]
   Inputs --> Guest[Exact guest and bounded exchange]
   Guest --> Exit[Independent native and VM exit]
   Exit --> Output[Verify output or failure logs]
@@ -56,6 +57,21 @@ injections, unknown tokens and ambiguous paths are rejected. Python, debug,
 web and pipeline connections are separate remaining work.
 
 ## Own the guest and its storage
+
+After reserving the exact operation, the runner observes the current-user
+Sandbox AppExecLink and the native helper's storage privilege before staging.
+Metadata opens the process token with `TOKEN_QUERY`, reads at most 256 privilege
+entries twice and requires unchanged bytes. It reports only assigned/enabled
+flags and whether privileged setup is required. It never enables or grants a
+privilege, installs a service, opens a volume or claims containment. This follows
+the documented [GetTokenInformation access contract](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation)
+and [TOKEN_PRIVILEGES layout](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_privileges).
+
+Missing Sandbox support or an unassigned storage privilege settles the consumed
+operation as unavailable before input/tool/image staging. A new approval is
+required to try again after setup; duplicate requests preserve the original
+result. Personal-host privileged setup is still unfinished. Readiness is an
+observation, not permission to elevate the application.
 
 The host-only runner stages exactly selected bytes, hard-links the existing
 worker and Node image, creates one original fixed-capacity disk and transfers
@@ -118,6 +134,11 @@ removed. `scripts/verify-windows-policy.mjs --synthetic --suite=policy` selects
 one complete group; omitting `--suite` runs them all. It provisions pinned Node
 and locked dependencies without a .NET or optional-runtime download, opens no
 VM/account/keyboard and retains only a small seven-day receipt.
+
+All four jobs passed at `cdd86cb` in workflow `41914612230`. Digest-verified
+`windows-policy-cdd-{policy,recovery,stop,output}.json` receipts retain the exact
+results and verified child cleanup. Prerequisite transport/session/runner checks
+pass 30/30 locally; the actual Windows token query remains a native CI check.
 
 [Current verification](verification.md) identifies exact source checkpoints,
 installed Linux demonstrations and all 30 native Windows filesystem checks.

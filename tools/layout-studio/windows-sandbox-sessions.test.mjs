@@ -18,6 +18,7 @@ async function fixture(t){
   const entry=new Promise(resolve=>{entered=resolve;});
   const native={recover:async()=>nativeExited,close:async()=>{},call:async(c,context,input,authorize,options={})=>{
     assert.equal(c,"personal");if(!options.cleanup)await authorize();calls.push(input.action);
+    if(input.action==="metadata"){assert.equal(context.operationId,binding.operationId);assert.equal(context.scopeDigest,binding.scopeDigest);assert.equal((await store.snapshot(c)).repositoryWindowsGuests?.length??0,0);return{status:"available",effectStarted:false};}
     const row=(await store.snapshot(c)).repositoryWindowsGuests.find(row=>row.operationId===context.operationId);assert.equal(row.sandboxId,context.sandboxId);
     if(input.action==="start"){
       if(unknownStart){const id=randomUUID();if(unknownStart==="exact")guests.add(context.sandboxId);if(unknownStart==="foreign")guests.add(randomUUID());await store.update(c,"synthetic-lost-native-start",state=>{state.repositoryWindowsGuests[0].nativeStartCommandId=id;state.repositoryWindowsGuestCommands=[{...context,id,action:"start",startAcknowledged:true,stoppedVerified:true,ownedRuntime:{schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:12345,birth:"1",containment:process.platform==="win32"?"windows-job":"owned-linux-session"}}];});throw Error("Synthetic interrupted native creation");}
@@ -43,6 +44,10 @@ async function fixture(t){
   t.after(async()=>{active=true;nativeExited=true;guests.clear();if(unknownStart)await store.update("personal","dispose-explicit-fake-guests",state=>{for(const row of state.repositoryWindowsGuests??[])row.stoppedVerified=true;});for(const service of services){await service.recover("personal");await service.close();}await rm(root,{recursive:true,force:true});});
   return{store,service,runner,create,spec,binding,ready,calls,entered:entry,hold:()=>{hold=true;},unknownStart:value=>{unknownStart=value;},active:value=>{active=value;},stopAllowed:value=>{stopAllowed=value;},observeAbsent:()=>guests.clear(),hook:fn=>{hook=fn;},run:(signal=new AbortController().signal,onReady=ready)=>runner.run(spec,signal,()=>{throw Error("A CLI guardian is not a viewer PID");},onReady)};
 }
+test("prerequisite metadata uses an exact authorized host binding without reserving or adopting a guest",async t=>{
+ const f=await fixture(t);let authorizations=0;assert.equal((await f.service.metadata("personal",f.binding,async()=>{authorizations++;})).effectStarted,false);assert.equal(authorizations,1);assert.deepEqual(f.calls,["metadata"]);assert.equal((await f.store.snapshot("personal")).repositoryWindowsGuests?.length??0,0);
+ await assert.rejects(f.service.metadata("personal",{...f.binding,pid:123},async()=>{}));await assert.rejects(f.service.metadata("personal",f.binding,async()=>{throw Error("Revoked preflight");}),/Revoked/);assert.deepEqual(f.calls,["metadata"]);
+});
 test("managed guest lifecycle acknowledges exact ownership before one worker and verifies VM exit separately from native command exit",async t=>{
   const f=await fixture(t),result=await f.run();assert.equal(result.exitCode,0);assert.equal(result.hostProcessContained,true);assert.equal(result.guestSessionExit.stopped,true);assert.equal(result.pid,undefined);assert.deepEqual(f.calls,["start","connect","probe-login","execute","stop","list"]);assert.equal(await f.service.consumerStopped("personal",f.binding.operationId),true);
   await assert.rejects(f.run(),/already exists/);assert.equal(f.calls.filter(c=>c==="execute").length,1);assert.equal((await f.service.list("personal"))[0].exchangeQuotaEnforced,true);

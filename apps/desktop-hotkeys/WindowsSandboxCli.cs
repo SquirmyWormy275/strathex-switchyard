@@ -135,8 +135,14 @@ internal static class WindowsSandboxCli
         using var mapping = action is "start" or "validate-config" ? ReviewedInputStager.PinBoundedMapping(request.GetProperty("exchangeBinding"), exchangeRoot) : null;
         if (action == "validate-config") { Write(new { schema = Schema, action, status = "validated", configurationSha256 = request.GetProperty("configurationSha256").GetString(), exchangeQuotaEnforced = true, sandboxEnforced = false, effectStarted = false }); return 0; }
         using var pinned = PinAlias(out var alias);
+        if (action == "metadata")
+        {
+            var storage = ReviewedInputStager.StoragePrerequisites();
+            if (pinned is null) Write(new { schema = Schema, action, status = "unavailable", reason = "The current-user Windows Sandbox AppExecLink is unavailable.", storage, effectStarted = false });
+            else Write(new { schema = Schema, action, status = "available", aliasType = "current-user-AppExecLink", storage, effectStarted = false });
+            return 0;
+        }
         if (pinned is null) { Write(new { schema = Schema, action, status = "unavailable", reason = "The current-user Windows Sandbox AppExecLink is unavailable; no ordinary executable or legacy viewer was substituted.", effectStarted = false }); return 0; }
-        if (action == "metadata") { Write(new { schema = Schema, action, status = "available", aliasType = "current-user-AppExecLink", effectStarted = false }); return 0; }
         if (action == "list") { Write(new { schema = Schema, action, status = "observed", ids = await List(alias), effectStarted = false }); return 0; }
         string sandboxId = Id(request);
         var before = await List(alias);
