@@ -51,20 +51,23 @@ preserved.
   verified; no archive/installer bundle was retained locally. This predates the
   newer retained-ownership/recovery/client-launch source.
 
-## Active Windows verification
+## Windows client verification
 
-The new WinRT URI transport is implemented with fixed targets, native URL hash
-witnesses, protected ownership and no script-policy override. Its short native
-run 41819226971 passed 40/41 checks; the metadata child exceeded its 15-second
-startup deadline. This is a software failure, not an unavailable account/device.
-No newer native Windows success is claimed.
+The fixed WinRT URI transport passes all 41 checks in four native Windows groups
+at source ea96ffe, including actual Windows PowerShell WinRT/AsTask metadata
+without URI activation. Run [41820186124](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41820186124),
+receipt 36694c71-9a72-4d40-9254-a5625bbdf762. The tested merge commit af900d6 has
+exactly the same source tree as ea96ffe. Bounded artifact 13317375091 (1,321 bytes)
+was downloaded and verified against SHA-256
+`58750425922e5b5654326fa1c8efde6065f22674ba3d76dc4bdbf73225e93a37`; its complete
+receipt is retained privately as client-platform-windows-ea96ffe.json. No ZIP or
+Windows installer/runtime was retained locally.
 
-The correction uses native UTF-8 stdin/stdout and a fixed system Utility module,
-matching the working DPAPI helper. A metadata-only inspection mode emits bounded
-constant startup phases. Four local groups pass (41 tests, 40 passed, one native
-Windows skip); receipt a3346e67-be87-43a5-a412-ff321cd155b5. The correction changes
-only Windows startup/metadata diagnostics; native verification is still pending.
-The short workflow is independent of the long complete release queue.
+The initial run passed 40/41 but timed out in metadata startup. Native UTF-8
+streams and a fixed system Utility module, matching the working DPAPI contract,
+corrected that path; the 15-second deadline was preserved. This is accepted
+software/native metadata evidence, not an interactive Windows URI, account,
+window or device check. The complete newer Windows release remains pending.
 
 ## Work still required
 

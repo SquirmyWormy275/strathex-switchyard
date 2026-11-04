@@ -69,7 +69,8 @@ profile, arbitrary command or fallback runtime is selected. A missing projection
 or prohibited script fails without weakening host policy. Both native helpers
 independently verify the exact reviewed target URL hash before requesting it.
 The short client-platform workflow checks native Windows metadata without
-launching a URI; its result and interactive Windows acceptance remain pending.
+launching a URI; all 41 checks passed at ea96ffe after correcting native UTF-8 startup. Interactive
+Windows URI/account/window acceptance remains pending.
 
 Exact native Claude desktop binding and frontend controls remain unfinished
 implementation. The catalog reports those missing capabilities. Do
