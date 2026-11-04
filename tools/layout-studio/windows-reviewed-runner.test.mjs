@@ -8,6 +8,18 @@ import { createSuiteStore } from "./suite-store.mjs";
 import { createWindowsReviewedRunner } from "./windows-reviewed-runner.mjs";
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 
+test("an empty Windows workspace opens without optional Run prerequisites, while retained ownership fails closed", async t => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-windows-lazy-recovery-")), keys = new Map();
+  const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
+  await store.initialize("personal"); let probes = 0;
+  const runner = createWindowsReviewedRunner({ store, stateDirectory: join(root,"runs"), platform: "win32", pins: async () => { probes++; throw Error("Run prerequisite unavailable"); } });
+  t.after(async () => { await runner.close(); await rm(root,{recursive:true,force:true}); });
+  assert.deepEqual(await runner.recover("personal"), { cleaned:true }); assert.equal(probes,0);
+  await store.update("personal","fixture-retained-owner",state => { state.repositoryWindowsGuestCommands = [{ stoppedVerified:false }]; });
+  await assert.rejects(runner.recover("personal"),/Run prerequisite unavailable/); assert.equal(probes,1);
+  await store.update("personal","fixture-owner-exited",state => { state.repositoryWindowsGuestCommands = []; });
+});
+
 // Explicit native service/VM doubles; encrypted state, file reads and kernel
 // leases are real. No disk, VM, account, keyboard or runtime copy is created.
 async function fixture(t) {
@@ -52,7 +64,7 @@ test("one host-only Windows Run connects exact staging, bounded storage, backend
 });
 test("a live preparation remains fenced across independent runner/store instances before any VM exists",async t=>{
  const f=await fixture(t);f.holdStaging();const running=f.run();await f.staged;
- const other=f.create(f.otherStore());assert.equal((await other.recover("personal")).cleaned,false);assert.equal(await f.consumers[1]("personal",f.context.operationId),false);assert.equal(f.calls.some(name=>name.startsWith("cleanup-")),false);
+ const other=f.create(f.otherStore());assert.equal((await other.recover("personal")).cleaned,false);await other.prerequisites();assert.equal(await f.consumers[1]("personal",f.context.operationId),false);assert.equal(f.calls.some(name=>name.startsWith("cleanup-")),false);
  f.releaseStage();assert.equal((await running).status,"completed");assert.equal((await other.recover("personal")).cleaned,true);
 });
 test("unknown guest exit preserves every asset and blocks a fresh operation until exact exit-only reconciliation",async t=>{

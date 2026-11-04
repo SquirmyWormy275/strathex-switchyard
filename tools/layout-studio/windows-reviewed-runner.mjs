@@ -84,8 +84,13 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
     } finally { cleanupOwners.delete(key(c, id)); }
   }
   async function recover(c) {
-    seen.add(c); const p = await ports();
+    seen.add(c);
     const observed = await store.tryWithResourceLock("repository-execution", runLease(c), async lease => {
+      const state = await store.snapshot(c);
+      // Opening an unrelated workspace must not require the optional Windows
+      // Run helper. Retained ownership still requires the real native ports.
+      if (!(state.repositoryWindowsRuns?.length || state.repositoryWindowsGuests?.some(row => row.stoppedVerified !== true) || state.repositoryWindowsGuestCommands?.some(row => row.stoppedVerified !== true))) return { cleaned: true };
+      const p = await ports();
       let cleaned = true; await p.sessions.recover(c); lease.assert();
       for (const row of (await store.snapshot(c)).repositoryWindowsRuns ?? []) {
         if (row.schema !== schema) throw Error("Preserve an unfamiliar protected Windows Run schema.");

@@ -8,6 +8,13 @@ behind each accepted result.
 
 ## Active backend iteration
 
+All four complete Windows policy files pass in workflow `41914612230` at
+`cdd86cb`. The separate Windows client check exposed eager optional-helper
+loading when opening an empty workspace. Recovery now checks encrypted ownership
+under its kernel lease before loading native ports. Existing ownership remains
+fail-closed. The runner, suite and physical-intent files pass 35/35 locally;
+native client rerun is pending.
+
 Windows status now reads the two validated output streams through bounded
 hashed descriptors and checks the exact operation directory before/after reads.
 It redacts credential forms; changed bytes or a substituted root make current
@@ -21,7 +28,8 @@ harness limit after four completed cases. Its verified failed receipt is
 `windows-policy-63cb-failed.json`, with child cleanup verified. All cases are now
 in complete policy/recovery/stop/output files, explicitly represented in the
 required inventory and run as separate Windows jobs with five-minute file
-bounds. No assertion or production deadline was waived. Native rerun is pending.
+bounds. No assertion or production deadline was waived. All four native jobs
+subsequently passed at `cdd86cb`.
 
 Complete Linux `45e9eb6` passes 159/159 groups: 1,045 tests, 1,035 passed and ten
 declared skips. Receipt `3424729b-c961-45aa-ad4d-f3c5359a5982` was retained;
