@@ -154,3 +154,10 @@ exit codes. The helper builds with zero warnings/errors; six real Linux mode
 guards pass. Build/probe scratch was removed after retaining source/assembly
 hashes in `windows-failure-results-build-20261104.json`. These compiled cases
 validate the wire format, not native Job enforcement or an actual VM task.
+
+The focused Windows policy workflow runs the required inventory and Studio
+admission/stop group through the same isolated runner. It provisions pinned
+Node and locked dependencies, opens no VM/account/keyboard and does not download
+a .NET toolchain or optional runtime. A small seven-day receipt artifact keeps
+its native-Windows policy result separate from the filesystem and full-release
+lanes. Entry point: `scripts/verify-windows-policy.mjs --synthetic`.
