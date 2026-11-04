@@ -61,10 +61,9 @@ pass. Scratch was removed after retaining
 `windows-image-inspection-build-20261104.json`.
 
 The creation proof explicitly reports `attached: false`,
-`exchangeQuotaEnforced: false` and `sandboxEnforced: false`. Writable-volume
-ownership, attach/mount/detach and recovery, actual disk-full validation, the
-trusted writable lease, and Studio Windows Run connection remain unfinished.
-A disk image alone is not an execution capability.
+`exchangeQuotaEnforced: false` and `sandboxEnforced: false`. A separate one-time
+writable handoff is described below. An image creation proof alone is not an
+execution capability; Studio Windows Run remains unfinished.
 
 ## Detached image ownership
 
@@ -94,10 +93,9 @@ quota/consumer fences, exact guardian exits and guarded removal; its new result
 passes all 19 checks at `e589c4f`, run 41889645807. Protected image records are
 omitted from general workspace snapshots.
 
-This phase owns immutable detached images only. Its lease still reports no
-filesystem enforcement or sandbox protections. Transferring ownership to a
-writable-volume lifecycle and safely retiring changed guest data remains part
-of the unfinished attach/mount/detach and Run integration.
+The initial lease owns an immutable detached image and reports no filesystem
+enforcement or sandbox protections. It becomes unusable after a writable-volume
+reservation; the separate volume lease owns subsequent inspection and cleanup.
 
 ## Exact native volume transition
 
@@ -132,9 +130,37 @@ packaged-import checks pass. Scratch was removed after retaining
 duplicate refusal, fresh mounted inspection, bounded writes through actual
 kernel disk-full and exact unmount/detach readback. It uses only its new owned
 image, attempts original-identity cleanup after failure, and never starts a VM.
-Those new native results are pending.
+All 23 native checks pass at `f4c0f9a`, run 41892941320, including actual
+disk-full behavior and independent detached readback. The digest-verified small
+artifact is retained as `windows-volume-f4c0f9a-native.json`.
 
-Durable writable-volume handoff/ownership and restart recovery, Windows Sandbox
-mapping of this trusted volume, Studio Run connection and a supported personal
-host's privileged setup remain implementation work. The new mode does not make
-the existing immutable image lease writable or enable the Windows Run action.
+## Durable writable handoff
+
+`createVolume()` reserves the original image and mount identities in encrypted
+state before native attach acknowledgement. It cannot replay, create another
+image in the compartment, or return the original immutable lease to service.
+Fresh inspection binds the exact volume GUID, capacity, mount association and
+ACL readback. Native readiness, independently observed process exit and current
+scope are separate checks. Lost writes or acknowledgements retain the original
+reservation and permit only original-identity reconciliation.
+
+The resulting lease reports the actual filesystem quota separately from Sandbox
+containment. A consumer holds its own cross-process lock and must recheck scope
+before returning a result. Cleanup requires trusted consumer exit, independently
+stopped native commands, fresh exact-volume inspection and detached readback.
+Guest changes to the disposable FAT body are expected; removal still requires
+the original backing identity, length, footer and complete entry set. Foreign
+entries, replaced files, changed footer bytes or unknown owners are preserved.
+Restart cleanup can resume an already verified detach without replaying attach
+or upgrading the original admission outcome.
+
+All 53 focused storage/suite/runner checks pass, including 18 storage fault and
+lifecycle cases. Packaged import checks and type checking pass. These tests use
+explicit native doubles, real encrypted records, locks and descriptor reads;
+they do not demonstrate a mounted volume. The native Windows lane now includes
+three additional host-service checks for the one-time handoff, consumer fencing
+and changed-body cleanup; those aggregate results are pending.
+
+Windows Sandbox mapping of this trusted volume, Studio Run connection and a
+supported personal host's privileged setup remain implementation work. No VM
+execution capability is inferred from a volume lease.
