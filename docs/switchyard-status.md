@@ -8,12 +8,22 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Linux hosted run `41924141682` exposed a stop-readiness race: a durable running
+owner could become visible before its exact in-memory stop controller. The
+controller now registers before that write; acknowledgement still follows the
+write and final authorization guard. A deterministic regression suspends the
+writer after commit and checks cancellability without early acknowledgement.
+Pipeline stop tests now wait on the actual durable-ready transition instead of
+guessing a ten-second startup time. Production and group deadlines are unchanged.
+
 Windows broker protected-file creation/readback is now implemented with an
 Administrators/System owner, exact protected ACLs, client read-only code/metadata,
 private signing-key storage, no reparse traversal and bounded handle reads.
 The expanded proof compiles with zero warnings; all sixteen crypto/parser cases
 still pass and scratch was removed. Sixteen actual Windows file/low-privilege
-checks are pending CI. They use a restricted version of the existing worker token,
+checks now pass at `366d409`, workflow `41924140253`, alongside all sixteen
+crypto/parser and thirty existing filesystem checks. The broker archive digest
+was verified and `windows-broker-protected-files-366.json` retained. They use a restricted version of the existing worker token,
 create no account or service, and remove their new nonce directory. Privileged
 service/pipe/setup/volume integration remains unfinished.
 

@@ -13,6 +13,8 @@ const sha=value=>createHash("sha256").update(value).digest("hex"),linux={skip:pr
 
 async function fixture(t,{action="pipeline_local_gate",report="complete",hold=false}={}){
  const f=await authorityFixture(t,{executionActions:connectedExecutionActions("linux")});
+ let acknowledgeReady;const nativeReady=new Promise(resolve=>{acknowledgeReady=resolve;}),update=f.store.update;
+ f.store.update=async(...args)=>{const result=await update(...args);if(args[1]==="repository-execution-ready")acknowledgeReady();return result;};
  const dimensions=["correctness",...(action==="pipeline_clean_reproduction"?["reproduction"]:[]),"isolation","production_data","ambient_credentials"],body={schema:"sxsy-b122.linux-repository-recipe-result",version:1,coverage:dimensions.map(dimension=>({dimension,status:report==="unavailable"&&dimension==="correctness"?"unavailable":"covered",fixtureId:"approved:synthetic-program"})),scannerFixtureIds:[],advisoryFixtureIds:[]};
  const program=`import assert from 'node:assert/strict';import{readFile,writeFile,access}from'node:fs/promises';import net from'node:net';
  assert.equal(await readFile('input.txt','utf8'),'reviewed non-production input');assert.equal(process.env.HOME,undefined);assert.equal(process.env.NODE_ENV,'test');await assert.rejects(access(${JSON.stringify(join(f.root,"task.txt"))}));await assert.rejects(writeFile('input.txt','forbidden'));await writeFile('/tmp/pipeline-output','temporary');
@@ -24,8 +26,9 @@ async function fixture(t,{action="pipeline_local_gate",report="complete",hold=fa
  const bytes=JSON.stringify(manifest);await writeFile(join(f.root,"pipeline.json"),bytes);
  const grantInput={...f.proposed,paths:["task.txt","program.mjs","input.txt","pipeline.json"],classifications:{includedUntracked:["program.mjs","input.txt","pipeline.json"]},actions:[action]},approval=await f.service.review("personal",grantInput),grant=await f.service.issue("personal",{...grantInput,token:approval.confirmation.token});
  const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution")});f.onCleanup(()=>execution.close());
- return {...f,execution,grant,grantInput,proposed:{requestId:randomUUID(),authorityId:grant.id,manifestPath:"pipeline.json",manifestSha256:sha(bytes),action}};
+ return {...f,execution,grant,grantInput,nativeReady,proposed:{requestId:randomUUID(),authorityId:grant.id,manifestPath:"pipeline.json",manifestSha256:sha(bytes),action}};
 }
+async function awaitNativeReady(f,running){await Promise.race([f.nativeReady,running.then(result=>{throw Error(`The pipeline returned ${result.status} before durable native readiness.`);})]);assert.equal((await f.store.snapshot("personal")).repositoryExecutions?.[0]?.status,"running");}
 
 test("both connected pipeline actions run actual isolated inputs and earn exact authenticated receipts without changing a provider task",linux,async t=>{
  for(const action of ["pipeline_local_gate","pipeline_clean_reproduction"]){
@@ -52,14 +55,14 @@ test("exact pipeline action grants, source witnesses and protected receipt keys 
 
 test("workspace cancellation stops the actual foreground pipeline and settles its existing budget without replay",linux,async t=>{
  const f=await fixture(t,{hold:true}),review=await f.execution.review("personal",f.proposed),request={requestId:f.proposed.requestId,token:review.confirmation.token},running=f.execution.apply("personal",request);
- const deadline=Date.now()+10000;let native;while(Date.now()<deadline){native=(await f.store.snapshot("personal")).repositoryExecutions?.[0];if(native?.status==="running")break;await new Promise(resolve=>setTimeout(resolve,20));}assert.equal(native?.status,"running");
+ await awaitNativeReady(f,running);
  assert.equal((await f.execution.stopCompartment("personal")).stopped,true);const result=await running;assert.notEqual(result.status,"completed");const status=await f.execution.status("personal",f.proposed.requestId);assert.equal(status.nativeExitVerified,true);assert.equal(status.stagingCleanupPending,false);assert.equal((await f.execution.apply("personal",request)).replayed,true);
  const budgets=await new DurableBudgetManager(repositoryEffectJournal(f.store,"personal",{domain:"execution"})).list();assert.equal(budgets.some(claim=>["claimed","running","cancelling","timed_out"].includes(claim.state)),false);assert.equal((await f.store.snapshot("personal")).repositoryExecutions.length,1);
 });
 
 test("a separately approved exact stop cancels a live pipeline before its response, with immutable admission and a distinct receipt",linux,async t=>{
  const f=await fixture(t,{hold:true}),review=await f.execution.review("personal",f.proposed),request={requestId:f.proposed.requestId,token:review.confirmation.token},running=f.execution.apply("personal",request);
- let native;const deadline=Date.now()+10000;while(Date.now()<deadline){native=(await f.store.snapshot("personal")).repositoryExecutions?.[0];if(native?.status==="running")break;await new Promise(resolve=>setTimeout(resolve,20));}assert.equal(native?.status,"running");
+ await awaitNativeReady(f,running);
  const original=(await f.store.snapshot("personal")).repositoryExecutionReviews[0];assert.ok(original.admission);assert.equal(original.outcome,undefined);
  const stopId=randomUUID(),stop=await f.execution.reviewStop("personal",{requestId:f.proposed.requestId,stopId}),stopInput={stopId,token:stop.confirmation.token};const stopped=await f.execution.applyStop("personal",stopInput);assert.equal(stopped.status,"completed",JSON.stringify(stopped));assert.equal(stopped.originalOperationId,original.operationId);assert.notEqual(stopped.operationId,original.operationId);assert.ok(stopped.receiptId);
  const result=await running;assert.notEqual(result.status,"completed");assert.equal((await f.execution.applyStop("personal",stopInput)).receiptId,stopped.receiptId);assert.equal((await f.execution.apply("personal",request)).replayed,true);

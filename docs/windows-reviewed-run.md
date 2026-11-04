@@ -34,8 +34,13 @@ reads and verify the ACL/owner; creation uses the protected descriptor atomicall
 and reads written bytes back. Its Windows-only CI proof disables privileges and
 makes Administrators deny-only using [CreateRestrictedToken](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken),
 then checks public reads and denied code/config/key/permission writes. That native
-proof is pending; Linux cannot establish Windows ACL acceptance. No service is
-installed by this check, and its new nonce directory is removed after verification.
+proof passes all sixteen checks on native Windows at `366d409`, alongside the
+sixteen parser/cryptography checks and existing thirty filesystem checks,
+workflow [41924140253](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41924140253).
+The broker archive was digest-verified and retained locally as
+`windows-broker-protected-files-366.json`, binding the actual merge source
+`2173e868`. No service is installed by this check, and its new nonce directory
+is removed after verification.
 
 ```mermaid
 flowchart LR

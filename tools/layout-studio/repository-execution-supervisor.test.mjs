@@ -45,6 +45,28 @@ test("concurrent host calls and independent instances cannot replay an execution
   await assert.rejects(f.port().start(f.request),/already has an owned/);
   const second=f.create(), pending=assert.rejects(f.port(second).start(f.request),/protected startup/);release();await first.wait();await pending;assert.equal(f.effects(),1);
 });
+test("durable readiness is cancellable before its writer returns without acknowledging startup early",async t=>{
+  let enter,releaseReady,releaseEffect;
+  const entered=new Promise(resolve=>{enter=resolve;}),readyGate=new Promise(resolve=>{releaseReady=resolve;}),effectGate=new Promise(resolve=>{releaseEffect=resolve;});
+  const f=await fixture(t,async stage=>{if(stage==="effect")await effectGate;});
+  t.after(()=>{releaseReady();releaseEffect();});
+  const update=f.store.update;
+  f.store.update=async(...args)=>{const result=await update(...args);if(args[1]==="repository-execution-ready"){enter();await readyGate;}return result;};
+  let acknowledged=false;
+  const pending=f.port().start(f.request).then(value=>{acknowledged=true;return value;});
+  try {
+    await entered;
+    const row=(await f.store.snapshot("personal")).repositoryExecutions[0];
+    assert.equal(row.status,"running");assert.equal(row.ownedRuntime.id,f.calls[0].owner.id);
+    assert.equal(acknowledged,false,"startup acknowledgement must wait for persistence and its final guard");
+    assert.equal(await f.service.canStop("personal",f.binding.operationId),true,"an observable durable owner must already have its exact stop controller");
+    assert.equal(await f.service.canStop("personal",randomUUID()),false);
+    releaseReady();const child=await pending;
+    const stop=f.service.stopOperation("personal",f.binding.operationId);
+    releaseEffect();assert.equal((await stop).accepted,true);await child.wait();
+    await assert.rejects(f.port().start(f.request),/protected startup/);assert.equal(f.calls.length,1);
+  } finally {releaseReady();releaseEffect();await pending.catch(()=>{});}
+});
 test("startup, exit and final persistence faults retain conservative outcomes without another native effect",async t=>{
   for(const boundary of ["repository-execution-ready","repository-execution-native-exit","repository-execution-result"]){
     const f=await fixture(t), update=f.store.update;let fail=true;f.store.update=async(...args)=>{if(fail&&args[1]===boundary){fail=false;throw Error("Synthetic persistence failure");}return update(...args);};
