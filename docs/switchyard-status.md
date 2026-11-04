@@ -81,6 +81,19 @@ suite packaging steps; complete bundle verification was still running at the
 last check. The newer 7012333 full run is queued behind it. Track fresh runs after
 subsequent documentation checkpoints; do not relabel queueing as a hardware block.
 
+## Complete Windows failure corrected in the native boundary test
+
+Complete run 41823818569 at 38eb56d reached all groups but failed the client group:
+its Python-only negative test tried `python` in the deliberately restricted
+copied-source PATH. Nine other client cases, including native WinRT metadata,
+passed. Receipt b7410441-17c0-494d-930b-a8363d0df29f preserves that failure.
+The negative test now invokes each platform's actual fixed helper: Windows
+PowerShell on Windows and system Python/Gio on Linux. Four malformed requests
+must fail before broker activation. No test was skipped, no ambient PATH added
+and no script policy changed. Six focused groups pass locally (60 tests, 59
+passed plus the declared native Windows metadata skip), receipt
+286739b9-26e1-4100-8a8c-ef4d2165655c. Fresh Windows/full acceptance is pending.
+
 ## Client roles and physical intent connection
 
 Exact `client-surface` role bindings now connect summon to the fixed HTTPS

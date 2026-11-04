@@ -31,12 +31,13 @@ async function fixture(t, handler) {
   return { stage, store, service, create, enable: () => store.update("personal", "companion", s => { s.mode = "personal-companion"; }), calls: () => calls, stopped: v => { stopped = v; }, active: v => { active = v; } };
 }
 const request = () => ({ id: "github-copilot-web", requestId: randomUUID() });
-test("the Python launch boundary rejects raw URI, command and self-approval input before importing desktop dependencies", async () => {
+test("the native platform launch boundary rejects raw URI, command and self-approval before broker activation", async () => {
+  const native = process.platform === "win32" ? clientLaunchCommand("github-copilot-web") : { executable: "/usr/bin/python3", args: ["-I", "-B", fileURLToPath(new URL("./client-portal.py", import.meta.url))], schema: "switchyard-client-portal/v1" };
   for (const extra of [{ url: "https://foreign.invalid" }, { command: "arbitrary" }, { approved: true }, { targetSha256: "0".repeat(64) }]) {
     const result = await new Promise((resolve, reject) => {
-      const child = spawn(process.platform === "win32" ? "python" : "/usr/bin/python3", ["-I", "-B", fileURLToPath(new URL("./client-portal.py", import.meta.url))], { stdio: ["pipe", "pipe", "pipe"] }); let out = "", err = "";
+      const child = spawn(native.executable, native.args, { stdio: ["pipe", "pipe", "pipe"], timeout: 10000 }); let out = "", err = "";
       child.stdout.on("data", b => { out += b; }); child.stderr.on("data", b => { err += b; }); child.stdin.on("error", () => {}); child.once("error", reject); child.once("close", code => resolve({ code, out, err }));
-      child.stdin.end(JSON.stringify({ schema: "switchyard-client-portal/v1", id: "github-copilot-web", targetSha256: createHash("sha256").update("https://github.com/copilot").digest("hex"), ...extra }) + "\n");
+      child.stdin.end(JSON.stringify({ schema: native.schema, id: "github-copilot-web", targetSha256: createHash("sha256").update("https://github.com/copilot").digest("hex"), ...extra }) + "\n");
     }); assert.equal(result.code, 2); assert.equal(result.out, ""); assert.equal(result.err.includes("foreign.invalid"), false); assert.match(result.err, /did not settle/);
   }
 });
