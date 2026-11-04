@@ -53,6 +53,23 @@ test("concurrent suite bootstrap recovers a compartment once and never silently 
   } finally { await suite.close(); }
 }));
 
+test("repository recovery routes preserve exact IDs and unknown native exit prevents false keyboard-only or workspace-stop acceptance", () => fixture(async ({ store }) => {
+  let agentClosed = false, recoveryClosed = false;
+  const repositoryRecovery = { list: async c => [{ compartment: c, status: "recovery-required" }], inspect: async (c, id) => ({ compartment: c, operationId: id, repositoryWritten: false }), stopCompartment: async () => ({ stopped: false }), close: async () => { recoveryClosed = true; throw new Error("Synthetic repository exit unconfirmed"); } };
+  const suite = createSuite({ store, repositoryRecovery, agents: { discovery: async () => [], close() { agentClosed = true; } }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    assert.equal((await suite.handle("/api/suite/coding/repository-effects/list", { compartment: "personal" }))[0].status, "recovery-required");
+    const id = "11111111-1111-1111-1111-111111111111", view = await suite.handle("/api/suite/coding/repository-effects/inspect", { compartment: "personal", id }); assert.equal(view.operationId, id); assert.equal(view.repositoryWritten, false);
+    await store.update("personal", "synthetic-recovery-packet", s => { s.repositoryEffectJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectCheckpoints = [{ original: "synthetic-private-recovery-bytes" }]; s.repositoryEffects = []; });
+    const snapshot = await suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(JSON.stringify(snapshot).includes("synthetic-private-recovery-bytes"), false); assert.equal(Object.hasOwn(snapshot, "repositoryEffectCheckpoints"), false);
+    await assert.rejects(suite.handle("/api/suite/mode", { compartment: "personal", mode: "keyboard-only" }), /owned process stop is unconfirmed/); assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+    await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
+    await assert.rejects(suite.handle("/api/suite/compartment/select", { compartment: "work" }), /guardian has not verified exit/); assert.equal(await store.selection(), "personal");
+  } finally { await assert.rejects(suite.close(), /repository exit unconfirmed/); }
+  assert.equal(agentClosed, true); assert.equal(recoveryClosed, true);
+}));
+
 test("new and legacy workspaces start keyboard-only; portable imports cannot enable providers and companion modes must match policy", () => fixture(async ({ store }) => {
   let providerCalls = 0;
   const suite = createSuite({ store, agents: { discovery: async () => [], design: async () => { providerCalls++; }, close() {} }, voice: { discovery: async () => ({ available: false }) } });

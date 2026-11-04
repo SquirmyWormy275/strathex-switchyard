@@ -1796,3 +1796,43 @@ nine declared platform skips. Receipt 184543fb-5986-4c26-935e-ba34e5bec3d7.
 All 25 focused journal/native/packaging/runner cases, 17 actual Git handler
 cases, the 16 suite regressions and TypeScript checks pass. No current source
 Windows acceptance is inferred from this Linux run.
+
+
+## Read-only repository recovery and exact preserved descriptor reopening
+
+The authenticated suite now lists protected repository operation summaries and
+inspects one exact retained operation UUID. All former native owners must
+independently verify exit before new fixed read-only metadata probes start.
+The observer compares native index/lease identities, original index/private
+index digests, lock stamps and the recorded reference intent. It returns an
+explicit recommendation without writing the repository or replaying a ref
+update. Changed files remain untouched. Recovery approval/application and
+public local-commit admission remain unfinished and disabled.
+
+The native Linux commit scenario now also runs the real owned metadata
+observer; the retained-packet fault scenario checks unknown-exit gating, exact
+index reconciliation recommendations, private-index changes and keyboard-only
+denial. Nineteen actual Git cases pass, including separately reopening exact
+preserved index/private leases and reconciling an already committed tree without
+another commit. Changed lock stamps and original index bytes refuse reopening.
+The host now records the private index identity/digest and original branch
+before reference effects.
+
+Restart marks reserved/executing records recovery-required. Unknown guardian
+exit prevents false keyboard-only stop acceptance and preserves workspace
+selection; shutdown closes other resources even if a boundary reports failure.
+Frontend snapshots omit private journals/index backup packets. Fifty-one
+affected journal/native/recovery/suite/authority/packaging/runner checks and
+TypeScript checks pass. Complete Linux verification is recorded separately.
+
+Published source `4a2460b` passed the normal installed update's six checks with
+its frozen frontend and private link unchanged; receipt
+assignment-legends-1793781088103.json. Its source-only application bundle has
+460 files and 4,313,401 bytes; disposable staging was removed. Native Windows
+run 41800071271 for that source is pending behind 41798074080. These are
+software/native acceptance checks, not unavailable hardware/account checks.
+
+Complete Linux acceptance passed 142/142 groups: 917 tests, 908 passed and
+nine declared platform skips; receipt c45acffa-ad97-461a-9983-861db0d6de03.
+The 51 focused checks and TypeScript checks also pass. The observer's write
+flag remains false and recovery application remains explicitly unimplemented.

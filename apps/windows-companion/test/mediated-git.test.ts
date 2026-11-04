@@ -13,6 +13,7 @@ import { GitCliInspector } from "../../../packages/control-plane/src/git-inspect
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
 import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "../src/mediated-git.ts";
+import { OwnedGitIndexLease, reopenOwnedGitFileLock } from "../src/git-index-lease.ts";
 import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 
 class RecordingChildSaga implements ChildOperationSaga {
@@ -401,6 +402,38 @@ test("a readback failure after a verified reference update retains exact transac
     const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "ambiguous"); assert.equal(outcome.data?.recoveryStatePreserved, true);
     assert.notEqual(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head); await access(join(isolated.root, ".git/index.lock"));
     assert.ok((await readdir(join(isolated.state, "git-operations"))).length); assert.ok((await readdir(join(isolated.state, "git-locks"))).length);
+  } finally { await isolated.dispose(); }
+});
+
+test("exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved recovery bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let advanced = false;
+    let preservation: Parameters<NonNullable<import("../src/mediated-git.ts").MediatedGitHandlerOptions["onPreservation"]>>[0] | undefined;
+    const runner: LocalGitRunner = { async run(args, options) { if (advanced && args[0] === "rev-parse" && args[1] === "HEAD") throw new Error("Synthetic unavailable readback"); const r = await delegate.run(args, options); if (args.includes("update-ref") && r.exitCode === 0) advanced = true; return r; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner, onPreservation: async value => { preservation = value; } }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.data?.recoveryStatePreserved, true); assert.ok(preservation?.privateIndex);
+    const committed = await requireCommand(isolated.root, "git", "rev-parse", "HEAD");
+    // This helper assumes the caller has independently verified all former owners
+    // stopped, holds its host resource lease and obtained exact recovery approval.
+    const lease = await OwnedGitIndexLease.reopenPreserved(preservation.sharedIndex);
+    await lease.replaceWith(preservation.privateIndex);
+    const worktree = await reopenOwnedGitFileLock({ filePath: preservation.worktreeLock.path, identity: preservation.worktreeLock.identity, contentSha256: preservation.worktreeLock.contentSha256 }); await worktree.release();
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), committed); assert.equal(await requireCommand(isolated.root, "git", "diff", "--cached", "--name-only"), "");
+    await assert.rejects(access(join(isolated.root, ".git/index.lock")), { code: "ENOENT" }); await assert.rejects(OwnedGitIndexLease.reopenPreserved(preservation.sharedIndex), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("reopening a preserved lease refuses in-place lock changes and changed original index bytes", async () => {
+  const isolated = await fixture();
+  try {
+    const path = join(isolated.root, ".git/index"), lease = await OwnedGitIndexLease.acquire(path); await lease.copyOriginalTo(join(isolated.state, "copy")); const preservation = lease.preservation(); await lease.abandon();
+    await writeFile(path + ".lock", "different writer");
+    await assert.rejects(OwnedGitIndexLease.reopenPreserved(preservation), /lock changed/); assert.equal(await readFile(path + ".lock", "utf8"), "different writer");
+    await rm(path + ".lock"); const second = await OwnedGitIndexLease.acquire(path); await second.copyOriginalTo(join(isolated.state, "copy-2")); const next = second.preservation(); await second.abandon();
+    await writeFile(path, "different original bytes");
+    await assert.rejects(OwnedGitIndexLease.reopenPreserved(next), /original Git index content changed/); assert.equal(await readFile(path, "utf8"), "different original bytes"); await access(path + ".lock");
   } finally { await isolated.dispose(); }
 });
 

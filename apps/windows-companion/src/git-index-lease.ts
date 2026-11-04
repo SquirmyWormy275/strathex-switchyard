@@ -5,14 +5,17 @@ import { lstat, open, rename, unlink, type FileHandle } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 import { NodeFileDigestReader } from "../../../packages/control-plane/src/git-inspector.ts";
 export interface GitFileIdentity { readonly device: string; readonly inode: string; readonly birthtimeNs: string; }
+export interface GitFileStamp { readonly size: string; readonly mtimeNs: string; readonly ctimeNs: string; }
 export interface GitIndexPreservation {
   readonly indexPath: string;
   readonly lockPath: string;
   readonly indexIdentity: GitFileIdentity;
   readonly lockIdentity: GitFileIdentity;
   readonly originalIndexSha256: string;
+  readonly lockStamp: GitFileStamp;
 }
 export function gitFileIdentity(s: BigIntStats): GitFileIdentity { return { device: s.dev.toString(), inode: s.ino.toString(), birthtimeNs: s.birthtimeNs.toString() }; }
+export function gitFileStamp(s: BigIntStats): GitFileStamp { return { size: s.size.toString(), mtimeNs: s.mtimeNs.toString(), ctimeNs: s.ctimeNs.toString() }; }
 function sameIdentity(s: BigIntStats, expected: GitFileIdentity): boolean { return s.dev.toString() === expected.device && s.ino.toString() === expected.inode && s.birthtimeNs.toString() === expected.birthtimeNs; }
 export async function assertOwnedGitFile(path: string, handle: FileHandle, expected: GitFileIdentity): Promise<BigIntStats> {
   const held = await handle.stat({ bigint: true }), named = await lstat(path, { bigint: true });
@@ -29,6 +32,17 @@ async function readIndex(path: string, handle: FileHandle, expected: GitFileIden
     if (position !== bytes.length || after.size !== initial.size || after.mtimeNs !== initial.mtimeNs || after.ctimeNs !== initial.ctimeNs) throw new Error("The original Git index changed during read.");
     return bytes;
   } catch (error) { bytes.fill(0); throw error; }
+}
+/** Exact native identity, stamp and bounded bytes from one descriptor, for host recovery. */
+export async function captureGitFile(path: string, maxBytes = 32 * 1024 * 1024): Promise<Readonly<{ identity: GitFileIdentity; stamp: GitFileStamp; sha256: string; bytes: Buffer }>> {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 32 * 1024 * 1024) throw new Error("Choose a bounded Git recovery file size.");
+  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const expected = gitFileIdentity(await handle.stat({ bigint: true })), stamp = await assertOwnedGitFile(path, handle, expected);
+    if (stamp.size > BigInt(maxBytes)) throw new Error("The Git recovery file exceeds its bound.");
+    const bytes = await readIndex(path, handle, expected, stamp);
+    return { identity: expected, stamp: gitFileStamp(stamp), sha256: createHash("sha256").update(bytes).digest("hex"), bytes };
+  } finally { await handle.close(); }
 }
 export interface OwnedGitFileLock {
   readonly filePath: string;
@@ -51,6 +65,23 @@ export async function createOwnedGitFileLock(filePath: string, content: string):
       finally { await abandon(); }
     } };
   } catch (error) { try { if (identity) { await assertOwnedGitFile(filePath, handle, identity); await unlink(filePath); } } catch { /* Preserve a replacement. */ } await handle.close(); throw error; }
+}
+/** Reopen only a protected, byte-identical former lease; never adopt a busy foreign lock. */
+export async function reopenOwnedGitFileLock(preserved: Readonly<{ filePath: string; identity: GitFileIdentity; contentSha256: string }>): Promise<OwnedGitFileLock> {
+  const handle = await open(preserved.filePath, constants.O_RDWR | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const stamp = await assertOwnedGitFile(preserved.filePath, handle, preserved.identity);
+    if (stamp.size > 4096n) throw new Error("The preserved private Git lease exceeds its bound.");
+    const bytes = await readIndex(preserved.filePath, handle, preserved.identity, stamp);
+    try { if (createHash("sha256").update(bytes).digest("hex") !== preserved.contentSha256) throw new Error("The preserved private Git lease bytes changed. Preserve the different file."); } finally { bytes.fill(0); }
+    let closed = false;
+    const abandon = async () => { if (!closed) { closed = true; await handle.close(); } };
+    return { ...preserved, abandon, release: async () => {
+      if (closed) return;
+      try { const current = await assertOwnedGitFile(preserved.filePath, handle, preserved.identity); if (current.size !== stamp.size || current.mtimeNs !== stamp.mtimeNs || current.ctimeNs !== stamp.ctimeNs) throw new Error("The preserved Git lease changed during reconciliation."); await unlink(preserved.filePath); }
+      finally { await abandon(); }
+    } };
+  } catch (error) { await handle.close(); throw error; }
 }
 export class OwnedGitIndexLease {
   readonly indexPath: string;
@@ -87,6 +118,20 @@ export class OwnedGitIndexLease {
       }
     }
   }
+  /** The host must prove former native owners stopped and hold its resource lease first. */
+  static async reopenPreserved(preserved: GitIndexPreservation): Promise<OwnedGitIndexLease> {
+    if (preserved.lockPath !== `${preserved.indexPath}.lock` || !preserved.lockStamp) throw new Error("The exact preserved Git index-lock proof is unavailable.");
+    const lock = await open(preserved.lockPath, constants.O_RDWR | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0)); let index: FileHandle | undefined;
+    try {
+      const lockStat = await assertOwnedGitFile(preserved.lockPath, lock, preserved.lockIdentity), stamp = preserved.lockStamp;
+      if (lockStat.size.toString() !== stamp.size || lockStat.mtimeNs.toString() !== stamp.mtimeNs || lockStat.ctimeNs.toString() !== stamp.ctimeNs) throw new Error("The preserved shared Git lock changed. Preserve it for operator recovery.");
+      index = await open(preserved.indexPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+      const original = await assertOwnedGitFile(preserved.indexPath, index, preserved.indexIdentity), bytes = await readIndex(preserved.indexPath, index, preserved.indexIdentity, original);
+      try { if (createHash("sha256").update(bytes).digest("hex") !== preserved.originalIndexSha256) throw new Error("The preserved original Git index content changed. No replacement is permitted."); } finally { bytes.fill(0); }
+      const lease = new OwnedGitIndexLease(preserved.indexPath, index, lock, original, lockStat); lease.originalDigest = preserved.originalIndexSha256;
+      return lease;
+    } catch (error) { await Promise.allSettled([index?.close(), lock.close()]); throw error; }
+  }
   async copyOriginalTo(destination: string): Promise<void> {
     if (this.closed) throw new Error("This owned Git index lease is closed.");
     const bytes = await readIndex(this.indexPath, this.index, this.indexIdentity, this.original);
@@ -100,7 +145,7 @@ export class OwnedGitIndexLease {
   }
   preservation(): GitIndexPreservation {
     if (!this.originalDigest) throw new Error("Copy and verify the original index before recording preservation.");
-    return { indexPath: this.indexPath, lockPath: this.lockPath, indexIdentity: this.indexIdentity, lockIdentity: this.lockIdentity, originalIndexSha256: this.originalDigest };
+    return { indexPath: this.indexPath, lockPath: this.lockPath, indexIdentity: this.indexIdentity, lockIdentity: this.lockIdentity, originalIndexSha256: this.originalDigest, lockStamp: gitFileStamp(this.initialLock) };
   }
   async replaceWith(privateIndex: string): Promise<void> {
     if (this.closed) throw new Error("This owned Git index lease is closed.");

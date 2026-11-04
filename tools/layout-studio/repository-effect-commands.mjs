@@ -7,6 +7,7 @@ import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { fixedGitExecutable, inspectionEnvironment } from "./repository-inspection.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
+import { captureGitFile } from "../../apps/windows-companion/src/git-index-lease.ts";
 const digest = v => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const operationHash = v => createHash("sha256").update(v).digest("hex");
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
@@ -28,7 +29,7 @@ export function createRepositoryEffectCommands({ store, stateDirectory, command 
   return {
     async execute(c, { task, operationId, bindingDigest, author, authorize }, fn) {
       if (!uuid(operationId) || !/^[a-f0-9]{64}$/.test(bindingDigest ?? "") || typeof authorize !== "function" || typeof fn !== "function") throw new Error("Use one protected host effect binding and operation UUID.");
-      if (!author || typeof author.name !== "string" || !author.name.trim() || author.name.length > 200 || /[<>\x00-\x1f\x7f]/.test(author.name) || typeof author.email !== "string" || author.email.length > 254 || !/^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9.-]+$/.test(author.email)) throw new Error("Review the exact local commit author name and email.");
+      if (!author || typeof author.name !== "string" || !author.name.trim() || author.name !== author.name.trim() || Buffer.from(author.name).toString("utf8") !== author.name || author.name.length > 200 || /[<>\x00-\x1f\x7f]/.test(author.name) || typeof author.email !== "string" || author.email.length > 254 || !/^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9.-]+$/.test(author.email)) throw new Error("Review the exact local commit author name and email.");
       if (typeof store.withResourceLock !== "function") throw new Error("Repository effects require the protected cross-process resource lease.");
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() };
       const check = async () => { if (closed || resource.controller.signal.aborted || generation !== (generations.get(c) ?? 0)) throw new Error("This repository effect was stopped."); await authorize(); await store.authorize(c, { provider: task.provider }); await verifyRepositoryIdentity(task); };
@@ -55,7 +56,7 @@ export function createRepositoryEffectCommands({ store, stateDirectory, command 
           await store.update(c, "repository-effect-reserve", s => {
             s.repositoryEffects = (s.repositoryEffects ?? []).filter(r => r.status !== "settled").concat((s.repositoryEffects ?? []).filter(r => r.status === "settled").slice(-7));
             if (s.repositoryEffects.length >= 32) throw new Error("The repository effect inventory is full. Existing recovery records were preserved.");
-            s.repositoryEffects.push({ schema: "switchyard-repository-effect/v1", id: operationId, taskId: task.id, bindingDigest, repositoryRoot: task.repositoryRoot, repositoryIdentity: task.repositoryIdentity, gitDirectory, gitIdentity, author: structuredClone(author), scratch, scratchIdentity, commands: [], status: "reserved", at: now() });
+            s.repositoryEffects.push({ schema: "switchyard-repository-effect/v1", id: operationId, taskId: task.id, provider: task.provider, bindingDigest, repositoryRoot: task.repositoryRoot, repositoryIdentity: task.repositoryIdentity, gitDirectory, gitIdentity, author: structuredClone(author), scratch, scratchIdentity, commands: [], status: "reserved", at: now() });
           }, { provider: task.provider }); recordStarted = true;
           const executable = await resolveGit(); let count = 0; const started = now();
           const runner = { run: async (args, options) => {
@@ -76,7 +77,16 @@ export function createRepositoryEffectCommands({ store, stateDirectory, command 
             if (!["completed", "failed"].includes(result.status) || !Number.isInteger(result.exitCode)) throw new Error("The native Git command did not produce one exact terminal result.");
             return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.exitCode ? "Native Git command rejected the reviewed effect" : "" };
           } };
-          outcome = await fn({ runner, stateDirectory, onPreservation: value => update(c, operationId, "repository-effect-preservation", r => { if (value.operationId !== operationId || value.repositoryRoot !== task.repositoryRoot) throw new Error("Preservation belongs to a different repository effect."); r.preservation = structuredClone(value); }) });
+          outcome = await fn({ runner, stateDirectory, onPreservation: async value => {
+            if (value.operationId !== operationId || value.repositoryRoot !== task.repositoryRoot) throw new Error("Preservation belongs to a different repository effect.");
+            let privateIndexProof;
+            if (value.privateIndex) {
+              if (!inside(join(stateDirectory, "git-operations", operationHash(operationId)), value.privateIndex)) throw new Error("The preserved private index belongs to another operation.");
+              const captured = await captureGitFile(value.privateIndex);
+              try { privateIndexProof = { identity: captured.identity, sha256: captured.sha256 }; } finally { captured.bytes.fill(0); }
+            }
+            await update(c, operationId, "repository-effect-preservation", r => { r.preservation = { ...structuredClone(value), ...(privateIndexProof ? { privateIndexProof } : {}) }; });
+          } });
           if (!outcome || !["completed", "failed", "blocked", "unavailable", "incomplete", "cancelled", "running"].includes(outcome.status) || !["not_started", "committed", "ambiguous", "compensated"].includes(outcome.effectDisposition)) throw new Error("The host Git effect did not return one typed effect disposition.");
           lease.assert();
           return outcome;

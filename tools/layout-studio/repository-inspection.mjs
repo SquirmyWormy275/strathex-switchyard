@@ -1,6 +1,6 @@
 /** Fixed read-only Git queries through owned native guardians; no repository scripts. */
 import { realpath, stat, lstat, mkdtemp, rm } from "node:fs/promises";
-import { join, dirname, basename } from "node:path";
+import { join, dirname, basename, resolve } from "node:path";
 import { homedir } from "node:os";
 import { privateDirectory, directoryIdentity } from "./private-fs.mjs";
 import { GitCliInspector, NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
@@ -13,7 +13,7 @@ const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
   ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
   ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], ["rev-parse", "HEAD"],
-  ["write-tree"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
+  ["write-tree"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
   ["ls-files", "--others", "--exclude-standard", "-z"],
   ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
   ["submodule", "status", "--recursive"]
@@ -52,7 +52,8 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
     return { stopped: stops.every(Boolean) };
   }
   return {
-    async capture(c, task, classifications, authorize = async () => {}) {
+    async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false } = {}) {
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
       const check = async () => { if (closed || generation !== (generations.get(c) ?? 0) || resource.controller.signal.aborted) throw new Error("Repository inspection was stopped."); await authorize(); };
       await check(); await store.authorize(c, { provider: task.provider }); await verifyRepositoryIdentity(task);
@@ -98,6 +99,17 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       } };
       try {
         await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch);
+        if (metadataOnly) {
+          const names = ["root", "branch", "head", "headTree", "gitDirectory", "indexPath"], fixed = [["rev-parse", "--show-toplevel"], ["branch", "--show-current"], ["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"]];
+          const values = [];
+          // Sequential probes keep their shared scratch alive until each exact
+          // guardian has exited, and remain inside the same 45-second budget.
+          for (const args of fixed) { const result = await runner.run(args); if (result.exitCode !== 0) throw new Error("The fixed repository recovery metadata is unavailable."); values.push(result.stdout.trim()); }
+          const observed = Object.fromEntries(names.map((name, i) => [name, values[i]]));
+          if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(observed.head) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(observed.headTree)) throw new Error("Repository recovery metadata contains an invalid object identity.");
+          observed.gitDirectory = await realpath(observed.gitDirectory); observed.indexPath = resolve(task.repositoryRoot, observed.indexPath);
+          await check(); await verifyRepositoryIdentity(task); return observed;
+        }
         const included = new Set(classifications.includedUntracked), excluded = new Set(classifications.excludedUntracked), ignored = new Set(classifications.excludedIgnored);
         let inspection;
         const inspector = new GitCliInspector({ runner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => ignored.has(p) ? "excluded" : "unknown" });

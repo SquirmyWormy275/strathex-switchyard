@@ -60,7 +60,7 @@ The suite must connect independent native-exit reconciliation and recovery
 before enabling this effect API. The existing companion handler remains behind
 its own broker and final-effect guard; it is not a standalone authority boundary.
 
-Seventeen tests use actual disposable repositories and Git processes. They cover
+Nineteen tests use actual disposable repositories and Git processes. They cover
 ordinary/private-index commits, branch/detached setup, stale targets, competing
 reference updates, exact binary content, changed witnesses and tripwire filters,
 diff drivers, text conversion, fsmonitor and hooks. Descriptor-bound index and
@@ -99,7 +99,7 @@ checkpoint data, independently hashed on readback, and referenced by the core
 checkpoint ledger before broker admission. No plaintext recovery copy is written.
 The checkpoint's recovery guide authorizes no restore or deletion.
 
-Five integration scenarios pass. One uses the actual native Linux guardian,
+Six integration scenarios pass. One uses the actual native Linux guardian,
 Git and kernel leases: a separately confirmed durable operation commits exact
 binary bytes with the reviewed author, preserves another edited file, reconciles
 the shared index, independently verifies every retained guardian exited, and
@@ -110,10 +110,11 @@ retention across an unknown exit/restart and cancellation with late output.
 Native Windows has a declared skip for the Linux guardian journey; its existing
 helper lane separately checks the underlying native command transport.
 
-The suite's public commit admission and operator recovery routes are still
-unconnected. This internal demonstration does not enable the task authority
-API to execute a commit. Those routes and normal installed acceptance remain
-implementation work. The transport currently bounds an operation to 128 commands
+The suite now exposes read-only recovery listing and inspection through its
+authenticated API. Public commit admission and separately confirmed recovery
+application remain unconnected. This internal demonstration does not enable the
+task authority API to execute a commit. Those effect routes and their normal
+installed acceptance remain implementation work. The transport currently bounds an operation to 128 commands
 and two minutes, each command to ten seconds, and index checkpoints to 512 KiB.
 Encrypted checkpoint and effect journal inventories each have a 2 MiB bound;
 recovery data is preserved when either fills. The offline suite now includes only
@@ -129,3 +130,37 @@ mise exec node@24.14.0 -- node --test tools/layout-studio/repository-effects.tes
 It creates its own private state, synthetic identity and local repository, verifies
 the resulting commit and native exits, then removes that fixture. It neither
 prompts a model nor commits changes in this checkout.
+
+
+## Observe a retained operation without replay
+
+Authenticated POST routes `/api/suite/coding/repository-effects/list` and
+`/api/suite/coding/repository-effects/inspect` expose only the current workspace's
+operation summaries and exact recovery observations. Inspection takes `id`, an
+operation UUID; it accepts no command, path, replacement bytes or reference
+update. Select that Personal companion workspace before observing it.
+
+Inspection holds the native repository resource lease, independently checks all
+retained Git guardians, then observes the root, branch, HEAD/tree, metadata
+directory and index path through fixed owned native queries. It rechecks every
+retained metadata guardian after exit. Descriptor-bound file identities, hashes
+and lock timestamps distinguish the exact original index and owned leases from
+changed or foreign files. The response recommends review of owned cleanup,
+review of exact committed-index reconciliation, or manual investigation. It
+returns `repositoryWritten: false`, `referenceMutationReplayed: false` and
+`recoveryApplyImplemented: false`. A recommendation is not permission to act.
+
+A native Linux scenario reads back an actually committed operation through this
+observer and independently verifies exit without changing its repository. A
+separate synthetic retained packet checks the unknown-owner gate, exact pending
+index recommendation, changed-private-index refusal and keyboard-only denial.
+Two additional actual Git cases reopen the exact preserved descriptors,
+reconcile an already committed index without another commit, and reject changed
+lock/original-index bytes. The operator approval and apply route is still open.
+
+Restart marks in-flight effect records for recovery. Keyboard-only mode and
+workspace switching refuse a false stopped claim when a repository guardian's
+exit is unconfirmed. Shutdown still closes other owned resources if a recovery
+component reports failure. Ordinary frontend snapshots omit effect journals,
+original-index checkpoint bytes and private operation records; explicit recovery
+routes return bounded observations instead. No frontend asset changed.

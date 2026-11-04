@@ -11,6 +11,8 @@ import { repositoryIdentity } from "./coding-task-identity.mjs";
 import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
 import { createRepositoryEffectCommands } from "./repository-effect-commands.mjs";
 import { createRepositoryEffectCheckpoints } from "./repository-effect-checkpoints.mjs";
+import { createRepositoryEffectRecovery } from "./repository-effect-recovery.mjs";
+import { OwnedGitIndexLease, createOwnedGitFileLock, captureGitFile } from "../../apps/windows-companion/src/git-index-lease.ts";
 import { fixedGitExecutable } from "./repository-inspection.mjs";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 import { DurableMediatedExecutor } from "../../packages/control-plane/src/runtime.ts";
@@ -88,6 +90,9 @@ test("the durable suite runtime commits exact binary bytes through independently
   assert.ok(activeRequest.childSaga); assert.ok((await journal.readEntries()).some(e => e.kind === "operation.updated")); assert.equal((await readFile(join(root, "private/personal.sealed.json"), "utf8")).includes("exact synthetic native commit"), false);
   await store.update("personal", "synthetic-checkpoint-corruption", s => { s.repositoryEffectCheckpoints[0].recovery.indexBase64 = "Y2hhbmdlZA=="; });
   assert.equal((await checkpointPorts.checkpointVerifier.verify(artifact)).available, false);
+  const recovery = createRepositoryEffectRecovery({ store, stateDirectory });
+  try { const view = await recovery.inspect("personal", record.id); assert.equal(view.recommendation, "settled"); assert.equal(view.nativeOwnersStoppedVerified, true); assert.equal(view.repositoryWritten, false); assert.equal(view.observed.metadata.head, await run("rev-parse", "HEAD")); assert.equal(view.recoveryApplyImplemented, false); }
+  finally { await recovery.close(); }
 });
 test("unknown native Git exit retains its protected scope across restart and blocks replacement without replay", async t => {
   const { root, store } = await fixture(t), repositoryRoot = join(root, "repository"); await mkdir(join(repositoryRoot, ".git"), { recursive: true });
@@ -123,4 +128,26 @@ test("repository effect cancellation discards late command results and records i
   const pending = service.execute("personal", { task, operationId: randomUUID(), bindingDigest: "a".repeat(64), author: { name: "Synthetic", email: "synthetic@example.invalid" }, authorize: async () => {} }, async ({ runner }) => runner.run(["rev-parse", "HEAD"], { cwd: repositoryRoot })).then(() => { throw new Error("Cancelled native output was accepted"); }, e => e);
   await acknowledged; assert.equal((await service.stopCompartment("personal")).stopped, true); assert.match((await pending).message, /stopped/);
   const record = (await store.snapshot("personal")).repositoryEffects[0]; assert.equal(record.status, "recovery-required"); assert.equal(record.commands[0].stoppedVerified, true); await service.close();
+});
+
+test("recovery observation requires independent exit and exact index/lease evidence, preserves changes and never replays a reference update", async t => {
+  const { root, store } = await fixture(t), repositoryRoot = join(root, "repository"), gitDirectory = join(repositoryRoot, ".git"), stateDirectory = join(root, "effects"), id = randomUUID();
+  await mkdir(gitDirectory, { recursive: true }); const indexPath = join(gitDirectory, "index"); await writeFile(indexPath, "synthetic original index");
+  const task = { id: randomUUID(), provider: "codex", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot) }, opDirectory = join(stateDirectory, "git-operations", createHash("sha256").update(id).digest("hex")), lockDirectory = join(stateDirectory, "git-locks");
+  await mkdir(opDirectory, { recursive: true }); await mkdir(lockDirectory); const worktree = await createOwnedGitFileLock(join(lockDirectory, "synthetic.lock"), "synthetic owned lease");
+  const index = await OwnedGitIndexLease.acquire(indexPath), copy = join(opDirectory, "copy"); await index.copyOriginalTo(copy); const indexProof = index.preservation(); await index.abandon(); await worktree.abandon();
+  const privateIndex = join(opDirectory, "private"); await writeFile(privateIndex, "synthetic reviewed index"); const privateProof = await captureGitFile(privateIndex); privateProof.bytes.fill(0);
+  const native = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: process.platform === "linux" ? "owned-linux-session" : "windows-job" }, gitIdentity = await repositoryIdentity(gitDirectory), beforeHead = "a".repeat(40), afterHead = "b".repeat(40), expectedTree = "c".repeat(40);
+  await store.update("personal", "synthetic-retained-effect", s => { s.repositoryEffects = [{ schema: "switchyard-repository-effect/v1", id, taskId: task.id, provider: task.provider, bindingDigest: "a".repeat(64), repositoryRoot, repositoryIdentity: task.repositoryIdentity, gitDirectory, gitIdentity, status: "recovery-required", commands: [{ ownedRuntime: native, stoppedVerified: false, referenceIntent: { arguments: ["update-ref", "--create-reflog", "-m", "Switchyard scoped local commit", "refs/heads/feature/recovery", afterHead, beforeHead] } }], preservation: { operationId: id, repositoryRoot, beforeHead, beforeBranch: "feature/recovery", expectedTree, privateIndex, privateIndexProof: { identity: privateProof.identity, sha256: privateProof.sha256 }, sharedIndex: indexProof, worktreeLock: { path: worktree.filePath, identity: worktree.identity, contentSha256: worktree.contentSha256 } } }]; });
+  let stopped = false, calls = 0;
+  const inspection = { async observe(_c, _task, authorize) { calls++; await authorize(); return { root: repositoryRoot, branch: "feature/recovery", head: afterHead, headTree: expectedTree, gitDirectory, indexPath }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
+  const recovery = createRepositoryEffectRecovery({ store, stateDirectory, inspection, guardianStopped: async () => stopped });
+  try {
+    await assert.rejects(recovery.inspect("personal", id), /not independently verified exit/); assert.equal(calls, 0); stopped = true;
+    const view = await recovery.inspect("personal", id); assert.equal(view.recommendation, "review-index-reconciliation"); assert.equal(view.referenceMutationReplayed, false); assert.equal(view.repositoryWritten, false); assert.equal(view.recoveryApplyImplemented, false);
+    assert.equal((await store.snapshot("personal")).repositoryEffects[0].commands[0].stoppedVerified, true); assert.equal(await readFile(indexPath, "utf8"), "synthetic original index");
+    await writeFile(privateIndex, "changed outside review"); assert.equal((await recovery.inspect("personal", id)).recommendation, "manual-review"); assert.equal(await readFile(privateIndex, "utf8"), "changed outside review");
+    await store.update("personal", "synthetic-keyboard-only", s => { s.mode = "keyboard-only"; }); const before = calls;
+    await assert.rejects(recovery.inspect("personal", id), /Personal companion/); assert.equal(calls, before);
+  } finally { await recovery.close(); }
 });

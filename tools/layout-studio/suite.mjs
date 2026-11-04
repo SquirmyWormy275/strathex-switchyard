@@ -28,9 +28,10 @@ import { createReadoutProfiles } from "./readout-profiles.mjs";
 import { createKeyboardIndicators } from "./keyboard-indicators.mjs";
 import { createMatrixDiagnostics } from "./matrix-diagnostics.mjs";
 import { createTaskAuthority } from "./task-authority.mjs";
+import { createRepositoryEffectRecovery } from "./repository-effect-recovery.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, repositoryRecovery, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -50,6 +51,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   let closed = false;
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
   taskAuthority ??= createTaskAuthority({ store, isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
+  repositoryRecovery ??= createRepositoryEffectRecovery({ store, stateDirectory: join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   async function stopExample(compartment, example) {
     const key = `${compartment}:${example}`, child = examples.get(key);
     exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1);
@@ -67,7 +69,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     if (initializing.has(id)) { await initializing.get(id); if (policy !== undefined) await store.initialize(id, policy); return; }
     const pending = (async () => {
       await store.initialize(id, policy);
-      await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; for (const t of s.codingSessions ?? []) if (t.status === "creating") t.status = "creation-uncertain"; for (const t of s.codingTurns ?? []) if (["reserved", "submitting", "submitted", "cancellation-requested"].includes(t.status)) t.status = "outcome-unconfirmed"; });
+      await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; for (const t of s.codingSessions ?? []) if (t.status === "creating") t.status = "creation-uncertain"; for (const effect of s.repositoryEffects ?? []) if (["reserved", "executing"].includes(effect.status)) effect.status = "recovery-required"; for (const t of s.codingTurns ?? []) if (["reserved", "submitting", "submitted", "cancellation-requested"].includes(t.status)) t.status = "outcome-unconfirmed"; });
       await store.update(id, "claude-creation-recovery", (s) => { for (const task of s.codingSessions ?? []) if (task.provider === "claude-code" && task.nativeTransport === "owned-print" && task.nativeIdentityVerified === false && (s.codingTurns ?? []).some((turn) => turn.taskId === task.id && !["failed-before-turn"].includes(turn.status))) task.status = "creation-uncertain"; });
       started.add(id);
     })();
@@ -136,7 +138,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         await loadSelection();
         if (activeCompartment !== compartment) {
           await matrixDiagnostics.stopCompartment(activeCompartment);
-          await taskAuthority.stopCompartment(activeCompartment);
+          const recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment);
+          if (recoveryStop?.stopped === false || authorityStop?.stopped === false) throw new Error("An owned repository guardian has not verified exit; workspace selection was preserved.");
           pauseMonitor(activeCompartment); await foreground.stopCompartment?.(activeCompartment);
           await store.update(activeCompartment, "compartment-suspend-sources", (s) => { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; });
         }
@@ -154,12 +157,12 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         });
         if (body.mode === "keyboard-only") {
           await matrixDiagnostics.stopCompartment(compartment);
-          await taskAuthority.stopCompartment(compartment);
+          const recoveryStop = await repositoryRecovery.stopCompartment(compartment), authorityStop = await taskAuthority.stopCompartment(compartment);
           pauseMonitor(compartment);
           // Stop the exact print continuation before reconciling the original
           // background inventory, which can briefly report the same session.
           const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
-          const stopped = await Promise.all([foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([recoveryStop, authorityStop, foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -167,6 +170,8 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       }
       if (path === "/api/suite/coding/authority/review") return taskAuthority.review(compartment, body);
       if (path === "/api/suite/coding/authority/issue") return taskAuthority.issue(compartment, body);
+      if (path === "/api/suite/coding/repository-effects/list") return repositoryRecovery.list(compartment);
+      if (path === "/api/suite/coding/repository-effects/inspect") return repositoryRecovery.inspect(compartment, body.id);
       if (path === "/api/suite/coding/authority/list") return taskAuthority.list(compartment);
       if (path === "/api/suite/coding/authority/revalidate") return taskAuthority.revalidate(compartment, body.id);
       if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
@@ -263,7 +268,10 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       }
       if (path === "/api/suite/snapshot") {
         const s = await store.snapshot(compartment);
-        return { ...s, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
+        // Recovery packets include original index bytes and private ownership
+        // records. Explicit recovery routes expose observations, never backups.
+        const { repositoryEffectJournal, repositoryEffectCheckpoints, repositoryEffects, ...snapshot } = s;
+        return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
       if (path === "/api/suite/profile/select") return store.selectProfile(compartment, body.profileId, body.revision ?? null);
@@ -284,6 +292,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/devices/restore") return devices.restore(compartment, body.id);
       if (path === "/api/suite/devices/unlock") return devices.unlock(body.deviceId, body.operation);
       if (path === "/api/suite/devices/lock") { await matrixDiagnostics.stopCompartment(compartment);
+          await repositoryRecovery.stopCompartment(compartment);
           await taskAuthority.stopCompartment(compartment); return devices.relock(compartment, body.deviceId); }
       if (path === "/api/suite/devices/matrix/review") return matrixDiagnostics.review(compartment, body);
       if (path === "/api/suite/devices/matrix/start") return matrixDiagnostics.start(compartment, body);
@@ -361,6 +370,6 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       await store.authorize(compartment, { provider: binding.provider });
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; await matrixDiagnostics.close(); await taskAuthority.close(); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; }
+    async close() { closed = true; const boundaryStops = await Promise.allSettled([matrixDiagnostics.close(), repositoryRecovery.close(), taskAuthority.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

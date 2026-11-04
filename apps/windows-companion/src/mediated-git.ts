@@ -114,7 +114,7 @@ export interface MediatedGitHandlerOptions {
   readonly runner?: LocalGitRunner;
   readonly now?: () => number;
   readonly lockTimeoutMs?: number;
-  readonly onPreservation?: (value: Readonly<{ operationId: string; repositoryRoot: string; beforeHead: string; beforeIndexTree: string; expectedTree?: string; privateIndex?: string; privateIndexCopy: string; worktreeLock: { path: string; identity: GitFileIdentity; contentSha256: string }; sharedIndex: GitIndexPreservation }>) => Promise<void>;
+  readonly onPreservation?: (value: Readonly<{ operationId: string; repositoryRoot: string; beforeHead: string; beforeBranch: string; beforeIndexTree: string; expectedTree?: string; privateIndex?: string; privateIndexCopy: string; worktreeLock: { path: string; identity: GitFileIdentity; contentSha256: string }; sharedIndex: GitIndexPreservation }>) => Promise<void>;
   readonly classifyUntracked?: (path: string) => UntrackedClassification;
   readonly classifyIgnored?: (path: string) => UntrackedClassification;
   readonly remediation?: Pick<DurableContainmentIncidentCoordinator, "assertRemediationPermit" | "recordRemediation">;
@@ -225,7 +225,7 @@ export class LocalMediatedGitHandler {
         await sharedIndexLock.copyOriginalTo(inspectionCopy); temporaryInspectionIndex = inspectionCopy;
         const indexLocked = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
         if (indexLocked) return indexLocked;
-        await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeIndexTree: request.target.indexTree, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
+        await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeBranch: request.target.branch ?? "", beforeIndexTree: request.target.indexTree, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
         if (request.childSaga) {
           featureBranchChild = await request.childSaga.begin({
             action: "git.feature-branch",
@@ -305,7 +305,7 @@ export class LocalMediatedGitHandler {
       const indexLockedPrecondition = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
       if (indexLockedPrecondition) return indexLockedPrecondition;
       const expectedTree = await this.currentIndexTree(root, environment);
-      await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeIndexTree: request.target.indexTree, expectedTree, privateIndex: temporaryIndex, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
+      await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeBranch: request.target.branch ?? "", beforeIndexTree: request.target.indexTree, expectedTree, privateIndex: temporaryIndex, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
       if (request.childSaga) {
         localCommitChild = await request.childSaga.begin({
           action: "git.local-commit",

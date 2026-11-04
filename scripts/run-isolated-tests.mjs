@@ -65,6 +65,8 @@ const mediatedGitTests = [
   "feature-branch creation uses an expected-HEAD transaction without checkout filters",
   "an unconfirmed native Git exit retains its exact indices and shared lock for recovery",
   "a readback failure after a verified reference update retains exact transaction recovery files",
+  "exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit",
+  "reopening a preserved lease refuses in-place lock changes and changed original index bytes",
   "a replacement shared index lock is preserved after the exact reviewed commit advances HEAD",
   "a replacement original index is never overwritten during shared-index reconciliation",
   "the previous worktree owner cannot delete a replacement private lock during cleanup",
