@@ -2071,3 +2071,27 @@ and fixture hashes in client-portal-private-bus-1793789449865.json. The explicit
 installed proof script requests one real fixed GitHub Copilot homepage through
 normal authenticated routes, with no prompt or repository/session selection.
 Its source is syntax-checked; installed acceptance remains pending.
+
+
+## Normal installed Linux client request accepted
+
+Published 1ecffbbb033a081dbde867ff269134d0f4e90d52 installed through the normal
+command; all six update checks pass (assignment-legends-1793789660854.json).
+Release 3feadf02a764b19631da4c3ae746f59790b322aae0a90af153bdbab1ac339789
+contains 467 files and 4,404,899 bytes. Frozen frontend digest/private link are
+unchanged; package staging is empty and current plus rollback occupy about 11 MiB.
+
+The normal installed client launch passed six checks. It requested the actual
+fixed GitHub Copilot homepage once and received OpenURI Response 0; no prompt,
+repository or conversation was selected. The protected native helper independently
+verified exit and removed its empty scratch. A duplicate returned the same
+request/owner without another helper; a substituted recipe under that UUID was
+rejected. Sanitized inventory/ordinary snapshots omit private ownership details.
+Receipt installed-client-launch-1793789674617.json.
+
+The proof restored keyboard-only validation state and original selection, preserved
+definitions/private link and removed only its own local test record. It did not
+close the external browser or claim visual page, account, plan or session
+acceptance. Windows launch and exact native Claude desktop/IDE binding remain
+implementation work; the existing cda0327 complete Windows release acceptance
+does not cover this newer client-launch source.
