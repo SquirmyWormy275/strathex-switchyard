@@ -35,9 +35,26 @@ test("kernel lock releases after its owner crashes and a separate process can ac
       const timer = setTimeout(() => reject(new Error("Synthetic lock owner did not become ready")), 15000);
       child.on("error", (e) => { clearTimeout(timer); reject(e); }); child.stdout.on("data", (b) => { if (b.toString().includes("HELD")) { clearTimeout(timer); resolve(); } }); child.once("exit", () => { clearTimeout(timer); reject(new Error("Synthetic lock owner exited before acquiring")); });
     });
+    let probed = false;
+    await assert.rejects(withStateLock(root, "personal", async () => { probed = true; }, { nonBlocking: true }), error => error.code === "STATE_LOCK_BUSY");
+    assert.equal(probed, false);
     const exited = once(child, "close"); child.kill("SIGKILL"); await exited;
     let entered = false; await withStateLock(root, "personal", async () => { entered = true; }); assert.equal(entered, true);
   } finally { child.stdin.end(); if (child.exitCode === null) child.kill(); await rm(root, { recursive: true, force: true }); }
+});
+
+test("nonblocking resource probes distinguish a held kernel lease from callback failures and retain the normal owner", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-resource-probe-")), secrets = { get: async () => undefined, set: async () => {} };
+  const a = createSuiteStore({ root, secrets }), b = createSuiteStore({ root, secrets }); let called = false;
+  try {
+    await a.withResourceLock("repository-execution", "synthetic-owner", async held => {
+      const busy = await b.tryWithResourceLock("repository-execution", "synthetic-owner", async () => { called = true; });
+      assert.deepEqual(busy, { acquired: false }); assert.equal(called, false); held.assert();
+    });
+    assert.deepEqual(await b.tryWithResourceLock("repository-execution", "synthetic-owner", async held => { held.assert(); return "verified"; }), { acquired: true, value: "verified" });
+    await assert.rejects(b.tryWithResourceLock("repository-execution", "synthetic-owner", async () => { throw Object.assign(Error("Synthetic callback failure"), { code: "STATE_LOCK_BUSY" }); }), /callback failure/);
+    await assert.rejects(b.tryWithResourceLock("unknown", "synthetic-owner", async () => {}), /Unsupported/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("lock identity and symlink root are rejected before a protected mutation", { skip: process.platform !== "linux" }, async () => {

@@ -6,7 +6,7 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { privateDirectory } from "./private-fs.mjs";
-export async function withStateLock(root, id, fn, { onProgress } = {}) {
+export async function withStateLock(root, id, fn, { onProgress, nonBlocking = false } = {}) {
   if (!/^[a-z][a-z0-9-]{0,63}$/.test(id)) throw new Error("Private lock identity is invalid.");
   const directory = join(root, "locks"), path = join(directory, `${id}.lock`);
   await privateDirectory(directory);
@@ -18,11 +18,11 @@ export async function withStateLock(root, id, fn, { onProgress } = {}) {
   if (!named.isFile() || named.isSymbolicLink() || (process.platform !== "win32" && (named.uid !== userInfo().uid || (named.mode & 0o077)))) throw new Error("Private lock ownership or permissions are invalid.");
   onProgress?.("lease-file");
   let child;
-  if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", "--timeout", "10", "--conflict-exit-code", "75", path, process.execPath, "-e", 'process.stdout.write("LOCKED\\n"); process.stdin.resume();'], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
+  if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", ...(nonBlocking ? ["--nonblock"] : ["--timeout", "10"]), "--conflict-exit-code", "75", path, process.execPath, "-e", 'process.stdout.write("LOCKED\\n"); process.stdin.resume();'], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
   else if (process.platform === "win32") {
     child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", onProgress ? "pipe" : "ignore"] });
     if (onProgress) { let diagnostic = ""; child.stderr.on("data", (b) => { diagnostic = (diagnostic + b.toString()).slice(-1024); let end; while ((end = diagnostic.indexOf("\n")) >= 0) { const line = diagnostic.slice(0, end).trim(); diagnostic = diagnostic.slice(end + 1); if (["lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found", "lease-held"].includes(line) || /^lease-error-[0-9]{1,5}$/.test(line)) onProgress(line); } }); }
-    child.stdin.write(JSON.stringify({ path, parentPid: process.pid, trace: Boolean(onProgress) }) + "\n");
+    child.stdin.write(JSON.stringify({ path, parentPid: process.pid, trace: Boolean(onProgress), nonBlocking }) + "\n");
   } else throw new Error("This platform has no implemented private state lock. No state was changed.");
   onProgress?.("lease-spawned");
   let alive = true, resolveClosed;
@@ -32,7 +32,7 @@ export async function withStateLock(root, id, fn, { onProgress } = {}) {
   try {
     await new Promise((resolve, reject) => {
       let output = ""; const timer = setTimeout(() => { child.kill(); reject(new Error("Private state lock timed out. Existing data was preserved.")); }, 15000);
-      const fail = () => { clearTimeout(timer); reject(new Error("The private state lock is unavailable or busy. Existing data was preserved.")); };
+      const fail = code => { clearTimeout(timer); const error = new Error("The private state lock is unavailable or busy. Existing data was preserved."); if (nonBlocking && code === 75) error.code = "STATE_LOCK_BUSY"; reject(error); };
       child.once("error", fail); child.once("close", fail);
       child.stdout.setEncoding("utf8"); child.stdout.on("data", (chunk) => { output += chunk; if (output === "LOCKED\n" || output === "LOCKED\r\n") { clearTimeout(timer); child.removeListener("close", fail); child.removeListener("error", fail); child.on("error", () => { alive = false; }); resolve(); } else if (output.includes("\n") || output.length > 128) { child.kill(); fail(); } });
     });

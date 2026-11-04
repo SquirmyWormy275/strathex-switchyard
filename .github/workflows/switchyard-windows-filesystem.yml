@@ -71,7 +71,7 @@ jobs:
         timeout-minutes: 6
         run: |
           $ErrorActionPreference = 'Stop'
-          & node --test --test-concurrency=1 scripts/run-isolated-tests.test.mjs tools/layout-studio/windows-exchange-images.test.mjs tools/layout-studio/windows-sandbox-native.test.mjs tools/layout-studio/windows-sandbox-sessions.test.mjs
+          & node --test --test-concurrency=1 scripts/run-isolated-tests.test.mjs tools/layout-studio/state-lock.test.mjs tools/layout-studio/windows-exchange-images.test.mjs tools/layout-studio/windows-sandbox-native.test.mjs tools/layout-studio/windows-sandbox-sessions.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'A protected storage ownership or harness contract failed.' }
 
       - name: Verify actual native filesystems and guardians without opening a guest

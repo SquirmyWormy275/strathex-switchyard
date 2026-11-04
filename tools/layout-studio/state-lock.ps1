@@ -30,6 +30,7 @@ try {
             $nativeError = $_.Exception.HResult -band 0xffff
             if ($null -ne $tracePipe) { $tracePipe.WriteLine('lease-error-' + $nativeError) }
             if ($nativeError -notin @(32, 33)) { throw }
+            if ($request.nonBlocking -eq $true) { exit 75 }
             if ([DateTime]::UtcNow -ge $deadline) { throw 'Private state is busy.' }; Start-Sleep -Milliseconds 25
         }
     }

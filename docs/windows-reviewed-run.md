@@ -47,3 +47,12 @@ They create no VM, account, keyboard connection or runtime copy. Native mapping
 acceptance is separately proven by all 30 checks at `e4ef1f06`, workflow
 41898161164; the digest-verified JSON receipt is
 `windows-bounded-mapping-e4ef-native.json`.
+
+The runner's cross-process preparation fence uses a kernel resource lease.
+A nonblocking probe distinguishes an actually held lease from unavailable or
+failed lock verification; unknown errors remain errors. Cleanup cannot infer
+that a live preparation is abandoned merely because its VM has not started.
+The original blocking state-lock behavior is unchanged. The new probe is tested
+against another actual process, owner death, independent store instances and a
+callback failure whose error code resembles a busy lock. Native Windows probe
+acceptance is included in the short filesystem workflow.
