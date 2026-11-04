@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
+import { mkdtemp, mkdir, open, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { GitCliInspector, NodeGitCommandRunner, type GitCommandResult, type GitCommandRunner, type FileDigestReader } from "../src/git-inspector.ts";
+import { GitCliInspector, NodeGitCommandRunner, NodeFileDigestReader, type GitCommandResult, type GitCommandRunner, type FileDigestReader } from "../src/git-inspector.ts";
 
 class ScriptedRunner implements GitCommandRunner {
   readonly calls: string[] = [];
@@ -137,4 +141,87 @@ test("read-only Git inspector positively represents a tracked worktree deletion 
   assert.equal(inspection.trackedFiles?.[1]?.path, "unknown.bin");
   assert.equal(inspection.trackedFiles?.[1]?.digest, undefined);
   assert.match(inspection.issues?.join(" ") ?? "", /unable to hash tracked file unknown\.bin/i);
+});
+
+
+async function digestFixture(t: { after(fn: () => Promise<void>): void }) {
+  const directory = await mkdtemp(join(tmpdir(), "switchyard-digest-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const root = join(directory, "repository"), outside = join(directory, "outside");
+  await mkdir(root); await mkdir(outside);
+  return { directory, root, outside };
+}
+
+test("repository digests hash actual files, preserve missing state and reject parent junction escape", async (t) => {
+  const { root, outside } = await digestFixture(t), reader = new NodeFileDigestReader();
+  const bytes = Buffer.from("approved task input\n");
+  await writeFile(join(root, "input.txt"), bytes);
+  await writeFile(join(outside, "private.txt"), "must never enter the snapshot");
+  await symlink(outside, join(root, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await reader.digest(root, "input.txt"), `sha256:${createHash("sha256").update(bytes).digest("hex")}`);
+  assert.equal(await reader.state(root, "input.txt"), "regular_file");
+  assert.equal(await reader.state(root, "absent/input.txt"), "missing");
+  for (const operation of [reader.digest(root, "linked/private.txt"), reader.state(root, "linked/private.txt")]) {
+    await assert.rejects(operation, /parent must be a real directory/i);
+  }
+  await assert.rejects(reader.digest(root, "../outside/private.txt"), /escapes/i);
+  await assert.rejects(reader.state(root, ""), /escapes/i);
+});
+
+test("repository digest byte limits are enforced on actual files and exact-limit input remains valid", async (t) => {
+  const { root } = await digestFixture(t), reader = new NodeFileDigestReader({ maxFileBytes: 64 });
+  await writeFile(join(root, "exact.bin"), Buffer.alloc(64, 7));
+  await writeFile(join(root, "large.bin"), Buffer.alloc(65, 7));
+  assert.match(await reader.digest(root, "exact.bin"), /^sha256:[a-f0-9]{64}$/);
+  await assert.rejects(reader.digest(root, "large.bin"), /bounded digest size/i);
+  for (const maxFileBytes of [0, -1, NaN, 1.5, 128 * 1024 * 1024 + 1]) {
+    assert.throws(() => new NodeFileDigestReader({ maxFileBytes }), /bounded/i);
+  }
+});
+
+test("a parent replaced after descriptor acquisition is rejected before reading and the descriptor closes", async (t) => {
+  const { root } = await digestFixture(t), parent = join(root, "inputs");
+  await mkdir(parent); await writeFile(join(parent, "task.txt"), "original");
+  let acquired: FileHandle | undefined, reads = 0;
+  const openFile: typeof open = async (path, flags, mode) => {
+    const handle = await open(path, flags, mode); acquired = handle;
+    const originalRead = handle.read.bind(handle);
+    handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
+      reads++; return originalRead(buffer, offset, length, position);
+    }) as FileHandle["read"];
+    await rename(parent, join(root, "moved")); await mkdir(parent);
+    await writeFile(join(parent, "task.txt"), "replacement");
+    return handle;
+  };
+  await assert.rejects(new NodeFileDigestReader({ openFile }).digest(root, "inputs/task.txt"), /parent changed/i);
+  assert.equal(reads, 0); assert.equal(acquired?.fd, -1);
+});
+
+test("a named file replaced after descriptor acquisition cannot be hashed as the approved path", async (t) => {
+  const { root } = await digestFixture(t), path = join(root, "task.txt");
+  await writeFile(path, "original"); let acquired: FileHandle | undefined;
+  const openFile: typeof open = async (name, flags, mode) => {
+    const handle = await open(name, flags, mode); acquired = handle;
+    await rename(path, join(root, "old.txt")); await writeFile(path, "replacement");
+    return handle;
+  };
+  await assert.rejects(new NodeFileDigestReader({ openFile }).digest(root, "task.txt"), /file changed/i);
+  assert.equal(acquired?.fd, -1);
+});
+
+test("content modified during descriptor hashing is rejected and the descriptor closes", async (t) => {
+  const { root } = await digestFixture(t), path = join(root, "task.txt");
+  await writeFile(path, Buffer.alloc(65537, 4)); let acquired: FileHandle | undefined, changed = false;
+  const openFile: typeof open = async (name, flags, mode) => {
+    const handle = await open(name, flags, mode); acquired = handle;
+    const originalRead = handle.read.bind(handle);
+    handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
+      const result = await originalRead(buffer, offset, length, position);
+      if (!changed) { changed = true; await writeFile(path, Buffer.alloc(65538, 5)); }
+      return result;
+    }) as FileHandle["read"];
+    return handle;
+  };
+  await assert.rejects(new NodeFileDigestReader({ openFile }).digest(root, "task.txt"), /file changed during hashing/i);
+  assert.equal(changed, true); assert.equal(acquired?.fd, -1);
 });

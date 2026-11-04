@@ -1560,3 +1560,22 @@ dependencies and test renderings are removed after verification. Full corrected
 Windows acceptance is still pending; this was a software failure, not an account
 or hardware blocker. GitHub's connector omitted live steps and lagged completion;
 the read-only native job details confirmed the actual failed step.
+
+## Repository input boundaries before authority integration
+
+The task snapshot reader now rejects symbolic links or Windows junctions in
+parent directories, binds each opened file to native directory/file identities,
+and checks those identities again after hashing. Hashing streams in bounded
+chunks with a 32 MiB per-file ceiling instead of reading arbitrary file sizes
+into memory. A replacement or content change makes the snapshot incomplete.
+Ten inspector checks pass, including real temporary files, parent-link escapes,
+replacement before reading, content mutation during hashing, exact byte limits
+and descriptor cleanup. TypeScript checks pass. This is a prerequisite to the
+remaining task authority integration, not a claim that the integration is done.
+
+The last pushed checkpoint `2e64ff6` completed both GitHub Linux and Windows
+release workflows successfully. The Windows job separately passed backend tests,
+both documentation generators, native observer/guardian tests, fresh optional
+runtime verification and the complete packaged release build. Detailed receipt
+acceptance is being reconciled; interactive accounts and physical devices remain
+separate checks.

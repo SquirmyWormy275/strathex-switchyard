@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath, stat } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { lstat, open, realpath, stat, type FileHandle } from "node:fs/promises";
+import { constants, type BigIntStats } from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 
 import { trackedMissingFileDigest, type GitInspection, type GitInspector, type ManifestFile } from "./snapshot.ts";
@@ -90,37 +91,77 @@ export class NodeGitCommandRunner implements GitCommandRunner {
   }
 }
 
-/** Hashes files only beneath the resolved repository root and rejects symlink traversal. */
+interface DirectoryStamp { readonly path: string; readonly dev: bigint; readonly ino: bigint; }
+interface OpenRepositoryFile { readonly handle: FileHandle; readonly root: string; readonly path: string; readonly parents: readonly DirectoryStamp[]; readonly metadata: BigIntStats; }
+
+/** Descriptor-bound, bounded hashing. Parent links cannot escape a task's root. */
 export class NodeFileDigestReader implements FileDigestReader {
+  private readonly maxFileBytes: number;
+  private readonly openFile: typeof open;
+  constructor(options: { readonly maxFileBytes?: number; readonly openFile?: typeof open } = {}) {
+    this.maxFileBytes = options.maxFileBytes ?? 32 * 1024 * 1024;
+    if (!Number.isSafeInteger(this.maxFileBytes) || this.maxFileBytes < 1 || this.maxFileBytes > 128 * 1024 * 1024) throw new Error("Choose a bounded repository digest size.");
+    this.openFile = options.openFile ?? open;
+  }
+
   async digest(repositoryRoot: string, relativePath: string): Promise<string> {
-    const candidate = this.candidate(repositoryRoot, relativePath);
-    const metadata = await lstat(candidate);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
-    const contents = await readFile(candidate);
-    return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+    const file = await this.openVerified(repositoryRoot, relativePath);
+    try {
+      if (file.metadata.size > BigInt(this.maxFileBytes)) throw new Error("Repository file exceeds the bounded digest size.");
+      const hash = createHash("sha256"), buffer = Buffer.alloc(65536); let position = 0;
+      while (true) {
+        const { bytesRead } = await file.handle.read(buffer, 0, buffer.length, position);
+        if (!bytesRead) break;
+        position += bytesRead;
+        if (position > this.maxFileBytes) throw new Error("Repository file exceeds the bounded digest size.");
+        hash.update(buffer.subarray(0, bytesRead));
+      }
+      const after = await file.handle.stat({ bigint: true });
+      if (!sameFile(file.metadata, after) || after.size !== BigInt(position)) throw new Error("Repository file changed during hashing.");
+      await this.assertCurrent(file, after);
+      return `sha256:${hash.digest("hex")}`;
+    } finally { await file.handle.close(); }
   }
 
   async state(repositoryRoot: string, relativePath: string): Promise<"regular_file" | "missing"> {
-    const candidate = this.candidate(repositoryRoot, relativePath);
-    try {
-      const metadata = await lstat(candidate);
-      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
-      return "regular_file";
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return "missing";
-      throw error;
-    }
+    try { const file = await this.openVerified(repositoryRoot, relativePath); await file.handle.close(); return "regular_file"; }
+    catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return "missing"; throw error; }
   }
 
-  private candidate(repositoryRoot: string, relativePath: string): string {
-    const root = resolve(repositoryRoot);
-    const candidate = resolve(root, relativePath);
-    const relation = relative(root, candidate);
-    if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || resolve(root, relation) !== candidate) {
-      throw new Error("Path escapes the verified repository root.");
+  private async openVerified(repositoryRoot: string, relativePath: string): Promise<OpenRepositoryFile> {
+    const root = await realpath(resolve(repositoryRoot)), path = resolve(root, relativePath), relation = relative(root, path);
+    if (!relation || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation)) throw new Error("Path escapes the verified repository root.");
+    const parents: DirectoryStamp[] = [];
+    const parentParts = relative(root, dirname(path)).split(sep).filter(Boolean); let current = root;
+    for (const part of ["", ...parentParts]) {
+      if (part) current = resolve(current, part);
+      const metadata = await lstat(current, { bigint: true });
+      if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("Repository parent must be a real directory without symbolic links.");
+      parents.push({ path: current, dev: metadata.dev, ino: metadata.ino });
     }
-    return candidate;
+    const named = await lstat(path, { bigint: true });
+    if (!named.isFile() || named.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
+    const handle = await this.openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    try {
+      const metadata = await handle.stat({ bigint: true }), file = { handle, root, path, parents, metadata };
+      await this.assertCurrent(file, metadata); return file;
+    } catch (error) { await handle.close(); throw error; }
   }
+
+  private async assertCurrent(file: OpenRepositoryFile, metadata: BigIntStats): Promise<void> {
+    if (!metadata.isFile()) throw new Error("Path is not a regular repository file.");
+    for (const parent of file.parents) {
+      const observed = await lstat(parent.path, { bigint: true });
+      if (!observed.isDirectory() || observed.isSymbolicLink() || observed.dev !== parent.dev || observed.ino !== parent.ino) throw new Error("Repository parent changed during file inspection.");
+    }
+    const named = await lstat(file.path, { bigint: true });
+    if (!named.isFile() || named.isSymbolicLink() || !sameFile(metadata, named)) throw new Error("Repository file changed during inspection.");
+    const relation = relative(file.root, await realpath(file.path));
+    if (!relation || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation)) throw new Error("Path escapes the verified repository root.");
+  }
+}
+function sameFile(a: BigIntStats, b: BigIntStats): boolean {
+  return a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs;
 }
 
 function cleanOutput(value: string): string | undefined {
