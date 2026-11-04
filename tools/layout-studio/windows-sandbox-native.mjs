@@ -10,15 +10,23 @@ import { scopeHash } from "./confirmations.mjs";
 const schema="switchyard-windows-sandbox-cli/v1", nativeHelper=fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe",import.meta.url));
 const uuid=value=>typeof value==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const dig=value=>typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
-const fields={metadata:[],list:[],start:["sandboxId","configuration","configurationSha256"],stop:["sandboxId"],connect:["sandboxId"],"probe-login":["sandboxId"],execute:["sandboxId","catalogRelativePath","timeoutMs"]};
+const fields={metadata:[],list:[],start:["sandboxId","configuration","configurationSha256","exchangeBinding"],stop:["sandboxId"],connect:["sandboxId"],"probe-login":["sandboxId"],execute:["sandboxId","catalogRelativePath","timeoutMs"]};
 const statuses={metadata:["available","unavailable"],list:["observed","unavailable"],start:["started","blocked","outcome-unconfirmed","unavailable"],stop:["stopped","outcome-unconfirmed","unavailable"],connect:["connection-requested","outcome-unconfirmed","absent","unavailable"],"probe-login":["executed","dispatch-unconfirmed","absent","unavailable"],execute:["executed","dispatch-unconfirmed","absent","unavailable"]};
 const once=new Set(["start","connect","execute","stop"]),leaseKey=scopeHash(["switchyard-windows-sandbox-cli","current-user"]);
 const commandField=action=>({start:"nativeStartCommandId",connect:"nativeConnectCommandId",execute:"nativeExecuteCommandId",stop:"nativeStopCommandId"}[action]);
+
+export function validateWindowsExchangeBinding(value,operationId){
+  const keys=["schema","operationId","stagingRoot","stagingIdentity","imageIdentity","mountIdentity","footerSha256","volumeGuid"];
+  const identity=value=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).sort().join()==="device,inode"&&[value.device,value.inode].every(part=>typeof part==="string"&&/^(0|[1-9][0-9]{0,19})$/.test(part));
+  if(!value||typeof value!=="object"||Array.isArray(value)||Object.keys(value).sort().join()!==keys.sort().join()||value.schema!=="switchyard-windows-bounded-volume/v1"||!uuid(operationId)||value.operationId!==operationId||!dig(value.footerSha256)||![value.stagingIdentity,value.imageIdentity,value.mountIdentity].every(identity)||typeof value.stagingRoot!=="string"||value.stagingRoot.length>2048||!new RegExp("^[A-Za-z]:[\\\\/].*[\\\\/]disk-"+operationId+"$").test(value.stagingRoot)||/[\x00-\x1f\x7f]/.test(value.stagingRoot)||typeof value.volumeGuid!=="string"||!/^\\\\\?\\Volume\{[a-f0-9-]{36}\}\\$/i.test(value.volumeGuid))throw Error("Bind only the exact host-owned bounded Windows exchange volume.");
+  return structuredClone(value);
+}
 
 function request(input,context){
   if(!input||!Object.hasOwn(fields,input.action)||Object.keys(input).sort().join()!==["action",...fields[input.action]].sort().join())throw Error("Choose only one closed Sandbox verb and its exact structured fields.");
   if(fields[input.action].includes("sandboxId")&&(!uuid(input.sandboxId)||input.sandboxId!==context.sandboxId))throw Error("The native Sandbox verb belongs to a different exact guest identity.");
   if(input.action==="start"&&(!dig(input.configurationSha256)||typeof input.configuration!=="string"||Buffer.byteLength(input.configuration)>16384||createHash("sha256").update(input.configuration).digest("hex")!==input.configurationSha256))throw Error("Bind one bounded exact guest configuration and its UTF-8 byte digest.");
+  if(input.action==="start")validateWindowsExchangeBinding(input.exchangeBinding,context.operationId);
   if(input.action==="execute"&&(!Number.isSafeInteger(input.timeoutMs)||input.timeoutMs<1000||input.timeoutMs>600000||typeof input.catalogRelativePath!=="string"||input.catalogRelativePath.length>512||input.catalogRelativePath.split("/").some(part=>!part||part==="."||part==="..")||/[\\\x00-\x1f\x7f:"<>|*?]/.test(input.catalogRelativePath)))throw Error("Use only the fixed guest worker and a bounded literal catalog path.");
   return {schema,...structuredClone(input)};
 }
@@ -55,7 +63,7 @@ export function createWindowsSandboxNativeCalls({store,stateDirectory,platform=p
       const resource={controller:new AbortController(),clients:new Set(),done:null};active.set(c,resource);seen.add(c);
       resource.done=store.withResourceLock("repository-execution",leaseKey,async lease=>{
         const check=async()=>{lease.assert();if(!cleanup){if(closed||resource.controller.signal.aborted||signal?.aborted||!await isActive(c))throw Error("The native Sandbox command was stopped or its workspace changed.");await store.authorize(c,{provider:context.provider});await authorize();}
-          if(cleanup||!["metadata","list"].includes(input.action)){const row=(await store.snapshot(c)).repositoryWindowsGuests?.find(row=>row.operationId===context.operationId);if(!row||row.scopeDigest!==context.scopeDigest||row.sandboxId!==context.sandboxId||row.provider!==context.provider||input.action==="start"&&row.configurationSha256!==input.configurationSha256||!["start","list"].includes(input.action)&&row.startVerified!==true)throw Error("No exact protected guest ownership authorizes this native verb.");}
+          if(cleanup||!["metadata","list"].includes(input.action)){const row=(await store.snapshot(c)).repositoryWindowsGuests?.find(row=>row.operationId===context.operationId);if(!row||row.scopeDigest!==context.scopeDigest||row.sandboxId!==context.sandboxId||row.provider!==context.provider||input.action==="start"&&(row.configurationSha256!==input.configurationSha256||row.exchangeBindingSha256!==scopeHash(input.exchangeBinding))||!["start","list"].includes(input.action)&&row.startVerified!==true)throw Error("No exact protected guest ownership authorizes this native verb.");}
         };
         let id,owner,ready=false;
         try{
@@ -72,7 +80,7 @@ export function createWindowsSandboxNativeCalls({store,stateDirectory,platform=p
           if(result.status!=="completed"||result.exitCode!==0)throw Error("The fixed native Sandbox operation did not return a verified result.");
           // Revocation prevents another effect, but must not erase a verified
           // ownership/exit observation needed to stop what already started.
-          const value=response(JSON.parse(result.stdout),input);lease.assert();await update(c,id,"windows-guest-native-result",(row,state)=>{if(row.requestDigest!==scopeHash(input))throw Error("The exact native observation binding changed.");row.status="settled";row.result=value;const guest=state.repositoryWindowsGuests?.find(guest=>guest.operationId===context.operationId);if(once.has(input.action)){if(!guest||guest.scopeDigest!==context.scopeDigest||guest.sandboxId!==context.sandboxId)throw Error("Preserve native evidence whose protected guest ownership changed.");guest.nativeResults??={};guest.nativeResults[input.action]=value;}if(input.action==="start"&&value.status==="started"){guest.startVerified=true;guest.status="started";}if(input.action==="stop"&&value.status==="stopped")guest.stoppedVerified=true;});return value;
+          const value=response(JSON.parse(result.stdout),input);lease.assert();await update(c,id,"windows-guest-native-result",(row,state)=>{if(row.requestDigest!==scopeHash(input))throw Error("The exact native observation binding changed.");row.status="settled";row.result=value;const guest=state.repositoryWindowsGuests?.find(guest=>guest.operationId===context.operationId);if(once.has(input.action)){if(!guest||guest.scopeDigest!==context.scopeDigest||guest.sandboxId!==context.sandboxId)throw Error("Preserve native evidence whose protected guest ownership changed.");guest.nativeResults??={};guest.nativeResults[input.action]=value;}if(input.action==="start"&&value.status==="started"){guest.startVerified=true;guest.status="started";guest.exchangeQuotaEnforced=true;}if(input.action==="stop"&&value.status==="stopped")guest.stoppedVerified=true;});return value;
         }catch(error){if(id)await update(c,id,"windows-guest-native-unconfirmed",row=>{row.status=ready?"outcome-unconfirmed":"not-started";if(owner)row.ownedRuntime??=owner;}).catch(()=>{});throw error;}
         finally{await Promise.all([...resource.clients].map(client=>client.stop().catch(()=>false)));}
       }).finally(()=>{if(active.get(c)===resource)active.delete(c);});

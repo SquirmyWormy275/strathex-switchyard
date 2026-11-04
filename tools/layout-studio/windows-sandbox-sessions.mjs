@@ -3,7 +3,7 @@ import { randomUUID,createHash } from "node:crypto";
 import { basename,dirname,join } from "node:path";
 import { privateRead } from "./private-fs.mjs";
 import { scopeHash } from "./confirmations.mjs";
-import { createWindowsSandboxNativeCalls } from "./windows-sandbox-native.mjs";
+import { createWindowsSandboxNativeCalls,validateWindowsExchangeBinding } from "./windows-sandbox-native.mjs";
 
 const schema="switchyard-windows-sandbox-session/v1",guestSchema="switchyard-windows-sandbox-guest/v1";
 const uuid=value=>typeof value==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
@@ -71,6 +71,7 @@ export function createWindowsSandboxSessions({store,stateDirectory,platform=proc
       return {
         async run(spec,signal,_onStarted,onGuestReady){
           if(platform!=="win32"||!spec?.reviewedGuest||spec.executable!=="C:\\Windows\\System32\\WindowsSandbox.exe"||spec.args?.length!==1||basename(spec.args[0])!=="sandbox.wsb"||dirname(spec.args[0])!==spec.cwd||spec.reviewedGuest.operationId!==binding.operationId||!digest(spec.reviewedGuest.configurationSha256)||typeof spec.reviewedCatalogRelativePath!=="string"||typeof onGuestReady!=="function"||!Number.isInteger(spec.timeoutMs)||spec.timeoutMs<1000||spec.timeoutMs>600000)throw Error("Managed Sandbox execution requires the exact reviewed backend configuration and guest acknowledgement port.");
+          const exchangeBinding=validateWindowsExchangeBinding(spec.reviewedExchangeBinding,binding.operationId);
           const key=`${c}:${binding.operationId}`,generation=generations.get(c)??0;
           if(closed||resources.has(key)||[...resources.values()].some(resource=>resource.compartment===c))throw Error("This workspace already owns a guest lifecycle; no concurrent replacement was started.");
           const resource={compartment:c,controller:new AbortController(),done:null,deadlineTimer:null};resources.set(key,resource);
@@ -84,12 +85,12 @@ export function createWindowsSandboxSessions({store,stateDirectory,platform=proc
               await check();const recovery=await recoverUnlocked(c);if(!recovery.stopped)throw Error("A retained guest or native owner still needs independent exit verification.");
               if((await snapshot(c)).repositoryWindowsGuests?.some(row=>row.operationId===binding.operationId))throw Error("This guest operation already exists; the recipe cannot be replayed.");
               const configuration=await privateRead(spec.args[0]);if(sha(configuration)!==spec.reviewedGuest.configurationSha256||Buffer.byteLength(configuration)>16384)throw Error("The exact reviewed guest configuration changed before native startup.");
-              await store.update(c,"windows-guest-session-reserve",state=>{const all=state.repositoryWindowsGuests??[],retained=all.filter(row=>row.stoppedVerified!==true);state.repositoryWindowsGuests=[...retained,...all.filter(row=>!retained.includes(row)).slice(-16)];if(state.repositoryWindowsGuests.length>=64||all.some(row=>row.operationId===binding.operationId))throw Error("The protected guest inventory is full or changed; preserve prior ownership.");state.repositoryWindowsGuests.push({schema,...context,configurationSha256:spec.reviewedGuest.configurationSha256,catalogRelativePath:spec.reviewedCatalogRelativePath,status:"reserved",stoppedVerified:false,startVerified:false,createdAt:now(),deadline,exchangeQuotaEnforced:false});});reserved=true;
+              await store.update(c,"windows-guest-session-reserve",state=>{const all=state.repositoryWindowsGuests??[],retained=all.filter(row=>row.stoppedVerified!==true);state.repositoryWindowsGuests=[...retained,...all.filter(row=>!retained.includes(row)).slice(-16)];if(state.repositoryWindowsGuests.length>=64||all.some(row=>row.operationId===binding.operationId))throw Error("The protected guest inventory is full or changed; preserve prior ownership.");state.repositoryWindowsGuests.push({schema,...context,configurationSha256:spec.reviewedGuest.configurationSha256,catalogRelativePath:spec.reviewedCatalogRelativePath,exchangeBindingSha256:scopeHash(exchangeBinding),status:"reserved",stoppedVerified:false,startVerified:false,createdAt:now(),deadline,exchangeQuotaEnforced:false});});reserved=true;
               const call=input=>native.call(c,context,input,check,{signal:combined});
-              await check();const started=await call({action:"start",sandboxId,configuration,configurationSha256:spec.reviewedGuest.configurationSha256});
+              await check();const started=await call({action:"start",sandboxId,configuration,configurationSha256:spec.reviewedGuest.configurationSha256,exchangeBinding});
               if(started.status!=="started")throw Error("Native guest startup did not verify the exact newly owned ID; no recipe was acknowledged.");
               await check();await onGuestReady({schema:guestSchema,sandboxId,operationId:binding.operationId,configurationSha256:spec.reviewedGuest.configurationSha256});
-              await update(c,binding.operationId,"windows-guest-acknowledged",row=>{row.recipeAcknowledgedAt=now();row.status="acknowledged";});
+              await update(c,binding.operationId,"windows-guest-acknowledged",row=>{row.recipeAcknowledgedAt=now();row.status="acknowledged";row.exchangeQuotaEnforced=true;});
               await check();const connected=await call({action:"connect",sandboxId});if(connected.status!=="connection-requested")throw Error("The exact guest viewer connection remains unconfirmed.");
               let login=false;const loginDeadline=Math.min(deadline,now()+45000);
               while(now()<loginDeadline){await check();const probe=await call({action:"probe-login",sandboxId});if(probe.status==="executed"&&probe.guestExitCode===0){login=true;break;}await sleep(250);}
@@ -103,7 +104,7 @@ export function createWindowsSandboxSessions({store,stateDirectory,platform=proc
             let stoppedVerified=false,nativeExited=false,row;
             if(reserved){
               try{row=await get(c,binding.operationId);stoppedVerified=await stopObserved(c,row);nativeExited=await native.recover(c);}catch{failure??=Error("The exact guest or native command exit remains unconfirmed.");}
-              await update(c,binding.operationId,"windows-guest-session-result",row=>{row.status=!failure&&stoppedVerified&&nativeExited?"settled":"outcome-unconfirmed";row.result={workerExitCode:guestExitCode,stoppedVerified,nativeCommandsExited:nativeExited,timedOut:timeout.signal.aborted||now()>=deadline,cancelled:resource.controller.signal.aborted||signal?.aborted===true,recipeReplayed:false,exchangeQuotaEnforced:false};});
+              await update(c,binding.operationId,"windows-guest-session-result",row=>{row.status=!failure&&stoppedVerified&&nativeExited?"settled":"outcome-unconfirmed";row.result={workerExitCode:guestExitCode,stoppedVerified,nativeCommandsExited:nativeExited,timedOut:timeout.signal.aborted||now()>=deadline,cancelled:resource.controller.signal.aborted||signal?.aborted===true,recipeReplayed:false,exchangeQuotaEnforced:row.exchangeQuotaEnforced===true};});
               row=await get(c,binding.operationId);
             }
             if(!reserved&&failure)throw failure;
@@ -123,7 +124,7 @@ export function createWindowsSandboxSessions({store,stateDirectory,platform=proc
     },
     recover,stopCompartment,
     async consumerStopped(c,operationId){if(resources.has(`${c}:${operationId}`))return false;const row=await get(c,operationId);return (!row||row.stoppedVerified===true)&&await native.recover(c);},
-    async list(c){return ((await snapshot(c)).repositoryWindowsGuests??[]).map(row=>({operationId:row.operationId,status:row.status,startVerified:row.startVerified===true,stoppedVerified:row.stoppedVerified===true,workerExitCode:row.workerExitCode??null,exchangeQuotaEnforced:false}));},
+    async list(c){return ((await snapshot(c)).repositoryWindowsGuests??[]).map(row=>({operationId:row.operationId,status:row.status,startVerified:row.startVerified===true,stoppedVerified:row.stoppedVerified===true,workerExitCode:row.workerExitCode??null,exchangeQuotaEnforced:row.exchangeQuotaEnforced===true}));},
     async close(){closed=true;const results=await Promise.all([...seen].map(stopCompartment));await native.close();if(results.some(result=>!result.stopped))throw Error("A managed guest still needs independent exit verification; its ownership and mapped files were preserved.");}
   };
 }

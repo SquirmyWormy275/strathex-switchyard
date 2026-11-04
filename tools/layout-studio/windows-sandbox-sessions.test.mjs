@@ -8,6 +8,7 @@ import {createSuiteStore}from"./suite-store.mjs";
 import {privateWrite}from"./private-fs.mjs";
 import {createWindowsSandboxSessions}from"./windows-sandbox-sessions.mjs";
 const sha=value=>createHash("sha256").update(value).digest("hex");
+const syntheticExchange=operationId=>({schema:"switchyard-windows-bounded-volume/v1",operationId,stagingRoot:`C:\\owned\\disk-${operationId}`,stagingIdentity:{device:"1",inode:"2"},imageIdentity:{device:"1",inode:"3"},mountIdentity:{device:"1",inode:"4"},footerSha256:"b".repeat(64),volumeGuid:`\\\\?\\Volume{${randomUUID()}}\\`});
 // Explicit native/VM doubles; none of these tests allocate a Windows guest.
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),"switchyard-guest-session-contract-")),keys=new Map(),guests=new Set(),calls=[],stopResults=new Map(),services=[];
@@ -37,14 +38,14 @@ async function fixture(t){
     throw Error("Unexpected synthetic native action");
   }};
   const create=()=>{const service=createWindowsSandboxSessions({store,stateDirectory:join(root,"sessions"),platform:"win32",native,isActive:async()=>active,now:()=>clock,sleep:async ms=>{clock+=ms;}});services.push(service);return service;};
-  const service=create(),runner=service.forOperation("personal",binding,async()=>{}),spec={executable:"C:\\Windows\\System32\\WindowsSandbox.exe",args:[configPath],cwd,shell:false,environment:{SystemRoot:"C:\\Windows",WINDIR:"C:\\Windows"},timeoutMs:process.platform==="win32"?60000:5000,maxOutputBytes:4096,reviewedGuest:{operationId:binding.operationId,configurationSha256:sha(configuration)},reviewedCatalogRelativePath:"sandbox-job.json"};
+  const service=create(),runner=service.forOperation("personal",binding,async()=>{}),spec={executable:"C:\\Windows\\System32\\WindowsSandbox.exe",args:[configPath],cwd,shell:false,environment:{SystemRoot:"C:\\Windows",WINDIR:"C:\\Windows"},timeoutMs:process.platform==="win32"?60000:5000,maxOutputBytes:4096,reviewedGuest:{operationId:binding.operationId,configurationSha256:sha(configuration)},reviewedExchangeBinding:syntheticExchange(binding.operationId),reviewedCatalogRelativePath:"sandbox-job.json"};
   const ready=async identity=>{assert.equal(identity.operationId,binding.operationId);assert.equal(identity.configurationSha256,sha(configuration));assert.equal((await store.snapshot("personal")).repositoryWindowsGuests[0].startVerified,true);acknowledged=true;};
   t.after(async()=>{active=true;nativeExited=true;guests.clear();if(unknownStart)await store.update("personal","dispose-explicit-fake-guests",state=>{for(const row of state.repositoryWindowsGuests??[])row.stoppedVerified=true;});for(const service of services){await service.recover("personal");await service.close();}await rm(root,{recursive:true,force:true});});
   return{store,service,runner,create,spec,binding,ready,calls,entered:entry,hold:()=>{hold=true;},unknownStart:value=>{unknownStart=value;},active:value=>{active=value;},stopAllowed:value=>{stopAllowed=value;},observeAbsent:()=>guests.clear(),hook:fn=>{hook=fn;},run:(signal=new AbortController().signal,onReady=ready)=>runner.run(spec,signal,()=>{throw Error("A CLI guardian is not a viewer PID");},onReady)};
 }
 test("managed guest lifecycle acknowledges exact ownership before one worker and verifies VM exit separately from native command exit",async t=>{
   const f=await fixture(t),result=await f.run();assert.equal(result.exitCode,0);assert.equal(result.hostProcessContained,true);assert.equal(result.guestSessionExit.stopped,true);assert.equal(result.pid,undefined);assert.deepEqual(f.calls,["start","connect","probe-login","execute","stop","list"]);assert.equal(await f.service.consumerStopped("personal",f.binding.operationId),true);
-  await assert.rejects(f.run(),/already exists/);assert.equal(f.calls.filter(c=>c==="execute").length,1);assert.equal((await f.service.list("personal"))[0].exchangeQuotaEnforced,false);
+  await assert.rejects(f.run(),/already exists/);assert.equal(f.calls.filter(c=>c==="execute").length,1);assert.equal((await f.service.list("personal"))[0].exchangeQuotaEnforced,true);
 });
 test("failed guest acknowledgement starts no worker and still stops the exact newly owned guest",async t=>{
   const f=await fixture(t),result=await f.run(undefined,async()=>{throw Error("Synthetic lost backend guest identity write");});assert.equal(result.exitCode,null);assert.equal(result.guestSessionExit.stopped,true);assert.deepEqual(f.calls,["start","stop","list"]);assert.equal((await f.service.list("personal"))[0].status,"outcome-unconfirmed");
@@ -64,4 +65,11 @@ test("a lost final guest state write retains native exit and cannot replay the s
 });
 test("interrupted creation can stop only its exact acknowledged nonce; empty or foreign inventory cannot prove a pending start stopped",async t=>{
   for(const inventory of ["empty","foreign","exact"]){const f=await fixture(t);f.unknownStart(inventory);const result=await f.run();assert.equal(result.exitCode,null);assert.equal(f.calls.includes("execute"),false);const row=(await f.store.snapshot("personal")).repositoryWindowsGuests[0];assert.equal(row.stoppedVerified,inventory==="exact",inventory);assert.equal(f.calls.includes("stop"),inventory==="exact",inventory);assert.equal(row.recoveredStartWithoutReplay===true,inventory==="exact",inventory);}
+});
+
+test("managed startup requires the exact bounded volume binding before reserving or starting any guest",async t=>{
+ const f=await fixture(t);
+ for(const reviewedExchangeBinding of [undefined,{...f.spec.reviewedExchangeBinding,operationId:randomUUID()},{...f.spec.reviewedExchangeBinding,stagingRoot:"C:\\ordinary"}])await assert.rejects(f.runner.run({...f.spec,reviewedExchangeBinding},new AbortController().signal,()=>{},f.ready),/bounded Windows exchange/);
+ assert.deepEqual(f.calls,[]);assert.equal((await f.store.snapshot("personal")).repositoryWindowsGuests?.length??0,0);
+ assert.equal((await f.run()).guestSessionExit.stopped,true);
 });

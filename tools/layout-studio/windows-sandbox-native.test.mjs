@@ -5,14 +5,17 @@ import { mkdtemp,rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createSuiteStore } from "./suite-store.mjs";
-import { createWindowsSandboxNativeCalls } from "./windows-sandbox-native.mjs";
+import { scopeHash } from "./confirmations.mjs";
+import { createWindowsSandboxNativeCalls,validateWindowsExchangeBinding } from "./windows-sandbox-native.mjs";
 const schema="switchyard-windows-sandbox-cli/v1",sha=value=>createHash("sha256").update(value).digest("hex");
+const syntheticExchange=operationId=>({schema:"switchyard-windows-bounded-volume/v1",operationId,stagingRoot:`C:\\owned\\disk-${operationId}`,stagingIdentity:{device:"1",inode:"2"},imageIdentity:{device:"1",inode:"3"},mountIdentity:{device:"1",inode:"4"},footerSha256:"b".repeat(64),volumeGuid:`\\\\?\\Volume{${randomUUID()}}\\`});
 // Explicit native/VM doubles. This suite tests the protected transport, not WSB.
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),"switchyard-sandbox-native-contract-")),keys=new Map(),owners=new Map(),services=[];
   const store=createSuiteStore({root:join(root,"private"),secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>{keys.set(c+p,v);}}});await store.initialize("personal");
   const context={operationId:randomUUID(),sandboxId:randomUUID(),scopeDigest:"a".repeat(64),provider:"codex"},configuration="synthetic bounded configuration";
-  await store.update("personal","fixture",state=>{state.mode="personal-companion";state.repositoryWindowsGuests=[{...context,configurationSha256:sha(configuration),status:"reserved",stoppedVerified:false}];});
+  const exchangeBinding=syntheticExchange(context.operationId);
+  await store.update("personal","fixture",state=>{state.mode="personal-companion";state.repositoryWindowsGuests=[{...context,configurationSha256:sha(configuration),exchangeBindingSha256:scopeHash(exchangeBinding),status:"reserved",stoppedVerified:false}];});
   let effects=0,stopped=true,active=true,badInventory=false,observationHook=async()=>{};
   const command=async(exe,args,options)=>{
     assert.equal(exe,process.execPath);assert.deepEqual(args,["--windows-sandbox-cli"]);
@@ -29,7 +32,7 @@ async function fixture(t){
     }finally{owners.set(scope.id,true);}
   };
   const create=()=>{const service=createWindowsSandboxNativeCalls({store,stateDirectory:join(root,"commands"),platform:"win32",helper:process.execPath,command,guardianStopped:async scope=>stopped&&owners.get(scope.id)===true,isActive:async()=>active});services.push(service);return service;};
-  const service=create(),start={action:"start",sandboxId:context.sandboxId,configuration,configurationSha256:sha(configuration)},authorize=async()=>{};
+  const service=create(),start={action:"start",sandboxId:context.sandboxId,configuration,configurationSha256:sha(configuration),exchangeBinding},authorize=async()=>{};
   t.after(async()=>{stopped=true;for(const s of services){await s.recover("personal");await s.close();}await rm(root,{recursive:true,force:true});});
   return {store,service,create,context,start,authorize,effects:()=>effects,setStopped:value=>{stopped=value;},setActive:value=>{active=value;},observationHook:fn=>{observationHook=fn;},badInventory:()=>{badInventory=true;},call:input=>service.call("personal",context,input,authorize)};
 }
@@ -61,4 +64,11 @@ test("revocation after native creation preserves exact ownership facts for clean
   assert.equal((await f.call(f.start)).status,"started");assert.equal((await f.store.snapshot("personal")).repositoryWindowsGuests[0].startVerified,true);
   await assert.rejects(f.call({action:"execute",sandboxId:f.context.sandboxId,catalogRelativePath:"sandbox-job.json",timeoutMs:5000}));assert.equal(f.effects(),1);
   const stopped=await f.service.call("personal",f.context,{action:"stop",sandboxId:f.context.sandboxId},f.authorize,{cleanup:true});assert.equal(stopped.absentObserved,true);assert.equal(f.effects(),2);
+});
+
+test("only an exact bounded exchange binding can reach native start admission",async t=>{
+  const f=await fixture(t),binding=f.start.exchangeBinding;
+  assert.deepEqual(validateWindowsExchangeBinding(binding,f.context.operationId),binding);
+  for(const exchangeBinding of [undefined,{...binding,operationId:randomUUID()},{...binding,mountIdentity:{device:"1",inode:"replacement"}},{...binding,volumeGuid:"C:\\"},{...binding,stagingRoot:"C:\\ordinary"},{...binding,quota:true}])await assert.rejects(f.call({...f.start,exchangeBinding}));
+  const altered={...binding,footerSha256:"c".repeat(64)};await assert.rejects(f.call({...f.start,exchangeBinding:altered}),/protected guest ownership/);assert.equal(f.effects(),0);
 });

@@ -110,6 +110,51 @@ internal static partial class ReviewedInputStager
         return total;
     }
 
+    // Read-only mapping admission. Keep every original handle pinned through
+    // native VM creation; an ordinary directory or arbitrary junction cannot
+    // substitute for this exact, already attached bounded volume.
+    public static IDisposable PinBoundedMapping(JsonElement binding, string mappedRoot)
+    {
+        var handles = new List<SafeFileHandle>();
+        try
+        {
+            Exact(binding, "schema", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256", "volumeGuid");
+            if (binding.GetProperty("schema").GetString() != "switchyard-windows-bounded-volume/v1"
+                || !Guid.TryParseExact(binding.GetProperty("operationId").GetString(), "D", out var operation) || operation == Guid.Empty
+                || !Digest.IsMatch(binding.GetProperty("footerSha256").GetString() ?? "")) throw Invalid();
+            string root = Absolute(binding.GetProperty("stagingRoot")), volume = binding.GetProperty("volumeGuid").GetString() ?? "";
+            if (Path.GetFileName(root) != "disk-" + operation.ToString("D") || !VolumeName(volume)
+                || !string.Equals(Path.GetFullPath(mappedRoot), Path.Combine(root, "mount"), StringComparison.OrdinalIgnoreCase)) throw Invalid();
+            var directory = PinDirectories(root, handles, ReadControl);
+            if (!Matches(Information(directory, true), binding.GetProperty("stagingIdentity"))) throw Invalid();
+            VerifyPrivateDirectory(directory);
+            if (!Directory.EnumerateFileSystemEntries(root).Select(Path.GetFileName).Order(StringComparer.Ordinal).SequenceEqual(new[] { "exchange.vhd", "mount" })) throw Invalid();
+            string imagePath = Path.Combine(root, "exchange.vhd"), mountPath = Path.Combine(root, "mount");
+            var metadata = CreateFileW(NativeName(imagePath), GenericRead, ShareRead | ShareWrite, IntPtr.Zero, OpenExisting, OpenReparsePoint, IntPtr.Zero); handles.Add(metadata);
+            var original = Information(metadata, false);
+            if (!Matches(original, binding.GetProperty("imageIdentity")) || original.Links != 1
+                || (((ulong)original.SizeHigh << 32) | original.SizeLow) != (ulong)BoundedExchangeImage.BackingBytes) throw Invalid();
+            var footer = new byte[512]; int read = 0;
+            while (read < footer.Length)
+            {
+                int count = RandomAccess.Read(metadata, footer.AsSpan(read), BoundedExchangeImage.BackingBytes - 512 + read);
+                if (count == 0) throw Invalid(); read += count;
+            }
+            if (Convert.ToHexString(SHA256.HashData(footer)).ToLowerInvariant() != binding.GetProperty("footerSha256").GetString()) throw Invalid();
+            var mount = PinMount(mountPath, binding.GetProperty("mountIdentity"), false, out bool mounted); handles.Add(mount);
+            if (!mounted) throw Invalid();
+            var image = BoundedExchangeImage.OpenNativeImage(imagePath, operation, 0x00080000, 0); handles.Add(image);
+            if (!BoundedExchangeImage.ReadNativeState(image, operation)) throw Invalid();
+            VerifyMount(mountPath, volume, image, operation);
+            return new BoundedMappingPins(handles);
+        }
+        catch { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); throw; }
+    }
+    private sealed class BoundedMappingPins(List<SafeFileHandle> handles) : IDisposable
+    {
+        public void Dispose() { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+    }
+
     public static int RunBoundedVolume()
     {
         const string schema = "switchyard-windows-bounded-volume/v1"; var handles = new List<SafeFileHandle>(); string phase = "request";

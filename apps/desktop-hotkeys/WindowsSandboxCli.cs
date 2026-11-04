@@ -44,7 +44,7 @@ internal static class WindowsSandboxCli
             || path.Split('/').Any(part => part.Length == 0 || part is "." or ".." || part.Equals(".git", StringComparison.OrdinalIgnoreCase) || part.EndsWith(' ') || part.EndsWith('.') || Regex.IsMatch(part, @"^(con|prn|aux|nul|clock\$|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))) throw Invalid();
         return path.Replace('/', '\\');
     }
-    private static string Configuration(JsonElement request)
+    private static string Configuration(JsonElement request, out string exchangeRoot)
     {
         string text = request.GetProperty("configuration").GetString() ?? "", digest = request.GetProperty("configurationSha256").GetString() ?? "";
         if (Encoding.UTF8.GetByteCount(text) > 16384 || !Regex.IsMatch(digest, "^[a-f0-9]{64}$") || Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant() != digest) throw Invalid();
@@ -58,6 +58,7 @@ internal static class WindowsSandboxCli
         var mappings = root.Element("MappedFolders") ?? throw Invalid();
         if (root.Elements("MappedFolders").Count() != 1 || mappings.Elements().Count() != 3) throw Invalid();
         var expected = new Dictionary<string, string>(StringComparer.Ordinal) { [@"C:\B122\input"] = "true", [@"C:\B122\tools"] = "true", [@"C:\B122\exchange"] = "false" };
+        exchangeRoot = "";
         var seen = new HashSet<string>(StringComparer.Ordinal); var hosts = new List<string>();
         foreach (var mapping in mappings.Elements())
         {
@@ -67,7 +68,7 @@ internal static class WindowsSandboxCli
             if (!seen.Add(guest) || !expected.TryGetValue(guest, out var readOnly) || mapping.Element("ReadOnly")!.Value != readOnly || !SafeLocalPath(host) || !Directory.Exists(host)) throw Invalid();
             string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(host));
             if (hosts.Any(other => full.Equals(other, StringComparison.OrdinalIgnoreCase) || full.StartsWith(other + "\\", StringComparison.OrdinalIgnoreCase) || other.StartsWith(full + "\\", StringComparison.OrdinalIgnoreCase))) throw Invalid();
-            hosts.Add(full);
+            hosts.Add(full); if (guest == @"C:\B122\exchange") exchangeRoot = full;
         }
         return text;
     }
@@ -127,8 +128,12 @@ internal static class WindowsSandboxCli
         while (count < chars.Length) { int read = await Console.In.ReadAsync(chars.AsMemory(count)); if (read == 0) break; count += read; }
         if (count > MaximumInput) throw Invalid(); using var document = JsonDocument.Parse(new string(chars, 0, count)); var request = document.RootElement;
         string action = request.GetProperty("action").GetString() ?? "";
-        string[] fields = action switch { "metadata" or "list" => new[] { "schema", "action" }, "start" => new[] { "schema", "action", "sandboxId", "configuration", "configurationSha256" }, "stop" or "connect" or "probe-login" => new[] { "schema", "action", "sandboxId" }, "execute" => new[] { "schema", "action", "sandboxId", "catalogRelativePath", "timeoutMs" }, _ => throw Invalid() };
+        string[] fields = action switch { "metadata" or "list" => new[] { "schema", "action" }, "start" => new[] { "schema", "action", "sandboxId", "configuration", "configurationSha256", "exchangeBinding" }, "validate-config" => new[] { "schema", "action", "configuration", "configurationSha256", "exchangeBinding" }, "stop" or "connect" or "probe-login" => new[] { "schema", "action", "sandboxId" }, "execute" => new[] { "schema", "action", "sandboxId", "catalogRelativePath", "timeoutMs" }, _ => throw Invalid() };
         Exact(request, fields); if (request.GetProperty("schema").GetString() != Schema) throw Invalid();
+        string? configuration = null; string exchangeRoot = "";
+        if (action is "start" or "validate-config") configuration = Configuration(request, out exchangeRoot);
+        using var mapping = action is "start" or "validate-config" ? ReviewedInputStager.PinBoundedMapping(request.GetProperty("exchangeBinding"), exchangeRoot) : null;
+        if (action == "validate-config") { Write(new { schema = Schema, action, status = "validated", configurationSha256 = request.GetProperty("configurationSha256").GetString(), exchangeQuotaEnforced = true, sandboxEnforced = false, effectStarted = false }); return 0; }
         using var pinned = PinAlias(out var alias);
         if (pinned is null) { Write(new { schema = Schema, action, status = "unavailable", reason = "The current-user Windows Sandbox AppExecLink is unavailable; no ordinary executable or legacy viewer was substituted.", effectStarted = false }); return 0; }
         if (action == "metadata") { Write(new { schema = Schema, action, status = "available", aliasType = "current-user-AppExecLink", effectStarted = false }); return 0; }
@@ -137,9 +142,8 @@ internal static class WindowsSandboxCli
         var before = await List(alias);
         if (action == "start")
         {
-            string configuration = Configuration(request);
             if (before.Length != 0) { Write(new { schema = Schema, action, status = "blocked", effectStarted = false }); return 0; }
-            var launched = await Invoke(alias, new[] { "start", "--id", sandboxId, "--config", configuration, "--raw" }, 45000);
+            var launched = await Invoke(alias, new[] { "start", "--id", sandboxId, "--config", configuration!, "--raw" }, 45000);
             var after = await List(alias);
             bool verified = launched.ExitCode == 0 && after.Length == 1 && after[0] == sandboxId;
             Write(new { schema = Schema, action, status = verified ? "started" : "outcome-unconfirmed", sandboxId, configurationSha256 = request.GetProperty("configurationSha256").GetString(), effectStarted = true }); return 0;

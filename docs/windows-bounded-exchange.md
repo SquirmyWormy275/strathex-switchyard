@@ -159,7 +159,9 @@ lifecycle cases. Packaged import checks and type checking pass. These tests use
 explicit native doubles, real encrypted records, locks and descriptor reads;
 they do not demonstrate a mounted volume. The native Windows lane now includes
 three additional host-service checks for the one-time handoff, consumer fencing
-and changed-body cleanup; those aggregate results are pending.
+and changed-body cleanup. All 26 actual native checks pass at `a8690328`, run
+41896980735; its digest-verified receipt is
+`windows-writable-handoff-a869-native.json`.
 
 Windows Sandbox mapping of this trusted volume, Studio Run connection and a
 supported personal host's privileged setup remain implementation work. No VM

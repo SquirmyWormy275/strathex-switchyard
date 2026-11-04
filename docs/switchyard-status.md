@@ -8,6 +8,26 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The Windows host now durably hands one original fixed-capacity image into a
+writable-volume lifecycle. Native Windows workflow 41896980735 at `a8690328`
+passes actual host-service creation, mounted readback, non-replay/consumer fences
+and cleanup of changed disposable guest data, alongside its ownership fault
+checks. Local storage/suite/runner checks pass 53/53. Original image identities,
+footer, exact detach and independent native/guest exit remain cleanup fences.
+
+Native Sandbox startup now requires that exact bounded volume binding; a
+read-only configuration-validation verb uses the same native checks without
+starting a VM. Fifty focused storage/transport/session/runner cases, four release
+checks, type checking, a zero-warning/error helper build and six Linux guards
+pass. Native mapping acceptance is pending CI. The bounded backend connection,
+Studio Windows Run adapter and personal-host privileged setup remain unfinished
+software. Supported interactive Windows VM acceptance remains a separate check.
+
+Complete Windows `72c5f96` passes 261/261 groups: 1,738 tests, 1,690 passed and
+48 declared skips. Its bounded archive was SHA-256 verified and only receipt
+`d2b0aa0e-67a1-4f55-bf55-d21daf5fab91` retained. That checkpoint predates the
+image/volume ownership work. The frontend remains frozen; no browser was reloaded.
+
 The Linux reviewed Run service now passes actual task-input → policy/checkpoint/
 budget → Bubblewrap → owned guardian → terminal-result checks. It preserves the
 original admission result, releases terminal budget claims, and removes only

@@ -66,12 +66,12 @@ jobs:
           } finally { $zip.Dispose() }
           Remove-Item -LiteralPath $archive -Force
 
-      - name: Verify image and writable-volume ownership fault boundaries
+      - name: Verify storage and mapping ownership fault boundaries
         shell: pwsh
         timeout-minutes: 6
         run: |
           $ErrorActionPreference = 'Stop'
-          & node --test --test-concurrency=1 scripts/run-isolated-tests.test.mjs tools/layout-studio/windows-exchange-images.test.mjs
+          & node --test --test-concurrency=1 scripts/run-isolated-tests.test.mjs tools/layout-studio/windows-exchange-images.test.mjs tools/layout-studio/windows-sandbox-native.test.mjs tools/layout-studio/windows-sandbox-sessions.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'A protected storage ownership or harness contract failed.' }
 
       - name: Verify actual native filesystems and guardians without opening a guest
