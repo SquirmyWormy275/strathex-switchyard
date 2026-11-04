@@ -65,7 +65,17 @@ internal static class WindowsStorageBrokerPipe
                     var request=WindowsStorageBrokerProtocol.ReadRequest(bytes,settings.Binding);
                     phase="storage";var storage=JsonSerializer.SerializeToElement(ReviewedInputStager.StoragePrerequisites());
                     phase="signature";byte[] reply=WindowsStorageBrokerProtocol.Reply(settings.Binding,request,storage,signingKey);
-                    try{phase="write";await WriteFrame(pipe,reply,deadline.Token);}finally{CryptographicOperations.ZeroMemory(reply);}
+                    try
+                    {
+                        phase="write";await WriteFrame(pipe,reply,deadline.Token);
+                        // DisconnectNamedPipe discards unread server output. A
+                        // bounded acknowledgement proves the client consumed
+                        // this exact nonce-bound signed reply before disconnect.
+                        phase="acknowledgement";byte[] acknowledgement=await ReadFrame(pipe,32,deadline.Token);
+                        try{if(acknowledgement.Length!=32||!CryptographicOperations.FixedTimeEquals(acknowledgement,SHA256.HashData(reply)))throw Invalid();}
+                        finally{CryptographicOperations.ZeroMemory(acknowledgement);}
+                    }
+                    finally{CryptographicOperations.ZeroMemory(reply);}
                 }
                 finally{CryptographicOperations.ZeroMemory(bytes);}
             }
@@ -91,7 +101,11 @@ internal static class WindowsStorageBrokerPipe
         using var pipe=new NamedPipeClientStream(PipeDirection.InOut,true,true,handle);
         string nonce=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();byte[] bytes=WindowsStorageBrokerProtocol.Request(settings.Binding,nonce);
         var request=WindowsStorageBrokerProtocol.ReadRequest(bytes,settings.Binding);await WriteFrame(pipe,bytes,deadline.Token);byte[] reply=await ReadFrame(pipe,16384,deadline.Token);
-        try{return WindowsStorageBrokerProtocol.Verify(reply,settings.Binding,request,WindowsStorageBrokerInstallation.PublicKeyBytes(settings));}
+        try
+        {
+            var verified=WindowsStorageBrokerProtocol.Verify(reply,settings.Binding,request,WindowsStorageBrokerInstallation.PublicKeyBytes(settings));
+            byte[] acknowledgement=SHA256.HashData(reply);try{await WriteFrame(pipe,acknowledgement,deadline.Token);}finally{CryptographicOperations.ZeroMemory(acknowledgement);}return verified;
+        }
         finally{CryptographicOperations.ZeroMemory(bytes);CryptographicOperations.ZeroMemory(reply);}
     }
 }

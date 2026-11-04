@@ -4,6 +4,7 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Principal;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
@@ -47,17 +48,33 @@ internal static class NativeServiceProof
             }
             finally{LocalFree(admins);}
         }
+        DelayedConsumption(settings).GetAwaiter().GetResult();checks++;
         RejectMalformed(settings).GetAwaiter().GetResult();checks++;
         Require(WindowsStorageBrokerPipe.Observe(settings).GetAwaiter().GetResult().GetProperty("privilegeStateUnchanged").GetBoolean());
         return checks;
     }
-    private static async Task RejectMalformed(WindowsStorageBrokerInstallation.Settings settings)
+    private static NamedPipeClientStream OpenClient(WindowsStorageBrokerInstallation.Settings settings)
     {
         string name=@"\\.\pipe\switchyard-storage-"+settings.OwnerScope+"-"+settings.InstallationId;
         var handle=CreateFileW(name,0x100183,0,IntPtr.Zero,3,0x40110000,IntPtr.Zero);
         if(handle.IsInvalid){handle.Dispose();if(!WaitNamedPipeW(name,1000))throw new InvalidOperationException("The exact pipe is unavailable.");handle=CreateFileW(name,0x100183,0,IntPtr.Zero,3,0x40110000,IntPtr.Zero);}
         if(handle.IsInvalid){handle.Dispose();throw new InvalidOperationException("The exact pipe did not reopen.");}
-        using var pipe=new NamedPipeClientStream(PipeDirection.InOut,true,true,handle);using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        return new NamedPipeClientStream(PipeDirection.InOut,true,true,handle);
+    }
+    private static async Task DelayedConsumption(WindowsStorageBrokerInstallation.Settings settings)
+    {
+        using var pipe=OpenClient(settings);using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        byte[] requestBytes=WindowsStorageBrokerProtocol.Request(settings.Binding,Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant()),header=new byte[4];var request=WindowsStorageBrokerProtocol.ReadRequest(requestBytes,settings.Binding);
+        BinaryPrimitives.WriteUInt32LittleEndian(header,(uint)requestBytes.Length);await pipe.WriteAsync(header,deadline.Token);await pipe.WriteAsync(requestBytes,deadline.Token);await pipe.FlushAsync(deadline.Token);
+        // The old server disconnected after buffering its write and discarded
+        // this unread response. This deliberate delay makes that race repeatable.
+        await Task.Delay(200,deadline.Token);await pipe.ReadExactlyAsync(header,deadline.Token);uint length=BinaryPrimitives.ReadUInt32LittleEndian(header);if(length is <2 or >16384)throw new InvalidOperationException("The delayed response exceeded its frame bound.");
+        byte[] reply=new byte[checked((int)length)];await pipe.ReadExactlyAsync(reply,deadline.Token);var storage=WindowsStorageBrokerProtocol.Verify(reply,settings.Binding,request,WindowsStorageBrokerInstallation.PublicKeyBytes(settings));if(!storage.GetProperty("privilegeStateUnchanged").GetBoolean())throw new InvalidOperationException("The delayed reply did not authenticate.");
+        byte[] acknowledgement=SHA256.HashData(reply);BinaryPrimitives.WriteUInt32LittleEndian(header,32);await pipe.WriteAsync(header,deadline.Token);await pipe.WriteAsync(acknowledgement,deadline.Token);await pipe.FlushAsync(deadline.Token);
+    }
+    private static async Task RejectMalformed(WindowsStorageBrokerInstallation.Settings settings)
+    {
+        using var pipe=OpenClient(settings);using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(5));
         byte[] bytes=Encoding.UTF8.GetBytes("{\"schema\":\"untrusted\",\"action\":\"attach\",\"path\":\"C:\\\\foreign.vhd\"}"),header=new byte[4];BinaryPrimitives.WriteUInt32LittleEndian(header,(uint)bytes.Length);
         await pipe.WriteAsync(header,deadline.Token);await pipe.WriteAsync(bytes,deadline.Token);await pipe.FlushAsync(deadline.Token);
         byte[] response=new byte[1];try{if(await pipe.ReadAsync(response,deadline.Token)!=0)throw new InvalidOperationException("An unapproved pipe request received data.");}catch(IOException){/* Server disconnects without any reply. */}

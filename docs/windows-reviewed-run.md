@@ -43,10 +43,17 @@ application, assign privileges to a user or expose any volume/shell verb. Its
 metadata continues to say `brokerImplemented: false` because bounded privileged
 storage effects and the normal-user setup path remain unfinished.
 
+The client verifies each signed reply, then sends its SHA-256 digest as a bounded
+transport acknowledgement. The server retains the connection until that exact
+digest arrives within the existing five-second bound. This prevents
+[DisconnectNamedPipe from discarding unread output](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-disconnectnamedpipe).
+The native proof deliberately delays reading a valid reply, so an early
+disconnect fails deterministically. This acknowledgement authorizes no effect.
+
 Helper and linked proof compile without warnings; the sixteen actual crypto
 checks and four package checks pass locally, and build scratch was removed.
 The new disposable Windows lane installs this exact metadata service, verifies
-twelve restricted-client/cache/malformed-pipe boundaries, then observes exact
+thirteen restricted-client/delayed-reader/cache/malformed-pipe boundaries, then observes exact
 exit and removal. That native lifecycle proof is pending CI. The per-service
 runtime environment and extraction behavior require this actual native check;
 managed compilation cannot establish them. No broker service was installed on
