@@ -11,7 +11,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFile, lstat, mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { copyFile, lstat, mkdir, open, realpath, rename, rm, rmdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
@@ -19,6 +19,8 @@ import {
   type BrokerOutcome,
   type GitRequest
 } from "../../../packages/control-plane/src/brokers.ts";
+import { VerifiedGitContentStager } from "./git-content-stager.ts";
+import type { UntrackedClassification } from "../../../packages/control-plane/src/git-inspector.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
 import type { ChildOperationLease } from "../../../packages/control-plane/src/operations.ts";
 import type { ContainmentRemediationBinding, DurableContainmentIncidentCoordinator } from "../../../packages/control-plane/src/containment-incidents.ts";
@@ -30,7 +32,7 @@ export interface LocalGitResult {
 }
 
 export interface LocalGitRunner {
-  run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>> }>): Promise<LocalGitResult>;
+  run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>>; input?: Uint8Array }>): Promise<LocalGitResult>;
 }
 
 /** Fixed-argv runner: no request field is ever interpreted as shell syntax. */
@@ -40,12 +42,14 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
     if (!candidates.length || candidates.some((candidate) => !fixedGitPath(candidate))) throw new Error("Local Git mediation requires fixed absolute Git executable candidates.");
     this.candidates = [...candidates];
   }
-  async run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>> }>): Promise<LocalGitResult> {
+  async run(args: readonly string[], options: Readonly<{ cwd: string; environment?: Readonly<Record<string, string>>; input?: Uint8Array }>): Promise<LocalGitResult> {
+    if (options.input !== undefined && (!(options.input instanceof Uint8Array) || options.input.byteLength > 524288)) throw new Error("Local Git input exceeds its bounded binary pipe contract.");
+    const input = options.input === undefined ? undefined : Buffer.from(options.input);
     const executable = await this.resolveExecutable();
     const environment = options.environment ?? {};
     if (Object.keys(environment).some((key) => key !== "GIT_INDEX_FILE") || Object.values(environment).some((value) => /[\r\n\0]/.test(value))) throw new Error("Local Git mediation rejected an unknown or unsafe environment override.");
     return new Promise((resolveResult, reject) => {
-      const child = spawn(executable, [...args], {
+      const child = spawn(executable, ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], {
         cwd: options.cwd,
         shell: false,
         windowsHide: true,
@@ -55,13 +59,17 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
         env: {
           ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot ?? "C:\\Windows", WINDIR: process.env.WINDIR ?? "C:\\Windows" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent" }),
           GIT_OPTIONAL_LOCKS: "0",
+          GIT_NO_REPLACE_OBJECTS: "1",
           GIT_TERMINAL_PROMPT: "0",
           GCM_INTERACTIVE: "Never",
           GIT_CONFIG_NOSYSTEM: "1",
+          GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
           LC_ALL: "C",
           ...environment
         }
       });
+      const delivered = input === undefined ? Promise.resolve(true) : new Promise<boolean>(resolve => { child.stdin.on("error", () => resolve(false)); child.stdin.end(input, () => resolve(true)); });
+      if (input === undefined) { child.stdin.on("error", () => {}); child.stdin.end(); }
       const stdout: Buffer[] = [];
       const stderr: Buffer[] = [];
       let outputBytes = 0;
@@ -77,11 +85,11 @@ export class SpawnLocalGitRunner implements LocalGitRunner {
       child.stdout.on("data", collect(stdout));
       child.stderr.on("data", collect(stderr));
       child.once("error", reject);
-      child.once("close", (exitCode) => resolveResult({
-        exitCode: exitCode ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8")
-      }));
+      child.once("close", async (exitCode) => {
+        const bytes = Buffer.concat(stdout), output = bytes.toString("utf8");
+        if (!Buffer.from(output).equals(bytes)) { reject(new Error("Git query stdout is not valid UTF-8 text.")); return; }
+        resolveResult({ exitCode: await delivered ? exitCode ?? 1 : 1, stdout: output, stderr: Buffer.concat(stderr).toString("utf8") });
+      });
     });
   }
 
@@ -105,6 +113,8 @@ export interface MediatedGitHandlerOptions {
   readonly runner?: LocalGitRunner;
   readonly now?: () => number;
   readonly lockTimeoutMs?: number;
+  readonly classifyUntracked?: (path: string) => UntrackedClassification;
+  readonly classifyIgnored?: (path: string) => UntrackedClassification;
   readonly remediation?: Pick<DurableContainmentIncidentCoordinator, "assertRemediationPermit" | "recordRemediation">;
 }
 
@@ -138,6 +148,7 @@ export class LocalMediatedGitHandler {
   private readonly now: () => number;
   private readonly lockTimeoutMs: number;
   private readonly remediation?: MediatedGitHandlerOptions["remediation"];
+  private readonly contentStager: VerifiedGitContentStager;
 
   constructor(options: MediatedGitHandlerOptions) {
     this.stateDirectory = resolve(options.stateDirectory);
@@ -145,6 +156,7 @@ export class LocalMediatedGitHandler {
     this.now = options.now ?? Date.now;
     this.lockTimeoutMs = options.lockTimeoutMs ?? 2_000;
     this.remediation = options.remediation;
+    this.contentStager = new VerifiedGitContentStager({ runner: this.runner, ...(options.classifyUntracked ? { classifyUntracked: options.classifyUntracked } : {}), ...(options.classifyIgnored ? { classifyIgnored: options.classifyIgnored } : {}) });
   }
 
   async execute(request: GitRequest): Promise<BrokerOutcome> {
@@ -182,9 +194,11 @@ export class LocalMediatedGitHandler {
 
     let lock: HeldLock | undefined;
     let sharedIndexLock: HeldSharedIndexLock | undefined;
+    let operationDirectory: string | undefined;
     let temporaryIndex: string | undefined;
     let temporaryInspectionIndex: string | undefined;
     let temporaryHooks: string | undefined;
+    let preserveState = false;
     let featureBranchChild: ChildOperationLease | undefined;
     let localCommitChild: ChildOperationLease | undefined;
     try {
@@ -197,7 +211,7 @@ export class LocalMediatedGitHandler {
       const precondition = await this.verifyGitPreconditions(root, request);
       if (precondition) return precondition;
 
-      const operationDirectory = join(this.stateDirectory, "git-operations", request.operationId);
+      operationDirectory = join(this.stateDirectory, "git-operations", createHash("sha256").update(request.operationId).digest("hex"));
       await mkdir(operationDirectory, { recursive: true, mode: 0o700 });
       temporaryIndex = join(operationDirectory, `index-${randomUUID()}`);
       temporaryHooks = join(operationDirectory, `hooks-${randomUUID()}`);
@@ -209,6 +223,11 @@ export class LocalMediatedGitHandler {
         const beforeBranch = await this.verifyGitPreconditions(root, request);
         if (beforeBranch) return beforeBranch;
         const featureBranch = request.mutation.featureBranch!;
+        sharedIndexLock = await this.acquireSharedIndexLock(root);
+        temporaryInspectionIndex = join(operationDirectory, `shared-index-${randomUUID()}`);
+        await copyFile(sharedIndexLock.indexPath, temporaryInspectionIndex);
+        const indexLocked = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
+        if (indexLocked) return indexLocked;
         if (request.childSaga) {
           featureBranchChild = await request.childSaga.begin({
             action: "git.feature-branch",
@@ -226,11 +245,16 @@ export class LocalMediatedGitHandler {
           }
           await request.childSaga.markExecuting(featureBranchChild);
         }
-        const switched = await this.runner.run(["-c", `core.hooksPath=${temporaryHooks}`, "switch", "-c", featureBranch, request.target.head], { cwd: root });
+        // One reference transaction creates the branch and changes HEAD only
+        // if the reviewed previous symbolic ref or detached object still matches.
+        // No checkout, worktree refresh, filter or post-checkout hook is involved.
+        const oldType = request.target.detached ? "oid" : "ref", oldValue = request.target.detached ? request.target.head : `refs/heads/${request.target.branch}`;
+        const transaction = Buffer.from(["start", `create refs/heads/${featureBranch}`, request.target.head, "option no-deref", "symref-update HEAD", `refs/heads/${featureBranch}`, oldType, oldValue, "prepare", "commit", ""].join("\0"));
+        const switched = await this.runner.run(["-c", `core.hooksPath=${temporaryHooks}`, "update-ref", "--stdin", "-z", "--create-reflog", "-m", "Switchyard reviewed feature branch"], { cwd: root, input: transaction });
         const [observedBranch, observedHead, observedIndex] = await Promise.all([
           this.currentBranch(root).catch(() => undefined),
           this.currentHead(root).catch(() => undefined),
-          this.currentIndexTree(root).catch(() => undefined)
+          this.currentIndexTree(root, { GIT_INDEX_FILE: temporaryInspectionIndex }).catch(() => undefined)
         ]);
         if (switched.exitCode === 0 && observedBranch === featureBranch && observedHead === request.target.head && observedIndex === request.target.indexTree) {
           if (featureBranchChild) {
@@ -257,8 +281,8 @@ export class LocalMediatedGitHandler {
 
       const readTree = await this.runner.run(["read-tree", request.target.indexTree], { cwd: root, environment });
       if (readTree.exitCode !== 0) return failedGit("The broker could not construct a private index from the reviewed target.", readTree, "not_started");
-      const stage = await this.runner.run(["add", "-A", "--", ...paths.paths], { cwd: root, environment });
-      if (stage.exitCode !== 0) return failedGit("The broker could not stage only the reviewed task-owned paths.", stage, "not_started");
+      const stage = await this.contentStager.stage(root, request.target, paths.paths, environment);
+      if (stage) return stage;
       const exact = await this.verifyPrivateIndex(root, environment, paths.canonical);
       if (exact) return exact;
 
@@ -298,26 +322,38 @@ export class LocalMediatedGitHandler {
         try { await this.remediation.assertRemediationPermit(remediation); }
         catch { return { status: "blocked", summary: "The containment remediation permit changed immediately before the local commit effect.", effectDisposition: "not_started" }; }
       }
+      // Porcelain commit can refresh worktree entries and invoke clean filters.
+      // Create an object from the already-verified tree, then CAS only the exact
+      // reviewed branch. Neither command stages or reopens worktree content.
+      const object = await this.runner.run([
+        "-c", `core.hooksPath=${temporaryHooks}`, "-c", "commit.gpgSign=false",
+        "commit-tree", expectedTree, "-p", request.target.head, "-m", request.mutation.message
+      ], { cwd: root, environment });
+      const createdHead = object.stdout.trim();
+      if (object.exitCode !== 0 || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(createdHead)) {
+        if (localCommitChild) await request.childSaga!.settle(localCommitChild, "failed", { observedHead: request.target.head });
+        return failedGit("The reviewed commit object could not be created; no branch update was requested.", object, "not_started");
+      }
       const commit = await this.runner.run([
-        "-c", `core.hooksPath=${temporaryHooks}`,
-        "-c", "commit.gpgSign=false",
-        "commit", "--no-verify", "-m", request.mutation.message
+        "-c", `core.hooksPath=${temporaryHooks}`, "update-ref", "--create-reflog",
+        "-m", "Switchyard scoped local commit", `refs/heads/${request.target.branch!}`, createdHead, request.target.head
       ], { cwd: root, environment });
       if (commit.exitCode === 0) {
         const postHead = await this.currentHead(root);
         const committedTree = await this.currentHeadTree(root);
         const privateTree = await this.currentIndexTree(root, environment);
         if (localCommitChild) {
-          await request.childSaga!.markExternalCommitted(localCommitChild, { postHead, committedTree });
-          await request.childSaga!.settle(localCommitChild, "completed", { postHead, committedTree });
+          await request.childSaga!.markExternalCommitted(localCommitChild, { createdHead, postHead, committedTree });
         }
-        if (privateTree !== committedTree) {
+        if (postHead !== createdHead || committedTree !== expectedTree || privateTree !== committedTree) {
+          if (localCommitChild) await request.childSaga!.settle(localCommitChild, "ambiguous", { createdHead, postHead, committedTree });
           return {
             status: "incomplete",
             summary: "Git advanced HEAD but the private reviewed index no longer matches the committed tree; reconciliation is required.",
             effectDisposition: "committed"
           };
         }
+        if (localCommitChild) await request.childSaga!.settle(localCommitChild, "completed", { postHead, committedTree });
         try {
           await sharedIndexLock.replaceWith(temporaryIndex);
           sharedIndexLock = undefined;
@@ -371,21 +407,25 @@ export class LocalMediatedGitHandler {
       if (localCommitChild) await request.childSaga!.settle(localCommitChild, "failed", { observedHead: request.target.head });
       return failedGit("The reviewed local commit was rejected without changing the observed target HEAD.", commit, "not_started");
     } catch (error) {
+      preserveState = typeof error === "object" && error !== null && "code" in error && error.code === "RUNTIME_STOP_UNCONFIRMED";
       if (featureBranchChild && request.childSaga) await request.childSaga.settle(featureBranchChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
       if (localCommitChild && request.childSaga) await request.childSaga.settle(localCommitChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
-      return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous" };
+      return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous", ...(preserveState ? { data: { recoveryStatePreserved: true, operationId: request.operationId } } : {}) };
     } finally {
-      if (temporaryIndex) {
-        await rm(temporaryIndex, { force: true }).catch(() => undefined);
-        await rm(`${temporaryIndex}.lock`, { force: true }).catch(() => undefined);
+      if (!preserveState) {
+        if (temporaryIndex) {
+          await rm(temporaryIndex, { force: true }).catch(() => undefined);
+          await rm(`${temporaryIndex}.lock`, { force: true }).catch(() => undefined);
+        }
+        if (temporaryInspectionIndex) {
+          await rm(temporaryInspectionIndex, { force: true }).catch(() => undefined);
+          await rm(`${temporaryInspectionIndex}.lock`, { force: true }).catch(() => undefined);
+        }
+        if (temporaryHooks) await rm(temporaryHooks, { recursive: true, force: true }).catch(() => undefined);
+        if (sharedIndexLock) await sharedIndexLock.release().catch(() => undefined);
+        if (lock) await lock.release().catch(() => undefined);
+        if (operationDirectory) await rmdir(operationDirectory).catch(() => undefined);
       }
-      if (temporaryInspectionIndex) {
-        await rm(temporaryInspectionIndex, { force: true }).catch(() => undefined);
-        await rm(`${temporaryInspectionIndex}.lock`, { force: true }).catch(() => undefined);
-      }
-      if (temporaryHooks) await rm(temporaryHooks, { recursive: true, force: true }).catch(() => undefined);
-      if (sharedIndexLock) await sharedIndexLock.release().catch(() => undefined);
-      if (lock) await lock.release().catch(() => undefined);
     }
   }
 
@@ -429,7 +469,7 @@ export class LocalMediatedGitHandler {
       this.currentHead(root),
       this.currentBranch(root),
       this.currentIndexTree(root, indexEnvironment),
-      this.runner.run(["diff", "--cached", "--quiet", "--exit-code"], { cwd: root, ...(indexEnvironment ? { environment: indexEnvironment } : {}) })
+      this.runner.run(["diff", "--no-ext-diff", "--no-textconv", "--cached", "--quiet", "--exit-code"], { cwd: root, ...(indexEnvironment ? { environment: indexEnvironment } : {}) })
     ]);
     if (head !== request.target.head || branch !== (request.target.branch ?? "") || indexTree !== request.target.indexTree) {
       return { status: "incomplete", summary: "The repository HEAD, branch, or default index changed after target capture; no Git mutation was started.", effectDisposition: "not_started" };
@@ -442,7 +482,7 @@ export class LocalMediatedGitHandler {
   }
 
   private async verifyPrivateIndex(root: string, environment: Readonly<Record<string, string>>, expected: ReadonlySet<string>): Promise<BrokerOutcome | undefined> {
-    const result = await this.runner.run(["diff", "--cached", "--name-only", "-z"], { cwd: root, environment });
+    const result = await this.runner.run(["diff", "--no-ext-diff", "--no-textconv", "--cached", "--name-only", "-z"], { cwd: root, environment });
     if (result.exitCode !== 0) return failedGit("The broker could not inspect its private index.", result, "not_started");
     const actual = result.stdout.split("\0").filter(Boolean).map((path) => canonicalRepositoryPath(path));
     if (actual.some((path) => !path) || actual.length !== expected.size || actual.some((path) => !expected.has(path!))) {

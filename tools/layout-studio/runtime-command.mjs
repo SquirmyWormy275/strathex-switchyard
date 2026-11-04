@@ -96,6 +96,7 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
   if (!detailed && (result.status !== "completed" || result.exitCode !== 0)) throw new Error(`The optional runtime operation ${result.status === "timed-out" ? "timed out" : result.status === "output-limit" ? "exceeded its output bound" : "failed"}. Existing components were preserved.`);
   const bytes = Buffer.from(result.stdout, "base64");
   if (bytes.toString("base64") !== result.stdout || bytes.length > maxOutputBytes) throw new Error("Invalid bounded runtime output.");
+  if (!Buffer.from(bytes.toString("utf8")).equals(bytes)) throw new Error("Native command stdout is not valid UTF-8 text.");
   if (input !== undefined && result.inputDelivered !== true) throw new Error("The exact native input was not fully delivered. Its outcome remains unconfirmed.");
   if (!detailed) return bytes.toString("utf8");
   const errors = Buffer.from(result.stderr ?? "", "base64");

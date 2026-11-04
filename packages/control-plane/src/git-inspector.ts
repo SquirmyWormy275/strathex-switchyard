@@ -56,7 +56,7 @@ export class NodeGitCommandRunner implements GitCommandRunner {
   async run(args: readonly string[], workingDirectory?: string): Promise<GitCommandResult> {
     const executable = await this.fixedExecutable();
     return new Promise((resolveResult, reject) => {
-      const child = spawn(executable, [...args], {
+      const child = spawn(executable, ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], {
         cwd: workingDirectory,
         shell: false,
         windowsHide: true,
@@ -65,6 +65,7 @@ export class NodeGitCommandRunner implements GitCommandRunner {
           GIT_CONFIG_NOSYSTEM: "1",
           GIT_TERMINAL_PROMPT: "0",
           GIT_OPTIONAL_LOCKS: "0",
+          GIT_NO_REPLACE_OBJECTS: "1",
           LC_ALL: "C"
         }
       });
@@ -73,11 +74,11 @@ export class NodeGitCommandRunner implements GitCommandRunner {
       child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
       child.once("error", reject);
-      child.once("close", (exitCode) => resolveResult({
-        exitCode: exitCode ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8")
-      }));
+      child.once("close", (exitCode) => {
+        const bytes = Buffer.concat(stdout), output = bytes.toString("utf8");
+        if (!Buffer.from(output).equals(bytes)) { reject(new Error("Git query stdout is not valid UTF-8 text.")); return; }
+        resolveResult({ exitCode: exitCode ?? 1, stdout: output, stderr: Buffer.concat(stderr).toString("utf8") });
+      });
     });
   }
 

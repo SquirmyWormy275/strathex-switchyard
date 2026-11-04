@@ -24,6 +24,9 @@ test("runtime guardian commits readiness, preserves invocation identity and retu
   const output = await runRuntimeCommand(executable, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'yes');process.stderr.write(${JSON.stringify(secret)});process.stdout.write(JSON.stringify({value:'verified',invokedAs:process.argv0}))`], { ...options, onGuardianReady: async (frame) => { scope = frame; assert.ok(frame.guardianPid > 0); assert.equal(await runtimeGuardianStopped(frame, options), false); await assert.rejects(readFile(marker), { code: "ENOENT" }); ready = true; await new Promise(r => setTimeout(r, 50)); } });
   assert.equal(ready, true); assert.deepEqual(JSON.parse(output), { value: "verified", invokedAs: executable }); assert.equal(await readFile(marker, "utf8"), "yes"); assert.ok(!output.includes(secret));
   assert.equal(await runtimeGuardianStopped(scope, options), true);
+  let invalidScope;
+  await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write(Buffer.from([255]))"], { ...options, onGuardianReady: frame => { invalidScope = frame; } }), /valid UTF-8/);
+  assert.equal(await runtimeGuardianStopped(invalidScope, options), true);
 }));
 test("runtime guardian cannot execute when the durable start acknowledgement fails", { skip }, () => fixture(async (root) => {
   const marker = join(root, "ran");

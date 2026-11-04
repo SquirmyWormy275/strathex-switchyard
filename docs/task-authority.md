@@ -10,7 +10,9 @@ The suite's commit-effect route is still unfinished. These controls establish
 and revalidate its authority boundary; they do not enable native provider tools,
 change a model's permissions, execute a plan, stage files or create a commit.
 The existing companion commit broker remains a separate implementation until
-its policy, containment and final-effect barriers are connected here.
+its policy, containment, native ownership, final-effect and recovery barriers
+are connected here. The [repository-effect contract](mediated-repository-effects.md)
+describes the implemented companion component and its remaining suite connection.
 
 ## Review an exact scope
 

@@ -145,6 +145,9 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/mode") {
         const result = await store.update(compartment, "mode-select", (s) => {
           if (!["keyboard-only", s.policy === "work" ? "managed-companion" : "personal-companion"].includes(body.mode)) throw new Error("Choose keyboard-only or the companion mode matching this workspace's policy.");
+          // Fence pending starts at the durable mode decision, before any slow
+          // source/provider shutdown. A later resume must not revive an older request.
+          for (const kind of ["custom", "langchain"]) { const key = `${compartment}:${kind}`; exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); }
           s.mode = body.mode; s.modeSelectedAt = Date.now();
           if (body.mode === "keyboard-only") { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; }
           return { mode: s.mode, policyStillEnforced: true };
@@ -216,6 +219,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         const generation = fence;
         const starting = (async () => {
         const id = `${body.example}-example`, state = await store.snapshot(compartment);
+        if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped before startup.");
         let enrollment;
         if (state.agents.some((a) => a.id === id)) enrollment = { compartment, agentId: id, token: await store.credential(compartment, `agent-${id}`, undefined, { provider: "custom-agent" }), initialSequence: state.agents.find((a) => a.id === id).sequence };
         else enrollment = await custom.enroll(compartment, { id, name: body.example === "custom" ? "Synthetic custom agent" : "Synthetic LangChain Runnable", capabilities: agentIntents });

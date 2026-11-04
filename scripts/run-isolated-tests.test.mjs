@@ -44,7 +44,10 @@ test("platform groups accept only their exact declared skip count", async () => 
 test("Linux source lane keeps shared and native groups without claiming Windows runtime coverage", () => {
   assert.ok(linuxGroups.some((group) => group.file === "packages/control-plane/test/runtime.test.ts"));
   assert.ok(linuxGroups.some((group) => group.file === "apps/linux-companion/test/linux-secret.test.ts"));
-  assert.equal(linuxGroups.some((group) => group.file.startsWith("apps/windows-companion/")), false);
+  const portableGit = linuxGroups.filter(group => group.file.startsWith("apps/windows-companion/"));
+  assert.deepEqual([...new Set(portableGit.map(group => group.file))], ["apps/windows-companion/test/mediated-git.test.ts"]);
+  assert.deepEqual(portableGit, requiredGroups.filter(group => group.file === "apps/windows-companion/test/mediated-git.test.ts"));
+  assert.ok(portableGit.some(group => group.pattern?.includes("bypasses repository clean/process/diff/textconv/fsmonitor")));
   assert.equal(linuxGroups.find((group) => group.file === "apps/linux-companion/test/linux-isolation.test.ts")?.expectedSkipped, process.platform === "linux" ? undefined : 1);
 });
 

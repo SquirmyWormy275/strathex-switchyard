@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,7 +12,7 @@ import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../pa
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
-import { LocalMediatedGitHandler } from "../src/mediated-git.ts";
+import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "../src/mediated-git.ts";
 import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 
 class RecordingChildSaga implements ChildOperationSaga {
@@ -25,7 +25,7 @@ class RecordingChildSaga implements ChildOperationSaga {
   async settle(_lease: ChildOperationLease, outcome: ChildOperationOutcome, details?: Readonly<Record<string, string>>) { this.events.push({ kind: `settle:${outcome}`, value: details }); }
 }
 
-async function command(cwd: string, ...args: string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> {
+async function command(cwd: string, ...args: string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string; readonly stdoutBytes: Buffer }> {
   return new Promise((resolveResult, reject) => {
     const child = spawn(args[0]!, args.slice(1), { cwd, shell: false, windowsHide: true });
     const stdout: Buffer[] = [];
@@ -33,7 +33,7 @@ async function command(cwd: string, ...args: string[]): Promise<{ readonly code:
     child.stdout.on("data", (value: Buffer) => stdout.push(value));
     child.stderr.on("data", (value: Buffer) => stderr.push(value));
     child.once("error", reject);
-    child.once("close", (code) => resolveResult({ code: code ?? 1, stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8") }));
+    child.once("close", (code) => resolveResult({ code: code ?? 1, stdout: Buffer.concat(stdout).toString("utf8"), stdoutBytes: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8") }));
   });
 }
 
@@ -129,9 +129,9 @@ function grant(target: TargetSnapshot): AuthorityGrant {
   };
 }
 
-function permittedRequest(target: TargetSnapshot, guard: EffectGuard) {
+function permittedRequest(target: TargetSnapshot, guard: EffectGuard, ownedPaths: readonly string[] = ["src-safe.ts"]) {
   const definition = commandForAction("local_commit");
-  const selected = session(target);
+  const selected = { ...session(target), plannedFiles: ownedPaths };
   const authority = grant(target);
   const policy = new PolicyEngine({ version: "isolated-mediated-git-v1" });
   const confirmation = policy.createConfirmation({
@@ -150,7 +150,7 @@ function permittedRequest(target: TargetSnapshot, guard: EffectGuard) {
       authority,
       permit,
       effectGuard: guard,
-      mutation: { kind: "local_commit" as const, paths: ["src-safe.ts"], message: "reviewed isolated change" }
+      mutation: { kind: "local_commit" as const, paths: ownedPaths, message: "reviewed isolated change" }
     }
   };
 }
@@ -286,4 +286,107 @@ test("mediated local commit rejects unowned paths, a dirty shared index, contain
   } finally {
     await isolated.dispose();
   }
+});
+
+
+const shellQuote = (value: string) => "'" + value.replaceAll("\\", "/").replaceAll("'", "'\\''") + "'";
+
+test("raw commit mediation bypasses repository clean/process/diff/textconv/fsmonitor commands and hooks", async () => {
+  const isolated = await fixture();
+  try {
+    const marker = join(isolated.state, "must-not-run"), script = join(isolated.state, "tripwire.cjs");
+    await writeFile(script, `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected');process.stdout.write('unreviewed')`);
+    await writeFile(join(isolated.root, ".gitattributes"), "src-safe.ts filter=tripwire diff=tripwire\n");
+    await requireCommand(isolated.root, "git", "add", ".gitattributes"); await requireCommand(isolated.root, "git", "commit", "-m", "synthetic attributes");
+    const program = `${shellQuote(process.execPath)} ${shellQuote(script)}`;
+    for (const key of ["filter.tripwire.clean", "filter.tripwire.process", "diff.tripwire.command", "diff.tripwire.textconv", "core.fsmonitor"]) await requireCommand(isolated.root, "git", "config", key, program);
+    await requireCommand(isolated.root, "git", "config", "filter.tripwire.required", "true"); await requireCommand(isolated.root, "git", "config", "diff.tripwire.trustExitCode", "true");
+    for (const name of ["pre-commit", "post-commit", "reference-transaction"]) await writeFile(join(isolated.root, ".git/hooks", name), `#!/bin/sh\nprintf unexpected > ${shellQuote(marker)}\nexit 0\n`, { mode: 0o755 });
+    const content = "export const value = 'literal reviewed bytes';\n"; await writeFile(join(isolated.root, "src-safe.ts"), content);
+    const target = await isolated.capture(); assert.equal(target.completeness, "complete", target.reasons.join(" "));
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary);
+    assert.equal(await requireCommand(isolated.root, "git", "show", "HEAD:src-safe.ts"), content.trim());
+    await assert.rejects(access(marker), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("new binary files cross the private blob pipe unchanged and remain non-executable", async () => {
+  const isolated = await fixture();
+  try {
+    const bytes = Buffer.alloc(1025); for (let i = 0; i < bytes.length; i++) bytes[i] = i % 256;
+    await writeFile(join(isolated.root, "new.bin"), bytes);
+    const target = await isolated.capture(), { policy, request } = permittedRequest(target, effectGuard(isolated), ["new.bin"]), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary);
+    assert.deepEqual((await command(isolated.root, "git", "show", "HEAD:new.bin")).stdoutBytes, bytes);
+    assert.match(await requireCommand(isolated.root, "git", "ls-tree", "HEAD", "new.bin"), /^100644 blob /);
+  } finally { await isolated.dispose(); }
+});
+
+test("a file changed between its manifest witness and private byte read cannot be committed", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture();
+    const delegate = new SpawnLocalGitRunner(); let changed = false;
+    const runner: LocalGitRunner = { async run(args, options) { if (!changed && args.includes("--stage")) { changed = true; await writeFile(join(isolated.root, "src-safe.ts"), "unreviewed bytes\n"); } return delegate.run(args, options); } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "not_started", outcome.summary); assert.equal(changed, true);
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+    assert.equal(await readFile(join(isolated.root, "src-safe.ts"), "utf8"), "unreviewed bytes\n");
+  } finally { await isolated.dispose(); }
+});
+
+test("a competing branch update wins its own CAS and is never overwritten by a reviewed local commit", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture();
+    const delegate = new SpawnLocalGitRunner(); let rival: string | undefined;
+    const runner: LocalGitRunner = { async run(args, options) {
+      if (!rival && args.includes("update-ref")) {
+        const object = await delegate.run(["-c", "commit.gpgSign=false", "commit-tree", target.indexTree!, "-p", target.head!, "-m", "synthetic concurrent actor"], options); assert.equal(object.exitCode, 0); rival = object.stdout.trim();
+        const update = await delegate.run(["update-ref", `refs/heads/${target.branch}`, rival, target.head!], options); assert.equal(update.exitCode, 0);
+      }
+      return delegate.run(args, options);
+    } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "incomplete"); assert.ok(rival);
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), rival);
+  } finally { await isolated.dispose(); }
+});
+
+
+test("feature-branch creation uses an expected-HEAD transaction without checkout filters", async () => {
+  const isolated = await fixture();
+  try {
+    await requireCommand(isolated.root, "git", "checkout", "main");
+    await writeFile(join(isolated.root, ".gitattributes"), "src-safe.ts filter=tripwire\n");
+    await requireCommand(isolated.root, "git", "add", ".gitattributes"); await requireCommand(isolated.root, "git", "commit", "-m", "synthetic attributes");
+    const marker = join(isolated.state, "must-not-run"), script = join(isolated.state, "tripwire.cjs");
+    await writeFile(script, `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected');process.stdout.write('unreviewed')`);
+    const program = `${shellQuote(process.execPath)} ${shellQuote(script)}`;
+    await requireCommand(isolated.root, "git", "config", "filter.tripwire.clean", program); await requireCommand(isolated.root, "git", "config", "filter.tripwire.required", "true");
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved dirty worktree\n");
+    const target = await isolated.capture(), { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute({ ...request, mutation: { ...request.mutation, featureBranch: "feature/raw-branch" } });
+    assert.equal(outcome.status, "incomplete", outcome.summary); assert.equal(outcome.data?.freshReviewRequired, true);
+    assert.equal(await requireCommand(isolated.root, "git", "branch", "--show-current"), "feature/raw-branch"); assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+    await assert.rejects(access(marker), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("an unconfirmed native Git exit retains its exact indices and shared lock for recovery", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner();
+    const runner: LocalGitRunner = { async run(args, options) { if (args.includes("update-ref")) throw Object.assign(new Error("Synthetic native exit unconfirmed"), { code: "RUNTIME_STOP_UNCONFIRMED" }); return delegate.run(args, options); } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "ambiguous"); assert.equal(outcome.data?.recoveryStatePreserved, true);
+    await access(join(isolated.root, ".git/index.lock")); assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+  } finally { await isolated.dispose(); }
 });

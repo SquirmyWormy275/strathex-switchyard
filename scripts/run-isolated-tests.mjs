@@ -28,7 +28,7 @@ const controlPlaneTests = [
   "host-path", "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
   "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts",
   "voice", "workflow-artifacts"
-].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
+].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts`, ...(name === "git-inspector" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}) }));
 const companionTests = [
   "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "automation-child-effects", "automation-effect-executor", "automation-high-consequence", "automation-installed-runtime", "automation-manifest-coordinator", "automation-manifest-review", "automation-proposal-source", "automation-refresh-git", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "containment-remote-evaluator", "containment-remote-host", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "default-composition-handoff", "durable-credentials", "installed-automation-e2e", "main-shutdown",
@@ -57,7 +57,13 @@ const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
   "default-branch review creates a hook-disabled feature branch and requires a fresh target before committing",
   "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target",
-  "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
+  "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change",
+  "raw commit mediation bypasses repository clean/process/diff/textconv/fsmonitor commands and hooks",
+  "new binary files cross the private blob pipe unchanged and remain non-executable",
+  "a file changed between its manifest witness and private byte read cannot be committed",
+  "a competing branch update wins its own CAS and is never overwritten by a reviewed local commit",
+  "feature-branch creation uses an expected-HEAD transaction without checkout filters",
+  "an unconfirmed native Git exit retains its exact indices and shared lock for recovery"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
   .map((name) => ({
@@ -201,9 +207,9 @@ export const requiredGroups = [
   ...providerHostTests,
   ...providerTlsNetworkTests
 ];
-/** The native Linux source lane omits Windows-only runtime contracts. */
+/** Linux omits Windows-only runtime contracts and includes the portable native Git transactions. */
 export const linuxGroups = requiredGroups
-  .filter((group) => !group.file.startsWith("apps/windows-companion/") && !group.file.startsWith("deployment/windows/"));
+  .filter((group) => (group.file === "apps/windows-companion/test/mediated-git.test.ts" || !group.file.startsWith("apps/windows-companion/")) && !group.file.startsWith("deployment/windows/"));
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {

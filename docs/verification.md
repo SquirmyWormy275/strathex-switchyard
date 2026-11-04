@@ -13,6 +13,7 @@ for coverage, and the [continuation record](switchyard-status.md) for details.
 | Consented matrix backend | Ten fault tests plus six installed rejection checks: explicit one-use consent, policy, physical unlock, scope, capture bounds, stop, late responses and relock. | No HID opened by the installed demonstration. Physical typing/unlock/relock acceptance and frontend controls remain open. |
 | Original 0.9 controller | Seven direct protocol tests and 82 focused device/configuration checks: expansion readout, rotating keymap, strict framing, persistent key setter, recovery and protection of calibration/expansion keycodes. | Fault transports backed by the pinned vendor source; no physical legacy controller or solenoid acceptance. Expansion control remains unavailable. |
 | Task authority boundary | Eight real-repository scenarios, core/packaging checks and seven installed checks with an actual empty native Codex task. Eight retained native guardian identities independently verified exited; zero model prompts. | Unit task identity is synthetic; the installed journey uses the actual account-bound native task and restores workspace selection/keyboard-only mode. The suite commit-effect route is unfinished; native provider permissions stay unchanged. |
+| Companion repository effects | Ten actual Git scenarios: private index, exact binary blobs, no filter/diff/textconv/fsmonitor/hook execution, tracked modes, expected-HEAD branch transactions, competing ref preservation and simulated unknown-exit retention. | Updated component has focused Linux acceptance. Suite commit-effect admission/recovery and native Windows acceptance remain unfinished. |
 | Normal installed Codex task | Seven checks rerun after the shared recovery changes: one reviewed native reply, exact turn acknowledgement, durable duplicates, replay rejection and keyboard-only cleanup. | Read-only/restricted text task; provider completion is not verified coding-task completion. |
 | Normal installed Claude task | Thirteen checks: exact creation/continuation, three separately reviewed prompts, distinct recorded/stopped guardians and explicit resume-only recovery after a synthetic lost-acceptance fault. | Original account and UUID retained; no tools or invented native turn IDs. This fault injection is not a claimed physical crash. |
 | Native Claude command supervision | Eight real metadata checks verified nine distinct guardians exited, including shared designer/task probes. Installed empty-task creation stayed observable, then passed separately reviewed exact stop and replay rejection under the new supervision. The 13-check installed text journey passed again after the shared-probe change. | Metadata/empty-task checks send no model prompt; text regression sends three tiny approved prompts. No account fallback or external-session stop; native background-service ownership remains distinct from the CLI guardian. |
@@ -25,7 +26,11 @@ Earlier Windows runs exposed skip-inventory, checkout line-ending and generated
 text/manifest failures. Those were software failures and were corrected before
 the complete `2e64ff6` run passed. A masked or partial earlier step is not
 retroactively accepted. The latest task-authority work has its own pending full
-source/native acceptance; the Windows checkpoint above predates it.
+source/native acceptance; the Windows checkpoint above predates it. The later `0bf079b` Windows backend
+run rejected one bundled-example startup race before release packaging. The
+mode decision now invalidates pending starts synchronously, and its test holds
+shutdown open deterministically. Full corrected Windows acceptance remains
+pending; this failure is software work, not a hardware/account blocker.
 
 ## Follow a result into the code
 

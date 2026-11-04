@@ -27,7 +27,7 @@ export async function fixedGitExecutable() {
 export function inspectionEnvironment(scratch) {
   const windows = process.platform === "win32", system = process.env.SystemRoot || "C:\\Windows";
   return { ...(windows ? { SystemRoot: system, WINDIR: system, PATH: `${system}\\System32`, GIT_CONFIG_GLOBAL: "NUL" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }),
-    GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_ALLOW_PROTOCOL: "", LC_ALL: "C", ...(scratch ? { TMPDIR: scratch, TMP: scratch, TEMP: scratch } : {}) };
+    GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_ALLOW_PROTOCOL: "", LC_ALL: "C", ...(scratch ? { TMPDIR: scratch, TMP: scratch, TEMP: scratch } : {}) };
 }
 function safeRemote(value) {
   if (!value) return;

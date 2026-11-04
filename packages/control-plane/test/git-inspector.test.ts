@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, open, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -161,7 +162,7 @@ test("repository digests hash actual files, preserve missing state and reject pa
   assert.equal(await reader.digest(root, "input.txt"), `sha256:${createHash("sha256").update(bytes).digest("hex")}`);
   assert.equal(await reader.state(root, "input.txt"), "regular_file");
   assert.equal(await reader.state(root, "absent/input.txt"), "missing");
-  for (const operation of [reader.digest(root, "linked/private.txt"), reader.state(root, "linked/private.txt")]) {
+  for (const operation of [() => reader.digest(root, "linked/private.txt"), () => reader.state(root, "linked/private.txt")]) {
     await assert.rejects(operation, /parent must be a real directory/i);
   }
   await assert.rejects(reader.digest(root, "../outside/private.txt"), /escapes/i);
@@ -242,4 +243,12 @@ test("NUL Git filenames with literal backslashes cannot alias another tracked pa
   const actual = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect("C:/work/example");
   assert.deepEqual(actual.trackedFiles, [{ path: "src/safe.txt", digest: "sha256:src/safe.txt" }]);
   assert.match(actual.issues?.join(" ") ?? "", /ambiguous backslash filename/i);
+});
+
+test("native Git metadata refuses invalid UTF-8 filenames before they can alias a Unicode path", { skip: process.platform !== "linux" ? "Unix byte-path behavior is exercised on native Linux" : false }, async t => {
+  const { root } = await digestFixture(t);
+  execFileSync("/usr/bin/git", ["init", root], { env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" }, stdio: "ignore" });
+  await writeFile(Buffer.concat([Buffer.from(root + "/"), Buffer.from([255]), Buffer.from(".txt")]), "invalid byte name");
+  await writeFile(join(root, "\ufffd.txt"), "different Unicode file");
+  await assert.rejects(new NodeGitCommandRunner().run(["ls-files", "--others", "-z"], root), /valid UTF-8/i);
 });

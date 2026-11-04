@@ -86,10 +86,10 @@ test("keyboard-only selection pauses backend sources and stops only this compart
 }));
 
 test("concurrent bundled-example starts share one launch and mode changes invalidate a pending startup", () => fixture(async ({ store }) => {
-  let launches = 0, release, block = false, waiting;
+  let launches = 0, release, releaseAuthorityStop, block = false, waiting;
   const snapshot = store.snapshot.bind(store);
   store.snapshot = async (...args) => { if (block) { block = false; waiting?.(); await new Promise((r) => { release = r; }); } return snapshot(...args); };
-  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, spawnExample: () => {
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, taskAuthority: { stopCompartment: () => new Promise(resolve => { releaseAuthorityStop = () => resolve({ stopped: true }); }), close: async () => {} }, spawnExample: () => {
     launches++; const child = new EventEmitter(); child.exitCode = null; child.stdin = new EventEmitter(); child.stdin.write = () => {}; child.stdin.end = () => {};
     child.kill = () => { child.exitCode = 0; queueMicrotask(() => child.emit("close", 0)); return true; };
     queueMicrotask(() => child.emit("spawn")); return child;
@@ -107,9 +107,11 @@ test("concurrent bundled-example starts share one launch and mode changes invali
     // Wait until the durable mode is selected; then release the older request.
     while ((await snapshot("personal")).mode !== "keyboard-only") await new Promise((r) => setTimeout(r, 10));
     await suite.handle("/api/suite/mode", { mode: "personal-companion" });
-    release(); await mode; await rejection;
+    release(); await rejection;
+    while (!releaseAuthorityStop) await new Promise(r => setTimeout(r, 1));
+    releaseAuthorityStop(); await mode;
     assert.equal(launches, 1);
-  } finally { release?.(); await suite.close(); }
+  } finally { release?.(); releaseAuthorityStop?.(); await suite.close(); }
 }));
 
 test("missing keys never replace existing data; saved profiles survive restart and omit local environment data", () => fixture(async ({ root, store, keys, secrets }) => {

@@ -1686,3 +1686,32 @@ with filter-free blob staging and plumbing/CAS effects. That replacement and
 the suite effect connection remain unfinished; they are software work, not
 hardware/account blockers. The user withdrew the Seagate steering before any
 move or drive/configuration change; development stays in the current checkout.
+
+## Repository effects without configuration-driven execution
+
+The companion local-commit handler now reconstructs manifest witnesses and
+stages descriptor-verified bytes through bounded binary stdin into Git with
+filters disabled. Blob IDs are independently checked; tracked modes are
+preserved and new blobs are non-executable. Commit-tree plus an expected-old-HEAD
+reference update replaces porcelain commit. Feature-branch setup uses a single
+reference transaction with old symbolic/detached HEAD checks, without checkout.
+External diff/textconv, fsmonitor, hooks and replacement refs cannot provide
+execution. Unknown native exits retain exact private indices and locks.
+Operation staging uses hashed IDs and removes empty folders after success.
+
+Ten actual Git scenarios pass, including tripwire commands/hooks, binary blobs,
+changed content witnesses, competing ref updates and simulated unknown-exit
+preservation. All ten are now included in Linux's normal source lane as well as
+Windows's complete lane; earlier Linux receipts did not include these companion
+patterns. Metadata stdout now rejects invalid UTF-8 rather than aliasing a
+different filename. The explicit Unix byte-path case has one declared non-Linux
+skip. The suite's effect-admission/recovery connection remains unfinished; no
+application commit or broader model permission was enabled by this change.
+
+Windows run 41792006381 at `0bf079b` failed one of 342 backend cases: a pending
+bundled example could survive a fast keyboard-only/resume transition while
+shutdown was still pending. The mode decision now fences old starts before slow
+cleanup, with another generation check immediately after reading startup state.
+The deterministic test holds authority shutdown open; all 16 suite cases pass.
+This is a software race correction, not an unavailable Windows account/device
+check. See mediated-repository-effects.md for actual boundaries and remaining work.
