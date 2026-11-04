@@ -67,7 +67,9 @@ effects. Build receipt: `windows-sandbox-cli-build-20261104.json`.
 
 Windows CI exercises metadata through the actual owned native transport
 without creating a VM; it passes at `899c78e` and subsequent native checkpoints.
-The new bounded-mapping native checks are pending. Fifty combined storage,
+All 30 bounded-mapping/filesystem native checks pass at `e4ef1f06`, run
+41898161164. Its archive was digest-verified and only
+`windows-bounded-mapping-e4ef-native.json` retained; no VM was opened. Fifty combined storage,
 transport, session and runner checks pass, including missing or altered volume
 bindings before guest reservation. Four release checks and type checking pass.
 The current helper builds with zero warnings/errors; six Linux native-only
