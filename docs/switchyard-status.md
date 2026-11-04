@@ -16,14 +16,14 @@ readiness cannot substitute the reviewed executable descriptor. The API,
 shutdown/restart boundaries and evidence exclusions are described in the
 [execution contract](reviewed-task-execution.md). The frontend is unchanged.
 
-Normal installed source `0aeae75` passed ten checks with one actual empty
+Normal installed source `f5dd3be` passed ten checks with one actual empty
 Codex task and zero prompts. Actual output confirmed denied host files,
 credentials and loopback, a read-only workspace and 64 MiB temporary filesystem.
 The terminal receipt, separate exact-stop receipt and duplicate admissions
 matched. A third, freshly reviewed Run started after the stopped Run; all three
 native guardians independently exited and unchanged input copies were removed.
 Definitions, selection, keyboard-only validation state and the private link were
-restored. Receipt: `installed-repository-execution-1793810385256.json`.
+restored. Receipt: `installed-repository-execution-1793816998155.json`.
 
 Complete local Linux source at `0151e69` passes 151/151 groups: 967 tests,
 957 passed and ten declared platform skips. Receipt:
@@ -180,6 +180,19 @@ GUID formatting reverses its first fields. The comparator now checks the exact
 original bytes instead. No alternative UUID/capacity is accepted; corrected
 native acceptance remains pending.
 
+Corrected `899c78e` now passes all 16 actual native Windows filesystem checks,
+including image UUID/capacity/type, detached state and fresh immutable readback.
+The small archive was downloaded and digest-verified; only
+`windows-filesystem-899c78e-native.json` was retained. Detached image ownership
+is now implemented separately: protected reservation before ACK, exact full/
+footer hashes and identities, one outstanding image per compartment, no replay,
+consumer/native exit fences, fresh native inspection before cleanup, scope
+revocation and late-exit reconciliation. Eight image fault cases plus the
+combined 43-case ownership/snapshot/runner check pass; four package checks and
+type checking pass. Its actual native service journey is now in CI, pending.
+Writable-volume ownership/attach/mount/detach/recovery and the Studio Run adapter
+remain unfinished; the detached lease grants no execution protection.
+
 ## Current pilot
 
 The normal installed command is `~/.local/bin/switchyard`. Source development uses
@@ -187,9 +200,9 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `0aeae75` is installed as release
-`53193df2ac2663d595e8a4e61373c2ea0f039cea19864dc53f04b6956cdaaec6`: 481 files,
-4,734,369 bytes. Six normal update checks pass (assignment-legends-1793810073715.json).
+Published source `f5dd3be` is installed as release
+`3b3b7883ab312dd486cf165180ff9e057020c8a933e2d1dbf2584ada2f4b688e`: 484 files,
+4,779,454 bytes. Six normal update checks pass (assignment-legends-1793816639962.json).
 Current plus one rollback occupy about 12 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
