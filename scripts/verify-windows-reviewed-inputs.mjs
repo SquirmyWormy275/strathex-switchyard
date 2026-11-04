@@ -2,12 +2,14 @@
 /** Actual NTFS/ACL/sharing checks only; never opens a VM, account or keyboard. */
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, mkdir, writeFile, readFile, access, open, symlink, rename, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, access, open, symlink, rename, rm, rmdir, lstat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, isAbsolute } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { createWindowsReviewedInputs } from "../tools/layout-studio/windows-reviewed-inputs.mjs";
 import { createWindowsSandboxNativeCalls } from "../tools/layout-studio/windows-sandbox-native.mjs";
+import { createWindowsGuestTools } from "../tools/layout-studio/windows-guest-tools.mjs";
+import { runOwnedNativeCommand } from "../tools/layout-studio/owned-native-command.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
 import { directoryIdentity, privateWrite } from "../tools/layout-studio/private-fs.mjs";
 const flags=process.argv.slice(2),helper=flags.find(flag=>flag.startsWith("--helper="))?.slice(9);
@@ -17,7 +19,10 @@ const sha=bytes=>createHash("sha256").update(bytes).digest("hex"),identity=stat=
 const store=createSuiteStore({root:join(root,"private"),secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>{keys.set(c+p,v);}}});await store.initialize("personal");await store.update("personal","native-input-test",state=>{state.mode="personal-companion";});
 let nativeCalls=0,failure;
 const service=createWindowsReviewedInputs({store,stateDirectory,helper,consumerStopped:async()=>true,command:(exe,args,options)=>{nativeCalls++;assert.equal(exe,helper);assert.deepEqual(args,["--stage-reviewed-inputs"]);return runRuntimeCommand(exe,args,{...options,windowsHelper:helper});}});
-const sandboxNative=createWindowsSandboxNativeCalls({store,stateDirectory:join(root,"sandbox-native"),helper});
+const sandboxNative=createWindowsSandboxNativeCalls({store,stateDirectory:join(root,"sandbox-native"),helper,command:(exe,args,options)=>{nativeCalls++;return runRuntimeCommand(exe,args,{...options,windowsHelper:helper});}});
+// Hard links stay on the compiled helper's volume. This owned test directory
+// is outside its build artifact, and no second native runtime is copied.
+const toolsRoot=join(dirname(dirname(helper)),`switchyard-guest-tools-${randomUUID()}`),tools=createWindowsGuestTools({store,stateDirectory:toolsRoot,helper,consumerStopped:async()=>true,command:(exe,args,options)=>{nativeCalls++;return runRuntimeCommand(exe,args,{...options,windowsHelper:helper});}});
 // consumerStopped is true only because this bounded journey never creates or
 // maps a guest VM. Production consumers must supply their own verified fence.
 try {
@@ -31,6 +36,10 @@ try {
   const state=await store.snapshot("personal");for(const row of state.repositoryWindowsInputs){assert.equal(row.stoppedVerified,true);assert.equal(await runtimeGuardianStopped(row.ownedRuntime,{windowsHelper:helper}),true);assert.equal(row.cleanupPending,false);}checks.push("every exact native staging guardian independently exited and every unchanged owned copy was removed; no VM or runtime copy was created");
   const metadata=await sandboxNative.call("personal",{operationId:randomUUID(),sandboxId:randomUUID(),scopeDigest:"b".repeat(64),provider:"codex"},{action:"metadata"},async()=>{});assert.ok(["available","unavailable"].includes(metadata.status));assert.equal(metadata.effectStarted,false);
   for(const row of (await store.snapshot("personal")).repositoryWindowsGuestCommands){assert.equal(row.stoppedVerified,true);assert.equal(await runtimeGuardianStopped(row.ownedRuntime,{windowsHelper:helper}),true);}checks.push("fixed native Sandbox metadata mode reported only its current-user AppExecLink availability, with independently verified command exit and no guest creation");
+  const helperSha256=sha(await readFile(helper)),toolLease=await tools.prepare("personal",{operationId:randomUUID(),scopeDigest:"c".repeat(64),provider:"codex"},{expectedSha256:helperSha256},async()=>{});
+  const worker=join(toolLease.root,toolLease.helperFilename),sourceStat=await lstat(helper,{bigint:true}),workerStat=await lstat(worker,{bigint:true});assert.equal(workerStat.dev,sourceStat.dev);assert.equal(workerStat.ino,sourceStat.ino);assert.equal(toolLease.copiedBytes,0);assert.equal(toolLease.workerEmbedded,true);await toolLease.assertCurrent();checks.push("actual NTFS embedded worker staging reused the exact native helper inode under a protected private directory with zero copied runtime bytes");
+  const guardResource={clients:new Set()},guard=await runOwnedNativeCommand({executable:worker,args:["--catalog"],cwd:toolLease.root,env:{},resource:guardResource,expectedExecutableSha256:helperSha256,timeout:15000,maxOutputBytes:1024,captureStderrBytes:0,command:(exe,args,options)=>{nativeCalls++;return runRuntimeCommand(exe,args,{...options,windowsHelper:helper});},guardianStopped:scope=>runtimeGuardianStopped(scope,{windowsHelper:helper}),onReady:scope=>store.update("personal","native-worker-entry-ready",state=>{state.nativeWorkerEntryGuard={ownedRuntime:scope,stoppedVerified:false};}),onStopped:async scope=>{assert.equal(await runtimeGuardianStopped(scope,{windowsHelper:helper}),true);await store.update("personal","native-worker-entry-exit",state=>{assert.equal(state.nativeWorkerEntryGuard.ownedRuntime.id,scope.id);state.nativeWorkerEntryGuard.stoppedVerified=true;});}});
+  assert.equal(guard.exitCode,64,"The renamed image reached the embedded worker argument guard, not the hotkey entry point");assert.equal(guard.stdout,"");assert.equal((await store.snapshot("personal")).nativeWorkerEntryGuard.stoppedVerified,true);assert.equal((await Promise.all([...guardResource.clients].map(client=>client.stop()))).every(Boolean),true);await toolLease.release();await assert.rejects(access(toolLease.root),{code:"ENOENT"});assert.equal(sha(await readFile(helper)),helperSha256);checks.push("the renamed native image reached the strict guest-worker argument guard without entering a VM or shutdown path; guardian exit, unchanged source bytes and owned-link cleanup were verified");
 } catch(error){failure=error;}
-finally{try{await sandboxNative.close();await service.close();if(!failure)await rm(root,{recursive:true});}catch(error){failure??=error;}}
+finally{try{await tools.close();await sandboxNative.close();await service.close();if(!failure){await rmdir(join(toolsRoot,"personal"));await rmdir(toolsRoot);await rm(root,{recursive:true});}}catch(error){failure??=error;}}
 const receipt=join(process.env.RUNNER_TEMP||homedir(),"switchyard-windows-inputs-verification.json"),result={schema:"switchyard-native-windows-inputs/v1",at:new Date().toISOString(),success:!failure,checks,nativeCalls,helperSha256:sha(await readFile(helper)),windowsSandboxVerified:false,guestLaunched:false,keyboardOpened:false,accountOpened:false,failure:failure?.message??null,...(failure?{retainedSyntheticRoot:root}:{})};await privateWrite(receipt,JSON.stringify(result,null,2)+"\n");console.log(JSON.stringify({receipt,success:!failure,checks:checks.length,nativeCalls,guestLaunched:false}));if(failure)throw failure;

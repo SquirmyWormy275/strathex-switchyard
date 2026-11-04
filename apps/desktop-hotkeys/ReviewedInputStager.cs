@@ -35,6 +35,8 @@ internal static class ReviewedInputStager
     private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation information);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetVolumeInformationW(string root, StringBuilder? volume, uint volumeLength, out uint serial, out uint maximumComponent, out uint flags, StringBuilder filesystem, uint filesystemLength);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
@@ -63,9 +65,9 @@ internal static class ReviewedInputStager
     {
         if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Count() != fields.Length || value.EnumerateObject().Any(property => !fields.Contains(property.Name, StringComparer.Ordinal))) throw Invalid();
     }
-    private static string Absolute(JsonElement value)
+    private static string Absolute(JsonElement value) => Absolute(value.GetString() ?? throw Invalid());
+    private static string Absolute(string path)
     {
-        string path = value.GetString() ?? throw Invalid();
         if (path.Length > 2048 || !Regex.IsMatch(path, @"^[A-Za-z]:[\\/]", RegexOptions.CultureInvariant) || path[2..].Contains(':') || path.Any(char.IsControl)
             || path.Split('\\', '/').Skip(1).Any(part => part is "." or ".." || part.EndsWith(' ') || part.EndsWith('.') || Reserved.IsMatch(part))) throw Invalid();
         string full = Path.GetFullPath(path);
@@ -74,10 +76,11 @@ internal static class ReviewedInputStager
         if (!GetVolumeInformationW(Path.GetPathRoot(full)!, null, 0, out _, out _, out _, filesystem, 32) || filesystem.ToString() != "NTFS") throw Invalid();
         return full;
     }
+    private static string NativeName(string path) => @"\\?\" + path;
     private static bool Inside(string root, string path) => path.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     private static SafeFileHandle Open(string path, bool directory, uint extraAccess = 0)
     {
-        var handle = CreateFileW(path, (directory ? ReadAttributes : GenericRead) | extraAccess, directory ? ShareRead | ShareWrite : ShareRead, IntPtr.Zero, OpenExisting, OpenReparsePoint | (directory ? BackupSemantics : 0), IntPtr.Zero);
+        var handle = CreateFileW(NativeName(path), (directory ? ReadAttributes : GenericRead) | extraAccess, directory ? ShareRead | ShareWrite : ShareRead, IntPtr.Zero, OpenExisting, OpenReparsePoint | (directory ? BackupSemantics : 0), IntPtr.Zero);
         try { Information(handle, directory); return handle; }
         catch { handle.Dispose(); throw; }
     }
@@ -190,6 +193,46 @@ internal static class ReviewedInputStager
             return 0;
         }
         catch { Console.Error.WriteLine("Exact reviewed Windows input staging failed. Preserve partial owned staging for verification."); return 2; }
+        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+    }
+
+    // Link only this exact running helper image. The same image embeds the
+    // fixed guest worker; no caller supplies a replacement tool or executable.
+    public static int RunToolLink()
+    {
+        const string schema = "switchyard-windows-guest-tools/v1";
+        var handles = new List<SafeFileHandle>(); string phase = "request";
+        try
+        {
+            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            var text = new StringBuilder(); int character;
+            while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
+            using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
+            Exact(request, "schema", "operationId", "sourceIdentity", "stagingRoot", "stagingIdentity", "expectedSha256");
+            if (request.GetProperty("schema").GetString() != schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation)) throw Invalid();
+            string source = Environment.ProcessPath ?? throw Invalid(), stageRoot = Absolute(request.GetProperty("stagingRoot")), expected = request.GetProperty("expectedSha256").GetString() ?? "";
+            if (!Path.GetFileName(source).Equals("Switchyard.Hotkeys.exe", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(stageRoot) != "tools-" + operation.ToString("D") || !Digest.IsMatch(expected)) throw Invalid();
+            phase = "directory";
+            PinDirectories(Absolute(Path.GetDirectoryName(source)!), handles);
+            var stage = PinDirectories(stageRoot, handles, WriteDac | ReadControl); var stageIdentity = Information(stage, true);
+            if (!Matches(stageIdentity, request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(stageRoot).Any()) throw Invalid();
+            RestrictNewDirectory(stage);
+            phase = "source-image";
+            using var stream = new FileStream(Open(source, false), FileAccess.Read); var sourceIdentity = Information(stream.SafeFileHandle, false);
+            long bytes = checked((long)(((ulong)sourceIdentity.SizeHigh << 32) | sourceIdentity.SizeLow));
+            if (!Matches(sourceIdentity, request.GetProperty("sourceIdentity")) || bytes is < 1 or > 128L * 1024 * 1024 || Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant() != expected) throw Invalid();
+            string target = Path.Combine(stageRoot, "b122-sandbox-worker.exe");
+            phase = "hard-link";
+            if (!CreateHardLinkW(NativeName(target), NativeName(source), IntPtr.Zero)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            phase = "linked-identity";
+            using var linked = Open(target, false); var actual = Information(linked, false);
+            if (!Matches(actual, request.GetProperty("sourceIdentity")) || !Matches(Information(stage, true), request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(stageRoot).Count() != 1) throw Invalid();
+            bool embedded = typeof(Sxsy.B122.SandboxHelper.Program).Assembly == typeof(ReviewedInputStager).Assembly;
+            if (!embedded) throw Invalid();
+            Console.WriteLine(JsonSerializer.Serialize(new { schema, operationId = operation.ToString("D"), sourceIdentity = Identity(actual), stagingIdentity = Identity(stageIdentity), sha256 = expected, linkedBytes = bytes, copiedBytes = 0, toolName = "b122-sandbox-worker.exe", privateAclReadbackVerified = true, workerEmbedded = true, sandboxEnforced = false }));
+            return 0;
+        }
+        catch (Exception error) { Console.Error.WriteLine($"Native guest-tool staging failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}. No runtime-copy fallback was used."); return 2; }
         finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 }

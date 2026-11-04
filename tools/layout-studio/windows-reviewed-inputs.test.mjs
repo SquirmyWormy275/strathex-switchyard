@@ -21,7 +21,7 @@ async function fixture(t,hook) {
     assert.equal(exe,process.execPath);assert.deepEqual(args,["--stage-reviewed-inputs"]);const request=JSON.parse(options.inputText),scope={schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:12345,birth:"1",containment:process.platform==="win32"?"windows-job":"owned-linux-session"};owners.set(scope.id,false);
     try{
       await options.onGuardianReady(scope);effects++;
-      const row=(await store.snapshot("personal")).repositoryWindowsInputs[0];assert.equal(row.ownedRuntime.id,scope.id);assert.equal(row.stoppedVerified,false);assert.equal(row.path,request.stagingRoot);await hook?.("effect",{request,options,scope});
+      const row=(await store.snapshot("personal")).repositoryWindowsInputs.find(row=>row.operationId===request.operationId);assert.equal(row.ownedRuntime.id,scope.id);assert.equal(row.stoppedVerified,false);assert.equal(row.path,request.stagingRoot);await hook?.("effect",{request,options,scope});
       for(const file of request.inputFiles){const bytes=await readFile(join(request.sourceRoot,file.path));assert.equal(hash(bytes),file.sha256);assert.equal(bytes.length,file.size);const path=join(request.stagingRoot,file.path);await mkdir(dirname(path),{recursive:true});await writeFile(path,bytes);}
       await hook?.("after-copy",{request,options,scope});
       return {status:"completed",exitCode:0,inputDelivered:true,treeExitVerified:true,stdout:JSON.stringify({schema:request.schema,operationId:request.operationId,sourceIdentity:request.sourceIdentity,stagingIdentity:request.stagingIdentity,inputManifestSha256:request.inputManifestSha256,files:request.inputFiles.length,bytes:request.inputFiles.reduce((sum,file)=>sum+file.size,0),privateAclReadbackVerified:true,classification:"reviewed-non-production-bytes",sandboxEnforced:false}),stderr:""};
@@ -39,6 +39,10 @@ test("Windows input contract persists readiness, copies only reviewed binary byt
 test("unknown native reader exit blocks replacement across instances and leaves staging until independently observed",async t=>{
   const f=await fixture(t);f.stopped(false);await assert.rejects(f.service.prepare("personal",f.context,f.input,f.authorize));await assert.rejects(f.service.close(),/exit remains unconfirmed/);
   const other=f.create();await assert.rejects(other.prepare("personal",{...f.context,operationId:randomUUID()},f.input,f.authorize),/Reconcile/);assert.equal(f.effects(),1);f.stopped(true);assert.equal((await other.recover("personal")).cleanupPending,false);assert.equal((await other.list("personal"))[0].status,"outcome-unconfirmed");
+});
+test("a verified late reader stop releases the same-process staging slot without replaying its old request",async t=>{
+  const f=await fixture(t);f.stopped(false);await assert.rejects(f.service.prepare("personal",f.context,f.input,f.authorize));assert.equal(f.effects(),1);f.stopped(true);assert.equal((await f.service.stopCompartment("personal")).stopped,true);
+  await assert.rejects(f.service.prepare("personal",f.context,f.input,f.authorize),/Reconcile|exists/);assert.equal(f.effects(),1);const next=await f.service.prepare("personal",{...f.context,operationId:randomUUID()},f.input,f.authorize);assert.equal(f.effects(),2);await next.release();
 });
 test("unexpected files, modified inputs and replacement directories cannot pass handoff or cleanup",async t=>{
   const foreign=await fixture(t,async(stage,{request})=>{if(stage==="after-copy")await writeFile(join(request.stagingRoot,"foreign"),"preserve");});await assert.rejects(foreign.service.prepare("personal",foreign.context,foreign.input,foreign.authorize),/unfamiliar/);const row=(await foreign.store.snapshot("personal")).repositoryWindowsInputs[0];await assert.rejects(foreign.service.cleanup("personal",row.operationId),/unfamiliar/);assert.equal(await readFile(join(row.path,"foreign"),"utf8"),"preserve");

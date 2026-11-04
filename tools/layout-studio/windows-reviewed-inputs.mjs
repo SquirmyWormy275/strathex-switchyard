@@ -80,6 +80,7 @@ export function createWindowsReviewedInputs({ store, stateDirectory, platform = 
     const active=[...resources.values()].filter(resource=>resource.compartment===c);active.forEach(resource=>resource.controller.abort());
     await Promise.allSettled(active.map(resource=>resource.done));
     const clients=await Promise.all(active.flatMap(resource=>[...resource.clients].map(client=>client.stop().catch(()=>false))));
+    for(const[key,resource]of resources)if(active.includes(resource)&&[...resource.clients].every(client=>client.closed))resources.delete(key);
     let stopped=clients.every(Boolean),cleanupPending=false;
     for(const row of (await store.snapshot(c)).repositoryWindowsInputs??[]){
       if(row.ownedRuntime&&!await guardianStopped(row.ownedRuntime)){stopped=false;continue;}

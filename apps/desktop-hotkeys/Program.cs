@@ -129,6 +129,8 @@ internal static class Program
     }
     public static int Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--catalog" && string.Equals(Path.GetFileName(Environment.ProcessPath), "b122-sandbox-worker.exe", StringComparison.OrdinalIgnoreCase)) return OperatingSystem.IsWindows() ? Sxsy.B122.SandboxHelper.Program.Main(args).GetAwaiter().GetResult() : 2;
+        if (args.SequenceEqual(new[] { "--stage-guest-tools" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.RunToolLink() : 2;
         if (args.SequenceEqual(new[] { "--stage-reviewed-inputs" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.Run() : 2;
         if (args.SequenceEqual(new[] { "--windows-sandbox-cli" })) return OperatingSystem.IsWindows() ? WindowsSandboxCli.Run() : 2;
         if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();

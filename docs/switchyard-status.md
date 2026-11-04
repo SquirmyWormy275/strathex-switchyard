@@ -47,7 +47,10 @@ The failure was an actual application-stop race: `/proc/<pid>/stat` returned
 `ESRCH` after the authenticated process exited between checks. Stop now accepts
 that exact exit observation alongside `ENOENT`; generation/birth checks remain.
 All five application cases pass, including deterministic ESRCH/ENOENT reads
-after a real authenticated fixture shutdown. A complete corrected run is pending.
+after a real authenticated fixture shutdown. Complete corrected `e9dd9ae` passes
+154/154 groups: 988 tests, 978 passed and ten declared platform skips. Receipt
+`0dfaddc5-3caf-4538-8ff4-3d4d563f6ad8` was retained and its disposable checkout
+removed after every child exit and cleanup was verified.
 
 Reviewed per-run stop has a separate approval, budget, operation and receipt,
 with exact-handle ownership, duplicate rejection and receipt-only recovery.
@@ -110,7 +113,15 @@ lifecycle cases and the combined 57-case boundary/inventory check pass; package
 imports and type checking pass. The compiled worker parser passes five actual
 checks with zero-warning/error build; scratch was removed and hashes retained in
 `windows-guest-worker-lifecycle-build-20261104.json`. [Lifecycle contract](windows-managed-guest-lifecycle.md).
-The Studio Windows Run adapter, packaged worker/tool staging, bounded writable
+The embedded guest worker now builds into the existing helper and stages as one
+exact, private NTFS hard link without copying a runtime. Protected ownership,
+native/consumer exit fences, no replay and foreign-data preservation pass 44
+focused cases with snapshot/runner checks. Both input and tool staging now
+release their in-process slot after independently verified late exit. Six actual
+compiled entry/guard checks pass with zero warnings/errors; source/assembly
+hashes were retained and scratch removed. Native Windows link/renamed-entry
+acceptance is now included in CI, pending. [Tool contract](windows-guest-tools.md).
+The Studio Windows Run adapter, selected recipe runtime staging, bounded writable
 exchange, broader build outputs and remaining action connections are unfinished
 implementation, not hardware blocks. The coordinator explicitly reports no
 exchange filesystem quota. Actual VM startup/login/worker/stop/restart acceptance
@@ -281,7 +292,7 @@ bootloader, solenoid operation, public release, merge or license change occurred
 
 1. Connect host-pinned general execution recipes to the task authority, durable
    operation/budget and owned-guardian paths, reusing the reviewed input provider.
-   Finish Windows worker/tool staging, the bounded writable exchange, Studio
+   Finish selected Windows recipe runtime staging, the bounded writable exchange, Studio
    execution adapter and broader output/restart recovery; the
    older direct process-group launcher is not the desktop readiness/exit protocol.
 2. Complete exact native desktop/IDE/terminal attachments and the remaining

@@ -5,8 +5,11 @@ reviewed backend's process-runner contract. It creates an exact VM, acknowledges
 its identity before the worker, establishes its login session, dispatches the
 worker once, and verifies VM stop independently of the short CLI processes.
 The coordinator is implemented and software-tested. The Studio Windows Run
-adapter, packaged worker/tool staging and bounded exchange-volume implementation
+adapter, selected recipe runtime staging and bounded exchange-volume implementation
 remain work to finish; actual VM acceptance also needs a supported Windows host.
+
+The [embedded worker staging contract](windows-guest-tools.md) now reuses the
+existing helper image through one exact private hard link; no runtime is copied.
 
 The trusted host supplies a compartment, operation ID, protected review digest,
 provider and fresh authority callback. The coordinator accepts only the exact
