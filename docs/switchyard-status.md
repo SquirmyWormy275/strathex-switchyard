@@ -1901,3 +1901,32 @@ verified before removing only that failed fixture and its local records. Native
 empty-task history was preserved. Cleanup receipt
 failed-commit-fixture-cleanup-1793783549513.json. The installed proof is being
 rerun after this correction; it is not accepted yet.
+
+
+## Corrected installed commit accepted, complete Linux source and current device readout
+
+Published `713f439` passed the normal installed update's six checks; receipt
+assignment-legends-1793783957902.json. Installed commit acceptance then passed
+seven checks with an actual empty native Codex task, zero model prompts, two
+separate approvals, exact binary bytes/author, preserved unowned working edit,
+reconciled shared index, duplicate operation/receipt readback and read-only
+recovery observation. All 38 Git guardians and eight retained inspection
+guardians independently verified exit. The proof restored workspace selection
+and keyboard-only mode, preserved definitions/private link and removed its
+successful staging and local test records. Native empty-task history remains.
+Receipt installed-repository-commit-1793784076954.json.
+
+The complete Linux source run passed 144/144 groups: 922 tests, 913 passed
+and nine platform skips; receipt 908ace57-fac3-4a72-a68b-f8343d22987f.
+Current plus one rollback application version occupy about 11 MiB; application
+bundle staging is empty, with no extra Node/.NET/Python/model copy added.
+Fresh installed enumeration at 2026-11-04T09:24:06.900Z returned zero
+configuration interfaces without opening a device or writing keys; receipt
+device-enumeration-1793784246900.json. F77/B122 physical acceptance remains
+blocked by absent interfaces. Recovery application, general execution effects,
+remaining distinct integrations and frozen frontend controls are software work.
+
+Windows run 41804809563 for `64a13e0` was cancelled by the repository's queued
+workflow concurrency policy before acceptance. No agent cancellation was sent.
+Corrected complete native Windows acceptance remains pending; no newer success
+is inferred from earlier passing helper/runtime/backend steps.

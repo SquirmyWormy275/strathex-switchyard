@@ -219,3 +219,20 @@ the same sequence on Linux and replaces the destination during close; it remains
 untouched. Complete corrected native Windows acceptance remains pending. The
 implementation uses libuv's [MoveFileEx replacement](https://github.com/libuv/libuv/blob/v1.x/src/win/fs.c)
 with the [documented Windows move API](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw).
+
+
+The corrected normal installed journey passed seven checks at `713f439`. It
+created one actual empty native Codex task and used both review/approval stages
+without a model prompt. The resulting commit contains exactly the supplied 512
+binary bytes and author; the unrelated worktree edit stayed outside the commit
+and the shared index reconciled. Duplicate HTTP execution returned the same
+operation and receipt with no additional native command. The installed recovery
+observer read back the exact final HEAD without mutation. All 38 Git guardians
+and eight retained inspection guardians independently verified stopped.
+
+Receipt `installed-repository-commit-1793784076954.json` records restored
+workspace selection/keyboard-only mode, unchanged definitions/private link and
+removed successful staging. The earlier failed HTTP fixture was separately
+preflighted and cleaned; its failure receipt remains retained. Native empty-task
+history remains. This is local host acceptance, not a provider coding-task
+completion or physical keyboard acceptance claim.

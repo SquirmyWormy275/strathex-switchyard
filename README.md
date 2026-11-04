@@ -72,7 +72,10 @@ software-tested. Both installed native task APIs now pass reviewed text journeys
 Codex retains its exact turn acknowledgement; Claude supports exact creation,
 continuation and separately approved resume-only recovery after an uncertain
 first turn. Owned guardian exit, duplicate/replay handling and keyboard-only
-cleanup are verified. Provider replies do not establish coding-task completion.
+cleanup are verified. Separately approved host commits now pass a normal installed
+journey with an actual empty native task, exact binary bytes, explicit author,
+unowned-edit preservation and durable duplicate/receipt readback. No model prompt
+is sent by that journey. Provider replies do not establish coding-task completion.
 
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
@@ -82,7 +85,7 @@ managed startup, installer, bootstrap, portable profiles and automation checks.
 Fresh native Windows installation/import/model/recheck and cleanup also passed
 with 49 exact distributions. Newer private-pipe and recovery checkpoints await
 their corrected complete Windows run. The latest accepted Linux run has 144 groups
-and 921 tests. [Verification details](docs/verification.md) distinguish each result
+and 922 tests. [Verification details](docs/verification.md) distinguish each result
 and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
