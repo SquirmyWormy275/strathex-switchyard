@@ -13,7 +13,7 @@ using Microsoft.Win32.SafeHandles;
 // Fixed filesystem operation only. This mode does not launch a recipe or claim
 // VM containment. The caller pre-creates and durably records one empty directory.
 [SupportedOSPlatform("windows")]
-internal static class ReviewedInputStager
+internal static partial class ReviewedInputStager
 {
     private const string Schema = "switchyard-windows-reviewed-inputs/v1";
     private const uint GenericRead = 0x80000000, ReadAttributes = 0x80, ReadControl = 0x20000, WriteDac = 0x40000;
@@ -109,7 +109,7 @@ internal static class ReviewedInputStager
         finally { LocalFree(memory); }
         VerifyPrivateDirectory(directory);
     }
-    private static void VerifyPrivateDirectory(SafeFileHandle directory)
+    private static void VerifyPrivateDirectory(SafeFileHandle directory, bool requireProtected = true)
     {
         string sid = WindowsIdentity.GetCurrent().User?.Value ?? throw Invalid();
         if (GetSecurityInfo(directory, 1, 4, out _, out _, out _, out _, out var observed) != 0) throw Invalid();
@@ -118,7 +118,7 @@ internal static class ReviewedInputStager
             uint length = GetSecurityDescriptorLength(observed); if (length is < 20 or > 65536) throw Invalid();
             var bytes = new byte[checked((int)length)]; Marshal.Copy(observed, bytes, 0, bytes.Length);
             var security = new RawSecurityDescriptor(bytes, 0);
-            if ((security.ControlFlags & ControlFlags.DiscretionaryAclProtected) == 0 || security.DiscretionaryAcl is not { Count: 3 } acl) throw Invalid();
+            if (requireProtected && (security.ControlFlags & ControlFlags.DiscretionaryAclProtected) == 0 || security.DiscretionaryAcl is not { Count: 3 } acl) throw Invalid();
             var allowed = new HashSet<string>(StringComparer.Ordinal) { sid, "S-1-5-18", "S-1-5-32-544" };
             var found = new HashSet<string>(StringComparer.Ordinal);
             foreach (GenericAce entry in acl)

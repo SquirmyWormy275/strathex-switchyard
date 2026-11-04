@@ -193,6 +193,23 @@ type checking pass. Its actual native service journey is now in CI, pending.
 Writable-volume ownership/attach/mount/detach/recovery and the Studio Run adapter
 remain unfinished; the detached lease grants no execution protection.
 
+The detached ownership service now passes all 19 actual native Windows checks
+at `e589c4f`, run 41889645807. The same immutable source passes all 156 Linux
+groups: 1,004 tests, 994 passed and ten declared platform skips. Receipt
+`71ff7517-e62b-4fbc-87c6-be7aa3d3deac` was retained; all children were verified
+cleaned/exited and the temporary checkout was removed.
+
+The exact native volume attach/inspect/detach mode is now implemented. It binds
+the original image and mount directory, derives its device from the VHD handle,
+verifies the single exact partition extent and mounted capacity, and requires
+fresh detached image/tag/footer readback before reporting cleanup. It enables
+only an existing assigned manage-volume privilege in that helper's token.
+Six Linux entry guards, four package checks and a zero-warning/error build pass;
+build scratch was removed. Native CI now includes actual fixed-capacity disk-full
+and detach checks, pending. Durable writable-volume handoff/restart ownership,
+trusted guest mapping, normal Windows privilege setup and Studio Run connection
+remain implementation work; no guest or workstation disk was opened locally.
+
 ## Current pilot
 
 The normal installed command is `~/.local/bin/switchyard`. Source development uses

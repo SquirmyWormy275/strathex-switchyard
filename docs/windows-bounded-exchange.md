@@ -91,9 +91,50 @@ checking pass. Tests use owned sparse synthetic files, real descriptor hashing,
 encrypted state and kernel locks. They do not mount a disk. Native CI now also
 exercises this host service through actual creation, fresh readback, duplicate/
 quota/consumer fences, exact guardian exits and guarded removal; its new result
-is pending. Protected image records are omitted from general workspace snapshots.
+passes all 19 checks at `e589c4f`, run 41889645807. Protected image records are
+omitted from general workspace snapshots.
 
 This phase owns immutable detached images only. Its lease still reports no
 filesystem enforcement or sandbox protections. Transferring ownership to a
 writable-volume lifecycle and safely retiring changed guest data remains part
 of the unfinished attach/mount/detach and Run integration.
+
+## Exact native volume transition
+
+The fixed `--bounded-exchange-volume` mode now implements attach, inspect and
+detach for an original image and precreated `mount` folder. Requests pin both
+native file/directory identities and the image's footer; attach additionally
+requires its complete initial hash. The root must contain exactly these two
+entries. Paths to physical disks, drive letters, volume selectors, format
+commands and source images are not accepted.
+
+Attach enables only an already assigned `SeManageVolumePrivilege` in that
+helper's process token. It does not grant the privilege or install a service.
+Windows' [AttachVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-attachvirtualdisk)
+creates the attachment without a drive letter. Its persistence is tracked
+separately from the short helper's process lifetime. The physical device number
+is derived from this exact opened image, then a bounded read-only volume scan
+requires one matching partition extent at the original offset and length.
+Only that volume can be associated with the original empty private folder.
+
+Readback verifies its mount-point tag and original NTFS directory identity,
+volume GUID, exact backing extent, FAT label/serial and bounded capacity. The
+private root and mount ACLs are read back independently. Detach removes only
+that verified association, calls
+[DetachVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-detachvirtualdisk),
+closes its handle, and reopens the original image to verify detached state,
+unchanged footer and cleared mount-point tag. API success alone is insufficient.
+Unknown results preserve the original image/mount for exact reconciliation.
+
+The helper compiles with zero warnings/errors; six Linux mode guards and four
+packaged-import checks pass. Scratch was removed after retaining
+`windows-bounded-volume-build-20261104.json`. Native CI now adds exact attach,
+duplicate refusal, fresh mounted inspection, bounded writes through actual
+kernel disk-full and exact unmount/detach readback. It uses only its new owned
+image, attempts original-identity cleanup after failure, and never starts a VM.
+Those new native results are pending.
+
+Durable writable-volume handoff/ownership and restart recovery, Windows Sandbox
+mapping of this trusted volume, Studio Run connection and a supported personal
+host's privileged setup remain implementation work. The new mode does not make
+the existing immutable image lease writable or enable the Windows Run action.

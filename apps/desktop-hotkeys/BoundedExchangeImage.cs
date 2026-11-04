@@ -93,14 +93,27 @@ internal static class BoundedExchangeImage
     [SupportedOSPlatform("windows")]
     public static void ReadNativeHeader(string path, Guid operationId)
     {
+        using var handle = OpenNativeImage(path, operationId, 0x00080000, 0);
+        if (ReadNativeState(handle, operationId)) throw new InvalidOperationException("native-vhd-loaded-1");
+    }
+    [SupportedOSPlatform("windows")]
+    public static SafeFileHandle OpenNativeImage(string path, Guid operationId, uint access, uint writeDepth)
+    {
         var storage = new StorageType { DeviceId = 2, Vendor = new Guid("ec984aec-a0f9-47e9-901f-71415a66345b") };
-        var parameters = new OpenParameters { Version = 1, ReadWriteDepth = 0 };
-        // GET_INFO only, zero writable backing-store depth; never attach.
-        uint error = OpenVirtualDisk(ref storage, path, 0x00080000, 0, ref parameters, out var nativeHandle);
+        var parameters = new OpenParameters { Version = 1, ReadWriteDepth = writeDepth };
+        uint error = OpenVirtualDisk(ref storage, path, access, 0, ref parameters, out var nativeHandle);
         if (error != 0) throw new System.ComponentModel.Win32Exception(checked((int)error));
-        using (var handle = new SafeFileHandle(nativeHandle, ownsHandle: true))
+        var handle = new SafeFileHandle(nativeHandle, ownsHandle: true);
+        try
         {
             if (handle.IsInvalid) throw new InvalidOperationException("The native VHD reader returned no valid metadata handle.");
+            _ = ReadNativeState(handle, operationId); return handle;
+        }
+        catch { handle.Dispose(); throw; }
+    }
+    [SupportedOSPlatform("windows")]
+    public static bool ReadNativeState(SafeFileHandle handle, Guid operationId)
+    {
             byte[] Read(uint version, uint minimum)
             {
                 var bytes = new byte[32]; BinaryPrimitives.WriteUInt32LittleEndian(bytes, version); uint length = 32;
@@ -118,7 +131,6 @@ internal static class BoundedExchangeImage
             // would reverse its first three fields and change the comparison.
             if (!identifier.AsSpan(8, 16).SequenceEqual(operationId.ToByteArray(bigEndian: true))) throw new InvalidOperationException("native-vhd-identifier-other");
             if (nativeType != 2) throw new InvalidOperationException($"native-vhd-type-{nativeType}");
-            if (nativeLoaded != 0) throw new InvalidOperationException($"native-vhd-loaded-{nativeLoaded}");
-        }
+            return nativeLoaded != 0;
     }
 }
