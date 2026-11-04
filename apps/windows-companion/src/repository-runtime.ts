@@ -15,6 +15,7 @@ import type { Readable } from "node:stream";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { EffectDisposition } from "../../../packages/control-plane/src/contracts.ts";
 import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
+import { validateRepositoryInputs, type RepositoryInputFile } from "./repository-inputs.ts";
 
 export const repositoryRuntimeManifestSchema = "sxsy-b122.repository-runtime" as const;
 export const repositoryRuntimeManifestVersion = 1 as const;
@@ -57,6 +58,8 @@ export interface RepositoryProcessRecipe {
   readonly isolation: RepositoryRuntimeIsolation;
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
+  /** Optional v1 extension; Linux disposable roots require these exact host-pinned bytes. */
+  readonly inputFiles?: readonly RepositoryInputFile[];
   readonly web?: RepositoryWebRecipe;
   readonly python?: Readonly<{ readonly interpreter: string }>;
 }
@@ -129,6 +132,7 @@ export interface RepositoryExecutionRootProvider {
     action: RepositoryProcessAction;
     repositoryRoot: string;
     isolation: RepositoryRuntimeIsolation;
+    inputFiles?: readonly RepositoryInputFile[];
   }>): Promise<RepositoryExecutionRootLease>;
 }
 
@@ -396,7 +400,7 @@ function validateStopRecipe(value: Record<string, unknown>, errors: string[]): R
 }
 
 function validateProcessRecipe(action: RepositoryProcessAction, value: Record<string, unknown>, allowedHttpsUrls: readonly string[], errors: string[]): RepositoryProcessRecipe {
-  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
+  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python", "inputFiles"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
   if (value.kind !== "process") errors.push(`${action} must use a process recipe.`);
   if (!boundedString(value.executable, `${action}.executable`, errors, 2_048) || !isAbsolute(value.executable as string)) errors.push(`${action}.executable must be an exact absolute executable path.`);
   const args: string[] = [];
@@ -426,6 +430,11 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
   const isolation = value.isolation === "disposable" ? "disposable" : "repository";
   if (value.isolation !== "repository" && value.isolation !== "disposable") errors.push(`${action}.isolation must be repository or disposable.`);
   if (disposableRequired.has(action) && isolation !== "disposable") errors.push(`${action} requires a disposable execution root.`);
+  let inputFiles: readonly RepositoryInputFile[] | undefined;
+  if (value.inputFiles !== undefined) {
+    try { inputFiles = validateRepositoryInputs(value.inputFiles); } catch (error) { errors.push(`${action}.inputFiles: ${(error as Error).message}`); }
+    if (isolation !== "disposable") errors.push(`${action}.inputFiles requires disposable isolation.`);
+  }
   boundedInteger(value.timeoutMs, `${action}.timeoutMs`, errors, 50, maximumTimeoutMs);
   boundedInteger(value.maxOutputBytes, `${action}.maxOutputBytes`, errors, 1, maximumOutputBytes);
   const web = value.web === undefined ? undefined : validateWebRecipe(action, value.web, allowedHttpsUrls, errors);
@@ -445,6 +454,7 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
     isolation,
     timeoutMs: typeof value.timeoutMs === "number" ? value.timeoutMs : 1_000,
     maxOutputBytes: typeof value.maxOutputBytes === "number" ? value.maxOutputBytes : 4_096,
+    ...(inputFiles ? { inputFiles } : {}),
     ...(web ? { web } : {}),
     ...(python ? { python } : {})
   };
@@ -807,7 +817,7 @@ export class RepositoryRuntime {
     const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
     if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason), effectDisposition: "not_started" };
     let lease: RepositoryExecutionRootLease;
-    try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation }); }
+    try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation, ...(recipe.inputFiles ? { inputFiles: recipe.inputFiles } : {}) }); }
     catch (error) {
       return error instanceof RuntimeUnavailableError
         ? { status: "unavailable", summary: untrustedSummary(error.message), effectDisposition: "not_started" }

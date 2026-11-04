@@ -1,6 +1,6 @@
-/** Bounded native client checks, independent of the long complete release lane. */
+/** Bounded native client and reviewed-input checks, independent of the complete release lane. */
 import { requiredGroups, runVerification } from "./run-isolated-tests.mjs";
-const files = new Set(["tools/layout-studio/client-launch.test.mjs", "tools/layout-studio/physical-intent.test.mjs", "tools/layout-studio/integrations.test.mjs", "tools/layout-studio/suite.test.mjs", "deployment/suite/release.test.mjs"]);
+const files = new Set(["tools/layout-studio/client-launch.test.mjs", "tools/layout-studio/physical-intent.test.mjs", "tools/layout-studio/integrations.test.mjs", "tools/layout-studio/suite.test.mjs", "deployment/suite/release.test.mjs", "apps/windows-companion/test/repository-runtime.test.ts"]);
 const groups = requiredGroups.filter(g => files.has(g.file));
 if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
 const { receipt, receiptPath } = await runVerification({ groups });

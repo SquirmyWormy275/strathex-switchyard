@@ -23,8 +23,8 @@ preserved.
 
 ## Accepted evidence
 
-- Complete Linux source: 147/147 groups, 947 tests, 937 passed and ten declared
-  platform skips; receipt 1b505309-6e94-421c-bdac-0de08b075a38. The additional
+- Complete Linux source: 147/147 groups, 950 tests, 940 passed and ten declared
+  platform skips; receipt 99c53747-2954-4709-ba97-b646bf07d43f. The additional
   Windows metadata probe is explicitly skipped on Linux. Type checking passes.
 - Normal installed reviewed commit: seven checks with one actual empty Codex
   task, zero prompts, exact binary bytes/author, preserved unowned edit, shared
@@ -53,21 +53,19 @@ preserved.
 
 ## Windows client verification
 
-The fixed WinRT URI transport passes all 41 checks in four native Windows groups
-at source ea96ffe, including actual Windows PowerShell WinRT/AsTask metadata
-without URI activation. Run [41820186124](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41820186124),
-receipt 36694c71-9a72-4d40-9254-a5625bbdf762. The tested merge commit af900d6 has
-exactly the same source tree as ea96ffe. Bounded artifact 13317375091 (1,321 bytes)
-was downloaded and verified against SHA-256
-`58750425922e5b5654326fa1c8efde6065f22674ba3d76dc4bdbf73225e93a37`; its complete
-receipt is retained privately as client-platform-windows-ea96ffe.json. No ZIP or
-Windows installer/runtime was retained locally.
+The published role source 15cd19b passes all 47 checks in five native Windows
+client groups, including actual Windows PowerShell WinRT/AsTask metadata without
+URI activation. Run [41823579833](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41823579833),
+receipt 9097bbd9-ec2b-4dc3-ae9d-8619c6fc4993. Its tested merge commit f4c37b2 has
+exactly the same source tree. Bounded artifact 13317249676 (1,424 bytes) was
+downloaded and SHA-256 verified; the complete receipt is retained privately as
+client-platform-windows-15cd19b.json. No ZIP or installer/runtime was retained.
 
-The initial run passed 40/41 but timed out in metadata startup. Native UTF-8
-streams and a fixed system Utility module, matching the working DPAPI contract,
-corrected that path; the 15-second deadline was preserved. This is accepted
-software/native metadata evidence, not an interactive Windows URI, account,
-window or device check. The complete newer Windows release remains pending.
+The earlier WinRT source ea96ffe passed 41 checks after correcting native UTF-8
+startup and the fixed Utility module; the original 40/41 timeout remains in the
+verification history. The 15-second metadata deadline was preserved. These are
+accepted software/native metadata checks, not interactive Windows URI, account,
+window or device acceptance. The complete newer Windows release remains pending.
 
 ## Client roles and physical intent connection
 
@@ -98,6 +96,26 @@ private dated definition backup remains. No physical key, browser visual/account
 or interactive Windows acceptance is claimed. Fresh native Windows source
 acceptance remains pending.
 
+## Reviewed disposable execution inputs
+
+The older Linux execution-root provider copied an entire repository, potentially
+including ignored credentials. It now requires exact host-pinned non-production
+input paths, SHA-256 values and sizes. Descriptor-bound reads, bounded buffers,
+source/staging identities and replacement-preserving cleanup enforce the file
+boundary; unselected files are not copied. The namespace no longer mounts the
+host's whole `/etc`. Old disposable pins without reviewed inputs fail closed and
+need deliberate repinning. See [the input contract](reviewed-execution-inputs.md).
+
+Nineteen focused Linux/runtime checks and type checking pass. The final complete
+Linux run passes all 147 groups (950 tests: 940 passed, ten declared platform
+skips; receipt 99c53747-2954-4709-ba97-b646bf07d43f). A real Bubblewrap
+proof passed three checks (repository-inputs-native-1793793697536.json): exactly
+one file staged; host home, host `/etc/passwd`, unselected synthetic credentials,
+ambient credential variables and a live host loopback listener inaccessible;
+original files unchanged and temporary staging removed. No runtime was copied.
+This is an execution prerequisite, not completion of general execution effects,
+Windows guest staging, output disk quotas or the frozen frontend connection.
+
 ## Work still required
 
 General execution effects, exact native desktop/IDE/terminal attachment, remaining
@@ -107,8 +125,8 @@ account, native conversation, task completion, exact resume, submission or
 mediation. Microsoft work Copilot remains distinct from GitHub Copilot; no
 personal fallback or employer approval is inferred.
 
-Installed discovery returned zero configuration interfaces at
-2026-11-04T09:24:06Z. Actual F77/B122 identity, typing/unlock/hot-plug, physical
+Installed discovery again returned zero configuration interfaces; latest receipt
+device-enumeration-1793793796030.json. No HID interface was opened or written. Actual F77/B122 identity, typing/unlock/hot-plug, physical
 transactions, printer/cap fit, interactive Windows accounts/windows, microphone
 and approved tenant behavior require their actual environments. No flash/reset,
 bootloader, solenoid operation, public release, merge or license change occurred.

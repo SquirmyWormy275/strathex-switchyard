@@ -70,6 +70,18 @@ async function writeVerifiedManifest(hostRoot: string, value: unknown, repositor
   });
 }
 
+test("even digest-pinned manifests reject unbounded or ambiguous disposable input authority", async context => {
+  const setup = await fixture(context), witness = { path: "task.mjs", sha256: "a".repeat(64), size: 12, classification: "non-production" };
+  const recipe = (inputFiles: unknown) => manifest(setup.repositoryRoot, { pipeline_local_gate: processRecipe({ isolation: "disposable", inputFiles }) });
+  for (const inputs of [[], [{ ...witness, command: "untrusted" }], [{ ...witness, path: "../outside" }], [{ ...witness, path: ".git/config" }], [{ ...witness, path: "C:stream" }], [{ ...witness, path: "NUL.txt" }], [witness, { ...witness, path: "TASK.mjs" }], [{ ...witness, classification: "production" }], [{ ...witness, size: 4 * 1024 * 1024 + 1 }], [{ ...witness, sha256: "unverified" }]]) {
+    await assert.rejects(writeVerifiedManifest(setup.hostRoot, recipe(inputs), setup.repositoryRoot), /inputFiles/);
+  }
+  const loaded = await writeVerifiedManifest(setup.hostRoot, recipe([witness]), setup.repositoryRoot);
+  const declared = loaded.manifest.recipes.pipeline_local_gate; assert.equal(declared?.kind, "process"); if (declared?.kind !== "process") throw Error("Expected process recipe");
+  assert.deepEqual(declared.inputFiles, [witness]); assert.equal(Object.isFrozen(declared.inputFiles?.[0]), true);
+  await assert.rejects(writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, { pipeline_local_gate: processRecipe({ inputFiles: [witness] }) }), setup.repositoryRoot), /inputFiles requires disposable/);
+});
+
 test("a digest-pinned host manifest accepts only the exact bounded v1 structured schema", async (context) => {
   const setup = await fixture(context);
   await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.stdout.write('ok')", "utf8");
@@ -131,7 +143,7 @@ test("disposable pipeline recipes require an injected disposable root and never 
   const setup = await fixture(context);
   await writeFile(join(setup.disposableRoot, "task.mjs"), "process.stdout.write(`${process.cwd()}:${process.env.SXSY_TEST_DB}`)", "utf8");
   const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, {
-    pipeline_local_gate: processRecipe({ isolation: "disposable", environment: { SXSY_TEST_DB: "isolated.sqlite" } })
+    pipeline_local_gate: processRecipe({ isolation: "disposable", environment: { SXSY_TEST_DB: "isolated.sqlite" }, inputFiles: [{ path: "task.mjs", sha256: createHash("sha256").update(await readFile(join(setup.disposableRoot, "task.mjs"))).digest("hex"), size: (await readFile(join(setup.disposableRoot, "task.mjs"))).length, classification: "non-production" }] })
   }), setup.repositoryRoot);
 
   const unavailable = await new RepositoryRuntime(loaded, { effectGuard: allowEffects }).execute("pipeline_local_gate", { targetSnapshotId });
@@ -142,6 +154,7 @@ test("disposable pipeline recipes require an injected disposable root and never 
     async prepare(input): Promise<RepositoryExecutionRootLease> {
       assert.equal(input.action, "pipeline_local_gate");
       assert.equal(input.isolation, "disposable");
+      assert.equal(input.inputFiles?.[0]?.path, "task.mjs");
       return {
         root: setup.disposableRoot,
         isolation: "disposable",

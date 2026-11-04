@@ -1,12 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
-import { cp, lstat, mkdir, readFile, realpath, rename, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 import type { OperationControllerObservation } from "../../../packages/control-plane/src/runtime.ts";
 import type { BrokerOutcome, ExecutionRequest, IsolationRequest } from "../../../packages/control-plane/src/brokers.ts";
 import type {
-  RepositoryExecutionRootLease,
-  RepositoryExecutionRootProvider,
   RepositoryProcessObservationRequest,
   RepositoryProcessRecoveryScope,
   RepositoryProcessStartRequest,
@@ -20,9 +18,6 @@ import type { DurableRepositoryRuntimeRegistry } from "../../windows-companion/s
 import type { ScannerFixtureResolver, VerifiedScannerFixture } from "../../windows-companion/src/scanner-fixtures.ts";
 
 const bwrapPath = "/usr/bin/bwrap";
-const maximumDisposableEntries = 100_000;
-const maximumDisposableBytes = 2 * 1024 * 1024 * 1024;
-const maximumDisposableCopyMs = 120_000;
 const isolatedActions = new Set(["pipeline_local_gate", "pipeline_clean_reproduction", "shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"]);
 const coverageByAction: Readonly<Record<string, readonly string[]>> = {
   pipeline_local_gate: ["correctness", "isolation", "production_data", "ambient_credentials"],
@@ -33,53 +28,7 @@ const coverageByAction: Readonly<Record<string, readonly string[]>> = {
   release_shield: ["secrets", "pii", "security_defects", "history", "insecure_paths", "permissions", "infrastructure", "vulnerabilities", "licenses", "provenance", "sbom", "isolation"]
 };
 
-/** Private, disposable repository copies used only by recipes that explicitly require them. */
-export class LinuxDisposableExecutionRootProvider implements RepositoryExecutionRootProvider {
-  private readonly root: string;
-  constructor(stateDirectory: string) { this.root = resolve(stateDirectory, "repository-execution-roots"); }
-
-  async prepare(input: Parameters<RepositoryExecutionRootProvider["prepare"]>[0]): Promise<RepositoryExecutionRootLease> {
-    const repositoryRoot = await realpath(input.repositoryRoot);
-    if (input.isolation === "repository") return { root: repositoryRoot, isolation: "repository", release: async () => undefined };
-    await mkdir(this.root, { recursive: true, mode: 0o700 });
-    const canonicalRoot = await realpath(this.root);
-    const token = `${createHash("sha256").update(repositoryRoot).digest("hex").slice(0, 24)}-${randomUUID()}`;
-    const staging = join(canonicalRoot, `.staging-${token}`);
-    const destination = join(canonicalRoot, token);
-    let entries = 0; let bytes = 0; const deadline = Date.now() + maximumDisposableCopyMs;
-    try {
-      await cp(repositoryRoot, staging, {
-        recursive: true,
-        force: false,
-        errorOnExist: true,
-        verbatimSymlinks: true,
-        filter: async (source) => {
-          if (Date.now() > deadline) throw new Error("The disposable repository copy exceeded its time budget.");
-          const suffix = relative(repositoryRoot, source);
-          if (suffix === ".git" || suffix.startsWith(`.git${process.platform === "win32" ? "\\" : "/"}`)) return false;
-          const metadata = await lstat(source);
-          if (metadata.isSymbolicLink()) throw new Error("Disposable repository copies refuse symbolic links.");
-          entries += 1; if (metadata.isFile()) bytes += metadata.size;
-          if (entries > maximumDisposableEntries || bytes > maximumDisposableBytes) throw new Error("The disposable repository copy exceeded its file or byte budget.");
-          return true;
-        }
-      });
-      await rename(staging, destination);
-      const canonical = await realpath(destination);
-      if (!inside(canonicalRoot, canonical) || canonical === repositoryRoot) throw new Error("The Linux disposable execution root escaped its private state boundary.");
-      return {
-        root: canonical,
-        isolation: "disposable",
-        protections: { productionData: "denied", ambientCredentials: "denied" },
-        release: async () => { if (inside(canonicalRoot, canonical)) await rm(canonical, { recursive: true, force: true }); }
-      };
-    } catch (error) {
-      await rm(staging, { recursive: true, force: true }).catch(() => undefined);
-      await rm(destination, { recursive: true, force: true }).catch(() => undefined);
-      throw error;
-    }
-  }
-}
+export { LinuxDisposableExecutionRootProvider } from "./linux-repository-inputs.ts";
 
 /** Wraps security and pipeline recipes in a deny-network Bubblewrap namespace. */
 export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryProcessSupervisor {
@@ -106,7 +55,7 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
     const args = [
       "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
       "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-      "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--ro-bind", "/etc", "/etc",
+      "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
       mount, executionRoot, "/workspace", ...executableBind, "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
     ];
     const bwrap = await realpath(bwrapPath);

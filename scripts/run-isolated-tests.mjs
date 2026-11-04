@@ -103,7 +103,7 @@ const linuxSkippedOnNonLinux = new Map([
   ["linux-lifecycle", 2],
   ["linux-user-presence", 2],
   ["linux-process-supervisor", 3],
-  ["linux-repository-runtime", 3]
+  ["linux-repository-runtime", 6]
 ]);
 const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle", "linux-user-presence", "linux-pipewire-audio", "linux-hidraw", "linux-process-supervisor", "linux-repository-runtime", "omarchy-capabilities", "omarchy-identity", "omarchy-host-action", "omarchy-host-action-consumer"]
   .map((name) => ({

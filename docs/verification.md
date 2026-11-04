@@ -103,3 +103,38 @@ validation definitions/selection/mode were restored; its successful launch recor
 and bundle staging were removed. Current plus one rollback remain about 11 MiB.
 No physical keyboard event, visual/account acceptance or frontend review is
 inferred.
+
+Published role source `15cd19b` also passed all 47 tests in five native Windows
+client groups, run [41823579833](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41823579833),
+job 126552524573, receipt `9097bbd9-ec2b-4dc3-ae9d-8619c6fc4993`. The tested merge
+commit f4c37b25af49dd6ac2df4e2872d4fe19e5205388 has the exact same tree
+03359ee3c81ba75993a09f921e96e182948d4c06. Artifact 13317249676 (1,424-byte ZIP)
+was downloaded in memory and verified against SHA-256
+`385df68b68c02154927599498a1c170cde37a532d47540e5b994adeacd9e10f4`; only the
+private complete JSON receipt was retained. No interactive Windows keyboard,
+URI, account or window acceptance is inferred.
+
+Reviewed disposable inputs pass 19 focused Linux/runtime checks and type
+checking, including changed bytes/sizes, unselected credentials, unsafe paths,
+symlinked source directories/files, elapsed staging deadlines and replacement
+directory preservation. The real Linux Bubblewrap proof passed three checks
+again after deadline enforcement (repository-inputs-native-1793793697536.json).
+Only one exact synthetic file was staged; host home, host `/etc/passwd`,
+unselected credentials, ambient credential variables and a live host loopback
+listener were inaccessible. Original synthetic files were unchanged and all
+staging was removed. This accepts the Linux input/namespace boundary, not the
+remaining Studio execution connection, Windows guest staging or output quotas.
+
+Final reviewed-input source passes all 147 Linux groups: 950 tests, 940 passed,
+ten declared platform skips, zero failed/cancelled/todo; receipt
+`99c53747-2954-4709-ba97-b646bf07d43f`. Type checking and all 19 focused
+Linux/runtime tests pass. Six bounded client/runtime groups also pass 59/60 with
+the declared native Windows metadata skip (a26dfada-d1e3-47ef-bcda-697ee43f2c58).
+The previous complete Linux run passed before adding the explicit negative
+staging-deadline case; the final run above accepts that additional change.
+
+Fresh installed device enumeration returned zero configuration interfaces
+(device-enumeration-1793793796030.json). It opened no HID device and wrote no
+keyboard configuration. F77/B122 physical checks remain unavailable, separate
+from unfinished general execution, Windows guest input staging and frontend
+implementation.
