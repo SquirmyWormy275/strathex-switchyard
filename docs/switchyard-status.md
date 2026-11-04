@@ -8,6 +8,14 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The normal suite now exposes connected Run authority on both Linux and Windows,
+and passes the trusted platform through to the execution factory. The previous
+Windows policy tests exercised the adapter but missed the ordinary factory's
+Linux-only grant list. A normal route-level grant check now covers that entry,
+one-use approval, unsupported actions and Work rejection. Authority, suite and
+physical-intent files pass 33/33 locally. The Windows client startup lane passed
+at `1a0fa33`; the new factory check awaits its native rerun.
+
 Windows Run now observes the Sandbox command interface and storage privilege
 before staging inputs/tools/images. Native metadata uses query-only token access,
 bounded reads and unchanged privilege readback; missing prerequisites settle the

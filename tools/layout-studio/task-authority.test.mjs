@@ -5,6 +5,22 @@ import { readFile, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { createRepositoryInspection, fixedGitExecutable } from "./repository-inspection.mjs";
 import { authorityFixture as fixture } from "./test-support/task-authority-fixture.mjs";
+import { createTaskAuthority } from "./task-authority.mjs";
+import { createSuite } from "./suite.mjs";
+
+test("normal Windows suite authority routes issue only separately reviewed connected Run grants", async t => {
+  const f = await fixture(t); let nativeChecks = 0;
+  const suite = createSuite({store:f.store,platform:"win32",agents:{close:async()=>{}},coding:{status:async(c,id)=>{assert.equal(c,"personal");assert.equal(id,f.task.id);nativeChecks++;},close:async()=>{}},
+    taskAuthorityFactory:options=>createTaskAuthority({...options,inspection:f.inspection}),
+    repositoryExecution:{recoverCompartment:async()=>({cleaned:true}),close:async()=>{}}});
+  f.onCleanup(()=>suite.close());
+  const body={...f.proposed,actions:["run_target"]},review=await suite.handle("/api/suite/coding/authority/review",body);
+  assert.deepEqual(review.scope.allowedActions,["run_target"]);assert.ok(nativeChecks>=2);
+  await assert.rejects(suite.handle("/api/suite/coding/authority/issue",{...body,token:randomUUID()}));
+  const grant=await suite.handle("/api/suite/coding/authority/issue",{...body,token:review.confirmation.token});assert.deepEqual(grant.connectedExecutionActions,["run_target"]);assert.equal(grant.nativePermissionsChanged,false);
+  await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,actions:["debug_target"]}),/explicitly connected/);
+  await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,compartment:"work"}));
+});
 
 test("task authority binds real Git contents to one reviewed task/plan, consumes approval once and detects later edits", async t => {
   const f = await fixture(t), beforeHead = await f.run("rev-parse", "HEAD");

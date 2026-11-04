@@ -36,7 +36,7 @@ import { createClientIntegrations } from "./client-integrations.mjs";
 import { clientRecipe } from "../../integrations/client-recipes.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -56,10 +56,10 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   let selectionLoading;
   let closed = false;
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
-  taskAuthority ??= createTaskAuthority({ store, localCommitExecutionImplemented: true, executionActions: process.platform === "linux" ? ["run_target"] : [], isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
+  taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: ["linux","win32"].includes(platform) ? ["run_target"] : [], isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
   const repositoryDirectory = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects");
   repositoryCommits ??= createRepositoryCommits({ store, authority: taskAuthority, stateDirectory: repositoryDirectory });
-  repositoryExecution ??= createRepositoryExecution({ store, authority: taskAuthority, stateDirectory: join(repositoryDirectory, "execution"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
+  repositoryExecution ??= createRepositoryExecution({ store, authority: taskAuthority, platform, stateDirectory: join(repositoryDirectory, "execution"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   repositoryRecovery ??= createRepositoryEffectRecovery({ store, stateDirectory: repositoryDirectory, isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   clientLaunch ??= createClientLaunch({ store, stateDirectory: join(repositoryDirectory, "client-launches"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   async function stopExample(compartment, example) {
