@@ -84,6 +84,12 @@ internal static class WindowsStorageBrokerControl
         using var manager=OpenSCManagerW(null,null,1);if(manager.IsInvalid)throw Invalid();using var service=OpenServiceW(manager,settings.ServiceName,5);if(service.IsInvalid)return false;
         VerifyConfiguration(service,settings);var status=ReadStatus(service);return status.State==4&&status.Pid>0;
     }
+    internal static object ObserveState(WindowsStorageBrokerInstallation.Settings settings)
+    {
+        using var manager=OpenSCManagerW(null,null,1);if(manager.IsInvalid)throw Invalid();using var service=OpenServiceW(manager,settings.ServiceName,5);if(service.IsInvalid)throw Invalid();
+        VerifyConfiguration(service,settings);var status=ReadStatus(service);
+        return new{state=status.State,nativeExitCode=status.ExitCode,specificExitCode=status.SpecificExitCode,configurationVerified=true};
+    }
     internal static void Remove(WindowsStorageBrokerInstallation.Settings settings)
     {
         Administrator();using var manager=OpenSCManagerW(null,null,1);if(manager.IsInvalid)throw Invalid();

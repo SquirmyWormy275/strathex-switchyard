@@ -27,12 +27,13 @@ internal static class WindowsStorageBroker
             if(request.GetProperty("schema").GetString()!=Schema)throw Invalid();
             if(action=="metadata")
             {
+                string stage="installation";object? serviceState=null;
                 try
                 {
-                    var settings=WindowsStorageBrokerInstallation.Load(WindowsStorageBrokerFiles.CurrentOwnerSid());var storage=WindowsStorageBrokerPipe.Observe(settings).GetAwaiter().GetResult();
+                    var settings=WindowsStorageBrokerInstallation.Load(WindowsStorageBrokerFiles.CurrentOwnerSid());stage="service-status";serviceState=WindowsStorageBrokerControl.ObserveState(settings);stage="authenticated-pipe";var storage=WindowsStorageBrokerPipe.Observe(settings).GetAwaiter().GetResult();
                     Write(new{schema=Schema,action,status="bootstrap-ready",installationId=settings.InstallationId,ownerScope=settings.OwnerScope,serviceImageSha256=settings.ServiceImageSha256,protocolVerified=true,storage,brokerImplemented=false,effectStarted=false});return 0;
                 }
-                catch{Write(new{schema=Schema,action,status="unavailable",reason="The original protected broker and its fresh authenticated metadata could not be verified.",brokerImplemented=false,effectStarted=false});return 0;}
+                catch(Exception error){Write(new{schema=Schema,action,status="unavailable",reason="The original protected broker and its fresh authenticated metadata could not be verified.",failureStage=stage,serviceState,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:(int?)null,brokerImplemented=false,effectStarted=false});return 0;}
             }
             string sid=request.GetProperty("clientSid").GetString()??"",installationId=request.GetProperty("installationId").GetString()??"",sha=request.GetProperty("helperSha256").GetString()??"";
             string scope=WindowsStorageBrokerFiles.OwnerScope(sid);WindowsStorageBrokerProtocol.Request(new(installationId,scope,sha),new string('a',64));
