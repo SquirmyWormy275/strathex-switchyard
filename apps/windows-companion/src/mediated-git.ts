@@ -11,7 +11,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { copyFile, lstat, mkdir, open, realpath, rename, rm, rmdir, stat } from "node:fs/promises";
+import { lstat, mkdir, open, realpath, rename, rm, rmdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
@@ -19,6 +19,7 @@ import {
   type BrokerOutcome,
   type GitRequest
 } from "../../../packages/control-plane/src/brokers.ts";
+import { OwnedGitIndexLease, createOwnedGitFileLock, type OwnedGitFileLock, type GitFileIdentity, type GitIndexPreservation } from "./git-index-lease.ts";
 import { VerifiedGitContentStager } from "./git-content-stager.ts";
 import type { UntrackedClassification } from "../../../packages/control-plane/src/git-inspector.ts";
 import { redactText } from "../../../packages/control-plane/src/redaction.ts";
@@ -113,15 +114,13 @@ export interface MediatedGitHandlerOptions {
   readonly runner?: LocalGitRunner;
   readonly now?: () => number;
   readonly lockTimeoutMs?: number;
+  readonly onPreservation?: (value: Readonly<{ operationId: string; repositoryRoot: string; beforeHead: string; beforeIndexTree: string; expectedTree?: string; privateIndex?: string; privateIndexCopy: string; worktreeLock: { path: string; identity: GitFileIdentity; contentSha256: string }; sharedIndex: GitIndexPreservation }>) => Promise<void>;
   readonly classifyUntracked?: (path: string) => UntrackedClassification;
   readonly classifyIgnored?: (path: string) => UntrackedClassification;
   readonly remediation?: Pick<DurableContainmentIncidentCoordinator, "assertRemediationPermit" | "recordRemediation">;
 }
 
-interface HeldLock {
-  readonly filePath: string;
-  release(): Promise<void>;
-}
+type HeldLock = OwnedGitFileLock;
 
 /**
  * A real Git index lock, held only while the companion needs to reconcile the
@@ -129,12 +128,7 @@ interface HeldLock {
  * Git itself honours this lock, so a normal concurrent `git add` fails rather
  * than being silently overwritten by the broker's reconciliation step.
  */
-interface HeldSharedIndexLock {
-  readonly indexPath: string;
-  readonly lockPath: string;
-  replaceWith(privateIndex: string): Promise<void>;
-  release(): Promise<void>;
-}
+type HeldSharedIndexLock = OwnedGitIndexLease;
 
 /**
  * This handler is registered behind `InMemoryGitBroker`, whose permit,
@@ -149,6 +143,7 @@ export class LocalMediatedGitHandler {
   private readonly lockTimeoutMs: number;
   private readonly remediation?: MediatedGitHandlerOptions["remediation"];
   private readonly contentStager: VerifiedGitContentStager;
+  private readonly onPreservation: MediatedGitHandlerOptions["onPreservation"];
 
   constructor(options: MediatedGitHandlerOptions) {
     this.stateDirectory = resolve(options.stateDirectory);
@@ -156,6 +151,7 @@ export class LocalMediatedGitHandler {
     this.now = options.now ?? Date.now;
     this.lockTimeoutMs = options.lockTimeoutMs ?? 2_000;
     this.remediation = options.remediation;
+    this.onPreservation = options.onPreservation;
     this.contentStager = new VerifiedGitContentStager({ runner: this.runner, ...(options.classifyUntracked ? { classifyUntracked: options.classifyUntracked } : {}), ...(options.classifyIgnored ? { classifyIgnored: options.classifyIgnored } : {}) });
   }
 
@@ -224,10 +220,11 @@ export class LocalMediatedGitHandler {
         if (beforeBranch) return beforeBranch;
         const featureBranch = request.mutation.featureBranch!;
         sharedIndexLock = await this.acquireSharedIndexLock(root);
-        temporaryInspectionIndex = join(operationDirectory, `shared-index-${randomUUID()}`);
-        await copyFile(sharedIndexLock.indexPath, temporaryInspectionIndex);
+        const inspectionCopy = join(operationDirectory, `shared-index-${randomUUID()}`);
+        await sharedIndexLock.copyOriginalTo(inspectionCopy); temporaryInspectionIndex = inspectionCopy;
         const indexLocked = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
         if (indexLocked) return indexLocked;
+        await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeIndexTree: request.target.indexTree, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
         if (request.childSaga) {
           featureBranchChild = await request.childSaga.begin({
             action: "git.feature-branch",
@@ -300,11 +297,12 @@ export class LocalMediatedGitHandler {
       // the shared index into another private file lets us verify that no
       // normal Git writer slipped in immediately before the lock was taken.
       sharedIndexLock = await this.acquireSharedIndexLock(root);
-      temporaryInspectionIndex = join(operationDirectory, `shared-index-${randomUUID()}`);
-      await copyFile(sharedIndexLock.indexPath, temporaryInspectionIndex);
+      const inspectionCopy = join(operationDirectory, `shared-index-${randomUUID()}`);
+      await sharedIndexLock.copyOriginalTo(inspectionCopy); temporaryInspectionIndex = inspectionCopy;
       const indexLockedPrecondition = await this.verifyGitPreconditions(root, request, { GIT_INDEX_FILE: temporaryInspectionIndex });
       if (indexLockedPrecondition) return indexLockedPrecondition;
       const expectedTree = await this.currentIndexTree(root, environment);
+      await this.onPreservation?.({ operationId: request.operationId, repositoryRoot: root, beforeHead: request.target.head, beforeIndexTree: request.target.indexTree, expectedTree, privateIndex: temporaryIndex, privateIndexCopy: temporaryInspectionIndex, worktreeLock: { path: lock.filePath, identity: lock.identity, contentSha256: lock.contentSha256 }, sharedIndex: sharedIndexLock.preservation() });
       if (request.childSaga) {
         localCommitChild = await request.childSaga.begin({
           action: "git.local-commit",
@@ -358,10 +356,12 @@ export class LocalMediatedGitHandler {
           await sharedIndexLock.replaceWith(temporaryIndex);
           sharedIndexLock = undefined;
         } catch (error) {
+          preserveState = true;
           return {
             status: "incomplete",
             summary: redactText(`Git advanced HEAD but the shared index could not be reconciled safely: ${errorMessage(error, "unknown index error")}`),
-            effectDisposition: "committed"
+            effectDisposition: "committed",
+            data: { recoveryStatePreserved: true, operationId: request.operationId }
           };
         }
         if (remediation) {
@@ -412,7 +412,9 @@ export class LocalMediatedGitHandler {
       if (localCommitChild && request.childSaga) await request.childSaga.settle(localCommitChild, "ambiguous", { outcome: "exception" }).catch(() => undefined);
       return { status: "unavailable", summary: redactText(errorMessage(error, "The local Git broker failed before it could determine an outcome.")), effectDisposition: "ambiguous", ...(preserveState ? { data: { recoveryStatePreserved: true, operationId: request.operationId } } : {}) };
     } finally {
-      if (!preserveState) {
+      if (preserveState) {
+        await sharedIndexLock?.abandon(); await lock?.abandon();
+      } else {
         if (temporaryIndex) {
           await rm(temporaryIndex, { force: true }).catch(() => undefined);
           await rm(`${temporaryIndex}.lock`, { force: true }).catch(() => undefined);
@@ -518,15 +520,12 @@ export class LocalMediatedGitHandler {
   private async acquireLock(root: string): Promise<HeldLock> {
     const directory = join(this.stateDirectory, "git-locks");
     await mkdir(directory, { recursive: true, mode: 0o700 });
-    const safeName = basename(root).replace(/[^A-Za-z0-9._-]/g, "_");
-    const filePath = join(directory, `${safeName}-${Buffer.from(root).toString("base64url").slice(0, 32)}.lock`);
+    const safeName = basename(root).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 32);
+    const filePath = join(directory, `${safeName}-${createHash("sha256").update(process.platform === "win32" ? root.toLowerCase() : root).digest("hex")}.lock`);
     const deadline = this.now() + this.lockTimeoutMs;
     while (true) {
       try {
-        const handle = await open(filePath, "wx", 0o600);
-        await handle.writeFile(`${process.pid}:${this.now()}\n`, "utf8");
-        await handle.close();
-        return { filePath, release: async () => { await rm(filePath, { force: true }); } };
+        return await createOwnedGitFileLock(filePath, `${process.pid}:${this.now()}:${randomUUID()}\n`);
       } catch (error) {
         if (!isAlreadyExists(error) || this.now() >= deadline) throw new Error("Another mediated Git operation is active for this worktree.");
         await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
@@ -535,29 +534,7 @@ export class LocalMediatedGitHandler {
   }
 
   private async acquireSharedIndexLock(root: string): Promise<HeldSharedIndexLock> {
-    const indexPath = await this.sharedIndexPath(root);
-    const lockPath = `${indexPath}.lock`;
-    const deadline = this.now() + this.lockTimeoutMs;
-    while (true) {
-      try {
-        const handle = await open(lockPath, "wx", 0o600);
-        await handle.close();
-        return {
-          indexPath,
-          lockPath,
-          replaceWith: async (privateIndex) => {
-            await copyFile(privateIndex, lockPath);
-            await rename(lockPath, indexPath);
-          },
-          release: async () => { await rm(lockPath, { force: true }); }
-        };
-      } catch (error) {
-        if (!isAlreadyExists(error) || this.now() >= deadline) {
-          throw new Error("The shared Git index is busy; no mediated commit was started.");
-        }
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
-      }
-    }
+    return OwnedGitIndexLease.acquire(await this.sharedIndexPath(root), { now: this.now, timeoutMs: this.lockTimeoutMs });
   }
 
   private async sharedIndexPath(root: string): Promise<string> {
@@ -572,7 +549,7 @@ export class LocalMediatedGitHandler {
     const trustedGitDirectory = await realpath(gitDirectory.stdout.trim());
     const indexDirectory = await realpath(dirname(indexPath));
     const relation = relative(trustedGitDirectory, indexDirectory);
-    if (relation === ".." || relation.startsWith(`..${sep}`)) {
+    if (isAbsolute(relation) || relation === ".." || relation.startsWith(`..${sep}`)) {
       throw new Error("The shared Git index escapes the verified Git directory.");
     }
     return indexPath;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, open, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
+import { lstat, mkdtemp, mkdir, open, readFile, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -187,19 +187,33 @@ test("repository digest byte limits are enforced on actual files and exact-limit
 test("a parent replaced after descriptor acquisition is rejected before reading and the descriptor closes", async (t) => {
   const { root } = await digestFixture(t), parent = join(root, "inputs");
   await mkdir(parent); await writeFile(join(parent, "task.txt"), "original");
-  let acquired: FileHandle | undefined, reads = 0;
+  let acquired: FileHandle | undefined, reads = 0, renamePrevented = false;
   const openFile: typeof open = async (path, flags, mode) => {
     const handle = await open(path, flags, mode); acquired = handle;
     const originalRead = handle.read.bind(handle);
     handle.read = (async (buffer: Buffer, offset: number, length: number, position: number) => {
       reads++; return originalRead(buffer, offset, length, position);
     }) as FileHandle["read"];
-    await rename(parent, join(root, "moved")); await mkdir(parent);
-    await writeFile(join(parent, "task.txt"), "replacement");
+    try { await rename(parent, join(root, "moved")); }
+    catch (error) {
+      // Windows can deny the rename while the child descriptor is held.
+      // Prove that this OS-enforced boundary retained the original input.
+      if (process.platform === "win32" && (error as NodeJS.ErrnoException).code === "EPERM") { renamePrevented = true; return handle; }
+      await handle.close(); throw error;
+    }
+    await mkdir(parent); await writeFile(join(parent, "task.txt"), "replacement");
     return handle;
   };
-  await assert.rejects(new NodeFileDigestReader({ openFile }).digest(root, "inputs/task.txt"), /parent changed/i);
-  assert.equal(reads, 0); assert.equal(acquired?.fd, -1);
+  const captured = new NodeFileDigestReader({ openFile }).digest(root, "inputs/task.txt");
+  if (process.platform === "win32") {
+    const outcome = await captured.then(value => ({ value }), error => ({ error }));
+    if (renamePrevented) {
+      assert.ok("value" in outcome); assert.equal(outcome.value, createHash("sha256").update("original").digest("hex"));
+      assert.equal(await readFile(join(parent, "task.txt"), "utf8"), "original");
+      await assert.rejects(lstat(join(root, "moved")), { code: "ENOENT" }); assert.ok(reads > 0);
+    } else { assert.ok("error" in outcome); assert.match(String(outcome.error), /parent changed/i); assert.equal(reads, 0); }
+  } else { await assert.rejects(captured, /parent changed/i); assert.equal(reads, 0); }
+  assert.equal(acquired?.fd, -1);
 });
 
 test("a named file replaced after descriptor acquisition cannot be hashed as the approved path", async (t) => {

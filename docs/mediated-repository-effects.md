@@ -60,10 +60,15 @@ The suite must connect independent native-exit reconciliation and recovery
 before enabling this effect API. The existing companion handler remains behind
 its own broker and final-effect guard; it is not a standalone authority boundary.
 
-Ten tests use actual disposable repositories and Git processes. They cover
+Sixteen tests use actual disposable repositories and Git processes. They cover
 ordinary/private-index commits, branch/detached setup, stale targets, competing
 reference updates, exact binary content, changed witnesses and tripwire filters,
-diff drivers, text conversion, fsmonitor and hooks. A simulated unconfirmed native
+diff drivers, text conversion, fsmonitor and hooks. Descriptor-bound index and
+private worktree leases preserve another writer's replacement or in-place lock
+change. Original index bytes are copied through the held descriptor, and
+replacement bytes are synced and read back before the owned lock is renamed.
+A host preservation callback records native file identities and the original
+index digest before any reference mutation. A simulated unconfirmed native
 exit checks preservation; it is not a claimed physical crash. These tests are
 registered in both the Linux and Windows release lanes. Native Windows acceptance
 for the updated implementation is pending.

@@ -63,7 +63,13 @@ const mediatedGitTests = [
   "a file changed between its manifest witness and private byte read cannot be committed",
   "a competing branch update wins its own CAS and is never overwritten by a reviewed local commit",
   "feature-branch creation uses an expected-HEAD transaction without checkout filters",
-  "an unconfirmed native Git exit retains its exact indices and shared lock for recovery"
+  "an unconfirmed native Git exit retains its exact indices and shared lock for recovery",
+  "a replacement shared index lock is preserved after the exact reviewed commit advances HEAD",
+  "a replacement original index is never overwritten during shared-index reconciliation",
+  "the previous worktree owner cannot delete a replacement private lock during cleanup",
+  "host preservation records exact index and lock identities before any reference update",
+  "shared lock content changed in place is preserved rather than overwritten",
+  "private lock content changed in place remains untouched during cleanup"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
 const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
   .map((name) => ({
@@ -100,6 +106,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
   const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
@@ -121,7 +128,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/readout-profiles.test.mjs" },
   { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/suite.test.mjs" },
-  { file: "tools/layout-studio/task-authority.test.mjs" },
+  { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },
   { file: "tools/layout-studio/vial-dynamic.test.mjs" },

@@ -1715,3 +1715,40 @@ cleanup, with another generation check immediately after reading startup state.
 The deterministic test holds authority shutdown open; all 16 suite cases pass.
 This is a software race correction, not an unavailable Windows account/device
 check. See mediated-repository-effects.md for actual boundaries and remaining work.
+
+
+## Exact index ownership and host preservation checkpoint
+
+The shared Git index and its conventional lock are now held through native file
+descriptors with full-size device/inode/birth identities. The original index is
+copied from that descriptor, with size/time/digest checks, instead of reopening
+a pathname. Reconciliation writes through the owned lock, syncs and reads back
+the exact private-index bytes. Replacement or in-place changes to shared/private
+locks and replacement of the original index are preserved rather than deleted
+or overwritten. Uncertain native exits close held descriptors while retaining
+recovery files. A host callback records exact preservation identities before
+reference effects; the suite effect/recovery bridge remains unfinished.
+
+All sixteen actual Git scenarios and TypeScript checks pass. The previous
+complete Linux checkpoint at `8ced95d` passed 132/132 groups: 901 tests, 892
+passed and nine platform skips, receipt
+430ce721-8668-4757-b405-f70c535a5973. Its normal installed update passed six
+checks; installed authority acceptance passed seven checks with zero model
+prompts and eight independently stopped retained guardians. Receipts
+assignment-legends-1793778790478.json and
+installed-task-authority-1793779022331.json. Current plus one rollback remain
+about 9 MiB, with no disposable bundle staged.
+
+Complete Linux verification of this ownership checkpoint passed 138/138 groups,
+907 tests, 898 passed and nine platform skips; receipt
+85ea9254-de3e-47fd-81b7-5d57f5e4b563. The next Windows run (41794653052,
+`8ced95d`) passed backend, documentation, native helper observer/guardian, fresh
+optional runtime and suite packaging. Its complete bundle lane found two
+software checks: the eight authority scenarios exceeded the old 45-second group
+budget (the first alone took 30 seconds under native state leases), and Windows
+prevented the directory replacement attempted by a descriptor-race test. The
+authority group now explicitly allows four minutes on Windows. The race test
+accepts only the exact native EPERM boundary with original bytes intact and no
+replacement directory, or detects an actual parent replacement before reading.
+The descriptor must close in either case. All 28 affected Linux checks pass;
+complete corrected native Windows acceptance is still pending.
