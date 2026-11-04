@@ -16,14 +16,14 @@ readiness cannot substitute the reviewed executable descriptor. The API,
 shutdown/restart boundaries and evidence exclusions are described in the
 [execution contract](reviewed-task-execution.md). The frontend is unchanged.
 
-Normal installed source `26b78c2` passed ten checks with one actual empty
+Normal installed source `0aeae75` passed ten checks with one actual empty
 Codex task and zero prompts. Actual output confirmed denied host files,
 credentials and loopback, a read-only workspace and 64 MiB temporary filesystem.
 The terminal receipt, separate exact-stop receipt and duplicate admissions
 matched. A third, freshly reviewed Run started after the stopped Run; all three
 native guardians independently exited and unchanged input copies were removed.
 Definitions, selection, keyboard-only validation state and the private link were
-restored. Receipt: `installed-repository-execution-1793807525872.json`.
+restored. Receipt: `installed-repository-execution-1793810385256.json`.
 
 Complete local Linux source at `0151e69` passes 151/151 groups: 967 tests,
 957 passed and ten declared platform skips. Receipt:
@@ -33,7 +33,10 @@ passes 151/151 groups (968 tests, 958 passed, ten skips), receipt
 `8c5bf46c-45aa-402e-b153-7191f1778a3b`. Full `6c92229` passes 152/152 groups:
 973 tests, 963 passed and ten declared skips, receipt
 `82350ba4-6f30-4839-bddc-7fa318809380`. Both temporary checkouts were removed
-after their complete receipts and all exited children were verified. Ubuntu release CI at `0151e69` passes, including the actual namespace
+after their complete receipts and all exited children were verified. Complete
+`0aeae75` also passes 152/152 groups (973 tests, 963 passed, ten skips), receipt
+`ca301375-e244-4718-b78a-4b514094d07d`; its temporary checkout was removed after
+all child cleanup verified. Ubuntu release CI at `0aeae75` passes, including the actual namespace
 preflight with Ubuntu's packaged scoped bwrap AppArmor profile. No workstation
 policy, namespace restriction or guardian no-new-privs setting was weakened.
 
@@ -43,10 +46,11 @@ Windows CI at `0151e69` exposed its deadline being spent on repeated kernel-lock
 helper startups before the effect. Admission now uses one authenticated journal
 transaction; the same 15-second deadline and final scope check remain. A failed
 admission write cannot deliver a stop or leave a partially started claim. Native
-Windows acceptance of this correction is pending. The short Windows client lane
+Windows backend acceptance of this correction passes at `dbe62bb`. The short Windows client lane
 at `26b78c2` passed 42 assertions but exceeded the suite group's 45-second harness
 limit before its last case. That group now receives 120 seconds on Windows;
-no assertion or production deadline was removed.
+no assertion or production deadline was removed. Its corrected short Windows
+client lane passes at `0aeae75`.
 
 Native Windows reviewed-input staging is implemented separately from guest
 execution. The fixed C# reader pins NTFS directory/file handles, refuses reparse
@@ -59,7 +63,10 @@ four release-closure cases pass; the helper compiles with zero warnings/errors
 and rejects this mode on Linux before filesystem effects. The small build
 scratch directory was removed, with source/assembly hashes retained in
 `windows-reviewed-inputs-build-20261104.json`; no runtime was copied. Actual NTFS,
-ACL, junction and sharing checks are now in Windows CI and remain pending.
+ACL, junction, sharing and cleanup acceptance passes all six checks at `dbe62bb`,
+run 41866977914. Its 785-byte artifact was imported, SHA-256 verified and parsed;
+only `windows-reviewed-inputs-dbe62bb-native.json` was retained, not a runtime or
+archive. This confirms filesystem staging, not VM execution.
 [Input contract](reviewed-execution-inputs.md).
 
 The failed installed `0151e69` proof remains preserved, including its encrypted
@@ -74,9 +81,22 @@ operation and configuration. Unknown guest exit preserves the exchange and
 blocks extraction/restart replacement. Thirty-three mapping/staging/installation
 cases and four packaged-closure checks pass. The default process-only runner
 cannot supply that proof. [Guest mapping contract](windows-reviewed-guest-mapping.md).
-The native guest-session controller and Studio Windows Run connection, writable
-build outputs and remaining action integrations are unfinished implementation,
-not hardware blocks. Native Windows CI now continues independent helper checks
+The fixed native Sandbox CLI transport now implements closed metadata/list/
+start/stop/connect/login-probe/worker verbs with protected readiness, native exit,
+exact VM scope and non-replay tombstones. It separates the guest exit code from
+the CLI exit code. The new C# helper builds with zero warnings/errors; build
+scratch was removed after retaining `windows-sandbox-cli-build-20261104.json`.
+Five native-transport faults, 26 final transport/manifest/package cases, type
+checking and the delayed-recipe mapping checks pass. Actual no-VM native metadata
+acceptance is now in CI, pending. [Native command contract](windows-sandbox-native-commands.md).
+The managed guest lifecycle coordinator and Studio Windows Run connection,
+writable build outputs and remaining action integrations are unfinished
+implementation, not hardware blocks. Complete Windows verification at `dbe62bb`
+passed backend, native NTFS, helper, Job Object, fresh-runtime and suite packaging,
+then stopped on the runner's hard five-minute validator rejecting the explicitly
+declared eight-minute execution group. That exact exception and upfront timeout
+preflight are now tested; other groups retain the five-minute cap. Complete
+corrected Windows acceptance remains pending. Native Windows CI now continues independent helper checks
 after a backend failure, then requires that backend outcome in an unconditional
 final gate; a failed backend still makes the release verification fail.
 
@@ -87,10 +107,10 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `26b78c2` is installed as release
-`e2294283777e4f6b1afb050f4074c2c7163ce2117483b518f0f7cdd7ada1ac69`: 478 files,
-4,622,833 bytes. Six normal update checks pass (assignment-legends-1793807217916.json).
-Current plus one rollback occupy about 11 MiB, bundle staging is empty, and no
+Published source `0aeae75` is installed as release
+`53193df2ac2663d595e8a4e61373c2ea0f039cea19864dc53f04b6956cdaaec6`: 481 files,
+4,734,369 bytes. Six normal update checks pass (assignment-legends-1793810073715.json).
+Current plus one rollback occupy about 12 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
 preserved.

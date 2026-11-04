@@ -34,8 +34,8 @@ mise exec node@24.14.0 -- node scripts/verify-repository-execution-host.mjs --sy
 ```
 
 It requires the normal installed app and the existing permitted Codex login.
-Ten checks passed at `26b78c2`; the private result is
-`installed-repository-execution-1793807525872.json`. These include a separate exact
+Ten checks passed at `0aeae75`; the private result is
+`installed-repository-execution-1793810385256.json`. These include a separate exact
 stop receipt, duplicate handling, a fresh reviewed Run after that stop and three
 independently exited native guardians. Successful cleanup restores
 selection, definitions, keyboard-only validation state and the private endpoint;
@@ -102,8 +102,8 @@ replaced with guessed PIDs.
 
 Five service cases, focused stop faults, authenticated HTTP transport and
 package-import checks pass. Normal installed per-run stop and a fresh approved
-Run afterward pass the ten-check journey above. Native Windows deadline
-acceptance of the atomic admission change remains pending.
+Run afterward pass the ten-check journey above. Native Windows backend
+acceptance of the atomic admission change passes at `dbe62bb`.
 
 ## Retained evidence and recovery
 

@@ -87,8 +87,12 @@ node scripts/verify-windows-reviewed-inputs.mjs --synthetic --helper=C:\absolute
 ```
 
 This explicit synthetic check opens no guest, keyboard or provider account and
-copies no runtime. Native acceptance remains pending; it does not establish
-Windows Sandbox execution or interactive device/account acceptance.
+copies no runtime. Six actual native checks pass at `dbe62bb` (run 41866977914),
+including NTFS sharing, DACL readback, junction rejection, directory identity and
+cleanup. The verified private import is
+`windows-reviewed-inputs-dbe62bb-native.json`. This does not establish Windows
+Sandbox execution or interactive device/account acceptance. The new fixed
+Sandbox CLI metadata check is pending separately.
 
 Run the software boundaries with the pinned Node runtime:
 

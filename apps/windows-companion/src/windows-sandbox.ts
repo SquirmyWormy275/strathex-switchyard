@@ -97,6 +97,7 @@ export interface WindowsSandboxRunSpec {
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
   readonly reviewedGuest?: Readonly<{ operationId: string; configurationSha256: string }>;
+  readonly reviewedCatalogRelativePath?: string;
 }
 
 export interface WindowsSandboxGuestIdentity {
@@ -746,6 +747,7 @@ export class WindowsSandboxBackend {
         if ([targetRoot, destinationRoot, helperDirectory].some(root => overlaps(root, inputRoot))) throw new SandboxBlockedError("The reviewed input copy must be disjoint from the live repository, tools and output destination.");
       }
       const persistentVolumes = await this.resolvePersistentVolumes(profile, recipeId, allowedRoots, [targetRoot, destinationRoot, helperDirectory, stateRoot]);
+      if (reviewed && (persistentVolumes.length || this.options.helperFilename !== "b122-sandbox-worker.exe")) throw new SandboxBlockedError("Reviewed guest execution requires only its three fixed mappings and the pinned fixed worker filename.");
       const helperPath = join(helperDirectory, this.options.helperFilename);
       const helper = await this.filesystem.lstat(helperPath);
       if (!helper.isFile || helper.isSymbolicLink) throw new SandboxBlockedError("Windows Sandbox fixed guest helper is absent or is a symbolic link.");
@@ -786,7 +788,8 @@ export class WindowsSandboxBackend {
         profile,
         resourcePolicy,
         persistentVolumes,
-        interactive: Boolean(interactiveLifecycle)
+        interactive: Boolean(interactiveLifecycle),
+        delayedRecipe: Boolean(reviewed)
       });
       await this.filesystem.writeText(configurationPath, configurationDocument);
       const requestDigest = sha256(requestDocument);
@@ -851,7 +854,7 @@ export class WindowsSandboxBackend {
         shell: false,
         timeoutMs: this.timeoutMs,
         maxOutputBytes: this.maxProcessOutputBytes,
-        ...(reviewed ? { reviewedGuest: { operationId: reviewed.operationId, configurationSha256: configurationDigest } } : {})
+        ...(reviewed ? { reviewedGuest: { operationId: reviewed.operationId, configurationSha256: configurationDigest }, reviewedCatalogRelativePath: this.options.jobManifestRelativePath } : {})
       };
       if (interactiveLifecycle) {
         const identity = assertProcessIdentity(await interactiveLifecycle.launch(runSpec, configurationDigest, signal));
@@ -1389,6 +1392,7 @@ function createConfiguration(input: Readonly<{
   resourcePolicy: WindowsSandboxResourcePolicy;
   persistentVolumes: readonly PersistentVolumeMapping[];
   interactive: boolean;
+  delayedRecipe?: boolean;
 }>): string {
   const command = `&quot;C:\\B122\\tools\\${input.helperFilename}&quot; --catalog &quot;C:\\B122\\input\\${input.manifestRelativePath.replace(/\//g, "\\")}&quot; --request &quot;C:\\B122\\exchange\\request.json&quot; --output &quot;C:\\B122\\exchange&quot;`;
   return [
@@ -1407,7 +1411,7 @@ function createConfiguration(input: Readonly<{
     mappedFolder(input.exchangeRoot, "C:\\B122\\exchange", false),
     ...input.persistentVolumes.map((volume) => mappedFolder(volume.hostRoot, volume.sandboxRoot, volume.readOnly)),
     "  </MappedFolders>",
-    ...(input.interactive ? [] : [`  <LogonCommand><Command>${command}</Command></LogonCommand>`]),
+    ...(input.interactive || input.delayedRecipe ? [] : [`  <LogonCommand><Command>${command}</Command></LogonCommand>`]),
     "</Configuration>",
     ""
   ].join("\n");

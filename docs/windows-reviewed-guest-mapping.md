@@ -37,7 +37,9 @@ proof and therefore cannot complete this reviewed mode.
 
 Microsoft documents a separate Sandbox session ID and stop operation in its
 [Windows Sandbox CLI reference](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).
-Its guest controller must implement those actual ownership/stop boundaries;
+The [native command transport](windows-sandbox-native-commands.md) implements
+the fixed CLI verbs. The lifecycle coordinator still must connect their exact
+ownership/stop boundaries;
 closing the remote viewer is insufficient. No Windows guest was launched by
 the tests below.
 

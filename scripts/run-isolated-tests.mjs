@@ -115,7 +115,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && file === "tools/layout-studio/repository-execution.test.mjs") return { timeoutMs: 480_000 };
   if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
   if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
-  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
@@ -142,7 +142,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution-supervisor.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/repository-execution-staging.test.mjs" },
   { file: "tools/layout-studio/repository-execution-stop.test.mjs" },
-  { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs" },
+  { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-inputs.test.mjs") },
+  { file: "tools/layout-studio/windows-sandbox-native.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-native.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },
@@ -336,9 +337,14 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 }
 
 /** A result is recorded only after close proves this owned child has exited. */
+export function effectiveGroupTimeout(group, fallback = 45_000) {
+  const value = group.timeoutMs ?? fallback;
+  const reviewedLongGroup = group.file === "tools/layout-studio/repository-execution.test.mjs" && !group.args && group.timeoutMs === 480_000;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 300_000 && !reviewedLongGroup) throw new Error("An isolated test timeout must be 1–300000 milliseconds, except the explicitly reviewed 480000-millisecond execution group.");
+  return value;
+}
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000, cleanup = rm, sourceEnvironment = process.env } = {}) {
-  const effectiveTimeoutMs = group.timeoutMs ?? timeoutMs;
-  if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 300_000) throw new Error("An isolated test timeout must be an integer between 1 and 300000 milliseconds.");
+  const effectiveTimeoutMs = effectiveGroupTimeout(group, timeoutMs);
   const expectedSkipped = group.expectedSkipped ?? 0;
   if (!Number.isSafeInteger(expectedSkipped) || expectedSkipped < 0) throw new Error("An isolated test expectedSkipped value must be a non-negative integer.");
   const childExecutable = group.executable ?? executable;
@@ -429,6 +435,8 @@ async function cleanupIsolatedRoot(cleanup, testRoot, testParent) {
 async function writeReceipt(directory, receipt) { await mkdir(directory, { recursive: true }); const finalPath = join(directory, `isolated-test-${receipt.runId}.json`); const temporaryPath = `${finalPath}.${randomUUID()}.tmp`; try { await writeFile(temporaryPath, JSON.stringify(receipt, null, 2), { encoding: "utf8", mode: 0o600 }); await rename(temporaryPath, finalPath); return finalPath; } finally { await rm(temporaryPath, { force: true }).catch(() => {}); } }
 export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt } = {}) {
   if (groups === requiredGroups) assertRequiredTestManifest(groups);
+  // Reject a bad later allowance before launching any earlier test processes.
+  for (const group of groups) effectiveGroupTimeout(group, timeoutMs);
   const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; for (const group of groups) children.push(await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }));
   const passed = children.filter((item) => item.success).length;
   const tests = children.reduce((total, child) => total + (child.testCounts?.total ?? 0), 0);

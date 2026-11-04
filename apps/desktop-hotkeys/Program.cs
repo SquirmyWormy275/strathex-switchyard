@@ -130,6 +130,7 @@ internal static class Program
     public static int Main(string[] args)
     {
         if (args.SequenceEqual(new[] { "--stage-reviewed-inputs" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.Run() : 2;
+        if (args.SequenceEqual(new[] { "--windows-sandbox-cli" })) return OperatingSystem.IsWindows() ? WindowsSandboxCli.Run() : 2;
         if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();
         if (args.SequenceEqual(new[] { "--runtime-command-status" })) return RuntimeCommandRunner.ReadStatus();
         if (args.SequenceEqual(new[] { "--keyboard-indicators" })) return ReadKeyboardIndicators();

@@ -808,7 +808,7 @@ async function reviewedInputFixture(setup: Awaited<ReturnType<typeof fixture>>) 
 
 test("reviewed guest mapping contains only its exact staged inputs and retains a separate operation binding",async context=>{
   const setup=await fixture(context),inputs=await reviewedInputFixture(setup);
-  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
+  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));assert.ok(!xml.includes("<LogonCommand>"),"The guest cannot start its recipe before native identity acknowledgement");await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
   let launches=0;
   const runner:WindowsSandboxProcessRunner={run:async(...args)=>{launches++;const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return {...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
   const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});

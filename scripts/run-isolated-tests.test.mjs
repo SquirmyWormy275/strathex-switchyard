@@ -3,7 +3,7 @@ import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides, effectiveGroupTimeout } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
@@ -88,7 +88,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
-      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => [`tools/layout-studio/${name}.test.mjs`, 120_000]) : []),
+      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native"].map((name) => [`tools/layout-studio/${name}.test.mjs`, 120_000]) : []),
       ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
@@ -108,7 +108,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];
     assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
-    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"]) {
+    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native"]) {
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "win32"), { timeoutMs: 120_000 });
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "linux"), {});
     }
@@ -252,4 +252,15 @@ test("timeout terminates and awaits the entire task-owned descendant tree", asyn
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("the reviewed Windows execution allowance passes the runner guard and invalid later bounds fail before any child starts",async()=>{
+  const file="tools/layout-studio/repository-execution.test.mjs";
+  assert.equal(effectiveGroupTimeout({file,timeoutMs:480_000}),480_000);
+  for(const group of [{file:"unreviewed.test.mjs",timeoutMs:480_000},{file,timeoutMs:480_001},{file,timeoutMs:480_000,args:["-e","process.exit(0)"]}])assert.throws(()=>effectiveGroupTimeout(group),/explicitly reviewed/);
+  const directory=await mkdtemp(join(tmpdir(),"switchyard-timeout-preflight-")),marker=join(directory,"unexpected-child");
+  try{
+    await assert.rejects(runVerification({groups:[{file:"first-valid-child",args:["-e",`require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected')`]},{file:"later-invalid-bound",timeoutMs:480_001}],outputDirectory:directory}),/explicitly reviewed/);
+    await assert.rejects(readFile(marker),{code:"ENOENT"});
+  }finally{await rm(directory,{recursive:true,force:true});}
 });
