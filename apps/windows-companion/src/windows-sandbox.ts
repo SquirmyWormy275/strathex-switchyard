@@ -736,7 +736,7 @@ export class WindowsSandboxBackend {
           || receipt.reviewedInputManifestSha256 !== reviewed.inputManifestSha256 || receipt.recipeId !== recipeId || receipt.profile !== profile
           || receipt.reviewedExchangeRoot !== exchange?.root || receipt.reviewedExchangeBindingSha256 !== (exchange ? sha256(JSON.stringify(exchange.nativeBinding)) : undefined)
           || !sameDigest(receipt.recipeCatalogDigest, request.expectedRecipeCatalogSha256) || !sameDigest(receipt.helperDigest, request.expectedHelperSha256)) return { status: "blocked", summary: "The reviewed operation already belongs to a different exact guest mapping; no replay is available." };
-        return { status: receipt.state === "prepared" || receipt.state === "running" ? "unavailable" : terminalStatus(receipt.state), summary: receipt.summary, leaseId: receipt.leaseId, processId: receipt.processId, receiptPath: this.receiptPath(receipt), ...(receipt.resultRoot ? { resultRoot: receipt.resultRoot } : {}), ...(receipt.diagnosticRoot ? { diagnosticRoot: receipt.diagnosticRoot } : {}), replayed: true };
+        return { status: receipt.state === "prepared" || receipt.state === "running" ? "unavailable" : terminalStatus(receipt.state), summary: receipt.summary, leaseId: receipt.leaseId, processId: receipt.processId, receiptPath: this.receiptPath(receipt), ...(receipt.resultRoot ? { resultRoot: receipt.resultRoot } : {}), ...(receipt.diagnosticRoot ? { diagnosticRoot: receipt.diagnosticRoot } : {}), ...(receipt.reviewedInputRoot && receipt.resultManifestDigest && receipt.guestExitVerified && Number.isInteger(receipt.exitCode) ? { programExitCode: receipt.exitCode! >>> 0 } : {}), replayed: true };
       }
     }
     const live = reconciled.filter((entry) => entry.state === "prepared" || entry.state === "running");
@@ -992,7 +992,8 @@ export class WindowsSandboxBackend {
         : `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
       return {
         ...finished,
-        ...(failedProgram ? { diagnosticRoot: resultRoot, programExitCode: processResult.exitCode! >>> 0 } : {}),
+        ...(failedProgram ? { diagnosticRoot: resultRoot } : {}),
+        ...(reviewed ? { programExitCode: processResult.exitCode! >>> 0 } : {}),
         resultManifestSha256: validated.digest,
         recipeCatalogSha256: recipeCatalogDigest,
         sandboxHelperSha256: helperDigest,

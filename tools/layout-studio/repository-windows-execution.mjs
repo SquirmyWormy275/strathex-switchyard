@@ -1,10 +1,11 @@
 /** Studio Windows Run admission through the shared policy/checkpoint/budget ledgers. */
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { basename, join, relative } from "node:path";
 import { DurableMediatedExecutor } from "../../packages/control-plane/src/runtime.ts";
 import { InMemoryExecutionBroker } from "../../packages/control-plane/src/brokers.ts";
 import { commandForAction } from "../../packages/control-plane/src/command-catalog.ts";
 import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
+import { redactText } from "../../packages/control-plane/src/redaction.ts";
 import { createDurableAbortControl } from "../../apps/windows-companion/src/execution-cancellation.ts";
 import { repositoryRuntimeExecutionRecipe } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
@@ -34,6 +35,30 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
     const selected = { repositoryRoot: resolved.task.repositoryRoot, sourceIdentity, manifestPath: proposal.manifestPath, manifestSha256: proposal.manifestSha256, allowedFiles };
     const loaded = await loadWindowsReviewedRun({ ...selected, recipeRuntimeSha256: prerequisites.recipeRuntime.sha256 });
     return { selected, loaded };
+  }
+  async function output(c, review, run) {
+    const result = run?.result, root = result?.diagnosticRoot ?? result?.resultRoot;
+    const empty = { output: null, diagnostic: null, artifactStatus: "not-produced" };
+    if (!root || !Array.isArray(result.validatedOutputs)) return empty;
+    if (run.nativeExitVerified !== true) return { ...empty, artifactStatus: "awaiting-exit" };
+    try {
+      const parent = join(stateDirectory, "windows", c, "results", run.operationId);
+      if (typeof root !== "string" || relative(parent, root) !== basename(root) || (!basename(root).startsWith("sandbox-") || !uuid(basename(root).slice(8))) || result.resultRoot && result.diagnosticRoot || result.validatedOutputs.length > 256) throw Error("Unverified output ownership");
+      const before = await directoryIdentity(root), text = []; let total = 0;
+      for (const path of ["process.stdout.txt", "process.stderr.txt"]) {
+        const records = result.validatedOutputs.filter(file => file.path === path);
+        if (records.length !== 1 || !digest(records[0].sha256) || !Number.isSafeInteger(records[0].size) || records[0].size < 0 || records[0].size > 524288) throw Error("Unverified output manifest");
+        total += records[0].size; if (total > review.recipe.maxOutputBytes) throw Error("Unverified shared output bound");
+        const read = await reader.read(root, path);
+        try {
+          if (read.bytes.length !== records[0].size || read.digest !== `sha256:${records[0].sha256}`) throw Error("Output changed after its verified copy");
+          text.push(redactText(read.bytes.toString("utf8")));
+        } finally { read.bytes.fill(0); }
+      }
+      const after = await directoryIdentity(root);
+      if (before.dev !== after.dev || before.ino !== after.ino) throw Error("Output directory changed during inspection");
+      return { output: text[0], diagnostic: text[1], artifactStatus: "available" };
+    } catch { return { output: null, diagnostic: "Stored Windows program output is unavailable or changed. The original Run result is preserved.", artifactStatus: "unavailable" }; }
   }
   async function observation(c, binding) {
     const state = await store.snapshot(c), review = state.repositoryExecutionReviews?.find(row => row.engine === engine && row.operationId === binding.operationId), run = state.repositoryWindowsRuns?.find(row => row.operationId === binding.operationId);
@@ -107,7 +132,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
       await update(c, row.requestId, "windows-execution-admission-result", row => { row.outcome = { ...outcome, providerTaskCompletionVerified: false, nativePermissionsChanged: false }; row.status = outcome.effectDisposition === "ambiguous" ? "outcome-unconfirmed" : "settled"; row.finishedAt = now(); }); hosts.set(`${c}:${row.requestId}`, host); return { ...outcome, replayed: false, providerTaskCompletionVerified: false, nativePermissionsChanged: false };
     }); },
     async list(c) { return ((await store.snapshot(c)).repositoryExecutionReviews ?? []).filter(row => row.engine === engine).map(view); },
-    async status(c, id) { if (!uuid(id)) throw Error("Choose one exact Windows execution request UUID."); await recoverCompartment(c); await hosts.get(`${c}:${id}`)?.runtime.reconcileBudgetedOperations(); const state = await store.snapshot(c), row = state.repositoryExecutionReviews?.find(row => row.engine === engine && row.requestId === id); if (!row) throw Error("That Windows execution is unavailable in this workspace."); const run = state.repositoryWindowsRuns?.find(run => run.operationId === row.operationId); return { ...view(row), nativeStatus: run?.status ?? "not-observed", nativeExitVerified: run?.nativeExitVerified === true, stagingCleanupPending: run?.cleanupPending ?? false, output: null, diagnostic: null, programExitCode: null }; },
+    async status(c, id) { if (!uuid(id)) throw Error("Choose one exact Windows execution request UUID."); await recoverCompartment(c); await hosts.get(`${c}:${id}`)?.runtime.reconcileBudgetedOperations(); const state = await store.snapshot(c), row = state.repositoryExecutionReviews?.find(row => row.engine === engine && row.requestId === id); if (!row) throw Error("That Windows execution is unavailable in this workspace."); const run = state.repositoryWindowsRuns?.find(run => run.operationId === row.operationId); return { ...view(row), nativeStatus: run?.status ?? "not-observed", nativeExitVerified: run?.nativeExitVerified === true, stagingCleanupPending: run?.cleanupPending ?? false, ...await output(c, row, run), programExitCode: Number.isInteger(run?.result?.programExitCode) ? run.result.programExitCode : null }; },
     async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); const stopped = await runner.stopCompartment(c); await stops.stopCompartment(c); await Promise.allSettled([pending.get(c)].filter(Boolean)); for (const [id, host] of hosts) if (id.startsWith(c + ":")) await host.runtime.reconcileBudgetedOperations(); return stopped; },
     reviewStop: stops.review, applyStop: stops.apply, listStops: stops.list,
     async close() { closed = true; for (const c of seen) generations.set(c, (generations.get(c) ?? 0) + 1); let failure; try { await stops.close(); } catch (error) { failure = error; } try { await runner.close(); } catch (error) { failure ??= error; } await Promise.allSettled(pending.values()); for (const host of [...hosts.values(), ...recovery.values()]) { try { await host.runtime?.reconcileBudgetedOperations?.(); await host.reconcileBudgetedOperations?.(); } finally { host.runtime?.stopObservation?.(); host.stopObservation?.(); } } if (failure) throw failure; }

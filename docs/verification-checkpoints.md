@@ -191,3 +191,12 @@ The accidental all-platform invocation on Linux at `9cfb922` failed 17 of
 Receipt `44baad6c-95ca-41ca-8f19-56147672fb57` remains failed. Every child cleanup
 verified and that worktree was removed. The corrected explicit Linux lane at
 `6e82937` independently passes all 158 groups, as recorded in current verification.
+
+The first focused Windows policy lane at `63cb7cf`, workflow 41911778472,
+passed its 17-case inventory group and timed out the whole Studio group after
+four completed cases. Its complete receipt records one passed group and one
+failed group; no complete Studio test count is claimed from partial TAP. The
+1,598-byte archive was digest-verified and only
+`windows-policy-63cb-failed.json` retained. Cleanup verified. The complete policy,
+recovery, stop and output files now run in separate bounded jobs, with every
+file in the required inventory.

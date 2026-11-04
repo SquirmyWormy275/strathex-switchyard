@@ -16,6 +16,10 @@ jobs:
   verify-policy-admission:
     runs-on: windows-2022
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [policy, recovery, stop, output]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"
@@ -41,14 +45,14 @@ jobs:
         timeout-minutes: 12
         run: |
           $ErrorActionPreference = 'Stop'
-          & node scripts/verify-windows-policy.mjs --synthetic
+          & node scripts/verify-windows-policy.mjs --synthetic "--suite=${{ matrix.suite }}"
           if ($LASTEXITCODE -ne 0) { throw 'A Windows task/approval/checkpoint/budget/stop receipt boundary failed.' }
 
       - name: Retain only the bounded policy verification receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: switchyard-windows-policy-${{ github.sha }}
+          name: switchyard-windows-policy-${{ matrix.suite }}-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-policy-verification/isolated-test-*.json
           if-no-files-found: error
           retention-days: 7

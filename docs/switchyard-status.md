@@ -8,6 +8,21 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Windows status now reads the two validated output streams through bounded
+hashed descriptors and checks the exact operation directory before/after reads.
+It redacts credential forms; changed bytes or a substituted root make current
+output unavailable without rewriting the original Run result. Failed diagnostics
+stay separate from successful artifacts, including duplicate exit-code readback.
+Thirteen policy/stop/output cases and the combined 66-check
+policy/inventory/backend/package group pass locally; type checking passes.
+
+The first focused Windows policy run at `63cb7cf` hit the four-minute whole-file
+harness limit after four completed cases. Its verified failed receipt is
+`windows-policy-63cb-failed.json`, with child cleanup verified. All cases are now
+in complete policy/recovery/stop/output files, explicitly represented in the
+required inventory and run as separate Windows jobs with five-minute file
+bounds. No assertion or production deadline was waived. Native rerun is pending.
+
 Complete Linux `45e9eb6` passes 159/159 groups: 1,045 tests, 1,035 passed and ten
 declared skips. Receipt `3424729b-c961-45aa-ad4d-f3c5359a5982` was retained;
 every child cleanup verified and the worktree was removed. Normal installed

@@ -1,11 +1,31 @@
-# Exact Windows Run requests
+# Reviewed Windows Run and exact stop
 
-The Windows connection uses a small host manifest to bind the selected input
-files to the guest's existing catalog format. The live repository is never a
-writable guest mapping. The validator and host-only runner are implemented;
-the Studio platform factory now connects policy admission and separate stop approval.
+The Windows Studio platform factory connects a selected task to an isolated
+program run. Task authority, one-use approval, checkpoints and budgets precede
+native execution. The live repository is never writable inside the guest, and
+program exit never marks the provider's coding task complete.
 
-`run.json` has exactly these fields:
+Normal personal-host privileged storage setup remains unfinished software.
+Actual interactive VM acceptance requires a supported Windows Sandbox host;
+filesystem CI and runner doubles do not establish that acceptance. The frontend
+remains frozen for review.
+
+```mermaid
+flowchart LR
+  Task[Task authority and selected bytes] --> Review[One-use review]
+  Review --> Ledger[Checkpoint and budget]
+  Ledger --> Inputs[Read-only inputs and pinned tools]
+  Inputs --> Guest[Exact guest and bounded exchange]
+  Guest --> Exit[Independent native and VM exit]
+  Exit --> Output[Verify output or failure logs]
+  Output --> Result[Result and separate storage retirement]
+  Stop[Separately approved exact stop] --> Guest
+```
+
+## Declare the exact inputs
+
+A host manifest binds the existing guest catalog to explicit non-production
+files. It has exactly these fields:
 
 ```json
 {
@@ -21,143 +41,85 @@ the Studio platform factory now connects policy admission and separate stop appr
 }
 ```
 
-The placeholder digests and sizes above must be replaced with the actual bytes;
-the document cannot approve itself. The manifest and every input must match the
-separately granted task snapshot. The guest catalog must itself be selected.
-Inputs retain the shared 4 MiB per-file, 64 MiB total, 4,096-file/path bounds.
+Replace placeholder digests and sizes with the actual bytes. The manifest
+cannot approve itself: it and every input must match the separately granted
+task snapshot. The selected guest catalog contains one `run_target` recipe,
+using the exact host-pinned `C:\B122\tools\node.exe` digest. Its first argument
+names a selected `.mjs`, `.cjs` or `.js` file through `{INPUT_ROOT}`. Inline code,
+host commands, replacement runtimes and implicit repository copies are refused.
 
-The catalog contains one `run_target` recipe using the exact host-pinned
-`C:\B122\tools\node.exe` digest. Its first argument names an explicitly selected
-`.mjs`, `.cjs` or `.js` file through `{INPUT_ROOT}`. Inline code, host commands,
-replacement runtimes and implicit repository copies are refused. Remaining
-arguments are bounded literals. Working files and artifacts live in the bounded
-guest exchange; selected inputs remain read-only.
+Inputs retain the shared 4 MiB per-file, 64 MiB total and 4,096-file/path bounds.
+The recipe limit is nine minutes, leaving a minute inside the ten-minute guest
+bound; the encompassing policy deadline can cancel earlier. Captured output is
+at most 512 KiB. Credentials, fixed environment overrides, Node startup
+injections, unknown tokens and ambiguous paths are rejected. Python, debug,
+web and pipeline connections are separate remaining work.
 
-The validator limits recipe execution to nine minutes, leaving a minute for the
-managed guest lifecycle within the ten-minute host bound. Captured output is at
-most 512 KiB. Fixed environment entries, Node startup injections, credentials,
-unknown tokens, ambiguous artifact names and traversal paths are rejected.
-These are the currently connected recipe limits, not claims of Python, build,
-debug, web or pipeline action completion.
+## Own the guest and its storage
 
-Seven checks validate actual selected-file loading, stale or absent task
-witnesses, unchanged private files, buffer clearing, exact runtime/catalog
-binding, resource limits, forbidden arguments/environments and invalid UTF-8.
-They create no VM, account, keyboard connection or runtime copy. Native mapping
-acceptance is separately proven by all 30 checks at `e4ef1f06`, workflow
-41898161164; the digest-verified JSON receipt is
-`windows-bounded-mapping-e4ef-native.json`.
+The host-only runner stages exactly selected bytes, hard-links the existing
+worker and Node image, creates one original fixed-capacity disk and transfers
+it once into a trusted writable lease. No runtime-copy fallback is allowed.
+Native Sandbox startup pins the original image/mount identities, footer, volume
+GUID, exact extent/capacity and three closed mappings. Inputs/tools are read-only;
+only the owned exchange is writable. Network and host redirection are denied.
+[Native storage contract](windows-bounded-exchange.md).
 
-The runner's cross-process preparation fence uses a kernel resource lease.
-A nonblocking probe distinguishes an actually held lease from unavailable or
-failed lock verification; unknown errors remain errors. Cleanup cannot infer
-that a live preparation is abandoned merely because its VM has not started.
-The original blocking state-lock behavior is unchanged. The new probe is tested
-against another actual process, owner death, independent store instances and a
-callback failure whose error code resembles a busy lock. Native Windows probe
-acceptance is included in the short filesystem workflow.
+A kernel lease spans preparation, guest execution and cleanup. Another process
+must acquire it before recovery touches the guest; a missing VM during live
+preparation is not an abandoned operation. Readiness persists exact ownership
+before acknowledgement. Unknown effects cannot replay. Scope changes and durable
+exact-operation cancellation markers stop the original owner.
 
-## Host orchestration
+Run admission, eventual program result, independent exit and storage retirement
+are separate records. Only the native volume service can detach/remove its
+original disk. Generic backend cleanup cannot traverse that mount. A known
+program result survives failed storage cleanup; replacement remains blocked
+until the original ownership reconciles. General snapshots omit these records.
 
-`createWindowsReviewedRunner` connects the native input, worker/runtime, image,
-bounded-volume and managed-session services to the backend. Its caller must
-already own policy admission and supply the exact current task guard. Paths to
-replacement helpers, runtimes or host commands are not request fields. Source
-and runtime hashes are rechecked before the durable Run reservation; each native
-service retains its own original readiness and exit records.
+## Stop and read results
 
-The runner holds its kernel lease through preparation, guest output validation
-and cleanup. Recovery in another process must acquire that lease before touching
-the guest or its staging. The native cleanup callbacks additionally probe the
-same lease so they cannot mistake preparation for an absent consumer. Mode
-shutdown cancels the owned boundary and waits for its result.
+Exact stop has its own confirmation, operation, 120-second Windows budget and
+receipt. Its immutable original admission is distinct from the eventual program
+result. PIDs, guest IDs and commands are not accepted. This Windows allowance
+does not change the Linux stop budget. A lost final write can recover an already
+recorded passing receipt. Late exit without that receipt preserves an incomplete
+stop result and cannot replay cancellation or the worker.
 
-A backend completion requires fresh independent guest/native exit readback
-before the runner reports completion. The original backend observation, admitted
-result and storage retirement are recorded separately. Unknown exit preserves
-all assets and blocks replacement. Failed cleanup leaves a known program result
-intact while blocking another Run; later reconciliation cannot replay or upgrade
-the original program result. General workspace snapshots omit these records.
+Successful output is extracted only after exact VM/native exit and manifest,
+path, size, digest, resource-field and current-scope checks. Failed v2 results
+must also match the independently observed guest exit code, including signed
+Windows bits. They may retain only `process.stdout.txt` and
+`process.stderr.txt`, within the shared output bound. `diagnosticRoot` is
+separate from successful `resultRoot`; the execution stays failed.
 
-The combined runner/manifest/kernel-lock/privacy/release group passes 43 checks;
-type checking passes. Nine orchestration cases use explicit native service/VM
-doubles with actual encrypted records, file reads and kernel leases. They cover
-cross-process recovery during preparation and guest execution, stale scope,
-ambiguous reservation, unsupported prerequisites, cancellation and late cleanup.
-Native Windows acceptance of the new runner/probe cases is pending. Actual
-supported-host VM execution and the Studio admission connection remain separate.
+Status reads expose redacted text only from those two verified files, inside
+the exact operation's owned result directory. Descriptor hashing and directory
+identity checks reject changed bytes or substituted roots. Missing/changed
+output becomes unavailable without rewriting the original Run result. Unknown
+exit releases no diagnostic bytes. These files are untrusted program data and
+grant no task authority.
 
-Windows workflow 41903318562 at `62c71e5` passed the real kernel probe and
-owner-death checks, then failed its explicit test-inventory gate: the new
-manifest-validator suite had not been listed. Its failed record is retained as
-`windows-run-inventory-62c71-failed.json`; no native journey ran in that failed
-workflow. Both new suites are now in the required inventory. The corrected
-inventory/runner/manifest/lock/privacy group passes all 56 local checks. Native
-Windows rerun is pending; no failure or required check was waived.
+## Verify the boundaries
 
-Cancellation is now durable and scoped to one protected Run operation. A second
-instance records the stop marker; the original owner observes it through bounded
-polling, aborts the exact managed boundary and retains its original result. No
-PID or unrelated guest can be supplied. Workspace shutdown records cancellation
-for retained runs before stopping local handles; cross-process recovery still
-requires the same kernel lease. The combined inventory/runner/manifest/lock/
-privacy group passes 57 checks, including a real encrypted cross-instance stop
-request against an explicit guest double. The ten orchestration cases do not
-claim an actual Windows VM.
+Thirteen Studio admission/stop/output cases use real task grants, Git inspection,
+encrypted ledgers, file reads and kernel locks with an explicit Windows runner
+double. The combined policy/inventory/backend/package group passes 66 checks.
+Type checking passes. Four cases invoke the actual compiled C# result formatter;
+its warning-free build and six Linux native-only guards pass. They validate wire
+format and guards, not an actual VM or native Job enforcement.
 
-## Studio policy and exact stop
+The Windows policy workflow runs complete policy, recovery, stop and output test
+files as separate jobs, with each file explicitly present in the required
+inventory. Each Windows group is capped at five minutes. This follows the first
+whole-file run's four-minute timeout: its first four cases completed, but the
+run remains failed in `windows-policy-63cb-failed.json`. No case or assertion was
+removed. `scripts/verify-windows-policy.mjs --synthetic --suite=policy` selects
+one complete group; omitting `--suite` runs them all. It provisions pinned Node
+and locked dependencies without a .NET or optional-runtime download, opens no
+VM/account/keyboard and retains only a small seven-day receipt.
 
-The Windows platform factory now selects this runner through the same task
-authority, one-use confirmation, checkpoint, target resolver, budget and receipt
-services used by Linux. The review binds source directory identity, input
-witnesses, catalog, runtime/helper prerequisites and the current workspace.
-Changed inputs, revoked grants, a substituted prerequisite or a failed protected
-checkpoint cannot dispatch the guest. An unavailable preflight remains a
-no-program outcome.
-
-Exact stop has a separate confirmation, operation, 120-second Windows budget and
-receipt. The immutable Run admission is distinct from the eventual program
-result. Stop targets only the protected operation; PIDs, guest IDs and commands
-are not accepted. Its budget is separate from the unchanged Linux stop budget.
-A lost final write can recover an already recorded passing receipt. Late exit
-without such a receipt preserves an incomplete stop result and cannot replay
-cancellation or the worker.
-
-Eleven Studio admission/stop/restart cases pass using real task grants, Git
-inspection, encrypted policy/checkpoint/budget/receipt ledgers and an explicit
-Windows runner double. A separate 41-check platform/package group passes,
-including the existing actual Linux host broker. Type checking passes. Native
-filesystem acceptance and supported interactive VM acceptance remain separate.
-The frontend is unchanged.
-
-## Failed-program diagnostics
-
-A nonzero reviewed guest program can now produce a failed v2 result containing
-its actual process exit code and only `process.stdout.txt` /
-`process.stderr.txt`. The worker preserves the exit code, skips declared build
-artifacts and keeps its shared output bound. Successful v2 results retain their
-existing shape.
-
-The backend binds a failed manifest to the independently observed guest exit
-code, including signed Windows exit-code bits. It requires the original request,
-resource claims, exact guest stop, native exit, input/volume leases, output
-hashes and the current extraction guard. Mismatched exit codes, additional
-artifacts, false resource fields, changed hashes and oversized logs are refused.
-The copied logs have a separate `diagnosticRoot`; `resultRoot` remains absent
-and the execution stays failed. Unknown VM exit releases no diagnostic bytes.
-The original native volume service still owns retirement.
-
-The related backend/helper/installation/lifecycle/release group passes 46 checks
-with one declared platform skip (47 total); type checking passes. Four cases
-invoke the actual compiled C# result formatter, including unsuccessful and signed
-exit codes. The helper builds with zero warnings/errors; six real Linux mode
-guards pass. Build/probe scratch was removed after retaining source/assembly
-hashes in `windows-failure-results-build-20261104.json`. These compiled cases
-validate the wire format, not native Job enforcement or an actual VM task.
-
-The focused Windows policy workflow runs the required inventory and Studio
-admission/stop group through the same isolated runner. It provisions pinned
-Node and locked dependencies, opens no VM/account/keyboard and does not download
-a .NET toolchain or optional runtime. A small seven-day receipt artifact keeps
-its native-Windows policy result separate from the filesystem and full-release
-lanes. Entry point: `scripts/verify-windows-policy.mjs --synthetic`.
+[Current verification](verification.md) identifies exact source checkpoints,
+installed Linux demonstrations and all 30 native Windows filesystem checks.
+[The requirement ledger](switchyard-requirements.md) separates unfinished
+software from hardware/account acceptance.

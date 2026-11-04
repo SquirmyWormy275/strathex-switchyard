@@ -4,15 +4,22 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { requiredGroups, runVerification, assertRequiredTestManifest } from "./run-isolated-tests.mjs";
 
-if (process.platform !== "win32" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw Error("Usage on Windows: node scripts/verify-windows-policy.mjs --synthetic. This check opens no VM, account or keyboard.");
+const suites = {
+  policy: "tools/layout-studio/repository-windows-execution.test.mjs",
+  recovery: "tools/layout-studio/repository-windows-execution-recovery.test.mjs",
+  stop: "tools/layout-studio/repository-windows-execution-stop.test.mjs",
+  output: "tools/layout-studio/repository-windows-execution-output.test.mjs"
+};
+const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
+if (process.platform !== "win32" || flags[0] !== "--synthetic" || flags.length > 2 || flags.length === 2 && !Object.hasOwn(suites, suite)) throw Error("Usage on Windows: node scripts/verify-windows-policy.mjs --synthetic [--suite=policy|recovery|stop|output]. This check opens no VM, account or keyboard.");
 assertRequiredTestManifest();
-const files = ["scripts/run-isolated-tests.test.mjs", "tools/layout-studio/repository-windows-execution.test.mjs"];
+const files = ["scripts/run-isolated-tests.test.mjs", ...(suite ? [suites[suite]] : Object.values(suites))];
 const groups = files.map(file => {
   const group = requiredGroups.find(group => group.file === file);
   if (!group) throw Error("A required Windows policy test group is missing.");
   return group;
 });
 const result = await runVerification({ groups, outputDirectory: join(process.env.RUNNER_TEMP || tmpdir(), "switchyard-policy-verification") });
-console.log(JSON.stringify({ success: result.receipt.success, runId: result.receipt.runId, totals: result.receipt.totals, guestLaunched: false, accountOpened: false, keyboardOpened: false }));
+console.log(JSON.stringify({ suite: suite ?? "all", success: result.receipt.success, runId: result.receipt.runId, totals: result.receipt.totals, guestLaunched: false, accountOpened: false, keyboardOpened: false }));
 for (const child of result.receipt.children.filter(child => !child.success)) console.log(JSON.stringify({ file: child.file, exitCode: child.exitCode, timeout: child.timeout, diagnostic: child.failureDiagnostic }));
 process.exitCode = result.receipt.success ? 0 : 1;
