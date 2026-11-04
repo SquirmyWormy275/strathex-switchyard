@@ -86,3 +86,11 @@ cross-process recovery during preparation and guest execution, stale scope,
 ambiguous reservation, unsupported prerequisites, cancellation and late cleanup.
 Native Windows acceptance of the new runner/probe cases is pending. Actual
 supported-host VM execution and the Studio admission connection remain separate.
+
+Windows workflow 41903318562 at `62c71e5` passed the real kernel probe and
+owner-death checks, then failed its explicit test-inventory gate: the new
+manifest-validator suite had not been listed. Its failed record is retained as
+`windows-run-inventory-62c71-failed.json`; no native journey ran in that failed
+workflow. Both new suites are now in the required inventory. The corrected
+inventory/runner/manifest/lock/privacy group passes all 56 local checks. Native
+Windows rerun is pending; no failure or required check was waived.
