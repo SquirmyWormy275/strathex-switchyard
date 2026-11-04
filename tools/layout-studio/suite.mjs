@@ -173,8 +173,12 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       }
       if (path === "/api/suite/coding/authority/review") return taskAuthority.review(compartment, body);
       if (path === "/api/suite/coding/authority/issue") return taskAuthority.issue(compartment, body);
-      if (path === "/api/suite/coding/commits/review") return repositoryCommits.review(compartment, body);
-      if (path === "/api/suite/coding/commits/execute") return repositoryCommits.execute(compartment, body);
+      if (path === "/api/suite/coding/commits/review" || path === "/api/suite/coding/commits/execute") {
+        // The HTTP host adds its trusted workspace origin to every request.
+        // It is transport metadata, not part of an exact commit proposal.
+        const { workspaceBaseUrl, ...proposal } = body;
+        return path.endsWith("/review") ? repositoryCommits.review(compartment, proposal) : repositoryCommits.execute(compartment, proposal);
+      }
       if (path === "/api/suite/coding/commits/list") return repositoryCommits.list(compartment);
       if (path === "/api/suite/coding/repository-effects/list") return repositoryRecovery.list(compartment);
       if (path === "/api/suite/coding/repository-effects/inspect") return repositoryRecovery.inspect(compartment, body.id);

@@ -64,6 +64,7 @@ finally {
   try {
     await api("mode", { compartment, mode: "keyboard-only" }); if (await store.selection() === compartment) await api("compartment/select", { compartment: selection });
     const state = await store.snapshot(compartment); assert.equal((state.repositoryProbes ?? []).some(p => p.taskId === taskId && !p.stoppedVerified), false);
+    for (const probe of (state.repositoryProbes ?? []).filter(p => p.taskId === taskId)) assert.equal(await runtimeGuardianStopped(probe.ownedRuntime), true);
     for (const effect of state.repositoryEffects ?? []) for (const command of effect.commands) assert.equal(await runtimeGuardianStopped(command.ownedRuntime), true);
     if (!failure) {
       const exact = digest(effectFields.map(field => state[field] ?? null));

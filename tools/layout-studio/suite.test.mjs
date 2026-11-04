@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
+import { createStudioServer } from "./serve.mjs";
 import { createAgentService, codexDesignConfig, assertCodexDesignConfig } from "./agents.mjs";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile } from "./workspace.mjs";
@@ -68,6 +69,22 @@ test("repository recovery routes preserve exact IDs and unknown native exit prev
     await assert.rejects(suite.handle("/api/suite/compartment/select", { compartment: "work" }), /guardian has not verified exit/); assert.equal(await store.selection(), "personal");
   } finally { await assert.rejects(suite.close(), /repository exit unconfirmed/); }
   assert.equal(agentClosed, true); assert.equal(recoveryClosed, true);
+}));
+
+test("HTTP workspace origin metadata is removed from exact commit proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
+  const calls = [], repositoryCommits = { review: async (c, input) => { calls.push({ c, input }); if (input.force !== undefined) throw new Error("Broader operation fields are rejected"); return { status: "requires-confirmation" }; }, execute: async (c, input) => { calls.push({ c, input }); return { status: "completed" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
+  const suite = createSuite({ store, repositoryCommits, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  const token = "t".repeat(43), server = createStudioServer({ suite, bridge: { close() {} }, token }); server.listen(0, "127.0.0.1"); await once(server, "listening");
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const api = async (path, body) => { const response = await fetch(origin + "/api/suite/coding/commits/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    const requestId = "11111111-1111-1111-1111-111111111111", input = { compartment: "personal", requestId, author: { name: "Synthetic", email: "synthetic@example.invalid" } };
+    assert.equal((await api("review", input)).status, 200); assert.equal(Object.hasOwn(calls[0].input, "workspaceBaseUrl"), false); assert.equal(calls[0].input.requestId, requestId);
+    const rejected = await api("review", { ...input, force: true }); assert.equal(rejected.status, 409); assert.match(rejected.body.error, /Broader operation/); assert.equal(calls[1].input.force, true);
+    assert.equal((await api("execute", { compartment: "personal", requestId, token: "22222222-2222-2222-2222-222222222222" })).status, 200);
+    assert.equal(Object.hasOwn(calls[2].input, "workspaceBaseUrl"), false); assert.equal(calls[2].input.token, "22222222-2222-2222-2222-222222222222");
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
 }));
 
 test("new and legacy workspaces start keyboard-only; portable imports cannot enable providers and companion modes must match policy", () => fixture(async ({ store }) => {

@@ -1880,3 +1880,24 @@ Git/inspector cases pass. Corrected native Windows acceptance remains pending.
 The prior `39a1534` source passed the normal six-check installed update, receipt
 assignment-legends-1793782119744.json; its 461-file, 4,330,999-byte source bundle
 was removed after verification. The frozen frontend/private link were preserved.
+
+
+## Installed HTTP commit envelope correction
+
+At `64a13e0`, the normal installed update passed six checks with frozen frontend
+and private link preserved (assignment-legends-1793783263609.json). Its first
+commit journey was rejected before a Git effect: the HTTP host adds trusted
+workspaceBaseUrl metadata to every suite body, and the exact commit DTO rejected
+that extra field. Source-only service tests had not exercised that host envelope.
+The suite now removes only this host transport field before review/execute;
+unknown command/force fields still reach the strict rejection boundary. A real
+authenticated loopback HTTP test covers valid review/execute and broader-field
+rejection; all 18 suite checks pass.
+
+Failure receipt installed-repository-commit-1793783315887.json remains retained.
+After independent exit checks for all eight retained probes, baseline HEAD/branch,
+known synthetic files, revoked authority and no reserved effect/journal were
+verified before removing only that failed fixture and its local records. Native
+empty-task history was preserved. Cleanup receipt
+failed-commit-fixture-cleanup-1793783549513.json. The installed proof is being
+rerun after this correction; it is not accepted yet.
