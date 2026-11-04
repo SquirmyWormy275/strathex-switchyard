@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createCustomAgents } from "./custom-agents.mjs";
 import { createCopilot } from "./copilot.mjs";
+import { createClientIntegrations } from "./client-integrations.mjs";
+import { clientRecipe, validateClientRecipe } from "../../integrations/client-recipes.mjs";
 import { createStudioServer } from "./serve.mjs";
 import { switchyardAgent } from "../../integrations/agent-sdk.mjs";
 import { agentRoutes, agentMessageSchema, agentResponseSchema, requestMac, responseMac, sameMac } from "../../integrations/agent-protocol.mjs";
@@ -24,6 +26,25 @@ function memoryStore() {
     }
   };
 }
+test("declarative client recipes reject substituted targets, commands, imported authority and future versions", () => {
+  const recipe = clientRecipe("github-copilot-web");
+  const reordered = Object.fromEntries(Object.entries(recipe).reverse()); assert.deepEqual(validateClientRecipe(reordered), recipe);
+  for (const input of [{ ...recipe, target: { kind: "https", url: "https://github.com.evil.invalid/copilot" } }, { ...recipe, target: { kind: "https", url: "https://user:secret@github.com/copilot" } }, { ...recipe, command: "arbitrary executable" }, { ...recipe, approved: true }, { ...recipe, importedAuthority: true }, { ...recipe, version: 2 }]) assert.throws(() => validateClientRecipe(input), /recipe|Imported/);
+  assert.throws(() => clientRecipe("microsoft-copilot"), /exact client/); assert.throws(() => clientRecipe("claude-code"), /exact client/);
+});
+test("client discovery keeps offline configuration useful and Work recipes cannot route to a personal provider", async () => {
+  const store = memoryStore(), service = createClientIntegrations({ store, platform: "linux" });
+  const personal = await service.catalog("personal"), work = await service.catalog("work");
+  assert.equal(personal.entries.every(e => e.capabilities.hostLaunchConnected === false && e.account === "not-verified" && e.session === "not-identified" && e.importedAuthority === false), true);
+  assert.equal(work.entries.filter(e => e.policyPermitsProvider).length, 1); assert.equal(work.entries.find(e => e.policyPermitsProvider).provider, "microsoft-365-copilot");
+  assert.equal(work.entries.find(e => e.provider === "github-copilot").policyPermitsProvider, false);
+  await assert.rejects(service.recipe("work", { id: "github-copilot-web" }), /prohibited/);
+  const safe = await service.recipe("work", { id: "microsoft-365-copilot-web" }); assert.equal(safe.hostActionAuthorized, false); assert.equal(safe.modelPromptSubmitted, false);
+  await assert.rejects(service.recipe("personal", { id: "figma-web", command: "open another site" }), /exact documented/);
+  const desktop = personal.entries.find(e => e.provider === "claude-desktop"); assert.equal(desktop.recipe.target.kind, "native-application"); assert.equal(desktop.capabilities.exactResume, false);
+  desktop.recipe.target.applicationId = "foreign"; assert.equal((await service.recipe("personal", { id: "claude-desktop" })).recipe.target.applicationId, "claude-desktop");
+  assert.equal(store.history.length, 0); assert.equal(store.secrets.size, 0);
+});
 
 test("custom SDK events require exact scoped MAC, freshness and monotonic sequence; commands have one claim", async () => {
   const store = memoryStore(); let clock = 100000;

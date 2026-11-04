@@ -71,7 +71,7 @@ test("repository recovery routes preserve exact IDs and unknown native exit prev
   assert.equal(agentClosed, true); assert.equal(recoveryClosed, true);
 }));
 
-test("HTTP workspace origin metadata is removed from exact commit and recovery proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
+test("HTTP workspace origin metadata is removed from exact commit, recovery and client proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
   const calls = [], repositoryCommits = { review: async (c, input) => { calls.push({ c, input }); if (input.force !== undefined) throw new Error("Broader operation fields are rejected"); return { status: "requires-confirmation" }; }, execute: async (c, input) => { calls.push({ c, input }); return { status: "completed" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
   const repositoryRecovery = { review: repositoryCommits.review, apply: repositoryCommits.execute, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
   const suite = createSuite({ store, repositoryCommits, repositoryRecovery, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
@@ -90,6 +90,14 @@ test("HTTP workspace origin metadata is removed from exact commit and recovery p
     assert.equal(Object.hasOwn(calls[3].input, "workspaceBaseUrl"), false); assert.equal(calls[3].input.cleanupPrivateStaging, true);
     assert.equal(await recover("review", { compartment: "personal", id: requestId, force: true }), 409); assert.equal(calls[4].input.force, true);
     assert.equal(await recover("apply", { compartment: "personal", id: requestId, reviewId: requestId, token: requestId }), 200); assert.equal(Object.hasOwn(calls[5].input, "workspaceBaseUrl"), false);
+    const clients = async (path, body, authenticated = true) => { const r = await fetch(origin + "/api/suite/integrations/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
+    assert.equal((await clients("catalog", { compartment: "personal" }, false)).status, 401);
+    const catalog = await clients("catalog", { compartment: "personal" }); assert.equal(catalog.status, 200); assert.equal(catalog.body.entries.every(e => e.account === "not-verified"), true);
+    const recipe = await clients("recipe", { compartment: "personal", id: "figma-web" }); assert.equal(recipe.status, 200); assert.equal(recipe.body.hostActionAuthorized, false); assert.equal(recipe.body.recipe.importedAuthority, false);
+    assert.equal((await clients("recipe", { compartment: "personal", id: "figma-web", url: "https://foreign.invalid" })).status, 409);
+    const launch = { compartment: "personal", id: "github-copilot-web", requestId };
+    const gated = await clients("launch", launch); assert.equal(gated.status, 409); assert.match(gated.body.error, process.platform === "linux" ? /Keyboard-only/ : /unfinished/);
+    const injected = await clients("launch", { ...launch, command: "untrusted" }); assert.equal(injected.status, 409); assert.match(injected.body.error, /exact documented/);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
 }));
 

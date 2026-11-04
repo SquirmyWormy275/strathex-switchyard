@@ -14,7 +14,7 @@ import { createPortablePackage, packageDefinition, portableDefinitionDigest, pre
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
 const templates = {
-  personal: { providers: ["codex", "claude-code", "native-chatgpt", "custom-agent", "local-transcription"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
+  personal: { providers: ["codex", "claude-code", "native-chatgpt", "custom-agent", "local-transcription", "github-copilot", "claude-desktop", "cursor", "figma"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
   work: { providers: ["microsoft-365-copilot"], accounts: [], export: false, recording: false, crossCompartment: false, retentionDays: 7 }
 };
 
@@ -138,7 +138,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   }
   return {
     async withResourceLock(kind, identity, fn) {
-      if (!["voice-cpu", "repository-effects"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
+      if (!["voice-cpu", "repository-effects", "client-launch"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
       return withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, fn);
     },
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },

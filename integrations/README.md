@@ -25,6 +25,49 @@ processes must coordinate that one enrollment's sequence, or use distinct enroll
 identities. Do not retry a claimed command after a timeout: inspect its uncertain
 outcome. Claims are delivered once and are never automatically replayed.
 
+## Distinct client recipes
+
+`POST /api/suite/integrations/catalog` with `{ compartment }` reports documented
+client surfaces without opening an application, inspecting browser accounts or
+claiming a native session. `POST /api/suite/integrations/recipe` accepts only
+`{ compartment, id }` and returns the exact versioned declarative recipe. It is
+useful in keyboard-only mode; it grants no host action or provider authority.
+Work policy permits only the Microsoft 365 Copilot recipe. A recipe cannot carry
+an alternate URL, command, account, permission or self-approval.
+
+| Recipe | Supported surface and primary contract |
+| --- | --- |
+| `github-copilot-web` | [GitHub.com Copilot](https://docs.github.com/en/copilot/how-tos/manage-your-account/get-started-with-a-copilot-plan), separate from Microsoft 365 Copilot. |
+| `microsoft-365-copilot-web` | [Microsoft Copilot Chat for an approved work account](https://learn.microsoft.com/en-us/copilot/manage-copilot-chat); the vendor's current primary URL is `copilot.cloud.microsoft`. Browser identity remains unverified. |
+| `claude-desktop` | [Native Claude desktop](https://support.claude.com/en/articles/10065433-install-claude-desktop), separate from Claude Code. Linux beta has explicit distribution/feature limits. No web substitute is inferred. |
+| `cursor-cloud` | [Cursor Cloud Agents](https://prod.cursor.com/help/getting-started/first-project), separate from native IDE/CLI task control. |
+| `figma-web` | [Figma's file browser](https://help.figma.com/hc/en-us/articles/1500005554982-Guide-to-files-and-folders), with no file/team/edit authority selected. |
+
+The [versioned recipe validator](client-recipes.mjs) accepts only the exact
+built-in target and boundary. Vendor sources were checked on November 4, 2026;
+they establish documented surfaces, not local installation/account acceptance.
+Linux fixed HTTPS launch requests connect through the system Python 3 Gio client
+and the [OpenURI portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.OpenURI.html).
+`POST /api/suite/integrations/launch` accepts only `{ compartment, id, requestId }`
+in the selected matching companion mode. It persists exact native ownership
+before startup acknowledgement, waits for the portal's Response and independently
+verifies helper exit. Duplicate request UUIDs return retained results without
+another portal request. `launches` lists sanitized retained evidence. Work policy
+permits only the fixed Microsoft work surface; no profile content enters the URI.
+
+Portal acceptance means `launch-requested`; window/account/session state remains
+unverified. Keyboard-only/selection changes stop only the owned request helper,
+not the user's external browser. Unknown outcomes survive restart without replay;
+unverified native owners prevent replacement. The helper requires the desktop's
+system `python3` with Gio/GLib and a running OpenURI portal. It adds no runtime or
+model copy and changes no desktop settings. A missing dependency fails on use.
+
+Windows launch, exact native Claude desktop binding and frontend controls remain
+unfinished implementation. The catalog reports those missing capabilities. Do
+not bind a launch-only recipe to resume, submit, cancel or mediated repository
+actions. Native client/tenant/account acceptance remains separate from the
+implemented request transport.
+
 ## Version 2 wire contract
 
 Only `POST /agent/v2/event`, `/agent/v2/poll` and `/agent/v2/ack` accept this

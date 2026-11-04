@@ -87,8 +87,8 @@ The complete Windows release passed 250 test/build groups for `cda0327`, includi
 managed startup, installer, bootstrap, portable profiles and automation checks.
 Fresh native Windows installation/import/model/recheck and cleanup also passed
 with 49 exact distributions. The corrected private-pipe/index paths passed that complete run; newer
-retained-ownership and recovery application changes await their own Windows run. The latest accepted Linux run has 146 groups
-and 932 tests. [Verification details](docs/verification.md) distinguish each result
+retained-ownership and recovery application changes await their own Windows run. The latest accepted Linux run has 147 groups
+and 942 tests. [Verification details](docs/verification.md) distinguish each result
 and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.

@@ -2032,3 +2032,42 @@ no archive, Windows installer bundle or extra runtime was retained locally.
 Newer 51d641b retained-ownership and 5aa4713 metadata recovery source are later
 checkpoints and still require their own complete native Windows result. No
 interactive Windows account, microphone, HID or F77/B122 acceptance is inferred.
+
+
+## Distinct client contracts and Linux launch transport
+
+Five versioned recipes now distinguish GitHub Copilot web, Microsoft work Copilot
+web, native Claude desktop, Cursor Cloud Agents and Figma web. Vendor sources
+were checked on November 4, 2026. Recipes are useful offline and carry no local
+authority; substituted URLs/commands, future versions and self-approval fields
+are rejected. The current Microsoft work web entry uses copilot.cloud.microsoft
+from Microsoft's updated documentation; the existing delegated Graph adapter
+remains a separate capability. Work policy still prohibits personal providers.
+
+Linux launch requests are connected through the fixed system Python3 Gio helper
+and OpenURI, with Response subscription before the request, exact handle/target
+identity, cancellation and bounded exit. Each request persists in the encrypted
+compartment before native start acknowledgement; kernel leases serialize host
+instances, duplicates return retained results, unknown owners block replacement
+and shutdown/selection changes discard late results. Only the owned request
+helper is stopped; the external browser is not owned or closed. No prompt or
+profile content enters the URI. Generic account, window/session, resume, submit,
+cancel or mediated capabilities are not inferred.
+
+The source passes eight lifecycle/fault tests, recipe/policy checks, actual HTTP
+transport/auth gates and packaging import checks. Five actual Python/Gio cases
+on independent private D-Bus sessions passed acceptance/cancel/reject, response
+before method return and explicit stop/Close behavior, with no browser opened.
+The live workstation reports OpenURI version 5 and system Gio availability.
+Its full source run and installed URI request proof are pending. Windows launch,
+native Claude desktop/IDE attachment and frontend controls remain implementation
+work; their account/UI acceptance is separate. No desktop setting was changed.
+
+
+The final Linux source run passed 147/147 groups: 942 tests, 933 passed and nine
+declared platform skips; receipt 6ee9054b-79f1-4e1f-b411-e5177f901c0e. Type
+checking passes. Five native private-bus results are retained with exact helper
+and fixture hashes in client-portal-private-bus-1793789449865.json. The explicit
+installed proof script requests one real fixed GitHub Copilot homepage through
+normal authenticated routes, with no prompt or repository/session selection.
+Its source is syntax-checked; installed acceptance remains pending.

@@ -143,6 +143,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/vial-encoders.test.mjs" },
   { file: "tools/layout-studio/vial-rules.test.mjs" },
   { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/client-launch.test.mjs" },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/instance.test.mjs" },
   { file: "tools/layout-studio/foreground.test.mjs" },
