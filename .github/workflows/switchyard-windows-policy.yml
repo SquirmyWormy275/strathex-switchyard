@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [policy, recovery, stop, output]
+        suite: [policy, recovery, stop, output, authority, host-stop]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"

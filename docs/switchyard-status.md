@@ -8,6 +8,12 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The focused native Windows matrix now also runs the complete task-authority and
+host-stop files. This directly checks the ordinary factory's grant path and the
+new immutable-admission stop logic without waiting for the full release lane.
+Each file retains its existing isolated harness bound; guest/account/device
+execution remains doubled or unopened. The expanded matrix is pending CI.
+
 The installed `c7525a0` pipeline journey passes seven checks with one empty native
 Codex task and zero prompts: both actions, exact authenticated receipts and
 duplicate refusal, two independently exited guardians, unchanged original

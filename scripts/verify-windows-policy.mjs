@@ -8,10 +8,12 @@ const suites = {
   policy: "tools/layout-studio/repository-windows-execution.test.mjs",
   recovery: "tools/layout-studio/repository-windows-execution-recovery.test.mjs",
   stop: "tools/layout-studio/repository-windows-execution-stop.test.mjs",
-  output: "tools/layout-studio/repository-windows-execution-output.test.mjs"
+  output: "tools/layout-studio/repository-windows-execution-output.test.mjs",
+  authority: "tools/layout-studio/task-authority.test.mjs",
+  "host-stop": "tools/layout-studio/repository-execution-stop.test.mjs"
 };
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
-if (process.platform !== "win32" || flags[0] !== "--synthetic" || flags.length > 2 || flags.length === 2 && !Object.hasOwn(suites, suite)) throw Error("Usage on Windows: node scripts/verify-windows-policy.mjs --synthetic [--suite=policy|recovery|stop|output]. This check opens no VM, account or keyboard.");
+if (process.platform !== "win32" || flags[0] !== "--synthetic" || flags.length > 2 || flags.length === 2 && !Object.hasOwn(suites, suite)) throw Error("Usage on Windows: node scripts/verify-windows-policy.mjs --synthetic [--suite=policy|recovery|stop|output|authority|host-stop]. This check opens no VM, account or keyboard.");
 assertRequiredTestManifest();
 const files = ["scripts/run-isolated-tests.test.mjs", ...(suite ? [suites[suite]] : Object.values(suites))];
 const groups = files.map(file => {

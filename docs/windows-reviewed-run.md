@@ -125,9 +125,10 @@ Type checking passes. Four cases invoke the actual compiled C# result formatter;
 its warning-free build and six Linux native-only guards pass. They validate wire
 format and guards, not an actual VM or native Job enforcement.
 
-The Windows policy workflow runs complete policy, recovery, stop and output test
-files as separate jobs, with each file explicitly present in the required
-inventory. Each Windows group is capped at five minutes. This follows the first
+The Windows policy workflow runs complete policy, recovery, stop, output,
+task-authority and host-stop test files as separate jobs. Every file is explicitly
+present in the required inventory and retains its existing harness bound. The
+four Windows adapter files are capped at five minutes. This follows the first
 whole-file run's four-minute timeout: its first four cases completed, but the
 run remains failed in `windows-policy-63cb-failed.json`. No case or assertion was
 removed. `scripts/verify-windows-policy.mjs --synthetic --suite=policy` selects
