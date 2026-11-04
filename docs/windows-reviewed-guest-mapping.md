@@ -5,8 +5,10 @@ The Windows Sandbox backend can consume the native
 read-only instead of exposing the live repository, binds it to the exact
 operation and catalog, and preserves it when guest exit is unknown. This path
 is software-tested. The [managed guest lifecycle](windows-managed-guest-lifecycle.md)
-is implemented and software-tested; the Studio Windows adapter, worker/tool
-staging and bounded writable exchange remain unfinished implementation.
+is implemented and software-tested. Native worker/runtime staging and durable
+bounded-volume ownership are implemented and accepted in the Windows filesystem
+lane. The Studio Windows adapter and normal personal-host privileged setup
+remain unfinished implementation.
 
 Construct the trusted backend with `requireReviewedInputs: true`. Its request
 must carry the native staging capability and matching `operationId`. JSON
@@ -54,3 +56,35 @@ guest exit, lost identity writes and mismatched VM/configuration exit evidence.
 Native NTFS staging acceptance is a separate Windows CI journey. Actual guest
 execution, VM stop/restart acceptance and interactive account/device checks have
 not been established by these results.
+
+## Trusted bounded exchange
+
+Connected Windows execution can now require `requireBoundedExchange: true` in
+addition to exact reviewed inputs. Its request must carry the original native
+volume capability, bound to the same operation, fixed 64 MiB capacity and native
+mapping proof. Both cross-process consumer leases remain held through guest
+preparation, acknowledgement, independent exit and output validation. The
+control-plane isolation wrapper can obtain this lease only from its trusted
+host provider; request JSON cannot reconstruct its methods.
+
+Only this capability can admit the owned FAT mount as an exchange root. Ordinary
+source/tool/destination directory validation is unchanged. Output descendants
+are individually checked for plain file/directory kinds and forbidden links;
+manifest sizes, paths, hashes, exact request bindings and resource-enforcement
+proofs still apply. Resolving a Windows volume mount to its GUID is not used as
+a way to relax the ordinary task allowlist.
+
+Receipts bind the original exchange root and native-binding digest. Duplicates
+cannot substitute another volume. Unknown VM exit preserves both the mapped
+volume and its inputs, blocks extraction and cannot replay the worker. Generic
+backend cleanup removes only its control records; the original native volume
+service exclusively owns detach and backing-file removal. Its separate cleanup
+state must be checked before declaring storage retired.
+
+The backend/worker/installation/lifecycle/release group passes 43 checks with one
+declared platform skip (44 total), and type checking passes. Four new backend
+cases cover exact mapping/output validation, malformed or overlapping leases,
+unknown guest exit and linked output/revoked volumes. They use explicit volume
+and VM doubles and ordinary owned temporary folders. The native mapping lane
+is separate; this is not an actual VM demonstration. The Studio Windows Run
+connection remains unfinished.

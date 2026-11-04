@@ -19,8 +19,11 @@ Native Sandbox startup now requires that exact bounded volume binding; a
 read-only configuration-validation verb uses the same native checks without
 starting a VM. Fifty focused storage/transport/session/runner cases, four release
 checks, type checking, a zero-warning/error helper build and six Linux guards
-pass. Native mapping acceptance is pending CI. The bounded backend connection,
-Studio Windows Run adapter and personal-host privileged setup remain unfinished
+pass. Native mapping acceptance is pending CI. The higher backend and isolation wrapper now consume the trusted bounded
+volume lease while holding both consumer locks, validate plain output descendants
+and preserve exclusive native-owner retirement. Their related group passes
+43 checks with one declared platform skip; type checking passes. The Studio
+Windows Run adapter and personal-host privileged setup remain unfinished
 software. Supported interactive Windows VM acceptance remains a separate check.
 
 Complete Windows `72c5f96` passes 261/261 groups: 1,738 tests, 1,690 passed and

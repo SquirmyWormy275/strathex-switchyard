@@ -12,6 +12,7 @@ import {
   rename,
   rm,
   stat,
+  symlink,
   writeFile
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,6 +29,7 @@ import {
   type WindowsSandboxLifecycleController,
   type WindowsSandboxProcessIdentity,
   type WindowsSandboxProcessRunner,
+  type WindowsSandboxReviewedExchangeLease,
   type WindowsSandboxRunSpec
 } from "../src/windows-sandbox.ts";
 
@@ -101,7 +103,7 @@ function successfulRunner(assertSpec?: (spec: WindowsSandboxRunSpec) => Promise<
       assert.equal(signal.aborted, false);
       await assertSpec?.(spec);
       await onStarted(4242);
-      const exchangeRoot = join(dirname(spec.args[0]!), "exchange");
+      const exchangeRoot = spec.reviewedExchangeBinding ? join(spec.reviewedExchangeBinding.stagingRoot, "mount") : join(dirname(spec.args[0]!), "exchange");
       const request = JSON.parse(await readFile(join(exchangeRoot, "request.json"), "utf8")) as Record<string, unknown>;
       const outputRoot = join(exchangeRoot, "output");
       const contents = Buffer.from("validated sandbox result", "utf8");
@@ -386,7 +388,7 @@ test("invalid quarantine content fails closed without copying any output", async
   const runner: WindowsSandboxProcessRunner = {
     async run(spec, _signal, onStarted) {
       await onStarted(9);
-      const exchangeRoot = join(dirname(spec.args[0]!), "exchange");
+      const exchangeRoot = spec.reviewedExchangeBinding ? join(spec.reviewedExchangeBinding.stagingRoot, "mount") : join(dirname(spec.args[0]!), "exchange");
       const request = JSON.parse(await readFile(join(exchangeRoot, "request.json"), "utf8")) as Record<string, unknown>;
       await mkdir(join(exchangeRoot, "output"), { recursive: true });
       await writeFile(join(exchangeRoot, "output", "report.txt"), "tampered", "utf8");
@@ -866,4 +868,59 @@ test("restart observes exact guest exit without upgrading an unconfirmed program
   const failed=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(failed.status,"failed");
   available=true;wrong=true;await assert.rejects(backend.reconcile(),/independent stop proof/);await access(join(dirname(failed.receiptPath!),"exchange/request.json"));
   wrong=false;const [receipt]=await backend.reconcile();assert.equal(receipt!.state,"failed");assert.equal(receipt!.guestExitVerified,true);assert.equal(receipt!.cleanupVerified,true);assert.deepEqual(await readdir(setup.destinationRoot),[]);await assert.rejects(access(join(dirname(failed.receiptPath!),"exchange")),{code:"ENOENT"});await access(inputs.lease.root);assert.equal(executions,1);
+});
+
+
+// These volume capabilities deliberately use ordinary temporary test folders.
+// Native Windows mount/extent/ACL admission is accepted in its separate CI lane.
+async function reviewedExchangeFixture(setup: Awaited<ReturnType<typeof fixture>>, operationId: string) {
+  const stagingRoot=join(setup.base,`disk-${operationId}`),root=join(stagingRoot,"mount");await mkdir(root,{recursive:true});
+  await writeFile(join(stagingRoot,"exchange.vhd"),"synthetic original volume owner");
+  let held=0,checks=0,current=true;
+  const lease:WindowsSandboxReviewedExchangeLease={schema:"switchyard-windows-bounded-volume/v1",operationId,root,maximumBytes:67108864,privateAclReadbackVerified:true,exchangeQuotaEnforced:true,sandboxEnforced:false,
+    nativeBinding:{schema:"switchyard-windows-bounded-volume/v1",operationId,stagingRoot,stagingIdentity:{device:"1",inode:"2"},imageIdentity:{device:"1",inode:"3"},mountIdentity:{device:"1",inode:"4"},footerSha256:"a".repeat(64),volumeGuid:"\\\\?\\Volume{11111111-2222-4333-8444-555555555555}\\"},
+    async assertCurrent(){assert.equal(current,true,"Synthetic volume identity changed");assert.ok(held>0);checks++;},
+    async withConsumer<T>(effect:()=>Promise<T>){held++;try{return await effect();}finally{held--;}}
+  };
+  return{lease,held:()=>held,checks:()=>checks,revoke:()=>{current=false;}};
+}
+function exactGuestRunner(inner:WindowsSandboxProcessRunner):WindowsSandboxProcessRunner {
+  return{async run(...args){const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return{...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
+}
+test("bounded guest mapping holds its native consumer lease, validates output without resolving the mount and leaves retirement to its original owner",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+ const filesystem=new InjectedFileSystem(),originalRealpath=filesystem.realpath.bind(filesystem);filesystem.realpath=async path=>{assert.ok(path!==exchange.lease.root&&!path.startsWith(exchange.lease.root+"/"),"Generic realpath must not resolve the trusted volume mount");return originalRealpath(path);};
+ const inner=successfulRunner(async spec=>{launches++;assert.equal(exchange.held(),1);assert.deepEqual(spec.reviewedExchangeBinding,exchange.lease.nativeBinding);const xml=await readFile(spec.args[0],"utf8");assert.ok(xml.includes(`<HostFolder>${exchange.lease.root}</HostFolder>`));});
+ const backend=createBackend(setup,exactGuestRunner(inner),[],{requireReviewedInputs:true,requireBoundedExchange:true,filesystem}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+ const result=await backend.run(request);assert.equal(result.status,"completed",result.summary);assert.equal(exchange.held(),0);assert.ok(exchange.checks()>=4);assert.equal(await readFile(join(result.resultRoot!,"report.txt"),"utf8"),"validated sandbox result");
+ const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.reviewedExchangeRoot,exchange.lease.root);assert.equal(receipt.reviewedExchangeBindingSha256,sha256(JSON.stringify(exchange.lease.nativeBinding)));assert.equal(receipt.exchangeQuotaEnforced,true);assert.equal(receipt.cleanupVerified,true);
+ await access(join(exchange.lease.root,"request.json"));assert.equal(await readFile(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"),"utf8"),"synthetic original volume owner");
+ assert.equal((await backend.run(request)).replayed,true);assert.equal(launches,1);
+ const altered={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding,footerSha256:"f".repeat(64)}};assert.equal((await backend.run({...request,reviewedExchange:altered})).status,"blocked");assert.equal(launches,1);
+});
+test("bounded backend refuses missing, serialized, wrong-scope, unbounded and overlapping exchange capabilities without guest effects",async context=>{
+ for(const invalid of ["missing","serialized","operation","binding","quota","path","overlap"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  const lease:any={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding}};
+  if(invalid==="serialized"){delete lease.assertCurrent;delete lease.withConsumer;}
+  if(invalid==="operation")lease.operationId="bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  if(invalid==="binding")lease.nativeBinding.operationId="bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  if(invalid==="quota")lease.exchangeQuotaEnforced=false;
+  if(invalid==="path")lease.root=setup.targetRoot;
+  if(invalid==="overlap"){lease.nativeBinding.stagingRoot=setup.targetRoot;lease.root=join(setup.targetRoot,"mount");}
+  const backend=createBackend(setup,exactGuestRunner(successfulRunner(()=>{launches++;})),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,...(invalid==="missing"?{}:{reviewedExchange:lease})});assert.ok(["blocked","unavailable"].includes(result.status),`${invalid}: ${result.summary}`);assert.equal(launches,0);assert.equal(exchange.held(),0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+ }
+});
+test("bounded exchange survives an unknown guest exit and cannot be extracted or replayed on restart",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+ const backend=createBackend(setup,successfulRunner(()=>{launches++;}),[],{requireReviewedInputs:true,requireBoundedExchange:true}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+ const result=await backend.run(request);assert.equal(result.status,"failed");assert.match(result.summary,/guest exit remains unconfirmed/i);await access(join(exchange.lease.root,"result-manifest.json"));assert.equal((await readdir(setup.destinationRoot)).length,0);assert.equal((await backend.run(request)).status,"blocked");assert.equal(launches,1);assert.equal(exchange.held(),0);
+});
+test("bounded output still rejects links and a revoked native volume before extraction",async context=>{
+ for(const failure of ["link","revoked"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),inner=successfulRunner();
+  const runner=exactGuestRunner({async run(...args){const result=await inner.run(...args);if(failure==="revoked")exchange.revoke();else{const report=join(exchange.lease.root,"output/report.txt");await rm(report);await symlink(join(setup.targetRoot,"unselected.env"),report);}return result;}});
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true,requireBoundedExchange:true});const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed",result.summary);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));assert.equal(exchange.held(),0);
+ }
 });

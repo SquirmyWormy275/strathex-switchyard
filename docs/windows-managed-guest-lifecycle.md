@@ -47,11 +47,13 @@ stopped owned exchange and never extracts unconfirmed output or replays a worker
 Input staging has its own `consumerStopped` fence, independent of native reader
 exit. No provider task-completion claim follows from worker or VM exit.
 
-The coordinator reports `exchangeQuotaEnforced: false`. Output collection limits
-do not impose a filesystem quota on a writable mapped exchange. The Studio
-Windows execution action remains disabled while its adapter and bounded writable
-workspace are unfinished. No hardware/account limitation is used to hide that
-remaining implementation.
+The coordinator now requires the exact native bounded-volume binding before
+reserving a guest and binds its digest to the protected start record. Quota
+admission is recorded only after exact native startup verifies. This historical
+admission fact is separate from current volume ownership and independent VM
+exit. Output collection limits alone never provide filesystem enforcement. The
+Studio Windows execution action remains disabled while its adapter is unfinished;
+normal personal-host privileged setup also remains implementation work.
 
 The focused command, lifecycle, backend/worker-contract and runner inventory checks
 pass 57 cases; four packaged-import cases and type checking pass separately.
