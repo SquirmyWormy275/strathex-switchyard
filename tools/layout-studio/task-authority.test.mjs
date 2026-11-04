@@ -3,7 +3,7 @@ import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, mkdir, readFile, writeFile, rm, access } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, readFile, writeFile, rm, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
@@ -15,7 +15,7 @@ async function fixture(t) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-authority-"));
   let serviceToClose;
   t.after(async () => { try { await serviceToClose?.close(); } finally { await rm(stage, { recursive: true, force: true }); } });
-  const root = join(stage, "repository"); await mkdir(root);
+  await mkdir(join(stage, "repository")); const root = await realpath(join(stage, "repository"));
   const git = await fixedGitExecutable();
   const run = async (...args) => (await execute(git, args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_TERMINAL_PROMPT: "0" }, timeout: 10000 })).stdout;
   await run("init", "-b", "main"); await run("config", "user.name", "Synthetic verification"); await run("config", "user.email", "synthetic@example.invalid");
@@ -37,7 +37,7 @@ async function fixture(t) {
     await options.onGuardianReady(frame);
     const p = (await store.snapshot("personal")).repositoryProbes.find(p => p.ownedRuntime.id === frame.id); assert.equal(p.stoppedVerified, false);
     try { const result = await execute(executable, args, { cwd: options.cwd, env: options.env, timeout: options.timeout, maxBuffer: options.maxOutputBytes, signal: options.signal }); return { ...result, status: "completed", exitCode: 0, inputDelivered: true, treeExitVerified: true }; }
-    catch (e) { if (e.code === "ABORT_ERR" || !Number.isInteger(e.code)) throw e; return { status: "completed", exitCode: e.code, stdout: e.stdout, stderr: e.stderr, inputDelivered: true, treeExitVerified: true }; }
+    catch (e) { if (e.code === "ABORT_ERR" || !Number.isInteger(e.code)) throw e; return { status: "failed", exitCode: e.code, stdout: e.stdout, stderr: e.stderr, inputDelivered: true, treeExitVerified: true }; }
   };
   const inspection = createRepositoryInspection({ store, command, guardianStopped: async () => true, now });
   const service = createTaskAuthority({ store, inspection, now, isActive: async () => active, checkNative: async (_c, t) => { nativeChecks++; assert.equal(t.sessionId, task.sessionId); } });
@@ -49,7 +49,7 @@ async function fixture(t) {
 test("task authority binds real Git contents to one reviewed task/plan, consumes approval once and detects later edits", async t => {
   const f = await fixture(t), beforeHead = await f.run("rev-parse", "HEAD");
   const review = await f.service.review("personal", f.proposed);
-  assert.equal(review.scope.targetSnapshot.completeness, "complete"); assert.deepEqual(review.scope.allowedActions, ["local_commit"]);
+  assert.equal(review.scope.targetSnapshot.completeness, "complete"); assert.equal(review.scope.targetSnapshot.upstream, undefined); assert.deepEqual(review.scope.allowedActions, ["local_commit"]);
   await assert.rejects(f.service.issue("personal", { ...f.proposed, planRevision: "changed-plan", token: review.confirmation.token }), /match|scope/i);
   const issued = await f.service.issue("personal", { ...f.proposed, token: review.confirmation.token });
   assert.equal(issued.nativePermissionsChanged, false); assert.equal(issued.localCommitExecutionImplemented, false);
@@ -60,6 +60,7 @@ test("task authority binds real Git contents to one reviewed task/plan, consumes
   assert.equal((await f.service.revalidate("personal", issued.id)).allowed, false);
   assert.equal(await f.run("rev-parse", "HEAD"), beforeHead);
   assert.equal((await f.store.snapshot("personal")).repositoryProbes.every(p => p.stoppedVerified), true);
+  for (const p of (await f.store.snapshot("personal")).repositoryProbes) if (p.scratch) await assert.rejects(access(p.scratch), { code: "ENOENT" });
   const sealed = await readFile(join(f.stage, "private/personal.sealed.json"), "utf8");
   assert.equal(sealed.includes("synthetic-session"), false); assert.equal(sealed.includes(review.confirmation.token), false);
 });
@@ -142,4 +143,19 @@ test("suspending an acknowledged repository probe discards late results and reco
   assert.match((await pending).message, /stopped/i);
   assert.equal((await f.store.snapshot("personal")).repositoryProbes.at(-1).stoppedVerified, true);
   assert.deepEqual(await f.service.list("personal"), []); await probe.close();
+});
+
+
+test("Git root spelling is canonicalized through native realpath and another real directory is rejected", async t => {
+  const f = await fixture(t), classifications = { includedUntracked: [], excludedUntracked: [], excludedIgnored: [] };
+  let redirect = false;
+  const command = async (exe, args, options) => {
+    const result = await f.command(exe, args, options);
+    if (args.at(-2) === "rev-parse" && args.at(-1) === "--show-toplevel") return { ...result, stdout: (redirect ? f.stage : f.root + "/../repository") + "\n" };
+    return result;
+  };
+  const reader = createRepositoryInspection({ store: f.store, command, guardianStopped: async () => true });
+  assert.equal((await reader.capture("personal", f.task, classifications)).snapshot.repositoryRoot, f.root);
+  redirect = true; assert.equal((await reader.capture("personal", f.task, classifications)).snapshot.completeness, "incomplete");
+  await reader.close();
 });

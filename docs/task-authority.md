@@ -64,7 +64,10 @@ fsmonitor commands are disabled. Each command has native process supervision,
 a ten-second deadline and bounded output. Its exact guardian scope is encrypted
 before execution and verified exit is recorded. An unsettled scope survives
 restart and blocks replacement until independent native readback verifies exit.
-Cancellation discards late results.
+Cancellation discards late results. Git temporary files use a private, identity-bound
+runtime directory, removed after verified guardian exit. An unsettled guardian
+retains its scratch for recovery. A missing optional upstream is represented as
+unavailable metadata, independently of successful process supervision.
 
 File hashing rejects parent links/junctions, descriptor replacement and content
 changes. This route supports at most 4,096 input files, 4 MiB per file and 64 MiB
@@ -79,3 +82,14 @@ synthetic native-task identities. Installed native-account acceptance is recorde
 separately on the [verification page](verification.md). Provider completion,
 execution authority and independently verified coding-task completion remain
 different results.
+
+On the installed Linux pilot, the explicit synthetic journey creates an empty
+native task without sending a model prompt:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-task-authority-host.mjs --synthetic
+```
+
+It uses a disposable Git repository, checks replay and changed-target rejection,
+revokes the grant and restores workspace selection/keyboard-only mode. An
+uncertain result retains its exact protected records and staging for recovery.

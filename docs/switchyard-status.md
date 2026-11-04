@@ -1612,3 +1612,36 @@ complete acceptance. The terminal's previous GitHub token became invalid; the
 connected GitHub app published the exact tested file tree as `f519b83` using a
 leased fast-forward. The local object and branch were verified and synchronized
 without changing global credentials or rewriting remote history.
+
+## Native repository status and canonical roots
+
+Complete Linux source acceptance at `9ba994c`: 122/122 groups, 889 tests,
+880 passed and nine platform skips; receipt
+644cdddd-e387-4efd-8b4c-edf53000ed59. The normal installed update then passed
+six checks with unchanged frontend, definitions and private link; its disposable
+bundle was removed. The initial installed authority journey was not accepted:
+a missing optional upstream produces a normal nonzero Git result, but the
+adapter incorrectly treated the native guardian's `failed` command status as
+a lifecycle failure. The test transport had returned `completed` for nonzero
+exits and masked this distinction. Both now use the real status contract.
+
+Native root queries are canonicalized through realpath before later queries;
+Windows Git's slash spelling cannot create a false root mismatch, and another
+real directory is rejected. Eight real-repository scenarios now include that
+boundary. Private identity-bound probe scratch avoids dependence on shared /tmp
+capacity; scratch remains when exit is unverified and is removed after verified
+exit. A temporary /tmp user-quota failure interrupted a focused test run; that
+run is not accepted. Later focused runs are recorded separately.
+
+Resuming the pilot also exposed an existing OS keyring rejected for malformed
+multiline text. Nine original workspace keys were individually authenticated
+against their existing AEAD files and restored through Secret Service. Dated,
+hash-verified private recovery copies were saved; the original keyring and
+encrypted workspaces were not replaced. Unrelated keyring entries were not
+modified. This recovery is local evidence, not a source-code plaintext fallback.
+
+The corrected source also completed an actual native-guardian capture of the
+disposable pilot repository with no upstream. Its snapshot was complete and
+all eight retained guardian identities independently verified exited. Twelve
+affected authority/packaging checks and typecheck pass. This diagnostic is not
+a replacement for the pending corrected normal installed authority journey.
