@@ -122,11 +122,15 @@ bindings before issuing a passing receipt. Malformed evidence retains the fact
 that the program ran. Revocation before evidence issuance cannot earn a passing
 result, and duplicate requests cannot execute again.
 
-Foreground pipelines honor the durable cancellation/deadline control and
-workspace/application shutdown. The existing separately reviewed managed-Run
-stop API remains specific to admitted managed Run processes.
+Foreground pipelines honor durable cancellation/deadline control and
+workspace/application shutdown. The separately reviewed stop API also accepts
+an exact live pipeline before its response arrives: the checkpoint stores its
+immutable admission independently of the eventual program result. The stop
+review names the original action and binds that admission plus the native owner.
+If a program result already exists, its digest remains part of the stop scope.
+Legacy Run records retain their original outcome-bound stop/recovery behavior.
 
-Four source cases exercise actual native namespaces, both actions, incomplete
+Five source cases exercise actual native namespaces, both actions, incomplete
 reports, exact grants, key/input substitution, cancellation, native exit and
 cleanup. The normal installed demonstration is:
 
@@ -135,8 +139,13 @@ mise exec node@24.14.0 -- node --experimental-transform-types scripts/verify-rep
 ```
 
 It uses a new disposable repository and one empty native Codex task, with zero
-prompts. Installed acceptance for the new pipeline route is pending until that
-journey completes; source namespace checks and installed evidence stay distinct.
+prompts. The first installed pipeline journey passed seven checks at `c7525a0`,
+release `7f2704d4425c23116082bb238a9358396b4e2d66c8513cbe254f7dfb8f0826d8`,
+receipt `installed-repository-pipeline-1793829048435.json`. It ran both actions,
+verified exact authenticated receipts and duplicate refusal, independently
+observed two guardian exits, removed staging and restored definitions, selection,
+modes and the private endpoint. The expanded pending-pipeline stop journey is
+awaiting its installed check.
 
 The task/account/directory binding, complete repository snapshot, manifest bytes,
 executable identity and selected workspace are checked again before the effect.

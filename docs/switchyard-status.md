@@ -8,6 +8,20 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The installed `c7525a0` pipeline journey passes seven checks with one empty native
+Codex task and zero prompts: both actions, exact authenticated receipts and
+duplicate refusal, two independently exited guardians, unchanged original
+repository and restored definitions/selection/modes/private link. Receipt
+`installed-repository-pipeline-1793829048435.json`; six update checks pass in
+`assignment-legends-1793828922235.json`. Staging and the bundle were removed.
+
+Exact stop now accepts a live foreground pipeline before its program response
+exists. A protected immutable admission binds the original action/operation/
+target/scope independently from later program settlement. Prior outcome-bound
+records retain their recovery rules. Seventeen Run/pipeline/stop cases and 28
+harness/package/stop cases pass; type checking passes. Expanded installed stop
+acceptance is pending. Frontend remains frozen.
+
 Linux local-gate and clean-reproduction actions now share the normal reviewed
 execution route. Exact task grants, foreground bounded namespaces, typed reports
 and host-authenticated evidence precede passing receipts. Four actual namespace

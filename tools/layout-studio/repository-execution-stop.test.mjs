@@ -51,3 +51,18 @@ test("a failed atomic admission write cannot deliver a stop or leave a partially
   assert.equal((await new DurableBudgetManager(repositoryEffectJournal(f.store,"personal",{domain:"execution-stop"})).list()).length,0);
   assert.equal((await f.service.apply("personal",input)).replayed,true);assert.equal(f.calls(),0);
 });
+
+test("a foreground execution can be stopped from its immutable admission before its eventual program result exists",async t=>{
+ const f=await fixture(t),admission={schema:"switchyard-execution-admission/v1",operationId:f.operationId,action:"pipeline_local_gate",targetSnapshotId:"a".repeat(64),scopeDigest:"e".repeat(64),admittedAt:Date.now()};
+ await f.store.update("personal","fixture-foreground-admission",state=>{const run=state.repositoryExecutionReviews[0];Object.assign(run,{action:admission.action,scopeDigest:admission.scopeDigest,admission});delete run.outcome;});
+ const review=await f.service.review("personal",f.proposal),input={stopId:f.proposal.stopId,token:review.confirmation.token};
+ // Program settlement is independent of the stop review and can arrive later.
+ const eventual={status:"cancelled",effectDisposition:"committed",operationId:f.operationId};await f.store.update("personal","fixture-program-settled",state=>{state.repositoryExecutionReviews[0].outcome=eventual;});
+ const result=await f.service.apply("personal",input);assert.equal(result.status,"completed",JSON.stringify(result));assert.equal(f.calls(),1);
+ const state=await f.store.snapshot("personal");assert.deepEqual(state.repositoryExecutionReviews[0].admission,admission);assert.deepEqual(state.repositoryExecutionReviews[0].outcome,eventual);assert.equal((await f.service.apply("personal",input)).receiptId,result.receiptId);
+});
+
+test("changed original admission cannot authorize a foreground stop even while its exact process handle remains live",async t=>{
+ const f=await fixture(t);await f.store.update("personal","fixture-foreground-admission",state=>{const run=state.repositoryExecutionReviews[0];Object.assign(run,{action:"pipeline_local_gate",scopeDigest:"e".repeat(64)});run.admission={schema:"switchyard-execution-admission/v1",operationId:f.operationId,action:run.action,targetSnapshotId:run.targetSnapshotId,scopeDigest:run.scopeDigest,admittedAt:Date.now()};delete run.outcome;});
+ const review=await f.service.review("personal",f.proposal);await f.store.update("personal","fixture-changed-original-admission",state=>{state.repositoryExecutionReviews[0].admission.admittedAt++;});await assert.rejects(f.service.apply("personal",{stopId:f.proposal.stopId,token:review.confirmation.token}),/scope changed/);assert.equal(f.calls(),0);
+});

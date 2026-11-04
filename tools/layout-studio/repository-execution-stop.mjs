@@ -10,7 +10,18 @@ const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-
 const tokenHash = value => createHash("sha256").update(value).digest("hex");
 const workspace = state => scopeHash([state.policy, state.mode, state.modeSelectedAt ?? null, state.accounts, state.taskAuthorityEpoch ?? 0]);
 const budget = { version: "suite-execution-stop/v1", commandClasses: { stop_managed_run: { maxConcurrent: 1, timeoutMs: 15000, maxAttempts: 1, windowMs: 3600000, maxClaimsPerWindow: 60, maxCostUnitsPerWindow: 60, defaultCostUnits: 1 } } };
-const view = row => ({ stopId: row.stopId, requestId: row.requestId, originalOperationId: row.originalOperationId, managedProcessId: row.managedProcessId, targetSnapshotId: row.targetSnapshotId, scopeDigest: row.scopeDigest, status: row.status, expiresAt: row.expiresAt, result: row.result ?? null });
+const view = row => ({ stopId: row.stopId, requestId: row.requestId, originalAction:row.originalAction??"run_target", originalOperationId: row.originalOperationId, managedProcessId: row.managedProcessId, targetSnapshotId: row.targetSnapshotId, scopeDigest: row.scopeDigest, status: row.status, expiresAt: row.expiresAt, result: row.result ?? null });
+function admissionDigest(run) {
+  const value=run?.admission;
+  if(value===undefined)return undefined;
+  if(!value||Object.keys(value).sort().join()!=="action,admittedAt,operationId,schema,scopeDigest,targetSnapshotId"||value.schema!=="switchyard-execution-admission/v1"||value.operationId!==run.operationId||value.action!==run.action||value.targetSnapshotId!==run.targetSnapshotId||value.scopeDigest!==run.scopeDigest||!Number.isSafeInteger(value.admittedAt)||value.admittedAt<0)throw Error("The immutable original execution admission did not verify.");
+  return scopeHash(value);
+}
+function originalMatches(run,row) {
+  if(row.originalAdmissionDigest!==undefined&&admissionDigest(run)!==row.originalAdmissionDigest)return false;
+  if(row.originalOutcomeDigest!==undefined)return run?.outcome!==undefined&&scopeHash(run.outcome)===row.originalOutcomeDigest;
+  return row.originalAdmissionDigest!==undefined;
+}
 
 export function createRepositoryExecutionStops({ store, supervisors, isActive = async () => true, reconcile = async () => {}, now = Date.now } = {}) {
   const pending = new Map(), generations = new Map();
@@ -34,7 +45,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
     });
   }
   function scope(compartment, state, run, native) {
-    return scopeHash(["switchyard-execution-stop/v1", compartment, run.requestId, run.operationId, run.sessionId, run.authorityId, run.targetSnapshotId, run.manifestSha256, native.supervisorId, native.commandDigest, native.ownedRuntime, workspace(state)]);
+    return scopeHash(["switchyard-execution-stop/v1", compartment, run.requestId, run.operationId, run.sessionId, run.authorityId, run.targetSnapshotId, run.manifestSha256, native.supervisorId, native.commandDigest, native.ownedRuntime, workspace(state),...(run.admission!==undefined?[admissionDigest(run)]:[])]);
   }
   async function inspect(compartment, requestId, generation) {
     current(compartment, generation);
@@ -42,7 +53,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
     const state = await store.snapshot(compartment);
     const run = state.repositoryExecutionReviews?.find(row => row.requestId === requestId);
     const native = state.repositoryExecutions?.find(row => row.operationId === run?.operationId);
-    if (!run || !native?.ownedRuntime || !run.outcome || !["codex", "claude-code"].includes(native.provider)) throw Error("Choose an exact protected execution with its native ownership identity.");
+    if (!run || !native?.ownedRuntime || !run.outcome && !admissionDigest(run) || !["codex", "claude-code"].includes(native.provider)) throw Error("Choose an exact protected execution with its native ownership identity and original admission.");
     if (state.policy !== "personal" || state.mode !== "personal-companion") throw Error("Reviewed execution stop requires this permitted Personal companion workspace.");
     await store.authorize(compartment, { provider: native.provider });
     if (!await supervisors.canStop(compartment, native.operationId)) throw Error("This host has no live exact execution handle. Observe retained ownership; no PID-based substitute or replay is available.");
@@ -60,7 +71,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
     for (const row of (await store.snapshot(compartment)).repositoryExecutionStops ?? []) {
       if (!["executing", "outcome-unconfirmed"].includes(row.status)) continue;
       const state = await store.snapshot(compartment), native = state.repositoryExecutions?.find(native => native.operationId === row.originalOperationId), original = state.repositoryExecutionReviews?.find(run => run.requestId === row.requestId);
-      if (native?.stoppedVerified !== true || scopeHash([native.supervisorId, native.commandDigest, native.ownedRuntime]) !== row.nativeBindingDigest || scopeHash(original?.outcome) !== row.originalOutcomeDigest) continue;
+      if (native?.stoppedVerified !== true || scopeHash([native.supervisorId, native.commandDigest, native.ownedRuntime]) !== row.nativeBindingDigest || !originalMatches(original,row)) continue;
       const operation = await operations.get(row.stopId), receipt = operation?.details.receiptId ? await receipts.get(operation.details.receiptId) : undefined;
       const recorded = operation?.state === "recorded" && operation.action === "stop_managed_run" && receipt?.operationId === row.stopId && receipt.action === "stop_managed_run" && receipt.targetSnapshotId === row.scopeDigest && receipt.result === "passed" && receipt.completeness === "complete";
       if (operation && !["recorded", "failed", "cancelled"].includes(operation.state)) {
@@ -84,7 +95,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
         const confirmation = await suiteConfirmations(store, compartment, observed.native.provider, now).issue({ action: "stop_managed_run", sessionId: observed.run.sessionId, authorityId: observed.run.authorityId, targetSnapshotId: observed.run.targetSnapshotId, scopeDigest: observed.scopeDigest, reason: "Stop only this exact owned execution. Prior program effects are not rolled back, and unknown program results remain unknown.", reauthenticated: false });
         const fresh = await inspect(compartment, input.requestId, generation);
         if (fresh.scopeDigest !== observed.scopeDigest) throw Error("The exact execution or workspace changed during stop review.");
-        const row = { schema: "switchyard-execution-stop/v1", ...input, originalOperationId: fresh.run.operationId, managedProcessId: fresh.native.supervisorId, targetSnapshotId: fresh.run.targetSnapshotId, sessionId: fresh.run.sessionId, authorityId: fresh.run.authorityId, provider: fresh.native.provider, scopeDigest: fresh.scopeDigest, nativeBindingDigest: scopeHash([fresh.native.supervisorId, fresh.native.commandDigest, fresh.native.ownedRuntime]), tokenDigest: tokenHash(confirmation.token), originalOutcomeDigest: scopeHash(fresh.run.outcome), status: "reviewed", expiresAt: confirmation.record.expiresAt };
+        const row = { schema: "switchyard-execution-stop/v1", ...input, originalAction:fresh.run.action??"run_target", originalOperationId: fresh.run.operationId, managedProcessId: fresh.native.supervisorId, targetSnapshotId: fresh.run.targetSnapshotId, sessionId: fresh.run.sessionId, authorityId: fresh.run.authorityId, provider: fresh.native.provider, scopeDigest: fresh.scopeDigest, nativeBindingDigest: scopeHash([fresh.native.supervisorId, fresh.native.commandDigest, fresh.native.ownedRuntime]), tokenDigest: tokenHash(confirmation.token), ...(fresh.run.admission!==undefined?{originalAdmissionDigest:admissionDigest(fresh.run)}:{}), ...(fresh.run.outcome!==undefined?{originalOutcomeDigest:scopeHash(fresh.run.outcome)}:{}), status: "reviewed", expiresAt: confirmation.record.expiresAt };
         await store.update(compartment, "repository-execution-stop-review", state => {
           const rows = state.repositoryExecutionStops ?? [], retained = rows.filter(row => ["executing", "outcome-unconfirmed"].includes(row.status) || row.status === "reviewed" && Date.parse(row.expiresAt) > now());
           state.repositoryExecutionStops = [...retained, ...rows.filter(row => !retained.includes(row)).slice(-16)];
@@ -103,7 +114,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
         if (row.status !== "reviewed") return { ...(row.result ?? { status: "incomplete", effectDisposition: "ambiguous", summary: "The prior stop outcome remains unconfirmed; no stop was replayed." }), replayed: true };
         const check = async () => {
           const observed = await inspect(compartment, row.requestId, generation);
-          if (observed.scopeDigest !== row.scopeDigest || scopeHash(observed.run.outcome) !== row.originalOutcomeDigest) throw Error("The exact reviewed stop or workspace scope changed.");
+          if (observed.scopeDigest !== row.scopeDigest || !originalMatches(observed.run,row)) throw Error("The exact reviewed stop, original admission or workspace scope changed.");
           return observed;
         };
         await check();
@@ -142,7 +153,7 @@ export function createRepositoryExecutionStops({ store, supervisors, isActive = 
           failurePhase = "exit-reconciliation";
           await reconcile(compartment);
           const state = await store.snapshot(compartment), original = state.repositoryExecutionReviews?.find(run => run.requestId === row.requestId);
-          if (scopeHash(original?.outcome) !== row.originalOutcomeDigest) throw Error("The original admission outcome changed; preserve both stop and program evidence.");
+          if (!originalMatches(original,row)) throw Error("The original admission or prior outcome changed; preserve both stop and program evidence.");
           if (!stoppedVerified || Date.parse(claim.expiresAt) <= now()) throw Error("The exact stop did not verify native exit within its budget; prior outcomes remain preserved.");
           const evidenceDigest = scopeHash([row.scopeDigest, before.native.ownedRuntime, before.native.commandDigest, "independently-verified-native-exit"]);
           failurePhase = "receipt-recording";
