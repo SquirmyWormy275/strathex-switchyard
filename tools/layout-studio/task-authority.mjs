@@ -44,7 +44,7 @@ function ledger(state, now) {
     } })
   }, { clock: () => new Date(now()).toISOString() });
 }
-export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store }), localCommitExecutionImplemented = false, now = () => Date.now() } = {}) {
+export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, now = () => Date.now() } = {}) {
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
   async function access(c, id, generation) {

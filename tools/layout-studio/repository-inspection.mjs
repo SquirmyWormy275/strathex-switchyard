@@ -36,7 +36,7 @@ function safeRemote(value) {
   try { const u = new URL(value); if (["https:", "ssh:"].includes(u.protocol) && !u.password && (!u.username || u.protocol === "ssh:" && u.username === "git") && !u.search && !u.hash) return value; } catch { /* local/opaque remotes are not consequential identities */ }
   throw new Error("Use a credential-free HTTPS or SSH origin before reviewing task authority.");
 }
-export function createRepositoryInspection({ store, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, resolveGit = fixedGitExecutable, now = () => Date.now(), runtimeRoot = join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-repository-probes") } = {}) {
+export function createRepositoryInspection({ store, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, resolveGit = fixedGitExecutable, ownerKind = "standalone-inspection", now = () => Date.now(), runtimeRoot = join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-repository-probes") } = {}) {
   const running = new Map(), generations = new Map(), seen = new Set(); let closed = false;
   async function removeScratch(path, identity) {
     if (!path) return;
@@ -45,11 +45,33 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
     if (current.dev.toString() !== identity.device || current.ino.toString() !== identity.inode) throw new Error("The owned repository scratch directory changed; preserve it for recovery.");
     await rm(path, { recursive: true });
   }
+  async function cleanScratch(c, path, identity) {
+    await removeScratch(path, identity);
+    await store.update(c, "repository-probe-scratch-cleaned", s => { for (const p of s.repositoryProbes ?? []) if (p.scratch === path) p.scratchCleanupPending = false; });
+  }
   async function stopCompartment(c) {
+    seen.add(c);
     generations.set(c, (generations.get(c) ?? 0) + 1);
     const resources = [...(running.get(c) ?? [])]; resources.forEach(r => r.controller.abort());
     const stops = await Promise.all(resources.flatMap(r => [...r.clients].map(client => client.stop().catch(() => false))));
-    return { stopped: stops.every(Boolean) };
+    let retainedStopped = true;
+    for (const probe of (await store.snapshot(c)).repositoryProbes ?? []) if (!probe.stoppedVerified && (!probe.ownerKind || probe.ownerKind === ownerKind)) {
+      if (!await guardianStopped(probe.ownedRuntime)) { retainedStopped = false; continue; }
+      await store.update(c, "repository-probe-stop-readback", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === probe.ownedRuntime.id); if (!p) throw new Error("The retained repository guardian ownership record changed."); p.stoppedVerified = true; });
+    }
+    if (stops.every(Boolean) && retainedStopped) {
+      const paths = new Map();
+      for (const r of resources) if (r.scratch) paths.set(r.scratch, r.scratchIdentity);
+      const records = (await store.snapshot(c)).repositoryProbes ?? [];
+      for (const p of records) if (p.scratch && p.scratchCleanupPending !== false && (!p.ownerKind || p.ownerKind === ownerKind)) paths.set(p.scratch, p.scratchIdentity);
+      for (const [path, identity] of paths) {
+        const owners = records.filter(p => p.scratch === path);
+        if (!(await Promise.all(owners.map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) { retainedStopped = false; continue; }
+        await cleanScratch(c, path, identity);
+      }
+      if (retainedStopped) { for (const r of resources) if ([...r.clients].every(p => p.closed)) running.get(c)?.delete(r); if (!running.get(c)?.size) running.delete(c); }
+    }
+    return { stopped: stops.every(Boolean) && retainedStopped };
   }
   return {
     async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
@@ -60,9 +82,11 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       // A restarted process must independently settle every retained guardian first.
       for (const record of (await store.snapshot(c)).repositoryProbes ?? []) if (record.stoppedVerified !== true) {
         if (!await guardianStopped(record.ownedRuntime)) throw new Error("A previous repository guardian has not verified exit. Its protected identity was preserved.");
-        await removeScratch(record.scratch, record.scratchIdentity);
         await store.update(c, "repository-probe-reconcile", s => { const current = s.repositoryProbes?.find(p => p.ownedRuntime.id === record.ownedRuntime.id); if (current) current.stoppedVerified = true; });
       }
+      const old = (await store.snapshot(c)).repositoryProbes ?? [], cleanup = new Map();
+      for (const p of old) if (p.scratch && p.scratchCleanupPending !== false && (!p.ownerKind || p.ownerKind === ownerKind) && ![...(running.get(c) ?? [])].some(r => r.scratch === p.scratch)) cleanup.set(p.scratch, p.scratchIdentity);
+      for (const [path, identity] of cleanup) if ((await Promise.all(old.filter(p => p.scratch === path).map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) await cleanScratch(c, path, identity);
       await check(); const executable = await resolveGit(); await check();
       const members = running.get(c) ?? new Set(); members.add(resource); running.set(c, members);
       let fileCount = 0, totalBytes = 0, scratch, scratchIdentity;
@@ -79,10 +103,11 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       const start = now();
       const runner = { async run(args, cwd = task.repositoryRoot) {
         await check(); if (now() - start > 45000 || !queries.has(JSON.stringify(args)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries are permitted.");
+        let readyPersisted = false;
         const result = await runOwnedNativeCommand({ executable, args: ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], cwd,
           env: inspectionEnvironment(scratch), timeout: 10000, maxOutputBytes: 262144, captureStderrBytes: 4096, signal: resource.controller.signal, resource, command, guardianStopped,
-          onReady: async scope => { await check(); await store.update(c, "repository-probe-ready", s => { s.repositoryProbes = (s.repositoryProbes ?? []).filter(p => !p.stoppedVerified).concat((s.repositoryProbes ?? []).filter(p => p.stoppedVerified).slice(-7)); if (s.repositoryProbes.length >= 16) throw new Error("Unsettled repository guardians require reconciliation."); s.repositoryProbes.push({ taskId: task.id, ownedRuntime: scope, stoppedVerified: false, scratch, scratchIdentity: { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() }, at: now() }); }, { provider: task.provider }); await check(); },
-          onStopped: async scope => { await store.update(c, "repository-probe-exit", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === scope.id); if (!p) throw new Error("The exact repository guardian record is unavailable."); p.stoppedVerified = true; }); }
+          onReady: async scope => { await check(); await store.update(c, "repository-probe-ready", s => { const all = s.repositoryProbes ?? [], held = all.filter(p => !p.stoppedVerified || p.scratch && p.scratchCleanupPending !== false); const recentLimit = Math.min(7, Math.max(0, 15 - held.length)); s.repositoryProbes = held.concat(recentLimit ? all.filter(p => !held.includes(p)).slice(-recentLimit) : []); if (s.repositoryProbes.length >= 16) throw new Error("Unsettled repository guardians require reconciliation."); s.repositoryProbes.push({ taskId: task.id, ownerKind, ownedRuntime: scope, stoppedVerified: false, scratchCleanupPending: true, scratch, scratchIdentity: { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() }, at: now() }); }, { provider: task.provider }); readyPersisted = true; await check(); },
+          onStopped: async scope => { if (!readyPersisted) { if (!await guardianStopped(scope)) throw new Error("The unacknowledged repository guardian has not verified exit."); return; } await store.update(c, "repository-probe-exit", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === scope.id); if (!p) throw new Error("The exact repository guardian record is unavailable."); p.stoppedVerified = true; }); }
         });
         await check();
         if (!["completed", "failed"].includes(result.status) || !Number.isSafeInteger(result.exitCode)) throw new Error("The repository query did not settle within its native bounds.");
@@ -98,7 +123,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
         return { exitCode: result.exitCode, stdout, stderr: result.exitCode ? "Native Git query unavailable" : "" };
       } };
       try {
-        await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch);
+        await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch); resource.scratch = scratch; resource.scratchIdentity = { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() };
         if (metadataOnly) {
           const names = ["root", "branch", "head", "headTree", "gitDirectory", "indexPath"], fixed = [["rev-parse", "--show-toplevel"], ["branch", "--show-current"], ["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"]];
           const values = [];
@@ -120,11 +145,11 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
         return { snapshot, files: { tracked: inspection?.trackedFiles ?? [], untracked: inspection?.untrackedFiles ?? [], ignored: inspection?.ignoredFiles ?? [] } };
       } finally {
         const stops = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
-        members.delete(resource); if (!members.size) running.delete(c);
         if (!stops.every(Boolean)) throw new Error("Owned repository guardian exit is unconfirmed; protected recovery state and scratch were retained.");
         if (scratch) {
-          await removeScratch(scratch, scratchIdentity && { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() });
+          await cleanScratch(c, scratch, scratchIdentity && { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() });
         }
+        members.delete(resource); if (!members.size) running.delete(c);
       }
     },
     stopCompartment,

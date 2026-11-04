@@ -44,6 +44,17 @@ export async function captureGitFile(path: string, maxBytes = 32 * 1024 * 1024):
     return { identity: expected, stamp: gitFileStamp(stamp), sha256: createHash("sha256").update(bytes).digest("hex"), bytes };
   } finally { await handle.close(); }
 }
+/** Delete one explicitly reviewed private artifact, never a different named file. */
+export async function removePreservedGitFile(path: string, expected: Readonly<{ identity: GitFileIdentity; sha256: string; stamp: GitFileStamp }>): Promise<void> {
+  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+  try {
+    const stamp = await assertOwnedGitFile(path, handle, expected.identity);
+    if (stamp.size.toString() !== expected.stamp.size || stamp.mtimeNs.toString() !== expected.stamp.mtimeNs || stamp.ctimeNs.toString() !== expected.stamp.ctimeNs) throw new Error("The reviewed private Git artifact changed. Preserve it.");
+    const bytes = await readIndex(path, handle, expected.identity, stamp);
+    try { if (createHash("sha256").update(bytes).digest("hex") !== expected.sha256) throw new Error("The reviewed private Git artifact bytes changed. Preserve it."); } finally { bytes.fill(0); }
+    const final = await assertOwnedGitFile(path, handle, expected.identity); if (final.size !== stamp.size || final.mtimeNs !== stamp.mtimeNs || final.ctimeNs !== stamp.ctimeNs) throw new Error("The reviewed private Git artifact changed before removal."); await unlink(path);
+  } finally { await handle.close(); }
+}
 export interface OwnedGitFileLock {
   readonly filePath: string;
   readonly identity: GitFileIdentity;
@@ -148,10 +159,11 @@ export class OwnedGitIndexLease {
     if (!this.originalDigest) throw new Error("Copy and verify the original index before recording preservation.");
     return { indexPath: this.indexPath, lockPath: this.lockPath, indexIdentity: this.indexIdentity, lockIdentity: this.lockIdentity, originalIndexSha256: this.originalDigest, lockStamp: gitFileStamp(this.initialLock) };
   }
-  async replaceWith(privateIndex: string, { closeOriginalBeforeRename = process.platform === "win32" } = {}): Promise<void> {
+  async replaceWith(privateIndex: string, { closeOriginalBeforeRename = process.platform === "win32", expectedPrivateIndexSha256 }: { closeOriginalBeforeRename?: boolean; expectedPrivateIndexSha256?: string } = {}): Promise<void> {
     if (this.closed) throw new Error("This owned Git index lease is closed.");
     const root = dirname(privateIndex), captured = await new NodeFileDigestReader().read(root, relative(root, privateIndex));
     try {
+      if (expectedPrivateIndexSha256 !== undefined && (!/^[a-f0-9]{64}$/.test(expectedPrivateIndexSha256) || captured.digest !== `sha256:${expectedPrivateIndexSha256}`)) throw new Error("The private Git index no longer matches the exact reviewed recovery bytes.");
       const lockBefore = await assertOwnedGitFile(this.lockPath, this.lock, this.lockIdentity);
       if (lockBefore.size !== this.initialLock.size || lockBefore.mtimeNs !== this.initialLock.mtimeNs || lockBefore.ctimeNs !== this.initialLock.ctimeNs) throw new Error("The owned shared-index lock changed before replacement; preserve it for recovery.");
       const original = await readIndex(this.indexPath, this.index, this.indexIdentity, this.original); original.fill(0);

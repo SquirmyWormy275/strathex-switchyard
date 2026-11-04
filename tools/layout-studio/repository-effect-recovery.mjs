@@ -9,7 +9,7 @@ import { captureGitFile } from "../../apps/windows-companion/src/git-index-lease
 const equal = (a, b) => a && b && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => a[k] === b[k]);
 const inside = (root, path) => { const r = relative(root, path); return r && !isAbsolute(r) && r !== ".." && !r.startsWith(`..${sep}`); };
 const hash = value => createHash("sha256").update(value).digest("hex");
-export function createRepositoryEffectRecovery({ store, stateDirectory, isActive = async () => true, inspection = createRepositoryInspection({ store }), guardianStopped = runtimeGuardianStopped } = {}) {
+export function createRepositoryEffectRecovery({ store, stateDirectory, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "repository-recovery" }), guardianStopped = runtimeGuardianStopped } = {}) {
   const pending = new Set(), generations = new Map(); let closed = false;
   async function readFile(path) {
     try { const value = await captureGitFile(path); try { return { present: true, identity: value.identity, stamp: value.stamp, sha256: value.sha256 }; } finally { value.bytes.fill(0); } }

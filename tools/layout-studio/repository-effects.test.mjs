@@ -24,11 +24,11 @@ import { LocalMediatedGitHandler } from "../../apps/windows-companion/src/mediat
 const exec = promisify(execFile);
 async function fixture(t) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-effect-"));
-  t.after(() => rm(stage, { recursive: true, force: true }));
+  const cleanup = []; t.after(async () => { try { for (const fn of cleanup) await fn(); } finally { await rm(stage, { recursive: true, force: true }); } });
   const root = await realpath(stage), keys = new Map(), store = createSuiteStore({ root: join(root, "private"), secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => { keys.set(`${c}:${p}`, v); } } });
   await store.initialize("personal"); await store.initialize("work", "work");
   await store.update("personal", "fixture", s => { s.mode = "personal-companion"; });
-  return { root, store, journal: repositoryEffectJournal(store, "personal", { provider: "codex" }) };
+  return { root, store, journal: repositoryEffectJournal(store, "personal", { provider: "codex" }), onCleanup: fn => cleanup.push(fn) };
 }
 test("suite effect journals use authenticated compartments, atomic rollback and a verified chain without plaintext files", async t => {
   const { root, store, journal } = await fixture(t);
@@ -38,6 +38,9 @@ test("suite effect journals use authenticated compartments, atomic rollback and 
   assert.equal((await journal.readEntries()).length, 1);
   await assert.rejects(journal.append("test.invalid", { value: undefined }), /JSON/);
   assert.equal((await repositoryEffectJournal(store, "work").readEntries()).length, 0);
+  const recovery = repositoryEffectJournal(store, "personal", { domain: "recovery" }); await recovery.append("test.recovery", { private: "synthetic private recovery" });
+  assert.equal((await recovery.readEntries()).length, 1); assert.equal((await journal.readEntries()).length, 1); assert.notEqual(recovery.filePath, journal.filePath);
+  assert.throws(() => repositoryEffectJournal(store, "personal", { domain: "unknown" }), /journal domain/);
   assert.equal((await readFile(join(root, "private/personal.sealed.json"), "utf8")).includes("synthetic-private-effect"), false);
   await store.update("personal", "synthetic-corruption", s => { s.repositoryEffectJournal[0].payload.private = "changed"; });
   await assert.rejects(journal.readEntries(), /chain did not verify/);
@@ -51,7 +54,7 @@ test("repository effect admission rejects unsafe authors and absent cross-proces
   await assert.rejects(noLease.execute("personal", { ...options, author: { name: "Synthetic", email: "synthetic@example.invalid" } }, async () => {}), /resource lease/); await noLease.close();
 });
 test("the durable suite runtime commits exact binary bytes through independently stopped native Git guardians", { skip: process.platform !== "linux" ? "Native Linux guardian journey; native Windows transport has its own helper lane" : false }, async t => {
-  const { root, store, journal } = await fixture(t), repositoryRoot = join(root, "repository"); await mkdir(repositoryRoot);
+  const { root, store, journal, onCleanup } = await fixture(t), repositoryRoot = join(root, "repository"); await mkdir(repositoryRoot);
   const git = await fixedGitExecutable(), run = async (...args) => (await exec(git, args, { cwd: repositoryRoot, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" } })).stdout.trim();
   await run("init", "-b", "main"); await run("config", "user.name", "Synthetic base"); await run("config", "user.email", "base@example.invalid");
   await writeFile(join(repositoryRoot, "task.bin"), "before"); await writeFile(join(repositoryRoot, "unowned.txt"), "keep"); await run("add", "."); await run("-c", "commit.gpgSign=false", "commit", "-m", "synthetic base");
@@ -59,7 +62,7 @@ test("the durable suite runtime commits exact binary bytes through independently
   const content = Buffer.from([0, 255, 128, 10, 13, 42]); await writeFile(join(repositoryRoot, "task.bin"), content); await writeFile(join(repositoryRoot, "unowned.txt"), "outside owned scope");
   const factory = new TargetSnapshotFactory(new GitCliInspector()), capture = () => factory.capture({ targetHint: repositoryRoot, policyVersion: "synthetic-native-effect/v1", environment: { toolVersions: { git: "native" } } });
   const target = await capture(), task = { id: randomUUID(), provider: "codex", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot) }, bindingDigest = createHash("sha256").update("synthetic-reviewed-effect").digest("hex"), stateDirectory = join(root, "effects");
-  const service = createRepositoryEffectCommands({ store, stateDirectory }); t.after(() => service.close());
+  const service = createRepositoryEffectCommands({ store, stateDirectory }); onCleanup(() => service.close());
   let authorized = true, activeRequest;
   const checkpointPorts = createRepositoryEffectCheckpoints({ store, compartment: "personal", task, authorize: async () => { if (!authorized) throw new Error("Synthetic authority revoked"); } });
   const captureCheckpoint = checkpointPorts.checkpointCapture.capture;
@@ -108,7 +111,7 @@ test("unknown native Git exit retains its protected scope across restart and blo
   const create = () => createRepositoryEffectCommands({ store, stateDirectory, command, resolveGit: async () => "/synthetic/git", guardianStopped: async () => independentlyStopped });
   const first = create();
   await assert.rejects(first.execute("personal", options, async ({ runner }) => runner.run(["rev-parse", "HEAD"], { cwd: repositoryRoot })), { code: "RUNTIME_STOP_UNCONFIRMED" });
-  const record = (await store.snapshot("personal")).repositoryEffects[0]; assert.equal(record.status, "recovery-required"); assert.equal(record.commands[0].stoppedVerified, false); await access(record.scratch); await first.close();
+  const record = (await store.snapshot("personal")).repositoryEffects[0]; assert.equal(record.status, "recovery-required"); assert.equal(record.commands[0].stoppedVerified, false); await access(record.scratch); assert.equal((await first.stopCompartment("personal")).stopped, false); await assert.rejects(first.close(), /guardian.*independent exit/);
   const resumed = create();
   await assert.rejects(resumed.execute("personal", { ...options, operationId: randomUUID() }, async () => {}), /not independently verified exit/); assert.equal(calls, 1);
   independentlyStopped = true;

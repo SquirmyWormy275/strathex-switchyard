@@ -68,6 +68,7 @@ const mediatedGitTests = [
   "exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit",
   "reopening a preserved lease refuses in-place lock changes and changed original index bytes",
   "the Windows replacement sequence closes its destination and preserves a competing replacement after that close",
+  "reviewed private index bytes and artifact identity must still match before replacement or cleanup",
   "a replacement shared index lock is preserved after the exact reviewed commit advances HEAD",
   "a replacement original index is never overwritten during shared-index reconciliation",
   "the previous worktree owner cannot delete a replacement private lock during cleanup",

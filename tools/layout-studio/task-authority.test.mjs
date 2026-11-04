@@ -71,7 +71,7 @@ test("unsettled native guardians survive restart and prevent replacement until i
   await f.store.update("personal", "uncertain-probe", s => { s.repositoryProbes = [{ taskId: f.task.id, ownedRuntime: scope, stoppedVerified: false }]; });
   const blocked = createRepositoryInspection({ store: f.store, command: f.command, guardianStopped: async () => false });
   await assert.rejects(blocked.capture("personal", f.task, { includedUntracked: [], excludedUntracked: [], excludedIgnored: [] }), /not verified exit/i);
-  assert.equal(f.counters().calls, 0); await blocked.close();
+  assert.equal(f.counters().calls, 0); assert.equal((await blocked.stopCompartment("personal")).stopped, false); await assert.rejects(blocked.close(), /guardian.*verified exit/);
   await f.service.review("personal", f.proposed);
   assert.equal((await f.store.snapshot("personal")).repositoryProbes.every(p => p.stoppedVerified), true);
 });

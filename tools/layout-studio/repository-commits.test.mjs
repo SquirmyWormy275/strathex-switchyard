@@ -8,7 +8,7 @@ import { createRepositoryCommits } from "./repository-commits.mjs";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 async function fixture(t) {
   const f = await authorityFixture(t), service = createRepositoryCommits({ store: f.store, authority: f.service, stateDirectory: join(f.stage, "effects"), now: f.now });
-  t.after(() => service.close()); return { ...f, commits: service };
+  f.onCleanup(() => service.close()); return { ...f, commits: service };
 }
 async function grant(f, proposed = f.proposed) { const review = await f.service.review("personal", proposed); return f.service.issue("personal", { ...proposed, token: review.confirmation.token }); }
 const proposal = authorityId => ({ requestId: randomUUID(), authorityId, message: "Reviewed synthetic suite commit", author: { name: "Synthetic reviewed author", email: "synthetic@example.invalid" } });

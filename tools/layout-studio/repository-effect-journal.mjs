@@ -1,7 +1,6 @@
 /** The control-plane journal lives inside the existing locked AEAD compartment. */
 import { randomUUID } from "node:crypto";
 import { journalEntryHash, stableJson } from "../../packages/control-plane/src/store.ts";
-const field = "repositoryEffectJournal";
 function verified(entries) {
   if (!Array.isArray(entries) || entries.length > 8192) throw new Error("The protected repository effect journal is invalid or full.");
   let previous;
@@ -11,9 +10,11 @@ function verified(entries) {
   }
   return structuredClone(entries);
 }
-export function repositoryEffectJournal(store, compartment, { now = Date.now, provider } = {}) {
+export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects" } = {}) {
+  if (!["effects", "recovery"].includes(domain)) throw new Error("Unsupported protected repository journal domain.");
+  const field = domain === "effects" ? "repositoryEffectJournal" : "repositoryRecoveryJournal";
   const journal = {
-    filePath: `suite-aead:${compartment}:repository-effects`, hasAuthenticatedProtection: true,
+    filePath: `suite-aead:${compartment}:repository-${domain}`, hasAuthenticatedProtection: true,
     async readEntries() { return verified((await store.snapshot(compartment))[field] ?? []); },
     async verifyChain() { await journal.readEntries(); return true; },
     async transaction(fn) {

@@ -432,10 +432,18 @@ export class OperationSagaStore {
    * manufactures a completed result or receipt; it merely releases the active
    * dispatch scope so a fresh explicit generation can re-observe provider state.
    */
-  async settleRecoveredParents(): Promise<readonly ReconciliationResult[]> {
+  async settleRecoveredParents(options: Readonly<{ rootOperationId?: string }> = {}): Promise<readonly ReconciliationResult[]> {
+    if (options.rootOperationId !== undefined) nonEmpty(options.rootOperationId, "root operation id");
     const results: ReconciliationResult[] = [];
     for (;;) {
-      const operations = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      const all = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      const belongs = (operation: OperationRecord): boolean => {
+        if (!options.rootOperationId) return true;
+        let current = operation; const seen = new Set<string>();
+        while (current.parentId) { if (seen.has(current.id)) return false; seen.add(current.id); const parent = all.get(current.parentId); if (!parent) return false; current = parent; }
+        return current.id === options.rootOperationId;
+      };
+      const operations = new Map([...all].filter(([, operation]) => belongs(operation)));
       let candidate: OperationRecord | undefined;
       let evidence: readonly OperationRecord[] = [];
 

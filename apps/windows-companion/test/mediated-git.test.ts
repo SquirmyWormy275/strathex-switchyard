@@ -13,7 +13,7 @@ import { GitCliInspector } from "../../../packages/control-plane/src/git-inspect
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
 import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "../src/mediated-git.ts";
-import { OwnedGitIndexLease, reopenOwnedGitFileLock, captureGitFile } from "../src/git-index-lease.ts";
+import { OwnedGitIndexLease, reopenOwnedGitFileLock, captureGitFile, removePreservedGitFile } from "../src/git-index-lease.ts";
 import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 
 class RecordingChildSaga implements ChildOperationSaga {
@@ -451,6 +451,18 @@ test("the Windows replacement sequence closes its destination and preserves a co
     try { await assert.rejects(second.replaceWith(nextCopy, { closeOriginalBeforeRename: true }), /original Git index changed/); }
     finally { await second.abandon(); }
     assert.equal(await readFile(path, "utf8"), "competing index after destination close"); await access(path + ".lock");
+  } finally { await isolated.dispose(); }
+});
+
+test("reviewed private index bytes and artifact identity must still match before replacement or cleanup", async () => {
+  const isolated = await fixture();
+  try {
+    const index = join(isolated.root, ".git/index"), privateIndex = join(isolated.state, "reviewed-index"), lease = await OwnedGitIndexLease.acquire(index); await lease.copyOriginalTo(privateIndex);
+    const expected = await readFile(index), proof = await captureGitFile(privateIndex); proof.bytes.fill(0);
+    await writeFile(privateIndex, "different private index bytes"); await assert.rejects(lease.replaceWith(privateIndex, { expectedPrivateIndexSha256: proof.sha256 }), /exact reviewed recovery bytes/); assert.deepEqual(await readFile(index), expected); await lease.release();
+    const changed = await captureGitFile(privateIndex); changed.bytes.fill(0); await rename(privateIndex, privateIndex + ".owned-old"); await writeFile(privateIndex, "foreign replacement artifact");
+    await assert.rejects(removePreservedGitFile(privateIndex, changed), /owned Git file was replaced/); assert.equal(await readFile(privateIndex, "utf8"), "foreign replacement artifact");
+    const named = await captureGitFile(privateIndex); named.bytes.fill(0); await assert.rejects(removePreservedGitFile(privateIndex, { ...named, sha256: "0".repeat(64) }), /artifact bytes changed/); await removePreservedGitFile(privateIndex, named); await assert.rejects(access(privateIndex), { code: "ENOENT" });
   } finally { await isolated.dispose(); }
 });
 

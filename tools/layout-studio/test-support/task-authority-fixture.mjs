@@ -13,7 +13,7 @@ const execute = promisify(execFile);
 export async function authorityFixture(t) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-authority-"));
   let serviceToClose;
-  t.after(async () => { try { await serviceToClose?.close(); } finally { await rm(stage, { recursive: true, force: true }); } });
+  const cleanup = []; t.after(async () => { try { const results = await Promise.allSettled([...cleanup.map(fn => fn()), serviceToClose?.close()]); const failure = results.find(r => r.status === "rejected"); if (failure) throw failure.reason; } finally { await rm(stage, { recursive: true, force: true }); } });
   await mkdir(join(stage, "repository")); const root = await realpath(join(stage, "repository"));
   const git = await fixedGitExecutable();
   const run = async (...args) => (await execute(git, args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_TERMINAL_PROMPT: "0" }, timeout: 10000 })).stdout;
@@ -42,6 +42,6 @@ export async function authorityFixture(t) {
   const service = createTaskAuthority({ store, inspection, now, isActive: async () => active, checkNative: async (_c, t) => { nativeChecks++; assert.equal(t.sessionId, task.sessionId); } });
   serviceToClose = service;
   const proposed = { taskId: task.id, planRevision: "plan-1", paths: ["task.txt"], lifetimeMinutes: 15 };
-  return { stage, root, store, task, service, inspection, proposed, command, now, run, advance: n => { time += n; }, counters: () => ({ calls, nativeChecks }), setActive: v => { active = v; } };
+  return { stage, root, store, task, service, inspection, proposed, command, now, run, advance: n => { time += n; }, counters: () => ({ calls, nativeChecks }), setActive: v => { active = v; }, onCleanup: fn => cleanup.push(fn) };
 }
 

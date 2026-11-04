@@ -1930,3 +1930,24 @@ Windows run 41804809563 for `64a13e0` was cancelled by the repository's queued
 workflow concurrency policy before acceptance. No agent cancellation was sent.
 Corrected complete native Windows acceptance remains pending; no newer success
 is inferred from earlier passing helper/runtime/backend steps.
+
+## Retained native ownership and recovery prerequisites
+
+Native Git and inspection shutdown now independently checks retained ownership
+records instead of treating an empty in-memory client map as verified exit.
+Unknown owners keep their resource and private scratch references. Inspection
+controllers identify their own probes, retain pending cache cleanup across a
+restart and remove only identity-verified cache after every guardian exits.
+Failed startup persistence cannot be mistaken for an acknowledged command.
+
+Recovery prerequisites include digest-bound private-index replacement and
+identity-bound removal, an isolated recovery journal domain and saga settlement
+scoped to one explicit root operation. These primitives do not expose recovery
+application yet. Original uncertain commit outcomes remain uncertain.
+
+Type checking and the complete Linux run passed: 145/145 groups, 924 tests,
+915 passed and nine declared platform skips. Receipt
+e6e5bf02-75a5-43e4-b7ca-1e5430172458. The installed release remains 713f439;
+this source checkpoint has not replaced it. Windows run 41807554404 for cda0327
+was still running when checked; complete newer native Windows acceptance is
+pending.
