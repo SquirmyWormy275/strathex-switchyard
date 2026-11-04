@@ -89,13 +89,29 @@ scratch was removed after retaining `windows-sandbox-cli-build-20261104.json`.
 Five native-transport faults, 26 final transport/manifest/package cases, type
 checking and the delayed-recipe mapping checks pass. Actual no-VM native metadata
 acceptance is now in CI, pending. [Native command contract](windows-sandbox-native-commands.md).
-The managed guest lifecycle coordinator and Studio Windows Run connection,
-writable build outputs and remaining action integrations are unfinished
-implementation, not hardware blocks. Complete Windows verification at `dbe62bb`
+The managed guest lifecycle coordinator is now implemented and software-tested:
+exact creation, guest acknowledgement, viewer/login readiness, one worker,
+deadline/mode cancellation, owned VM stop and receipt-preserving restart recovery.
+It never substitutes a viewer PID or adopts a foreign singleton. A pending
+unconfirmed start remains unknown even when inventory is empty; only its exact
+acknowledged nonce or explicit native no-effect evidence permits reconciliation.
+The worker now supports explicit host shutdown ownership while preserving legacy
+request defaults, avoiding result loss from racing guest self-shutdown. Seven
+lifecycle cases and the combined 57-case boundary/inventory check pass; package
+imports and type checking pass. The compiled worker parser passes five actual
+checks with zero-warning/error build; scratch was removed and hashes retained in
+`windows-guest-worker-lifecycle-build-20261104.json`. [Lifecycle contract](windows-managed-guest-lifecycle.md).
+The Studio Windows Run adapter, packaged worker/tool staging, bounded writable
+exchange, broader build outputs and remaining action connections are unfinished
+implementation, not hardware blocks. The coordinator explicitly reports no
+exchange filesystem quota. Actual VM startup/login/worker/stop/restart acceptance
+remains a separate supported-Windows-host check. Complete Windows verification at `dbe62bb`
 passed backend, native NTFS, helper, Job Object, fresh-runtime and suite packaging,
 then stopped on the runner's hard five-minute validator rejecting the explicitly
 declared eight-minute execution group. That exact exception and upfront timeout
-preflight are now tested; other groups retain the five-minute cap. Complete
+preflight are now tested; other groups retain the five-minute cap. The early Windows backend harness
+now allows 20 minutes for the expanded encrypted lifecycle cases; individual
+effect deadlines and final backend failure gate remain unchanged. Complete
 corrected Windows acceptance remains pending. Native Windows CI now continues independent helper checks
 after a backend failure, then requires that backend outcome in an unconditional
 final gate; a failed backend still makes the release verification fail.
@@ -256,8 +272,8 @@ bootloader, solenoid operation, public release, merge or license change occurred
 
 1. Connect host-pinned general execution recipes to the task authority, durable
    operation/budget and owned-guardian paths, reusing the reviewed input provider.
-   Finish the native Windows guest-session controller, output quotas and restart
-   staging recovery; the
+   Finish Windows worker/tool staging, the bounded writable exchange, Studio
+   execution adapter and broader output/restart recovery; the
    older direct process-group launcher is not the desktop readiness/exit protocol.
 2. Complete exact native desktop/IDE/terminal attachments and the remaining
    source-verified controller controls, without substituting homepage launch for

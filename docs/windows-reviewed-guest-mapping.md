@@ -4,8 +4,9 @@ The Windows Sandbox backend can consume the native
 [reviewed-input lease](reviewed-execution-inputs.md). It maps the selected copy
 read-only instead of exposing the live repository, binds it to the exact
 operation and catalog, and preserves it when guest exit is unknown. This path
-is software-tested; the native guest-session controller and the Studio Windows
-Run connection remain unfinished implementation.
+is software-tested. The [managed guest lifecycle](windows-managed-guest-lifecycle.md)
+is implemented and software-tested; the Studio Windows adapter, worker/tool
+staging and bounded writable exchange remain unfinished implementation.
 
 Construct the trusted backend with `requireReviewedInputs: true`. Its request
 must carry the native staging capability and matching `operationId`. JSON
@@ -38,8 +39,8 @@ proof and therefore cannot complete this reviewed mode.
 Microsoft documents a separate Sandbox session ID and stop operation in its
 [Windows Sandbox CLI reference](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-cli).
 The [native command transport](windows-sandbox-native-commands.md) implements
-the fixed CLI verbs. The lifecycle coordinator still must connect their exact
-ownership/stop boundaries;
+the fixed CLI verbs. The lifecycle coordinator connects their exact
+ownership/stop boundaries and is software-tested;
 closing the remote viewer is insufficient. No Windows guest was launched by
 the tests below.
 
@@ -47,7 +48,7 @@ the tests below.
 mise exec node@24.14.0 -- node --experimental-transform-types --test apps/windows-companion/test/windows-sandbox.test.ts apps/windows-companion/test/sandbox-installation.test.ts tools/layout-studio/windows-reviewed-inputs.test.mjs
 ```
 
-All 33 cases pass, including explicit guest doubles for selected-only mapping,
+All 34 backend/staging/installation cases pass, including explicit guest doubles for selected-only mapping,
 duplicates, missing/deserialized/wrong-operation leases, late revocation, unknown
 guest exit, lost identity writes and mismatched VM/configuration exit evidence.
 Native NTFS staging acceptance is a separate Windows CI journey. Actual guest

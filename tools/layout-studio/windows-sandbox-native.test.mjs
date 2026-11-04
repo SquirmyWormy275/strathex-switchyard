@@ -13,7 +13,7 @@ async function fixture(t){
   const store=createSuiteStore({root:join(root,"private"),secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>{keys.set(c+p,v);}}});await store.initialize("personal");
   const context={operationId:randomUUID(),sandboxId:randomUUID(),scopeDigest:"a".repeat(64),provider:"codex"},configuration="synthetic bounded configuration";
   await store.update("personal","fixture",state=>{state.mode="personal-companion";state.repositoryWindowsGuests=[{...context,configurationSha256:sha(configuration),status:"reserved",stoppedVerified:false}];});
-  let effects=0,stopped=true,active=true,badInventory=false;
+  let effects=0,stopped=true,active=true,badInventory=false,observationHook=async()=>{};
   const command=async(exe,args,options)=>{
     assert.equal(exe,process.execPath);assert.deepEqual(args,["--windows-sandbox-cli"]);
     const input=JSON.parse(options.inputText),scope={schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:12345,birth:"1",containment:process.platform==="win32"?"windows-job":"owned-linux-session"};owners.set(scope.id,false);
@@ -25,13 +25,13 @@ async function fixture(t){
       if(input.action==="start")value={schema,action:input.action,status:"started",sandboxId:input.sandboxId,configurationSha256:input.configurationSha256,effectStarted:true};
       if(input.action==="execute")value={schema,action:input.action,status:"executed",sandboxId:input.sandboxId,guestExitCode:7,effectStarted:true};
       if(input.action==="stop")value={schema,action:input.action,status:"stopped",sandboxId:input.sandboxId,absentObserved:true,effectStarted:true};
-      return {status:"completed",exitCode:0,inputDelivered:true,treeExitVerified:true,stdout:JSON.stringify(value)};
+      await observationHook(input.action);return {status:"completed",exitCode:0,inputDelivered:true,treeExitVerified:true,stdout:JSON.stringify(value)};
     }finally{owners.set(scope.id,true);}
   };
   const create=()=>{const service=createWindowsSandboxNativeCalls({store,stateDirectory:join(root,"commands"),platform:"win32",helper:process.execPath,command,guardianStopped:async scope=>stopped&&owners.get(scope.id)===true,isActive:async()=>active});services.push(service);return service;};
   const service=create(),start={action:"start",sandboxId:context.sandboxId,configuration,configurationSha256:sha(configuration)},authorize=async()=>{};
   t.after(async()=>{stopped=true;for(const s of services){await s.recover("personal");await s.close();}await rm(root,{recursive:true,force:true});});
-  return {store,service,create,context,start,authorize,effects:()=>effects,setStopped:value=>{stopped=value;},setActive:value=>{active=value;},badInventory:()=>{badInventory=true;},call:input=>service.call("personal",context,input,authorize)};
+  return {store,service,create,context,start,authorize,effects:()=>effects,setStopped:value=>{stopped=value;},setActive:value=>{active=value;},observationHook:fn=>{observationHook=fn;},badInventory:()=>{badInventory=true;},call:input=>service.call("personal",context,input,authorize)};
 }
 test("native Sandbox commands persist ownership before acknowledgement and retain the guest exit code separately",async t=>{
   const f=await fixture(t);assert.equal((await f.call({action:"metadata"})).effectStarted,false);assert.equal((await f.call(f.start)).status,"started");
@@ -55,4 +55,10 @@ test("unknown native exit blocks replacement across instances without inventing 
 test("a lost native result write preserves an uncertain start and original native owner without a second VM effect",async t=>{
   const f=await fixture(t),original=f.store.update;let fail=true;f.store.update=async(...args)=>{if(fail&&args[1]==="windows-guest-native-result"){fail=false;throw Error("Synthetic lost native result");}return original(...args);};
   await assert.rejects(f.call(f.start));assert.equal(f.effects(),1);const row=(await f.store.snapshot("personal")).repositoryWindowsGuestCommands[0];assert.equal(row.stoppedVerified,true);assert.ok(row.ownedRuntime);assert.equal(row.status,"outcome-unconfirmed");const duplicate=await f.call(f.start);assert.equal(duplicate.replayed,true);assert.equal(duplicate.status,"outcome-unconfirmed");assert.equal(f.effects(),1);
+});
+test("revocation after native creation preserves exact ownership facts for cleanup while refusing another program action",async t=>{
+  const f=await fixture(t);f.observationHook(async action=>{if(action==="start")f.setActive(false);});
+  assert.equal((await f.call(f.start)).status,"started");assert.equal((await f.store.snapshot("personal")).repositoryWindowsGuests[0].startVerified,true);
+  await assert.rejects(f.call({action:"execute",sandboxId:f.context.sandboxId,catalogRelativePath:"sandbox-job.json",timeoutMs:5000}));assert.equal(f.effects(),1);
+  const stopped=await f.service.call("personal",f.context,{action:"stop",sandboxId:f.context.sandboxId},f.authorize,{cleanup:true});assert.equal(stopped.absentObserved,true);assert.equal(f.effects(),2);
 });

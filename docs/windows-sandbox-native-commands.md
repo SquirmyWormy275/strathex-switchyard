@@ -3,9 +3,10 @@
 Switchyard's fixed Windows helper implements bounded Sandbox metadata, list,
 start, stop, connect, login-probe and worker-execution verbs. The encrypted host
 transport records each native guardian before acknowledging it and retains
-uncertain results without replay. The managed guest lifecycle and Studio
-Windows Run connection are still unfinished implementation; these command
-boundaries alone are not a working Windows task run.
+uncertain results without replay. The [managed guest lifecycle](windows-managed-guest-lifecycle.md) now connects
+those commands and passes software fault checks. The Studio Windows adapter,
+worker/tool staging and bounded writable exchange remain unfinished; these
+command boundaries alone are not a working Studio Windows task run.
 
 The helper accepts one closed JSON request through `--windows-sandbox-cli`.
 It resolves only the current user's known-folder
@@ -49,7 +50,7 @@ and [native CLI wrapper and payload models](https://github.com/microsoft/WinAppC
 The AppExecLink tag is defined in Microsoft's
 [reparse-tag protocol reference](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4).
 
-Five transport fault cases pass, including readiness/result write failures,
+Six transport fault cases pass, including readiness/result write failures,
 unknown native exit across instances, wrong scope and durable duplicate
 tombstones. Combined HTTP/privacy/inventory checks pass; package imports and
 type checking pass. The complete changed C# helper compiles with zero warnings
@@ -59,5 +60,5 @@ effects. Build receipt: `windows-sandbox-cli-build-20261104.json`.
 Windows CI now exercises metadata through the actual owned native transport
 without creating a VM. That new check is pending. Actual VM startup, viewer/login,
 worker execution, stop and restart acceptance require a supported Windows Sandbox
-host. The higher-level guest coordinator remains code to finish, independently
-of those host checks.
+host. The higher-level coordinator is implemented and software-tested; its Studio
+adapter and writable-workspace implementation remain independent work.

@@ -55,6 +55,7 @@ internal static class Program
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
     private static readonly CancellationTokenSource ApplicationCancellation = new();
+    private static bool HostOwnsGuestShutdown;
 
     public static async Task<int> Main(string[] args)
     {
@@ -90,7 +91,7 @@ internal static class Program
         }
         finally
         {
-            if (sandboxGuestConfirmed)
+            if (sandboxGuestConfirmed && !HostOwnsGuestShutdown)
             {
                 RequestSandboxShutdown();
             }
@@ -160,6 +161,7 @@ internal static class Program
         {
             throw new HelperException(65, "Helper digest does not match the exact host request.");
         }
+        HostOwnsGuestShutdown = request.HostOwnsGuestShutdown;
 
         Catalog catalog = ParseCatalog(catalogBytes);
         Recipe recipe = catalog.Recipes.SingleOrDefault(item => StringComparer.Ordinal.Equals(item.Id, request.RecipeId))
@@ -366,9 +368,14 @@ internal static class Program
     private static Request ParseRequest(byte[] bytes)
     {
         using JsonDocument document = ParseJson(bytes, "request");
-        JsonElement root = RequireExactObject(document.RootElement,
-            new[] { "schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "helperDigest", "resourcePolicy", "resourcePolicyDigest" },
-            "request");
+        string[] fields = { "schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "helperDigest", "resourcePolicy", "resourcePolicyDigest" };
+        bool hostOwnsShutdown = false;
+        if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("hostOwnsGuestShutdown", out var lifecycle))
+        {
+            if (lifecycle.ValueKind != JsonValueKind.True && lifecycle.ValueKind != JsonValueKind.False) throw new HelperException(65, "Guest shutdown ownership must be an exact boolean.");
+            hostOwnsShutdown = lifecycle.GetBoolean(); fields = fields.Append("hostOwnsGuestShutdown").ToArray();
+        }
+        JsonElement root = RequireExactObject(document.RootElement, fields, "request");
         RequireExactString(root, "schema", RequestSchema);
         RequireExactInteger(root, "version", RequestVersion);
         string requestId = RequireBoundedString(root, "requestId", 256);
@@ -392,7 +399,7 @@ internal static class Program
             throw new HelperException(65, "Request recipe and sandbox profile do not match.");
         }
         ValidateResourcePolicy(profile, resourcePolicy, resourcePolicyDigest);
-        return new Request(requestId, leaseId, recipeId, profile, catalogDigest, helperDigest, resourcePolicy, resourcePolicyDigest);
+        return new Request(requestId, leaseId, recipeId, profile, catalogDigest, helperDigest, resourcePolicy, resourcePolicyDigest, hostOwnsShutdown);
     }
 
     private static ResourcePolicy ParseResourcePolicy(JsonElement element)
@@ -854,7 +861,8 @@ internal static class Program
         string RecipeCatalogDigest,
         string HelperDigest,
         ResourcePolicy ResourcePolicy,
-        string ResourcePolicyDigest);
+        string ResourcePolicyDigest,
+        bool HostOwnsGuestShutdown);
     private sealed record ResourcePolicy(int CpuRatePercent, int JobMemoryMiB, int ProcessMemoryMiB, int ActiveProcessLimit, int WallTimeMs);
     private sealed record Catalog(IReadOnlyList<Recipe> Recipes);
     private sealed record Recipe(

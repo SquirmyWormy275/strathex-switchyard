@@ -808,7 +808,7 @@ async function reviewedInputFixture(setup: Awaited<ReturnType<typeof fixture>>) 
 
 test("reviewed guest mapping contains only its exact staged inputs and retains a separate operation binding",async context=>{
   const setup=await fixture(context),inputs=await reviewedInputFixture(setup);
-  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));assert.ok(!xml.includes("<LogonCommand>"),"The guest cannot start its recipe before native identity acknowledgement");await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
+  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));assert.ok(!xml.includes("<LogonCommand>"),"The guest cannot start its recipe before native identity acknowledgement");const request=JSON.parse(await readFile(join(dirname(spec.args[0]!),"exchange/request.json"),"utf8"));assert.equal(request.hostOwnsGuestShutdown,true);await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
   let launches=0;
   const runner:WindowsSandboxProcessRunner={run:async(...args)=>{launches++;const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return {...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
   const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});
@@ -856,4 +856,14 @@ test("guest acknowledgement and exit evidence cannot cross an operation, configu
     const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});
     assert.equal(result.status,"failed",fault);assert.equal(recipes,fault.startsWith("ready")?0:1,fault);assert.deepEqual(await readdir(setup.destinationRoot),[],fault);await access(inputs.lease.root);await access(join(dirname(result.receiptPath!),"exchange/request.json"));await assert.rejects(backend.reconcile(),/independent stop proof/);
   }
+});
+
+test("restart observes exact guest exit without upgrading an unconfirmed program or extracting its output",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),inner=successfulRunner();let executions=0,available=false,wrong=false;
+  const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",operationId:inputs.lease.operationId,configurationSha256:""};
+  const runner:WindowsSandboxProcessRunner={run:async(...args)=>{executions++;identity.configurationSha256=args[0].reviewedGuest!.configurationSha256;await args[3]!(identity);return inner.run(...args);},reconcileReviewedOperation:async input=>{assert.equal(input.operationId,identity.operationId);assert.equal(input.knownSandboxId,identity.sandboxId);return available?{...identity,stopped:true,...(wrong?{configurationSha256:"f".repeat(64)}:{})}:undefined;}};
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});
+  const failed=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(failed.status,"failed");
+  available=true;wrong=true;await assert.rejects(backend.reconcile(),/independent stop proof/);await access(join(dirname(failed.receiptPath!),"exchange/request.json"));
+  wrong=false;const [receipt]=await backend.reconcile();assert.equal(receipt!.state,"failed");assert.equal(receipt!.guestExitVerified,true);assert.equal(receipt!.cleanupVerified,true);assert.deepEqual(await readdir(setup.destinationRoot),[]);await assert.rejects(access(join(dirname(failed.receiptPath!),"exchange")),{code:"ENOENT"});await access(inputs.lease.root);assert.equal(executions,1);
 });

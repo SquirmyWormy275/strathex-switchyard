@@ -131,6 +131,8 @@ export interface WindowsSandboxProcessRunner {
   ): Promise<WindowsSandboxProcessResult>;
   /** Unknown or reused process identities must conservatively report active. */
   isProcessActive?(pid: number): Promise<boolean>;
+  /** Observe only the protected original VM operation; never replay its worker. */
+  reconcileReviewedOperation?(input: Readonly<{ operationId: string; configurationSha256: string; knownSandboxId?: string }>): Promise<(WindowsSandboxGuestIdentity & Readonly<{ stopped: true }>) | undefined>;
 }
 
 /** Exact native identity for one non-reusable WindowsSandbox.exe process. */
@@ -776,7 +778,8 @@ export class WindowsSandboxBackend {
         recipeCatalogDigest,
         helperDigest,
         resourcePolicy,
-        resourcePolicyDigest
+        resourcePolicyDigest,
+        ...(reviewed ? { hostOwnsGuestShutdown: true } : {})
       });
       await this.filesystem.writeText(requestPath, requestDocument);
       const configurationDocument = createConfiguration({
@@ -1039,7 +1042,10 @@ export class WindowsSandboxBackend {
         continue;
       }
       if (receipt.reviewedInputRoot && receipt.guestStartAttempted && receipt.guestExitVerified !== true) {
-        throw new SandboxBlockedError("A reviewed guest session still needs independent stop proof; its mapped inputs and exchange were preserved.");
+        const observed = await this.runner.reconcileReviewedOperation?.({ operationId: receipt.reviewedInputOperationId!, configurationSha256: receipt.configurationDigest, ...(receipt.guestSessionId ? { knownSandboxId: receipt.guestSessionId } : {}) }).catch(() => undefined);
+        if (!validGuestIdentity(observed, receipt.reviewedInputOperationId!, receipt.configurationDigest, true) || receipt.guestSessionId && observed.sandboxId !== receipt.guestSessionId) throw new SandboxBlockedError("A reviewed guest session still needs independent stop proof; its mapped inputs and exchange were preserved.");
+        receipt = this.updateReceipt(receipt, { guestSessionId: observed.sandboxId, guestExitVerified: true, ...(receipt.state === "prepared" || receipt.state === "running" ? { state: "failed", summary: "Independent guest exit was recovered. The interrupted program outcome remains unconfirmed; no worker was replayed." } : {}), reconciledAt: this.now().toISOString() });
+        await this.writeReceipt(receiptPath, receipt);
       }
       if (receipt.state === "prepared" || receipt.state === "running") {
         if (receipt.hostProcessIdentity) {
