@@ -2011,3 +2011,24 @@ about 11 MiB. Draft PR20 now describes the implemented metadata recovery and
 146-group/932-test Linux evidence. General execution effects, distinct client
 integrations and frontend controls remain implementation work; absent hardware
 and interactive accounts remain separate acceptance checks.
+
+
+## Complete corrected Windows release accepted
+
+Windows run 41807554404, job 126503302154, completed successfully for PR head
+cda0327656f60ed9d09facd7bce27e292623d377. Its complete release receipt
+6fa0410b-85ba-4dd5-a7f9-69b7b112767f passes 250/250 groups: 1,657 tests,
+1,615 passed and 42 reviewed platform skips, with zero failed/cancelled/todo.
+The job also passed the full native backend, generated documentation/manual,
+private-input/Job Object helper, fresh optional runtime, packaging and final
+canonical-source checks. GitHub merge commit 61de7b5e2f0b577d3f890d8d6e15a7cab5f6204b
+has exactly the same tree as cda0327 (ca66129a4366f8991e04056c9f8f65c5bc90333e).
+This accepts the earlier startup/index corrections.
+
+Bounded artifact 13313323640 (28,159 bytes) was downloaded and verified against
+GitHub SHA-256 af93b0f537302fa84800957b78bf9296f51871041d21d3fdf2e852f34fe3e3c4.
+Its complete JSON receipt is retained privately as windows-complete-cda0327.json;
+no archive, Windows installer bundle or extra runtime was retained locally.
+Newer 51d641b retained-ownership and 5aa4713 metadata recovery source are later
+checkpoints and still require their own complete native Windows result. No
+interactive Windows account, microphone, HID or F77/B122 acceptance is inferred.

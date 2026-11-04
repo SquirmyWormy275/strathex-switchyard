@@ -83,11 +83,11 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Windows release passed 231 test/build groups for `2e64ff6`, including
+The complete Windows release passed 250 test/build groups for `cda0327`, including
 managed startup, installer, bootstrap, portable profiles and automation checks.
 Fresh native Windows installation/import/model/recheck and cleanup also passed
-with 49 exact distributions. Newer private-pipe and recovery checkpoints await
-their corrected complete Windows run. The latest accepted Linux run has 146 groups
+with 49 exact distributions. The corrected private-pipe/index paths passed that complete run; newer
+retained-ownership and recovery application changes await their own Windows run. The latest accepted Linux run has 146 groups
 and 932 tests. [Verification details](docs/verification.md) distinguish each result
 and its source checkpoint. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
