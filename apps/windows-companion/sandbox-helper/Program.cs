@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -71,8 +72,7 @@ internal static class Program
             Invocation invocation = ParseInvocation(args);
             RequireWindowsSandboxGuest(invocation);
             sandboxGuestConfirmed = true;
-            await ExecuteAsync(invocation, ApplicationCancellation.Token).ConfigureAwait(false);
-            return 0;
+            return await ExecuteAsync(invocation, ApplicationCancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -136,7 +136,7 @@ internal static class Program
         return new Invocation(catalogPath, requestPath, outputPath);
     }
 
-    private static async Task ExecuteAsync(Invocation invocation, CancellationToken cancellationToken)
+    private static async Task<int> ExecuteAsync(Invocation invocation, CancellationToken cancellationToken)
     {
         EnsureConcreteDirectory(InputRoot, "input root");
         EnsureConcreteDirectory(invocation.OutputPath, "exchange root");
@@ -212,16 +212,20 @@ internal static class Program
             request.ResourcePolicy,
             cancellationToken).ConfigureAwait(false);
 
-        if (processExecution.ExitCode != 0)
-        {
-            throw new HelperException(74, "Verified sandbox recipe returned a non-success exit code.");
-        }
-
+        bool succeeded = processExecution.ExitCode == 0;
         var outputs = new List<ResultOutput>();
         AddBoundedProcessOutput(quarantineOutput, "process.stdout.txt", processExecution.StandardOutput, outputs);
         AddBoundedProcessOutput(quarantineOutput, "process.stderr.txt", processExecution.StandardError, outputs);
-        CollectArtifacts(recipe.Artifacts, workRoot, quarantineOutput, outputs);
+        if (succeeded) CollectArtifacts(recipe.Artifacts, workRoot, quarantineOutput, outputs);
 
+        byte[] manifestBytes = CreateResultManifest(request, processExecution, outputs);
+        AtomicWrite(resultTemporaryPath, resultManifestPath, manifestBytes);
+        return processExecution.ExitCode;
+    }
+
+    private static byte[] CreateResultManifest(Request request, ProcessExecution processExecution, IReadOnlyList<ResultOutput> outputs)
+    {
+        bool succeeded = processExecution.ExitCode == 0;
         var manifest = new
         {
             schema = ResultSchema,
@@ -232,8 +236,9 @@ internal static class Program
             profile = request.Profile,
             recipeCatalogDigest = request.RecipeCatalogDigest,
             resourcePolicyDigest = request.ResourcePolicyDigest,
-            outcome = "completed",
-            summary = "Fixed digest-pinned sandbox recipe completed with validated bounded outputs.",
+            outcome = succeeded ? "completed" : "failed",
+            summary = succeeded ? "Fixed digest-pinned sandbox recipe completed with validated bounded outputs."
+                : "The bounded guest program exited unsuccessfully; only its captured stdout and stderr are retained.",
             resourceEnforcement = new
             {
                 jobObject = true,
@@ -245,12 +250,14 @@ internal static class Program
             },
             outputs = outputs.Select(output => new { path = output.Path, size = output.Size, sha256 = output.Sha256 }).ToArray()
         };
-        byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+        JsonObject result = JsonSerializer.SerializeToNode(manifest, JsonOptions)!.AsObject();
+        if (!succeeded) result.Add("processExitCode", processExecution.ExitCode);
+        byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(result, JsonOptions);
         if (manifestBytes.Length > 256 * 1024)
         {
             throw new HelperException(74, "Result manifest exceeded its fixed bound.");
         }
-        AtomicWrite(resultTemporaryPath, resultManifestPath, manifestBytes);
+        return manifestBytes;
     }
 
     private static async Task<ProcessExecution> RunProcessAsync(

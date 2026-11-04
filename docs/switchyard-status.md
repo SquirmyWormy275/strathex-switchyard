@@ -8,6 +8,24 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Complete Linux `45e9eb6` passes 159/159 groups: 1,045 tests, 1,035 passed and ten
+declared skips. Receipt `3424729b-c961-45aa-ad4d-f3c5359a5982` was retained;
+every child cleanup verified and the worktree was removed. Normal installed
+source `45e9eb6`, release `011271c786007a49ce2a6558e8596b83fb20d59b6be422bbac83b57b87844a9b`,
+passes six preservation checks and all ten actual Linux Run checks with zero
+prompts. Receipts `assignment-legends-1793824727363.json` and
+`installed-repository-execution-1793824944140.json`. Frozen frontend/private
+link/definitions/modes remain intact, and the temporary bundle was removed.
+
+Failed Windows programs now retain only bounded verified stdout/stderr after
+exact native/VM exit, with the actual exit code and a separate diagnostic root.
+They stay failed; declared build artifacts cannot leave the guest on this path.
+The related 47-case group passes 46 with one declared platform skip; type
+checking passes. The actual compiled formatter passes four exit-code cases;
+the helper builds without warnings/errors and six Linux guards pass. Scratch
+was removed after retaining `windows-failure-results-build-20261104.json`.
+Actual VM/Job acceptance and normal Windows privileged setup remain separate.
+
 The Studio Windows platform factory now connects reviewed Run and separately
 approved exact stop to the shared task/policy/checkpoint/budget/receipt boundary.
 Eleven admission/stop/restart cases pass with real Git inspection and encrypted

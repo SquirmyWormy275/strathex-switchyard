@@ -226,6 +226,7 @@ export interface WindowsSandboxReceipt {
   readonly reconciledAt?: string;
   readonly resultManifestDigest?: string;
   readonly resultRoot?: string;
+  readonly diagnosticRoot?: string;
   readonly summary: string;
 }
 
@@ -237,6 +238,8 @@ export interface WindowsSandboxExecutionResult {
   readonly processId?: string;
   readonly receiptPath?: string;
   readonly resultRoot?: string;
+  readonly diagnosticRoot?: string;
+  readonly programExitCode?: number;
   /** Host-memory bindings from the already validated result manifest. */
   readonly resultManifestSha256?: string;
   readonly recipeCatalogSha256?: string;
@@ -733,7 +736,7 @@ export class WindowsSandboxBackend {
           || receipt.reviewedInputManifestSha256 !== reviewed.inputManifestSha256 || receipt.recipeId !== recipeId || receipt.profile !== profile
           || receipt.reviewedExchangeRoot !== exchange?.root || receipt.reviewedExchangeBindingSha256 !== (exchange ? sha256(JSON.stringify(exchange.nativeBinding)) : undefined)
           || !sameDigest(receipt.recipeCatalogDigest, request.expectedRecipeCatalogSha256) || !sameDigest(receipt.helperDigest, request.expectedHelperSha256)) return { status: "blocked", summary: "The reviewed operation already belongs to a different exact guest mapping; no replay is available." };
-        return { status: receipt.state === "prepared" || receipt.state === "running" ? "unavailable" : terminalStatus(receipt.state), summary: receipt.summary, leaseId: receipt.leaseId, processId: receipt.processId, receiptPath: this.receiptPath(receipt), ...(receipt.resultRoot ? { resultRoot: receipt.resultRoot } : {}), replayed: true };
+        return { status: receipt.state === "prepared" || receipt.state === "running" ? "unavailable" : terminalStatus(receipt.state), summary: receipt.summary, leaseId: receipt.leaseId, processId: receipt.processId, receiptPath: this.receiptPath(receipt), ...(receipt.resultRoot ? { resultRoot: receipt.resultRoot } : {}), ...(receipt.diagnosticRoot ? { diagnosticRoot: receipt.diagnosticRoot } : {}), replayed: true };
       }
     }
     const live = reconciled.filter((entry) => entry.state === "prepared" || entry.state === "running");
@@ -968,10 +971,12 @@ export class WindowsSandboxBackend {
       if (!processResult.hostProcessContained) return await this.finish(receiptPath, receipt, "failed", "Windows Sandbox could not prove host-process containment or the absence of survivors.");
       if (processResult.timedOut) return await this.finish(receiptPath, receipt, "timed_out", "Windows Sandbox exceeded its bounded deadline and its owned process was terminated.");
       if (processResult.cancelled || signal.aborted) return await this.finish(receiptPath, receipt, "cancelled", "Windows Sandbox was cancelled and its owned process was terminated.");
-      if (processResult.exitCode !== 0) return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode ?? "no exit code"}).`);
-
+      const failedProgram = processResult.exitCode !== 0;
+      if (failedProgram && (!reviewed || !Number.isInteger(processResult.exitCode) || processResult.exitCode! < -2147483648 || processResult.exitCode! > 4294967295)) return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode ?? "no exit code"}).`);
       if (exchange) await exchange.assertCurrent();
-      const validated = await this.validateResultManifest(canonicalExchangeRoot, { requestId, leaseId, recipeId, profile, recipeCatalogDigest, resourcePolicyDigest }, exchange);
+      let validated: ValidatedResultManifest;
+      try { validated = await this.validateResultManifest(canonicalExchangeRoot, { requestId, leaseId, recipeId, profile, recipeCatalogDigest, resourcePolicyDigest }, exchange, failedProgram ? processResult.exitCode! : undefined); }
+      catch (error) { if (!failedProgram) throw error; return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode}); bounded failure diagnostics did not verify.`); }
       await this.assertCanonicalUnchanged(targetRoot, "target");
       await this.assertCanonicalUnchanged(destinationRoot, "destination");
       if (exchange) await exchange.assertCurrent(); else await this.assertCanonicalUnchanged(canonicalExchangeRoot, "exchange");
@@ -980,11 +985,14 @@ export class WindowsSandboxBackend {
       const resultRoot = await this.extractValidated(rawId, destinationRoot, validated.outputs);
       receipt = this.updateReceipt(receipt, {
         resultManifestDigest: validated.digest,
-        resultRoot
+        ...(failedProgram ? { diagnosticRoot: resultRoot } : { resultRoot })
       });
-      const finished = await this.finish(receiptPath, receipt, "completed", `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
+      const finished = await this.finish(receiptPath, receipt, failedProgram ? "failed" : "completed", failedProgram
+        ? `Windows Sandbox program exited unsuccessfully (${processResult.exitCode}); only verified bounded stdout/stderr diagnostics were retained.`
+        : `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
       return {
         ...finished,
+        ...(failedProgram ? { diagnosticRoot: resultRoot, programExitCode: processResult.exitCode! >>> 0 } : {}),
         resultManifestSha256: validated.digest,
         recipeCatalogSha256: recipeCatalogDigest,
         sandboxHelperSha256: helperDigest,
@@ -1239,7 +1247,8 @@ export class WindowsSandboxBackend {
       recipeCatalogDigest: string;
       resourcePolicyDigest: string;
     }>,
-    exchange?: WindowsSandboxReviewedExchangeLease
+    exchange?: WindowsSandboxReviewedExchangeLease,
+    failureExitCode?: number
   ): Promise<ValidatedResultManifest> {
     const manifestPath = join(exchangeRoot, "result-manifest.json");
     const metadata = await this.filesystem.lstat(manifestPath).catch(() => undefined);
@@ -1248,8 +1257,10 @@ export class WindowsSandboxBackend {
     let unknown: unknown;
     try { unknown = JSON.parse(Buffer.from(bytes).toString("utf8")); }
     catch { throw new SandboxValidationError("Windows Sandbox result manifest is not valid JSON."); }
-    if (!isRecord(unknown) || !exactKeys(unknown, ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicyDigest", "outcome", "summary", "resourceEnforcement", "outputs"])) throw new SandboxValidationError("Windows Sandbox result manifest does not use the exact v2 schema.");
-    if (unknown.schema !== windowsSandboxResultSchema || unknown.version !== 2 || unknown.outcome !== "completed") throw new SandboxValidationError("Windows Sandbox helper did not provide a successful exact-schema result.");
+    const failed = failureExitCode !== undefined;
+    if (!isRecord(unknown) || !exactKeys(unknown, ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicyDigest", "outcome", "summary", "resourceEnforcement", "outputs", ...(failed ? ["processExitCode"] : [])])) throw new SandboxValidationError("Windows Sandbox result manifest does not use the exact v2 schema.");
+    if (unknown.schema !== windowsSandboxResultSchema || unknown.version !== 2 || unknown.outcome !== (failed ? "failed" : "completed")) throw new SandboxValidationError("Windows Sandbox helper did not provide the exact expected program outcome.");
+    if (failed && (!Number.isInteger(unknown.processExitCode) || (unknown.processExitCode as number) < -2147483648 || (unknown.processExitCode as number) > 4294967295 || ((unknown.processExitCode as number) >>> 0) === 0 || ((unknown.processExitCode as number) >>> 0) !== (failureExitCode >>> 0))) throw new SandboxValidationError("Windows Sandbox failure diagnostics do not match the independently observed guest exit code.");
     if (unknown.requestId !== binding.requestId || unknown.leaseId !== binding.leaseId || unknown.recipeId !== binding.recipeId || unknown.profile !== binding.profile || unknown.recipeCatalogDigest !== binding.recipeCatalogDigest || unknown.resourcePolicyDigest !== binding.resourcePolicyDigest) throw new SandboxValidationError("Windows Sandbox result manifest is stale or is not bound to this exact request, profile, resource policy, and recipe catalog.");
     if (!isRecord(unknown.resourceEnforcement) || !exactKeys(unknown.resourceEnforcement, ["jobObject", "cpuHardCap", "memoryLimit", "processLimit", "noSurvivors", "activeProcessesAfterCleanup"])
       || unknown.resourceEnforcement.jobObject !== true || unknown.resourceEnforcement.cpuHardCap !== true
@@ -1259,6 +1270,7 @@ export class WindowsSandboxBackend {
     }
     if (typeof unknown.summary !== "string" || Buffer.byteLength(unknown.summary, "utf8") > 1_024) throw new SandboxValidationError("Windows Sandbox result summary is invalid or oversized.");
     if (!Array.isArray(unknown.outputs) || unknown.outputs.length > maximumOutputs) throw new SandboxValidationError("Windows Sandbox output manifest exceeds its file-count bound.");
+    if (failed && (unknown.outputs.length !== 2 || unknown.outputs.map(item => isRecord(item) ? item.path : null).sort().join() !== "process.stderr.txt,process.stdout.txt")) throw new SandboxValidationError("Failed Windows programs may retain only the two fixed captured diagnostic streams.");
     const outputRoot = join(exchangeRoot, "output");
     if (exchange) await this.boundedExchangePath(exchange, outputRoot, true);
     else await this.canonicalOwnedDirectory(outputRoot, [exchangeRoot], "quarantine output");
@@ -1271,6 +1283,7 @@ export class WindowsSandboxBackend {
       if (!Number.isSafeInteger(item.size) || (item.size as number) < 0 || (item.size as number) > maximumSingleOutputBytes) throw new SandboxValidationError("Windows Sandbox output size is invalid or oversized.");
       if (typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(item.sha256)) throw new SandboxValidationError("Windows Sandbox output digest is invalid.");
       total += item.size as number;
+      if (failed && total > this.maxProcessOutputBytes) throw new SandboxValidationError("Windows Sandbox failure diagnostics exceed the reviewed shared output bound.");
       if (total > this.maxExtractedBytes) throw new SandboxValidationError("Windows Sandbox total extracted output exceeds its configured bound.");
       const sourcePath = resolve(outputRoot, item.path);
       if (!inside(outputRoot, sourcePath)) throw new SandboxValidationError("Windows Sandbox output escapes quarantine.");
@@ -1351,7 +1364,8 @@ export class WindowsSandboxBackend {
       leaseId: next.leaseId,
       processId: next.processId,
       receiptPath,
-      ...(next.resultRoot ? { resultRoot: next.resultRoot } : {})
+      ...(next.resultRoot ? { resultRoot: next.resultRoot } : {}),
+      ...(next.diagnosticRoot ? { diagnosticRoot: next.diagnosticRoot } : {})
     };
   }
 
@@ -1558,6 +1572,7 @@ function parseReceipt(contents: string, rawId: string): WindowsSandboxReceipt {
     if (bounded && (!reviewed || typeof value.reviewedExchangeRoot !== "string" || !isAbsolute(value.reviewedExchangeRoot)
       || typeof value.reviewedExchangeBindingSha256 !== "string" || !validDigest(value.reviewedExchangeBindingSha256)
       || value.exchangeQuotaEnforced !== true)) throw new Error("Windows Sandbox bounded-volume receipt binding is malformed.");
+    if (value.diagnosticRoot !== undefined && (typeof value.diagnosticRoot !== "string" || !isAbsolute(value.diagnosticRoot) || typeof value.destinationRoot !== "string" || !inside(value.destinationRoot, value.diagnosticRoot) || basename(value.diagnosticRoot) !== `sandbox-${rawId}` || value.resultRoot !== undefined || value.state !== "failed")) throw new Error("Windows Sandbox diagnostic receipt ownership is malformed.");
     if ((value.guestStartAttempted !== undefined && (!reviewed || typeof value.guestStartAttempted !== "boolean"))
       || (value.guestExitVerified !== undefined && (!reviewed || typeof value.guestExitVerified !== "boolean"))
       || (value.guestSessionId !== undefined && (!reviewed || typeof value.guestSessionId !== "string" || !safeUuid.test(value.guestSessionId)))

@@ -69,7 +69,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
             const state = await store.snapshot(c), guest = state.repositoryWindowsGuests?.find(row => row.operationId === request.operationId);
             const uncertainStart = state.repositoryWindowsGuestCommands?.some(row => row.operationId === request.operationId && row.action === "start" && row.startAcknowledged === true && row.result?.effectStarted !== false);
             const effectDisposition = result.status === "incomplete" ? "ambiguous" : ["blocked", "unavailable"].includes(result.status) ? guest?.startVerified === true ? "committed" : uncertainStart ? "ambiguous" : "not_started" : "committed";
-            return { status: result.status, summary: result.summary, effectDisposition, data: { engine, ...(result.receiptPath ? { receiptPath: result.receiptPath } : {}), ...(result.resultRoot ? { resultRoot: result.resultRoot } : {}), providerTaskCompletionVerified: false } };
+            return { status: result.status, summary: result.summary, effectDisposition, data: { engine, ...(result.receiptPath ? { receiptPath: result.receiptPath } : {}), ...(result.resultRoot ? { resultRoot: result.resultRoot } : {}), ...(result.diagnosticRoot ? { diagnosticRoot: result.diagnosticRoot } : {}), ...(Number.isInteger(result.programExitCode) ? { programExitCode: result.programExitCode } : {}), providerTaskCompletionVerified: false } };
           } finally { control.dispose(); }
         });
         return { execution, executionRecipeFactory: { create: (definition, target) => definition.action === "run_target" && target.id === review.targetSnapshotId ? repositoryRuntimeExecutionRecipe("run_target", target) : undefined } };

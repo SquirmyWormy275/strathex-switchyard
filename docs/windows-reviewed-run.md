@@ -129,3 +129,28 @@ Windows runner double. A separate 41-check platform/package group passes,
 including the existing actual Linux host broker. Type checking passes. Native
 filesystem acceptance and supported interactive VM acceptance remain separate.
 The frontend is unchanged.
+
+## Failed-program diagnostics
+
+A nonzero reviewed guest program can now produce a failed v2 result containing
+its actual process exit code and only `process.stdout.txt` /
+`process.stderr.txt`. The worker preserves the exit code, skips declared build
+artifacts and keeps its shared output bound. Successful v2 results retain their
+existing shape.
+
+The backend binds a failed manifest to the independently observed guest exit
+code, including signed Windows exit-code bits. It requires the original request,
+resource claims, exact guest stop, native exit, input/volume leases, output
+hashes and the current extraction guard. Mismatched exit codes, additional
+artifacts, false resource fields, changed hashes and oversized logs are refused.
+The copied logs have a separate `diagnosticRoot`; `resultRoot` remains absent
+and the execution stays failed. Unknown VM exit releases no diagnostic bytes.
+The original native volume service still owns retirement.
+
+The related backend/helper/installation/lifecycle/release group passes 46 checks
+with one declared platform skip (47 total); type checking passes. Four cases
+invoke the actual compiled C# result formatter, including unsuccessful and signed
+exit codes. The helper builds with zero warnings/errors; six real Linux mode
+guards pass. Build/probe scratch was removed after retaining source/assembly
+hashes in `windows-failure-results-build-20261104.json`. These compiled cases
+validate the wire format, not native Job enforcement or an actual VM task.

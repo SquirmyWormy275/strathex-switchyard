@@ -924,3 +924,30 @@ test("bounded output still rejects links and a revoked native volume before extr
   const backend=createBackend(setup,runner,[],{requireReviewedInputs:true,requireBoundedExchange:true});const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed",result.summary);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));assert.equal(exchange.held(),0);
  }
 });
+
+
+function failedGuestProgram(exitCode=7,change:(manifest:any)=>void=()=>{}):WindowsSandboxProcessRunner {
+ const inner=successfulRunner();return{async run(...args){const result=await inner.run(...args),spec=args[0],root=spec.reviewedExchangeBinding?join(spec.reviewedExchangeBinding.stagingRoot,"mount"):join(dirname(spec.args[0]!),"exchange"),manifest=JSON.parse(await readFile(join(root,"result-manifest.json"),"utf8"));manifest.outcome="failed";manifest.processExitCode=exitCode;manifest.outputs=[];
+ for(const [path,text] of [["process.stdout.txt","captured failing program output"],["process.stderr.txt","synthetic failure diagnostic"]]){const bytes=Buffer.from(text);await writeFile(join(root,"output",path),bytes);manifest.outputs.push({path,size:bytes.length,sha256:sha256(bytes)});}change(manifest);await writeFile(join(root,"result-manifest.json"),JSON.stringify(manifest));return{...result,exitCode:exitCode>>>0};}};
+}
+test("a failed reviewed guest retains only verified bounded logs while keeping a failed task result and the original volume owner",async context=>{
+ for(const exitCode of [7,-1073741515]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  const inner=failedGuestProgram(exitCode),runner=exactGuestRunner({async run(...args){launches++;return inner.run(...args);}}),backend=createBackend(setup,runner,[],{requireReviewedInputs:true,requireBoundedExchange:true}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+  const result=await backend.run(request);assert.equal(result.status,"failed",result.summary);assert.equal(result.resultRoot,undefined);assert.ok(result.diagnosticRoot);assert.equal(result.programExitCode,exitCode>>>0);assert.deepEqual((await readdir(result.diagnosticRoot!)).sort(),["process.stderr.txt","process.stdout.txt"]);assert.equal(await readFile(join(result.diagnosticRoot!,"process.stderr.txt"),"utf8"),"synthetic failure diagnostic");
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.state,"failed");assert.equal(receipt.diagnosticRoot,result.diagnosticRoot);assert.equal(receipt.cleanupVerified,true);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+  const duplicate=await backend.run(request);assert.equal(duplicate.replayed,true);assert.equal(duplicate.status,"failed");assert.equal(duplicate.diagnosticRoot,result.diagnosticRoot);assert.equal(launches,1);
+ }
+});
+test("mismatched exit evidence, arbitrary artifacts, false resource claims and changed log hashes cannot be extracted as failure diagnostics",async context=>{
+ for(const invalid of ["exit","artifact","resource","digest","bound"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);
+  const inner=failedGuestProgram(7,manifest=>{if(invalid==="exit")manifest.processExitCode=8;if(invalid==="artifact")manifest.outputs[0].path="report.txt";if(invalid==="resource")manifest.resourceEnforcement.noSurvivors=false;if(invalid==="digest")manifest.outputs[0].sha256="f".repeat(64);});
+  const backend=createBackend(setup,exactGuestRunner(inner),[],{requireReviewedInputs:true,requireBoundedExchange:true,...(invalid==="bound"?{maxProcessOutputBytes:4}:{})}),result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});
+  assert.equal(result.status,"failed");assert.equal(result.diagnosticRoot,undefined);assert.equal(result.resultRoot,undefined);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+ }
+});
+test("a failed program still cannot release diagnostic bytes before independent exact VM exit",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),backend=createBackend(setup,failedGuestProgram(),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+ const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed");assert.equal(result.diagnosticRoot,undefined);assert.match(result.summary,/guest exit remains unconfirmed/i);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.root,"result-manifest.json"));
+});
