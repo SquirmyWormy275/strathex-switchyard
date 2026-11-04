@@ -56,3 +56,14 @@ test("application subprocesses receive desktop/credential-store coordinates with
   assert.equal(env.windir, "C:\\Windows"); assert.equal(env.ProgramFiles, "C:\\Program Files"); assert.equal(env.PROCESSOR_ARCHITECTURE, "AMD64");
   for (const k of ["NODE_OPTIONS", "NODE_PATH", "PYTHONPATH", "PSModulePath", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GH_TOKEN"]) assert.equal(env[k], undefined);
 });
+
+test("an authenticated stop accepts ESRCH or ENOENT when its exact process exits during the stat read",()=>applicationFixture(async({options})=>{
+  for(const code of ["ESRCH","ENOENT"]){
+    const app=await launchApplication(options);let reads=0;
+    const stopped=await stopApplication({...options,expectedBuild:app.build,expectedInstanceId:app.instanceId,probeProcess:()=>{},readProcessStat:async pid=>{assert.equal(pid,app.pid);if(++reads===1)return `${pid} (synthetic stat-read race) ${["S",...Array(18).fill("0"),"123"].join(" ")}`;throw Object.assign(Error("Synthetic process disappeared during read"),{code});}});
+    assert.equal(stopped.stopped,true);assert.equal(stopped.instanceId,app.instanceId);assert.equal(reads,2);
+    const deadline=Date.now()+5000;let exited=false;
+    while(Date.now()<deadline){try{process.kill(app.pid,0);if(process.platform==="linux"){const stat=await readFile(`/proc/${app.pid}/stat`,"utf8");if(stat.slice(stat.lastIndexOf(")")+2).startsWith("Z ")){exited=true;break;}}}catch(error){if(["ESRCH","ENOENT"].includes(error.code)){exited=true;break;}throw error;}await new Promise(resolve=>setTimeout(resolve,25));}
+    assert.equal(exited,true,"The actual fixture application also exited; the injected stat error never stopped an unrelated process");
+  }
+}));

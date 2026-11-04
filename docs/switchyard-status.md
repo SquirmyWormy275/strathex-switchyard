@@ -40,6 +40,15 @@ all child cleanup verified. Ubuntu release CI at `0aeae75` passes, including the
 preflight with Ubuntu's packaged scoped bwrap AppArmor profile. No workstation
 policy, namespace restriction or guardian no-new-privs setting was weakened.
 
+The full `c5059dd` Linux run passes 152/153 groups: 979 tests, 968 passed, one
+failed and ten declared skips. Receipt `1f131ceb-d88e-4d87-a191-1402fab793f2` is
+preserved as failed; all children exited and its temporary checkout was removed.
+The failure was an actual application-stop race: `/proc/<pid>/stat` returned
+`ESRCH` after the authenticated process exited between checks. Stop now accepts
+that exact exit observation alongside `ENOENT`; generation/birth checks remain.
+All five application cases pass, including deterministic ESRCH/ENOENT reads
+after a real authenticated fixture shutdown. A complete corrected run is pending.
+
 Reviewed per-run stop has a separate approval, budget, operation and receipt,
 with exact-handle ownership, duplicate rejection and receipt-only recovery.
 Windows CI at `0151e69` exposed its deadline being spent on repeated kernel-lock

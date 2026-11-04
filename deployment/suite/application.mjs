@@ -110,23 +110,23 @@ export async function launchApplication({ bundleRoot, port = 43177, stateRoot = 
     }
   });
 }
-export async function stopApplication({ stateRoot = applicationStateRoot(), expectedBuild, expectedInstanceId } = {}) {
+export async function stopApplication({ stateRoot = applicationStateRoot(), expectedBuild, expectedInstanceId, probeProcess = pid => process.kill(pid, 0), readProcessStat = process.platform === "linux" ? pid => readFile(`/proc/${pid}/stat`, "utf8") : undefined } = {}) {
   const endpoint = await savedEndpoint(stateRoot);
   if (!endpoint) return { status: "not-started", stopped: true };
   if (expectedBuild !== undefined && endpoint.instance.build !== expectedBuild || expectedInstanceId !== undefined && endpoint.instance.id !== expectedInstanceId) throw new Error("The saved application generation changed before stop. The different owner was preserved.");
   let birth = null;
   try {
-    process.kill(endpoint.pid, 0);
-    if (process.platform === "linux") { const s = await readFile(`/proc/${endpoint.pid}/stat`, "utf8"), fields = s.slice(s.lastIndexOf(") ") + 2).split(" "); if (fields[0] === "Z") return { status: "already-exited", stopped: true }; birth = fields[19]; }
+    probeProcess(endpoint.pid);
+    if (readProcessStat) { const s = await readProcessStat(endpoint.pid), fields = s.slice(s.lastIndexOf(") ") + 2).split(" "); if (fields[0] === "Z") return { status: "already-exited", stopped: true }; birth = fields[19]; }
   } catch (e) { if (["ESRCH", "ENOENT"].includes(e.code)) return { status: "already-exited", stopped: true }; throw e; }
   const proof = await requestInstance(endpoint, { operation: "stop" });
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
-    try { process.kill(proof.pid, 0); }
+    try { probeProcess(proof.pid); }
     catch (e) { if (e.code === "ESRCH") return { status: "stopped", stopped: true, instanceId: proof.instanceId }; throw e; }
     if (birth) {
-      try { const s = await readFile(`/proc/${proof.pid}/stat`, "utf8"), fields = s.slice(s.lastIndexOf(") ") + 2).split(" "); if (fields[0] === "Z" || fields[19] !== birth) return { status: "stopped", stopped: true, instanceId: proof.instanceId }; }
-      catch (e) { if (e.code === "ENOENT") return { status: "stopped", stopped: true, instanceId: proof.instanceId }; throw e; }
+      try { const s = await readProcessStat(proof.pid), fields = s.slice(s.lastIndexOf(") ") + 2).split(" "); if (fields[0] === "Z" || fields[19] !== birth) return { status: "stopped", stopped: true, instanceId: proof.instanceId }; }
+      catch (e) { if (["ENOENT", "ESRCH"].includes(e.code)) return { status: "stopped", stopped: true, instanceId: proof.instanceId }; throw e; }
     }
     await wait(50);
   }
