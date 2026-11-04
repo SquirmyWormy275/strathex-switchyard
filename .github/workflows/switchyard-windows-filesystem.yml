@@ -1,0 +1,87 @@
+name: Switchyard Windows filesystem boundaries
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: switchyard-windows-filesystem-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-native-filesystem:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      NUGET_XMLDOC_MODE: skip
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      npm_config_update_notifier: "false"
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+
+      - name: Provision the reviewed repository-local offline .NET toolchain
+        shell: pwsh
+        run: .\deployment\windows\Provision-B122DotnetToolchain.ps1
+
+      - name: Build the exact helper and provision its pinned Node prerequisite
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\apps\desktop-hotkeys\Switchyard.Hotkeys.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\.tools\dotnet\dotnet.exe restore $project -r win-x64 --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Native helper offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe publish $project --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:RuntimeFrameworkVersion=8.0.30 -o $output
+          if ($LASTEXITCODE -ne 0) { throw 'Native helper build failed.' }
+          $archive = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip' -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne '313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66') { throw 'The official Node archive digest changed.' }
+          $nodeRoot = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node'
+          New-Item -ItemType Directory -Path $nodeRoot | Out-Null
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            $entry = $zip.GetEntry('node-v24.14.0-win-x64/node.exe')
+            if ($null -eq $entry) { throw 'The verified official Node image is missing.' }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $nodeRoot 'node.exe'), $false)
+          } finally { $zip.Dispose() }
+          Remove-Item -LiteralPath $archive -Force
+
+      - name: Verify actual native filesystems and guardians without opening a guest
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $node = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node\node.exe'
+          & node scripts/verify-windows-reviewed-inputs.mjs --synthetic "--helper=$helper" "--node=$node"
+          if ($LASTEXITCODE -ne 0) { throw 'A native filesystem, identity, image-header, sharing or owned-exit check failed.' }
+          Remove-Item -LiteralPath (Split-Path -Parent $node) -Recurse -Force
+
+      - name: Retain the bounded native acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-filesystem-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-inputs-verification.json
+          if-no-files-found: error
+          retention-days: 7

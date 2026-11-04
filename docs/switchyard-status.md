@@ -141,7 +141,27 @@ now allows 20 minutes for the expanded encrypted lifecycle cases; individual
 effect deadlines and final backend failure gate remain unchanged. Complete
 corrected Windows acceptance remains pending. Native Windows CI now continues independent helper checks
 after a backend failure, then requires that backend outcome in an unconditional
-final gate; a failed backend still makes the release verification fail.
+final gate; a failed backend still makes the release verification fail. Complete
+corrected Windows release verification now passes at `c5059dd`, run 41872535770,
+including backend, native filesystem/guardian checks, optional-runtime acceptance
+and the complete packaged release. Seven real input/metadata checks were imported
+after verifying their archive digest; only `windows-reviewed-inputs-c505-native.json`
+was retained. Newer worker/Node/image changes have separate pending native checks.
+The bounded full-verification archive was also downloaded and digest-verified;
+only its JSON receipt was retained. It records 259/259 groups, 1,720 tests,
+1,672 passed and 48 declared skips: `c4e345be-cb3f-4188-8542-3ce9fbc63ec3`.
+
+The bounded Windows exchange image constructor is now implemented: a new exact
+private file, fixed 64 MiB virtual capacity, 63 MiB FAT16 partition, operation-bound
+VHD footer, native read-only header verification and no mount/attach effect.
+Fourteen compiled corruption/format checks and an independent read-only fsck
+pass; the helper builds without warnings/errors. Build/probe/specification
+scratch was removed after retaining source/assembly hashes. A separate short
+Windows filesystem workflow now runs the native input, worker, Node and image
+journeys without waiting for the full release lane. [Exchange contract](windows-bounded-exchange.md).
+Durable image ownership, attach/mount/detach/recovery, actual disk-full validation
+and the Studio adapter remain unfinished implementation; image creation grants
+neither a writable exchange lease nor execution protections.
 
 ## Current pilot
 

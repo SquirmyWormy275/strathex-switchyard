@@ -263,4 +263,45 @@ internal static class ReviewedInputStager
         catch (Exception error) { Console.Error.WriteLine($"Native guest-tool staging failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}. No runtime-copy fallback was used."); return 2; }
         finally { foreach (var stream in streams) stream.Dispose(); foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
+
+    // Creates only exchange.vhd inside an acknowledged new private directory.
+    // This operation never attaches a disk or formats any host volume.
+    public static int RunBoundedImage()
+    {
+        const string schema = "switchyard-windows-bounded-image/v1";
+        var handles = new List<SafeFileHandle>(); string phase = "request";
+        try
+        {
+            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            var text = new StringBuilder(); int character;
+            while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
+            using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
+            Exact(request, "schema", "operationId", "stagingRoot", "stagingIdentity");
+            if (request.GetProperty("schema").GetString() != schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation) || operation == Guid.Empty) throw Invalid();
+            string root = Absolute(request.GetProperty("stagingRoot"));
+            if (Path.GetFileName(root) != "disk-" + operation.ToString("D")) throw Invalid();
+            phase = "directory";
+            var directory = PinDirectories(root, handles, WriteDac | ReadControl); var original = Information(directory, true);
+            if (!Matches(original, request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(root).Any()) throw Invalid();
+            RestrictNewDirectory(directory);
+            phase = "create";
+            using var image = new FileStream(Path.Combine(root, "exchange.vhd"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
+            var created = Information(image.SafeFileHandle, false);
+            if (created.Links != 1) throw Invalid();
+            phase = "write";
+            BoundedExchangeImage.WriteNew(image, operation); image.Flush(flushToDisk: true);
+            string footerSha256 = BoundedExchangeImage.Validate(image, operation);
+            if (!Matches(Information(directory, true), request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(root).Count() != 1 || Information(image.SafeFileHandle, false).Links != 1) throw Invalid();
+            image.Position = 0; string imageSha256 = Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant();
+            image.Dispose(); phase = "native-header";
+            using var pinned = Open(Path.Combine(root, "exchange.vhd"), false);
+            var current = Information(pinned, false);
+            if (current.Volume != created.Volume || current.IndexHigh != created.IndexHigh || current.IndexLow != created.IndexLow) throw Invalid();
+            BoundedExchangeImage.ReadNativeHeader(Path.Combine(root, "exchange.vhd"), operation);
+            Console.WriteLine(JsonSerializer.Serialize(new { schema, operationId = operation.ToString("D"), stagingIdentity = Identity(original), imageIdentity = Identity(created), imageFilename = "exchange.vhd", virtualBytes = BoundedExchangeImage.VirtualBytes, backingBytes = BoundedExchangeImage.BackingBytes, filesystem = "FAT16", imageSha256, footerSha256, nativeHeaderVerified = true, privateAclReadbackVerified = true, attached = false, exchangeQuotaEnforced = false, sandboxEnforced = false }));
+            return 0;
+        }
+        catch (Exception error) { Console.Error.WriteLine($"Native bounded exchange image failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}. Preserve any partial owned image; no disk was attached."); return 2; }
+        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+    }
 }
