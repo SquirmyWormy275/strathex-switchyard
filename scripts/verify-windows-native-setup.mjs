@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+/** Actual native PE and no-effect setup preflight; never displays a UAC prompt. */
+import assert from "node:assert/strict";
+import {createHash,randomUUID} from "node:crypto";
+import {readFile} from "node:fs/promises";
+import {join,isAbsolute} from "node:path";
+import {tmpdir} from "node:os";
+import {runRuntimeCommand,runtimeGuardianStopped} from "../tools/layout-studio/runtime-command.mjs";
+import {desktopEnvironment} from "../tools/layout-studio/process-environment.mjs";
+import {privateWrite} from "../tools/layout-studio/private-fs.mjs";
+const flags=process.argv.slice(2);
+if(process.platform!=="win32"||flags.length!==3||flags[0]!=="--synthetic"||!flags[1].startsWith("--helper=")||!flags[2].startsWith("--setup=")||!isAbsolute(flags[1].slice(9))||!isAbsolute(flags[2].slice(8)))throw Error("Use the Windows-only no-effect native setup proof with exact helper and setup images.");
+const helper=flags[1].slice(9),setup=flags[2].slice(8),bytes=await readFile(setup),expected=createHash("sha256").update(bytes).digest("hex"),checks=[],owners=[],receipt=join(process.env.RUNNER_TEMP||tmpdir(),"switchyard-native-setup-verification.json");
+const evidence={schema:"switchyard-native-setup-proof/v1",sourceCommit:process.env.GITHUB_SHA??null,setupSha256:expected,checks,elevationRequested:false,serviceInstalled:false,volumeOpened:false};let failure;
+async function execute(args,code){const result=await runRuntimeCommand(setup,args,{windowsHelper:helper,expectedExecutableSha256:expected,env:desktopEnvironment(),timeout:30000,maxOutputBytes:8192,detailed:true,onGuardianReady:async frame=>{owners.push(frame);}});assert.equal(result.exitCode,code);assert.equal(await runtimeGuardianStopped(owners.at(-1),{windowsHelper:helper}),true);return JSON.parse(result.stdout);}
+try{
+ assert.equal(bytes.readUInt16LE(0),0x5a4d);const pe=bytes.readUInt32LE(0x3c);assert.equal(bytes.readUInt32LE(pe),0x4550);assert.equal(bytes.readUInt16LE(pe+4),0x8664);const optional=pe+24;assert.equal(bytes.readUInt16LE(optional),0x20b);const sections=bytes.readUInt16LE(pe+6),table=optional+bytes.readUInt16LE(pe+20),rva=bytes.readUInt32LE(optional+112+10*8);assert.ok(sections>0&&sections<32&&rva>0);
+ let configuration;for(let i=0;i<sections;i++){const entry=table+i*40,start=bytes.readUInt32LE(entry+12),size=bytes.readUInt32LE(entry+16);if(rva>=start&&rva+80<=start+size)configuration=bytes.readUInt32LE(entry+20)+rva-start;}
+ assert.ok(configuration!==undefined&&configuration+80<=bytes.length);assert.ok(bytes.readUInt32LE(configuration)>=80);assert.equal(bytes.readUInt16LE(configuration+78),0x800);checks.push("native x64 image limits dependent DLL loading to System32 before entry");
+ const metadata=await execute(["--metadata"],0);assert.equal(metadata.schema,"switchyard-windows-native-setup/v1");assert.equal(metadata.status,"available");assert.match(metadata.clientSid,/^S-1-5-21-(?:[0-9]+-){3}[0-9]+$/);assert.equal(metadata.effectStarted,false);checks.push("metadata observes only the current native user without elevation");
+ const unknown=await execute(["--untrusted-command"],2);assert.equal(unknown.status,"unavailable");assert.equal(unknown.effectStarted,false);checks.push("unknown commands cannot select a program, path or effect");
+ const changed=await execute(["--install-bootstrap",metadata.clientSid,randomUUID(),"0".repeat(64)],2);assert.equal(changed.status,"unavailable");assert.equal(changed.effectStarted,false);checks.push("changed adjacent helper bytes are refused before any elevation or installation");
+ evidence.nativeExitVerified=(await Promise.all(owners.map(frame=>runtimeGuardianStopped(frame,{windowsHelper:helper})))).every(Boolean);assert.equal(evidence.nativeExitVerified,true);checks.push("all exact native guardians exited independently");
+}catch(error){failure=error;evidence.diagnostic=String(error.message).slice(0,512);}
+evidence.success=!failure;await privateWrite(receipt,JSON.stringify({...evidence,nativeOwners:owners},null,2)+"\n");console.log(JSON.stringify({success:evidence.success,checks:checks.length,diagnostic:evidence.diagnostic??null,receipt}));if(failure)throw Error("The native setup no-effect proof failed; no UAC or service acceptance is claimed.");

@@ -66,6 +66,17 @@ jobs:
           } finally { $zip.Dispose() }
           Remove-Item -LiteralPath $archive -Force
 
+      - name: Build and verify the closed native setup preflight without elevation
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\deployment\windows\Build-SwitchyardSetup.ps1 -OutputDirectory $output
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup compiler or linker failed.' }
+          & node scripts/verify-windows-native-setup.mjs --synthetic "--helper=$(Join-Path $output 'Switchyard.Hotkeys.exe')" "--setup=$(Join-Path $output 'Switchyard.Setup.exe')"
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup preflight failed; no elevation was attempted.' }
+
       - name: Verify the copied helper has no adjacent runtime dependency
         shell: pwsh
         timeout-minutes: 3
@@ -158,5 +169,14 @@ jobs:
         with:
           name: switchyard-storage-broker-bootstrap-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-storage-broker-bootstrap-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the native setup preflight receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-native-setup-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-native-setup-verification.json
           if-no-files-found: error
           retention-days: 7
