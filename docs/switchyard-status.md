@@ -8,6 +8,21 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Installed `5fd0186` now passes all eight expanded pipeline checks, including a
+separately approved stop before the program response arrives, exact duplicate
+receipts, unchanged admission, three independently exited guardians, removed
+staging and restored definitions/selection/modes/private link. Zero prompts.
+Receipt `installed-repository-pipeline-1793829793401.json`; six update checks in
+`assignment-legends-1793829389543.json`; bundle staging removed.
+
+The first pending-stop validation exhausted its 15-second readiness observation
+wait. Failed receipt `installed-repository-pipeline-1793829551182.json` and small
+synthetic evidence were preserved, native exits verified and state restored.
+The retry measured 38.7 seconds of full scope revalidation/native readiness.
+The validator now allows 120 seconds within its existing HTTP deadline; no
+production command/approval/process/stop deadline changed. Native Windows
+host-stop job `126894160666` passes at `a50a205`.
+
 The focused native Windows matrix now also runs the complete task-authority and
 host-stop files. This directly checks the ordinary factory's grant path and the
 new immutable-admission stop logic without waiting for the full release lane.

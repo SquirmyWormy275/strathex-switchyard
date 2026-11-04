@@ -139,13 +139,20 @@ mise exec node@24.14.0 -- node --experimental-transform-types scripts/verify-rep
 ```
 
 It uses a new disposable repository and one empty native Codex task, with zero
-prompts. The first installed pipeline journey passed seven checks at `c7525a0`,
-release `7f2704d4425c23116082bb238a9358396b4e2d66c8513cbe254f7dfb8f0826d8`,
-receipt `installed-repository-pipeline-1793829048435.json`. It ran both actions,
-verified exact authenticated receipts and duplicate refusal, independently
-observed two guardian exits, removed staging and restored definitions, selection,
-modes and the private endpoint. The expanded pending-pipeline stop journey is
-awaiting its installed check.
+prompts. The expanded installed journey passes eight checks at `5fd0186`,
+release `883e1fa667b33d001ffeecc2f8ab74882630a378821806e90f37f7964e923ce9`,
+receipt `installed-repository-pipeline-1793829793401.json`. It runs both actions,
+verifies exact authenticated receipts and duplicate refusal, separately stops a
+pending pipeline, independently observes three guardian exits, removes staging
+and restores definitions, selection, modes and the private endpoint.
+
+The first pending-stop validation used a 15-second readiness wait, which expired
+before the native startup boundary. Its failed receipt
+`installed-repository-pipeline-1793829551182.json` and synthetic evidence remain
+preserved, with owned exits verified and state restored. The retry measured
+38.7 seconds for full scope revalidation and native readiness; the validator now
+allows 120 seconds inside its existing 180-second HTTP bound. Production command,
+approval, native process and stop deadlines are unchanged.
 
 The task/account/directory binding, complete repository snapshot, manifest bytes,
 executable identity and selected workspace are checked again before the effect.
