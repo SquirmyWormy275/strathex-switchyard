@@ -7,8 +7,8 @@ operation and catalog, and preserves it when guest exit is unknown. This path
 is software-tested. The [managed guest lifecycle](windows-managed-guest-lifecycle.md)
 is implemented and software-tested. Native worker/runtime staging and durable
 bounded-volume ownership are implemented and accepted in the Windows filesystem
-lane. The Studio Windows adapter and normal personal-host privileged setup
-remain unfinished implementation.
+lane. The Studio Windows adapter is now connected; normal personal-host privileged
+setup remains unfinished implementation. [Run contract](windows-reviewed-run.md).
 
 Construct the trusted backend with `requireReviewedInputs: true`. Its request
 must carry the native staging capability and matching `operationId`. JSON
@@ -87,4 +87,4 @@ cases cover exact mapping/output validation, malformed or overlapping leases,
 unknown guest exit and linked output/revoked volumes. They use explicit volume
 and VM doubles and ordinary owned temporary folders. The native mapping lane
 is separate; this is not an actual VM demonstration. The Studio Windows Run
-connection remains unfinished.
+connection is implemented and software-tested; actual VM acceptance is separate.

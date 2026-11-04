@@ -7,9 +7,10 @@ bounded result. A successful program exit does not mark the coding task done.
 
 This backend path is API-only while the frontend is frozen. The current policy
 provides a read-only reviewed workspace, denied network and ambient credentials,
-and a 64 MiB temporary filesystem. It never mounts the live repository. Writable
-build outputs, Windows guest execution, debug,
-web, environment and pipeline connections remain implementation work. Workspace
+and a 64 MiB temporary filesystem. It never mounts the live repository. The Windows platform now has its own reviewed guest Run and exact-stop adapter;
+its policy tests use a runner double and normal personal-host privileged setup
+remains unfinished. Writable build outputs, debug, web, environment and pipeline
+connections remain implementation work. [Windows contract](windows-reviewed-run.md). Workspace
 shutdown, keyboard-only mode and application shutdown stop owned executions.
 
 ## Try the boundaries

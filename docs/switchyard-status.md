@@ -8,6 +8,27 @@ behind each accepted result.
 
 ## Active backend iteration
 
+The Studio Windows platform factory now connects reviewed Run and separately
+approved exact stop to the shared task/policy/checkpoint/budget/receipt boundary.
+Eleven admission/stop/restart cases pass with real Git inspection and encrypted
+ledgers, using an explicit Windows runner double. A separate 41-check
+platform/package group passes, including the existing actual Linux host broker.
+The immutable Run admission, eventual program result and storage retirement are
+separate. An unrecorded uncertain stop cannot become a passing result from exit
+alone. [Windows Run contract](windows-reviewed-run.md).
+
+Complete Linux `6e82937` passes 158/158 groups: 1,034 tests, 1,024 passed and ten
+declared skips; receipt `0b7c5d8e-711c-417a-ba9b-8e2cb7896ba8`. Every child cleanup
+verified and the worktree was removed. The earlier all-platform invocation on
+Linux remains failed in the checkpoint archive. Corrected Windows workflow
+41904474050 at `9cfb922` passes the fault step and all 30 native filesystem checks;
+its digest-verified JSON receipt is `windows-runner-9cfb-native.json`. The short
+Windows workflow and Linux/client lanes also pass at `6e82937`.
+
+Normal Windows privileged setup and broader action/device/attachment work remain
+unfinished software. Actual supported-host VM execution and physical/account
+acceptance remain separate checks. The frontend remains frozen.
+
 The host-only Windows Run runner now connects selected-file staging, exact
 worker/runtime links, bounded-volume handoff, managed sessions, backend output
 validation and independent cleanup. It holds a kernel lease through preparation

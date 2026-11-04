@@ -59,6 +59,7 @@ hard link with a fixed version command, guardian exit, unchanged source and
 writable-handle rejection. CI reuses its already verified official archive and
 removes that disposable prerequisite after success; no runtime is added here.
 
-The Studio Windows Run adapter and filesystem-bounded writable exchange remain
-unfinished implementation. Native VM startup/login/worker/stop acceptance needs
+The Studio Windows Run adapter now connects these exact tools to the bounded
+volume and reviewed policy path. Normal personal-host privileged setup remains
+unfinished software. [Run contract](windows-reviewed-run.md). Native VM startup/login/worker/stop acceptance needs
 a supported Windows Sandbox host; that does not block this source work.

@@ -114,9 +114,10 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && file === "tools/layout-studio/suite.test.mjs") return { timeoutMs: 120_000 };
   if (platform === "win32" && file === "tools/layout-studio/repository-execution.test.mjs") return { timeoutMs: 480_000 };
   if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
+  if (file === "tools/layout-studio/repository-windows-execution.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
   if (file === "tools/layout-studio/windows-exchange-images.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
   if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
-  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-reviewed-runner"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
@@ -150,6 +151,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/windows-exchange-images.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-exchange-images.test.mjs") },
   { file: "tools/layout-studio/windows-reviewed-run.test.mjs" },
   { file: "tools/layout-studio/windows-reviewed-runner.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-runner.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-execution.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },

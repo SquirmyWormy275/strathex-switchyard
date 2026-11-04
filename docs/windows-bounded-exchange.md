@@ -63,7 +63,8 @@ pass. Scratch was removed after retaining
 The creation proof explicitly reports `attached: false`,
 `exchangeQuotaEnforced: false` and `sandboxEnforced: false`. A separate one-time
 writable handoff is described below. An image creation proof alone is not an
-execution capability; Studio Windows Run remains unfinished.
+execution capability; the Studio Windows Run connection now consumes the
+separate trusted volume lease.
 
 ## Detached image ownership
 
@@ -163,6 +164,7 @@ and changed-body cleanup. All 26 actual native checks pass at `a8690328`, run
 41896980735; its digest-verified receipt is
 `windows-writable-handoff-a869-native.json`.
 
-Windows Sandbox mapping of this trusted volume, Studio Run connection and a
-supported personal host's privileged setup remain implementation work. No VM
+Windows Sandbox mapping and the Studio Run connection are now implemented
+and software-tested. A supported personal host's privileged setup remains
+implementation work. No VM
 execution capability is inferred from a volume lease.

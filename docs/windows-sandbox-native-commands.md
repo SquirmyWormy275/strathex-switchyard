@@ -4,9 +4,9 @@ Switchyard's fixed Windows helper implements bounded Sandbox metadata, list,
 start, stop, connect, login-probe and worker-execution verbs. The encrypted host
 transport records each native guardian before acknowledging it and retains
 uncertain results without replay. The [managed guest lifecycle](windows-managed-guest-lifecycle.md) now connects
-those commands and passes software fault checks. The Studio Windows adapter,
-bounded-volume backend connection and privileged personal-host setup remain unfinished; these
-command boundaries alone are not a working Studio Windows task run.
+those commands and passes software fault checks. The Studio Windows adapter and bounded-volume backend now connect those
+commands to reviewed policy admission. Privileged personal-host setup remains
+unfinished, and native commands alone do not demonstrate an actual VM task run.
 
 The helper accepts one closed JSON request through `--windows-sandbox-cli`.
 It resolves only the current user's known-folder
@@ -77,4 +77,5 @@ guards pass, and build scratch was removed after retaining
 `windows-bounded-mapping-build-20261104.json`. Actual VM startup, viewer/login,
 worker execution, stop and restart acceptance require a supported Windows Sandbox
 host. The higher-level coordinator is implemented and software-tested; its Studio
-adapter and bounded-volume backend connection remain independent work.
+adapter and bounded-volume backend are now connected; privileged personal-host
+setup and actual supported-host VM acceptance remain separate work.

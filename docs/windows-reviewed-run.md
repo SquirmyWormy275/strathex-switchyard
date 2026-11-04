@@ -3,7 +3,7 @@
 The Windows connection uses a small host manifest to bind the selected input
 files to the guest's existing catalog format. The live repository is never a
 writable guest mapping. The validator and host-only runner are implemented;
-the Studio policy/admission adapter is still being connected.
+the Studio platform factory now connects policy admission and separate stop approval.
 
 `run.json` has exactly these fields:
 
@@ -104,3 +104,28 @@ requires the same kernel lease. The combined inventory/runner/manifest/lock/
 privacy group passes 57 checks, including a real encrypted cross-instance stop
 request against an explicit guest double. The ten orchestration cases do not
 claim an actual Windows VM.
+
+## Studio policy and exact stop
+
+The Windows platform factory now selects this runner through the same task
+authority, one-use confirmation, checkpoint, target resolver, budget and receipt
+services used by Linux. The review binds source directory identity, input
+witnesses, catalog, runtime/helper prerequisites and the current workspace.
+Changed inputs, revoked grants, a substituted prerequisite or a failed protected
+checkpoint cannot dispatch the guest. An unavailable preflight remains a
+no-program outcome.
+
+Exact stop has a separate confirmation, operation, 120-second Windows budget and
+receipt. The immutable Run admission is distinct from the eventual program
+result. Stop targets only the protected operation; PIDs, guest IDs and commands
+are not accepted. Its budget is separate from the unchanged Linux stop budget.
+A lost final write can recover an already recorded passing receipt. Late exit
+without such a receipt preserves an incomplete stop result and cannot replay
+cancellation or the worker.
+
+Eleven Studio admission/stop/restart cases pass using real task grants, Git
+inspection, encrypted policy/checkpoint/budget/receipt ledgers and an explicit
+Windows runner double. A separate 41-check platform/package group passes,
+including the existing actual Linux host broker. Type checking passes. Native
+filesystem acceptance and supported interactive VM acceptance remain separate.
+The frontend is unchanged.

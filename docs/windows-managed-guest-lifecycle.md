@@ -5,8 +5,9 @@ reviewed backend's process-runner contract. It creates an exact VM, acknowledges
 its identity before the worker, establishes its login session, dispatches the
 worker once, and verifies VM stop independently of the short CLI processes.
 The coordinator is implemented and software-tested. The Studio Windows Run
-adapter and bounded exchange-volume implementation
-remain work to finish; actual VM acceptance also needs a supported Windows host.
+adapter and bounded exchange-volume lifecycle are connected and software-tested.
+Normal personal-host privileged setup remains unfinished; actual VM acceptance
+also needs a supported Windows host. [Run contract](windows-reviewed-run.md).
 
 The [embedded worker staging contract](windows-guest-tools.md) now reuses the
 existing helper image through one exact private hard link. One host-pinned
@@ -52,8 +53,8 @@ reserving a guest and binds its digest to the protected start record. Quota
 admission is recorded only after exact native startup verifies. This historical
 admission fact is separate from current volume ownership and independent VM
 exit. Output collection limits alone never provide filesystem enforcement. The
-Studio Windows execution action remains disabled while its adapter is unfinished;
-normal personal-host privileged setup also remains implementation work.
+Studio Windows execution path now uses this bounded backend through its policy
+adapter. Normal personal-host privileged setup remains implementation work.
 
 The focused command, lifecycle, backend/worker-contract and runner inventory checks
 pass 57 cases; four packaged-import cases and type checking pass separately.

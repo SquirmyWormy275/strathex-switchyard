@@ -13,6 +13,7 @@ import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
 import { createRepositoryExecutionSupervisors } from "./repository-execution-supervisor.mjs";
 import { createRepositoryExecutionStaging } from "./repository-execution-staging.mjs";
 import { createRepositoryExecutionStops } from "./repository-execution-stop.mjs";
+import { createWindowsRepositoryExecution } from "./repository-windows-execution.mjs";
 import { scopeHash } from "./confirmations.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
@@ -23,7 +24,8 @@ function proposed(input) {
   return {requestId:input.requestId,authorityId:input.authorityId,manifestPath:input.manifestPath,manifestSha256:input.manifestSha256,action:input.action};
 }
 const view=r=>({requestId:r.requestId,authorityId:r.authorityId,taskId:r.taskId,sessionId:r.sessionId,repositoryRoot:r.repositoryRoot,targetSnapshotId:r.targetSnapshotId,action:r.action,manifestPath:r.manifestPath,manifestSha256:r.manifestSha256,recipe:r.recipe,executableIdentity:r.executableIdentity,executionPolicy:r.executionPolicy,scopeDigest:r.scopeDigest,status:r.status,observedStatus:r.observedStatus??null,operationId:r.operationId??null,outcome:r.outcome??null,expiresAt:r.expiresAt,providerTaskCompletionVerified:false});
-export function createRepositoryExecution({store,authority,stateDirectory,platform=process.platform,isActive=async()=>true,supervisors=createRepositoryExecutionSupervisors({store,isActive}),staging=createRepositoryExecutionStaging({store,stateDirectory:join(stateDirectory,"inputs")}),namespaceFactory=native=>new LinuxBubblewrapRepositoryProcessSupervisor(native,{additionalActions:["run_target"],readOnlyDisposable:true,temporaryBytes:executionPolicy.temporaryBytes}),now=Date.now}={}) {
+export function createRepositoryExecution({store,authority,stateDirectory,platform=process.platform,isActive=async()=>true,supervisors=createRepositoryExecutionSupervisors({store,isActive}),staging=createRepositoryExecutionStaging({store,stateDirectory:join(stateDirectory,"inputs")}),namespaceFactory=native=>new LinuxBubblewrapRepositoryProcessSupervisor(native,{additionalActions:["run_target"],readOnlyDisposable:true,temporaryBytes:executionPolicy.temporaryBytes}),windowsRunner,now=Date.now}={}) {
+  if(platform==="win32")return createWindowsRepositoryExecution({store,authority,stateDirectory,isActive,now,runner:windowsRunner});
   const generations=new Map(),pending=new Map(),seen=new Set(),runtimes=new Map(),recoveryHosts=new Map(),reader=new NodeFileDigestReader({maxFileBytes:128*1024});let closed=false;
   const current=(c,g)=>{if(closed||g!==(generations.get(c)??0))throw Error("This reviewed execution was stopped.");};
   async function exclusive(c,fn){if(pending.has(c))throw Error("Wait for the current execution review or admission.");const g=generations.get(c)??0,p=Promise.resolve().then(()=>fn(g));pending.set(c,p);seen.add(c);try{return await p;}finally{if(pending.get(c)===p)pending.delete(c);}}
