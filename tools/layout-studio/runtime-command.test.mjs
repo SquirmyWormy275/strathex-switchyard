@@ -8,6 +8,13 @@ import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { createHash } from "node:crypto";
+import { windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
+
+test("fixed Windows helper temp coordinates exclude secrets and startup overrides and reject ambiguous or redirected syntax",()=>{
+  assert.deepEqual(windowsHelperTemporaryEnvironment({TEMP:"C:\\Users\\pilot\\Temp",TMP:"D:\\private-temp",API_KEY:"synthetic",DOTNET_STARTUP_HOOKS:"untrusted"}),{TEMP:"D:\\private-temp",TMP:"D:\\private-temp"});
+  assert.deepEqual(windowsHelperTemporaryEnvironment({Temp:"C:\\private-temp"}),{TEMP:"C:\\private-temp",TMP:"C:\\private-temp"});
+  for(const source of [{},{TEMP:"relative"},{TEMP:"\\\\server\\share"},{TEMP:"C:\\private\\..\\foreign"},{TEMP:"C:\\private\nforeign"},{TEMP:"C:\\private:stream"},{TEMP:"C:\\one",Temp:"C:\\two"}])assert.throws(()=>windowsHelperTemporaryEnvironment(source));
+});
 
 const windowsHelper = process.env.SWITCHYARD_TEST_RUNTIME_HELPER;
 const options = { env: runtimeEnvironment(), ...(windowsHelper ? { windowsHelper } : {}) };

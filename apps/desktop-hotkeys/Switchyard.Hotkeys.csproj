@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../windows-companion/sandbox-helper/Program.cs" Link="SandboxGuestWorker.cs" />

@@ -66,6 +66,15 @@ jobs:
           } finally { $zip.Dispose() }
           Remove-Item -LiteralPath $archive -Force
 
+      - name: Verify the copied helper has no adjacent runtime dependency
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node scripts/verify-windows-standalone-helper.mjs --synthetic "--helper=$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'The copied Windows helper requires an unshipped runtime or has unknown exit.' }
+
       - name: Verify broker metadata and protected files with a restricted token
         shell: pwsh
         timeout-minutes: 3
@@ -120,5 +129,14 @@ jobs:
         with:
           name: switchyard-storage-broker-protocol-${{ github.sha }}
           path: ${{ runner.temp }}/switchyard-storage-broker-protocol-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the standalone helper proof
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-standalone-helper-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-standalone-helper-verification.json
           if-no-files-found: error
           retention-days: 7

@@ -10,6 +10,17 @@ Actual interactive VM acceptance requires a supported Windows Sandbox host;
 filesystem CI and runner doubles do not establish that acceptance. The frontend
 remains frozen for review.
 
+The Windows helper now embeds its native .NET runtime libraries as well as its
+managed code. [Microsoft's single-file deployment contract](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
+requires `IncludeNativeLibrariesForSelfExtract` for this packaging. Calls to the
+fixed helper receive only validated current-user temporary coordinates in
+addition to their explicit environment; runtime startup overrides are refused.
+The Windows lane copies only the executable to a new empty directory, removes
+installed-runtime discovery paths, runs real metadata through its owned guardian,
+verifies independent exit and removes only that proof's copy/cache. This new
+native standalone acceptance is pending CI; local runtime/package checks pass.
+It does not establish privileged service or VM acceptance.
+
 The broker metadata wire contract is now implemented separately from the future
 privileged service. It accepts only a closed metadata request and binds a fresh
 256-bit nonce, installation UUID, owner-scope digest, service-image digest and

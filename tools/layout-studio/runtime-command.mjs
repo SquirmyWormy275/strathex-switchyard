@@ -5,7 +5,7 @@ import { createReadStream } from "node:fs";
 import { realpath, readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "./owned-process.mjs";
-import { desktopEnvironment } from "./process-environment.mjs";
+import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
 export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper } = {}) {
   if (frame?.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(frame.id) || !Number.isSafeInteger(frame.guardianPid) || frame.guardianPid < 1 || !/^[0-9]+$/.test(frame.birth ?? "") || frame.containment !== (process.platform === "linux" ? "owned-linux-session" : "windows-job")) throw new Error("The interrupted runtime guardian scope is invalid; preserve its stage.");
@@ -45,7 +45,12 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
   if (expectedExecutableSha256 !== undefined && (typeof expectedExecutableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(expectedExecutableSha256) || executableSha256 !== expectedExecutableSha256)) throw new Error("The exact reviewed native executable digest changed before guardian startup.");
   // Hash the native target but preserve the invocation path: Python locates
   // pyvenv.cfg beside its venv alias, and argv[0] is meaningful to native tools.
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256, args, cwd, environment: env ?? desktopEnvironment(), timeoutMs: timeout, maxOutputBytes, ...(linuxExecutable ? { linuxExecutableSha256: linuxExecutable.sha256 } : {}), ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
+  let environment=env??desktopEnvironment();
+  if(process.platform==="win32"&&resolved.toLowerCase()===(await realpath(windowsHelper)).toLowerCase()){
+    if(Object.keys(environment).some(name=>/^(DOTNET_|CORECLR_|COMPLUS_)/i.test(name)))throw Error("The fixed native helper cannot receive runtime startup overrides.");
+    environment={...Object.fromEntries(Object.entries(environment).filter(([name])=>!["TEMP","TMP"].includes(name.toUpperCase()))),...windowsHelperTemporaryEnvironment()};
+  }
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256, args, cwd, environment, timeoutMs: timeout, maxOutputBytes, ...(linuxExecutable ? { linuxExecutableSha256: linuxExecutable.sha256 } : {}), ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
   if (Buffer.byteLength(JSON.stringify(request)) > 1048576) throw new Error("The fixed runtime request exceeds its protocol bound.");
   checkAbort();
   const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore", ...(linuxExecutable ? [linuxExecutable.fd] : [])], env: desktopEnvironment() });
