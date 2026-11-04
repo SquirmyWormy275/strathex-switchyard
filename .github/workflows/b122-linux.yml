@@ -48,6 +48,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
 
+      - name: Verify the runner permits the actual namespace boundary
+        run: |
+          /usr/bin/bwrap --unshare-user --unshare-pid --unshare-net --die-with-parent --new-session --clearenv --proc /proc --dev /dev --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind-try /lib64 /lib64 --chdir / /usr/bin/true
+
       - name: Verify shared and native Linux control planes
         run: |
           npm run typecheck

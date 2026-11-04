@@ -26,6 +26,20 @@ claim about Windows containment. Bubblewrap and a working user-namespace policy
 are required for the Linux native case. No keyboard, existing project, account
 or desktop configuration is changed by these source tests.
 
+For an explicit normal installed Linux demonstration with one new disposable
+repository, an empty native Codex task and zero model prompts:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-repository-execution-host.mjs --synthetic
+```
+
+It requires the normal installed app and the existing permitted Codex login.
+Eight checks passed at `ab7ceed`; the private result is
+`installed-repository-execution-1793805620119.json`. Successful cleanup restores
+selection, definitions, keyboard-only validation state and the private endpoint;
+it retains the native empty-task history. Failed checks retain their synthetic
+staging and evidence.
+
 ## API sequence
 
 Use the existing authenticated loopback transport and selected personal

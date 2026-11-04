@@ -6,9 +6,11 @@ import { join, dirname } from "node:path";
 import { authorityFixture } from "./test-support/task-authority-fixture.mjs";
 import { createRepositoryExecution } from "./repository-execution.mjs";
 import { createRepositoryExecutionSupervisors } from "./repository-execution-supervisor.mjs";
+import { DurableBudgetManager } from "../../packages/control-plane/src/budgets.ts";
+import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
 import { createRepositoryExecutionStaging } from "./repository-execution-staging.mjs";
 const sha=bytes=>createHash("sha256").update(bytes).digest("hex");
-async function fixture(t,{native=false}={}) {
+async function fixture(t,{native=false,hold=false}={}) {
   const f=await authorityFixture(t,{executionActions:["run_target"]});
   const program="process.stdout.write('exact reviewed run output')",programPath=join(f.root,"program.mjs");await writeFile(programPath,program);
   const recipe={schema:"sxsy-b122.repository-runtime",version:1,repositoryRoot:f.root,allowedHttpsUrls:[],recipes:{run_target:{kind:"process",executable:process.execPath,args:["program.mjs"],cwd:".",environment:{},lifecycle:"managed",isolation:"disposable",timeoutMs:5000,maxOutputBytes:4096,inputFiles:[{path:"program.mjs",sha256:sha(program),size:Buffer.byteLength(program),classification:"non-production"}]}}};
@@ -16,7 +18,7 @@ async function fixture(t,{native=false}={}) {
   const grantInput={...f.proposed,paths:["task.txt","program.mjs","run.json"],classifications:{includedUntracked:["program.mjs","run.json"]},actions:["run_target"]};
   const approval=await f.service.review("personal",grantInput),grant=await f.service.issue("personal",{...grantInput,token:approval.confirmation.token});
   let effects=0;const owners=new Map();
-  const command=async(_exe,_args,options)=>{const owner={schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:12345,birth:"1",containment:process.platform==="linux"?"owned-linux-session":"windows-job"};owners.set(owner.id,false);await options.onGuardianReady(owner);effects++;owners.set(owner.id,true);return {status:"completed",exitCode:0,stdout:"synthetic program output",stderr:"",inputDelivered:true,treeExitVerified:true};};
+  const command=async(_exe,_args,options)=>{const owner={schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:12345,birth:"1",containment:process.platform==="linux"?"owned-linux-session":"windows-job"};owners.set(owner.id,false);await options.onGuardianReady(owner);effects++;if(hold)await new Promise(resolve=>{options.signal.addEventListener("abort",resolve,{once:true});if(options.signal.aborted)resolve();});owners.set(owner.id,true);return {status:"completed",exitCode:0,stdout:"synthetic program output",stderr:"",inputDelivered:true,treeExitVerified:true};};
   const supervisors=native?undefined:createRepositoryExecutionSupervisors({store:f.store,command,guardianStopped:async scope=>owners.get(scope.id)===true});
   // A portable test double exercises broker contracts without claiming a Windows/Linux OS boundary.
   const staging=native?undefined:createRepositoryExecutionStaging({store:f.store,stateDirectory:join(f.stage,"execution","inputs"),guardianStopped:async scope=>owners.get(scope.id)===true,providerFactory:state=>({async prepare(input){const base=join(state,"repository-execution-roots");await mkdir(base,{recursive:true});const root=await mkdtemp(join(base,"inputs-"));for(const file of input.inputFiles){const target=join(root,file.path);await mkdir(dirname(target),{recursive:true});await writeFile(target,await readFile(join(input.repositoryRoot,file.path)));}return {root,isolation:"disposable",protections:{productionData:"denied",ambientCredentials:"denied"},release:()=>rm(root,{recursive:true})};}})});
@@ -42,6 +44,12 @@ test("commit-only grants cannot authorize runs and changed inputs or revoked exe
   const f=await fixture(t),commitInput={...f.grantInput,actions:["local_commit"]},review=await f.service.review("personal",commitInput),commit=await f.service.issue("personal",{...commitInput,token:review.confirmation.token});
   await assert.rejects(f.execution.review("personal",{...f.proposed,authorityId:commit.id}),/not.*allow|prohibited|action/i);
   const accepted=await f.execution.review("personal",f.proposed);await f.service.revoke("personal",f.grant.id);await assert.rejects(f.execution.apply("personal",{requestId:f.proposed.requestId,token:accepted.confirmation.token}),/revoked/);assert.equal(f.effects(),0);
+});
+test("workspace cancellation settles only verified stop facts and releases the budget without changing the original admission",async t=>{
+  const f=await fixture(t,{hold:true}),review=await f.execution.review("personal",f.proposed),admission=await f.execution.apply("personal",{requestId:f.proposed.requestId,token:review.confirmation.token});assert.equal(admission.status,"running");
+  assert.equal((await f.execution.stopCompartment("personal")).stopped,true);
+  const status=await f.execution.status("personal",f.proposed.requestId);assert.equal(status.observedStatus,"cancelled");assert.equal(status.outcome.status,"running");assert.equal(status.nativeStatus,"outcome-unconfirmed");assert.equal(status.nativeExitVerified,true);assert.equal(status.programExitCode,null);
+  const budgets=await new DurableBudgetManager(repositoryEffectJournal(f.store,"personal",{domain:"execution"})).list();assert.equal(budgets.some(c=>["claimed","running","cancelling","timed_out"].includes(c.state)),false);assert.equal(f.effects(),1);
 });
 test("actual Linux host broker connects reviewed task inputs, namespace and owned guardian without a live repository write",{skip:process.platform!=="linux"},async t=>{
   const f=await fixture(t,{native:true}),review=await f.execution.review("personal",f.proposed),before=await f.run("rev-parse","HEAD");

@@ -63,8 +63,9 @@ test("unknown native exit survives another host instance and blocks replacement 
 });
 test("scope revocation before readiness prevents effects and shutdown cannot accept a late native result",async t=>{
   const before=await fixture(t,async stage=>{if(stage==="before-ready")before.authorize(false);});await assert.rejects(before.port().start(before.request),/protected startup/);assert.equal(before.effects(),0);
-  let enter;const entered=new Promise(r=>{enter=r;});const f=await fixture(t,async(stage,{options})=>{if(stage==="effect"){enter();await new Promise(resolve=>{options.signal.addEventListener("abort",resolve,{once:true});if(options.signal.aborted)resolve();});}});
+  let enter;const entered=new Promise(r=>{enter=r;});const f=await fixture(t,async(stage,{options,store})=>{if(stage==="effect"){enter();await new Promise(resolve=>{options.signal.addEventListener("abort",resolve,{once:true});if(options.signal.aborted)resolve();});assert.equal(typeof (await store.snapshot("personal")).repositoryExecutions[0].stopRequestedAt,"number","workspace cancellation must be durable before abort delivery");}});
   const p=await f.port().start(f.request);await entered;const stop=f.service.stopCompartment("personal");assert.equal((await p.wait()).terminalEvidence,"ambiguous");assert.equal((await stop).stopped,true);assert.equal((await f.store.snapshot("personal")).repositoryExecutions[0].status,"outcome-unconfirmed");
+  assert.equal((await f.port().observeOperation(f.request)).status,"cancelled","verified stop can settle cancellation without inventing a program result");
 });
 test("actual Linux supervised execution returns only after protected native readiness and independent exit",{skip:process.platform!=="linux"},async t=>{
   const f=await fixture(t), native=f.create({command:runRuntimeCommand,guardianStopped:runtimeGuardianStopped});
@@ -76,6 +77,6 @@ test("actual Linux supervised execution returns only after protected native read
   const original=sha(await readFile(tool)),binding={...f.binding,operationId:randomUUID()};
   const upgrading=f.create({guardianStopped:runtimeGuardianStopped,command:(exe,args,options)=>runRuntimeCommand(exe,args,{...options,onGuardianReady:async frame=>{await options.onGuardianReady(frame);await rename(tool,tool+"-old");await copyFile("/usr/bin/false",tool);}})});
   const pinned=new LinuxBubblewrapRepositoryProcessSupervisor(f.port(upgrading,binding),{additionalActions:["run_target"],readOnlyDisposable:true});
-  const child=await pinned.start({...request,operationId:binding.operationId,executionRoot,cwd:executionRoot,executable:tool,executableSha256:original,args:["reviewed native inode"]}),pinnedOutput=output(child.stdout);
-  assert.equal((await child.wait()).code,0);assert.equal(await pinnedOutput,"reviewed native inode");assert.notEqual(sha(await readFile(tool)),original,"atomic tool replacement must not replace the reviewed executable descriptor");
+  const child=await pinned.start({...request,operationId:binding.operationId,executionRoot,cwd:executionRoot,executable:tool,executableSha256:original,args:["reviewed native inode"]}),pinnedOutput=output(child.stdout),diagnostic=output(child.stderr);
+  assert.equal((await child.wait()).code,0,await diagnostic);assert.equal(await pinnedOutput,"reviewed native inode");assert.notEqual(sha(await readFile(tool)),original,"atomic tool replacement must not replace the reviewed executable descriptor");
 });

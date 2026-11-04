@@ -112,7 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
-  if (platform === "win32" && file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
+  if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
   const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }

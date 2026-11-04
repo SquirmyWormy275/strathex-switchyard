@@ -39,9 +39,11 @@ export function createRepositoryExecutionSupervisors({ store, command = runRunti
   }
   async function stopCompartment(c) {
     generations.set(c,(generations.get(c) ?? 0)+1);
-    const owned = [...resources.values()].filter(r => r.compartment === c); owned.forEach(r => r.controller.abort());
-    await Promise.allSettled(owned.map(r => r.done));
-    const exits = await Promise.all(owned.flatMap(r => [...r.clients].map(p => p.stop().catch(() => false))));
+    const owned = [...resources.entries()].filter(([,r]) => r.compartment === c);
+    await Promise.allSettled(owned.map(async([key,r])=>{try{await update(c,key.slice(c.length+1),"repository-execution-workspace-stop",row=>{row.stopRequestedAt??=now();});}finally{r.controller.abort();}}));
+    const ownedResources=owned.map(([,r])=>r);
+    await Promise.allSettled(ownedResources.map(r => r.done));
+    const exits = await Promise.all(ownedResources.flatMap(r => [...r.clients].map(p => p.stop().catch(() => false))));
     const verified = exits.every(Boolean) && await stopped(c);
     if (verified) for (const [key,r] of resources) if (r.compartment === c && [...r.clients].every(p=>p.closed)) resources.delete(key);
     return { stopped: verified };

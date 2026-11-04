@@ -16,18 +16,36 @@ readiness cannot substitute the reviewed executable descriptor. The API,
 shutdown/restart boundaries and evidence exclusions are described in the
 [execution contract](reviewed-task-execution.md). The frontend is unchanged.
 
+Normal installed Run at `ab7ceed` passed eight checks with one actual empty
+Codex task and zero prompts. Actual output confirmed denied host files,
+credentials and loopback, a read-only workspace and 64 MiB temporary filesystem.
+The terminal receipt and original duplicate admission matched; both native
+guardians independently exited, both input copies were removed, and definitions,
+selection, keyboard-only validation state and the private link were restored.
+Receipt: `installed-repository-execution-1793805620119.json`.
+
 Focused evidence: 38 HTTP/runtime/staging/execution cases and 20 shared broker/
 Linux runtime cases pass. The updated native input proof passes three checks
-(`repository-inputs-native-1793804631743.json`) without copying a runtime. These
-are source checks; normal installed execution acceptance is still pending.
+(`repository-inputs-native-1793804631743.json`) without copying a runtime.
+The full `ab7ceed` Linux run passed 149/150 groups; the final native recovery
+fault case exceeded its old 45-second group limit. That case then passed alone
+in 51 seconds. The corrected 120-second group plus ownership/manifest checks
+pass 30/30 cases (receipt `9b67cf81-8701-4344-ac05-293405d860cc`). Full acceptance
+of the corrected revision is still pending. The additional workspace-stop
+regression verifies durable cancellation before abort and released budgets while
+preserving the original admission and unconfirmed program outcome.
+
+Ubuntu CI at `ab7ceed` rejected the actual namespace tool-replacement test;
+native diagnostics and an explicit runner namespace preflight are now retained.
+That CI failure remains open; the same actual native check passes on this host.
 Windows guest execution, writable build outputs, reviewed per-run stop and the
 remaining action integrations are unfinished implementation, not hardware blocks.
 
 At published `c6e8a50`, GitHub Linux release verification and the short native
 Windows client-platform lane pass. The complete Windows run 41846396332 passed
 backend, helper, Job Object, fresh runtime and suite packaging, then exhausted
-the recovery group's 45-second harness allowance after six passing cases. Its
-Windows group budget is now 120 seconds, with no effect deadline or assertions
+the recovery group's 45-second harness allowance after six passing cases. The
+recovery group budget is now 120 seconds on both platforms, with no effect deadline or assertions
 removed; complete corrected acceptance remains pending.
 
 ## Current pilot
@@ -37,9 +55,9 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `7012333` is installed as release
-`5625f7250f4133a9f1dbcc7b949b2ad0c3042494ef7e610b6e79bda43dd791e8`: 468 files,
-4,417,965 bytes. Six normal update checks pass (assignment-legends-1793793990974.json).
+Published source `ab7ceed` is installed as release
+`0a02afc39dfc8d8dbba18ab317ae38c32167e3255568e2767ea518b521f8ad64`: 477 files,
+4,603,496 bytes. Six normal update checks pass (assignment-legends-1793805407570.json).
 Current plus one rollback occupy about 11 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
