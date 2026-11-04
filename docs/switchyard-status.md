@@ -13,9 +13,9 @@ The normal installed command is `~/.local/bin/switchyard`. Source development us
 local; it contains access credentials. The frontend is frozen for review and its
 exact digest/private link have survived the backend updates.
 
-Published source `6039e7f` is installed as release
-`59f2fd1b887dc0f11e903fca4158074da4aa1bc1bc3aceee1525f33b433a2d30`: 468 files,
-4,411,098 bytes. Six normal update checks pass (assignment-legends-1793790716942.json).
+Published source `15cd19b` is installed as release
+`345605f95d18e54617de469edfb86a34a7376a7ad8c3c48b07c9c0ba7d43259e`: 468 files,
+4,417,965 bytes. Six normal update checks pass (assignment-legends-1793792770918.json).
 Current plus one rollback occupy about 11 MiB, bundle staging is empty, and no
 extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
 configuration, native ChatGPT voice/overlay repair and the private link remain
@@ -88,8 +88,15 @@ stale/late role changes and synthetic Work-only routing. Native client responses
 in these cases are fixtures, not browser/account acceptance. The changed Windows C# sender compiles from isolated tracked sources; its actual
 dispatch method sent two authenticated HTTP packets with distinct matching UUIDs
 on Linux/.NET 8.0.30 (native-hotkey-dispatch-20261104-034142.json). No build files
-were retained. Normal installed role demonstration and fresh Windows source
-acceptance remain pending.
+were retained. The normal installed role demonstration then passed seven checks
+at 15cd19b (installed-client-launch-1793792795748.json): one real fixed homepage
+request through a temporary workflow role and the actual CLI physical-intent
+gateway, matching invocation/receipt, no duplicate helper, zero prompts and
+independently verified exit. It restored validation definitions, keyboard-only
+mode and selection and removed only its own successful launch record. A small
+private dated definition backup remains. No physical key, browser visual/account
+or interactive Windows acceptance is claimed. Fresh native Windows source
+acceptance remains pending.
 
 ## Work still required
 
@@ -105,6 +112,18 @@ Installed discovery returned zero configuration interfaces at
 transactions, printer/cap fit, interactive Windows accounts/windows, microphone
 and approved tenant behavior require their actual environments. No flash/reset,
 bootloader, solenoid operation, public release, merge or license change occurred.
+
+## Next executable work
+
+1. Connect host-pinned general execution recipes to the task authority, durable
+   operation/budget and containment paths; local commits alone do not complete
+   the execution integration.
+2. Complete exact native desktop/IDE/terminal attachments and the remaining
+   source-verified controller controls, without substituting homepage launch for
+   session identity or inferring electrical capabilities.
+3. Check fresh Windows CI for each new native change and continue integrated
+   acceptance. Preserve the frozen frontend until its review resumes; its task,
+   role, recovery and controller controls remain unfinished implementation.
 
 ## Preserved implementation history
 

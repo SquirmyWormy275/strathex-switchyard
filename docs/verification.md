@@ -92,3 +92,14 @@ old generated files after moving the intermediate directory; copying only the
 three exact tracked source/project files corrected the verification setup. All
 temporary build/probe files were removed. Interactive Windows hotkey/URI/account
 acceptance remains unverified.
+
+Normal installed source `15cd19b` passed six update checks with the exact frozen
+frontend/private link preserved (assignment-legends-1793792770918.json), followed
+by seven client role checks (installed-client-launch-1793792795748.json). One real
+GitHub Copilot homepage request entered through a temporary workflow role and the
+actual CLI physical-intent gateway, with exact invocation/receipt correlation,
+no duplicate helper, zero prompts and independently verified native exit. The
+validation definitions/selection/mode were restored; its successful launch record
+and bundle staging were removed. Current plus one rollback remain about 11 MiB.
+No physical keyboard event, visual/account acceptance or frontend review is
+inferred.
