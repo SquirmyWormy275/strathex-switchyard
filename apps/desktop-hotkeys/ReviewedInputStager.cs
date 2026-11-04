@@ -107,6 +107,11 @@ internal static class ReviewedInputStager
             if (!GetSecurityDescriptorDacl(memory, out bool present, out var acl, out _) || !present || acl == IntPtr.Zero || SetSecurityInfo(directory, 1, 0x80000004, IntPtr.Zero, IntPtr.Zero, acl, IntPtr.Zero) != 0) throw Invalid();
         }
         finally { LocalFree(memory); }
+        VerifyPrivateDirectory(directory);
+    }
+    private static void VerifyPrivateDirectory(SafeFileHandle directory)
+    {
+        string sid = WindowsIdentity.GetCurrent().User?.Value ?? throw Invalid();
         if (GetSecurityInfo(directory, 1, 4, out _, out _, out _, out _, out var observed) != 0) throw Invalid();
         try
         {
@@ -266,7 +271,7 @@ internal static class ReviewedInputStager
 
     // Creates only exchange.vhd inside an acknowledged new private directory.
     // This operation never attaches a disk or formats any host volume.
-    public static int RunBoundedImage()
+    public static int RunBoundedImage(bool inspect = false)
     {
         const string schema = "switchyard-windows-bounded-image/v1";
         var handles = new List<SafeFileHandle>(); string phase = "request";
@@ -276,23 +281,30 @@ internal static class ReviewedInputStager
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
-            Exact(request, "schema", "operationId", "stagingRoot", "stagingIdentity");
+            Exact(request, inspect ? new[] { "schema", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "expectedImageSha256" } : new[] { "schema", "operationId", "stagingRoot", "stagingIdentity" });
             if (request.GetProperty("schema").GetString() != schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation) || operation == Guid.Empty) throw Invalid();
             string root = Absolute(request.GetProperty("stagingRoot"));
             if (Path.GetFileName(root) != "disk-" + operation.ToString("D")) throw Invalid();
             phase = "directory";
-            var directory = PinDirectories(root, handles, WriteDac | ReadControl); var original = Information(directory, true);
-            if (!Matches(original, request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(root).Any()) throw Invalid();
-            RestrictNewDirectory(directory);
+            var directory = PinDirectories(root, handles, ReadControl | (inspect ? 0 : WriteDac)); var original = Information(directory, true);
+            if (!Matches(original, request.GetProperty("stagingIdentity"))) throw Invalid();
+            if (inspect)
+            {
+                var entries = Directory.EnumerateFileSystemEntries(root).ToArray();
+                if (entries.Length != 1 || Path.GetFileName(entries[0]) != "exchange.vhd") throw Invalid();
+                VerifyPrivateDirectory(directory);
+            }
+            else { if (Directory.EnumerateFileSystemEntries(root).Any()) throw Invalid(); RestrictNewDirectory(directory); }
             phase = "create";
-            using var image = new FileStream(Path.Combine(root, "exchange.vhd"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
+            using var image = inspect ? new FileStream(Open(Path.Combine(root, "exchange.vhd"), false), FileAccess.Read) : new FileStream(Path.Combine(root, "exchange.vhd"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
             var created = Information(image.SafeFileHandle, false);
-            if (created.Links != 1) throw Invalid();
+            if (created.Links != 1 || inspect && !Matches(created, request.GetProperty("imageIdentity"))) throw Invalid();
             phase = "write";
-            BoundedExchangeImage.WriteNew(image, operation); image.Flush(flushToDisk: true);
+            if (!inspect) { BoundedExchangeImage.WriteNew(image, operation); image.Flush(flushToDisk: true); }
             string footerSha256 = BoundedExchangeImage.Validate(image, operation);
             if (!Matches(Information(directory, true), request.GetProperty("stagingIdentity")) || Directory.EnumerateFileSystemEntries(root).Count() != 1 || Information(image.SafeFileHandle, false).Links != 1) throw Invalid();
             image.Position = 0; string imageSha256 = Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant();
+            if (inspect && imageSha256 != request.GetProperty("expectedImageSha256").GetString()) throw Invalid();
             image.Dispose(); phase = "native-header";
             using var pinned = Open(Path.Combine(root, "exchange.vhd"), false);
             var current = Information(pinned, false);
@@ -301,7 +313,7 @@ internal static class ReviewedInputStager
             Console.WriteLine(JsonSerializer.Serialize(new { schema, operationId = operation.ToString("D"), stagingIdentity = Identity(original), imageIdentity = Identity(created), imageFilename = "exchange.vhd", virtualBytes = BoundedExchangeImage.VirtualBytes, backingBytes = BoundedExchangeImage.BackingBytes, filesystem = "FAT16", imageSha256, footerSha256, nativeHeaderVerified = true, privateAclReadbackVerified = true, attached = false, exchangeQuotaEnforced = false, sandboxEnforced = false }));
             return 0;
         }
-        catch (Exception error) { Console.Error.WriteLine($"Native bounded exchange image failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}. Preserve any partial owned image; no disk was attached."); return 2; }
+        catch (Exception error) { string detail = error is InvalidOperationException && Regex.IsMatch(error.Message, "^native-vhd-[a-z0-9-]{1,100}$", RegexOptions.CultureInvariant) ? error.Message : "boundary"; Console.Error.WriteLine($"Native bounded exchange image failed at {phase}; Win32={(error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : 0)}; detail={detail}. Preserve any partial owned image; no disk was attached."); return 2; }
         finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 }

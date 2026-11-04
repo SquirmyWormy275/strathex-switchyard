@@ -106,13 +106,16 @@ internal static class BoundedExchangeImage
                 var bytes = new byte[32]; BinaryPrimitives.WriteUInt32LittleEndian(bytes, version); uint length = 32;
                 uint result = GetVirtualDiskInformation(handle, ref length, bytes, out uint used);
                 if (result != 0) throw new System.ComponentModel.Win32Exception(checked((int)result));
-                if (used < minimum || used > bytes.Length) throw new InvalidOperationException("The native fixed image header is incomplete.");
+                if (used < minimum || used > bytes.Length) throw new InvalidOperationException($"native-vhd-layout-{version}-{used}-{length}");
                 return bytes;
             }
             var size = Read(1, 32); var identifier = Read(2, 24); var subtype = Read(7, 12); var loaded = Read(13, 12);
-            if (BinaryPrimitives.ReadUInt64LittleEndian(size.AsSpan(8, 8)) != VirtualBytes || BinaryPrimitives.ReadUInt32LittleEndian(size.AsSpan(28, 4)) != 512
-                || new Guid(identifier.AsSpan(8, 16)) != operationId || BinaryPrimitives.ReadUInt32LittleEndian(subtype.AsSpan(8, 4)) != 2 || BinaryPrimitives.ReadUInt32LittleEndian(loaded.AsSpan(8, 4)) != 0)
-                throw new InvalidOperationException("The native VHD reader did not verify this exact detached fixed-capacity image.");
+            ulong nativeSize = BinaryPrimitives.ReadUInt64LittleEndian(size.AsSpan(8, 8)); uint nativeSector = BinaryPrimitives.ReadUInt32LittleEndian(size.AsSpan(28, 4)), nativeType = BinaryPrimitives.ReadUInt32LittleEndian(subtype.AsSpan(8, 4)), nativeLoaded = BinaryPrimitives.ReadUInt32LittleEndian(loaded.AsSpan(8, 4));
+            if (nativeSize != VirtualBytes) throw new InvalidOperationException($"native-vhd-size-{nativeSize}");
+            if (nativeSector != 512) throw new InvalidOperationException($"native-vhd-sector-{nativeSector}");
+            if (new Guid(identifier.AsSpan(8, 16)) != operationId) throw new InvalidOperationException(new Guid(identifier.AsSpan(8, 16), bigEndian: true) == operationId ? "native-vhd-identifier-network" : "native-vhd-identifier-other");
+            if (nativeType != 2) throw new InvalidOperationException($"native-vhd-type-{nativeType}");
+            if (nativeLoaded != 0) throw new InvalidOperationException($"native-vhd-loaded-{nativeLoaded}");
         }
     }
 }

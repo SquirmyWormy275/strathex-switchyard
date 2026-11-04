@@ -163,6 +163,18 @@ Durable image ownership, attach/mount/detach/recovery, actual disk-full validati
 and the Studio adapter remain unfinished implementation; image creation grants
 neither a writable exchange lease nor execution protections.
 
+The first short Windows filesystem run at `332aa8a` passed all 11 actual native
+input, embedded-worker and Node checks, then failed image header validation.
+The overall job remains failed; its digest-verified small JSON receipt is
+preserved as `windows-filesystem-332aa8a-failed.json`. The reader now emits closed
+field/numeric diagnostics for that software discrepancy. Exact read-only image
+inspection is implemented separately, binding original file identity, bytes,
+private DACL and detached metadata without changing the directory ACL. The
+updated C# build has no warnings/errors, all five Linux mode guards pass and
+16 staging/package cases pass. Native inspection/header acceptance is pending;
+the immutable Node/worker checks are confirmed individually, not an accepted
+complete image or VM path.
+
 ## Current pilot
 
 The normal installed command is `~/.local/bin/switchyard`. Source development uses

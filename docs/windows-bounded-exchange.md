@@ -41,8 +41,21 @@ hashes in `windows-bounded-image-build-20261104.json`.
 Native Windows CI now verifies image creation, independent Windows VHD metadata,
 exact hashes/identities, duplicate/foreign-entry/directory-change refusal and
 independent guardian exits. A separate short filesystem workflow runs these
-checks alongside the unchanged full release lane. Native results are pending;
-the local format test is not Windows acceptance.
+checks alongside the unchanged full release lane. Its first run at `332aa8a`
+passed all 11 input/worker/Node checks, then failed the image's native header
+validation. That failed receipt was downloaded and digest-verified as
+`windows-filesystem-332aa8a-failed.json`; the overall job is not accepted. The
+reader now reports only a closed field code and bounded numeric diagnostics so
+the native layout/identity discrepancy can be corrected from actual evidence.
+The local format test is not Windows acceptance.
+
+`--inspect-bounded-exchange-image` now provides a separate read-only native
+observation of the exact original file ID, full image hash, private directory
+DACL and detached VHD header. It cannot change the directory's ACL or create a
+replacement. CI includes changed identity/hash refusals and byte preservation;
+native acceptance remains pending. The updated helper builds with zero
+warnings/errors and five Linux native-only guards pass. Build scratch was
+removed after retaining `windows-image-inspection-build-20261104.json`.
 
 The creation proof explicitly reports `attached: false`,
 `exchangeQuotaEnforced: false` and `sandboxEnforced: false`. Durable host image
