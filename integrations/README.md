@@ -78,6 +78,39 @@ not bind a launch-only recipe to resume, submit, cancel or mediated repository
 actions. Native client/tenant/account acceptance remains separate from the
 implemented request transport.
 
+## Workflow roles that open client surfaces
+
+Bind an existing workflow role through `POST /api/suite/roles/bind`:
+
+```json
+{"compartment":"personal","roleId":"builder","intent":"summon","provider":"github-copilot","targetKind":"client-surface","targetId":"github-copilot-web"}
+```
+
+This local connection records a fresh binding identity and the exact recipe
+digest. It accepts summon only. No session ID, command, URL, imported approval or
+content is accepted. Microsoft work Copilot uses the corresponding work
+compartment/provider/recipe; other providers remain prohibited there. Native
+Claude desktop still requires an implemented exact application binding.
+
+`roles/dispatch` accepts `{ compartment, roleId, intent, requestId }`, with a fresh
+UUID for each deliberate invocation. The physical `switchyard.role/v1` gateway
+uses the persisted active compartment and generates that UUID in the Linux CLI
+or Windows hotkey sender. Reusing a UUID returns its retained result only for the
+same exact binding. Another role, a new binding revision, or the direct launch
+API cannot substitute that request. Neither gateway automatically retries.
+Binding/role changes are checked again before native acknowledgement and before
+accepting a result. An uncertain request is retained, not replayed.
+
+The connection review reports `capability: "launch-only"`. It establishes no
+window focus, account, conversation, task resumption, status or mediated authority.
+Opening a client leaves the active conversation unchanged. Frontend role controls
+remain pending while the current review is frozen. For an explicit installed
+Linux proof with one real homepage request and zero prompts, run
+`node scripts/verify-client-launch-host.mjs --synthetic --role`; it uses the idle
+validation workspace, saves a private definition backup, restores definitions and
+selection, and verifies the helper has exited. It does not establish a physical
+key event or visual/account acceptance.
+
 ## Version 2 wire contract
 
 Only `POST /agent/v2/event`, `/agent/v2/poll` and `/agent/v2/ack` accept this

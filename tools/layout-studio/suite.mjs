@@ -1,5 +1,5 @@
 /** Shared product state and bounded operations behind the authenticated origin. */
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import { createRepositoryEffectRecovery } from "./repository-effect-recovery.mjs
 import { createRepositoryCommits } from "./repository-commits.mjs";
 import { createClientLaunch } from "./client-launch.mjs";
 import { createClientIntegrations } from "./client-integrations.mjs";
+import { clientRecipe } from "../../integrations/client-recipes.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 export function createSuite({ store = createSuiteStore(), agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, repositoryRecovery, repositoryCommits, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
@@ -92,8 +93,11 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     if (!agentIntents.includes(intent) || !state.workflow.roles.some((r) => r.id === roleId)) throw new Error("Choose an existing workflow role and supported intent.");
     const binding = state.roleBindings?.find((b) => b.roleId === roleId && b.intent === intent);
     if (!binding) throw new Error("Bind this role and intent to an exact permitted session first.");
-    if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
-    if (binding.targetKind === "coding-task") {
+    if (binding.targetKind === "client-surface") {
+      const recipe = clientRecipe(binding.targetId);
+      if (intent !== "summon" || recipe.target.kind !== "https" || recipe.provider !== binding.provider || recipe.digest !== binding.recipeDigest || typeof binding.bindingId !== "string" || binding.sessionId !== undefined) throw new Error("This exact client role supports a fixed homepage launch only. Rebind changed recipes deliberately; focus, resume and session control are unavailable.");
+    } else if (binding.provider === "microsoft-365-copilot" && intent === "cancel") throw new Error("The selected Graph contract does not provide cancellation. Choose a supported role intent.");
+    else if (binding.targetKind === "coding-task") {
       const task = state.codingSessions?.find((t) => t.id === binding.targetId && t.provider === binding.provider && t.sessionId === binding.sessionId && t.schema === "switchyard-coding-session/v1");
       if (!task || !(intent === "status" && ["codex", "claude-code"].includes(binding.provider) || binding.provider === "claude-code" && intent === "summon" && task.backgroundId === null && task.status === "registered" || binding.provider === "codex" && intent === "resume" && task.launchPolicy === "read-only/on-request" && task.nativeTransport !== "owned-stdio" && task.status === "registered")) throw new Error("This exact coding-task binding supports runtime status only, plus verified live Claude focus or legacy owned read-only Codex daemon resume. Dedicated tasks continue through explicit text review. No alternate session action was selected.");
     } else if (binding.provider === "custom-agent") {
@@ -102,6 +106,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
     } else if (!state.conversations.some((c) => c.id === binding.targetId && c.provider === binding.provider && c.sessionId === binding.sessionId)) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
     return binding;
   }
+  function clientRoleDigest(state, binding) { return createHash("sha256").update(JSON.stringify([binding, state.workflow.roles.find(r => r.id === binding.roleId)])).digest("hex"); }
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
   const voiceSession = (s, id) => { const found = s.voice.find((o) => o.id === id); if (!found) throw new Error("That voice session is unavailable in this compartment."); return found; };
   function pauseMonitor(compartment) { if (monitors.has(compartment)) clearForeground(monitors.get(compartment)); monitors.delete(compartment); }
@@ -268,6 +273,13 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
         return store.update(compartment, "role-bind", (s) => {
           const role = s.workflow.roles.find((r) => r.id === body.roleId); if (!role) throw new Error("Save an agent role in your workflow first.");
           const provider = body.provider;
+          if (body.targetKind === "client-surface") {
+            if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "provider", "targetKind", "targetId", "workspaceBaseUrl"].includes(k))) throw new Error("Client role binding accepts only an exact documented surface and summon intent; commands, content, session IDs and imported approvals are not accepted.");
+            const recipe = clientRecipe(body.targetId);
+            if (body.intent !== "summon" || recipe.provider !== provider || recipe.target.kind !== "https") throw new Error("This client surface supports a fixed homepage launch only; choose its exact provider and summon intent.");
+            const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind: "client-surface", targetId: recipe.id, recipeDigest: recipe.digest, intent: "summon" };
+            s.roleBindings = [...(s.roleBindings ?? []).filter(b => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
+          }
           if (!s.policy || !["codex", "claude-code", "microsoft-365-copilot", "custom-agent"].includes(provider)) throw new Error("Unknown role provider.");
           const targetKind = body.targetKind ?? (provider === "custom-agent" ? "custom-agent" : "conversation");
           if (!["coding-task", "custom-agent", "conversation"].includes(targetKind) || (targetKind === "custom-agent") !== (provider === "custom-agent")) throw new Error("Choose the exact target kind supported by this provider.");
@@ -277,11 +289,15 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
           s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
         }, { provider: body.provider });
       }
-      if (path === "/api/suite/roles/dispatch") return this.dispatchRole(compartment, body.roleId, body.intent, body.content);
+      if (path === "/api/suite/roles/dispatch") {
+        if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
+        return this.dispatchRole(compartment, body.roleId, body.intent, body.content, body.requestId);
+      }
       if (path === "/api/suite/intent") {
+        if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         await loadSelection();
         if (body.implementation === "native-chatgpt.focus/v1") { await this.authorizeConnection(activeCompartment); const { focusNativeChatgpt } = await import("./host.mjs"); return focusNativeChatgpt(); }
-        if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent);
+        if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent, undefined, body.requestId);
         throw new Error("The physical intent is outside the closed implementation map.");
       }
       if (path === "/api/suite/snapshot") {
@@ -362,11 +378,16 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (path === "/api/suite/route/check") { await store.route(compartment, body.destination, "synthetic-boundary-check", body.provider); return { allowed: true }; }
       throw new Error("That suite operation is unavailable. No alternate action was executed.");
     },
-    async dispatchRole(compartment, roleId, intent, content) {
+    async dispatchRole(compartment, roleId, intent, content, requestId) {
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       await store.authorize(compartment, { provider: b.provider });
       let result;
-      if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
+      if (b.targetKind === "client-surface") {
+        if (content !== undefined) throw new Error("A homepage launch cannot receive workflow content, prompts or handoffs.");
+        const digest = clientRoleDigest(s, b);
+        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { const current = await store.snapshot(compartment), binding = roleTarget(current, roleId, intent); if (clientRoleDigest(current, binding) !== digest) throw new Error("The exact client role binding changed before dispatch settled. No alternate target was selected."); } });
+      }
+      else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
       else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
@@ -380,7 +401,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
           result = await (b.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: b.provider, message, plan: s.profile.plan, conversationId: c.id });
         }
       }
-      await store.update(compartment, "role-intent-result", (state) => { if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
+      await store.update(compartment, "role-intent-result", (state) => { if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
       return result;
     },
     async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {
@@ -390,6 +411,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
       if (connection.implementation !== "switchyard.role/v1") throw new Error("This physical connection is outside the closed action map.");
       const state = await store.snapshot(compartment), binding = roleTarget(state, connection.roleId, connection.intent);
       await store.authorize(compartment, { provider: binding.provider });
+      if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
     async close() { closed = true; const boundaryStops = await Promise.allSettled([matrixDiagnostics.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }

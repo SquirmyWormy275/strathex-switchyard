@@ -13,7 +13,7 @@ internal static class Program
     private static readonly ConcurrentQueue<JsonElement> Requests = new();
     private static readonly Dictionary<int, Binding> Bindings = new();
     private static readonly object OutputLock = new();
-    private static readonly HttpClient Client = new(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient Client = new(new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(125) };
     private static readonly HashSet<string> Intents = new() { "summon", "resume", "review", "handoff", "status", "cancel" };
     private static Uri? Origin;
     private static string Token = "";
@@ -66,6 +66,8 @@ internal static class Program
                     var implementation = body.GetProperty("implementation").GetString();
                     if (implementation != "switchyard.role/v1" && implementation != "native-chatgpt.focus/v1") throw new InvalidOperationException("Unsupported action");
                     if (implementation == "switchyard.role/v1" && (!Regex.IsMatch(body.GetProperty("roleId").GetString() ?? "", "^[A-Za-z0-9_.:-]{1,64}$") || !Intents.Contains(body.GetProperty("intent").GetString() ?? ""))) throw new InvalidOperationException("Invalid exact role intent");
+                    var allowedFields = implementation == "switchyard.role/v1" ? new[] { "implementation", "roleId", "intent" } : new[] { "implementation" };
+                    if (body.EnumerateObject().Any(property => !allowedFields.Contains(property.Name)) || body.EnumerateObject().Count() != allowedFields.Length) throw new InvalidOperationException("Hotkeys accept only the closed intent fields");
                     var layout = GetKeyboardLayout(GetWindowThreadProcessId(GetForegroundWindow(), out _));
                     if (((long)layout & 0xffff) != 0x0409) throw new InvalidOperationException("Verify US host layout before binding firmware-mapped keys");
                     if (!RegisterHotKey(IntPtr.Zero, keyId, modifiers | 0x4000U, virtualKey)) throw new InvalidOperationException($"Hotkey unavailable (Windows error {Marshal.GetLastWin32Error()}); existing shortcuts were preserved");
@@ -109,18 +111,21 @@ internal static class Program
     }
     private static async Task Fire(Binding binding)
     {
+        var requestId = Guid.NewGuid().ToString("D");
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(Origin!, "/api/suite/intent"));
             request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Token);
             request.Headers.TryAddWithoutValidation("Origin", Origin!.GetLeftPart(UriPartial.Authority));
-            request.Content = new StringContent(binding.Body, Encoding.UTF8, "application/json");
+            var packet = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(binding.Body)!;
+            packet.Add("requestId", JsonSerializer.SerializeToElement(requestId));
+            request.Content = new StringContent(JsonSerializer.Serialize(packet), Encoding.UTF8, "application/json");
             // The local server requires this exact content type.
             request.Content.Headers.ContentType = new("application/json");
             using var response = await Client.SendAsync(request);
-            Write(new { @event = "intent-result", bindingId = binding.Id, acknowledged = response.IsSuccessStatusCode, taskCompletionVerified = false });
+            Write(new { @event = "intent-result", bindingId = binding.Id, requestId, acknowledged = response.IsSuccessStatusCode, taskCompletionVerified = false });
         }
-        catch { Write(new { @event = "intent-result", bindingId = binding.Id, acknowledged = false, taskCompletionVerified = false }); }
+        catch { Write(new { @event = "intent-result", bindingId = binding.Id, requestId, acknowledged = false, taskCompletionVerified = false }); }
     }
     public static int Main(string[] args)
     {

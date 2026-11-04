@@ -37,8 +37,10 @@ export function createClientLaunch({ store, stateDirectory, platform = process.p
     return { stopped: results.every(Boolean) && await stoppedRecords(c), externalApplicationClosed: false };
   }
   return {
-    async launch(c, input) {
+    async launch(c, input, context = {}) {
       if (Object.keys(input).some(k => !["compartment", "id", "requestId"].includes(k)) || !uuid(input.requestId)) throw new Error("Request one exact documented client recipe and request UUID; imported commands, targets or approval fields cannot execute.");
+      const dispatchScope = context.digest ?? null;
+      if (dispatchScope !== null && (!/^[a-f0-9]{64}$/.test(dispatchScope) || typeof context.assertCurrent !== "function")) throw new Error("The exact local client dispatch scope is invalid.");
       const recipe = clientRecipe(input.id);
       const native = clientLaunchCommand(recipe.id, { platform, windowsSystemRoot });
       if (closed || pending.has(c)) throw new Error("Wait for this workspace's existing client launch; stopped requests cannot resume.");
@@ -46,10 +48,10 @@ export function createClientLaunch({ store, stateDirectory, platform = process.p
       if (typeof store.withResourceLock !== "function") throw new Error("Client launch requires the protected cross-process resource lease.");
       const operation = Promise.resolve().then(() => store.withResourceLock("client-launch", c, async lease => {
         const s = await store.snapshot(c), scope = workspace(s);
-        const check = async () => { lease.assert(); if (closed || generation !== (generations.get(c) ?? 0) || !await isActive(c)) throw new Error("This exact client launch was stopped or its workspace is no longer selected."); await store.authorize(c, { provider: recipe.provider }); const current = await store.snapshot(c); if (current.mode !== (current.policy === "personal" ? "personal-companion" : "managed-companion") || workspace(current) !== scope) throw new Error("The selected client launch workspace/account scope changed."); };
+        const check = async () => { lease.assert(); if (closed || generation !== (generations.get(c) ?? 0) || !await isActive(c)) throw new Error("This exact client launch was stopped or its workspace is no longer selected."); await store.authorize(c, { provider: recipe.provider }); const current = await store.snapshot(c); if (current.mode !== (current.policy === "personal" ? "personal-companion" : "managed-companion") || workspace(current) !== scope) throw new Error("The selected client launch workspace/account scope changed."); await context.assertCurrent?.(); };
         await check();
         const prior = s.clientLaunches?.find(r => r.requestId === input.requestId);
-        if (prior) { if (prior.recipeDigest !== recipe.digest) throw new Error("This request UUID belongs to a different exact client recipe."); return { ...(prior.result ?? { status: "outcome-unconfirmed", requestId: prior.requestId, recipeId: prior.recipeId, summary: "The previous launch request has no settled result. No effect was replayed." }), replayed: true }; }
+        if (prior) { if (prior.recipeDigest !== recipe.digest || (prior.dispatchScope ?? null) !== dispatchScope) throw new Error("This request UUID belongs to a different exact client recipe or role binding."); return { ...(prior.result ?? { status: "outcome-unconfirmed", requestId: prior.requestId, recipeId: prior.recipeId, summary: "The previous launch request has no settled result. No effect was replayed." }), replayed: true }; }
         if (!await stoppedRecords(c)) throw new Error("A retained client-launch guardian has not independently verified exit; no replacement was started.");
         await privateDirectory(stateDirectory); const scratch = await mkdtemp(join(stateDirectory, "launch-")), scratchIdentity = identity(await directoryIdentity(scratch));
         const resource = { controller: new AbortController(), clients: new Set() }; resources.set(c, resource); let reserved = false, readySaved = false, outcome;
@@ -59,7 +61,7 @@ export function createClientLaunch({ store, stateDirectory, platform = process.p
             const all = state.clientLaunches ?? [], retained = all.filter(r => ["reserved", "launching", "outcome-unconfirmed"].includes(r.status) || r.ownedRuntime && r.stoppedVerified !== true || r.cleanupPending);
             state.clientLaunches = [...retained, ...all.filter(r => !retained.includes(r)).slice(-16)];
             if (state.clientLaunches.length >= 32 || state.clientLaunches.some(r => r.requestId === input.requestId)) throw new Error("The protected client launch inventory is full or changed; existing records were preserved.");
-            state.clientLaunches.push({ requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, recipeDigest: recipe.digest, platform, nativeInterface: native.interface, workspaceDigest: scope, status: "reserved", at: now(), scratch, scratchIdentity, cleanupPending: true });
+            state.clientLaunches.push({ requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, recipeDigest: recipe.digest, dispatchScope, platform, nativeInterface: native.interface, workspaceDigest: scope, status: "reserved", at: now(), scratch, scratchIdentity, cleanupPending: true });
           }, { provider: recipe.provider }); reserved = true;
           const r = await runOwnedNativeCommand({ executable: native.executable, args: native.args, cwd: scratch, env: desktopEnvironment(), text: JSON.stringify({ schema: native.schema, id: recipe.id, targetSha256: createHash("sha256").update(recipe.target.url).digest("hex") }) + "\n", resource, signal: resource.controller.signal, command, guardianStopped, timeout: 45000, maxOutputBytes: 4096, captureStderrBytes: 0,
             onReady: async ownedRuntime => { await check(); await update(c, input.requestId, "client-launch-native-ready", v => { v.status = "launching"; v.ownedRuntime = ownedRuntime; v.stoppedVerified = false; }); readySaved = true; await check(); },

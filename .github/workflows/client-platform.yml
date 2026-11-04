@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/client-platform.yml'
       - 'integrations/**'
+      - 'apps/desktop-hotkeys/**'
       - 'tools/layout-studio/**'
       - 'scripts/verify-client-platform.mjs'
       - 'scripts/run-isolated-tests.mjs'

@@ -23,8 +23,8 @@ preserved.
 
 ## Accepted evidence
 
-- Complete Linux source: 147/147 groups, 944 tests, 934 passed and ten declared
-  platform skips; receipt 11e1038b-73dd-4bdf-9493-549a792fb586. The additional
+- Complete Linux source: 147/147 groups, 947 tests, 937 passed and ten declared
+  platform skips; receipt 1b505309-6e94-421c-bdac-0de08b075a38. The additional
   Windows metadata probe is explicitly skipped on Linux. Type checking passes.
 - Normal installed reviewed commit: seven checks with one actual empty Codex
   task, zero prompts, exact binary bytes/author, preserved unowned edit, shared
@@ -68,6 +68,28 @@ streams and a fixed system Utility module, matching the working DPAPI contract,
 corrected that path; the 15-second deadline was preserved. This is accepted
 software/native metadata evidence, not an interactive Windows URI, account,
 window or device check. The complete newer Windows release remains pending.
+
+## Client roles and physical intent connection
+
+Exact `client-surface` role bindings now connect summon to the fixed HTTPS
+transport, with a fresh local binding identity and recipe digest. The Linux CLI
+and Windows hotkey sender attach an invocation UUID. The protected launch record
+binds that UUID to its exact role, so retries do not launch again and rebinding
+cannot reuse an old result. Binding changes before native acknowledgement reject
+the request; late changes retain an uncertain outcome. Client bindings accept no
+prompt/context or invented session and do not change the active conversation.
+Work dispatch follows the persisted active workspace and permits only Microsoft
+work Copilot, regardless of a caller's Personal compartment field.
+
+Five focused groups pass: 47 tests, 46 passed and the one declared native Windows
+metadata skip on Linux; receipt f0d42bbb-0858-4b23-9ae0-bcc08b1409c0. Six physical
+intent cases include authenticated HTTP, actual gateway receipt correlation,
+stale/late role changes and synthetic Work-only routing. Native client responses
+in these cases are fixtures, not browser/account acceptance. The changed Windows C# sender compiles from isolated tracked sources; its actual
+dispatch method sent two authenticated HTTP packets with distinct matching UUIDs
+on Linux/.NET 8.0.30 (native-hotkey-dispatch-20261104-034142.json). No build files
+were retained. Normal installed role demonstration and fresh Windows source
+acceptance remain pending.
 
 ## Work still required
 

@@ -75,3 +75,20 @@ Approved Microsoft tenant tests, interactive Windows account/window tests,
 microphone capture and physical print fit also remain separate. No flash/reset,
 bootloader operation, solenoid change, public release or employer approval is
 established by these results.
+
+Client-role integration passes all 147 Linux groups (947 tests: 937 passed, ten
+declared platform skips), receipt `1b505309-6e94-421c-bdac-0de08b075a38`, plus type
+checking. Five bounded client groups pass 46/47 with the declared native Windows
+metadata skip, receipt `f0d42bbb-0858-4b23-9ae0-bcc08b1409c0`. Six physical-gateway
+cases cover authenticated role dispatch, actual HTTP/CLI invocation correlation,
+content/session injection, scoped duplicates, pre-acknowledgement/late rebinding,
+and active Work routing. Native client responses in those tests are fixtures.
+
+The changed Windows hotkey C# sources compile in an isolated directory. The
+actual sender method sent two authenticated closed role requests with distinct
+UUIDs and matching acknowledgement events on Linux/.NET 8.0.30; receipt
+`native-hotkey-dispatch-20261104-034142.json`. Its first build invocation included
+old generated files after moving the intermediate directory; copying only the
+three exact tracked source/project files corrected the verification setup. All
+temporary build/probe files were removed. Interactive Windows hotkey/URI/account
+acceptance remains unverified.

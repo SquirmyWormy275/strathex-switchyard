@@ -40,7 +40,7 @@ export async function dispatchPhysicalIntent(value, { root = runtimeDirectory(),
   try { process.kill(endpoint.pid, 0); } catch { throw new Error("Switchyard is not running. The intent was not redirected or replayed."); }
   const invocationId = randomUUID(), at = Date.now(); let accepted = false;
   try {
-    const response = await fetcher(`${url.origin}/api/suite/intent`, { method: "POST", redirect: "error", signal: AbortSignal.timeout(125000), headers: { Authorization: `Bearer ${match[1]}`, Origin: url.origin, "Content-Type": "application/json" }, body: JSON.stringify(request) });
+    const response = await fetcher(`${url.origin}/api/suite/intent`, { method: "POST", redirect: "error", signal: AbortSignal.timeout(125000), headers: { Authorization: `Bearer ${match[1]}`, Origin: url.origin, "Content-Type": "application/json" }, body: JSON.stringify({ ...request, requestId: invocationId }) });
     const reader = response.body.getReader(); let size = 0; const chunks = [];
     while (true) { const { done, value: chunk } = await reader.read(); if (done) break; size += chunk.byteLength; if (size > 256 * 1024) { await reader.cancel(); throw new Error("Intent response exceeds its bound."); } chunks.push(Buffer.from(chunk)); }
     const result = JSON.parse(Buffer.concat(chunks).toString("utf8"));
