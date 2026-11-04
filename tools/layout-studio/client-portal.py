@@ -1,5 +1,6 @@
 """One fixed HTTPS surface through OpenURI; keep its bus alive until Response."""
 import json
+import hashlib
 import signal
 import sys
 import uuid
@@ -17,7 +18,7 @@ def main():
     if len(line) > 4096:
         raise ValueError("oversized request")
     request = json.loads(line)
-    if set(request) != {"schema", "id"} or request["schema"] != "switchyard-client-portal/v1" or request["id"] not in TARGETS:
+    if set(request) != {"schema", "id", "targetSha256"} or request["schema"] != "switchyard-client-portal/v1" or request["id"] not in TARGETS or request["targetSha256"] != hashlib.sha256(TARGETS[request["id"]].encode("utf8")).hexdigest():
         raise ValueError("unsupported fixed surface")
     import gi
     gi.require_version("Gio", "2.0")

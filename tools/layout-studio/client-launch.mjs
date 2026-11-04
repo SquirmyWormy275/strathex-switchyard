@@ -1,7 +1,7 @@
 /** Explicit fixed-surface launch requests; no session control or foreground typing. */
 import { createHash } from "node:crypto";
 import { mkdtemp, rmdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { privateDirectory, directoryIdentity } from "./private-fs.mjs";
@@ -12,7 +12,14 @@ const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}
 const hash = v => createHash("sha256").update(JSON.stringify(v)).digest("hex");
 const workspace = s => hash([s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
 const identity = s => ({ device: s.dev.toString(), inode: s.ino.toString() });
-export function createClientLaunch({ store, stateDirectory, platform = process.platform, isActive = async () => true, command, guardianStopped = runtimeGuardianStopped, now = Date.now } = {}) {
+export function clientLaunchCommand(id, { platform = process.platform, windowsSystemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT } = {}) {
+  const recipe = clientRecipe(id);
+  if (!["linux", "win32"].includes(platform) || recipe.target.kind !== "https") throw new Error("Host launch for this platform/client is unfinished. No web substitute or fallback application was opened.");
+  if (platform === "linux") return { executable: "/usr/bin/python3", args: ["-I", "-B", fileURLToPath(new URL("./client-portal.py", import.meta.url))], schema: "switchyard-client-portal/v1", resultSchema: "switchyard-client-portal-result/v1", interface: "xdg-openuri/v1" };
+  if (typeof windowsSystemRoot !== "string" || !/^[A-Za-z]:[\\/][^:\r\n\0]+$/.test(windowsSystemRoot) || windowsSystemRoot.split(/[\\/]/).some(p => p === "." || p === "..") || !win32.isAbsolute(windowsSystemRoot)) throw new Error("The Windows system directory is unavailable; no shell or alternate runtime was selected.");
+  return { executable: win32.join(windowsSystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Mta", "-File", fileURLToPath(new URL("./client-launch-windows.ps1", import.meta.url))], schema: "switchyard-client-winrt/v1", resultSchema: "switchyard-client-native-launch-result/v1", interface: "windows-launchuri/v1" };
+}
+export function createClientLaunch({ store, stateDirectory, platform = process.platform, windowsSystemRoot, isActive = async () => true, command, guardianStopped = runtimeGuardianStopped, now = Date.now } = {}) {
   const pending = new Map(), resources = new Map(), generations = new Map(), seen = new Set(); let closed = false;
   async function update(c, requestId, action, fn) { return store.update(c, action, s => { const r = s.clientLaunches?.find(r => r.requestId === requestId); if (!r) throw new Error("The protected client launch identity changed."); return fn(r); }); }
   async function stoppedRecords(c) {
@@ -33,7 +40,7 @@ export function createClientLaunch({ store, stateDirectory, platform = process.p
     async launch(c, input) {
       if (Object.keys(input).some(k => !["compartment", "id", "requestId"].includes(k)) || !uuid(input.requestId)) throw new Error("Request one exact documented client recipe and request UUID; imported commands, targets or approval fields cannot execute.");
       const recipe = clientRecipe(input.id);
-      if (platform !== "linux" || recipe.target.kind !== "https") throw new Error("Host launch for this platform/client is unfinished. No web substitute or fallback application was opened.");
+      const native = clientLaunchCommand(recipe.id, { platform, windowsSystemRoot });
       if (closed || pending.has(c)) throw new Error("Wait for this workspace's existing client launch; stopped requests cannot resume.");
       seen.add(c); const generation = generations.get(c) ?? 0;
       if (typeof store.withResourceLock !== "function") throw new Error("Client launch requires the protected cross-process resource lease.");
@@ -52,17 +59,17 @@ export function createClientLaunch({ store, stateDirectory, platform = process.p
             const all = state.clientLaunches ?? [], retained = all.filter(r => ["reserved", "launching", "outcome-unconfirmed"].includes(r.status) || r.ownedRuntime && r.stoppedVerified !== true || r.cleanupPending);
             state.clientLaunches = [...retained, ...all.filter(r => !retained.includes(r)).slice(-16)];
             if (state.clientLaunches.length >= 32 || state.clientLaunches.some(r => r.requestId === input.requestId)) throw new Error("The protected client launch inventory is full or changed; existing records were preserved.");
-            state.clientLaunches.push({ requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, recipeDigest: recipe.digest, workspaceDigest: scope, status: "reserved", at: now(), scratch, scratchIdentity, cleanupPending: true });
+            state.clientLaunches.push({ requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, recipeDigest: recipe.digest, platform, nativeInterface: native.interface, workspaceDigest: scope, status: "reserved", at: now(), scratch, scratchIdentity, cleanupPending: true });
           }, { provider: recipe.provider }); reserved = true;
-          const r = await runOwnedNativeCommand({ executable: "/usr/bin/python3", args: ["-I", "-B", fileURLToPath(new URL("./client-portal.py", import.meta.url))], cwd: scratch, env: desktopEnvironment(), text: JSON.stringify({ schema: "switchyard-client-portal/v1", id: recipe.id }) + "\n", resource, signal: resource.controller.signal, command, guardianStopped, timeout: 45000, maxOutputBytes: 4096, captureStderrBytes: 0,
+          const r = await runOwnedNativeCommand({ executable: native.executable, args: native.args, cwd: scratch, env: desktopEnvironment(), text: JSON.stringify({ schema: native.schema, id: recipe.id, targetSha256: createHash("sha256").update(recipe.target.url).digest("hex") }) + "\n", resource, signal: resource.controller.signal, command, guardianStopped, timeout: 45000, maxOutputBytes: 4096, captureStderrBytes: 0,
             onReady: async ownedRuntime => { await check(); await update(c, input.requestId, "client-launch-native-ready", v => { v.status = "launching"; v.ownedRuntime = ownedRuntime; v.stoppedVerified = false; }); readySaved = true; await check(); },
             onStopped: async ownedRuntime => { if (!await guardianStopped(ownedRuntime)) throw new Error("The client-launch guardian has not independently verified exit."); if (!readySaved) return; await update(c, input.requestId, "client-launch-native-exit", v => { if (v.ownedRuntime?.id !== ownedRuntime.id) throw new Error("The exact retained client guardian changed."); v.stoppedVerified = true; }); }
           });
           await check();
           let value; try { value = JSON.parse(r.stdout); } catch { throw new Error("The exact desktop-portal response did not verify; no application state was guessed."); }
           const expected = ["schema", "id", "status", "response", "applicationOpenedVerified", "accountVerified", "sessionIdentified"];
-          if (r.status !== "completed" || r.exitCode !== 0 || !value || Object.keys(value).length !== expected.length || Object.keys(value).some(k => !expected.includes(k)) || value.schema !== "switchyard-client-portal-result/v1" || value.id !== recipe.id || !["accepted", "cancelled", "rejected", "outcome-unconfirmed"].includes(value.status) || value.response !== ({ accepted: 0, cancelled: 1, rejected: 2, "outcome-unconfirmed": null })[value.status] || ["applicationOpenedVerified", "accountVerified", "sessionIdentified"].some(k => value[k] !== false)) throw new Error("The exact desktop-portal response did not verify; no application state was guessed.");
-          outcome = { status: value.status === "accepted" ? "launch-requested" : value.status, requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, portalResponse: value.response, applicationOpenedVerified: false, providerAccountVerified: false, sessionIdentified: false, modelPromptSubmitted: false, replayed: false, provenance: "Exact fixed HTTPS target; XDG OpenURI Response; native helper independently exited. External browser/account/session remain outside this request's ownership." };
+          if (r.status !== "completed" || r.exitCode !== 0 || !value || Object.keys(value).length !== expected.length || Object.keys(value).some(k => !expected.includes(k)) || value.schema !== native.resultSchema || value.id !== recipe.id || !["accepted", "cancelled", "rejected", "outcome-unconfirmed"].includes(value.status) || value.response !== ({ accepted: 0, cancelled: 1, rejected: 2, "outcome-unconfirmed": null })[value.status] || ["applicationOpenedVerified", "accountVerified", "sessionIdentified"].some(k => value[k] !== false)) throw new Error("The exact desktop-portal response did not verify; no application state was guessed.");
+          outcome = { status: value.status === "accepted" ? "launch-requested" : value.status, requestId: input.requestId, recipeId: recipe.id, provider: recipe.provider, nativeInterface: native.interface, nativeResponse: value.response, portalResponse: platform === "linux" ? value.response : null, applicationOpenedVerified: false, providerAccountVerified: false, sessionIdentified: false, modelPromptSubmitted: false, replayed: false, provenance: `Exact fixed HTTPS target; ${native.interface} response; native helper independently exited. External browser/account/session remain outside this request's ownership.` };
           return outcome;
         } finally {
           const stops = await Promise.all([...resource.clients].map(p => p.stop().catch(() => false))), stopped = stops.every(Boolean) && await stoppedRecords(c);

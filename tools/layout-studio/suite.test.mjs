@@ -96,7 +96,7 @@ test("HTTP workspace origin metadata is removed from exact commit, recovery and 
     const recipe = await clients("recipe", { compartment: "personal", id: "figma-web" }); assert.equal(recipe.status, 200); assert.equal(recipe.body.hostActionAuthorized, false); assert.equal(recipe.body.recipe.importedAuthority, false);
     assert.equal((await clients("recipe", { compartment: "personal", id: "figma-web", url: "https://foreign.invalid" })).status, 409);
     const launch = { compartment: "personal", id: "github-copilot-web", requestId };
-    const gated = await clients("launch", launch); assert.equal(gated.status, 409); assert.match(gated.body.error, process.platform === "linux" ? /Keyboard-only/ : /unfinished/);
+    const gated = await clients("launch", launch); assert.equal(gated.status, 409); assert.match(gated.body.error, ["linux", "win32"].includes(process.platform) ? /Keyboard-only/ : /unfinished/);
     const injected = await clients("launch", { ...launch, command: "untrusted" }); assert.equal(injected.status, 409); assert.match(injected.body.error, /exact documented/);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
 }));

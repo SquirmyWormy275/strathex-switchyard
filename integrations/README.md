@@ -62,8 +62,17 @@ unverified native owners prevent replacement. The helper requires the desktop's
 system `python3` with Gio/GLib and a running OpenURI portal. It adds no runtime or
 model copy and changes no desktop settings. A missing dependency fails on use.
 
-Windows launch, exact native Claude desktop binding and frontend controls remain
-unfinished implementation. The catalog reports those missing capabilities. Do
+Windows fixed HTTPS requests now use the system Windows PowerShell WinRT
+projection and [Launcher.LaunchUriAsync](https://learn.microsoft.com/en-us/uwp/api/windows.system.launcher.launchuriasync),
+with the same protected request/ownership boundaries. No ExecutionPolicy override,
+profile, arbitrary command or fallback runtime is selected. A missing projection
+or prohibited script fails without weakening host policy. Both native helpers
+independently verify the exact reviewed target URL hash before requesting it.
+The short client-platform workflow checks native Windows metadata without
+launching a URI; its result and interactive Windows acceptance remain pending.
+
+Exact native Claude desktop binding and frontend controls remain unfinished
+implementation. The catalog reports those missing capabilities. Do
 not bind a launch-only recipe to resume, submit, cancel or mediated repository
 actions. Native client/tenant/account acceptance remains separate from the
 implemented request transport.

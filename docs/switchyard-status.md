@@ -2095,3 +2095,33 @@ close the external browser or claim visual page, account, plan or session
 acceptance. Windows launch and exact native Claude desktop/IDE binding remain
 implementation work; the existing cda0327 complete Windows release acceptance
 does not cover this newer client-launch source.
+
+
+## Windows URI request transport and exact native target witnesses
+
+The Windows request path now uses fixed system Windows PowerShell and the native
+WinRT Launcher.LaunchUriAsync projection. It shares the protected request UUID,
+workspace/account scope, native guardian readiness/exit, kernel lease, duplicate
+and stop/restart barriers. It passes only the fixed recipe ID plus an exact URL
+SHA-256 witness on private stdin. The Python and PowerShell helpers independently
+reject a target mismatch before requesting external activation. No script-policy
+override, shell command, profile, extra runtime or fallback browser is selected.
+
+The portable Windows transport case passes locally. A native Windows metadata
+probe validates the WinRT/AsTask projection without requesting any URI, and is
+one explicitly declared non-Windows skip. The short client-platform runner
+passes four local groups (41 tests, 40 passed, one native-Windows skip), receipt
+fe4d7133-e9bc-445c-9145-7a0d66568597. Five actual private D-Bus cases passed again
+with the new native target witness. A separate bounded Windows workflow uses
+pinned actions/toolchains and avoids the long complete release queue; its YAML
+and read-only permissions were validated locally. Native Windows metadata and
+interactive URI/account/window acceptance remain pending, not inferred from
+portable checks. The complete new Linux source run is in progress.
+
+
+The new full Linux run passes 147/147 groups: 944 tests, 934 passed and ten
+declared platform skips; receipt 11e1038b-73dd-4bdf-9493-549a792fb586. The
+additional skip is the explicitly native Windows WinRT metadata probe. Type
+checking passes. The installed pilot remains 1ecffbb until this source checkpoint
+is promoted; native Windows metadata and actual Windows URI/window/account
+acceptance remain pending.

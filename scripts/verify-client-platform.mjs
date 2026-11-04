@@ -1,0 +1,9 @@
+/** Bounded native client checks, independent of the long complete release lane. */
+import { requiredGroups, runVerification } from "./run-isolated-tests.mjs";
+const files = new Set(["tools/layout-studio/client-launch.test.mjs", "tools/layout-studio/integrations.test.mjs", "tools/layout-studio/suite.test.mjs", "deployment/suite/release.test.mjs"]);
+const groups = requiredGroups.filter(g => files.has(g.file));
+if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
+const { receipt, receiptPath } = await runVerification({ groups });
+for (const child of receipt.children) if (!child.success) console.log("FAIL_DETAIL " + JSON.stringify({ file: child.file, diagnostic: child.failureDiagnostic, counts: child.testCounts, timeout: child.timeout }));
+console.log(JSON.stringify({ schema: "switchyard-client-platform-verification/v1", platform: process.platform, receiptPath, runId: receipt.runId, success: receipt.success, totals: receipt.totals, meaning: "Native metadata and protocol/ownership boundaries; no Windows URI, account, window or device acceptance inferred" }));
+process.exitCode = receipt.success ? 0 : 1;

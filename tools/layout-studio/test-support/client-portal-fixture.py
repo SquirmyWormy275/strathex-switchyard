@@ -1,5 +1,6 @@
 """Explicit private-bus Linux helper acceptance; never opens a browser."""
 import json
+import hashlib
 import os
 import re
 import signal
@@ -50,7 +51,7 @@ helper = Path(__file__).resolve().parents[1] / "client-portal.py"
 process = subprocess.Popen([sys.executable, "-I", "-B", str(helper)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")})
 result = {}
 def wait():
-    output, errors = process.communicate(json.dumps({"schema": "switchyard-client-portal/v1", "id": "github-copilot-web"}).encode() + b"\n", timeout=15)
+    output, errors = process.communicate(json.dumps({"schema": "switchyard-client-portal/v1", "id": "github-copilot-web", "targetSha256": hashlib.sha256(b"https://github.com/copilot").hexdigest()}).encode() + b"\n", timeout=15)
     result.update(code=process.returncode, output=output.decode(), errorBytes=len(errors))
     GLib.idle_add(loop.quit)
 thread = threading.Thread(target=wait, daemon=True)

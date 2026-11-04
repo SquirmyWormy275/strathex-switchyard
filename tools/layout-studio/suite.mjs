@@ -43,7 +43,7 @@ export function createSuite({ store = createSuiteStore(), agents, voice = localV
   claudeSubmissions ??= createClaudeSubmissions({ store });
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
-  const clients = createClientIntegrations({ store, hostLaunchPlatforms: ["linux"] });
+  const clients = createClientIntegrations({ store, hostLaunchPlatforms: ["linux", "win32"] });
   const voiceQueue = createVoiceQueue({ store, voice });
   const readoutProfiles = createReadoutProfiles({ store, catalog: sourceCatalog });
   foreground ??= process.platform === "linux" ? { implemented: true, read: async (c, beforeStart) => { await beforeStart(); return { available: true, category: surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), provenance: "Hyprland application class; no task identity" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} } : { implemented: false };
