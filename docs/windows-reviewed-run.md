@@ -52,9 +52,10 @@ disconnect fails deterministically. This acknowledgement authorizes no effect.
 
 Helper and linked proof compile without warnings; the sixteen actual crypto
 checks and four package checks pass locally, and build scratch was removed.
-The new disposable Windows lane installs this exact metadata service, verifies
-thirteen restricted-client/delayed-reader/cache/malformed-pipe boundaries, then observes exact
-exit and removal. That native lifecycle proof is pending CI. The per-service
+The disposable Windows lane now passes this metadata service lifecycle and all
+thirteen restricted-client/delayed-reader/cache/malformed-pipe boundaries at
+`f4ba916`, workflow [41934738389](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41934738389).
+It observes exact service/process exit and removal. The per-service
 runtime environment and extraction behavior require this actual native check;
 managed compilation cannot establish them. No broker service was installed on
 the Linux pilot.
@@ -76,8 +77,10 @@ SDK is downloaded onto the Linux pilot. The linker uses
 to restrict startup DLL imports to System32. Its new no-effect native proof reads
 that field from the actual PE image, observes the current native user, and checks
 unknown commands/changed helper bytes are refused before elevation. Compilation
-and those five checks are pending Windows CI. The managed bootstrap compiles and
-refuses Linux. Application setup review/apply wiring, actual UAC interaction and
+and all five checks pass on native Windows at `39bc24f`. The managed bootstrap compiles and
+refuses Linux. A separate disposable native-setup lifecycle pass is now added to
+test protected staging, clean managed startup and exact removal on the already
+elevated worker. That pass remains pending. Application setup review/apply wiring, actual UAC interaction and
 privileged volume integration remain unfinished.
 
 The broker metadata wire contract is now implemented separately from the future
