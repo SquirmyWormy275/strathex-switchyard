@@ -117,6 +117,7 @@ internal static class WindowsStorageBrokerControl
             if(observed.IsInvalid&&error==1060)break;if(!observed.IsInvalid||error!=1072||Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
         }
         string[] expected={WindowsStorageBrokerInstallation.Executable,WindowsStorageBrokerInstallation.Configuration,WindowsStorageBrokerInstallation.PrivateKey};
+        if(WindowsStorageBrokerDiagnostic.Read(settings)!=null)expected=expected.Append(WindowsStorageBrokerDiagnostic.FileName).ToArray();
         using(var root=WindowsStorageBrokerFiles.PinDirectory(settings.Root,settings.ClientSid))
         {
             if(!Directory.GetFiles(settings.Root).Select(Path.GetFileName).Order().SequenceEqual(expected.Append(WindowsStorageBrokerRuntime.InventoryName).Order())||!Directory.GetDirectories(settings.Root).Select(Path.GetFileName).SequenceEqual(new[]{WindowsStorageBrokerRuntime.DirectoryName}))throw Invalid();

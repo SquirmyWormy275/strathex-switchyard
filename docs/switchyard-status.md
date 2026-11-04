@@ -8,6 +8,16 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Complete Linux `cba5e2b` passes 163/163 groups: 1,062 tests, 1,052 passed and ten
+declared skips. Receipt `26d8a535-ec4e-45ea-b47c-2db8d3bdb7e7` retained; every
+child cleanup verified and the disposable worktree removed. Installed normal
+`25f9fe6` passes six update and eight pipeline checks with zero prompts, three
+independent guardian exits, restored state and removed staging/checkout.
+Windows standalone helper and all 32 broker crypto/protected-file checks pass
+at `cba5e2b`. The exact System service remains running when the second request
+receives an empty response; bounded first-failure phase diagnostics are being
+used to isolate that failed lifecycle. No service or volume acceptance is inferred.
+
 The metadata-only Windows broker bootstrap now has exact SCM installation and
 removal, a System service, first-instance local pipe with kernel caller SID
 verification, signed challenge replies and a protected CLR extraction inventory.

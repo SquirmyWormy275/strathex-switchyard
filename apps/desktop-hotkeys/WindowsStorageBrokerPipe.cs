@@ -52,20 +52,20 @@ internal static class WindowsStorageBrokerPipe
         SystemIdentity();
         while(!stop.IsCancellationRequested)
         {
-            bool connected=false;
+            bool connected=false,callerMatched=false;string phase="connection";
             try
             {
-                await pipe.WaitForConnectionAsync(stop);connected=true;
+                await pipe.WaitForConnectionAsync(stop);connected=true;phase="frame";
                 using var deadline=CancellationTokenSource.CreateLinkedTokenSource(stop);deadline.CancelAfter(TimeSpan.FromSeconds(5));
                 byte[] bytes=await ReadFrame(pipe,4096,deadline.Token);
                 try
                 {
-                    string? client=null;pipe.RunAsClient(()=>{using var identity=WindowsIdentity.GetCurrent(true);client=identity?.User?.Value;});SystemIdentity();
-                    if(client!=settings.ClientSid)throw Invalid();
+                    phase="caller";string? client=null;pipe.RunAsClient(()=>{using var identity=WindowsIdentity.GetCurrent(true);client=identity?.User?.Value;});SystemIdentity();
+                    callerMatched=client==settings.ClientSid;if(!callerMatched)throw Invalid();phase="request";
                     var request=WindowsStorageBrokerProtocol.ReadRequest(bytes,settings.Binding);
-                    var storage=JsonSerializer.SerializeToElement(ReviewedInputStager.StoragePrerequisites());
-                    byte[] reply=WindowsStorageBrokerProtocol.Reply(settings.Binding,request,storage,signingKey);
-                    try{await WriteFrame(pipe,reply,deadline.Token);}finally{CryptographicOperations.ZeroMemory(reply);}
+                    phase="storage";var storage=JsonSerializer.SerializeToElement(ReviewedInputStager.StoragePrerequisites());
+                    phase="signature";byte[] reply=WindowsStorageBrokerProtocol.Reply(settings.Binding,request,storage,signingKey);
+                    try{phase="write";await WriteFrame(pipe,reply,deadline.Token);}finally{CryptographicOperations.ZeroMemory(reply);}
                 }
                 finally{CryptographicOperations.ZeroMemory(bytes);}
             }
@@ -73,6 +73,7 @@ internal static class WindowsStorageBrokerPipe
             {
                 // Malformed/unauthorized clients receive no data and start no effect.
                 SystemIdentity();
+                if(!stop.IsCancellationRequested)WindowsStorageBrokerDiagnostic.RetainFirst(settings,phase,error,callerMatched);
             }
             finally{if(connected)pipe.Disconnect();}
         }
