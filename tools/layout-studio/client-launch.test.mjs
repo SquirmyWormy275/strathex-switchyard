@@ -109,8 +109,8 @@ test("Windows URI transport uses the fixed system runtime, private recipe ID and
 test("the native Windows WinRT projection probe loads exact metadata without requesting a URI or changing script policy", { skip: process.platform !== "win32" ? "Native Windows PowerShell/WinRT metadata; no interactive URI requested" : false }, async () => {
   const invocation = clientLaunchCommand("github-copilot-web", { platform: "win32" });
   const result = await new Promise((resolve, reject) => {
-    const child = spawn(invocation.executable, invocation.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true }); let out = "", err = "";
-    const timer = setTimeout(() => { child.kill(); reject(new Error("Native WinRT metadata probe exceeded its deadline")); }, 15000);
+    const child = spawn(invocation.executable, [...invocation.args, "-Inspect"], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true }); let out = "", err = "";
+    const timer = setTimeout(() => { child.kill(); reject(new Error("Native WinRT metadata probe exceeded its deadline: " + err.slice(-1200))); }, 15000);
     child.stdout.on("data", b => { out += b; }); child.stderr.on("data", b => { err += b; }); child.stdin.on("error", () => {}); child.once("error", e => { clearTimeout(timer); reject(e); }); child.once("close", code => { clearTimeout(timer); resolve({ code, out, err }); });
     child.stdin.end(JSON.stringify({ schema: "switchyard-client-winrt-probe/v1" }) + "\n");
   }); assert.equal(result.code, 0, result.err); const value = JSON.parse(result.out); assert.equal(value.schema, "switchyard-client-winrt-probe-result/v1"); assert.equal(value.available, true); assert.equal(value.activationAttempted, false); assert.equal(value.scriptPolicyChanged, false);
