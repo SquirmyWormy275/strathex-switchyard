@@ -53,8 +53,10 @@ not turn explicitly selected production data into synthetic data, provide a
 disk quota for arbitrary writable build outputs, or accept every execution
 action. The connected Run path mounts reviewed inputs read-only and bounds its
 temporary filesystem. Windows now has a separate native NTFS staging port with
-the same manifest limits. Its guest mapping and execution connection remain
-unfinished; copying reviewed inputs alone provides no execution containment.
+the same manifest limits. The Sandbox backend now consumes that lease through the
+[reviewed guest mapping contract](windows-reviewed-guest-mapping.md). Its native
+guest-session controller and Studio execution connection remain unfinished;
+copying reviewed inputs alone provides no execution containment.
 
 ## Native Windows staging
 

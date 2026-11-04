@@ -28,9 +28,12 @@ restored. Receipt: `installed-repository-execution-1793807525872.json`.
 Complete local Linux source at `0151e69` passes 151/151 groups: 967 tests,
 957 passed and ten declared platform skips. Receipt:
 `9a24b1ab-23b8-44d5-9569-a444d2ff1ca0`. The disposable checkout was removed after
-its complete receipt and exited children were verified. Full verification at
-`26b78c2` is running in another small isolated checkout while implementation
-continues. Ubuntu release CI at `0151e69` passes, including the actual namespace
+its complete receipt and exited children were verified. Full `26b78c2` also
+passes 151/151 groups (968 tests, 958 passed, ten skips), receipt
+`8c5bf46c-45aa-402e-b153-7191f1778a3b`. Full `6c92229` passes 152/152 groups:
+973 tests, 963 passed and ten declared skips, receipt
+`82350ba4-6f30-4839-bddc-7fa318809380`. Both temporary checkouts were removed
+after their complete receipts and all exited children were verified. Ubuntu release CI at `0151e69` passes, including the actual namespace
 preflight with Ubuntu's packaged scoped bwrap AppArmor profile. No workstation
 policy, namespace restriction or guardian no-new-privs setting was weakened.
 
@@ -63,8 +66,19 @@ The failed installed `0151e69` proof remains preserved, including its encrypted
 workspace and synthetic inputs; it exposed the subsequently corrected dispatch
 scope reuse. New Run requests bind their own protected review digest, while
 same-request duplicates and legacy operation scopes retain no-replay behavior.
-Windows guest execution, writable build outputs and remaining action
-integrations are unfinished implementation, not hardware blocks.
+The Windows Sandbox backend now consumes exact native input capabilities,
+requires the selected catalog, binds source/operation/manifest, holds a kernel
+consumer lease and maps the reviewed copy read-only. Readiness persists the exact
+new guest ID before recipe acknowledgement; exit evidence must match its VM,
+operation and configuration. Unknown guest exit preserves the exchange and
+blocks extraction/restart replacement. Thirty-three mapping/staging/installation
+cases and four packaged-closure checks pass. The default process-only runner
+cannot supply that proof. [Guest mapping contract](windows-reviewed-guest-mapping.md).
+The native guest-session controller and Studio Windows Run connection, writable
+build outputs and remaining action integrations are unfinished implementation,
+not hardware blocks. Native Windows CI now continues independent helper checks
+after a backend failure, then requires that backend outcome in an unconditional
+final gate; a failed backend still makes the release verification fail.
 
 ## Current pilot
 
@@ -222,7 +236,8 @@ bootloader, solenoid operation, public release, merge or license change occurred
 
 1. Connect host-pinned general execution recipes to the task authority, durable
    operation/budget and owned-guardian paths, reusing the reviewed input provider.
-   Finish Windows guest staging, output quotas and restart staging recovery; the
+   Finish the native Windows guest-session controller, output quotas and restart
+   staging recovery; the
    older direct process-group launcher is not the desktop readiness/exit protocol.
 2. Complete exact native desktop/IDE/terminal attachments and the remaining
    source-verified controller controls, without substituting homepage launch for

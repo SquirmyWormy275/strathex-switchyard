@@ -51,6 +51,8 @@ jobs:
         run: npm.cmd ci --ignore-scripts
 
       - name: Verify the native Switchyard backend before the complete release build
+        id: backend-tests
+        continue-on-error: true
         shell: pwsh
         timeout-minutes: 15
         run: |
@@ -238,3 +240,13 @@ jobs:
       - name: Prove generated source remains canonical
         shell: pwsh
         run: git diff --exit-code
+
+      # Independent native helpers still run after a backend failure, but that
+      # failure must keep the overall release verification red.
+      - name: Enforce the native backend result
+        if: always()
+        shell: pwsh
+        run: |
+          if ('${{ steps.backend-tests.outcome }}' -cne 'success') {
+            throw 'The native backend did not pass. Independent helper evidence does not make this release verified.'
+          }

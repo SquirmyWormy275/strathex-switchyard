@@ -33,7 +33,7 @@ async function fixture(t,hook) {
   return {root,store,repositoryRoot,service,create,context,input,authorize,effects:()=>effects,stopped:value=>{stopped=value;},consumer:value=>{consumerExited=value;},authorized:value=>{authorized=value;}};
 }
 test("Windows input contract persists readiness, copies only reviewed binary bytes and makes no sandbox claim",async t=>{
-  const f=await fixture(t),lease=await f.service.prepare("personal",f.context,f.input,f.authorize);assert.deepEqual(await readFile(join(lease.root,"src/task.bin")),Buffer.from([0,1,255,128]));assert.deepEqual(await readdir(lease.root),["src"]);assert.equal(lease.sandboxEnforced,false);assert.equal(Object.hasOwn(lease,"protections"),false);await lease.assertCurrent();
+  const f=await fixture(t),lease=await f.service.prepare("personal",f.context,f.input,f.authorize);assert.deepEqual(await readFile(join(lease.root,"src/task.bin")),Buffer.from([0,1,255,128]));assert.deepEqual(await readdir(lease.root),["src"]);assert.equal(lease.sandboxEnforced,false);assert.equal(Object.hasOwn(lease,"protections"),false);await lease.withConsumer(()=>lease.assertCurrent());
   await assert.rejects(f.service.prepare("personal",f.context,f.input,f.authorize),/Reconcile|exists|owned/);assert.equal(f.effects(),1);f.consumer(false);await assert.rejects(lease.release(),/guest exit/);await access(lease.root);f.consumer(true);await lease.release();await assert.rejects(access(lease.root),{code:"ENOENT"});assert.equal((await f.service.list("personal"))[0].cleanupPending,false);
 });
 test("unknown native reader exit blocks replacement across instances and leaves staging until independently observed",async t=>{

@@ -793,3 +793,67 @@ test("target and effect guards run again immediately before exact focus and term
   assert.match(deniedTerminate.summary, /terminate authority changed/i);
   assert.equal(lifecycleCalls.includes("terminate"), false);
 });
+
+// These mapping capabilities and guest-exit observations are explicit doubles.
+// Actual NTFS staging has its own native journey; no VM is launched here.
+async function reviewedInputFixture(setup: Awaited<ReturnType<typeof fixture>>) {
+  const root=join(setup.base,"reviewed-inputs");await mkdir(root);
+  const catalog=await readFile(join(setup.targetRoot,"sandbox-job.json"));await writeFile(join(root,"sandbox-job.json"),catalog);
+  await writeFile(join(setup.targetRoot,"unselected.env"),"synthetic private bytes");
+  const inputFiles=[{path:"sandbox-job.json",sha256:sha256(catalog),size:catalog.length,classification:"non-production" as const}];
+  let checks=0;
+  const lease={operationId:"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",sourceRoot:setup.targetRoot,root,inputFiles,inputManifestSha256:sha256(JSON.stringify(inputFiles)),privateAclReadbackVerified:true as const,sandboxEnforced:false as const,withConsumer:async<T>(effect:()=>Promise<T>)=>effect(),assertCurrent:async()=>{checks++;assert.equal(sha256(await readFile(join(root,"sandbox-job.json"))),sha256(catalog));}};
+  return {lease,checks:()=>checks};
+}
+
+test("reviewed guest mapping contains only its exact staged inputs and retains a separate operation binding",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup);
+  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
+  let launches=0;
+  const runner:WindowsSandboxProcessRunner={run:async(...args)=>{launches++;const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return {...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(result.status,"completed",result.summary);assert.ok(inputs.checks()>=4);
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.reviewedInputRoot,inputs.lease.root);assert.equal(receipt.reviewedInputManifestSha256,inputs.lease.inputManifestSha256);assert.equal(receipt.reviewedInputOperationId,inputs.lease.operationId);assert.equal(receipt.guestExitVerified,true);
+  const duplicate=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(duplicate.replayed,true);assert.equal(duplicate.resultRoot,result.resultRoot);assert.equal(launches,1);
+  await access(inputs.lease.root);assert.equal(await readFile(join(setup.targetRoot,"unselected.env"),"utf8"),"synthetic private bytes");
+});
+
+test("a viewer exit cannot authorize reviewed guest extraction, exchange cleanup or restart replacement",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),backend=createBackend(setup,successfulRunner(),[],{requireReviewedInputs:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(result.status,"failed");assert.match(result.summary,/guest exit remains unconfirmed/i);
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.guestStartAttempted,true);assert.equal(receipt.guestExitVerified,false);assert.equal(receipt.cleanupVerified,false);await access(join(dirname(result.receiptPath!),"exchange/request.json"));await access(inputs.lease.root);assert.deepEqual(await readdir(setup.destinationRoot),[]);
+  await assert.rejects(backend.reconcile(),/independent stop proof/);
+  const again=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(again.status,"blocked");
+});
+
+test("reviewed mapping refuses absent, deserialized, wrong-operation and changed input capabilities before launch",async context=>{
+  for(const invalid of ["missing","serialized","operation","catalog","digest","late"]){
+    const setup=await fixture(context),inputs=await reviewedInputFixture(setup);let launches=0;
+    const backend=createBackend(setup,{run:async()=>{launches++;throw Error("unexpected guest launch");}},[],{requireReviewedInputs:true});
+    let lease=inputs.lease;
+    if(invalid==="serialized")lease=JSON.parse(JSON.stringify(lease));
+    if(invalid==="operation")lease={...lease,operationId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"};
+    if(invalid==="catalog")lease={...lease,inputFiles:[{...lease.inputFiles[0]!,path:"different.json"}]};
+    if(invalid==="digest")lease={...lease,inputManifestSha256:"f".repeat(64)};
+    if(invalid==="late")lease={...lease,assertCurrent:async()=>{await inputs.lease.assertCurrent();if(inputs.checks()>=3)throw Error("Synthetic input revocation before launch");}};
+    const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,...(invalid!=="missing"?{reviewedInputs:lease}:{})});
+    assert.notEqual(result.status,"completed",invalid);assert.equal(launches,0,invalid);await access(inputs.lease.root);
+  }
+});
+
+test("guest acknowledgement and exit evidence cannot cross an operation, configuration or VM identity",async context=>{
+  for(const fault of ["ready-operation","ready-write","exit-id","exit-config"]){
+    const setup=await fixture(context),inputs=await reviewedInputFixture(setup),inner=successfulRunner();let recipes=0;
+    const fs=new InjectedFileSystem(),write=fs.writeText.bind(fs);let failedWrite=false;
+    fs.writeText=async(path,text)=>{if(fault==="ready-write"&&!failedWrite&&path.includes("receipt.json.")&&JSON.parse(text).guestSessionId){failedWrite=true;throw Error("Synthetic lost VM identity write");}return write(path,text);};
+    const runner:WindowsSandboxProcessRunner={run:async(...args)=>{
+      const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};
+      await args[3]!({...identity,...(fault==="ready-operation"?{operationId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"}:{})});
+      recipes++;const result=await inner.run(...args);
+      return {...result,guestSessionExit:{...identity,stopped:true,...(fault==="exit-id"?{sandboxId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"}:{}),...(fault==="exit-config"?{configurationSha256:"f".repeat(64)}:{})}};
+    }};
+    const backend=createBackend(setup,runner,[],{requireReviewedInputs:true,filesystem:fs});
+    const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});
+    assert.equal(result.status,"failed",fault);assert.equal(recipes,fault.startsWith("ready")?0:1,fault);assert.deepEqual(await readdir(setup.destinationRoot),[],fault);await access(inputs.lease.root);await access(join(dirname(result.receiptPath!),"exchange/request.json"));await assert.rejects(backend.reconcile(),/independent stop proof/);
+  }
+});
