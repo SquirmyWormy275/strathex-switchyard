@@ -44,7 +44,7 @@ async function fixture(t) {
   return {recoverCalls:()=>recoverCalls,store,runner,create,context,plan,calls,consumers,identities,entered,staged,releaseStage,run:(binding=context,proposed=plan)=>runner.run("personal",binding,proposed,async()=>{}),hold:()=>{hold=true;},holdStaging:()=>{stageHold=true;},unknownExit:()=>{unknownExit=true;},observeExit:()=>{guestExited=true;unknownExit=false;},active:value=>{active=value;},cleanup:value=>{cleanupAllowed=value;},hook:fn=>{hook=fn;},otherStore:()=>createSuiteStore({root:join(stage,"private"),secrets})};
 }
 test("one host-only Windows Run connects exact staging, bounded storage, backend admission and separate native-owner cleanup",async t=>{
- const f=await fixture(t),result=await f.run();assert.equal(result.status,"completed");assert.equal(result.providerTaskCompletionVerified,false);
+ const f=await fixture(t),prerequisites=await f.runner.prerequisites();assert.equal(prerequisites.recipeRuntime.sha256,f.identities.recipeRuntime.sha256);prerequisites.recipeRuntime.sha256="f".repeat(64);const result=await f.run();assert.equal(result.status,"completed");assert.equal(result.providerTaskCompletionVerified,false);
  assert.deepEqual(f.calls.slice(0,5),["inputs","tools","images","volume","backend"]);assert.deepEqual(f.calls.slice(5).sort(),["cleanup-images","cleanup-inputs","cleanup-tools"]);
  const row=(await f.store.snapshot("personal")).repositoryWindowsRuns[0];assert.equal(row.cleanupPending,false);assert.equal(row.status,"settled");assert.equal(row.result.status,"completed");
  const before=f.calls.length;assert.equal((await f.run()).replayed,true);assert.equal(f.calls.length,before);
@@ -85,4 +85,11 @@ test("storage cleanup uncertainty remains separate from a verified backend resul
 });
 test("an unsupported or substituted host runtime cannot reserve staging or start a guest",async t=>{
  for(const invalid of ["version","runtime","helper"]){const f=await fixture(t);if(invalid==="version")f.identities.nodeVersion="25.0.0";if(invalid==="runtime")f.identities.recipeRuntime.sha256="f".repeat(64);if(invalid==="helper")f.identities.helperSha256="unknown";await assert.rejects(f.run());assert.equal(f.calls.length,0);assert.equal((await f.runner.list("personal")).length,0);}
+});
+
+test("a durable exact cancellation from another instance reaches only its original held guest without replay or a PID substitute",async t=>{
+ const f=await fixture(t);f.hold();const running=f.run();await f.entered;const other=f.create(f.otherStore());
+ assert.deepEqual(await other.stopOperation("personal",randomUUID()),{accepted:false,stopped:false});const requested=await other.stopOperation("personal",f.context.operationId);assert.equal(requested.accepted,true);assert.equal(requested.stopped,false);
+ const result=await Promise.race([running,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error("The durable cancellation was not observed")),8000);timer.unref?.();})]);assert.equal(result.status,"cancelled");assert.equal(f.calls.filter(name=>name==="backend").length,1);assert.equal((await f.runner.list("personal"))[0].result.status,"cancelled");
+ const duplicate=await f.run();assert.equal(duplicate.replayed,true);assert.equal(duplicate.status,"cancelled");assert.equal((await other.stopOperation("personal",f.context.operationId)).stopped,true);
 });

@@ -94,3 +94,13 @@ manifest-validator suite had not been listed. Its failed record is retained as
 workflow. Both new suites are now in the required inventory. The corrected
 inventory/runner/manifest/lock/privacy group passes all 56 local checks. Native
 Windows rerun is pending; no failure or required check was waived.
+
+Cancellation is now durable and scoped to one protected Run operation. A second
+instance records the stop marker; the original owner observes it through bounded
+polling, aborts the exact managed boundary and retains its original result. No
+PID or unrelated guest can be supplied. Workspace shutdown records cancellation
+for retained runs before stopping local handles; cross-process recovery still
+requires the same kernel lease. The combined inventory/runner/manifest/lock/
+privacy group passes 57 checks, including a real encrypted cross-instance stop
+request against an explicit guest double. The ten orchestration cases do not
+claim an actual Windows VM.

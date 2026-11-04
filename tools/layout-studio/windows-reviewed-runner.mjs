@@ -98,17 +98,24 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
     return observed.acquired ? observed.value : { cleaned: false };
   }
   async function stopCompartment(c) {
+    await store.update(c, "windows-run-workspace-cancel", state => { for (const row of state.repositoryWindowsRuns ?? []) if (row.schema === schema && row.cleanupPending) row.stopRequestedAt ??= now(); });
     const active = [...resources.values()].filter(resource => resource.compartment === c);
     active.forEach(resource => resource.controller.abort());
-    if (portsPromise) {
+    if (portsPromise && active.length) {
       const p = await ports(), stopped = await Promise.allSettled([p.sessions.stopCompartment(c), p.inputs.stopCompartment(c), p.tools.stopCompartment(c), p.images.stopCompartment(c)]);
       await Promise.allSettled(active.map(resource => resource.done));
-      const recovered = await recover(c), guest = await p.sessions.recover(c);
-      return { stopped: stopped.every(result => result.status === "fulfilled" && result.value.stopped !== false) || recovered.cleaned && guest.stopped === true, ...recovered };
+      const recovered = await recover(c);
+      return { stopped: stopped.every(result => result.status === "fulfilled" && result.value.stopped !== false) || recovered.cleaned, ...recovered };
     }
+    if (portsPromise) { const recovered = await recover(c); return { stopped: recovered.cleaned, ...recovered }; }
     return { stopped: true, cleaned: true };
   }
   return {
+    async prerequisites() {
+      const p = await ports();
+      if (p.identities.nodeVersion !== "24.14.0") throw Error("Windows Run requires its pinned Node 24.14.0 prerequisite.");
+      return structuredClone(p.identities);
+    },
     async run(c, context, plan, authorize, signal) {
       context = structuredClone(context); plan = structuredClone(plan);
       if (platform !== "win32" || !context || Object.keys(context).sort().join() !== "operationId,provider,scopeDigest" || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || typeof authorize !== "function"
@@ -116,10 +123,10 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
       if (closed || [...resources.values()].some(resource => resource.compartment === c)) throw Error("Wait for the current owned Windows Run; no concurrent replacement was started.");
       const id = context.operationId, operationKey = key(c, id), planDigest = scopeHash(plan), resource = { compartment: c, controller: new AbortController(), consumerReleased: false, done: null };
       resources.set(operationKey, resource); seen.add(c);
-      const check = async () => { resource.lease?.assert(); if (closed || resource.controller.signal.aborted || signal?.aborted || !await isActive(c)) throw Error("This exact Windows Run was stopped or its workspace changed."); await store.authorize(c, { provider: context.provider }); await authorize(); resource.lease?.assert(); };
+      const check = async () => { resource.lease?.assert(); if (closed || resource.controller.signal.aborted || signal?.aborted || !await isActive(c) || resource.reserved === true && (await get(c, id))?.stopRequestedAt !== undefined) throw Error("This exact Windows Run was stopped or its workspace changed."); await store.authorize(c, { provider: context.provider }); await authorize(); resource.lease?.assert(); };
       resource.done = store.withResourceLock("repository-execution", runLease(c), async lease => {
         resource.lease = lease;
-        let reserved = false, result, p;
+        let reserved = false, result, p, pollTimer, polling = false;
         try {
           lease.assert(); await check(); p = await ports(); if (p.identities.nodeVersion !== "24.14.0") throw Error("Windows Run requires its pinned Node 24.14.0 prerequisite; no runtime was downloaded or substituted.");
           const prior = await get(c, id);
@@ -130,7 +137,13 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           await p.sessions.recover(c);
           if ((await store.snapshot(c)).repositoryWindowsRuns?.some(row => row.cleanupPending)) throw Error("Reconcile the existing Windows Run's native owners and storage before another run.");
           const loaded = await loadWindowsReviewedRun({ ...plan, recipeRuntimeSha256: p.identities.recipeRuntime.sha256 }); await check();
-          await store.update(c, "windows-run-reserve", state => { const rows = state.repositoryWindowsRuns ?? []; if (rows.some(row => row.operationId === id || row.cleanupPending)) throw Error("The Windows Run reservation changed."); state.repositoryWindowsRuns = [...rows.slice(-32), { schema, ...context, planDigest, status: "executing", phase: "reserved", cleanupPending: true, createdAt: now() }]; }); reserved = true;
+          await store.update(c, "windows-run-reserve", state => { const rows = state.repositoryWindowsRuns ?? []; if (rows.some(row => row.operationId === id || row.cleanupPending)) throw Error("The Windows Run reservation changed."); state.repositoryWindowsRuns = [...rows.slice(-32), { schema, ...context, planDigest, status: "executing", phase: "reserved", cleanupPending: true, createdAt: now() }]; }); reserved = true; resource.reserved = true;
+          pollTimer = setInterval(async () => {
+            if (polling) return; polling = true;
+            try { const row = await get(c, id); if (!row || row.stopRequestedAt !== undefined) resource.controller.abort(); }
+            catch { resource.controller.abort(); }
+            finally { polling = false; }
+          }, 500); pollTimer.unref?.();
           const input = await p.inputs.prepare(c, context, { repositoryRoot: plan.repositoryRoot, sourceIdentity: plan.sourceIdentity, inputFiles: loaded.manifest.inputFiles }, check); await check();
           await update(c, id, "windows-run-inputs-ready", row => { row.phase = "inputs"; });
           const tools = await p.tools.prepare(c, context, { expectedSha256: p.identities.helperSha256 }, check); await tools.assertCurrent(); await check();
@@ -153,6 +166,7 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           if (reserved) await update(c, id, "windows-run-unconfirmed", row => { row.status = "outcome-unconfirmed"; }).catch(() => {});
           throw error;
         } finally {
+          clearInterval(pollTimer);
           resource.consumerReleased = true;
           if (reserved && p) await cleanup(c, id, p, lease).catch(() => ({ cleaned: false }));
         }
@@ -160,6 +174,15 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
       return resource.done;
     },
     recover, stopCompartment,
+    async stopOperation(c, id) {
+      const row = await get(c, id);
+      if (!row || row.schema !== schema) return { accepted: false, stopped: false };
+      await update(c, id, "windows-run-cancel-requested", row => { row.stopRequestedAt ??= now(); });
+      const resource = resources.get(key(c, id));
+      if (resource) { resource.controller.abort(); await stopCompartment(c); }
+      else await recover(c);
+      return { accepted: true, stopped: (await get(c, id))?.cleanupPending === false, originalOutcomeUnchanged: true };
+    },
     async list(c) { return ((await store.snapshot(c)).repositoryWindowsRuns ?? []).map(row => ({ operationId: row.operationId, scopeDigest: row.scopeDigest, status: row.status, phase: row.phase, cleanupPending: row.cleanupPending, result: row.result ?? null, providerTaskCompletionVerified: false })); },
     async close() { closed = true; const stopped = await Promise.all([...seen].map(stopCompartment)); if (portsPromise) { const p = await ports(); const results = await Promise.allSettled([p.sessions.close(), p.inputs.close(), p.tools.close(), p.images.close()]); if (results.some(result => result.status === "rejected") || stopped.some(result => !result.stopped)) throw Error("A Windows Run native owner remains unconfirmed; preserve its exact resources."); } }
   };
