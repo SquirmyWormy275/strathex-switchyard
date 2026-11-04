@@ -139,6 +139,7 @@ internal static class Program
         if (args.SequenceEqual(new[] { "--windows-storage-broker" })) return OperatingSystem.IsWindows() ? WindowsStorageBroker.Run() : 2;
         if (args.SequenceEqual(new[] { "--windows-storage-broker-service" })) return OperatingSystem.IsWindows() ? WindowsStorageBrokerService.Run() : 2;
         if (args.SequenceEqual(new[] { "--runtime-command" })) return RuntimeCommandRunner.Run();
+        if (args.SequenceEqual(new[] { "--runtime-package-metadata" })) return OperatingSystem.IsWindows() ? RuntimePackageMetadata.Run() : 2;
         if (args.SequenceEqual(new[] { "--runtime-command-status" })) return RuntimeCommandRunner.ReadStatus();
         if (args.SequenceEqual(new[] { "--keyboard-indicators" })) return ReadKeyboardIndicators();
         if (args.Length != 0) return 2;
