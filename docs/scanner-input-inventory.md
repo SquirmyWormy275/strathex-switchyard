@@ -43,7 +43,12 @@ no granted authority, task/account/revision drift and verified probe cleanup.
 Thirty-four surrounding authority, ignored-input, runner and package cases pass,
 with type checking. The new file also passes its normal isolated group with
 verified child cleanup (`isolated-test-56f81042-a616-4957-85a1-44d15d9a8152.json`).
-Installed acceptance of the new preview remains pending.
+The first installed verifier failed after the preview because it incorrectly
+required an empty receipt journal despite three legitimate feed-maintenance
+receipts. That failed outcome is retained in
+`installed-shield-baseline-1793862918331.json`; original user state was restored,
+no scanner program or model prompt ran. The verifier now compares the journal
+before/after inventory. Fresh installed acceptance remains pending.
 
 For a synthetic installed demonstration after updating to this source, run:
 
