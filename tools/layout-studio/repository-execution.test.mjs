@@ -29,7 +29,9 @@ async function fixture(t,{native=false,hold=false}={}) {
 }
 async function settled(f,id){const deadline=Date.now()+10000;let status;while(Date.now()<deadline){status=await f.execution.status("personal",id);if(status.nativeStatus==="settled"&&!status.stagingCleanupPending)return status;await new Promise(r=>setTimeout(r,20));}throw Error("Owned execution did not settle within its expected proof bound: "+JSON.stringify(status));}
 test("reviewed execution uses separate action authority, approval, checkpoint, budget and duplicate receipt boundaries",async t=>{
-  const f=await fixture(t),before=await f.run("rev-parse","HEAD"),review=await f.execution.review("personal",f.proposed);
+  const f=await fixture(t),before=await f.run("rev-parse","HEAD");
+  await f.store.update("personal","synthetic-explicit-host-observation",s=>{s.observations=[{id:"host-proof",status:"recording",sources:["host-action-events"],exclusions:[],events:[],updatedAt:f.now()}];});
+  const review=await f.execution.review("personal",f.proposed);
   assert.equal(review.review.executionPolicy.network,"denied");assert.equal(review.review.executionPolicy.hostRepositoryWritten,false);
   for(const bad of [{...f.proposed,requestId:randomUUID(),command:"untrusted"},{...f.proposed,requestId:randomUUID(),manifestPath:"../outside"},{...f.proposed,requestId:randomUUID(),operationScopeDigest:"a".repeat(64)}])await assert.rejects(f.execution.review("personal",bad));
   await assert.rejects(f.execution.apply("personal",{requestId:f.proposed.requestId,token:randomUUID()}),/approval/);assert.equal(f.effects(),0);
@@ -37,7 +39,9 @@ test("reviewed execution uses separate action authority, approval, checkpoint, b
   const status=await settled(f,f.proposed.requestId);assert.equal(status.nativeExitVerified,true);assert.equal(status.output,"synthetic program output");
   assert.equal(status.status,"settled");assert.equal(status.outcome.status,"running","terminal observation preserves the original admission result");
   const snapshot=await f.store.snapshot("personal"),row=snapshot.repositoryExecutionReviews[0];assert.ok(row.checkpoint);assert.equal(row.operationId,result.operationId);assert.equal(snapshot.repositoryExecutionJournal.some(e=>e.kind==="checkpoint.created"),true);
+  const events=snapshot.observations[0].events;assert.equal(events[0].phase,"host-action-prepared");assert.ok(events.every(e=>e.intent==="run_target"&&e.provenance==="switchyard-local-host-action"&&e.taskCompletionVerified===false));assert.equal(JSON.stringify(events).includes(f.root),false);
   assert.equal((await f.execution.apply("personal",input)).replayed,true);assert.equal(f.effects(),1);assert.equal(await f.run("rev-parse","HEAD"),before);assert.equal(await readFile(join(f.root,"task.txt"),"utf8"),"reviewed\n");
+  assert.deepEqual((await f.store.snapshot("personal")).observations[0].events,events);
   const stage=snapshot.repositoryExecutionStaging[0];assert.equal(stage.cleanupPending,false);await assert.rejects(access(stage.path),{code:"ENOENT"});
 });
 test("commit-only grants cannot authorize runs and changed inputs or revoked execution approvals cannot start programs",async t=>{

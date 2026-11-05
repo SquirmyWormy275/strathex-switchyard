@@ -7,10 +7,13 @@ import { windowsExecutionFixture as fixture } from "./test-support/windows-execu
 
 // The shared fixture opens no VM, account or keyboard.
 test("Studio Windows admission uses the exact task grant, one-use review, checkpoint, budget and protected terminal receipt",async t=>{
- const f=await fixture(t),head=await f.run("rev-parse","HEAD"),review=await f.execution.review("personal",f.proposed);assert.equal(review.review.engine,"windows-sandbox");assert.equal(review.review.executionPolicy.temporaryBytes,67108864);
+ const f=await fixture(t),head=await f.run("rev-parse","HEAD");
+ await f.store.update("personal","synthetic-explicit-host-observation",s=>{s.observations=[{id:"host-proof",status:"recording",sources:["host-action-events"],exclusions:[],events:[],updatedAt:f.now()}];});
+ const review=await f.execution.review("personal",f.proposed);assert.equal(review.review.engine,"windows-sandbox");assert.equal(review.review.executionPolicy.temporaryBytes,67108864);
  await assert.rejects(f.execution.apply("personal",{requestId:f.proposed.requestId,token:randomUUID()}),/approval/);assert.equal(f.effects(),0);
  const request={requestId:f.proposed.requestId,token:review.confirmation.token},result=await f.execution.apply("personal",request);assert.equal(result.status,"completed",JSON.stringify(result));assert.equal(result.providerTaskCompletionVerified,false);assert.equal(result.nativePermissionsChanged,false);assert.equal(f.effects(),1);
  const status=await f.execution.status("personal",f.proposed.requestId);assert.equal(status.nativeExitVerified,true);assert.equal(status.stagingCleanupPending,false);assert.equal(status.outcome.status,"completed");assert.equal((await f.execution.apply("personal",request)).replayed,true);assert.equal(f.effects(),1);
+ const events=(await f.store.snapshot("personal")).observations[0].events;assert.deepEqual(events.map(e=>[e.phase,e.status]),[["host-action-prepared","prepared"],["host-action-result-recorded","completed"]]);assert.ok(events.every(e=>e.intent==="run_target"&&e.provenance==="switchyard-local-host-action"&&e.taskCompletionVerified===false));assert.equal(JSON.stringify(events).includes(f.root),false);
  assert.equal(await f.run("rev-parse","HEAD"),head);assert.equal(await readFile(join(f.root,"task.txt"),"utf8"),"reviewed\n");
 });
 test("shell fields, absent file ownership, changed inputs and replacement prerequisites cannot reach Windows startup",async t=>{

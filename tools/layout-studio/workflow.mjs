@@ -42,5 +42,5 @@ export function observationSummary(session) {
   const suggestions = [];
   if (byKind.handoff?.count) suggestions.push({ question: "Could these handoffs share one reviewable context packet?", evidence: `${byKind.handoff.count} marked handoffs`, provenance: "heuristic suggestion; user must confirm intent" });
   if (byKind.interruption?.count || byKind.resume?.count) suggestions.push({ question: "Would one named resume step make interruptions easier to recover from?", evidence: `${byKind.interruption?.count ?? 0} marked interruptions; ${byKind.resume?.count ?? 0} resumes`, provenance: "heuristic suggestion; no measured time saving" });
-  return { id: session.id, status: session.status, events: session.events.length, byKind, focusCategories: session.focusCategories ?? {}, suggestions, boundary: "Focus categories, deliberate marks and agent metadata retain their own provenance. They do not establish intent, verified task completion or measured time savings." };
+  return { id: session.id, status: session.status, events: session.events.length, byKind, focusCategories: session.focusCategories ?? {}, suggestions, boundary: "Focus categories, deliberate marks, agent metadata and local host-action metadata retain their own provenance. They do not establish intent, verified task completion or measured time savings." };
 }

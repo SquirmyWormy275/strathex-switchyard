@@ -1,6 +1,7 @@
 /** The control-plane journal lives inside the existing locked AEAD compartment. */
 import { randomUUID } from "node:crypto";
 import { journalEntryHash, stableJson } from "../../packages/control-plane/src/store.ts";
+import { appendHostActionObservation } from "./host-action-observation.mjs";
 function verified(entries) {
   if (!Array.isArray(entries) || entries.length > 8192) throw new Error("The protected repository effect journal is invalid or full.");
   let previous;
@@ -23,7 +24,9 @@ export function repositoryEffectTransaction(state, domain, { now = Date.now, rec
       const entry = { schemaVersion: 1, sequence: (previous?.sequence ?? 0) + 1, id: randomUUID(), kind, at: new Date(now()).toISOString(), payload: structuredClone(payload), ...(previous ? { previousHash: previous.hash } : {}) };
       entry.hash = journalEntryHash(entry);
       if (state[field].length >= 8192 || Buffer.byteLength(stableJson([...state[field], entry])) > 2 * 1024 * 1024) throw new Error("The protected repository effect journal is full; prior effects were preserved.");
-      state[field].push(entry); return structuredClone(entry);
+      state[field].push(entry);
+      appendHostActionObservation(state, domain, entry);
+      return structuredClone(entry);
     }
   };
 }
